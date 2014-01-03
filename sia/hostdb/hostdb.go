@@ -2,34 +2,54 @@ package hostdb
 
 import (
 	// "crypto/rand"
-	// "errors"
-	// "math/big"
+	"errors"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
-	// "github.com/NebulousLabs/Sia/sia"
 )
 
 // Need to be easily able to swap hosts in and out of an active and inactive
 // list.
 type HostDatabase struct {
-	activeHosts   *hostNode
-	inactiveHosts map[string]*hostNode
+	hostTree *hostNode
+	activeHosts map[string]*hostNode
+	inactiveHosts map[string]*HostEntry
 	sync.RWMutex
 }
 
 // New returns an empty HostDatabase.
 func New() (hdb *HostDatabase) {
 	hdb = &HostDatabase{
-		inactiveHosts: make(map[string]*hostNode),
+		activeHosts: make(map[string]*hostNode),
+		inactiveHosts: make(map[string]*hostEntry),
 	}
 	return
 }
 
-// TODO: Implement this.
 func (hdb *HostDatabase) Info() ([]byte, error) {
 	return nil, nil
+}
+
+func (hdb *HostDatabase) Insert(entry *HostEntry) error {
+	_, hostNode := hdb.hostTree.insert(entry)
+	hdb.activeHosts[entry.ID] = hostNode
+}
+
+func (hdb *HostDatabase) Remove(id string) error {
+	node, exists := activeHosts[id]
+	if !exists {
+		_, exists := inactiveHosts[id]
+		if exists {
+			delete(inactiveHosts, id)
+			return
+		} else {
+			return errors.New("id not found in host database")
+		}
+	}
+	delete(activeHosts, id)
+	node.remove()
+	return
 }
 
 func (hdb *HostDatabase) Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) (err error) {

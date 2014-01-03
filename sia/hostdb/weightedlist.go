@@ -32,32 +32,34 @@ func (hn *hostNode) createNode(entry *HostEntry) *hostNode {
 
 // insert inserts a host entry into the node. insert is recursive. The value
 // returned is the number of nodes added to the tree, always 1 or 0.
-func (hn *hostNode) insert(entry *HostEntry) int {
+func (hn *hostNode) insert(entry *HostEntry) (nodesAdded int, newNode *hostNode) {
 	hn.weight += entry.Weight()
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
 	if hn.hostEntry == nil {
 		hn.hostEntry = entry
-		return 0
+		newNode = hn
+		return
 	}
 
 	// Insert the element into the lightest side.
-	var nodesAdded int
 	if hn.left == nil {
 		hn.left = hn.createNode(entry)
 		nodesAdded = 1
+		newNode = hn.left
 	} else if hn.right == nil {
 		hn.right = hn.createNode(entry)
 		nodesAdded = 1
+		newNode = hn.right
 	} else if hn.left.weight < hn.right.weight {
-		nodesAdded = hn.left.insert(entry)
+		nodesAdded, newNode = hn.left.insert(entry)
 	} else {
-		nodesAdded = hn.right.insert(entry)
+		nodesAdded, newNode = hn.right.insert(entry)
 	}
 
 	hn.count += nodesAdded
-	return nodesAdded
+	return
 }
 
 // remove takes a node and removes it from the tree by climbing through the
