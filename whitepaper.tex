@@ -58,6 +58,7 @@ There are 3 types of transactions.
 	\item Money Transfer
 	\item Host Announcement
 	\item File Contract
+	\item Proof of Storage
 \end{enumerate}
 
 The type field does different things for each type of transaction.
@@ -130,7 +131,7 @@ Money transfers are the generic transaction.
 They have no type field.
 
 \section{Host Announcement}
-Host announcements have a 1kb type field that arbitrary data can be placed in.
+Host announcements have a type field up to 1kb that can be used for arbitrary data.
 
 This is to tell potential clients about themselves, what files they store (which can be viewed in the file contracts), and any policy information.
 It's completely up to the hosts and clients to figure out how to use this 1kb in a useful way.
@@ -138,6 +139,62 @@ It's completely up to the hosts and clients to figure out how to use this 1kb in
 Most host announcements will likely consist of only a transaction fee, though some may perhaps also create a timelocked output as a demonstration of their committment to being a host.
 
 \section{File Contracts}
+File contracts are an agreement between a host and an uploader that the host will store a file.
+
+The inputs on the transaction are placed into a 'reward pool', which are conditionally sent to various outputs.
+
+The type field for a file contract contains:
+\begin{enumerate}
+	\item A merkle root hash of the file being stored.
+	\item The size of the underlying file.
+	\item A public key for the host to do file proofs against.
+	\item An up to 1kb field for arbitrary data.
+	\item A file proof frequency, maximum of 1 every block, minimum of 1 every 2016 blocks.
+	\item A reward to be split between some outputs if a file proof is found.
+	\item A reward to be split between some outputs if a file proof is not found.
+	\item A reward to be split between some outputs if a file proof is not found for N consecutive cylces.
+	\item A field indicating how the first reward scales. (??)
+	\item A field indicating how the second reward scales. (??)
+	\item A field indicating how the third reward scales. (??)
+\end{enumerate}
+
+The frequency gives a window in which the host can submit a storage proof.
+If the frequency is 1 every 20 blocks, then for each non-overlapping set of 20 blocks, a host can put a proof-of-storage in \textbf{any} of them.
+
+If the proof of storage appears, then some of the reward pool (which starts as the sum of all the inputs) is moved into the R1 outputs.
+Presumably, the R1 outputs all belong to the machines hosting the file.
+
+If the proof of storage does not appear in a certain window, then some of the reward pool is moved to the R2 outputs.
+Presumably, these outputs belong to the file uploader, and this acts as a refund.
+
+If the proof of storage does not appear for N consecutive windows, then some of the reward pool is moved to the R3 outputs.
+Presumably, this is a bigger reward, and it goes to the uploader, and acts as a larger refund, or even a host penalty.
+
+The scaling factors are currently underspecified, but will likely be a set of flags that enable contracts to feature increasingly painful penalities to the hosts as more storage proofs are missed.
+
+The file id is defined by the hash of the transaction announcing the file.
+
+The outputs of the file are not spendable until the reward pool has been fully distributed.
+
+\section{Proof of Storage}
+Each proof of storage transaction targets a specific file.
+A storage proof does not need to have any inputs or outputs.
+
+A storage proof has:
+\begin{enumerate}
+	\item A file id
+	\item A merkle proof proving the active index for the file.
+	\item A signature of the file id and the merkle proof concatenated, using the public key found in the file contract transaction.
+\end{enumerate}
+
+The merkle proof is performed on a random leaf in the file being stored.
+This 'random' leaf is chosen deterministically using the hash of the block immediately before the proof window as a seed.
+This random number could be manipulated using a block witholding attack or a 51\% attack, but where an attacker only has one third hashing power, the chances of pulling off a worthwhile attack are slim.
+Especially if there are many proofs that need to be performed, this method of generating random numbers is strong enough for most files because storage is cheap.
+
+It should be noted that there is another attack, the "closed window" attack.
+If a miner refuses to add a storage proof transaction to a block for enough blocks in a row, then the file host will not be able to complete the proof of storage even though they are online and have the file.
+Once again this is not a very likely attack because there are many miners, and hosts are free to refuse to hold any file where the storage window is less than 20 blocks.
 
 \section{Tweaks}
 6 minute block time.
