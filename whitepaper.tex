@@ -118,18 +118,36 @@ The signature covers:
 \begin{enumerate}
 	\item The Transaction Version
 	\item The Transaction Type
+	\item The Transaction Type Field
 	\item The Signature Timelock
 	\item The Signature Input ID
 	\item The Signature Signature Array
 	\item Every input and output specified by the signature array
 \end{enumerate}
 
+\section{Money Transfers}
+Money transfers are the generic transaction.
+They have no type field.
+
+\section{Host Announcement}
+Host announcements have a 1kb type field that arbitrary data can be placed in.
+
+This is to tell potential clients about themselves, what files they store (which can be viewed in the file contracts), and any policy information.
+It's completely up to the hosts and clients to figure out how to use this 1kb in a useful way.
+
+Most host announcements will likely consist of only a transaction fee, though some may perhaps also create a timelocked output as a demonstration of their committment to being a host.
+
+\section{File Contracts}
+
 \section{Tweaks}
 6 minute block time.
 
 Difficulty adjustments every block. (note - dishonest difficulty attack - ask wizards if there is a fix)
+Max adjustments of 1.0005x per block, corresponding to a max change of 5.3x every 2 weeks, compared to Bitcoin's clamp at 4x every 2 weeks.
 
 Block subsidy adjustments every block.
+Inflation initially be very high, around 25\% in year two.
+By year 4, inflation will taper to 5\% anually, and it will stay at that rate permenently.
 
 \section{Conclusion}
 
