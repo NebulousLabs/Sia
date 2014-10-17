@@ -19,6 +19,7 @@ luke@nebulouslabs.com
 
 \subsection*{Abstract}
 Sia is a blockchain-based cryptosystem that enables decentralized file storage.
+This paper serves as both a high level overview and as a specification.
 
 \section{Introduction}
 Decentralized storage is good for the health of the Internet.
@@ -30,10 +31,10 @@ Altcoin is needed for enforcing contracts that require storage proofs.
 \section{Block Structure}
 Block Header:
 \begin{enumerate}
-    \item Version
-    \item Previous Block Hash
-    \item Timestamp
-    \item Block Hash
+	\item Version
+	\item Previous Block Hash
+	\item Timestamp
+	\item Block Hash
 \end{enumerate}
 
 \[
@@ -43,22 +44,85 @@ Block Hash = H(Nonce || Transactions)
 \section{Transactions}
 Each transaction:
 \begin{enumerate}
-    \item Version
-    \item Input List
-    \item Output List
-    \item Transaction Signatures
+	\item Version
+	\item Type
+	\item Input List
+	\item Output List
+	\item Type Field
+	\item Transaction Signatures
 \end{enumerate}
+
+\subsection{Type}
+There are 3 types of transactions.
+\begin{enumerate}
+	\item Money Transfer
+	\item Host Announcement
+	\item File Contract
+\end{enumerate}
+
+The type field does different things for each type of transaction.
 
 \subsection{Inputs}
 There are up to 16 inputs.
 
 Each Input:
 \begin{enumerate}
-    \item Previous Output ID
-    \item Previous Output Spend Conditions
+	\item Previous Output ID
+	\item Previous Output Spend Conditions
 \end{enumerate}
 
 \subsection{Outputs}
+There are up to 16 outputs.
+
+Each Output:
+\begin{enumerate}
+	\item Hash of Output Spend Conditions.
+\end{enumerate}
+
+Outputs are identified by id.
+The output id is derived from the transaction that the output appeared in.
+The output id is derived by taking H(first valid input id || output index).
+The input id is valid if the input spends a previously existing output or is a block subsidy.
+
+\subsection{Spend Conditions}
+\begin{enumerate}
+	\item Timelock
+	\item Number of Signatures Required
+	\item Number of Valid Public Keys
+	\item Each Valid Public Key
+\end{enumerate}
+
+The timelock prevents an output from being spent until a certain time.
+
+The number of signatures and public keys creates an m-of-n multisig, where m and n can be as low as 1 and as high as 32.
+
+\subsection{Signatures}
+There can be a maximum of 32 * 16 signatures, 32 signatures per input for 16 total inputs.
+
+Each Signature:
+\begin{enumerate}
+	\item Timelock
+	\item Input ID
+	\item Signature Array
+	\item Actual Signature
+\end{enumerate}
+
+The timelock prevents a signature from being valid until a certain time.
+The signature array indicates what is being signed.
+It is a 32 bit array, one bit for each input and one bit for each output.
+This prevents certain inputs and outputs within the transaction from being changed without invalidating the signature.
+
+The input id must be an input in the transaction.
+
+The signature covers:
+\begin{enumerate}
+	\item The Transaction Version
+	\item The Transaction Type
+	\item The Signature Timelock
+	\item The Signature Input ID
+	\item The Signature Signature Array
+	\item Every input and output specified by the signature array
+\end{enumerate}
 
 \section{Tweaks}
 6 minute block time.
