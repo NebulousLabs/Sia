@@ -1,0 +1,79 @@
+\documentclass[twocolumn]{article}
+
+\begin{document}
+\frenchspacing
+
+\title{Sia: Simple Decentralized Storage}
+
+\author{
+{\rm David Vorick}\\
+Nebulous Inc.\\
+david@nebulouslabs.com
+\and
+{\rm Luke Champine}\\
+Nebulous Inc.\\
+luke@nebulouslabs.com
+}
+
+\maketitle
+
+\subsection*{Abstract}
+Sia is a blockchain-based cryptosystem that enables decentralized file storage.
+
+\section{Introduction}
+Decentralized storage is good for the health of the Internet.
+
+Sia is an altcoin that will be merge-mined with Bitcoin.
+
+Altcoin is needed for enforcing contracts that require storage proofs.
+
+\section{Block Structure}
+Block Header:
+\begin{enumerate}
+    \item Version
+    \item Previous Block Hash
+    \item Timestamp
+    \item Block Hash
+\end{enumerate}
+
+\[
+Block Hash = H(Nonce || Transactions)
+\]
+
+\section{Transactions}
+Each transaction:
+\begin{enumerate}
+    \item Version
+    \item Input List
+    \item Output List
+    \item Transaction Signatures
+\end{enumerate}
+
+\subsection{Inputs}
+There are up to 16 inputs.
+
+Each Input:
+\begin{enumerate}
+    \item Previous Output ID
+    \item Previous Output Spend Conditions
+\end{enumerate}
+
+\subsection{Outputs}
+
+\section{Tweaks}
+6 minute block time.
+
+Difficulty adjustments every block. (note - dishonest difficulty attack - ask wizards if there is a fix)
+
+Block subsidy adjustments every block.
+
+\section{Conclusion}
+
+\onecolumn
+\begin{bibliography}{2}
+
+\bibitem{}
+
+\end{bibliography}
+
+\end{document}
