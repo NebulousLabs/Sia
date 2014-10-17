@@ -196,6 +196,32 @@ It should be noted that there is another attack, the "closed window" attack.
 If a miner refuses to add a storage proof transaction to a block for enough blocks in a row, then the file host will not be able to complete the proof of storage even though they are online and have the file.
 Once again this is not a very likely attack because there are many miners, and hosts are free to refuse to hold any file where the storage window is less than 20 blocks.
 
+\section{Being a Host}
+As a host, you would make an announcement using a host announcement and follow some standard for organizing the announcement.
+This would contain information about how to contact you, your typical price and penaltys, and some cryptographic indication of which files you are already storing.
+
+Clients would then contact you, requesting you hold onto files.
+You agree to hold onto files, but only after they have given you the whole file.
+
+You use microchannel payments to charge the clients for downloading the file.
+
+As a host, you are protected against files you don't want because you don't have to agree to store anything.
+
+\section{Being an Uploader}
+You break the file into a bunch of erasure coded pieces, using M of N erasure coding.
+You encrypt the N pieces individually and upload them each to a different host.
+
+You find hosts by scanning the host announcements and having some protocol for reading them.
+You create a pool of hosts that fit your uploading criteria, and contact them at random weighted according to how much you trust them.
+The randomness protects you from malicious hosts and network instability.
+
+You upload the file to each of the hosts and they post a file contract agreeing to store them.
+You check in on the file every few months and do any repairs needed if hosts go offline.
+
+You use microchannel payments to negotiate downloads.
+You are protected against hosts holding your data hostage because you can just go to other hosts who are not holding it hostage.
+When data is available in many places, the places individually do not have much power over you.
+
 \section{Tweaks}
 6 minute block time.
 
