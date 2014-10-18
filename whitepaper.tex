@@ -28,19 +28,31 @@ Sia is an altcoin that will be merge-mined with Bitcoin.
 
 Altcoin is needed for enforcing contracts that require storage proofs.
 
-\section{Block Structure}
-Block Header:
-\begin{enumerate}
-	\item Version
-	\item Previous Block Hash
-	\item Timestamp
-	\item Nonce
-	\item Transactions Merkle Root
-\end{enumerate}
+\section{General Structure}
+Sia is going to be a cryptocurrency that is merge mined with Bitcoin.
+The general rules for mining blocks, handling orphan blocks, etc. will be the same as Bitcoin.
 
-Transactions are sorted by the numerical hash value, and then placed into a merkle tree.
+The major changes come to the way transactions work.
+The scripting system has been removed, instead being replaced by a general solution for doing multisigs.
+This reduces complexity and attack surface.
 
-The Nonce is a 256 bit field.
+3 new types of transactions have been added to Sia, which is what justifies the need for an altcoin instead of using the Bitcoin protocol itself.
+
+The first is a host announcement, which is essentially a 1kb block of arbitrary data that file hosts use to announce themselves to the network.
+This creates a decentralized ledger that clients can use to figure out who is available for providing storage to the network.
+This could be achieved off-blockchain, but that potentially creates centralization.
+
+The second is a file contract, which declares the intention of a host to store a file of a certain size and hash.
+Some combination of inputs creates a contract fund, which is used to pay the host and refund the client.
+A host agrees to submit a proof-of-storage to the blockchain with some frequency.
+A contract fund pays the host for successful proof of storage, and pays the client (a refund) if the proof of storage is not successful.
+
+The third is a proof of storage, which is used by hosts to fulfill their file contract obligations.
+
+An example contract contains 2 inputs, 12 coins from the client and 12 coins from the host.
+The host is required to provide a proof of storage once every month, getting paid one coin for each proof.
+If the host ever misses a month, then all remaining coins are rewarded to the client.
+When the 12th storage proof is provided, all remaining coins are rewarded to the host.
 
 \section{Transactions}
 Each transaction:
@@ -155,7 +167,8 @@ The type field for a file contract contains:
 	\item A file proof frequency, maximum of 1 every block, minimum of 1 every 2016 blocks.
 	\item A reward to be split between some outputs if a file proof is found.
 	\item A reward to be split between some outputs if a file proof is not found.
-	\item A reward to be split between some outputs if a file proof is not found for N consecutive cylces.
+	\item A reward to be split between some outputs if a file proof is not found for M consecutive cylces.
+	\item A set of outputs to send all remaining coins to after N blocks, finishing the contract.
 	\item A field indicating how the 3 rewards scale (left for future).
 \end{enumerate}
 
@@ -198,6 +211,14 @@ It should be noted that there is another attack, the "closed window" attack.
 If a miner refuses to add a storage proof transaction to a block for enough blocks in a row, then the file host will not be able to complete the proof of storage even though they are online and have the file.
 Once again this is not a very likely attack because there are many miners, and hosts are free to refuse to hold any file where the storage window is less than 20 blocks.
 
+\section{What's with all the arbitrary data?}
+These are sections left for hosts to make statements about their storage and policies, and for hosts to associate themselves with certain files using public keys.
+Because the data has no rules, it's simple enough for lightweight clients to only know the hash of the arbitrary data, adding just 32 bytes to each transaction.
+One example is using public keys for a host to prove ownership of certain files, therefore also proving reliability and longevity.
+
+We may need to implement something that incentivizes miners to keep the full data and distribute it - it's how clients will be able to find hosts and files.
+Forcing miners to do storage proofs on this data to release a block may be sufficient.
+
 \section{Being a Host}
 As a host, you would make an announcement using a host announcement and follow some standard for organizing the announcement.
 This would contain information about how to contact you, your typical price and penaltys, and some cryptographic indication of which files you are already storing.
@@ -224,13 +245,20 @@ You use microchannel payments to negotiate downloads.
 You are protected against hosts holding your data hostage because you can just go to other hosts who are not holding it hostage.
 When data is available in many places, the places individually do not have much power over you.
 
-\section{What's with all the arbitrary data?}
-These are sections left for hosts to make statements about their storage and policies, and for hosts to associate themselves with certain files using public keys.
-Because the data has no rules, it's simple enough for lightweight clients to only know the hash of the arbitrary data, adding just 32 bytes to each transaction.
-One example is using public keys for a host to prove ownership of certain files, therefore also proving reliability and longevity.
+\section{Uptime Incentives}
+The storage proofs contain no provisions that require constant uptime.
+There are also no provisions that require hosts to upload files to clients.
 
-We may need to implement something that incentivizes miners to keep the full data and distribute it - it's how clients will be able to find hosts and files.
-Forcing miners to do storage proofs on this data to release a block may be sufficient.
+However, hosts and clients can create micropayment channels to facilitate downloads.
+The client agrees to pay some worthwhile fee to the host every time they download the file.
+If the host is not online, the client will pay one of the redundant hosts that are online.
+
+Hosts are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
+If clients behaviorally pay hosts well, then hosts are more heavily incentivized to be online all the time.
+Clients can also more heavily reward greater throughput and lower latency.
+Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online.
+
+Simplified, uptime incentives do not rely on the structure of the protocol, they rely on the behavior of clients.
 
 \section{Tweaks}
 6 minute block time. We feel that the reduction in mining variance is worth the increased susceptibility to various mining attacks - as blocks can be expected to propagate in under 20 seconds, 6 minute block time is still significant compared to block propagation time.
@@ -247,7 +275,7 @@ Max block size will be initially set at 256kb and increased by 256kb every 3 mon
 Then it will increase by 25\% anually.
 
 \section{Conclusion}
-Sia is simple. Sia is superior.
+Sia is a minimalist financial protocol designed to enable decentralized storage.
 
 %\onecolumn
 %\begin{bibliography}{2}
