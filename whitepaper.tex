@@ -34,12 +34,13 @@ Block Header:
 	\item Version
 	\item Previous Block Hash
 	\item Timestamp
-	\item Block Hash
+	\item Nonce
+	\item Transactions Merkle Root
 \end{enumerate}
 
-\[
-Block Hash = H(Nonce || Transactions)
-\]
+Transactions are sorted by the numerical hash value, and then placed into a merkle tree.
+
+The Nonce is a 256 bit field.
 
 \section{Transactions}
 Each transaction:
@@ -53,7 +54,7 @@ Each transaction:
 \end{enumerate}
 
 \subsection{Type}
-There are 3 types of transactions.
+There are 4 types of transactions.
 \begin{enumerate}
 	\item Money Transfer
 	\item Host Announcement
@@ -82,8 +83,10 @@ Each Output:
 
 Outputs are identified by id.
 The output id is derived from the transaction that the output appeared in.
-The output id is derived by taking H(first valid input id || output index).
+The output id is derived by taking H(first valid input id $||$ output index).
 The input id is valid if the input spends a previously existing output or is a block subsidy.
+
+For example, in a transaction where only the third and fifth inputs add coins to the transaction, the id of the first output (index 0) is H(id of third input $||$ 0), and the id of the second output (index 1) is H(id of the third input $||$ 1).
 
 \subsection{Spend Conditions}
 \begin{enumerate}
@@ -131,7 +134,7 @@ Money transfers are the generic transaction.
 They have no type field.
 
 \section{Host Announcement}
-Host announcements have a type field up to 1kb that can be used for arbitrary data.
+Host announcements have a type field that is a hash of up to 1kb that can be used for arbitrary data.
 
 This is to tell potential clients about themselves, what files they store (which can be viewed in the file contracts), and any policy information.
 It's completely up to the hosts and clients to figure out how to use this 1kb in a useful way.
@@ -148,14 +151,12 @@ The type field for a file contract contains:
 	\item A merkle root hash of the file being stored.
 	\item The size of the underlying file.
 	\item A public key for the host to do file proofs against.
-	\item An up to 1kb field for arbitrary data.
+	\item An hash of up to 1kb of arbitrary data.
 	\item A file proof frequency, maximum of 1 every block, minimum of 1 every 2016 blocks.
 	\item A reward to be split between some outputs if a file proof is found.
 	\item A reward to be split between some outputs if a file proof is not found.
 	\item A reward to be split between some outputs if a file proof is not found for N consecutive cylces.
-	\item A field indicating how the first reward scales. (??)
-	\item A field indicating how the second reward scales. (??)
-	\item A field indicating how the third reward scales. (??)
+	\item A field indicating how the 3 rewards scale (left for future).
 \end{enumerate}
 
 The frequency gives a window in which the host can submit a storage proof.
@@ -170,7 +171,7 @@ Presumably, these outputs belong to the file uploader, and this acts as a refund
 If the proof of storage does not appear for N consecutive windows, then some of the reward pool is moved to the R3 outputs.
 Presumably, this is a bigger reward, and it goes to the uploader, and acts as a larger refund, or even a host penalty.
 
-The scaling factors are currently underspecified, but will likely be a set of flags that enable contracts to feature increasingly painful penalities to the hosts as more storage proofs are missed.
+The scaling factors will ideally give the uploader a choice for scaling penalties and rewards. Maybe the reward grows linearly as consecutive proofs are provided, and grows exponentially as consecutive proofs are not found. These will remain unimplemented for the time being.
 
 The file id is defined by the hash of the transaction announcing the file.
 
@@ -184,7 +185,8 @@ A storage proof has:
 \begin{enumerate}
 	\item A file id
 	\item A merkle proof proving the active index for the file.
-	\item A signature of the file id and the merkle proof concatenated, using the public key found in the file contract transaction.
+	\item A hash of up to 1kb field for arbitrary data.
+	\item A signature of H(the file id $||$ the merkle proof $||$ the arbitrary data), using the public key found in the file contract transaction.
 \end{enumerate}
 
 The merkle proof is performed on a random leaf in the file being stored.
@@ -222,8 +224,17 @@ You use microchannel payments to negotiate downloads.
 You are protected against hosts holding your data hostage because you can just go to other hosts who are not holding it hostage.
 When data is available in many places, the places individually do not have much power over you.
 
+\section{What's with all the arbitrary data?}
+These are sections left for hosts to make statements about their storage and policies, and for hosts to associate themselves with certain files using public keys.
+Because the data has no rules, it's simple enough for lightweight clients to only know the hash of the arbitrary data, adding just 32 bytes to each transaction.
+One example is using public keys for a host to prove ownership of certain files, therefore also proving reliability and longevity.
+
+We may need to implement something that incentivizes miners to keep the full data and distribute it - it's how clients will be able to find hosts and files.
+Forcing miners to do storage proofs on this data to release a block may be sufficient.
+
 \section{Tweaks}
-6 minute block time.
+6 minute block time. We feel that the reduction in mining variance is worth the increased susceptibility to various mining attacks - as blocks can be expected to propagate in under 20 seconds, 6 minute block time is still significant compared to block propagation time.
+Users are advised to wait for 10 confirmations instead of 6.
 
 Difficulty adjustments every block. (note - dishonest difficulty attack - ask wizards if there is a fix)
 Max adjustments of 1.0005x per block, corresponding to a max change of 5.3x every 2 weeks, compared to Bitcoin's clamp at 4x every 2 weeks.
@@ -231,6 +242,9 @@ Max adjustments of 1.0005x per block, corresponding to a max change of 5.3x ever
 Block subsidy adjustments every block.
 Inflation initially be very high, around 25\% in year two.
 By year 4, inflation will taper to 5\% anually, and it will stay at that rate permenently.
+
+Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
+Then it will increase by 25\% anually.
 
 \section{Conclusion}
 Sia is simple. Sia is superior.
