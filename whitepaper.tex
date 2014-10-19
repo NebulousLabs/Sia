@@ -104,6 +104,8 @@ The input id is valid if the input spends a previously existing output or is a b
 
 For example, in a transaction where only the third and fifth inputs add coins to the transaction, the id of the first output (index 0) is H(id of third input $||$ 0), and the id of the second output (index 1) is H(id of the third input $||$ 1).
 
+The difference between the inputs and outputs is given as a transaction fee to the miner.
+
 \subsection{Spend Conditions}
 \begin{enumerate}
 	\item Timelock
@@ -301,9 +303,29 @@ Then it will increase by 25\% anually.
 % \subsection{Permanent inflation}
 % \subsection{Locking Coins Down}
 
-% \section{Tweaks Under Consideration}
-% commiting to the summaries of the sia databases, instead of to the list of new transactions
-% a newish form of merge mining that makes it friendly for other protocols to jump on board and merge mine both us and Bitcoin and Namecoin
+\section{Under Consideration}
+\subsection{File Contract Penalty Scaling}
+The idea is to add a scaling factor to the file contract payouts to reward/punish consistent behavior.
+For example, you could have the penalty for missing a storage proof double every time that the penalty is missed.
+Or, you could have the reward for making a storage proof increase every time a storage proof is submitted.
+
+We are unclear on what might be the exact best way to accomplish this.
+
+\subsection{Committing to State}
+One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
+This would mean creating a structure for a database and hashing it.
+The database could be as simple as a series of structs, but there is a lot to consider when building this.
+We do not plan to have this in the beta, but are considering it for the 1.0.
+
+\subsection{Variance Enforced Merge Mining}
+Bitcoin enforces a number of leading 0s on a winning block.
+Sia could enforce something like a single leading 1, followed by a bunch of leading 0s.
+This creates the property that no hash is ever valid for both Bitcoin and Sia.
+
+The value to this is that the number of payouts a miner gets from finding blocks goes up.
+The total payout is still the same, but the number of payouts increases by the number of blocks that would have been valid for both.
+A block that solves the coin with the highest difficulty will always be valid for both blockchains.
+(I need to read more about merge mining before I publish this section)
 
 \section{Conclusion}
 Sia is a minimalist financial protocol designed to enable decentralized storage.
