@@ -36,30 +36,21 @@ We plan on having Sia be merge-mined with Bitcoin to minimize dilution of mining
 % Add references to Bitcoin here?
 % Add references to Bitcoin Whitepaper + Developers Guide? Another decent explanation of Bitcoin?
 
-Sia is going to be a cryptocurrency that is merge mined with Bitcoin.
-The general rules for mining blocks, handling orphan blocks, etc. will be the same as Bitcoin.
-
-The major changes come to the way transactions work.
-The scripting system has been removed, instead being replaced by a general solution for doing multisigs.
+The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
+Sia's primary departure from Bitcoin lies in its transactions.
+Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
+Sia opts instead to use an M-N multi-signature hash scheme for all transactions.
 This reduces complexity and attack surface.
 
-3 new types of transactions have been added to Sia, which is what justifies the need for an altcoin instead of using the Bitcoin protocol itself.
+Sia further extends multisig transactions to enable file storage on the network.
+Two extensions are needed to accomplish this: file contracts and storage proofs.
+File contracts declare the intention of a host to store a file with a certain size and hash.
+They specify that a host must periodically prove that they are still storing the file.
+Hosts accomplish this by submiting storage proof transactions to the network.
 
-The first is a host announcement, which is essentially a 1kb block of arbitrary data that file hosts use to announce themselves to the network.
-This creates a decentralized ledger that clients can use to figure out who is available for providing storage to the network.
-This could be achieved off-blockchain, but that potentially creates centralization.
-
-The second is a file contract, which declares the intention of a host to store a file of a certain size and hash.
-Some combination of inputs creates a contract fund, which is used to pay the host and refund the client.
-A host agrees to submit a proof-of-storage to the blockchain with some frequency.
-A contract fund pays the host for successful proof of storage, and pays the client (a refund) if the proof of storage is not successful.
-
-The third is a proof of storage, which is used by hosts to fulfill their file contract obligations.
-
-An example contract contains 2 inputs, 12 coins from the client and 12 coins from the host.
-The host is required to provide a proof of storage once every month, getting paid one coin for each proof.
-If the host ever misses a month, then all remaining coins are rewarded to the client.
-When the 12th storage proof is provided, all remaining coins are rewarded to the host.
+Backing each file contract is a contract fund.
+If a storage proof is valid, funds are sent to the host.
+If the proof is invalid (or missing), funds are instead sent to the client, in the manner of a refund.
 
 \section{Transactions}
 Each transaction:
