@@ -19,7 +19,6 @@ luke@nebulouslabs.com
 
 \subsection*{Abstract}
 Sia is a blockchain-based cryptosystem that enables decentralized file storage.
-This paper serves as both a high level overview and as a specification.
 
 \section{Introduction}
 We wish to create a decentralized cloud storage platform that is more powerful than the existing centralized storage platforms.
@@ -27,15 +26,12 @@ We use smart contracts and decentralized consensus as the foundation for our pla
 We start with a system very similar to Bitcoin and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
 The network automatically creates proof of storage challenges.
 
-Building on top of Bitcoin directly will not work because we need self-enforcing contracts for hosting files, something that is beyond Bitcoin's flexibility.
+Building on top of Bitcoin \cite{btc}, \cite{btcdg} directly will not work because we need self-enforcing contracts for hosting files, something that is beyond Bitcoin's flexibility.
 We have considered being a sidechain, but are not convinced that a sidechain offers sufficient security.
 We have chosen to make our own altcoin instead of using another altcoin such as Ethereum or Storj because we have not been sufficiently convinced that other altcoins are taking a secure approach.
 We plan on having Sia be merge-mined with Bitcoin to minimize dilution of mining power within the cryptocurrency ecosystem.
 
 \section{General Structure}
-% Add references to Bitcoin here?
-% Add references to Bitcoin Whitepaper + Developers Guide? Another decent explanation of Bitcoin?
-
 The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
 Sia's primary departure from Bitcoin lies in its transactions.
 Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
@@ -111,8 +107,6 @@ Each Signature:
 
 The timelock prevents a signature from being valid until a certain time.
 The signature array indicates what is being signed, which optionally allows for certain fields to be malleable.
-It is a 32 bit array, one bit for each input and one bit for each output, plus one bit for the transaction type, and one for the transaction type field.
-
 The input id must be an input in the transaction.
 
 The signature covers:
@@ -150,7 +144,7 @@ The type field for a file contract contains:
 	\item A challenge frequency.
 	\item A reward for successfully completing a proof, along with the recipient.
 	\item A reward for a missed proof, along with the recipient.
-	\item Number of consecutive missed proofs to terminate a contract, along with a recipient for all remaining input coins. (Unsuccessful termination)
+	\item Number of total missed proofs to terminate a contract, along with a recipient for all remaining input coins. (Unsuccessful termination)
 	\item Total duration of contract, along with a recipeint for all remaining input coins in the event of finishing the duration without triggering a termination. (Successful termination)
 \end{enumerate}
 
@@ -296,43 +290,42 @@ In short, clients choose a behavior that incentivizes hosts to be online.
 % \subsection{Locking Coins Down}
 
 \section{Under Consideration}
-\subsection{File Contract Penalty Scaling}
-The idea is to add a scaling factor to the file contract payouts to reward/punish consistent behavior.
-For example, you could have the penalty for missing a storage proof double every time that the penalty is missed.
-Or, you could have the reward for making a storage proof increase every time a storage proof is submitted.
+The primary foundation of Sia has been established in the above section.
+All other factors, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
 
-We are unclear on what might be the exact best way to accomplish this.
+Giving careful attention to \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
+We consider our knowledge to be currently insufficient to be certain about the security of any of these changes, which is why they are merely proposed.
+
+\subsection{Flexible Contract Penalities}
+Contracts are currently strict.
+There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
+Increased flexibility in the penalty schedule may be desirable.
 
 \subsection{Different Method for Proof of Storage}
-There's an article or two that I should link to.
+Solutions such as \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
 
 \subsection{Reduced Block Time}
-We are considering 6 minutes.
-Merchents would still be advised to wait for 1 hour of work; 10 confirmations.
-% Reference a paper here discussing difficulty, variance, propagation, etc.
-% Go into depth on the specific risks and rewards from adjusting the difficulty.
+We are comfortable reducing the block time to 5 minutes, with the primary goal being to reduce the variance with which a miner receives payment.
+A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as \cite{ibf} are enabling faster block propagation times.
 
-\subsection{Difficulty Adjustments Every Block}
-Difficulty adjustments every block. (note - dishonest difficulty attack - ask wizards if there is a fix)
-Max adjustments of 1.0005x per block, corresponding to a max change of 5.3x every 2 weeks, compared to Bitcoin's clamp at 4x every 2 weeks.
-% reference paper here...
+We believe that the risk induced by halving the block time is less than the benefit gained from the reduced incentive to join mining pools.
 
-\subsection{Subsidy Adjustments Every Block}
-Block subsidy adjustments every block.
-Inflation initially be very high, around 25\% in year two.
-By year 4, inflation will taper to 2.5\% anually, and it will stay at that rate permenently.
-% reference paper here, potentially talk about economics... or put that in another section?
+\subsection{More Frequent Difficulty Adjustments}
+We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
+Adjusting the difficulty every block is one option, and every 100 blocks is another option.
+
+\subsection{More Frequent Subsidy Adjustments}
+Increasing the frequency of the subsidy adjustment prevents problems like miner sudden miner dropoff.
+It smooths out the hashrate and gives people a more continuous sense of the economic state of the network.
 
 \subsection{Max Block Size Adjustment}
 Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
 Then it will increase by 25\% anually.
-% reference something here
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
-This would mean creating a structure for a database and hashing it.
-The database could be as simple as a series of structs, but there is a lot to consider when building this.
-We do not plan to have this in the beta, but are considering it for the 1.0.
+This would mean creating a structure for a database that represents the state of the network and hashing it.
+We could follow suggestions simliar to those presented in \cite{ubc}.
 
 \subsection{Variance Enforced Merge Mining}
 Bitcoin enforces a number of leading 0s on a winning block.
@@ -344,37 +337,69 @@ The total payout is still the same, but the number of payouts increases by the n
 A block that solves the coin with the highest difficulty will always be valid for both blockchains.
 (I need to read more about merge mining before I publish this section)
 
-\subsection{Stale Mining}
-Right now there are a decent amount of ways in Bitcoin to induce stale mining.
-Block witholding attacks for example.
-Awkward block timings for example (put the block on the edge of acceptible time, so that half the network rejects it).
+\subsection{Single Use Signatures}
+You submit a transaction with a 1-of-N multisig.
+Each public key would only be allowed to be used once though.
+This allows one address to be used for many transactions, without needing to reuse signatures.
 
-\subsection{Merkling Transactions}
-The idea is to have each transaction hashed in a way that's similar to a merkle tree, not for efficiency of proofs but rather so that certain details of a transaction can be revealed (such as a timelock) without revealing all of the details of the transaction.
+Using the concepts applied in HD Wallets \cite{hdw} might help achieve the same goal.
+Using something like a Merkle signature scheme might also help achieve this goal.
 
-\subsection{Proof of Storage on Arbitrary Data}
-There's a bunch of arbitrary data in the blockchain and not a whole lot of incentive for hosts to hang onto it.
-Requiring a proof of storage may fix this.
-Or it may just be good enough for new clients to expect to get the data when they download the blockchain.
-
-It's only a problem if people start accepting blocks even when they don't know what the arbitrary data is.
-
-\subsection{Single Use Multisig Trnasactions}
-The idea is that you have multiple signatures on a multisig, but you can only use each one once.
-This allows you to collect payments from the same address many times without needing to reuse a signature.
+\subsection{Alternate Mining Structure}
+Alternatives have been suggested that would address things like block withholding attacks.
+Additionally it might be useful to have a scheme where multiple miners get paid every block (this allows for high block time, but low block finding variance).
 
 \section{Conclusion}
-Sia is a minimalist financial protocol designed to enable decentralized storage.
+We have presented an idea for a protocol that would enable an incentivized decentralized storage ecosystem.
+The focus is on keeping the protocol minimal to maximize security, and to derive most of the power from the system by using smart clients and making use of arbitrary data stored on the blockchain.
+
+We have presented a set of potential changes to make that range from simple and probably safe to complex and probably unsafe.
+We do plan on implementing Sia as a beta without any of the 'Under Consideration' changes.
 
 \onecolumn
-\begin{thebibliography}{2}
+\begin{thebibliography}{9}
 
-\bibitem{mpc}
-	https://en.bitcoin.it/wiki/Contracts\#Example\_7:\_Rapidly-adjusted\_.28micro.29payments\_to\_a\_pre-determined\_party
+\bibitem{btc}
+	Satoshi Nakamoto,
+	\emph{Bitcoin: A Peer-to-Peer Electronic Cash System}.
+
+\bibitem{cpr}
+	Hovav Shacham, Brent Waters,
+	\emph{Compact Proofs of Retrievability},
+	Proc. of Asiacrypt 2008, vol. 5350, Dec 2008, pp. 90-107.
 
 \bibitem{reg}
 	K. V. Rashmi, Nihar B. Shah, and P. Vijay Kumar,
-	\emph{Optimal Exact-Regenerating Codes for Distributed Storage at the MSR and MBR Points vai a Product-Matrix Construction}
+	\emph{Optimal Exact-Regenerating Codes for Distributed Storage at the MSR and MBR Points vai a Product-Matrix Construction}.
+
+\bibitem{alts}
+	Andrew Poelstra,
+	\emph{A Treatsie on Altcoins}.
+
+\bibitem{ibf}
+	Gavin Andresen,
+	\emph{O(1) Block Propagation},
+	https://gist.github.com/gavinandresen/e20c3b5a1d4b97f79ac2
+
+\bibitem{hdw}
+	Gregory Maxwell,
+	\emph{Deterministic Wallets},
+	https://bitcointalk.org/index.php?topic=19137.0
+
+\bibitem{ubc}
+	etotheipi,
+	Ultimate blockchain compression w/ trust-free lite nodes.
+	https://bitcointalk.org/index.php?topic=88208.0
+
+\bibitem{mpc}
+	Mike Hearn,
+	\emph{Rapidly-adjusted (micro)payments to a pre-determined party},
+	https://en.bitcoin.it/wiki/Contracts\#Example\_7:\_Rapidly-adjusted\_.28micro.29payments\_to\_a\_pre-determined\_party
+
+\bibitem{btcdg}
+	Bitcoin Developer Guide
+	https://bitcoin.org/en/developer-guide
+
 
 \end{thebibliography}
 
