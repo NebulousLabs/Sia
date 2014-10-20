@@ -56,15 +56,21 @@ If the proof is invalid (or missing), funds are instead sent to the client, in t
 Each transaction:
 \begin{enumerate}
 	\item Version
+	\item Arbitrary Data
 	\item Input List
 	\item Output List
-	\item Type \& Type Field
+	\item A File Contract
+	\item A Storage Proof
 	\item Transaction Signatures
 \end{enumerate}
 
-\subsection{Inputs}
-There are up to 15 inputs.
+The difference between the inputs and outputs is given as a transaction fee to the miner.
 
+The arbitrary data is limited to 1kb, and is useful for hosts or clients making machine-readable announcements.
+
+The output list, the file contract, and the storage proof are all optional fields.
+
+\subsection{Inputs}
 Each Input:
 \begin{enumerate}
 	\item Previous Output ID
@@ -72,8 +78,6 @@ Each Input:
 \end{enumerate}
 
 \subsection{Outputs}
-There are up to 15 outputs.
-
 Each Output:
 \begin{enumerate}
 	\item Amount Sent to Output
@@ -82,12 +86,7 @@ Each Output:
 
 Outputs are identified by id.
 The output id is derived from the transaction that the output appeared in.
-The output id is derived by taking H(first valid input id $||$ output index).
-The input id is valid if the input spends a previously existing output or is a block subsidy.
-
-For example, in a transaction where only the third and fifth inputs add coins to the transaction, the id of the first output (index 0) is H(id of third input $||$ 0), and the id of the second output (index 1) is H(id of the third input $||$ 1).
-
-The difference between the inputs and outputs is given as a transaction fee to the miner.
+The output id is derived by taking H(id of input 0 $||$ output index).
 
 \subsection{Spend Conditions}
 \begin{enumerate}
@@ -99,11 +98,9 @@ The difference between the inputs and outputs is given as a transaction fee to t
 
 The timelock prevents an output from being spent until a certain time.
 
-The number of signatures and public keys creates an m-of-n multisig, where m and n can be as low as 1 and as high as 32.
+The number of signatures and public keys creates an m-of-n multisig, where m is the number of signatures required, and n is the number of public keys provided.
 
 \subsection{Signatures}
-There can be a maximum of 32 * 15 signatures, 32 signatures per input for 15 total inputs.
-
 Each Signature:
 \begin{enumerate}
 	\item Timelock
@@ -113,58 +110,53 @@ Each Signature:
 \end{enumerate}
 
 The timelock prevents a signature from being valid until a certain time.
-The signature array indicates what is being signed.
+The signature array indicates what is being signed, which optionally allows for certain fields to be malleable.
 It is a 32 bit array, one bit for each input and one bit for each output, plus one bit for the transaction type, and one for the transaction type field.
-This prevents certain inputs and outputs within the transaction from being changed without invalidating the signature.
 
 The input id must be an input in the transaction.
 
 The signature covers:
 \begin{enumerate}
-	\item The Transaction Version
 	\item The Signature Timelock
 	\item The Signature Input ID
 	\item The Signature Signature Array
 	\item Every field specified by the signature array.
 \end{enumerate}
 
-Each signature is a single signature, not a multisig signature.
-To complete multisig signatures, multiple signatures need to be added.
-This means that each signature in the multisig can potentially sign different parts of the transaction.
-
-\section{Transaction Types}
-There are 4 types of transactions.
+The signature array can specify the following items:
 \begin{enumerate}
-	\item Money Transfer
-	\item Host Announcement
-	\item File Contract
-	\item Proof of Storage
+	\item The Transaction Version
+	\item The Arbitrary Data
+	\item The File Contract
+	\item The Storage Proof
+	\item Any combination of inputs, including all or none of them.
+	\item Any combination of outputs, including all or none of them.
 \end{enumerate}
 
-The type field does different things for each type of transaction.
+Each signature corresponds to a single public key.
+Inputs that require multiple signatures will have multiple signatures listed in the signatures section, each with a potentially different set of fields that are signed.
 
 \section{File Contracts}
-File contracts are an agreement between a host and an uploader that the host will store a file.
+A file contract is an agreement between a host and an uploader that the host will store a file.
 The file is split into 64 byte segments, and a merkle tree is created from these segments.
 The root hash of the merkle tree is stored, along with the quantity of 64 byte blocks contained in the original file.
 
 The type field for a file contract contains:
 \begin{enumerate}
-	\item A merkle root hash of the file being stored.
-	\item The size of the underlying file.
-	\item An hash of up to 1kb of arbitrary data.
-	\item A file proof frequency, maximum of 1 every block, minimum of 1 every $2^{16}$ blocks.
+	\item Root hash of the merkle tree created from the file.
+	\item The number of leaves in the merkle tree.
+	\item A challenge frequency.
 	\item A reward for successfully completing a proof, along with the recipient.
 	\item A reward for a missed proof, along with the recipient.
 	\item Number of consecutive missed proofs to terminate a contract, along with a recipient for all remaining input coins. (Unsuccessful termination)
 	\item Total duration of contract, along with a recipeint for all remaining input coins in the event of finishing the duration without triggering a termination. (Successful termination)
 \end{enumerate}
 
-The frequency gives a window in which the host can submit a storage proof.
-If the frequency is 1 every 20 blocks, then for each non-overlapping set of 20 blocks, a host can put a proof-of-storage in \textbf{any} of them.
+The challenge frequency indicated how frequently a challenge will be issued to a host for a proof of storage.
+If the frequency is 20 blocks, then a challenge will be issued once every 20 blocks and the host will have 20 blocks to satisfy the challenge.
 
-The rewards for completed proofs and missed proofs create a new utxo belonging to the recipient.
-The recipient contains the same form as a transaction output.
+The rewards for completed proofs and missed proofs create a new transaction output belonging to the recipient specified in the contract.
+The recipient will be a hahs of the output spend conditions for the new output.
 The output id is defined by H(first valid input id of transaction $||$ reward type $||$ reward index)
 The reward type is one of 4 values: successful proof, missed proof, sucessful termination, unsuccessful termination.
 The index is the number of previous times an output has been created by this reward type for this contract.
@@ -173,10 +165,11 @@ Terminations will always have an index of 0, as the contract can only terminate 
 
 The final termination type is 'early termination', and is what happens if a contract runs out of funds before either other termination happens.
 
-The file id is defined by the hash of the transaction announcing the file.
+The contract id is defined by the hash of the transaction announcing the contract.
 
-Output 14 funds the contract - it's replaced with all 0's for the hash of the spend conditions.
-The other outputs function the same as in a monetary transfer.
+The contract must be funded by output 0, which must specify a null recipient. (All 0's for the hash of the output spend conditions)
+A transaction with a contract that has a non-zero output 0 is invalid.
+% This section needs help.
 
 \section{Proof of Storage}
 Each proof of storage transaction targets a specific file.
@@ -184,7 +177,7 @@ A storage proof does not need to have any inputs or outputs.
 
 A storage proof has:
 \begin{enumerate}
-	\item A file id
+	\item A contract id.
 	\item The proof of storage.
 \end{enumerate}
 
@@ -222,10 +215,17 @@ We call this a 'closed window' attack, because though the host has created the s
 The defense for this is having large windows, and assuming that at least one miner will be content submitting the storage proof in a block in return for a transaction fee.
 Because hosts consent to all file contracts, the host is able to reject any contract that they feel leaves them vulnerable to a closed window attack.
 
-\section{Arbitrary Data}
-These are sections left for hosts to make statements about their storage and policies, and for hosts to associate themselves with certain files using public keys.
-Because the data has no rules, it's simple enough for lightweight clients to only know the hash of the arbitrary data, adding just 32 bytes to each transaction.
-One example is using public keys for a host to prove ownership of certain files, therefore also proving reliability and longevity.
+\section{Arbitrary Transaction Data}
+The arbitrary data provides hosts and clients a decentralized way to organize themselves.
+Sia will likely be released with some standards for hosts announcing themselves to the world using the arbitrary data field.
+These standards will also include ways for hosts to associate themselves with certain files, so that the hosts can build up a reputation that's auditable on the decentralized ledger.
+Lightweight nodes will not need to store the arbitrary data.
+
+The arbitrary data is likely to be valuable to clients, which means clients may be willing to pay for access to the data.
+If too few miners are storing the full blockchain, clients can start rewarding miners who provide access to the arbitrary data fields.
+This creates incentives.
+
+The service provided by the arbitrary data fields could also be provided by a centralized service such as a forum or tracker.
 
 \section{Being a Host}
 As a host, you would make an announcement using a host announcement and follow some standard for organizing the announcement.
