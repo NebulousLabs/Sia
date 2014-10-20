@@ -152,19 +152,10 @@ There are 4 types of transactions.
 
 The type field does different things for each type of transaction.
 
-\subsection{Money Transfers}
-Money transfers are the generic transaction, and have no type data beyond indicating that they are a money transfer.
-
-\subsection{Host Announcement}
-Host announcements have a type field that is up to 1kb that can be used for arbitrary data.
-
-This is to tell potential clients about themselves, what files they store (which can be viewed in the file contracts), and any policy information.
-It's completely up to the hosts and clients to figure out how to use this 1kb in a useful way.
-
-Most host announcements will likely consist of only a transaction fee, though some may perhaps also create a timelocked output as a demonstration of their committment to being a host.
-
-\subsection{File Contracts}
+\section{File Contracts}
 File contracts are an agreement between a host and an uploader that the host will store a file.
+The file is split into 64 byte segments, and a merkle tree is created from these segments.
+The root hash of the merkle tree is stored, along with the quantity of 64 byte blocks contained in the original file.
 
 The type field for a file contract contains:
 \begin{enumerate}
@@ -196,27 +187,49 @@ The file id is defined by the hash of the transaction announcing the file.
 Output 14 funds the contract - it's replaced with all 0's for the hash of the spend conditions.
 The other outputs function the same as in a monetary transfer.
 
-\subsection{Proof of Storage}
-% Reference some paper talking about proof of storage.
+\section{Proof of Storage}
 Each proof of storage transaction targets a specific file.
 A storage proof does not need to have any inputs or outputs.
 
 A storage proof has:
 \begin{enumerate}
 	\item A file id
-	\item A merkle proof proving the active index for the file.
+	\item The proof of storage.
 \end{enumerate}
 
-The merkle proof is performed on a random leaf in the file being stored.
-This 'random' leaf is chosen deterministically using the hash of the block immediately before the proof window as a seed.
-This random number could be manipulated using a block witholding attack or a 51\% attack, but where an attacker only has one third hashing power, the chances of pulling off a worthwhile attack are slim.
-Especially if there are many proofs that need to be performed, this method of generating random numbers is strong enough for most files because storage is cheap.
+\subsection{Storage Challenges}
+Each contract has a challenge frequency, requiring a storage proof every N blocks.
+These windows are strictly defined, with the first window $W_0$ starting at block X, the second window $W_1$ starting at block X+N, and so on.
+The challenge requires a random number as a seed.
+The random number for window $W_i$ is derived from the hash of block $X-1 + i*N$.
 
-% Go into greater depth about the randomness of this.
+Using the random seed, one of the 64 bytes blocks from the original file is chosen.
+In one of the blocks covered by $W_i$ the host must submit a proof that they have the selected block.
+This is done by providing the 64 byte block, and then supplying the set of hashes that build each unknown branch of the merkle tree.
+The network, knowing both the root hash and index of the 64 byte block, is able to take the set of hashes and determine how to build the tree, then verifying that the root matches.
 
-It should be noted that there is another attack, the "closed window" attack.
-If a miner refuses to add a storage proof transaction to a block for enough blocks in a row, then the file host will not be able to complete the proof of storage even though they are online and have the file.
-Once again this is not a very likely attack because there are many miners, and hosts are free to refuse to hold any file where the storage window is less than 20 blocks.
+If the host is consistently able to demonstrate possession of a random 64 byte block, then the host is very likely storing the whole file.
+A host storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
+
+\subsection{Random Number Generation}
+The random number generator is subject to manipulation from block withholding attakcs.
+The random number is derived from a specific block, meaning that an attacker has only one chance to manipulate the random number for a particular challenge.
+The probability that an attacker will have the ability to manipulate the random number is equivalent to the probability that the attacker finds the block which generates the random number.
+Furthermore, withholding a block to manipulate the random number will cost the attacker the block reward.
+
+If an attacker is able to mine 50\% of the blocks, then a full 50\% of the challenges will still be random.
+An attacker storing only 50\% of a file will be able to complete the storage proof 75\% of the time, even using manipulation.
+
+Clients can protect themselves against random number attacks by having very large penalties for missing proofs.
+By having large windows and severe penalties, a financially incentivized attacker with less than 50\% hashing power will not have reason to perform manipulation attacks.
+
+\subsection{Closed Window Attacks}
+Hosts can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
+Miners could maliciously exclude storage proofs from blocks, depriving themselves of transactions fees but forcing a penalty the hosts.
+We call this a 'closed window' attack, because though the host has created the storage proof within the required window of time, they were unable to get the proof onto the blockchain.
+
+The defense for this is having large windows, and assuming that at least one miner will be content submitting the storage proof in a block in return for a transaction fee.
+Because hosts consent to all file contracts, the host is able to reject any contract that they feel leaves them vulnerable to a closed window attack.
 
 \section{Arbitrary Data}
 These are sections left for hosts to make statements about their storage and policies, and for hosts to associate themselves with certain files using public keys.
@@ -343,9 +356,9 @@ Or it may just be good enough for new clients to expect to get the data when the
 
 It's only a problem if people start accepting blocks even when they don't know what the arbitrary data is.
 
-% \subsection{Single Use Multisig Trnasactions}
-% The idea is that you have multiple signatures on a multisig, but you can only use each one once.
-% This allows you to collect payments from the same address many times without needing to reuse a signature.
+\subsection{Single Use Multisig Trnasactions}
+The idea is that you have multiple signatures on a multisig, but you can only use each one once.
+This allows you to collect payments from the same address many times without needing to reuse a signature.
 
 \section{Conclusion}
 Sia is a minimalist financial protocol designed to enable decentralized storage.
