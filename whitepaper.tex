@@ -22,11 +22,15 @@ Sia is a blockchain-based cryptosystem that enables decentralized file storage.
 This paper serves as both a high level overview and as a specification.
 
 \section{Introduction}
-Decentralized storage is good for the health of the Internet.
+We wish to create a decentralized cloud storage platform that is more powerful than the existing centralized storage platforms.
+We use smart contracts and decentralized consensus as the foundation for our platform.
+We start with a system very similar to Bitcoin and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
+The network automatically creates proof of storage challenges.
 
-Sia is an altcoin that will be merge-mined with Bitcoin.
-
-Altcoin is needed for enforcing contracts that require storage proofs.
+Building on top of Bitcoin directly will not work because we need self-enforcing contracts for hosting files, something that is beyond Bitcoin's flexibility.
+We have considered being a sidechain, but are not convinced that a sidechain offers sufficient security.
+We have chosen to make our own altcoin instead of using another altcoin such as Ethereum or Storj because we have not been sufficiently convinced that other altcoins are taking a secure approach.
+We plan on having Sia be merge-mined with Bitcoin to minimize dilution of mining power within the cryptocurrency ecosystem.
 
 \section{General Structure}
 % Add references to Bitcoin here?
