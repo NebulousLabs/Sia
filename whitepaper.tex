@@ -241,7 +241,7 @@ When a client wishes to use a host for storage, the client will contact the host
 In the typical case, both the host and the client will add funds to the contract, so that the host can be penalized for misisng storage proofs.
 Neither party is forced to agree to a contract until each is happy with the terms.
 
-Hosts and clients can create micropayment channels which can be used to fund the client downloading the file.
+Hosts and clients can create micropayment channels \cite{mpc} which can be used to fund the client downloading the file.
 
 \subsection{Host Protections}
 A host does not need to agree to a contract, and is therefore able to reject unfavorable terms and unfavorable or illegal files.
@@ -284,14 +284,6 @@ Clients can also more heavily reward greater throughput and lower latency.
 Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online.
 
 In short, clients choose a behavior that incentivizes hosts to be online.
-
-% \section{Micropayment Channels}
-% Actually this could be a subsection somewhere else.
-% Reference important stuff here.
-%
-% \subsection{Establishing a Contract}
-% Give at least one method for creating a file contract in a trust free environment
-% maybe find a paper.
 
 % \section{Sianotes}
 % \subsection{Taxing Contracts}
@@ -375,12 +367,15 @@ This allows you to collect payments from the same address many times without nee
 Sia is a minimalist financial protocol designed to enable decentralized storage.
 
 \onecolumn
-\begin{bibliography}{1}
+\begin{thebibliography}{2}
+
+\bibitem{mpc}
+	https://en.bitcoin.it/wiki/Contracts\#Example\_7:\_Rapidly-adjusted\_.28micro.29payments\_to\_a\_pre-determined\_party
 
 \bibitem{reg}
 	K. V. Rashmi, Nihar B. Shah, and P. Vijay Kumar,
 	\emph{Optimal Exact-Regenerating Codes for Distributed Storage at the MSR and MBR Points vai a Product-Matrix Construction}
 
-\end{bibliography}
+\end{thebibliography}
 
 \end{document}
