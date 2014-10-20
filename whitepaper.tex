@@ -136,6 +136,8 @@ The signature array can specify the following items:
 Each signature corresponds to a single public key.
 Inputs that require multiple signatures will have multiple signatures listed in the signatures section, each with a potentially different set of fields that are signed.
 
+A transaction is only valid if every input has been sufficiently signed.
+
 \section{File Contracts}
 A file contract is an agreement between a host and an uploader that the host will store a file.
 The file is split into 64 byte segments, and a merkle tree is created from these segments.
@@ -227,46 +229,61 @@ This creates incentives.
 
 The service provided by the arbitrary data fields could also be provided by a centralized service such as a forum or tracker.
 
-\section{Being a Host}
-As a host, you would make an announcement using a host announcement and follow some standard for organizing the announcement.
-This would contain information about how to contact you, your typical price and penaltys, and some cryptographic indication of which files you are already storing.
+\section{Storage Ecosystem}
+Sia relies on an ecosystem that facilitates decentralized storage.
+The arbitrary data field will be used by hosts to announce themselves to the network.
+Standards will be created that specify price, capacity, and other potentially usefil items.
 
-Clients would then contact you, requesting you hold onto files.
-You agree to hold onto files, but only after they have given you the whole file.
+Clients will browse through the list of transactions and parse any data they understand as a host announcement to create a host database.
+They then select hosts from the database which they will use to store their files.
 
-You use microchannel payments to charge the clients for downloading the file.
+When a client wishes to use a host for storage, the client will contact the host and try to set up a contract.
+In the typical case, both the host and the client will add funds to the contract, so that the host can be penalized for misisng storage proofs.
+Neither party is forced to agree to a contract until each is happy with the terms.
 
-As a host, you are protected against files you don't want because you don't have to agree to store anything.
+Hosts and clients can create micropayment channels which can be used to fund the client downloading the file.
 
-\section{Being an Uploader}
-You break the file into a bunch of erasure coded pieces, using M of N erasure coding.
-You encrypt the N pieces individually and upload them each to a different host.
+\subsection{Host Protections}
+A host does not need to agree to a contract, and is therefore able to reject unfavorable terms and unfavorable or illegal files.
+A host also does not need to sign a contract until the full file has been uploaded, which protects the host against malicious clients.
 
-You find hosts by scanning the host announcements and having some protocol for reading them.
-You create a pool of hosts that fit your uploading criteria, and contact them at random weighted according to how much you trust them.
-The randomness protects you from malicious hosts and network instability.
+The host has great flexibility in providing storage.
+The host can advertise itself as minimally reliable, and keep each file on only one hard drive in one network location.
+This will allow the host to sell cheap storage, and clients will likely be content with contracts that have minimal repercussions for lost files.
+The host can also advartise itself as highly reliable, keeping each file at a colocated redundancy of 3.
+This will allow the host to charge heavily for storage, but clients will likely require contracts with severe repercussions for lost files.
 
-You upload the file to each of the hosts and they post a file contract agreeing to store them.
-You check in on the file every few months and do any repairs needed if hosts go offline.
+\subsection{Client Protections}
+Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
+Each piece is then encrypted and stored on many hosts.
+By encrypting the pieces after encoding them, the client ensures that collaborating hosts are unable to reduce the redundancy.
+Hosts are selected randomly weighted according to price and historic reliability.
 
-You use microchannel payments to negotiate downloads.
-You are protected against hosts holding your data hostage because you can just go to other hosts who are not holding it hostage.
-When data is available in many places, the places individually do not have much power over you.
+The key to file security is in storing a single file in many places.
+By randomly selecting many hosts, the client can expect a reliablity for their files which matches the average reliability among the hosts that were sampled.
+By using many hosts but only needing a few to recover the original file, the client can keep a high reliability even if the average network reliability is low.
+The client can also check in every few weeks and replace any hosts that have gone offline.
 
-\section{Uptime Incentives}
+By picking many hosts, the client not only upgrades the reliability of its files, it also upgrades the maximum throughput that can be used to download the files.
+It is also likely that by picking many hosts, the client will reduce the latency associated with retreiving the file, especially if the client only needs to contact the closest subset of hosts who have the file.
+
+By having each file in many places, the client is also protected against host malice.
+If a host tries to randsom a file, the client can just download the file from a host that is not trying to randsom the file.
+Hosts have no power to monopolistically drive up prices when the file is available in many places, and instead will need to compete to collect the download fees.
+
+\subsection{Uptime Incentives}
 The storage proofs contain no provisions that require constant uptime.
-There are also no provisions that require hosts to upload files to clients.
+There are also no provisions that require hosts to upload files to clients upon request.
 
 However, hosts and clients can create micropayment channels to facilitate downloads.
-The client agrees to pay some worthwhile fee to the host every time they download the file.
-If the host is not online, the client will pay one of the redundant hosts that are online.
-
+If the client is offering a nontrivial fee for downloading a file, hosts will be incentivized to collect the fee.
+If one host is offline or unavailable, the client will pay the fee to a host that is online and available.
 Hosts are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
 If clients behaviorally pay hosts well, then hosts are more heavily incentivized to be online all the time.
 Clients can also more heavily reward greater throughput and lower latency.
 Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online.
 
-Simplified, uptime incentives do not rely on the structure of the protocol, they rely on the behavior of clients.
+In short, clients choose a behavior that incentivizes hosts to be online.
 
 % \section{Micropayment Channels}
 % Actually this could be a subsection somewhere else.
@@ -293,6 +310,9 @@ For example, you could have the penalty for missing a storage proof double every
 Or, you could have the reward for making a storage proof increase every time a storage proof is submitted.
 
 We are unclear on what might be the exact best way to accomplish this.
+
+\subsection{Different Method for Proof of Storage}
+There's an article or two that I should link to.
 
 \subsection{Reduced Block Time}
 We are considering 6 minutes.
@@ -354,11 +374,13 @@ This allows you to collect payments from the same address many times without nee
 \section{Conclusion}
 Sia is a minimalist financial protocol designed to enable decentralized storage.
 
-%\onecolumn
-%\begin{bibliography}{1}
+\onecolumn
+\begin{bibliography}{1}
 
-%\bibitem{}
+\bibitem{reg}
+	K. V. Rashmi, Nihar B. Shah, and P. Vijay Kumar,
+	\emph{Optimal Exact-Regenerating Codes for Distributed Storage at the MSR and MBR Points vai a Product-Matrix Construction}
 
-%\end{bibliography}
+\end{bibliography}
 
 \end{document}
