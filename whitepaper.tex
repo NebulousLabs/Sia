@@ -63,7 +63,7 @@ Each transaction:
 	\item Version
 	\item Input List
 	\item Output List
-	\item Type & Type Field
+	\item Type \& Type Field
 	\item Transaction Signatures
 \end{enumerate}
 
@@ -102,7 +102,6 @@ The difference between the inputs and outputs is given as a transaction fee to t
 	\item Each Valid Public Key
 \end{enumerate}
 
-% merkle the timelock so it can be optially revealed without revealing anything else.
 The timelock prevents an output from being spent until a certain time.
 
 The number of signatures and public keys creates an m-of-n multisig, where m and n can be as low as 1 and as high as 32.
@@ -220,9 +219,6 @@ These are sections left for hosts to make statements about their storage and pol
 Because the data has no rules, it's simple enough for lightweight clients to only know the hash of the arbitrary data, adding just 32 bytes to each transaction.
 One example is using public keys for a host to prove ownership of certain files, therefore also proving reliability and longevity.
 
-We may need to implement something that incentivizes miners to keep the full data and distribute it - it's how clients will be able to find hosts and files.
-Forcing miners to do storage proofs on this data to release a block may be sufficient.
-
 \section{Being a Host}
 As a host, you would make an announcement using a host announcement and follow some standard for organizing the announcement.
 This would contain information about how to contact you, your typical price and penaltys, and some cryptographic indication of which files you are already storing.
@@ -330,6 +326,16 @@ A block that solves the coin with the highest difficulty will always be valid fo
 Right now there are a decent amount of ways in Bitcoin to induce stale mining.
 Block witholding attacks for example.
 Awkward block timings for example (put the block on the edge of acceptible time, so that half the network rejects it).
+
+\subsection{Merkling Transactions}
+The idea is to have each transaction hashed in a way that's similar to a merkle tree, not for efficiency of proofs but rather so that certain details of a transaction can be revealed (such as a timelock) without revealing all of the details of the transaction.
+
+\subsection{Proof of Storage on Arbitrary Data}
+There's a bunch of arbitrary data in the blockchain and not a whole lot of incentive for hosts to hang onto it.
+Requiring a proof of storage may fix this.
+Or it may just be good enough for new clients to expect to get the data when they download the blockchain.
+
+It's only a problem if people start accepting blocks even when they don't know what the arbitrary data is.
 
 \section{Conclusion}
 Sia is a minimalist financial protocol designed to enable decentralized storage.
