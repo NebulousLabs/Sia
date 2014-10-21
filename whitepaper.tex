@@ -1,4 +1,5 @@
 \documentclass[twocolumn]{article}
+\usepackage{amsmath}
 
 \begin{document}
 \frenchspacing
@@ -25,7 +26,7 @@ Additional changes have been suggested in the final section, but will not be use
 \section{Introduction}
 We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions cloud storage, both at the p2p level and the enterprise level.
 We use smart contracts and decentralized consensus as the foundation for our platform.
-We start with a system very similar to Bitcoin \cite{btc}, \cite{btcdg} and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
+We start with a system very similar to Bitcoin \cite{btc,btcdg}, and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
 The network automatically creates proof of storage challenges, allowing the client to 'set and forget'.
 
 We have chosen to make an altcoin because we need a specific type of smart contract to scan the blockchain for storage proofs.
@@ -36,7 +37,7 @@ Between the existing altcoins and the promise of sidechains, we nonetheless felt
 The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
 Sia's primary departure from Bitcoin lies in its transactions.
 Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
-Sia opts instead to use an M-N multi-signature hash scheme for all transactions.
+Sia opts instead to use an $M$ of $N$ multi-signature hash scheme for all transactions.
 This reduces complexity and attack surface.
 
 Sia further extends multisig transactions to enable file storage on the network.
@@ -50,160 +51,101 @@ If a storage proof is valid, funds are sent to the host.
 If the proof is invalid (or missing), funds are instead sent to the client, in the manner of a refund.
 
 \section{Transactions}
-Each transaction:
-\begin{enumerate}
-	\item Version
-	\item Arbitrary Data
-	\item Input List
-	\item Output List
-	\item A File Contract
-	\item A Storage Proof
-	\item Transaction Signatures
-\end{enumerate}
+A transaction contains the following fields:
+\begin{tabular}{| l | l |}
+	\hline
+	\textbf{Field} & \textbf{Description} \\ \hline
+	Version        & Protocol version number \\ \hline
+	Arbitrary Data & Used for metadata or otherwise \\ \hline
+	Input List     & Incoming funds \\ \hline
+	Output List    & Outgoing funds (optional) \\ \hline
+	File Contract  & See: File Contracts (optional) \\ \hline
+	Storage Proof  & See: Proof of Storage (optional) \\ \hline
+	Signatures     & Signatures from each input \\ \hline
+\end{tabular}
 
-The difference between the inputs and outputs is given as a transaction fee to the miner.
-
-The arbitrary data is limited to 1kb, and is useful for hosts or clients making machine-readable announcements.
-
-The output list, the file contract, and the storage proof are all optional fields.
+A more detailed breakdown of these fields follows.
 
 \subsection{Inputs}
-Each Input:
-\begin{enumerate}
-	\item Previous Output ID
-	\item Previous Output Spend Conditions
-\end{enumerate}
+Each input comprises a previous output ID and the spend conditions associated with that output.
 
 \subsection{Outputs}
-Each Output:
-\begin{enumerate}
-	\item Amount Sent to Output
-	\item Hash of Output Spend Conditions.
-\end{enumerate}
+Each output holds an amount to be sent, along with a hash of the output spend conditions.
+The difference between the inputs and outputs is given as a transaction fee to the miner.
 
-Outputs are identified by id.
-The output id is derived from the transaction that the output appeared in.
-The output id is derived by taking H(id of input 0 $||$ output index).
+Each output has an associated identifier, which is derived from the transaction that the output appeared in.
+The ID of output $i$ is defined as $H(\text{input}_0 || i)$,
+where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
 
 \subsection{Spend Conditions}
-\begin{enumerate}
-	\item Timelock
-	\item Number of Signatures Required
-	\item Number of Valid Public Keys
-	\item Each Valid Public Key
-\end{enumerate}
-
-The timelock prevents an output from being spent until a certain time.
-
-The number of signatures and public keys creates an m-of-n multisig, where m is the number of signatures required, and n is the number of public keys provided.
+Both inputs and outputs make use of spend conditions, which dictate the circumstances under which an output can be spent.
+The two allowed conditions are a time lock (which locks the output until a certain time) and an $M$ of $N$ signature scheme.
+In such a scheme, there are $N$ public keys on the ``whitelist''.
+Some subset $M < N$ must sign the transaction in order to unlock the output. 
 
 \subsection{Signatures}
-Each Signature:
-\begin{enumerate}
-	\item Timelock
-	\item Input ID
-	\item Signature Array
-	\item Actual Signature
-\end{enumerate}
+Each cryptographic signature is paired with an input ID and a time lock. 
+The input ID indicates which input the signature is being applied to.
+It must match one of the inputs in the transaction.
+The time lock prevents the signature from being used before a certain time.
+A bit array is also provided with the signature, which marks which fields of the transaction were signed.
+Any field in the transaction can be marked as signed, including any subset of inputs and outputs---except for the signatures themselves.
+This allows for more nuanced transaction schemes.
 
-The timelock prevents a signature from being valid until a certain time.
-The signature array indicates what is being signed, which optionally allows for certain fields to be malleable.
-The input id must be an input in the transaction.
-
-The signature covers:
-\begin{enumerate}
-	\item The Signature Timelock
-	\item The Signature Input ID
-	\item The Signature Signature Array
-	\item Every field specified by the signature array.
-\end{enumerate}
-
-The signature array can specify the following items:
-\begin{enumerate}
-	\item The Transaction Version
-	\item The Arbitrary Data
-	\item The File Contract
-	\item The Storage Proof
-	\item Any combination of inputs, including all or none of them.
-	\item Any combination of outputs, including all or none of them.
-\end{enumerate}
-
-Each signature corresponds to a single public key.
-Inputs that require multiple signatures will have multiple signatures listed in the signatures section, each with a potentially different set of fields that are signed.
-
-A transaction is only valid if every input has been sufficiently signed.
+The actual data being signed, then, is a concatenation of the time lock, input ID, bit array, and every field specified by the bit array.
+Every such signature in the transaction must be valid for the transaction to be accepted.
 
 \section{File Contracts}
 A file contract is an agreement between a host and an uploader that the host will store a file.
-The file is split into 64 byte segments, and a merkle tree is created from these segments.
-The root hash of the merkle tree is stored, along with the quantity of 64 byte blocks contained in the original file.
+At the core of a file contract is the file's Merkle root hash, formed by splitting the file into segments and repeatedly concatenating and hashing them.
+This root hash, along with the total number of segments, can be used to verify storage proofs.
 
-The type field for a file contract contains:
-\begin{enumerate}
-	\item Root hash of the merkle tree created from the file.
-	\item The number of leaves in the merkle tree.
-	\item A challenge frequency.
-	\item A reward for successfully completing a proof, along with the recipient.
-	\item A reward for a missed proof, along with the recipient.
-	\item Number of total missed proofs to terminate a contract, along with a recipient for all remaining input coins. (Unsuccessful termination)
-	\item Total duration of contract, along with a recipeint for all remaining input coins in the event of finishing the duration without triggering a termination. (Successful termination)
-\end{enumerate}
-
-The challenge frequency indicated how frequently a challenge will be issued to a host for a proof of storage.
-If the frequency is 20 blocks, then a challenge will be issued once every 20 blocks and the host will have 20 blocks to satisfy the challenge.
+File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the refund for an invalid or missing proof, and the maximum number of proofs that can be missed.
+If the file contract is still valid at the end of the specified duration, it ``successfully terminates.''
+Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract ``unsuccessfully terminates.''
+Each of these potential outcomes (valid proof, invalid proof, successful termination, unsuccessful termination) has an associated recipient.
+The funds for these various payouts are provided by the inputs to the transaction.
 
 The rewards for completed proofs and missed proofs create a new transaction output belonging to the recipient specified in the contract.
-The recipient will be a hahs of the output spend conditions for the new output.
-The output id is defined by H(first valid input id of transaction $||$ reward type $||$ reward index)
-The reward type is one of 4 values: successful proof, missed proof, sucessful termination, unsuccessful termination.
-The index is the number of previous times an output has been created by this reward type for this contract.
-For example, the first successful proof will have an index of 0, the second will have an index of 1.
+The recipient will be a hash of the output spend conditions for the new output.
+The output ID is defined as $H(\text{input}_0 || \text{outcome} || \text{index})$.
+The outcome has four possible values, corresponding to the four potential outcomes listed above.
+The index is the number of times this outcome has occurred during the contract.
 Terminations will always have an index of 0, as the contract can only terminate once.
 
-The final termination type is 'early termination', and is what happens if a contract runs out of funds before either other termination happens.
-
-The contract id is defined by the hash of the transaction announcing the contract.
-
-The contract must be funded by output 0, which must specify a null recipient. (All 0's for the hash of the output spend conditions)
-A transaction with a contract that has a non-zero output 0 is invalid.
 % This section needs help.
+The contract ID is defined as the hash of the transaction announcing the contract.
+The contract must be funded by output 0, which must specify a null recipient.
+(A null recipient is defined as having all zeros as the hash of its spend conditions.)
 
 \section{Proof of Storage}
-Each proof of storage transaction targets a specific file.
-A storage proof does not need to have any inputs or outputs.
+Storage proof transactions are periodically submitted in order to fulfill file contracts.
+Each storage proof targets a specific file.
+A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
 
-A storage proof has:
-\begin{enumerate}
-	\item A contract id.
-	\item The proof of storage.
-\end{enumerate}
+\subsection{Algorithm}
+Each contract has a challenge frequency, which requires the host to submit a storage proof every $N$ blocks.
+Each interval of $N$ blocks then constitutes a ``window'' in which to submit the proof.
+The first such window, $W_0$, begins immediately after the block containing the contract.
 
-\subsection{Storage Challenges}
-Each contract has a challenge frequency, requiring a storage proof every N blocks.
-These windows are strictly defined, with the first window $W_0$ starting at block X, the second window $W_1$ starting at block X+N, and so on.
-The challenge requires a random number as a seed.
-The random number for window $W_i$ is derived from the hash of block $X-1 + i*N$.
-
-Using the random seed, one of the 64 bytes blocks from the original file is chosen.
-In one of the blocks covered by $W_i$ the host must submit a proof that they have the selected block.
-This is done by providing the 64 byte block, and then supplying the set of hashes that build each unknown branch of the merkle tree.
-The network, knowing both the root hash and index of the 64 byte block, is able to take the set of hashes and determine how to build the tree, then verifying that the root matches.
-
-If the host is consistently able to demonstrate possession of a random 64 byte block, then the host is very likely storing the whole file.
+The storage challenge requires a random number as a seed.
+The random number for window $W_i$ is generated by concatenating contract ID with the block prior to $W_i$ (i.e. $W_0 + i \times N - 1$) and hashing the result.
+This seed is used to select one of the file segments used to produce the Merkle tree.
+The host supplies this segment data, along with the set of hashes that can be used to reconstruct the root of the tree.
+The challenger can use these hashes to verify that the segment provided is indeed part of the original file.
+If the host is consistently able to demonstrate possession of a random segment, then the host is very likely storing the whole file.
 A host storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
 
 \subsection{Random Number Generation}
-The random number generator is subject to manipulation from block withholding attakcs.
-The random number is derived from a specific block, meaning that an attacker has only one chance to manipulate the random number for a particular challenge.
-The probability that an attacker will have the ability to manipulate the random number is equivalent to the probability that the attacker finds the block which generates the random number.
+The random number generator is subject to manipulation via block withholding attakcs.
+Because the random number is derived from a specific block, an attacker has only one chance to manipulate the random number for a particular challenge.
 Furthermore, withholding a block to manipulate the random number will cost the attacker the block reward.
 
-If an attacker is able to mine 50\% of the blocks, then a full 50\% of the challenges will still be random.
-An attacker storing only 50\% of a file will be able to complete the storage proof 75\% of the time, despite using expensive manipulation.
-
-Clients can protect themselves against random number attacks by having very large penalties for missing proofs.
-Proper penalties remove all incentives for an attacker to try and manipulate the random number of the contract.
-Clients are nonetheless advised to plan around potential byzantine attacks which may not be financially motivated.
+If an attacker is able to mine 50\% of the blocks, then 50\% of the challenges can be manipulated.
+However, the remaining 50\% are still random, so even in this scenario, an attacker storing only 50\% of a file will still fail 25\% of its storage proofs.
+Clients can therefore protect themselves against random number attacks by having very large penalties for missing proofs.
+Assuming the attacker is financially motivated, large windows and severe penalties should be sufficient to deter any attacker that controls less than 50\% of the network's hashing power.
+Clients are nonetheless advised to plan around potential Byzantine attacks which may not be financially motivated.
 
 \subsection{Closed Window Attacks}
 Hosts can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
