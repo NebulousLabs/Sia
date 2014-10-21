@@ -40,15 +40,12 @@ Bitcoin uses a scripting system to enable a range of transaction types, such as 
 Sia opts instead to use an $M$ of $N$ multi-signature hash scheme for all transactions.
 This reduces complexity and attack surface.
 
-Sia further extends multisig transactions to enable file storage on the network.
+Sia further extends transactions to enable file storage on the network.
 Two extensions are needed to accomplish this: file contracts and storage proofs.
 File contracts declare the intention of a host to store a file with a certain size and hash.
 They specify that a host must periodically prove that they are still storing the file.
-Hosts accomplish this by submiting storage proof transactions to the network.
-
-Backing each file contract is a contract fund.
-If a storage proof is valid, funds are sent to the host.
-If the proof is invalid (or missing), funds are instead sent to the client, in the manner of a refund.
+Hosts accomplish this by submiting storage proofs to the network.
+The specifics of this arrangement are defined in sections \ref{sec:contracts} and \ref{sec:storage}, respectively.
 
 \section{Transactions}
 A transaction contains the following fields:
@@ -96,6 +93,7 @@ The actual data being signed, then, is a concatenation of the time lock, input I
 Every such signature in the transaction must be valid for the transaction to be accepted.
 
 \section{File Contracts}
+\label{sec:contracts}
 A file contract is an agreement between a host and an uploader that the host will store a file.
 At the core of a file contract is the file's Merkle root hash, formed by splitting the file into segments and repeatedly concatenating and hashing them.
 This root hash, along with the total number of segments, can be used to verify storage proofs.
@@ -119,6 +117,7 @@ The contract must be funded by output 0, which must specify a null recipient.
 (A null recipient is defined as having all zeros as the hash of its spend conditions.)
 
 \section{Proof of Storage}
+\label{sec:storage}
 Storage proof transactions are periodically submitted in order to fulfill file contracts.
 Each storage proof targets a specific file.
 A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
