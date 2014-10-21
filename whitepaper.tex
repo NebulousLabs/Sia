@@ -26,7 +26,7 @@ Additional changes have been suggested in the final section, but will not be use
 \section{Introduction}
 We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions cloud storage, both at the p2p level and the enterprise level.
 We use smart contracts and decentralized consensus as the foundation for our platform.
-We start with a system very similar to Bitcoin \cite{btc,btcdg}, and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
+We start with a system very similar to Bitcoin \cite{btc}\cite{btcdg}, and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
 The network automatically creates proof of storage challenges, allowing the client to 'set and forget'.
 
 We have chosen to make an altcoin because we need a specific type of smart contract to scan the blockchain for storage proofs.
@@ -95,8 +95,8 @@ Every such signature in the transaction must be valid for the transaction to be 
 \section{File Contracts}
 \label{sec:contracts}
 A file contract is an agreement between a host and an uploader that the host will store a file.
-At the core of a file contract is the file's Merkle root hash, formed by splitting the file into segments and repeatedly concatenating and hashing them.
-This root hash, along with the total number of segments, can be used to verify storage proofs.
+At the core of a file contract is the file's Merkle root hash \cite{merkle}.
+This hash, along with the total number of segments, can be used to verify storage proofs.
 
 File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the refund for an invalid or missing proof, and the maximum number of proofs that can be missed.
 If the file contract is still valid at the end of the specified duration, it ``successfully terminates.''
@@ -310,6 +310,12 @@ We do intend to explore these proposed changes further and decide concretely on 
 \bibitem{btc}
 	Satoshi Nakamoto,
 	\emph{Bitcoin: A Peer-to-Peer Electronic Cash System}.
+
+\bibitem{merkle}
+	R.C. Merkle,
+	\emph{Protocols for public key cryptosystems},
+	In Proc. 1980 Symposium on Security and	Privacy,
+	IEEE Computer Society, pages 122-133, April 1980.
 
 \bibitem{cpr}
 	Hovav Shacham, Brent Waters,
