@@ -18,18 +18,19 @@ luke@nebulouslabs.com
 \maketitle
 
 \subsection*{Abstract}
-Sia is a blockchain-based cryptosystem that enables decentralized file storage.
+Sia is a Bitcoin-based altcoin with added support for decentralized storage.
+With the primary goal of securtiy, very few changes have been made to the Bitcoin protocol, only what is absolutely necessary.
+Additional changes have been suggested in the final section, but will not be used without serious consideration and peer review.
 
 \section{Introduction}
-We wish to create a decentralized cloud storage platform that is more powerful than the existing centralized storage platforms.
+We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions cloud storage, both at the p2p level and the enterprise level.
 We use smart contracts and decentralized consensus as the foundation for our platform.
-We start with a system very similar to Bitcoin and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
-The network automatically creates proof of storage challenges.
+We start with a system very similar to Bitcoin \cite{btc}, \cite{btcdg} and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
+The network automatically creates proof of storage challenges, allowing the client to 'set and forget'.
 
-Building on top of Bitcoin \cite{btc}, \cite{btcdg} directly will not work because we need self-enforcing contracts for hosting files, something that is beyond Bitcoin's flexibility.
-We have considered being a sidechain, but are not convinced that a sidechain offers sufficient security.
-We have chosen to make our own altcoin instead of using another altcoin such as Ethereum or Storj because we have not been sufficiently convinced that other altcoins are taking a secure approach.
-We plan on having Sia be merge-mined with Bitcoin to minimize dilution of mining power within the cryptocurrency ecosystem.
+We have chosen to make an altcoin because we need a specific type of smart contract to scan the blockchain for storage proofs.
+This is not possible within Bitcoin, so a more robust solution is needed.
+Between the existing altcoins and the promise of sidechains, we nonetheless felt that building an altcoin provided the greatest potential for success.
 
 \section{General Structure}
 The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
@@ -198,10 +199,11 @@ The probability that an attacker will have the ability to manipulate the random 
 Furthermore, withholding a block to manipulate the random number will cost the attacker the block reward.
 
 If an attacker is able to mine 50\% of the blocks, then a full 50\% of the challenges will still be random.
-An attacker storing only 50\% of a file will be able to complete the storage proof 75\% of the time, even using manipulation.
+An attacker storing only 50\% of a file will be able to complete the storage proof 75\% of the time, despite using expensive manipulation.
 
 Clients can protect themselves against random number attacks by having very large penalties for missing proofs.
-By having large windows and severe penalties, a financially incentivized attacker with less than 50\% hashing power will not have reason to perform manipulation attacks.
+Proper penalties remove all incentives for an attacker to try and manipulate the random number of the contract.
+Clients are nonetheless advised to plan around potential byzantine attacks which may not be financially motivated.
 
 \subsection{Closed Window Attacks}
 Hosts can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
@@ -213,29 +215,21 @@ Because hosts consent to all file contracts, the host is able to reject any cont
 
 \section{Arbitrary Transaction Data}
 The arbitrary data provides hosts and clients a decentralized way to organize themselves.
-Sia will likely be released with some standards for hosts announcing themselves to the world using the arbitrary data field.
-These standards will also include ways for hosts to associate themselves with certain files, so that the hosts can build up a reputation that's auditable on the decentralized ledger.
-Lightweight nodes will not need to store the arbitrary data.
+Standards can be agreed upon that are used to announce hosts, announce files, or create an entire decentralized file tracker.
+At a minimum, we plan on using the arbitrary data to associate hosts with files that they store, so that hosts can announce themselves a build a repuataion.
 
-The arbitrary data is likely to be valuable to clients, which means clients may be willing to pay for access to the data.
-If too few miners are storing the full blockchain, clients can start rewarding miners who provide access to the arbitrary data fields.
-This creates incentives.
-
-The service provided by the arbitrary data fields could also be provided by a centralized service such as a forum or tracker.
+Lightweight nodes do not need to store the arbitrary data, but the data is likely to be valuable to clients.
+Clients would potentially be willing to pay to download the data, which would incentive nodes to keep the data around.
 
 \section{Storage Ecosystem}
 Sia relies on an ecosystem that facilitates decentralized storage.
-The arbitrary data field will be used by hosts to announce themselves to the network.
-Standards will be created that specify price, capacity, and other potentially usefil items.
+The arbitrary data field will be used by hosts to announce themselves to the network, potentially specifying price, messaging address, etc.
 
-Clients will browse through the list of transactions and parse any data they understand as a host announcement to create a host database.
-They then select hosts from the database which they will use to store their files.
+Clients will be able to parse this data and create a database of hosts that they recognize.
+They can then figure out a set of hosts that they trust (as a set), and create file contracts with those hosts.
 
-When a client wishes to use a host for storage, the client will contact the host and try to set up a contract.
-In the typical case, both the host and the client will add funds to the contract, so that the host can be penalized for misisng storage proofs.
-Neither party is forced to agree to a contract until each is happy with the terms.
-
-Hosts and clients can create micropayment channels \cite{mpc} which can be used to fund the client downloading the file.
+The typical file contract will have both the host and the client paying funds into the contract, which enables the contract to enforce a financial penalty on the host for losing data.
+Hosts and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
 
 \subsection{Host Protections}
 A host does not need to agree to a contract, and is therefore able to reject unfavorable terms and unfavorable or illegal files.
@@ -244,26 +238,25 @@ A host also does not need to sign a contract until the full file has been upload
 The host has great flexibility in providing storage.
 The host can advertise itself as minimally reliable, and keep each file on only one hard drive in one network location.
 This will allow the host to sell cheap storage, and clients will likely be content with contracts that have minimal repercussions for lost files.
-The host can also advartise itself as highly reliable, keeping each file at a colocated redundancy of 3.
+The host can also advartise itself as highly reliable.
 This will allow the host to charge heavily for storage, but clients will likely require contracts with severe repercussions for lost files.
 
 \subsection{Client Protections}
 Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
 Each piece is then encrypted and stored on many hosts.
 By encrypting the pieces after encoding them, the client ensures that collaborating hosts are unable to reduce the redundancy.
-Hosts are selected randomly weighted according to price and historic reliability.
 
-The key to file security is in storing a single file in many places.
-By randomly selecting many hosts, the client can expect a reliablity for their files which matches the average reliability among the hosts that were sampled.
-By using many hosts but only needing a few to recover the original file, the client can keep a high reliability even if the average network reliability is low.
-The client can also check in every few weeks and replace any hosts that have gone offline.
+Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many hosts.
+By only needing 10\% out of 100 hosts, the client is betting against the most reliable 10\%, instead of betting against the average reliability.
+If the client is able to restore lost pieces on occasion, reliability goes up even more.
 
-By picking many hosts, the client not only upgrades the reliability of its files, it also upgrades the maximum throughput that can be used to download the files.
-It is also likely that by picking many hosts, the client will reduce the latency associated with retreiving the file, especially if the client only needs to contact the closest subset of hosts who have the file.
+By putting a file in many places, the client also benefits from an increased number of sources from which it can download data.
+By only needing to connect to the closet 10\%, the client can reduce latency.
+By only needing to connect to the fastest 10\%, the client can increase throughput.
 
-By having each file in many places, the client is also protected against host malice.
-If a host tries to randsom a file, the client can just download the file from a host that is not trying to randsom the file.
-Hosts have no power to monopolistically drive up prices when the file is available in many places, and instead will need to compete to collect the download fees.
+Finally, this strategy also protects the client from host malice.
+A host that is demanding randsom for a file is the same to the client as a host that is inactive.
+As long as 10\% of the hosts are not acting maliciously, the client can retrieve the file.
 
 \subsection{Uptime Incentives}
 The storage proofs contain no provisions that require constant uptime.
@@ -271,13 +264,14 @@ There are also no provisions that require hosts to upload files to clients upon 
 
 However, hosts and clients can create micropayment channels to facilitate downloads.
 If the client is offering a nontrivial fee for downloading a file, hosts will be incentivized to collect the fee.
-If one host is offline or unavailable, the client will pay the fee to a host that is online and available.
+If one host is unavailable, the client will pay the fee to a host that is available.
 Hosts are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
 If clients behaviorally pay hosts well, then hosts are more heavily incentivized to be online all the time.
 Clients can also more heavily reward greater throughput and lower latency.
-Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online.
+Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online, even if they do not wish to download anything.
+This further incentivizes hosts to be online and available.
 
-In short, clients choose a behavior that incentivizes hosts to be online.
+In short, uptime incentives depend on client behavior.
 
 % \section{Sianotes}
 % \subsection{Taxing Contracts}
@@ -293,7 +287,7 @@ In short, clients choose a behavior that incentivizes hosts to be online.
 The primary foundation of Sia has been established in the above section.
 All other factors, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
 
-Giving careful attention to \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
+Giving careful attention to 'A Treatsie on Altcoins' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We consider our knowledge to be currently insufficient to be certain about the security of any of these changes, which is why they are merely proposed.
 
 \subsection{Flexible Contract Penalities}
@@ -301,12 +295,17 @@ Contracts are currently strict.
 There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
 Increased flexibility in the penalty schedule may be desirable.
 
+\subsection{File Editing}
+Contracts are currently permanent, creating what is essentially an uneditable file on the network.
+It might be worth figuring out provisions that enable files to be edited or taken offline under certain contract terms.
+These terms would likely require consent from both the uploader and downloader.
+
 \subsection{Different Method for Proof of Storage}
-Solutions such as \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
+Solutions such as 'Compact Proofs of Retrievability' \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
 
 \subsection{Reduced Block Time}
 We are comfortable reducing the block time to 5 minutes, with the primary goal being to reduce the variance with which a miner receives payment.
-A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as \cite{ibf} are enabling faster block propagation times.
+A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as invertible bloom filters \cite{ibf} are enabling faster block propagation times.
 
 We believe that the risk induced by halving the block time is less than the benefit gained from the reduced incentive to join mining pools.
 
@@ -322,10 +321,22 @@ It smooths out the hashrate and gives people a more continuous sense of the econ
 Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
 Then it will increase by 25\% anually.
 
+\subsection{Long Range Miner Fees}
+Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
+Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
+
+\subsection{File Contract Fees}
+Some percent, like 1\% of all coins paid into a file contract would be given to miners, or put in a long range miner fee pool.
+This guarantees that as long as Sia is being used for it's core purpose (storage), there will be mining incentive.
+
+\subsection{Permanent Inflation}
+Picking something like 2\% or 5\% permanent inflation of the siacoin will discourage speculation, and also ensure that there is always a mining incentive.
+Since Sia is still useful for storage, the discouraged speculation will not kill the coin.
+
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
 This would mean creating a structure for a database that represents the state of the network and hashing it.
-We could follow suggestions simliar to those presented in \cite{ubc}.
+We could follow suggestions simliar to those presented on ultimate blockchain compression \cite{ubc}.
 
 \subsection{Variance Enforced Merge Mining}
 Bitcoin enforces a number of leading 0s on a winning block.
@@ -350,11 +361,13 @@ Alternatives have been suggested that would address things like block withholdin
 Additionally it might be useful to have a scheme where multiple miners get paid every block (this allows for high block time, but low block finding variance).
 
 \section{Conclusion}
-We have presented an idea for a protocol that would enable an incentivized decentralized storage ecosystem.
-The focus is on keeping the protocol minimal to maximize security, and to derive most of the power from the system by using smart clients and making use of arbitrary data stored on the blockchain.
+Sia takes the Bitcoin cryptocurrency and makes a few major changes.
+The first is removing the scripting system and instead enforcing a multisig solution, to reduce complexity and attack surface.
+The second is to introduce a file contract, which enables hosts to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
+Finally, arbitrary data fields have been added to all transactions to enable coordination among decentralized storage providers, and among decentralized file sharing systems.
 
-We have presented a set of potential changes to make that range from simple and probably safe to complex and probably unsafe.
-We do plan on implementing Sia as a beta without any of the 'Under Consideration' changes.
+We have addiitonally proposed a large array of potential changes that range from simple and probably safe to complex and probably unsafe.
+We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
 
 \onecolumn
 \begin{thebibliography}{9}
