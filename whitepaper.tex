@@ -228,7 +228,7 @@ In short, uptime incentives depend on client behavior.
 The primary foundation of Sia has been established in the above section.
 All other factors, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
 
-Giving careful attention to 'A Treatsie on Altcoins' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
+Giving careful attention to 'A Treatise on Altcoins' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We consider our knowledge to be currently insufficient to be certain about the security of any of these changes, which is why they are merely proposed.
 
 \subsection{Flexible Contract Penalities}
@@ -247,12 +247,10 @@ Solutions such as 'Compact Proofs of Retrievability' \cite{cpr} offer a potentia
 \subsection{Reduced Block Time}
 We are comfortable reducing the block time to 5 minutes, with the primary goal being to reduce the variance with which a miner receives payment.
 A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as invertible bloom filters \cite{ibf} are enabling faster block propagation times.
-
 We believe that the risk induced by halving the block time is less than the benefit gained from the reduced incentive to join mining pools.
 
 \subsection{More Frequent Difficulty Adjustments}
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
-Adjusting the difficulty every block is one option, and every 100 blocks is another option.
 
 \subsection{More Frequent Subsidy Adjustments}
 Increasing the frequency of the subsidy adjustment prevents problems like miner sudden miner dropoff.
@@ -262,44 +260,44 @@ It smooths out the hashrate and gives people a more continuous sense of the econ
 Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
 Then it will increase by 25\% anually.
 
-\subsection{Long Range Miner Fees}
-Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
-Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
+%\subsection{Long Range Miner Fees}
+%Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
+%Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
 
 \subsection{File Contract Fees}
-Some percent, like 1\% of all coins paid into a file contract would be given to miners, or put in a long range miner fee pool.
+Some percent, like 1\% of all coins paid into a file contract would be given to miners.
 This guarantees that as long as Sia is being used for it's core purpose (storage), there will be mining incentive.
 
-\subsection{Permanent Inflation}
-Picking something like 2\% or 5\% permanent inflation of the siacoin will discourage speculation, and also ensure that there is always a mining incentive.
-Since Sia is still useful for storage, the discouraged speculation will not kill the coin.
+%\subsection{Permanent Inflation}
+%Picking something like 2\% or 5\% permanent inflation of the siacoin will discourage speculation, and also ensure that there is always a mining incentive.
+%Since Sia is still useful for storage, the discouraged speculation will not kill the coin.
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
 This would mean creating a structure for a database that represents the state of the network and hashing it.
 We could follow suggestions simliar to those presented on ultimate blockchain compression \cite{ubc}.
 
-\subsection{Variance Enforced Merge Mining}
-Bitcoin enforces a number of leading 0s on a winning block.
-Sia could enforce something like a single leading 1, followed by a bunch of leading 0s.
-This creates the property that no hash is ever valid for both Bitcoin and Sia.
+%\subsection{Variance Enforced Merge Mining}
+%Bitcoin enforces a number of leading 0s on a winning block.
+%Sia could enforce something like a single leading 1, followed by a bunch of leading 0s.
+%This creates the property that no hash is ever valid for both Bitcoin and Sia.
 
-The value to this is that the number of payouts a miner gets from finding blocks goes up.
-The total payout is still the same, but the number of payouts increases by the number of blocks that would have been valid for both.
-A block that solves the coin with the highest difficulty will always be valid for both blockchains.
-(I need to read more about merge mining before I publish this section)
+%The value to this is that the number of payouts a miner gets from finding blocks goes up.
+%The total payout is still the same, but the number of payouts increases by the number of blocks that would have been valid for both.
+%A block that solves the coin with the highest difficulty will always be valid for both blockchains.
+%(I need to read more about merge mining before I publish this section)
 
-\subsection{Single Use Signatures}
-You submit a transaction with a 1-of-N multisig.
-Each public key would only be allowed to be used once though.
-This allows one address to be used for many transactions, without needing to reuse signatures.
+%\subsection{Single Use Signatures}
+%You submit a transaction with a 1-of-N multisig.
+%Each public key would only be allowed to be used once though.
+%This allows one address to be used for many transactions, without needing to reuse signatures.
 
-Using the concepts applied in HD Wallets \cite{hdw} might help achieve the same goal.
-Using something like a Merkle signature scheme might also help achieve this goal.
+%Using the concepts applied in HD Wallets \cite{hdw} might help achieve the same goal.
+%Using something like a Merkle signature scheme might also help achieve this goal.
 
-\subsection{Alternate Mining Structure}
-Alternatives have been suggested that would address things like block withholding attacks.
-Additionally it might be useful to have a scheme where multiple miners get paid every block (this allows for high block time, but low block finding variance).
+%\subsection{Alternate Mining Structure}
+%Alternatives have been suggested that would address things like block withholding attacks.
+%Additionally it might be useful to have a scheme where multiple miners get paid every block (this allows for high block time, but low block finding variance).
 
 \section{Conclusion}
 Sia takes the Bitcoin cryptocurrency and makes a few major changes.
@@ -307,7 +305,7 @@ The first is removing the scripting system and instead enforcing a multisig solu
 The second is to introduce a file contract, which enables hosts to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
 Finally, arbitrary data fields have been added to all transactions to enable coordination among decentralized storage providers, and among decentralized file sharing systems.
 
-We have addiitonally proposed a large array of potential changes that range from simple and probably safe to complex and probably unsafe.
+We have addiitonally proposed an array of potential changes that range from simple and probably safe to complex and probably unsafe.
 We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
 
 \onecolumn
