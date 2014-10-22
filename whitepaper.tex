@@ -54,6 +54,7 @@ A transaction contains the following fields:
 	\textbf{Field} & \textbf{Description} \\ \hline
 	Version        & Protocol version number \\ \hline
 	Arbitrary Data & Used for metadata or otherwise \\ \hline
+	Miner Fee      & A fee for the miner \\ \hline
 	Input List     & Incoming funds \\ \hline
 	Output List    & Outgoing funds (optional) \\ \hline
 	File Contract  & See: File Contracts (optional) \\ \hline
@@ -68,8 +69,6 @@ Each input comprises a previous output ID and the spend conditions associated wi
 
 \subsection{Outputs}
 Each output holds an amount to be sent, along with a hash of the output spend conditions.
-The difference between the inputs and outputs is given as a transaction fee to the miner.
-
 Each output has an associated identifier, which is derived from the transaction that the output appeared in.
 The ID of output $i$ is defined as $H(\text{input}_0 || i)$,
 where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
