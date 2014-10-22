@@ -213,6 +213,16 @@ Clients could even do random "checkups" that pay hosts some nontrivial reward si
 This further incentivizes hosts to be online and available.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
+\subsection{Open Issues}
+Clients need a reliable way to pick hosts.
+Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
+
+One solution to this might be to have clients pick hosts based on how much free space they are advertising.
+There could be a standardized method for generating Proof of Capacity random seeds, and then using a proof of capacity similar to what is suggested by Gregory Maxwell \cite{poc}.
+
+Centralized platforms for organize and rate hosts are also a potential option.
+Some form of reputation system is also an option.
+
 % \section{Sianotes}
 % \subsection{Taxing Contracts}
 % \subsection{Avoiding Taxes}
@@ -230,7 +240,7 @@ Other considerations, such as mining algorithm, block time, etc., can be assumed
 Giving careful attention to ``A Treatise on Altcoins'' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We caution that these propositions have not yet been rigorously examined from a security standpoint.
 
-\subsection{Flexible Contract Penalities}
+\subsection{Flexible Contract Penalties}
 Contracts are currently strict.
 There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
 Increased flexibility in the penalty schedule may be desirable.
@@ -344,6 +354,11 @@ We do intend to explore these proposed changes further and decide concretely on 
 	etotheipi,
 	Ultimate blockchain compression w/ trust-free lite nodes, \newline
 	https://bitcointalk.org/index.php?topic=88208.0
+
+\bibitem{poc}
+	Gregory Maxwell,
+	\emph{Proof of Storage to make distributed resource consumption costly.}
+	https://bitcointalk.org/index.php?topic=310323.0
 
 \bibitem{mpc}
 	Mike Hearn,
