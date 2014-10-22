@@ -1,0 +1,2 @@
+whitepaper:
+	pdflatex whitepaper.tex
