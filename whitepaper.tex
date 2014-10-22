@@ -135,6 +135,9 @@ The challenger can use these hashes to verify that the segment provided is indee
 If the host is consistently able to demonstrate possession of a random segment, then the host is very likely storing the whole file.
 A host storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
 
+The first window will potentially be a special case where the host does not receive compensation, because the host can submit the proof immediately after submitting the contract.
+This allows the host to claim compensation before actually holding the file.
+
 \subsection{Random Number Generation}
 The random number generator is subject to manipulation via block withholding attacks.
 Because the random number is derived from a specific block, an attacker has only one chance to manipulate the random number for a particular challenge.
@@ -322,6 +325,11 @@ Finally, arbitrary data fields have been added to all transactions to enable coo
 
 We have additionally proposed an array of potential changes that range from simple and probably safe to complex and probably unsafe.
 We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
+
+\section{Special Thanks}
+Thanks to Eliel for the proof of existence contribution, among additional contributions.
+Thanks to Mike Hearn for helping with the storage windows, among additional contributions.
+Thanks to all of the Bitcoin wizards, without whom Sia would never have stood a chance at being secure.
 
 \onecolumn
 \begin{thebibliography}{9}
