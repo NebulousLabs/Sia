@@ -253,6 +253,27 @@ These terms would likely require consent from both the uploader and downloader.
 \subsection{Different Storage Proofs}
 Solutions such as ``Compact Proofs of Retrievability'' \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
 
+\subsection{Proof of Existence Windows}
+In an attempt to partially resolve the closed window attacks, we could use a proof of existence strategy.
+A host can create a hash of the storage proof which they submit to the blockchain within the window.
+The host then has a greatly extended window in which they can demonstrate that the proof of storage was created during the required window.
+
+This has two advantages.
+First, an attacker cannot selectively exclude proof of existence hashes, because there's no way to figure out who owns each hash.
+Either the attacker doesn't include any unknown proof of existence hashes, or the attacker risks including undesired proof of existence hashes.
+Second, this allows hosts to submit small transactions to the network during peak hours and then the larger transactions when the traffic has died down.
+
+A further improvement would enable Merkle Tree proofs of existence.
+This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
+
+\subsection{Long Range Miner Fees}
+Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
+Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
+
+\subsection{File Contract Fees}
+Some percent, like 1\% of all coins paid into a file contract would be given to miners.
+This guarantees that as long as Sia is being used for it's core purpose (storage), there will be mining incentive.
+
 \subsection{Reduced Block Time}
 We are comfortable reducing the block time to 5 minutes, with the primary goal being to reduce the variance with which a miner receives payment.
 A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as invertible bloom filters \cite{ibf} are enabling faster block propagation times.
@@ -265,18 +286,6 @@ We would wish to have more frequent subsidy adjustments, which gives people a mo
 %\subsection{Max Block Size Adjustment}
 %Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
 %Then it will increase by 25\% anually.
-
-%\subsection{Long Range Miner Fees}
-%Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
-%Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
-
-\subsection{File Contract Fees}
-Some percent, like 1\% of all coins paid into a file contract would be given to miners.
-This guarantees that as long as Sia is being used for it's core purpose (storage), there will be mining incentive.
-
-%\subsection{Permanent Inflation}
-%Picking something like 2\% or 5\% permanent inflation of the siacoin will discourage speculation, and also ensure that there is always a mining incentive.
-%Since Sia is still useful for storage, the discouraged speculation will not kill the coin.
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
