@@ -240,6 +240,16 @@ Other considerations, such as mining algorithm, block time, etc., can be assumed
 Giving careful attention to ``A Treatise on Altcoins'' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We caution that these propositions have not yet been rigorously examined from a security standpoint.
 
+\subsection{Flexible Contract Length}
+I would like to see a situation where a contract can be extended or cut short by client actions.
+For example, any arbitrary person can extend a contract to encourage the host to keep the file for longer.
+For example, a client can withdraw funds from the contract halfway through and cause an early termination.
+
+This gives more power to clients and hosts, but also gives more room for contracts that are really bad for one party.
+The first feature can be emulated by a client just downloading a file and re-upping it somewhere else.
+The second feature is more tricky, and might be disagreeable to hosts.
+The second feature can be emulated by only creating contracts for a few days at a time, and continuously extending them.
+
 \subsection{Flexible Contract Penalties}
 Contracts are currently strict.
 There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
