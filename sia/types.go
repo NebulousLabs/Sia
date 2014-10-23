@@ -1,67 +1,63 @@
-package undefined
+package sia
 
-import (
-	"github.com/NebulousLabs/Sia/siacrypto"
+type (
+	Time     uint32
+	Currency uint64
+	Address  Hash
 )
 
-type Version uint16
-type Time uint32
-type Currency uint64
-type Address siacrypto.Hash
-
 type Block struct {
-	Version Version
-	Prevblock siacrypto.Hash
-	Timestamp Time
-	Nonce uint32 // may or may not be needed
+	Version      uint16
+	Prevblock    Hash
+	Timestamp    Time
+	Nonce        uint32 // may or may not be needed
 	MinerAddress Address
-	MerkleRoot siacrypto.Hash
+	MerkleRoot   Hash
 	Transactions []Transaction
 }
 
 type Transaction struct {
-	Version Version
+	Version       uint16
 	ArbitraryData []byte
-	MinerFee Currency
-	Inputs []Input
-	Outputs []Output
+	MinerFee      Currency
+	Inputs        []Input
+	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
-	Signatures []Signature
+	Signatures    []Signature
 }
 
 type Input struct {
-	OutputID Address // the source of coins for the input
+	OutputID        Address // the source of coins for the input
 	SpendConditions SpendConditions
 }
 
 type Output struct {
-	Value Currency // how many coins are in the output
-	SpendHash siacrypto.Hash // is not an address
+	Value     Currency // how many coins are in the output
+	SpendHash Hash     // is not an address
 }
 
 type SpendConditions struct {
-	TimeLock Time
-	RequiredSignatures uint8
-	PublicKeys []siacrypto.PublicKey
+	TimeLock      Time
+	NumSignatures uint8
+	PublicKeys    []PublicKey
 }
 
 type Signatures struct {
-	InputID siacrypto.Hash // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+	InputID        Hash // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
-	TimeLock Time
-	CoveredFields CoveredFields
-	Signature siacrypto.Signature
+	TimeLock       Time
+	CoveredFields  CoveredFields
+	Signature      Signature
 }
 
 type CoveredFields struct {
-	TransactionVersion bool
-	ArbitraryData bool
-	MinerFee bool
-	Inputs []uint8 // each element indicates an input index which is signed.
-	Outputs []uint8
-	Contracts []uint8
-	FileProofs []uint8
+	Version         bool
+	ArbitraryData   bool
+	MinerFee        bool
+	Inputs, Outputs []uint8 // each element indicates an input index which is signed.
+	Contracts       []uint8
+	FileProofs      []uint8
 }
 
 // Not enough flexibility in payments?  With the Start and End times, the only
@@ -69,23 +65,22 @@ type CoveredFields struct {
 // more are submitted or missed, and if they want things to scale harder in the
 // case of consecutive misses.
 type FileContract struct {
-	ContractFund Currency
-	FileMerkleRoot siacrypto.Hash
-	FileSize uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
-	ContractStart Time
-	ContractEnd Time
-	ChallengeFrequency Time // might cause problems to use the same Time that's used everywhere else, might need to be a block number or have different rules if using unicode-style time.
-	FailureTolerance uint32 // number of missed proofs before triggering unsuccessful termination
-	ValidProofPayout Currency
-	ValidProofPayoutAddress Address
-	MissedProofPayout Currency
-	MissedProofPayoutAddress Address
-	SuccessfulTerminationAddress Address
-	UnsuccessfulTerminationAddress Address
+	ContractFund       Currency
+	FileMerkleRoot     Hash
+	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
+	Start, End         Time
+	ChallengeFrequency Time   // might cause problems to use the same Time that's used everywhere else, might need to be a block number or have different rules if using unicode-style time.
+	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
+	ValidProofPayout   Currency
+	ValidProofAddress  Address
+	MissedProofPayout  Currency
+	MissedProofAddress Address
+	SuccessAddress     Address
+	FailureAddress     Address
 }
 
 type StorageProof struct {
-	ContractID hash
-	StorageProofFileSegment []byte // the 64- bytes that form the leaf of the merkle tree that's been selected to be proven on.
-	StorageProofHashSet []siacrypto.Hash
+	ContractID  hash
+	FileSegment []byte // the 64 bytes that form the leaf of the merkle tree that's been selected to be proven on.
+	HashSet     []Hash
 }
