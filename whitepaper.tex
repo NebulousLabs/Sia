@@ -215,7 +215,8 @@ However, we reiterate that uptime incentives are not part of the Sia protocol; t
 
 \subsection{Open Issues}
 Clients need a reliable way to pick hosts.
-Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
+Hosts could potentially sybil attack the network, and use false files to build up a fake reputation.
+One defense for a sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
 
 One solution to this might be to have clients pick hosts based on how much free space they are advertising.
 There could be a standardized method for generating Proof of Capacity random seeds, and then using a proof of capacity similar to what is suggested by Gregory Maxwell \cite{poc}.
