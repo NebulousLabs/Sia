@@ -4,12 +4,6 @@ import (
 	"io"
 )
 
-// A StorageProof contains the data and hashes needed to reconstruct a Merkle root.
-type StorageProof struct {
-	AtomBase  [AtomSize]byte
-	HashStack []*Hash
-}
-
 // buildProof constructs a list of hashes using the following procedure. The
 // storage proof requires traversing the Merkle tree from the proofIndex node
 // to the root. On each level of the tree, we must provide the hash of "sister"
@@ -17,12 +11,12 @@ type StorageProof struct {
 // the same parent as us.) To obtain this hash, we call MerkleCollapse on the
 // segment of data corresponding to the sister. This segment will double in
 // size on each iteration until we reach the root.
-func buildProof(rs io.ReadSeeker, numAtoms, proofIndex uint16) (sp StorageProof, err error) {
-	// get AtomBase
-	if _, err = rs.Seek(int64(proofIndex)*int64(AtomSize), 0); err != nil {
+func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StorageProof, err error) {
+	// get base segment
+	if _, err = rs.Seek(int64(proofIndex)*int64(SegmentSize), 0); err != nil {
 		return
 	}
-	if _, err = rs.Read(sp.AtomBase[:]); err != nil {
+	if _, err = rs.Read(sp.Segment[:]); err != nil {
 		return
 	}
 
@@ -41,22 +35,22 @@ func buildProof(rs io.ReadSeeker, numAtoms, proofIndex uint16) (sp StorageProof,
 	}
 
 	// calculate hashes of each sister
-	for size := uint16(1); size < numAtoms; size <<= 1 {
+	for size := uint16(1); size < numSegments; size <<= 1 {
 		// determine index
 		i := sisterIndex(size)
-		if i >= numAtoms {
+		if i >= numSegments {
 			// append dummy hash
-			sp.HashStack = append(sp.HashStack, nil)
+			sp.HashSet = append(sp.HashSet, nil)
 			continue
 		}
 
 		// seek to beginning of segment
-		rs.Seek(int64(i)*int64(AtomSize), 0)
+		rs.Seek(int64(i)*int64(SegmentSize), 0)
 
 		// truncate number of atoms to read, if necessary
 		truncSize := size
-		if i+size > numAtoms {
-			truncSize = numAtoms - i
+		if i+size > numSegments {
+			truncSize = numSegments - i
 		}
 
 		// calculate and append hash
@@ -65,7 +59,7 @@ func buildProof(rs io.ReadSeeker, numAtoms, proofIndex uint16) (sp StorageProof,
 		if err != nil {
 			return
 		}
-		sp.HashStack = append(sp.HashStack, &h)
+		sp.HashSet = append(sp.HashSet, &h)
 	}
 
 	return
@@ -76,18 +70,18 @@ func buildProof(rs io.ReadSeeker, numAtoms, proofIndex uint16) (sp StorageProof,
 // Care must be taken to ensure that the correct ordering is used when
 // concatenating hashes.
 func verifyProof(sp StorageProof, proofIndex uint16, expected Hash) bool {
-	h := HashBytes(sp.AtomBase[:])
+	h := HashBytes(sp.Segment[:])
 
 	var size uint16 = 1
-	for i := 0; i < len(sp.HashStack); i, size = i+1, size*2 {
+	for i := 0; i < len(sp.HashSet); i, size = i+1, size*2 {
 		// skip dummy hashes
-		if sp.HashStack[i] == nil {
+		if sp.HashSet[i] == nil {
 			continue
 		}
 		if proofIndex%(size*2) < size { // base is on the left branch
-			h = joinHash(h, *sp.HashStack[i])
+			h = joinHash(h, *sp.HashSet[i])
 		} else {
-			h = joinHash(*sp.HashStack[i], h)
+			h = joinHash(*sp.HashSet[i], h)
 		}
 	}
 

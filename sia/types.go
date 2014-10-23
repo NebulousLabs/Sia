@@ -1,6 +1,17 @@
 package sia
 
+const (
+	HashSize      = 32
+	PublicKeySize = 32
+	SignatureSize = 32
+	SegmentSize   = 32
+)
+
 type (
+	Hash      [HashSize]byte
+	PublicKey [PublicKeySize]byte
+	Signature [SignatureSize]byte
+
 	Time     uint32
 	Currency uint64
 	Address  Hash
@@ -80,7 +91,7 @@ type FileContract struct {
 }
 
 type StorageProof struct {
-	ContractID  hash
-	FileSegment []byte // the 64 bytes that form the leaf of the merkle tree that's been selected to be proven on.
-	HashSet     []Hash
+	ContractID Hash
+	Segment    [SegmentSize]byte
+	HashSet    []*Hash
 }

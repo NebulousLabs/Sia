@@ -6,13 +6,6 @@ import (
 	"io"
 )
 
-const (
-	HashSize = 32
-	AtomSize = 32
-)
-
-type Hash [HashSize]byte
-
 func HashBytes(data []byte) (h Hash) {
 	hash512 := sha512.Sum512(data)
 	copy(h[:], hash512[:])
@@ -25,16 +18,15 @@ func joinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
 
-// MerkleCollapse splits the provided data into segments of size AtomSize. It
-// then recursively transforms these segments into a Merkle tree, and returns
-// the root hash.
+// MerkleCollapse splits the provided data into segments. It then recursively
+// transforms these segments into a Merkle tree, and returns the root hash.
 func MerkleCollapse(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	if numAtoms == 0 {
 		err = errors.New("no data")
 		return
 	}
 	if numAtoms == 1 {
-		data := make([]byte, AtomSize)
+		data := make([]byte, SegmentSize)
 		_, err = reader.Read(data)
 		hash = HashBytes(data)
 		return
