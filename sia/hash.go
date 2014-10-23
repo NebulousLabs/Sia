@@ -27,12 +27,16 @@ func MerkleCollapse(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	}
 	if numAtoms == 1 {
 		data := make([]byte, SegmentSize)
-		_, err = reader.Read(data)
-		hash = HashBytes(data)
+		n, _ = reader.Read(data)
+		if n == 0 {
+			err = errors.New("no data")
+		} else {
+			hash = HashBytes(data)
+		}
 		return
 	}
 
-	// locate smallest power of 2 <= numAtoms
+	// locate smallest power of 2 < numAtoms
 	var mid uint16 = 1
 	for mid < numAtoms/2+numAtoms%2 {
 		mid *= 2
