@@ -14,12 +14,17 @@ type (
 
 	Time     uint32
 	Currency uint64
-	Address  Hash
+
+	BlockID    Hash
+	OutputID   Hash // An output id points to a specific output.
+	ContractID Hash
+	TransactionID Hash
+	Address    Hash // An address points to spend conditions.
 )
 
 type Block struct {
 	Version      uint16
-	Prevblock    Hash
+	Prevblock    BlockID
 	Timestamp    Time
 	Nonce        uint32 // may or may not be needed
 	MinerAddress Address
@@ -39,13 +44,13 @@ type Transaction struct {
 }
 
 type Input struct {
-	OutputID        Address // the source of coins for the input
+	OutputID        OutputID // the source of coins for the input
 	SpendConditions SpendConditions
 }
 
 type Output struct {
 	Value     Currency // how many coins are in the output
-	SpendHash Hash     // is not an address
+	SpendHash Address
 }
 
 type SpendConditions struct {
@@ -55,7 +60,7 @@ type SpendConditions struct {
 }
 
 type Signatures struct {
-	InputID        Hash // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
 	TimeLock       Time
 	CoveredFields  CoveredFields
@@ -66,7 +71,7 @@ type CoveredFields struct {
 	Version         bool
 	ArbitraryData   bool
 	MinerFee        bool
-	Inputs, Outputs []uint8 // each element indicates an input index which is signed.
+	Inputs, Outputs []uint8 // each element indicates an index which is signed.
 	Contracts       []uint8
 	FileProofs      []uint8
 }
@@ -80,7 +85,7 @@ type FileContract struct {
 	FileMerkleRoot     Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         Time
-	ChallengeFrequency Time   // might cause problems to use the same Time that's used everywhere else, might need to be a block number or have different rules if using unicode-style time.
+	ChallengeFrequency uint32 // size of window, one window at a time
 	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  Address
@@ -91,7 +96,7 @@ type FileContract struct {
 }
 
 type StorageProof struct {
-	ContractID Hash
+	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
 }
