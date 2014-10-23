@@ -1,4 +1,4 @@
-package main
+package sia
 
 import (
 	"crypto/sha512"
