@@ -1,5 +1,8 @@
 package sia
 
+// A transaction will not make it into the txn pool unless all of the signatures have been verified.
+// That that's left then is to verify that the outputs are unused.
+
 // state.go manages the state of the network, which in simplified terms is all
 // the blocks ever seen combined with some understanding of how they fit
 // together.
@@ -22,6 +25,7 @@ type State struct {
 
 type BlockNode struct {
 	ID BlockID
+	Verified bool // indicates whether the computation has been done to ensure all txns make sense.
 	Children []BlockNode
 }
 
