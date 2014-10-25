@@ -100,3 +100,8 @@ type StorageProof struct {
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
 }
+
+func (b Block) ID() (id BlockID) {
+	// Return the hash of the block.
+	return
+}
