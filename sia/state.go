@@ -18,7 +18,8 @@ type State struct {
 
 	BadBlocks map[BlockID]struct{} // A list of blocks that don't verify.
 	BlockMap map[BlockID]BlockNode // A list of all blocks in the blocktree.
-	OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
+	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
+	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
 	OpenTransactions map[TransactionID]Transaction // Transactions that are not yet incorporated into the ConsensusState.
 	DeadTransactions map[TransactionID]Transaction // Transactions that spend outputs already in a block or open transaction.
