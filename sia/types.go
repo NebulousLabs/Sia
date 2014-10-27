@@ -20,7 +20,7 @@ type (
 	OutputID      Hash // An output id points to a specific output.
 	ContractID    Hash
 	TransactionID Hash
-	Address       Hash // An address points to spend conditions.
+	CoinAddress   Hash // An address points to spend conditions.
 )
 
 type Block struct {
@@ -28,7 +28,7 @@ type Block struct {
 	ParentBlock  BlockID
 	Timestamp    Timestamp
 	Nonce        uint32 // may or may not be needed
-	MinerAddress Address
+	MinerAddress CoinAddress
 	MerkleRoot   Hash
 	Transactions []Transaction
 }
@@ -51,7 +51,7 @@ type Input struct {
 
 type Output struct {
 	Value     Currency // how many coins are in the output
-	SpendHash Address
+	SpendHash CoinAddress
 }
 
 type SpendConditions struct {
@@ -89,11 +89,11 @@ type FileContract struct {
 	ChallengeFrequency uint32 // size of window, one window at a time
 	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
-	ValidProofAddress  Address
+	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
-	MissedProofAddress Address
-	SuccessAddress     Address
-	FailureAddress     Address
+	MissedProofAddress CoinAddress
+	SuccessAddress     CoinAddress
+	FailureAddress     CoinAddress
 }
 
 type StorageProof struct {
