@@ -84,6 +84,9 @@ func (s *State) ValidateBlock(b Block) (err error) {
 
 	if err != nil {
 		// Rewind transactions added to ConsensusState.
+		for i := len(appliedTransactions) - 1; i >= 0; i-- {
+			s.RewindTransaction(appliedTransactions[i])
+		}
 		return
 	}
 
@@ -192,6 +195,7 @@ func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
 func (s *State) ApplyTransaction(t Transaction) {
 	// Remove all inputs from the unspent outputs list
 	for _, input := range t.Inputs {
+		s.ConsensusState.SpentOutputs[input.OutputID] = s.ConsensusState.UnspentOutputs[input.OutputID]
 		delete(s.ConsensusState.UnspentOutputs, input.OutputID)
 	}
 
@@ -202,6 +206,7 @@ func (s *State) ApplyTransaction(t Transaction) {
 	}
 
 	// Add all outputs created by storage proofs.
+	/*
 	for _, sp := range t.StorageProofs {
 		// Need to check that the contract fund has sufficient funds remaining.
 
@@ -211,5 +216,22 @@ func (s *State) ApplyTransaction(t Transaction) {
 			SpendHash: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofAddress,
 		}
 		s.ConsensusState.UnspentOutputs[newOutputID] = output
+	}
+	*/
+}
+
+func (s *State) ReverseTransaction (t Transaction) {
+	// Remove all outputs created by storage proofs.
+
+	// Remove all outputs created by outputs.
+	for _, output := range t.Outputs {
+		outputID := HashBytes(append(t.Inputs[0], []byte(i)))
+		delete(s.ConsensusState.UnspentOutputs, outputID)
+	}
+
+	// Add all outputs spent by inputs.
+	for _, input := range t.Inputs {
+		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
+		delete(s.ConsensusState.SpentOutputs, input.OutputID)
 	}
 }

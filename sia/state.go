@@ -45,6 +45,7 @@ type BlockNode struct {
 
 type ConsensusState struct {
 	UnspentOutputs map[OutputID]Output
+	SpendOutputs map[OutputID]Output
 	OpenContracts map[ContractID]OpenContract
 }
 
