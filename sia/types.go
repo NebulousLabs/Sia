@@ -103,6 +103,14 @@ type StorageProof struct {
 }
 
 func (b *Block) ID() (bid BlockID) {
-	// Calculate the hash of the block.
+	bytes := EncUint64(uint64(b.Version))
+	bytes = append(bytes, b.ParentBlock[:]...)
+	bytes = append(bytes, EncUint64(uint64(b.Timestamp))...)
+	bytes = append(bytes, EncUint64(uint64(b.Nonce))...)
+	bytes = append(bytes, b.MinerAddress[:]...)
+	bytes = append(bytes, b.MerkleRoot[:]...)
+
+	bid = BlockID(HashBytes(bytes))
+
 	return
 }

@@ -224,7 +224,7 @@ func (s *State) ApplyTransaction(t Transaction) {
 
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
-		newOutputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint32(uint32(i))...)))
+		newOutputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
 		s.ConsensusState.UnspentOutputs[newOutputID] = output
 	}
 
@@ -251,7 +251,7 @@ func (s *State) ReverseTransaction(t Transaction) {
 
 	// Remove all outputs created by outputs.
 	for i := range t.Outputs {
-		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint32(uint32(i))...)))
+		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
