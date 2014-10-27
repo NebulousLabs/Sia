@@ -12,17 +12,23 @@ type (
 	PublicKey [PublicKeySize]byte
 	Signature [SignatureSize]byte
 
-	Time     uint32
-	Currency uint64
-	Address  Hash
+	Timestamp   uint32
+	BlockHeight uint32
+	Currency    uint64
+
+	BlockID       Hash
+	OutputID      Hash // An output id points to a specific output.
+	ContractID    Hash
+	TransactionID Hash
+	CoinAddress   Hash // An address points to spend conditions.
 )
 
 type Block struct {
 	Version      uint16
-	Prevblock    Hash
-	Timestamp    Time
+	ParentBlock  BlockID
+	Timestamp    Timestamp
 	Nonce        uint32 // may or may not be needed
-	MinerAddress Address
+	MinerAddress CoinAddress
 	MerkleRoot   Hash
 	Transactions []Transaction
 }
@@ -35,29 +41,29 @@ type Transaction struct {
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
-	Signatures    []Signature
+	Signatures    []TransactionSignature
 }
 
 type Input struct {
-	OutputID        Address // the source of coins for the input
+	OutputID        OutputID // the source of coins for the input
 	SpendConditions SpendConditions
 }
 
 type Output struct {
 	Value     Currency // how many coins are in the output
-	SpendHash Hash     // is not an address
+	SpendHash CoinAddress
 }
 
 type SpendConditions struct {
-	TimeLock      Time
+	TimeLock      BlockHeight
 	NumSignatures uint8
 	PublicKeys    []PublicKey
 }
 
-type Signatures struct {
-	InputID        Hash // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+type TransactionSignature struct {
+	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
-	TimeLock       Time
+	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
 	Signature      Signature
 }
@@ -66,7 +72,7 @@ type CoveredFields struct {
 	Version         bool
 	ArbitraryData   bool
 	MinerFee        bool
-	Inputs, Outputs []uint8 // each element indicates an input index which is signed.
+	Inputs, Outputs []uint8 // each element indicates an index which is signed.
 	Contracts       []uint8
 	FileProofs      []uint8
 }
@@ -79,19 +85,32 @@ type FileContract struct {
 	ContractFund       Currency
 	FileMerkleRoot     Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
-	Start, End         Time
-	ChallengeFrequency Time   // might cause problems to use the same Time that's used everywhere else, might need to be a block number or have different rules if using unicode-style time.
+	Start, End         BlockHeight
+	ChallengeFrequency uint32 // size of window, one window at a time
 	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
-	ValidProofAddress  Address
+	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
-	MissedProofAddress Address
-	SuccessAddress     Address
-	FailureAddress     Address
+	MissedProofAddress CoinAddress
+	SuccessAddress     CoinAddress
+	FailureAddress     CoinAddress
 }
 
 type StorageProof struct {
-	ContractID Hash
+	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
+}
+
+func (b *Block) ID() (bid BlockID) {
+	bytes := EncUint64(uint64(b.Version))
+	bytes = append(bytes, b.ParentBlock[:]...)
+	bytes = append(bytes, EncUint64(uint64(b.Timestamp))...)
+	bytes = append(bytes, EncUint64(uint64(b.Nonce))...)
+	bytes = append(bytes, b.MinerAddress[:]...)
+	bytes = append(bytes, b.MerkleRoot[:]...)
+
+	bid = BlockID(HashBytes(bytes))
+
+	return
 }
