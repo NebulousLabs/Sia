@@ -100,6 +100,7 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
 
 	// s.BlockMap[b.ID()].Verified = true
+
 	return
 }
 
@@ -185,5 +186,30 @@ func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
 		}
 
 		// Check that the actual signature is valid, following the covered fields struct.
+	}
+}
+
+func (s *State) ApplyTransaction(t Transaction) {
+	// Remove all inputs from the unspent outputs list
+	for _, input := range t.Inputs {
+		delete(s.ConsensusState.UnspentOutputs, input.OutputID)
+	}
+
+	// Add all outputs to the unspent outputs list
+	for i, output := range t.Outputs {
+		newOutputID := HashBytes(append(t.Inputs[0], []byte(i)))
+		s.ConsensusState.UnspentOutputs[newOutputID] = output
+	}
+
+	// Add all outputs created by storage proofs.
+	for _, sp := range t.StorageProofs {
+		// Need to check that the contract fund has sufficient funds remaining.
+
+		newOutputID := HashBytes(append(ContractID), []byte(n))
+		output := Output {
+			Value: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofPayout,
+			SpendHash: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofAddress,
+		}
+		s.ConsensusState.UnspentOutputs[newOutputID] = output
 	}
 }

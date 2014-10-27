@@ -38,6 +38,9 @@ type BlockNode struct {
 
 	// A list of contract outputs that have been spent at this point, plus
 	// miner payment output.
+
+	// There also needs to be some indication of what the payout was for
+	// each contract, if a contract expired or emptied out.
 }
 
 type ConsensusState struct {
