@@ -102,15 +102,13 @@ type StorageProof struct {
 	HashSet    []*Hash
 }
 
-func (b *Block) ID() (bid BlockID) {
-	bytes := EncUint64(uint64(b.Version))
-	bytes = append(bytes, b.ParentBlock[:]...)
-	bytes = append(bytes, EncUint64(uint64(b.Timestamp))...)
-	bytes = append(bytes, EncUint64(uint64(b.Nonce))...)
-	bytes = append(bytes, b.MinerAddress[:]...)
-	bytes = append(bytes, b.MerkleRoot[:]...)
-
-	bid = BlockID(HashBytes(bytes))
-
-	return
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(MarshalAll(
+		uint64(b.Version),
+		Hash(b.ParentBlock),
+		uint64(b.Timestamp),
+		uint64(b.Nonce),
+		Hash(b.MinerAddress),
+		Hash(b.MerkleRoot),
+	)))
 }
