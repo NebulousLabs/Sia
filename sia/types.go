@@ -24,7 +24,7 @@ type (
 
 type Block struct {
 	Version      uint16
-	Prevblock    BlockID
+	ParentBlock  BlockID
 	Timestamp    Time
 	Nonce        uint32 // may or may not be needed
 	MinerAddress Address

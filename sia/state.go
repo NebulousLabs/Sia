@@ -15,14 +15,13 @@ type State struct {
 	// need to be pointers.
 	BlockRoot BlockNode
 
-
 	BadBlocks map[BlockID]struct{} // A list of blocks that don't verify.
-	BlockMap map[BlockID]BlockNode // A list of all blocks in the blocktree.
+	BlockMap map[BlockID]*BlockNode // A list of all blocks in the blocktree.
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
 	OpenTransactions map[TransactionID]Transaction // Transactions that are not yet incorporated into the ConsensusState.
-	DeadTransactions map[TransactionID]Transaction // Transactions that spend outputs already in a block or open transaction.
+	// DeadTransactions map[TransactionID]Transaction // Transactions that spend outputs already in a block or open transaction.
 
 	ConsensusState ConsensusState
 }
@@ -31,6 +30,8 @@ type BlockNode struct {
 	Block Block
 	Verified bool // indicates whether the computation has been done to ensure all txns make sense.
 	Children []*BlockNode
+
+	// A list of contract outputs that have been spent at this point, a list of outputs created passively by the block? (subsidy and miner fee?)
 }
 
 type ConsensusState struct {

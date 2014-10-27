@@ -4,9 +4,11 @@ import (
 	"errors"
 )
 
-// Currently a stateless verification. State is needed to build a tree though.
-func BlockVerify(b Block) {
-
+// Used to keep track of how many signatures an input has been signed by.
+type InputSignatures struct {
+	RemainingSignatures uint8
+	PossibleKeys []PublicKey
+	UsedKeys map[uint8]struct{}
 }
 
 // Add a block to the state struct.
@@ -51,22 +53,41 @@ func (s *State) IncorporateBlock(b Block) (err error) {
 
 	// Check the amount of work done by the block.
 
+	// Add the block to the block tree.
+	newBlockNode = new(BlockNode)
+	newBlockNode.Block = b
+	newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
+	parentBlockNode = s.BlockMap[b.ParentBlock]
+	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
+
+	// If block breaks forking threshold, validate set of blocks.
+
+}
+
+// ValidateBlock will both verify the block AND update the consensus state.
+// Updating ConsensusState is not necesary.
+func (s *State) ValidateBlock(b Block) (err error) {
 	// Check the hash on the merkle tree of transactions.
 
 	for _, txn := range b.Transactions {
-		// Validate each transaction.
-		err := s.ValidateTxn(txn)
+		err = s.ValidateTxn(txn)
 		if err != nil {
 			s.BadBlocks[bid] = struct{}{}
-			return
+			break
 		}
-	}
-}
 
-// If you are validating the block, then the consensus state needs to be
-// pointing at the current branch in the fork tree.
-func (s *State) ValidateBlock(b Block) (err error) {
-	// Move stuff from incorporate to here conditionally.
+		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
+	}
+
+	if err != nil {
+		// Rewind transactions added to ConsensusState.
+		return
+	}
+
+	// Add outputs for all of the missed proofs in the open transactions.
+
+	s.BlockMap[b.ID()].Verified = true
+	return
 }
 
 func (s *State) ValidateTxn(t Transaction) (err error) {
@@ -77,6 +98,7 @@ func (s *State) ValidateTxn(t Transaction) (err error) {
 
 	inputSum := 0
 	outputSum := t.MinerFee
+	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range Inputs {
 		utxo, exists := s.ConsensusState[input.OutputID]
 		if !exists {
@@ -90,7 +112,16 @@ func (s *State) ValidateTxn(t Transaction) (err error) {
 
 		// Check the timelock on the spend conditions is expired.
 
-		// Add the signature situation to some struct =/
+		// Create the condition for the input signatures and add it to the input signatures map.
+		_, exists = inputSignaturesMap[input.OutputID]
+		if exists {
+			err = errors.New("Output spent twice in same transaction")
+			return
+		}
+		var newInputSignatures InputSignatures
+		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
+		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
+		inputSignaturesMap[input.OutputID] = newInputSignatures
 	}
 
 	for _, output := range t.Outputs {
@@ -106,6 +137,12 @@ func (s *State) ValidateTxn(t Transaction) (err error) {
 
 	for _, proof := range t.StorageProofs {
 		// Check that the proof passes.
+		// Check that the proof has not already been submitted.
+	}
+
+	if inputSum != outputSum {
+		err = errors.New("Inputs do not equal outputs for transaction.")
+		return
 	}
 
 	for _, sig := range t.Signatures {
