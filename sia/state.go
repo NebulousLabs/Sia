@@ -1,7 +1,8 @@
 package sia
 
-// A transaction will not make it into the txn pool unless all of the signatures have been verified.
-// That that's left then is to verify that the outputs are unused.
+// A transaction will not make it into the txn pool unless all of the
+// signatures have been verified.  That that's left then is to verify that the
+// outputs are unused.
 
 // state.go manages the state of the network, which in simplified terms is all
 // the blocks ever seen combined with some understanding of how they fit
@@ -29,8 +30,11 @@ type State struct {
 type BlockNode struct {
 	Block Block
 	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
-	Height uint32 // could be computed, but this is easier.
 	Children []*BlockNode
+
+	Height uint32
+	RecentTimestamps []Time // The 11 recent timestamps.
+	// Difficulty uint32
 
 	// A list of contract outputs that have been spent at this point, plus
 	// miner payment output.

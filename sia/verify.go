@@ -58,23 +58,28 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	newBlockNode.Height = parentBlockNode.Height + 1
 	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 
-	// If block breaks forking threshold, validate set of blocks.
-
+	// If block breaks forking threshold, integrate set of blocks.
 }
 
 // ValidateBlock will both verify the block AND update the consensus state.
-// Updating ConsensusState is not necesary.
+// Calling integrate block is not needed.
 func (s *State) ValidateBlock(b Block) (err error) {
 	// Check the hash on the merkle tree of transactions.
 
+	var appliedTransactions []Transaction
+	minerSubsidy := 0
 	for _, txn := range b.Transactions {
-		err = s.ValidateTxn(txn)
+		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
 		if err != nil {
 			s.BadBlocks[bid] = struct{}{}
 			break
 		}
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
+		s.ApplyTransaction(txn)
+		appliedTransactions = append(appliedTransactions, txn)
+
+		minerSubsidy += txn.MinerFee
 	}
 
 	if err != nil {
@@ -83,7 +88,16 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	}
 
 	// Add outputs for all of the missed proofs in the open transactions.
+
+	// Add coin inflation to the miner subsidy.
+
 	// Add output contianing miner fees + block subsidy.
+	minerSubsidyID = append(b.ID(), []byte("minerSubsidy"))
+	minerSubsidyOutput := Output {
+		Value: minerSubsidy,
+		SpendConditions: b.MinerAddress,
+	}
+	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
 
 	// s.BlockMap[b.ID()].Verified = true
 	return
@@ -91,7 +105,7 @@ func (s *State) ValidateBlock(b Block) (err error) {
 
 // Add a function that integrates a block without verifying it.
 
-func (s *State) ValidateTxn(t Transaction) (err error) {
+func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
 	if t.Version != 1 {
 		err = errors.New("Transaction version is not recognized.")
 		return
@@ -131,9 +145,14 @@ func (s *State) ValidateTxn(t Transaction) (err error) {
 
 	for _, contract := range t.FileContracts {
 		outputSum := contract.ContractFund
-
-		// Check that start is in the future.
-		// Check that end is after start.
+		if contract.Start < currentHeight {
+			err = errors.New("Contract starts in the future.")
+			return
+		}
+		if contract.End <= contract.Start {
+			err = errors.New("Contract duration must be at least one block.")
+			return
+		}
 	}
 
 	for _, proof := range t.StorageProofs {
@@ -147,9 +166,23 @@ func (s *State) ValidateTxn(t Transaction) (err error) {
 	}
 
 	for _, sig := range t.Signatures {
-		// Check that each signature adds value to the input. (signs a unique public key, isn't frivilous)
+		// Check that each signature signs a unique pubkey where
+		// RemainingSignatures > 0.
+		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
+			err = errors.New("Friviolous Signature detected.")
+			return
+		}
+		_, exists := inputSignaturesMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
+		if exists {
+			err = errors.New("public key used twice while signing")
+			return
+		}
 
 		// Check the timelock on the signature.
+		if sig.Timelock <= currentHeight {
+			err = errors.New("signature timelock has not expired")
+			return
+		}
 
 		// Check that the actual signature is valid, following the covered fields struct.
 	}

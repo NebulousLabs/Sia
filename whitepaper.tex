@@ -73,6 +73,8 @@ Each output has an associated identifier, which is derived from the transaction 
 The ID of output $i$ is defined as $H(\text{input}_0 || i)$,
 where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
 
+The miner subsidy and fees are given the ID = $H(H(Block) || \text{miner})$.
+
 \subsection{Spend Conditions}
 Both inputs and outputs make use of spend conditions, which dictate the circumstances under which an output can be spent.
 The two allowed conditions are a time lock (which locks the output until a certain time) and an $M$ of $N$ signature scheme.
