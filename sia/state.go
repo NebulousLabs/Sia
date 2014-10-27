@@ -14,11 +14,11 @@ type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.  Blocks can never be removed from the tree, so this doesn't
 	// need to be pointers.
-	BlockRoot BlockNode
+	BlockRoot    BlockNode
 	CurrentBlock BlockID
 
-	BadBlocks map[BlockID]struct{} // A list of blocks that don't verify.
-	BlockMap map[BlockID]*BlockNode // A list of all blocks in the blocktree.
+	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
+	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
@@ -33,8 +33,8 @@ type BlockNode struct {
 	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
 	Children []*BlockNode
 
-	Height uint32
-	RecentTimestamps []Time // The 11 recent timestamps.
+	Height           BlockHeight
+	RecentTimestamps []Timestamp // The 11 recent timestamps.
 	// Difficulty uint32
 
 	// A list of contract outputs that have been spent at this point, plus
@@ -46,12 +46,12 @@ type BlockNode struct {
 
 type ConsensusState struct {
 	UnspentOutputs map[OutputID]Output
-	SpendOutputs map[OutputID]Output
-	OpenContracts map[ContractID]OpenContract
+	SpentOutputs   map[OutputID]Output
+	OpenContracts  map[ContractID]OpenContract
 }
 
 type OpenContract struct {
-	Contract FileContract
+	Contract       FileContract
 	RemainingFunds Currency
-	CurrentWindow bool // true means that a proof has been seen for the current window, false means it hasn't.
+	CurrentWindow  bool // true means that a proof has been seen for the current window, false means it hasn't.
 }

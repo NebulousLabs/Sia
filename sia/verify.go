@@ -7,8 +7,8 @@ import (
 // Used to keep track of how many signatures an input has been signed by.
 type InputSignatures struct {
 	RemainingSignatures uint8
-	PossibleKeys []PublicKey
-	UsedKeys map[uint8]struct{}
+	PossibleKeys        []PublicKey
+	UsedKeys            map[uint8]struct{}
 }
 
 // Add a block to the state struct.
@@ -41,7 +41,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		return
 	} */
 
-	prevNode, exists := s.BlockMap[b.Prevblock]
+	parentBlockNode, exists := s.BlockMap[b.ParentBlock]
 	if !exists {
 		// OrphanBlocks[bid] = b
 		err = errors.New("Block is an orphan")
@@ -51,10 +51,9 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// Check the amount of work done by the block.
 
 	// Add the block to the block tree.
-	newBlockNode = new(BlockNode)
+	newBlockNode := new(BlockNode)
 	newBlockNode.Block = b
 	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
-	parentBlockNode = s.BlockMap[b.ParentBlock]
 	newBlockNode.Height = parentBlockNode.Height + 1
 	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 
@@ -73,6 +72,8 @@ func (s *State) AcceptBlock(b Block) (err error) {
 
 		s.CurrentBlock = bid
 	}
+
+	return
 }
 
 // ValidateBlock will both verify the block AND update the consensus state.
@@ -81,11 +82,11 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	// Check the hash on the merkle tree of transactions.
 
 	var appliedTransactions []Transaction
-	minerSubsidy := 0
+	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
 		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
 		if err != nil {
-			s.BadBlocks[bid] = struct{}{}
+			s.BadBlocks[b.ID()] = struct{}{}
 			break
 		}
 
@@ -99,7 +100,7 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	if err != nil {
 		// Rewind transactions added to ConsensusState.
 		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.RewindTransaction(appliedTransactions[i])
+			s.ReverseTransaction(appliedTransactions[i])
 		}
 		return
 	}
@@ -109,10 +110,11 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	// Add coin inflation to the miner subsidy.
 
 	// Add output contianing miner fees + block subsidy.
-	minerSubsidyID = HashBytes(append([]byte(b.ID()), []byte("minerSubsidy")))
-	minerSubsidyOutput := Output {
-		Value: minerSubsidy,
-		SpendConditions: b.MinerAddress,
+	bid := b.ID()
+	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
+	minerSubsidyOutput := Output{
+		Value:     minerSubsidy,
+		SpendHash: b.MinerAddress,
 	}
 	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
 
@@ -123,17 +125,17 @@ func (s *State) ValidateBlock(b Block) (err error) {
 
 // Add a function that integrates a block without verifying it.
 
-func (s *State) ValidateTxn(t Transaction, currentHeight Time) (err error) {
+func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error) {
 	if t.Version != 1 {
 		err = errors.New("Transaction version is not recognized.")
 		return
 	}
 
-	inputSum := 0
+	inputSum := Currency(0)
 	outputSum := t.MinerFee
 	var inputSignaturesMap map[OutputID]InputSignatures
-	for _, input := range Inputs {
-		utxo, exists := s.ConsensusState[input.OutputID]
+	for _, input := range t.Inputs {
+		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
 			err = errors.New("Transaction spends a nonexisting output")
 			return
@@ -166,7 +168,6 @@ func (s *State) ValidateTxn(t Transaction, currentHeight Time) (err error) {
 	}
 
 	for _, contract := range t.FileContracts {
-		outputSum := contract.ContractFund
 		if contract.Start < currentHeight {
 			err = errors.New("Contract starts in the future.")
 			return
@@ -177,10 +178,12 @@ func (s *State) ValidateTxn(t Transaction, currentHeight Time) (err error) {
 		}
 	}
 
-	for _, proof := range t.StorageProofs {
-		// Check that the proof passes.
-		// Check that the proof has not already been submitted.
-	}
+	/*
+		for _, proof := range t.StorageProofs {
+			// Check that the proof passes.
+			// Check that the proof has not already been submitted.
+		}
+	*/
 
 	if inputSum != outputSum {
 		err = errors.New("Inputs do not equal outputs for transaction.")
@@ -201,13 +204,15 @@ func (s *State) ValidateTxn(t Transaction, currentHeight Time) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.Timelock < currentHeight {
+		if sig.TimeLock < currentHeight {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
 
 		// Check that the actual signature is valid, following the covered fields struct.
 	}
+
+	return
 }
 
 func (s *State) ApplyTransaction(t Transaction) {
@@ -219,31 +224,34 @@ func (s *State) ApplyTransaction(t Transaction) {
 
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
-		newOutputID := HashBytes(append(t.Inputs[0], []byte(i)))
+		newOutputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint32(uint32(i))...)))
 		s.ConsensusState.UnspentOutputs[newOutputID] = output
 	}
 
 	// Add all outputs created by storage proofs.
 	/*
-	for _, sp := range t.StorageProofs {
-		// Need to check that the contract fund has sufficient funds remaining.
+		for _, sp := range t.StorageProofs {
+			// Need to check that the contract fund has sufficient funds remaining.
 
-		newOutputID := HashBytes(append(ContractID), []byte(n))
-		output := Output {
-			Value: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofPayout,
-			SpendHash: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofAddress,
+			newOutputID := HashBytes(append(ContractID), []byte(n))
+			output := Output {
+				Value: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofPayout,
+				SpendHash: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofAddress,
+			}
+			s.ConsensusState.UnspentOutputs[newOutputID] = output
+
+			// need a counter or some way to determine what the index of
+			// the window is.
 		}
-		s.ConsensusState.UnspentOutputs[newOutputID] = output
-	}
 	*/
 }
 
-func (s *State) ReverseTransaction (t Transaction) {
+func (s *State) ReverseTransaction(t Transaction) {
 	// Remove all outputs created by storage proofs.
 
 	// Remove all outputs created by outputs.
-	for _, output := range t.Outputs {
-		outputID := HashBytes(append(t.Inputs[0], []byte(i)))
+	for i := range t.Outputs {
+		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint32(uint32(i))...)))
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 

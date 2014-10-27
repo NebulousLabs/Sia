@@ -27,7 +27,7 @@ func MerkleCollapse(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	}
 	if numAtoms == 1 {
 		data := make([]byte, SegmentSize)
-		n, _ = reader.Read(data)
+		n, _ := reader.Read(data)
 		if n == 0 {
 			err = errors.New("no data")
 		} else {

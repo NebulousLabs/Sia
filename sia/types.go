@@ -12,20 +12,21 @@ type (
 	PublicKey [PublicKeySize]byte
 	Signature [SignatureSize]byte
 
-	Time     uint32
-	Currency uint64
+	Timestamp   uint32
+	BlockHeight uint32
+	Currency    uint64
 
-	BlockID    Hash
-	OutputID   Hash // An output id points to a specific output.
-	ContractID Hash
+	BlockID       Hash
+	OutputID      Hash // An output id points to a specific output.
+	ContractID    Hash
 	TransactionID Hash
-	Address    Hash // An address points to spend conditions.
+	Address       Hash // An address points to spend conditions.
 )
 
 type Block struct {
 	Version      uint16
 	ParentBlock  BlockID
-	Timestamp    Time
+	Timestamp    Timestamp
 	Nonce        uint32 // may or may not be needed
 	MinerAddress Address
 	MerkleRoot   Hash
@@ -40,7 +41,7 @@ type Transaction struct {
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
-	Signatures    []Signature
+	Signatures    []TransactionSignature
 }
 
 type Input struct {
@@ -54,15 +55,15 @@ type Output struct {
 }
 
 type SpendConditions struct {
-	TimeLock      Time
+	TimeLock      BlockHeight
 	NumSignatures uint8
 	PublicKeys    []PublicKey
 }
 
-type Signatures struct {
+type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
-	TimeLock       Time
+	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
 	Signature      Signature
 }
@@ -84,7 +85,7 @@ type FileContract struct {
 	ContractFund       Currency
 	FileMerkleRoot     Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
-	Start, End         Time
+	Start, End         BlockHeight
 	ChallengeFrequency uint32 // size of window, one window at a time
 	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
@@ -99,4 +100,9 @@ type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
+}
+
+func (b *Block) ID() (bid BlockID) {
+	// Calculate the hash of the block.
+	return
 }
