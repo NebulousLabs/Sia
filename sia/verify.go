@@ -12,10 +12,7 @@ type InputSignatures struct {
 }
 
 // Add a block to the state struct.
-//
-// Currently txns are not harvested from bad blocks. Good txns should be
-// harvested from bad blocks.
-func (s *State) IncorporateBlock(b Block) (err error) {
+func (s *State) AcceptBlock(b Block) (err error) {
 	bid := b.ID() // Function is not implemented.
 
 	_, exists := s.BadBlocks[bid]
@@ -56,8 +53,9 @@ func (s *State) IncorporateBlock(b Block) (err error) {
 	// Add the block to the block tree.
 	newBlockNode = new(BlockNode)
 	newBlockNode.Block = b
-	newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
+	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
 	parentBlockNode = s.BlockMap[b.ParentBlock]
+	newBlockNode.Height = parentBlockNode.Height + 1
 	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 
 	// If block breaks forking threshold, validate set of blocks.
@@ -85,10 +83,13 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	}
 
 	// Add outputs for all of the missed proofs in the open transactions.
+	// Add output contianing miner fees + block subsidy.
 
-	s.BlockMap[b.ID()].Verified = true
+	// s.BlockMap[b.ID()].Verified = true
 	return
 }
+
+// Add a function that integrates a block without verifying it.
 
 func (s *State) ValidateTxn(t Transaction) (err error) {
 	if t.Version != 1 {

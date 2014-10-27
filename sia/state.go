@@ -28,10 +28,12 @@ type State struct {
 
 type BlockNode struct {
 	Block Block
-	Verified bool // indicates whether the computation has been done to ensure all txns make sense.
+	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
+	Height uint32 // could be computed, but this is easier.
 	Children []*BlockNode
 
-	// A list of contract outputs that have been spent at this point, a list of outputs created passively by the block? (subsidy and miner fee?)
+	// A list of contract outputs that have been spent at this point, plus
+	// miner payment output.
 }
 
 type ConsensusState struct {
