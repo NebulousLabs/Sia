@@ -15,6 +15,7 @@ type State struct {
 	// blocktree.  Blocks can never be removed from the tree, so this doesn't
 	// need to be pointers.
 	BlockRoot BlockNode
+	CurrentBlock BlockID
 
 	BadBlocks map[BlockID]struct{} // A list of blocks that don't verify.
 	BlockMap map[BlockID]*BlockNode // A list of all blocks in the blocktree.

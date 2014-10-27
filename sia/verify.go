@@ -58,7 +58,21 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	newBlockNode.Height = parentBlockNode.Height + 1
 	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 
-	// If block breaks forking threshold, integrate set of blocks.
+	// Do anything necessary to the transaction pool.
+
+	// If block adds to the current fork, validate it and advance fork.
+	// Note: current implementation will only ever accept the first block
+	// it sees, instead of picking longest chain.
+	if b.ParentBlock == s.CurrentBlock {
+		err = s.ValidateBlock(b)
+		if err != nil {
+			s.BadBlocks[bid] = struct{}{}
+			parentBlockNode.Children = parentBlockNode.Children[:len(parentBlockNode.Children)-1]
+			return
+		}
+
+		s.CurrentBlock = bid
+	}
 }
 
 // ValidateBlock will both verify the block AND update the consensus state.
@@ -95,7 +109,7 @@ func (s *State) ValidateBlock(b Block) (err error) {
 	// Add coin inflation to the miner subsidy.
 
 	// Add output contianing miner fees + block subsidy.
-	minerSubsidyID = append(b.ID(), []byte("minerSubsidy"))
+	minerSubsidyID = HashBytes(append([]byte(b.ID()), []byte("minerSubsidy")))
 	minerSubsidyOutput := Output {
 		Value: minerSubsidy,
 		SpendConditions: b.MinerAddress,
@@ -109,7 +123,7 @@ func (s *State) ValidateBlock(b Block) (err error) {
 
 // Add a function that integrates a block without verifying it.
 
-func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
+func (s *State) ValidateTxn(t Transaction, currentHeight Time) (err error) {
 	if t.Version != 1 {
 		err = errors.New("Transaction version is not recognized.")
 		return
@@ -130,6 +144,10 @@ func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
 		// Check that the spend conditions match the hash listed in the output.
 
 		// Check the timelock on the spend conditions is expired.
+		if input.SpendConditions.TimeLock < currentHeight {
+			err = errors.New("Output spent before timelock expiry.")
+			return
+		}
 
 		// Create the condition for the input signatures and add it to the input signatures map.
 		_, exists = inputSignaturesMap[input.OutputID]
@@ -183,7 +201,7 @@ func (s *State) ValidateTxn(t Transaction, currentHeight uint32) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.Timelock <= currentHeight {
+		if sig.Timelock < currentHeight {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
