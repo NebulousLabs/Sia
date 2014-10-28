@@ -12,9 +12,11 @@ import (
 type Wallet struct {
 	SecretKey *ecdsa.PrivateKey
 
+	SpendConditions SpendConditions
+
 	// OwnedOutputs is a list of outputs that can spent using the secret
 	// key.
-	OwnedOutputs map[OutputID]Output
+	// OwnedOutputs map[OutputID]Output
 }
 
 func CreateWallet() (w *Wallet, err error) {
@@ -22,17 +24,15 @@ func CreateWallet() (w *Wallet, err error) {
 
 	curve := elliptic.P256()
 	w.SecretKey, err = ecdsa.GenerateKey(curve, rand.Reader)
+
+	w.SpendConditions.NumSignatures = 1
+	w.SpendConditions.PublicKeys = make([]PublicKey, 1)
+	w.SpendConditions.PublicKeys[0] = PublicKey(w.SecretKey.PublicKey)
+
 	return
 }
 
 func (w *Wallet) GetAddress() (ca CoinAddress) {
-	var sc SpendConditions
-	sc.NumSignatures = 1
-	sc.PublicKeys = make([]PublicKey, 1)
-	sc.PublicKeys[0] = PublicKey(w.SecretKey.PublicKey)
-
-	// ca = HashStruct(SpendConditions)
-	// SpendConditions should be a merkle tree.
-
+	// ca = HashStruct(w.SpendConditions)
 	return
 }
