@@ -12,7 +12,7 @@ type (
 	PublicKey [PublicKeySize]byte
 	Signature [SignatureSize]byte
 
-	Timestamp   uint32
+	Timestamp   int64
 	BlockHeight uint32
 	Currency    uint64
 
