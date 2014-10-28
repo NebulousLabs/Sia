@@ -101,14 +101,3 @@ type StorageProof struct {
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
 }
-
-func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
-		uint64(b.Version),
-		Hash(b.ParentBlock),
-		uint64(b.Timestamp),
-		uint64(b.Nonce),
-		Hash(b.MinerAddress),
-		Hash(b.MerkleRoot),
-	)))
-}
