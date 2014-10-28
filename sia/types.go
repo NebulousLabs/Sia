@@ -35,7 +35,7 @@ type (
 )
 
 type Signature struct {
-	r, s *big.Int
+	R, S *big.Int
 }
 
 type Block struct {
