@@ -13,7 +13,7 @@ func TestBlockBuilding(t *testing.T) {
 	}
 
 	// Generate the Genesis State
-	state := CreateGenesisState(wallet.GetAddress())
+	state := CreateGenesisState(wallet.CoinAddress)
 
 	// Create an empty second block.
 	secondBlock := state.GenerateBlock()
