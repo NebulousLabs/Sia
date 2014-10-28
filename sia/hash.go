@@ -1,15 +1,13 @@
 package sia
 
 import (
-	"crypto/sha512"
+	"crypto/sha256"
 	"errors"
 	"io"
 )
 
-func HashBytes(data []byte) (h Hash) {
-	hash512 := sha512.Sum512(data)
-	copy(h[:], hash512[:])
-	return
+func HashBytes(data []byte) Hash {
+	return sha256.Sum256(data)
 }
 
 // Helper function for merkle trees; takes two hashes, appends them, and then
