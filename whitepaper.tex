@@ -226,8 +226,9 @@ This further incentivizes providers to be online and available.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
 \subsection{Basic Reputation System}
-Clients need some metric for picking storage providers.
-The arbitrary data leaves room for advanced reputations schemes, however we describe a simple one here.
+Clients need a reliable method for picking storage providers.
+Hosts could potentially sybil attack the network, and use false files to build up a fake reputation.
+One defense for a sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
 
 Storage providers declare themselves using the arbitrary data in a transaction that creates a large timelocked output.
 The timelocked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform sybil attacks, as they will need large timelocked outputs.
