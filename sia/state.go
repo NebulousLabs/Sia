@@ -12,9 +12,8 @@ package sia
 // everything, instead of using pointers.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
-	// blocktree.  Blocks can never be removed from the tree, so this doesn't
-	// need to be pointers.
-	BlockRoot    BlockNode
+	// blocktree.
+	BlockRoot    *BlockNode
 	CurrentBlock BlockID
 
 	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
@@ -22,14 +21,14 @@ type State struct {
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
-	OpenTransactions map[TransactionID]Transaction // Transactions that are not yet incorporated into the ConsensusState.
+	// OpenTransactions map[TransactionID]Transaction // Transactions that are not yet incorporated into the ConsensusState.
 	// DeadTransactions map[TransactionID]Transaction // Transactions that spend outputs already in a block or open transaction.
 
 	ConsensusState ConsensusState
 }
 
 type BlockNode struct {
-	Block Block
+	Block *Block
 	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
 	Children []*BlockNode
 
@@ -47,7 +46,7 @@ type BlockNode struct {
 type ConsensusState struct {
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
-	OpenContracts  map[ContractID]OpenContract
+	// OpenContracts  map[ContractID]OpenContract
 }
 
 type OpenContract struct {

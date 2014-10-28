@@ -18,9 +18,23 @@ func joinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
 
-// MerkleCollapse splits the provided data into segments. It then recursively
+// Takes as input a slice of hashes, which are the leaves of the merkle tree.
+// Produces the root hash from these leaves. The hashes correspond to some data
+// structure underneath. This function is useful for building merkle trees out
+// of arbitrary stuff, like transactions.
+func BuildMerkleTree(leaves []Hash) (hash Hash, err error) {
+	if len(leaves) == 0 {
+		err = errors.New("Cannot build tree of of length 1 object")
+		return
+	}
+
+	hash = leaves[0]
+	return
+}
+
+// MerkleFile splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
-func MerkleCollapse(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
+func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	if numAtoms == 0 {
 		err = errors.New("no data")
 		return
@@ -43,8 +57,19 @@ func MerkleCollapse(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	}
 
 	// since we always read "left to right", no extra Seeking is necessary
-	left, _ := MerkleCollapse(reader, mid)
-	right, err := MerkleCollapse(reader, numAtoms-mid)
+	left, _ := MerkleFile(reader, mid)
+	right, err := MerkleFile(reader, numAtoms-mid)
 	hash = joinHash(left, right)
 	return
+}
+
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(MarshalAll(
+		uint64(b.Version),
+		Hash(b.ParentBlock),
+		uint64(b.Timestamp),
+		uint64(b.Nonce),
+		Hash(b.MinerAddress),
+		Hash(b.MerkleRoot),
+	)))
 }

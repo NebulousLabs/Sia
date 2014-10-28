@@ -8,7 +8,7 @@ import (
 // storage proof requires traversing the Merkle tree from the proofIndex node
 // to the root. On each level of the tree, we must provide the hash of "sister"
 // node. (Since this is a binary tree, the sister node is the other node with
-// the same parent as us.) To obtain this hash, we call MerkleCollapse on the
+// the same parent as us.) To obtain this hash, we call MerkleFile on the
 // segment of data corresponding to the sister. This segment will double in
 // size on each iteration until we reach the root.
 func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StorageProof, err error) {
@@ -55,7 +55,7 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 
 		// calculate and append hash
 		var h Hash
-		h, err = MerkleCollapse(rs, truncSize)
+		h, err = MerkleFile(rs, truncSize)
 		if err != nil {
 			return
 		}

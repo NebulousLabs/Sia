@@ -12,7 +12,7 @@ type InputSignatures struct {
 }
 
 // Add a block to the state struct.
-func (s *State) AcceptBlock(b Block) (err error) {
+func (s *State) AcceptBlock(b *Block) (err error) {
 	bid := b.ID() // Function is not implemented.
 
 	_, exists := s.BadBlocks[bid]
@@ -78,7 +78,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 
 // ValidateBlock will both verify the block AND update the consensus state.
 // Calling integrate block is not needed.
-func (s *State) ValidateBlock(b Block) (err error) {
+func (s *State) ValidateBlock(b *Block) (err error) {
 	// Check the hash on the merkle tree of transactions.
 
 	var appliedTransactions []Transaction
