@@ -19,19 +19,33 @@ luke@nebulouslabs.com
 \maketitle
 
 \subsection*{Abstract}
+Sia is a platform for decentralized storage.
+Storage providers agree produce regular proofs of storage in return for compensation.
+Failure to provide storage proofs results in financial penalty.
+
 Sia is a Bitcoin-based altcoin with added support for decentralized storage.
-With the primary goal of security, very few changes have been made to the Bitcoin protocol, only what is absolutely necessary.
-Additional changes have been suggested in the final section, but will not be used without serious consideration and peer review.
+With the primary goal of security, few changes have been made to the Bitcoin protocol.
 
 \section{Introduction}
 We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions cloud storage, both at the p2p level and the enterprise level.
-We use smart contracts and decentralized consensus as the foundation for our platform.
-We start with a system very similar to Bitcoin \cite{btc}\cite{btcdg}, and add a self-enforcing contract that allows hosts to accept compensation for storing a file if they can regularly submit proof that they are storing the file.
-The network automatically creates proof of storage challenges, allowing the client to 'set and forget'.
+We wish to achieve the following goals:
+\begin{itemize}
+	\item Anyone can join the network as a storage provider and be compensated.
+	\item Clients can upload files to the network, but do not need to remain online to submit proof of storage challenges to storage providers.
+	\item Storage providers will suffer a financial penalty for losing a file, even if the client is not online to submit storage challenges.
+	\item Storage providers will be compensated for successfully storing a file, regardless of client behavior.
+	\item Clients can achieve high file reliability, even when the average storage provider is not reliable.
+\end{itemize}
 
-We have chosen to make an altcoin because we need a specific type of smart contract to scan the blockchain for storage proofs.
-This is not possible within Bitcoin, so a more robust solution is needed.
-Between the existing altcoins and the promise of sidechains, we nonetheless felt that building an altcoin provided the greatest potential for success.
+We have chosen to use a blockchain similar to Bitcoin \cite{btc, btcdg} as the foundation for our platform.
+This is accomplished by adding a smart contract transaction type to the blockchain.
+With this contract, a storage provider agrees to store a file for a period of time, submitting publicly auditable proofs of storage at some frequency.
+Failure to submit a proof of storage results in a penalty for the storage provider, but succeeding results in compensation.
+A blockchain is necessary to enforce that storage providers are paid or penalized appropriately regardless of client behavior.
+
+The initial implementation of our decentralized storage platform will be a blockchain with an altcoin.
+Future support for a two way peg with Bitcoin is planned, once there is a well established method for creating Bitcoin sidechains.
+With security in mind as the highest priority, our blockchain mimics Bitcoin except for the changes noted below.
 
 \section{General Structure}
 The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
@@ -42,9 +56,9 @@ This reduces complexity and attack surface.
 
 Sia further extends transactions to enable file storage on the network.
 Two extensions are needed to accomplish this: file contracts and storage proofs.
-File contracts declare the intention of a host to store a file with a certain size and hash.
-They specify that a host must periodically prove that they are still storing the file.
-Hosts accomplish this by submitting storage proofs to the network.
+File contracts declare the intention of a storage provider to store a file with a certain size and hash.
+They specify that a provider must periodically prove that they are still storing the file.
+Providers accomplish this by submitting storage proofs to the network.
 The specifics of this arrangement are defined in sections \ref{sec:contracts} and \ref{sec:storage}, respectively.
 
 \section{Transactions}
@@ -73,13 +87,13 @@ Each output has an associated identifier, which is derived from the transaction 
 The ID of output $i$ is defined as $H(\text{input}_0 || i)$,
 where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
 
-The miner subsidy and fees are given the ID = $H(H(Block) || \text{blockReward})$.
+The miner subsidy and fees each block are given output ID = $H(H(Block) || "blockReward")$.
 
 \subsection{Spend Conditions}
 Both inputs and outputs make use of spend conditions, which dictate the circumstances under which an output can be spent.
 The two allowed conditions are a time lock (which locks the output until a certain time) and an $M$ of $N$ signature scheme.
 In such a scheme, there are $N$ public keys on the ``whitelist''.
-Some subset $M < N$ must sign the transaction in order to unlock the output. 
+Some subset $M <= N$ must sign the transaction in order to unlock the output. 
 
 \subsection{Signatures}
 Each cryptographic signature is paired with an input ID and a time lock. 
@@ -95,11 +109,11 @@ Every such signature in the transaction must be valid for the transaction to be 
 
 \section{File Contracts}
 \label{sec:contracts}
-A file contract is an agreement between a host and an uploader that the host will store a file.
+A file contract is an agreement between a storage provider and a client requiring the provider to store a certain file.
 At the core of a file contract is the file's Merkle root hash \cite{merkle}.
-This hash, along with the total number of segments, can be used to verify storage proofs.
+This hash, along with the total size of the file, can be used to verify storage proofs.
 
-File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the refund for an invalid or missing proof, and the maximum number of proofs that can be missed.
+File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the reward for an invalid or missing proof, and the maximum number of proofs that can be missed.
 If the file contract is still valid at the end of the specified duration, it ``successfully terminates.''
 Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract ``unsuccessfully terminates.''
 Each of these potential outcomes (valid proof, invalid proof, successful termination, unsuccessful termination) has an associated recipient.
@@ -112,10 +126,10 @@ The outcome has four possible values, corresponding to the four potential outcom
 The index is the number of times this outcome has occurred during the contract.
 Terminations will always have an index of 0, as the contract can only terminate once.
 
-% This section needs help.
-The contract ID is defined as the hash of the transaction announcing the contract.
-The contract must be funded by output 0, which must specify a null recipient.
-(A null recipient is defined as having all zeros as the hash of its spend conditions.)
+It is noted that during standard use, the intended recipient for valid proofs and successful terminations is the storage provider, and the intended recipient for invalid proofs and unsuccesful terminations is the client.
+It is expected that both the client and the storage provider provide funds to the contract, which enables providers to be penalized for losing files.
+
+The ID of contract $i$ is defined by $H(\text{input}_0 || "contract" || i)$, where input$_0$ is the first input of the transaction and ``contract'' is the string ``contract''.
 
 \section{Proof of Storage}
 \label{sec:storage}
@@ -124,18 +138,20 @@ Each storage proof targets a specific file.
 A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
 
 \subsection{Algorithm}
-Each contract has a challenge frequency, which requires the host to submit a storage proof every $N$ blocks.
+Each contract has a challenge frequency, which requires the storage provider to submit a storage proof every $N$ blocks.
 Each interval of $N$ blocks then constitutes a ``window'' in which to submit the proof.
-The first such window, $W_0$, is specified within the contract.
-Contracts can be submitted to the blockchain before the first window, which will lock down the funds and guarantee enforcement of the contract.
+The first such window, $W_0$, begins at a time which is specified in the contract.
+Contracts can be submitted to the blockchain before the first window begins, which will lock down the funds and guarantee enforcement of the contract.
 
 The storage challenge requires a random number as a seed.
-The random number for window $W_i$ is generated by concatenating contract ID with the block prior to $W_i$ (i.e. $W_0 + i \times N - 1$) and hashing the result.
+The random number for window $W_i$ is generated by concatenating contract ID to the hash of the block prior to $W_i$ (i.e. $W_i + i \times N - 1$) and hashing the result.
 This seed is used to select one of the file segments used to produce the Merkle tree.
-The host supplies this segment data, along with the set of hashes that can be used to reconstruct the root of the tree.
-The challenger can use these hashes to verify that the segment provided is indeed part of the original file.
-If the host is consistently able to demonstrate possession of a random segment, then the host is very likely storing the whole file.
-A host storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
+The provider supplies this segment data, along with the set of hashes that can be used to reconstruct the root of the tree.
+The verifier can use these hashes to verify that the segment provided is indeed part of the original file.
+Because the proofs are submitted to the blockchain, everyone can verify that the provider has provided the correct random segment.
+
+If the providre is consistently able to demonstrate possession of a random segment, then the provider is very likely storing the whole file.
+A provider storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
 
 \subsection{Random Number Generation}
 The random number generator is subject to manipulation via block withholding attacks.
@@ -149,82 +165,81 @@ Assuming the attacker is financially motivated, large windows and severe penalti
 Clients are nonetheless advised to plan around potential Byzantine attacks which may not be financially motivated.
 
 \subsection{Closed Window Attacks}
-Hosts can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
-Miners could maliciously exclude storage proofs from blocks, depriving themselves of transactions fees but forcing a penalty the hosts.
-We call this a 'closed window' attack, because though the host has created the storage proof within the required window of time, they were unable to get the proof onto the blockchain.
+Storage providers can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
+Miners could maliciously exclude storage proofs from blocks, depriving themselves of transactions fees but forcing a penalty on storage providers.
+We call this a 'closed window' attack, because though the storage provider has created a storage proof within the required window of time, they are unable to get the proof onto the blockchain.
 
-The defense for this is having large windows, and assuming that at least one miner will be content submitting the storage proof in a block in return for a transaction fee.
-Because hosts consent to all file contracts, the host is able to reject any contract that they feel leaves them vulnerable to a closed window attack.
+The defense for this is having large windows, and assuming that at least some percentage of miners will be content submitting the storage proof in a block in return for a transaction fee.
+Because providers consent to all file contracts, the storage provider is able to reject any contract that they feel leaves them vulnerable to closed window attacks.
 
 \section{Arbitrary Transaction Data}
-The arbitrary data provides hosts and clients a decentralized way to organize themselves.
-Standards can be agreed upon that are used to announce hosts, announce files, or create an entire decentralized file tracker.
-At a minimum, we plan on using the arbitrary data to associate hosts with files that they store, so that hosts can announce themselves a build a reputation.
-
-Lightweight nodes do not need to store the arbitrary data, but the data is likely to be valuable to clients.
-Clients would potentially be willing to pay to download the data, which would incentive nodes to keep the data around.
+The arbitrary data provides storage providers and clients a decentralized way to organize themselves.
+Standards can be agreed upon that are used to announce providers, announce files, or create an entire decentralized file tracker.
+No part of the protocol enforces that arbitrary data be stored - nodes will accept blocks without having the arbitrary data.
+Full nodes are nonetheless incentivized to store the arbitrary data, as clients may be willing to pay to download the data.
 
 \section{Storage Ecosystem}
 Sia relies on an ecosystem that facilitates decentralized storage.
-The arbitrary data field will be used by hosts to announce themselves to the network, potentially specifying price, messaging address, etc.
+Storage providers can use the arbitrary data field to announce themselves as providers to the network.
+This can be done using standardized template that clients will be able to read.
+Clients can read these announcements and create a database of providers.
+They can then determine a set of providers that they trust (as a set) and create file contracts with those providers.
+Storage providers and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
 
-Clients will be able to parse this data and create a database of hosts that they recognize.
-They can then figure out a set of hosts that they trust (as a set), and create file contracts with those hosts.
-
-The typical file contract will have both the host and the client paying funds into the contract, which enables the contract to enforce a financial penalty on the host for losing data.
-Hosts and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
-
-\subsection{Host Protections}
-A host does not need to agree to a contract, and is therefore able to reject unfavorable terms and unfavorable or illegal files.
-A host also does not need to sign a contract until the full file has been uploaded, which protects the host against malicious clients.
-
-The host has great flexibility in providing storage.
-The host can advertise itself as minimally reliable, and keep each file on only one hard drive in one network location.
-This will allow the host to sell cheap storage, and clients will likely be content with contracts that have minimal repercussions for lost files.
-The host can also advertise itself as highly reliable.
-This will allow the host to charge heavily for storage, but clients will likely require contracts with severe repercussions for lost files.
+\subsection{Storage Provider Protections}
+A contract requires consent from both the storage provider and the client, allowing the provider to reject unfavorable terms and illegal files.
+The provider additionally does not need to sign a contract until the full file has been uploaded.
+The contract terms give storage providers flexibility.
+They can advertise themselves as minimally reliable, offering a low price and a agreeing to minimal penalties for losing files.
+Or, they can advertise themselves as highly reliable, offering a higher price and agreeing to high penalties for losing files.
+An efficient market will optimize storage strategies.
 
 \subsection{Client Protections}
 Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
-Each piece is then encrypted and stored on many hosts.
-By encrypting the pieces after encoding them, the client ensures that collaborating hosts are unable to reduce the redundancy.
+Each piece is then encrypted and stored on many storage providers.
+By encrypting the pieces after encoding them, the client ensures that collaborating providers are unable to reduce the redundancy.
 
-Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many hosts.
-By only needing 10\% out of 100 hosts, the client is betting against the most reliable 10\%, instead of betting against the average reliability.
+Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many providers.
+By only needing 10\% out of 100 providers, the client is relying on the most reliable 10\% of the 100, instead of the average reliability or least reliable subset.
 If the client is able to restore lost pieces on occasion, reliability goes up even more.
 
 By putting a file in many places, the client also benefits from an increased number of sources from which it can download data.
 By only needing to connect to the closet 10\%, the client can reduce latency.
 By only needing to connect to the fastest 10\%, the client can increase throughput.
 
-Finally, this strategy also protects the client from host malice.
-A host that is demanding ransom for a file is the same to the client as a host that is inactive.
-As long as 10\% of the hosts are not acting maliciously, the client can retrieve the file.
+Finally, this strategy also protects the client from malicious storage providers.
+A storage provider that is demanding ransom for a file is the same to the client as a provider that is offline.
+As long as 10\% of the providers are not acting maliciously, the client can retrieve the file.
 
 \subsection{Uptime Incentives}
 The storage proofs contain no provisions that require constant uptime.
-There are also no provisions that require hosts to upload files to clients upon request.
+There are also no provisions that require storage providers to upload files to clients upon request.
 
-However, hosts and clients can create micropayment channels to facilitate downloads.
-If the client is offering a nontrivial fee for downloading a file, hosts will be incentivized to collect the fee.
-If one host is unavailable, the client will pay the fee to a host that is available.
-Hosts are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
-If clients behaviorally pay hosts well, then hosts are more heavily incentivized to be online all the time.
+However, providers and clients can create micropayment channels to facilitate downloads.
+If the client is offering a nontrivial fee for downloading a file, providers will be incentivized to collect the fee.
+If one provider is unavailable or expensive, the client will pay the fee to a provider that is available and reasonably priced.
+Providers are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
+If clients behaviorally pay providers well, then providers are more heavily incentivized to be online all the time.
 Clients can also more heavily reward greater throughput and lower latency.
-Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online, even if they do not wish to download anything.
-This further incentivizes hosts to be online and available.
+Clients could even do random "checkups" that pay providers some nontrivial reward simply for being online, even if they do not wish to download anything.
+This further incentivizes providers to be online and available.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
-\subsection{Open Issues}
-Clients need a reliable way to pick hosts.
-Hosts could potentially sybil attack the network, and use false files to build up a fake reputation.
-One defense for a sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
+\subsection{Basic Reputation System}
+Clients need a reliable method for picking storage providers.
+Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
+One defense for a Sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
 
-One solution to this might be to have clients pick hosts based on how much free space they are advertising.
-There could be a standardized method for generating Proof of Capacity random seeds, and then using a proof of capacity similar to what is suggested by Gregory Maxwell \cite{poc}.
+Storage providers declare themselves using the arbitrary data in a transaction that creates a large timelocked output.
+The timelocked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform Sybil attacks, as they will need large timelocked outputs.
+When clients are scanning the blockchain, they select providers at random, but weight them according to the number of coins that are timelocked for more than a certain period of time.
+Clients can also weight providers according to the size of the refund for losing files, and the price of the files.
+Choosing a careful scheme for weighting providers during random selection will protect clients and ensure that malicious providers need to make significant investment to maintain a majority weight during the selection process.
 
-Centralized platforms for organize and rate hosts are also a potential option.
-Some form of reputation system is also an option.
+This scheme does not leave clients any way to leave reviews for storage providers.
+Additionally complexity could potentially allow clients to rate providers based on throughput, latency, and availability.
+Such a review system would need careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
+A centralized storage tracker could provide a more reasonable environment for a reputation system, and could manage the whole system out of band.
 
 % \section{Sianotes}
 % \subsection{Taxing Contracts}
@@ -243,25 +258,14 @@ Other considerations, such as mining algorithm, block time, etc., can be assumed
 Giving careful attention to ``A Treatise on Altcoins'' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We caution that these propositions have not yet been rigorously examined from a security standpoint.
 
-\subsection{Flexible Contract Length}
-I would like to see a situation where a contract can be extended or cut short by client actions.
-For example, any arbitrary person can extend a contract to encourage the host to keep the file for longer.
-For example, a client can withdraw funds from the contract halfway through and cause an early termination.
-
-This gives more power to clients and hosts, but also gives more room for contracts that are really bad for one party.
-The first feature can be emulated by a client just downloading a file and re-upping it somewhere else.
-The second feature is more tricky, and might be disagreeable to hosts.
-The second feature can be emulated by only creating contracts for a few days at a time, and continuously extending them.
-
-\subsection{Flexible Contract Penalties}
+\subsection{Flexible Contracts}
 Contracts are currently strict.
 There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
 Increased flexibility in the penalty schedule may be desirable.
 
-\subsection{File Editing}
-Contracts are currently permanent, creating what is essentially an uneditable file on the network.
-It might be worth figuring out provisions that enable files to be edited or taken offline under certain contract terms.
-These terms would likely require consent from both the uploader and downloader.
+Contracts are also currently permanent, creating what is essentially an uneditable file on the network.
+There may be value in adding flexibility that allows clients and hosts to negotiate an updated file hash or other updated contract terms.
+Updating the terms of the contract will require consent from all parties.
 
 \subsection{Different Storage Proofs}
 Solutions such as ``Compact Proofs of Retrievability'' \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
@@ -279,9 +283,12 @@ Second, this allows hosts to submit small transactions to the network during pea
 A further improvement would enable Merkle Tree proofs of existence.
 This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
 
-\subsection{Long Range Miner Fees}
-Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
-Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
+\subsection{Miner Fee Adjustments}
+If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
+This can be mitigated by putting all of the fees into a pool which pays out 33\% every block, making re-mining unprofitable for any party with less than 40\% of the network hashing power.
+
+Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
+It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
 
 \subsection{File Contract Fees}
 Some percent, like 1\% of all coins paid into a file contract would be given to miners.
@@ -296,9 +303,9 @@ We believe that the risk induced by halving the block time is less than the bene
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
 We would wish to have more frequent subsidy adjustments, which gives people a more continuous sense of the economic state and prevents moments where many miners turn off simultaneously.
 
-%\subsection{Max Block Size Adjustment}
-%Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
-%Then it will increase by 25\% anually.
+\subsection{Max Block Size Adjustment}
+Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
+Then it will increase by 25\% anually.
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
@@ -330,16 +337,11 @@ We could follow suggestions similar to those presented in ``Ultimate blockchain 
 \section{Conclusion}
 Sia takes the Bitcoin cryptocurrency and makes a few major changes.
 The first is removing the scripting system and instead enforcing a multisig solution, to reduce complexity and attack surface.
-The second is to introduce a file contract, which enables hosts to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
+The second is to introduce a file contract, which enables storage providers to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
 Finally, arbitrary data fields have been added to all transactions to enable coordination among decentralized storage providers, and among decentralized file sharing systems.
 
 We have additionally proposed an array of potential changes that range from simple and probably safe to complex and probably unsafe.
 We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
-
-\section{Special Thanks}
-Thanks to Eliel for the proof of existence contribution, among additional contributions.
-Thanks to Mike Hearn for helping with the storage windows, among additional contributions.
-Thanks to all of the Bitcoin wizards, without whom Sia would never have stood a chance at being secure.
 
 \onecolumn
 \begin{thebibliography}{9}
