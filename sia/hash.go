@@ -73,3 +73,19 @@ func (b *Block) ID() BlockID {
 		Hash(b.MerkleRoot),
 	)))
 }
+
+func (t *Transaction) Hash() Hash {
+	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
+	// allows you to selectively reveal pieces of a transaction? But what good is that?
+
+	return HashBytes(MarshalAll(
+		uint64(t.Version),
+		HashBytes(t.ArbitraryData),
+		uint64(t.MinerFee),
+		// Inputs
+		// Outputs
+		// File Contracts
+		// Storage Proofs
+		// Signatures
+	))
+}

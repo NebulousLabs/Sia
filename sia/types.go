@@ -1,5 +1,10 @@
 package sia
 
+import (
+	"crypto/ecdsa"
+	"math/big"
+)
+
 const (
 	HashSize      = 32
 	PublicKeySize = 32
@@ -9,10 +14,9 @@ const (
 
 type (
 	Hash      [HashSize]byte
-	PublicKey [PublicKeySize]byte
-	Signature [SignatureSize]byte
+	PublicKey ecdsa.PublicKey
 
-	Timestamp   uint32
+	Timestamp   int64
 	BlockHeight uint32
 	Currency    uint64
 
@@ -22,6 +26,10 @@ type (
 	TransactionID Hash
 	CoinAddress   Hash // An address points to spend conditions.
 )
+
+type Signature struct {
+	r, s *big.Int
+}
 
 type Block struct {
 	Version      uint16
