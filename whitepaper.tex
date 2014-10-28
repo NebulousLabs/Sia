@@ -184,60 +184,61 @@ Storage providers can use the arbitrary data field to announce themselves as pro
 This can be done using standardized template that clients will be able to read.
 Clients can read these announcements and create a database of providers.
 They can then determine a set of providers that they trust (as a set) and create file contracts with those providers.
-
-The typical file contract will have both the host and the client paying funds into the contract, which enables the contract to enforce a financial penalty on the host for losing data.
-Hosts and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
+Storage providers and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
 
 \subsection{Storage Provider Protections}
-A host does not need to agree to a contract, and is therefore able to reject unfavorable terms and unfavorable or illegal files.
-A host also does not need to sign a contract until the full file has been uploaded, which protects the host against malicious clients.
-
-The host has great flexibility in providing storage.
-The host can advertise itself as minimally reliable, and keep each file on only one hard drive in one network location.
-This will allow the host to sell cheap storage, and clients will likely be content with contracts that have minimal repercussions for lost files.
-The host can also advertise itself as highly reliable.
-This will allow the host to charge heavily for storage, but clients will likely require contracts with severe repercussions for lost files.
+A contract requires consent from both the storage provider and the client, allowing the provider to reject unfavorable terms and illegal files.
+The provider additionally does not need to sign a contract until the full file has been uploaded.
+The contract terms give storage providers flexibility.
+They can advertise themselves as minimally reliable, offering a low price and a agreeing to minimal penalties for losing files.
+Or, they can advertise themselves as highly reliable, offering a higher price and agreeing to high penalties for losing files.
+An efficient market will optimize storage strategies.
 
 \subsection{Client Protections}
 Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
-Each piece is then encrypted and stored on many hosts.
-By encrypting the pieces after encoding them, the client ensures that collaborating hosts are unable to reduce the redundancy.
+Each piece is then encrypted and stored on many storage providers.
+By encrypting the pieces after encoding them, the client ensures that collaborating providers are unable to reduce the redundancy.
 
-Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many hosts.
-By only needing 10\% out of 100 hosts, the client is betting against the most reliable 10\%, instead of betting against the average reliability.
+Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many providers.
+By only needing 10\% out of 100 providers, the client is betting against the most reliable 10\%, instead of betting against the average reliability.
 If the client is able to restore lost pieces on occasion, reliability goes up even more.
 
 By putting a file in many places, the client also benefits from an increased number of sources from which it can download data.
 By only needing to connect to the closet 10\%, the client can reduce latency.
 By only needing to connect to the fastest 10\%, the client can increase throughput.
 
-Finally, this strategy also protects the client from host malice.
-A host that is demanding ransom for a file is the same to the client as a host that is inactive.
-As long as 10\% of the hosts are not acting maliciously, the client can retrieve the file.
+Finally, this strategy also protects the client from malicious storage providers.
+A storage provider that is demanding ransom for a file is the same to the client as a provider that is offline.
+As long as 10\% of the providers are not acting maliciously, the client can retrieve the file.
 
 \subsection{Uptime Incentives}
 The storage proofs contain no provisions that require constant uptime.
-There are also no provisions that require hosts to upload files to clients upon request.
+There are also no provisions that require storage providers to upload files to clients upon request.
 
-However, hosts and clients can create micropayment channels to facilitate downloads.
-If the client is offering a nontrivial fee for downloading a file, hosts will be incentivized to collect the fee.
-If one host is unavailable, the client will pay the fee to a host that is available.
-Hosts are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
-If clients behaviorally pay hosts well, then hosts are more heavily incentivized to be online all the time.
+However, providers and clients can create micropayment channels to facilitate downloads.
+If the client is offering a nontrivial fee for downloading a file, providers will be incentivized to collect the fee.
+If one provider is unavailable or expensive, the client will pay the fee to a provider that is available and reasonably priced.
+Providers are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
+If clients behaviorally pay provierds well, then providers are more heavily incentivized to be online all the time.
 Clients can also more heavily reward greater throughput and lower latency.
-Clients could even do random "checkups" that pay hosts some nontrivial reward simply for being online, even if they do not wish to download anything.
-This further incentivizes hosts to be online and available.
+Clients could even do random "checkups" that pay providers some nontrivial reward simply for being online, even if they do not wish to download anything.
+This further incentivizes providers to be online and available.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
-\subsection{Open Issues}
-Clients need a reliable way to pick hosts.
-Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
+\subsection{Basic Reputation System}
+Clients need some metric for picking storage providers.
+The arbitrary data leaves room for advanced reputations schemes, however we describe a simple one here.
 
-One solution to this might be to have clients pick hosts based on how much free space they are advertising.
-There could be a standardized method for generating Proof of Capacity random seeds, and then using a proof of capacity similar to what is suggested by Gregory Maxwell \cite{poc}.
+Storage providers declare themselves using the arbitrary data in a transaction that creates a large timelocked output.
+The timelocked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform sybil attacks, as they will need large timelocked outputs.
+When clients are scanning the blockchain, they select providers at random, but weight them according to the number of coins that are timelocked for more than a certain period of time.
+Clients can also weight providers according to the size of the refund for losing files, and the price of the files.
+Choosing a careful scheme for weighting providers during random selection will protect clients and ensure that malicious providers need to make significant investment to maintain a majority weight during the selection process.
 
-Centralized platforms for organize and rate hosts are also a potential option.
-Some form of reputation system is also an option.
+This scheme does not leave clients any way to leave reviews for storage providers.
+Additionally complexity could potentially allow clients to rate providers based on throughput, latency, and availability.
+Such a review system would need careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
+A centralized storage tracker could provide a more reasonable environment for a reputation system, and could manage the whole system out of band.
 
 % \section{Sianotes}
 % \subsection{Taxing Contracts}
@@ -256,15 +257,14 @@ Other considerations, such as mining algorithm, block time, etc., can be assumed
 Giving careful attention to ``A Treatise on Altcoins'' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We caution that these propositions have not yet been rigorously examined from a security standpoint.
 
-\subsection{Flexible Contract Penalties}
+\subsection{Flexible Contracts}
 Contracts are currently strict.
 There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
 Increased flexibility in the penalty schedule may be desirable.
 
-\subsection{File Editing}
-Contracts are currently permanent, creating what is essentially an uneditable file on the network.
-It might be worth figuring out provisions that enable files to be edited or taken offline under certain contract terms.
-These terms would likely require consent from both the uploader and downloader.
+Contracts are also currently permanent, creating what is essentially an uneditable file on the network.
+There may be value in adding flexibility that allows clients and hosts to negotiate an updated file hash or other updated contract terms.
+Updating the terms of the contract will require consent from all parties.
 
 \subsection{Different Storage Proofs}
 Solutions such as ``Compact Proofs of Retrievability'' \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
@@ -282,9 +282,12 @@ Second, this allows hosts to submit small transactions to the network during pea
 A further improvement would enable Merkle Tree proofs of existence.
 This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
 
-\subsection{Long Range Miner Fees}
-Miner fees would go into a pool that pays out some portion of itself every block, like 0.1\%.
-Fees included into a block would incentivize miners for many future blocks, and be diluted slowly.
+\subsection{Miner Fee Adjustments}
+If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
+This can be mitigated by putting all of the fees into a pool which pays out 33\% every block, making re-mining unprofitable for any party with less than 40\% of the network hashing power.
+
+Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
+It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
 
 \subsection{File Contract Fees}
 Some percent, like 1\% of all coins paid into a file contract would be given to miners.
@@ -299,9 +302,9 @@ We believe that the risk induced by halving the block time is less than the bene
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
 We would wish to have more frequent subsidy adjustments, which gives people a more continuous sense of the economic state and prevents moments where many miners turn off simultaneously.
 
-%\subsection{Max Block Size Adjustment}
-%Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
-%Then it will increase by 25\% anually.
+\subsection{Max Block Size Adjustment}
+Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
+Then it will increase by 25\% anually.
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
@@ -333,16 +336,11 @@ We could follow suggestions similar to those presented in ``Ultimate blockchain 
 \section{Conclusion}
 Sia takes the Bitcoin cryptocurrency and makes a few major changes.
 The first is removing the scripting system and instead enforcing a multisig solution, to reduce complexity and attack surface.
-The second is to introduce a file contract, which enables hosts to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
+The second is to introduce a file contract, which enables storage providers to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
 Finally, arbitrary data fields have been added to all transactions to enable coordination among decentralized storage providers, and among decentralized file sharing systems.
 
 We have additionally proposed an array of potential changes that range from simple and probably safe to complex and probably unsafe.
 We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
-
-\section{Special Thanks}
-Thanks to Eliel for the proof of existence contribution, among additional contributions.
-Thanks to Mike Hearn for helping with the storage windows, among additional contributions.
-Thanks to all of the Bitcoin wizards, without whom Sia would never have stood a chance at being secure.
 
 \onecolumn
 \begin{thebibliography}{9}
