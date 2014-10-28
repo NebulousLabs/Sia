@@ -10,24 +10,30 @@ func HashBytes(data []byte) Hash {
 	return sha256.Sum256(data)
 }
 
-// Helper function for merkle trees; takes two hashes, appends them, and then
-// hashes their sum.
+// Helper function for Merkle trees; takes two hashes, concatenates them,
+// and hashes the result.
 func joinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
 
-// Takes as input a slice of hashes, which are the leaves of the merkle tree.
-// Produces the root hash from these leaves. The hashes correspond to some data
-// structure underneath. This function is useful for building merkle trees out
-// of arbitrary stuff, like transactions.
-func BuildMerkleTree(leaves []Hash) (hash Hash, err error) {
-	if len(leaves) == 0 {
-		err = errors.New("Cannot build tree of of length 1 object")
-		return
+// MerkleRoot calculates the "root hash" formed by repeatedly concatenating
+// and hashing a binary tree of hashes.  If the number of leaves is not a
+// power of 2, the orphan hash(es) are concatenated with a single 0 byte.
+// MerkleRoot will panic if the leaves slice is empty.
+func MerkleRoot(leaves []Hash) Hash {
+	if len(leaves) == 1 {
+		return HashBytes(append(leaves[0][:], 0))
+	} else if len(leaves) == 2 {
+		return joinHash(leaves[0], leaves[1])
 	}
 
-	hash = leaves[0]
-	return
+	// locate smallest power of 2 < len(leaves)
+	mid := 1
+	for mid < len(leaves)/2+len(leaves)%2 {
+		mid *= 2
+	}
+
+	return joinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
 }
 
 // MerkleFile splits the provided data into segments. It then recursively
