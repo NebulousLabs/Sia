@@ -200,7 +200,7 @@ Each piece is then encrypted and stored on many storage providers.
 By encrypting the pieces after encoding them, the client ensures that collaborating providers are unable to reduce the redundancy.
 
 Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many providers.
-By only needing 10\% out of 100 providers, the client is betting against the most reliable 10\%, instead of betting against the average reliability.
+By only needing 10\% out of 100 providers, the client is relying on the most reliable 10\% of the 100, instead of the average reliability or least reliable subset.
 If the client is able to restore lost pieces on occasion, reliability goes up even more.
 
 By putting a file in many places, the client also benefits from an increased number of sources from which it can download data.
@@ -219,7 +219,7 @@ However, providers and clients can create micropayment channels to facilitate do
 If the client is offering a nontrivial fee for downloading a file, providers will be incentivized to collect the fee.
 If one provider is unavailable or expensive, the client will pay the fee to a provider that is available and reasonably priced.
 Providers are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
-If clients behaviorally pay provierds well, then providers are more heavily incentivized to be online all the time.
+If clients behaviorally pay providers well, then providers are more heavily incentivized to be online all the time.
 Clients can also more heavily reward greater throughput and lower latency.
 Clients could even do random "checkups" that pay providers some nontrivial reward simply for being online, even if they do not wish to download anything.
 This further incentivizes providers to be online and available.
@@ -227,11 +227,11 @@ However, we reiterate that uptime incentives are not part of the Sia protocol; t
 
 \subsection{Basic Reputation System}
 Clients need a reliable method for picking storage providers.
-Hosts could potentially sybil attack the network, and use false files to build up a fake reputation.
-One defense for a sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
+Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
+One defense for a Sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
 
 Storage providers declare themselves using the arbitrary data in a transaction that creates a large timelocked output.
-The timelocked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform sybil attacks, as they will need large timelocked outputs.
+The timelocked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform Sybil attacks, as they will need large timelocked outputs.
 When clients are scanning the blockchain, they select providers at random, but weight them according to the number of coins that are timelocked for more than a certain period of time.
 Clients can also weight providers according to the size of the refund for losing files, and the price of the files.
 Choosing a careful scheme for weighting providers during random selection will protect clients and ensure that malicious providers need to make significant investment to maintain a majority weight during the selection process.
