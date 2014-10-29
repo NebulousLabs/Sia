@@ -12,7 +12,7 @@ const (
 	SegmentSize   = 32
 
 	TargetSecondsPerBlock = 300
-	DifficultyWindow      = 5000
+	TargetWindow          = 5000
 )
 
 var MaxAdjustmentUp = big.NewRat(10005, 10000)
@@ -32,7 +32,7 @@ type (
 	ContractID    Hash
 	TransactionID Hash
 	CoinAddress   Hash // An address points to spend conditions.
-	Difficulty    Hash
+	Target        Hash
 )
 
 type Signature struct {

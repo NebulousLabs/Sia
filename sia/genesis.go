@@ -43,12 +43,12 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.BlockMap[gbid] = s.BlockRoot
 	s.CurrentPath[BlockHeight(0)] = gbid
 
-	// Set the difficulty and timestamp information on the genesis block node.
+	// Set the target and timestamp information on the genesis block node.
 	s.BlockRoot.Height = 0
 	for i := range s.BlockRoot.RecentTimestamps {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
-	s.BlockRoot.Difficulty[15] = 1
+	s.BlockRoot.Target[15] = 1
 	s.BlockRoot.Depth = big.NewRat(0, 1)
 
 	return

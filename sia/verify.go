@@ -51,8 +51,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	// If timestamp is too far in the past, reject and put in bad blocks.
 
 	// Check the amount of work done by the block.
-	if !ValidHeader(parentBlockNode.Difficulty, b) {
-		err = errors.New("Block does not meet difficulty requirement")
+	if !ValidHeader(parentBlockNode.Target, b) {
+		err = errors.New("Block does not meet target")
 		s.BadBlocks[bid] = struct{}{}
 		return
 	}
@@ -70,39 +70,39 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	var expectedTimePassed Timestamp
 	var blockWindow BlockHeight
 	if newBlockNode.Height < 5000 {
-		// Calculate new difficulty, using block 0 timestamp.
+		// Calculate new target, using block 0 timestamp.
 		timePassed = b.Timestamp - s.BlockRoot.Block.Timestamp
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newBlockNode.Height)
 		blockWindow = newBlockNode.Height
 	} else {
-		// Calculate new difficulty, using block Height-5000 timestamp.
+		// Calculate new target, using block Height-5000 timestamp.
 		timePassed := b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
 		expectedTimePassed := TargetSecondsPerBlock * 5000
 		blockWindow = 5000
 	}
 
 	// Adjustment as a float = timePassed / expectedTimePassed / blockWindow.
-	difficultyAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
 
-	// Enforce a maximum difficultyAdjustment
-	if difficultyAdjustment.Cmp(MaxAdjustmentUp) == 1 {
-		difficultyAdjustment = MaxAdjustmentUp
-	} else if difficultyAdjustment.Cmp(MaxAdjustmentDown) == -1 {
-		difficultyAdjustment = MaxAdjustmentDown
+	// Enforce a maximum targetAdjustment
+	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
+		targetAdjustment = MaxAdjustmentUp
+	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
+		targetAdjustment = MaxAdjustmentDown
 	}
 
-	// Take the difficulty adjustment and apply it to the difficulty slice,
+	// Take the target adjustment and apply it to the target slice,
 	// using rational numbers. Truncate the result.
-	oldTarget := new(big.Int).SetBytes(parentBlockNode.Difficulty[:])
+	oldTarget := new(big.Int).SetBytes(parentBlockNode.Target[:])
 	ratOldTarget := new(big.Rat).SetInt(oldTarget)
-	ratNewTarget := ratOldTarget.Mul(difficultyAdjustment, ratOldTarget)
+	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
 	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
 	newTargetBytes := intNewTarget.Bytes()
-	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
-	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
+	offset := len(newBlockNode.Target[:]) - len(newTargetBytes)
+	copy(newBlockNode.Target[offset:], newTargetBytes)
 
-	// Add the parent difficulty to the depth of the block in the tree.
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Difficulty[:]))
+	// Add the parent target to the depth of the block in the tree.
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Target[:]))
 	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
 
 	// If block adds to the current fork, validate it and advance fork.

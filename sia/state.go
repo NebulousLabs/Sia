@@ -37,7 +37,7 @@ type BlockNode struct {
 
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
-	Difficulty       Difficulty    // Difficulty of next block.
+	Target           Target        // Target for next block.
 	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
 
 	// A list of contract outputs that have been spent at this point, plus
