@@ -32,9 +32,10 @@ type BlockNode struct {
 	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
 	Children []*BlockNode
 
-	Height           BlockHeight
-	RecentTimestamps []Timestamp // The 11 recent timestamps.
-	// Difficulty uint32
+	Height              BlockHeight
+	RecentTimestamps    [11]Timestamp // The 11 recent timestamps.
+	Difficulty          Difficulty    // Difficulty of next block.
+	DifficultyReference BlockID       // The block DifficultyWindow blocks earlier.
 
 	// A list of contract outputs that have been spent at this point, plus
 	// miner payment output.

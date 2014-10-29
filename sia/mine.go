@@ -3,6 +3,7 @@ package sia
 import (
 	"bytes"
 	"crypto/rand"
+	"time"
 )
 
 // Hashcash brute-forces a nonce that produces a hash less than target.
@@ -21,12 +22,12 @@ func Hashcash(target Hash) (nonce []byte, i int) {
 // Creates a new block.  This function creates a new block given a previous
 // block, isn't happy with being interrupted.  Need a different thread that can
 // be updated by listening on channels or something.
-func (s *State) GenerateBlock() (b *Block) {
+func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	b = &Block{
-		Version:     1,
-		ParentBlock: s.CurrentBlock,
-		// Timestamp
-		// Miner Address
+		Version:      1,
+		ParentBlock:  state.CurrentBlock,
+		Timestamp:    Timestamp(time.Now().Unix()),
+		MinerAddress: w.CoinAddress,
 		// Merkle Root
 		// List of Transactions
 	}

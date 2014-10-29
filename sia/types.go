@@ -6,10 +6,11 @@ import (
 )
 
 const (
-	HashSize      = 32
-	PublicKeySize = 32
-	SignatureSize = 32
-	SegmentSize   = 32
+	HashSize         = 32
+	PublicKeySize    = 32
+	SignatureSize    = 32
+	SegmentSize      = 32
+	DifficultyWindow = 5000
 )
 
 type (
@@ -25,6 +26,7 @@ type (
 	ContractID    Hash
 	TransactionID Hash
 	CoinAddress   Hash // An address points to spend conditions.
+	Difficulty    Hash
 )
 
 type Signature struct {
