@@ -24,6 +24,7 @@ type (
 
 	Timestamp   int64
 	BlockHeight uint32
+	BlockWeight *big.Rat // inverse of target
 	Currency    uint64
 
 	BlockID       Hash
@@ -115,4 +116,15 @@ type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []*Hash
+}
+
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(MarshalAll(
+		uint64(b.Version),
+		Hash(b.ParentBlock),
+		uint64(b.Timestamp),
+		uint64(b.Nonce),
+		Hash(b.MinerAddress),
+		Hash(b.MerkleRoot),
+	)))
 }

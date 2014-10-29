@@ -13,8 +13,10 @@ package sia
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
-	BlockRoot    *BlockNode
+	BlockRoot *BlockNode
+
 	CurrentBlock BlockID
+	CurrentDepth BlockWeight
 
 	BadBlocks   map[BlockID]struct{}    // A list of blocks that don't verify.
 	BlockMap    map[BlockID]*BlockNode  // A list of all blocks in the blocktree.
@@ -36,6 +38,7 @@ type BlockNode struct {
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Difficulty       Difficulty    // Difficulty of next block.
+	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
 
 	// A list of contract outputs that have been spent at this point, plus
 	// miner payment output.

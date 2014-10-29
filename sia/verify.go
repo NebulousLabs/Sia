@@ -101,6 +101,10 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
 	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
 
+	// Add the parent difficulty to the depth of the block in the tree.
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Difficulty[:]))
+	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
+
 	// If block adds to the current fork, validate it and advance fork.
 	// Note: current implementation will only ever accept the first block
 	// it sees, instead of picking longest chain.
@@ -113,6 +117,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		}
 
 		s.CurrentBlock = bid
+		s.CurrentDepth = newBlockNode.Depth
 		s.CurrentPath[newBlockNode.Height] = bid
 	}
 
