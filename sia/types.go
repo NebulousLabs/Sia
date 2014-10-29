@@ -6,11 +6,15 @@ import (
 )
 
 const (
-	HashSize         = 32
-	PublicKeySize    = 32
-	SignatureSize    = 32
-	SegmentSize      = 32
-	DifficultyWindow = 5000
+	HashSize      = 32
+	PublicKeySize = 32
+	SignatureSize = 32
+	SegmentSize   = 32
+
+	TargetSecondsPerBlock = 300
+	MaxAdjustmentUp       = 1000500000
+	MaxAdjustmentDown     = 999500000
+	DifficultyWindow      = 5000
 )
 
 type (

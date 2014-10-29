@@ -2,6 +2,7 @@ package sia
 
 import (
 	"errors"
+	"math/big"
 )
 
 // Used to keep track of how many signatures an input has been signed by.
@@ -64,11 +65,45 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newBlockNode.Height = parentBlockNode.Height + 1
 	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
 	newBlockNode.RecentTimestamps[10] = b.Timestamp
+
+	var timePassed Timestamp
+	var expectedTimePassed Timestamp
+	var blockWindow BlockHeight
 	if newBlockNode.Height < 5000 {
-		// Calculate new difficulty, using block 0 timestamp
+		// Calculate new difficulty, using block 0 timestamp.
+		timePassed = b.Timestamp - s.BlockRoot.Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newBlockNode.Height)
+		blockWindow = newBlockNode.Height
 	} else {
 		// Calculate new difficulty, using block Height-5000 timestamp.
+		timePassed := b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		expectedTimePassed := TargetSecondsPerBlock * 5000
+		blockWindow = 5000
 	}
+
+	// Adjustment as a float = timepassed / expectedTimePassed /
+	// blockWindow. Multiply by 1,000,000,000 to make for clean, integer
+	// math.
+	difficultyAdjustment := int64(timePassed) * 1000 * 1000 * 1000
+	difficultyAdjustment /= int64(expectedTimePassed)
+	difficultyAdjustment /= int64(blockWindow)
+
+	// Enforce a maximum difficultyAdjustment
+	if difficultyAdjustment > MaxAdjustmentUp {
+		difficultyAdjustment = MaxAdjustmentUp
+	} else if difficultyAdjustment < MaxAdjustmentDown {
+		difficultyAdjustment = MaxAdjustmentDown
+	}
+
+	// Take the difficulty adjustment and apply it to the difficulty slice.
+	bigAdjustment := big.NewInt(difficultyAdjustment)
+	oldTarget := big.NewInt(0)
+	oldTarget = oldTarget.SetBytes(parentBlockNode.Difficulty[:])
+	newTarget := big.NewInt(0)
+	newTarget = newTarget.Mul(oldTarget, bigAdjustment)
+	newTarget = newTarget.Div(newTarget, big.NewInt(1000*1000*1000))
+	targetBytes := newTarget.Bytes()
+	copy(newBlockNode.Difficulty[:], targetBytes)
 
 	// If block adds to the current fork, validate it and advance fork.
 	// Note: current implementation will only ever accept the first block
