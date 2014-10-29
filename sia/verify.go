@@ -93,12 +93,10 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	// Take the difficulty adjustment and apply it to the difficulty slice,
 	// using rational numbers. Truncate the result.
-	oldTarget := big.NewInt(0).SetBytes(parentBlockNode.Difficulty[:])
-	ratOldTarget := big.NewRat(0, 1).SetInt(oldTarget)
+	oldTarget := new(big.Int).SetBytes(parentBlockNode.Difficulty[:])
+	ratOldTarget := new(big.Rat).SetInt(oldTarget)
 	ratNewTarget := ratOldTarget.Mul(difficultyAdjustment, ratOldTarget)
-	newTargetNumerator := ratNewTarget.Num()
-	newTargetDenominator := ratNewTarget.Denom()
-	intNewTarget := big.NewInt(0).Div(newTargetNumerator, newTargetDenominator)
+	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
 	newTargetBytes := intNewTarget.Bytes()
 	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
 	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
