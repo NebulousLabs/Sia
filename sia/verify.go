@@ -2,6 +2,7 @@ package sia
 
 import (
 	"errors"
+	"math/big"
 )
 
 // Used to keep track of how many signatures an input has been signed by.
@@ -27,8 +28,6 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		return
 	}
 
-	// If timestamp is in the future, store in future blocks list.
-
 	_, exists = s.BlockMap[bid]
 	if exists {
 		err = errors.New("Block exists in block map.")
@@ -48,16 +47,59 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		return
 	}
 
+	// If timestamp is in the future, store in future blocks list.
+	// If timestamp is too far in the past, reject and put in bad blocks.
+
 	// Check the amount of work done by the block.
+	if !ValidHeader(parentBlockNode.Difficulty, b) {
+		err = errors.New("Block does not meet difficulty requirement")
+		s.BadBlocks[bid] = struct{}{}
+		return
+	}
 
 	// Add the block to the block tree.
 	newBlockNode := new(BlockNode)
 	newBlockNode.Block = b
+	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
 	newBlockNode.Height = parentBlockNode.Height + 1
-	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
+	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
+	newBlockNode.RecentTimestamps[10] = b.Timestamp
 
-	// Do anything necessary to the transaction pool.
+	var timePassed Timestamp
+	var expectedTimePassed Timestamp
+	var blockWindow BlockHeight
+	if newBlockNode.Height < 5000 {
+		// Calculate new difficulty, using block 0 timestamp.
+		timePassed = b.Timestamp - s.BlockRoot.Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newBlockNode.Height)
+		blockWindow = newBlockNode.Height
+	} else {
+		// Calculate new difficulty, using block Height-5000 timestamp.
+		timePassed := b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		expectedTimePassed := TargetSecondsPerBlock * 5000
+		blockWindow = 5000
+	}
+
+	// Adjustment as a float = timePassed / expectedTimePassed / blockWindow.
+	difficultyAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+
+	// Enforce a maximum difficultyAdjustment
+	if difficultyAdjustment.Cmp(MaxAdjustmentUp) == 1 {
+		difficultyAdjustment = MaxAdjustmentUp
+	} else if difficultyAdjustment.Cmp(MaxAdjustmentDown) == -1 {
+		difficultyAdjustment = MaxAdjustmentDown
+	}
+
+	// Take the difficulty adjustment and apply it to the difficulty slice,
+	// using rational numbers. Truncate the result.
+	oldTarget := new(big.Int).SetBytes(parentBlockNode.Difficulty[:])
+	ratOldTarget := new(big.Rat).SetInt(oldTarget)
+	ratNewTarget := ratOldTarget.Mul(difficultyAdjustment, ratOldTarget)
+	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
+	newTargetBytes := intNewTarget.Bytes()
+	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
+	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
 
 	// If block adds to the current fork, validate it and advance fork.
 	// Note: current implementation will only ever accept the first block
@@ -71,7 +113,10 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		}
 
 		s.CurrentBlock = bid
+		s.CurrentPath[newBlockNode.Height] = bid
 	}
+
+	// Do anything necessary to the transaction pool.
 
 	return
 }

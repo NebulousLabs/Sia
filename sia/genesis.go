@@ -22,19 +22,32 @@ func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
 
 // Create the state that contains the genesis block and nothing else.
 func CreateGenesisState(premineAddress CoinAddress) (s *State) {
+	// Create the genesis block using the premine address.
 	genesisBlock := CreateGenesisBlock(premineAddress)
 	gbid := genesisBlock.ID()
 
+	// Create a new state and initialize the maps.
 	s = new(State)
 	s.BadBlocks = make(map[BlockID]struct{})
 	s.BlockMap = make(map[BlockID]*BlockNode)
+	s.CurrentPath = make(map[BlockHeight]BlockID)
 
+	// Initialize ConsensusState maps.
 	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
 	s.ConsensusState.SpentOutputs = make(map[OutputID]Output)
 
+	// Fill out the block root node, and add it to the BlockMap.
 	s.BlockRoot = new(BlockNode)
-	s.CurrentBlock = genesisBlock.ID()
+	s.CurrentBlock = gbid
 	s.BlockMap[gbid] = s.BlockRoot
+
+	// Set the difficulty and timestamp information on the genesis block node.
+	s.BlockRoot.Height = 0
+	for i := range s.BlockRoot.RecentTimestamps {
+		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
+	}
+	s.BlockRoot.Difficulty[15] = 1
+	s.CurrentPath[BlockHeight(0)] = gbid
 
 	return
 }

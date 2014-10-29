@@ -10,7 +10,13 @@ const (
 	PublicKeySize = 32
 	SignatureSize = 32
 	SegmentSize   = 32
+
+	TargetSecondsPerBlock = 300
+	DifficultyWindow      = 5000
 )
+
+var MaxAdjustmentUp = big.NewRat(10005, 10000)
+var MaxAdjustmentDown = big.NewRat(9995, 10000)
 
 type (
 	Hash      [HashSize]byte
@@ -25,6 +31,7 @@ type (
 	ContractID    Hash
 	TransactionID Hash
 	CoinAddress   Hash // An address points to spend conditions.
+	Difficulty    Hash
 )
 
 type Signature struct {

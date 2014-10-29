@@ -16,8 +16,9 @@ type State struct {
 	BlockRoot    *BlockNode
 	CurrentBlock BlockID
 
-	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
-	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
+	BadBlocks   map[BlockID]struct{}    // A list of blocks that don't verify.
+	BlockMap    map[BlockID]*BlockNode  // A list of all blocks in the blocktree.
+	CurrentPath map[BlockHeight]BlockID // Points to the block id for a given height.
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
@@ -33,8 +34,8 @@ type BlockNode struct {
 	Children []*BlockNode
 
 	Height           BlockHeight
-	RecentTimestamps []Timestamp // The 11 recent timestamps.
-	// Difficulty uint32
+	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
+	Difficulty       Difficulty    // Difficulty of next block.
 
 	// A list of contract outputs that have been spent at this point, plus
 	// miner payment output.
