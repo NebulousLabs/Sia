@@ -47,7 +47,6 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
 	s.BlockRoot.Difficulty[15] = 1
-	s.BlockRoot.DifficultyReference = gbid // Points to genesis block until block DifficultyWindow + 1.
 	s.CurrentPath[BlockHeight(0)] = gbid
 
 	return

@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+func ValidHeader(difficulty Difficulty, b *Block) bool {
+	blockHash := HashBytes(b.HeaderBytes())
+	return bytes.Compare(difficulty[:], blockHash[:]) < 0
+}
+
 // Hashcash brute-forces a nonce that produces a hash less than target.
 func Hashcash(target Hash) (nonce []byte, i int) {
 	nonce = make([]byte, 8)

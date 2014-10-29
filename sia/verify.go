@@ -27,8 +27,6 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		return
 	}
 
-	// If timestamp is in the future, store in future blocks list.
-
 	_, exists = s.BlockMap[bid]
 	if exists {
 		err = errors.New("Block exists in block map.")
@@ -48,16 +46,29 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		return
 	}
 
+	// If timestamp is in the future, store in future blocks list.
+	// If timestamp is too far in the past, reject and put in bad blocks.
+
 	// Check the amount of work done by the block.
+	if !ValidHeader(parentBlockNode.Difficulty, b) {
+		err = errors.New("Block does not meet difficulty requirement")
+		s.BadBlocks[bid] = struct{}{}
+		return
+	}
 
 	// Add the block to the block tree.
 	newBlockNode := new(BlockNode)
 	newBlockNode.Block = b
+	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
 	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
 	newBlockNode.Height = parentBlockNode.Height + 1
-	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
-
-	// Do anything necessary to the transaction pool.
+	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
+	newBlockNode.RecentTimestamps[10] = b.Timestamp
+	if newBlockNode.Height < 5000 {
+		// Calculate new difficulty, using block 0 timestamp
+	} else {
+		// Calculate new difficulty, using block Height-5000 timestamp.
+	}
 
 	// If block adds to the current fork, validate it and advance fork.
 	// Note: current implementation will only ever accept the first block
