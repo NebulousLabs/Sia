@@ -16,8 +16,9 @@ type State struct {
 	BlockRoot    *BlockNode
 	CurrentBlock BlockID
 
-	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
-	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
+	BadBlocks   map[BlockID]struct{}    // A list of blocks that don't verify.
+	BlockMap    map[BlockID]*BlockNode  // A list of all blocks in the blocktree.
+	CurrentPath map[BlockHeight]BlockID // Points to the block id for a given height.
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 

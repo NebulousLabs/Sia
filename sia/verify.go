@@ -71,7 +71,10 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		}
 
 		s.CurrentBlock = bid
+		s.CurrentPath[newBlockNode.Height] = bid
 	}
+
+	// Do anything necessary to the transaction pool.
 
 	return
 }

@@ -30,6 +30,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s = new(State)
 	s.BadBlocks = make(map[BlockID]struct{})
 	s.BlockMap = make(map[BlockID]*BlockNode)
+	s.CurrentPath = make(map[BlockHeight]BlockID)
 
 	// Initialize ConsensusState maps.
 	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
@@ -47,6 +48,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	}
 	s.BlockRoot.Difficulty[15] = 1
 	s.BlockRoot.DifficultyReference = gbid // Points to genesis block until block DifficultyWindow + 1.
+	s.CurrentPath[BlockHeight(0)] = gbid
 
 	return
 }
