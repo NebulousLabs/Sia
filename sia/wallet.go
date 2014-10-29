@@ -77,14 +77,9 @@ func (w *Wallet) SpendCoins(amount Currency, address CoinAddress, state *State) 
 		return
 	}
 
-	t.Outputs = make([]Output, 2)
-	t.Outputs[0] = Output{
-		Value:     amount,
-		SpendHash: address,
-	}
-	t.Outputs[1] = Output{
-		Value:     total - amount,
-		SpendHash: w.CoinAddress,
+	t.Outputs = []Output{
+		{Value: amount, SpendHash: address},
+		{Value: total - amount, SpendHash: w.CoinAddress},
 	}
 
 	// Still need to sign the transaction.
