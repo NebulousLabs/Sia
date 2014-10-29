@@ -12,10 +12,11 @@ const (
 	SegmentSize   = 32
 
 	TargetSecondsPerBlock = 300
-	MaxAdjustmentUp       = 1000500000
-	MaxAdjustmentDown     = 999500000
 	DifficultyWindow      = 5000
 )
+
+var MaxAdjustmentUp = big.NewRat(10005, 10000)
+var MaxAdjustmentDown = big.NewRat(9995, 10000)
 
 type (
 	Hash      [HashSize]byte

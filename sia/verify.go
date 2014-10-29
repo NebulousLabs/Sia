@@ -81,29 +81,27 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		blockWindow = 5000
 	}
 
-	// Adjustment as a float = timepassed / expectedTimePassed /
-	// blockWindow. Multiply by 1,000,000,000 to make for clean, integer
-	// math.
-	difficultyAdjustment := int64(timePassed) * 1000 * 1000 * 1000
-	difficultyAdjustment /= int64(expectedTimePassed)
-	difficultyAdjustment /= int64(blockWindow)
+	// Adjustment as a float = timePassed / expectedTimePassed / blockWindow.
+	difficultyAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
 
 	// Enforce a maximum difficultyAdjustment
-	if difficultyAdjustment > MaxAdjustmentUp {
+	if difficultyAdjustment.Cmp(MaxAdjustmentUp) == 1 {
 		difficultyAdjustment = MaxAdjustmentUp
-	} else if difficultyAdjustment < MaxAdjustmentDown {
+	} else if difficultyAdjustment.Cmp(MaxAdjustmentDown) == -1 {
 		difficultyAdjustment = MaxAdjustmentDown
 	}
 
-	// Take the difficulty adjustment and apply it to the difficulty slice.
-	bigAdjustment := big.NewInt(difficultyAdjustment)
-	oldTarget := big.NewInt(0)
-	oldTarget = oldTarget.SetBytes(parentBlockNode.Difficulty[:])
-	newTarget := big.NewInt(0)
-	newTarget = newTarget.Mul(oldTarget, bigAdjustment)
-	newTarget = newTarget.Div(newTarget, big.NewInt(1000*1000*1000))
-	targetBytes := newTarget.Bytes()
-	copy(newBlockNode.Difficulty[:], targetBytes)
+	// Take the difficulty adjustment and apply it to the difficulty slice,
+	// using rational numbers. Truncate the result.
+	oldTarget := big.NewInt(0).SetBytes(parentBlockNode.Difficulty[:])
+	ratOldTarget := big.NewRat(0, 1).SetInt(oldTarget)
+	ratNewTarget := ratOldTarget.Mul(difficultyAdjustment, ratOldTarget)
+	newTargetNumerator := ratNewTarget.Num()
+	newTargetDenominator := ratNewTarget.Denom()
+	intNewTarget := big.NewInt(0).Div(newTargetNumerator, newTargetDenominator)
+	newTargetBytes := intNewTarget.Bytes()
+	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
+	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
 
 	// If block adds to the current fork, validate it and advance fork.
 	// Note: current implementation will only ever accept the first block
