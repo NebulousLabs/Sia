@@ -105,10 +105,15 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Target[:]))
 	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
 
-	// If block adds to the current fork, validate it and advance fork.
-	// Note: current implementation will only ever accept the first block
-	// it sees, instead of picking longest chain.
-	if b.ParentBlock == s.CurrentBlock {
+	// If the new node is .5% heavier than the other node, switch to the new fork.
+	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target))
+	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
+	requiredDepth = new(big.Rat).Add(s.ConsensusState.CurrentDepth, threshold)
+	if newBlockNode.Depth.Cmp(requiredDepth) == 1 {
+		// Rewind the Current state to a common parent, keeping track of who the parents of the other node are.
+		// Forward the state through all of the forked blocks, doing a validation of each.
+			// If at some point a block doesn't verify, you get to walk all the way backwards and forwards again.
+
 		err = s.ValidateBlock(b)
 		if err != nil {
 			s.BadBlocks[bid] = struct{}{}
@@ -119,9 +124,11 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		s.CurrentBlock = bid
 		s.CurrentDepth = newBlockNode.Depth
 		s.CurrentPath[newBlockNode.Height] = bid
-	}
 
-	// Do anything necessary to the transaction pool.
+		// Do something to the transaction pool.
+	} else {
+		// Do something to the transaction pool.
+	}
 
 	return
 }

@@ -15,9 +15,6 @@ type State struct {
 	// blocktree.
 	BlockRoot *BlockNode
 
-	CurrentBlock BlockID
-	CurrentDepth BlockWeight
-
 	BadBlocks   map[BlockID]struct{}    // A list of blocks that don't verify.
 	BlockMap    map[BlockID]*BlockNode  // A list of all blocks in the blocktree.
 	CurrentPath map[BlockHeight]BlockID // Points to the block id for a given height.
@@ -48,6 +45,9 @@ type BlockNode struct {
 }
 
 type ConsensusState struct {
+	CurrentBlock BlockID
+	CurrentDepth BlockWeight
+
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
 	// OpenContracts  map[ContractID]OpenContract
