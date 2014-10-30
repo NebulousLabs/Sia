@@ -15,32 +15,25 @@ type State struct {
 	// blocktree.
 	BlockRoot *BlockNode
 
+	// One map for each potential type of block.
 	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
 	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
-	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
-	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
+	// FutureBlocks
+	// OrphanBlocks
 
-	// OpenTransactions map[TransactionID]Transaction // Transactions that are not yet incorporated into the ConsensusState.
-	// DeadTransactions map[TransactionID]Transaction // Transactions that spend outputs already in a block or open transaction.
+	// Transaction pool stuff
 
 	ConsensusState ConsensusState
 }
 
 type BlockNode struct {
-	Block *Block
-	// Verified bool // indicates whether the computation has been done to ensure all txns make sense.
+	Block    *Block
 	Children []*BlockNode
 
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Target           Target        // Target for next block.
 	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
-
-	// A list of contract outputs that have been spent at this point, plus
-	// miner payment output.
-
-	// There also needs to be some indication of what the payout was for
-	// each contract, if a contract expired or emptied out.
 }
 
 type ConsensusState struct {
@@ -49,13 +42,4 @@ type ConsensusState struct {
 
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
-	// OpenContracts  map[ContractID]OpenContract
 }
-
-/*
-type OpenContract struct {
-	Contract       FileContract
-	RemainingFunds Currency
-	CurrentWindow  bool // true means that a proof has been seen for the current window, false means it hasn't.
-}
-*/

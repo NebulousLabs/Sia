@@ -85,6 +85,27 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	return
 }
 
+// Takes a block and a parent node, and adds the block as a child to the parent
+// node.
+func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockNode) {
+	// Create the child node.
+	newNode = new(BlockNode)
+	newNode.Block = b
+	newNode.Height = parentNode.Height + 1
+
+	// Copy over the timestamps.
+	copy(newNode.RecentTimestamps[:], parentNode.RecentTimestamps[1:])
+	newNode.RecentTimestamps[10] = b.Timestamp
+
+	// Calculate target and depth.
+
+	// Add the node to the block map and the list of its parents children.
+	s.BlockMap[b.ID()] = newNode
+	parentNode.Children = append(parentNode.Children, newNode)
+
+	return
+}
+
 // Add a block to the state struct.
 func (s *State) AcceptBlock(b *Block) (err error) {
 	// Check the maps in the state to see if the block is already known.
@@ -99,16 +120,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		return
 	}
 
-	/////////// Can be made into a function for adding a block to the tree.
-	// Add the block to the block tree.
-	newBlockNode := new(BlockNode)
-	newBlockNode.Block = b
-	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
-	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
-	newBlockNode.Height = parentBlockNode.Height + 1
-	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
-	newBlockNode.RecentTimestamps[10] = b.Timestamp
-	s.BlockMap[b.ID()] = newBlockNode
+	newBlockNode := s.addBlockToTree(parentBlockNode, b)
 
 	///////////// Can be made into a function for calculating adjusted difficulty.
 	var timePassed Timestamp
