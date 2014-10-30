@@ -77,7 +77,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		blockWindow = newBlockNode.Height
 	} else {
 		// Calculate new target, using block Height-5000 timestamp.
-		timePassed := b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		timePassed := b.Timestamp - s.BlockMap[s.ConsensusState.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
 		expectedTimePassed := TargetSecondsPerBlock * 5000
 		blockWindow = 5000
 	}
@@ -116,12 +116,12 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		// children of the parents so that we can re-trace as we
 		// validate the blocks.
 		currentNode := parentBlockNode
-		value := s.CurrentPath[currentNode.Height]
+		value := s.ConsensusState.CurrentPath[currentNode.Height]
 		var parentHistory []BlockID
 		for value != currentNode.Block.ID() {
 			parentHistory = append(parentHistory, currentNode.Block.ID())
 			currentNode = s.BlockMap[currentNode.Block.ParentBlock]
-			value = s.CurrentPath[currentNode.Height]
+			value = s.ConsensusState.CurrentPath[currentNode.Height]
 		}
 
 		// Remove blocks from the ConsensusState until we get to the
@@ -214,7 +214,7 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 	// s.BlockMap[b.ID()].Verified = true
 
 	s.ConsensusState.CurrentBlock = b.ID()
-	s.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
+	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
 
 	return
 }
@@ -367,5 +367,5 @@ func (s *State) RewindABlock() {
 	}
 
 	s.ConsensusState.CurrentBlock = block.ParentBlock
-	delete(s.CurrentPath, s.BlockMap[block.ID()].Height)
+	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
 }

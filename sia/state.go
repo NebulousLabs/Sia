@@ -15,9 +15,8 @@ type State struct {
 	// blocktree.
 	BlockRoot *BlockNode
 
-	BadBlocks   map[BlockID]struct{}    // A list of blocks that don't verify.
-	BlockMap    map[BlockID]*BlockNode  // A list of all blocks in the blocktree.
-	CurrentPath map[BlockHeight]BlockID // Points to the block id for a given height.
+	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
+	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
 	// FutureBlocks map[BlockID]Block // A list of blocks with out-of-range timestamps.
 	// OrphanBlocks map[BlockID]Block // A list of all blocks that are orphans.
 
@@ -46,6 +45,7 @@ type BlockNode struct {
 
 type ConsensusState struct {
 	CurrentBlock BlockID
+	CurrentPath  map[BlockHeight]BlockID // Points to the block id for a given height.
 
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
