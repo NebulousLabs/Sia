@@ -85,6 +85,11 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	return
 }
 
+func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
+	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
+}
+
 // Takes a block and a parent node, and adds the block as a child to the parent
 // node.
 func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockNode) {
@@ -98,6 +103,7 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	newNode.RecentTimestamps[10] = b.Timestamp
 
 	// Calculate target and depth.
+	newNode.Depth = s.childDepth(parentNode)
 
 	// Add the node to the block map and the list of its parents children.
 	s.BlockMap[b.ID()] = newNode
@@ -157,10 +163,6 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newTargetBytes := intNewTarget.Bytes()
 	offset := len(newBlockNode.Target[:]) - len(newTargetBytes)
 	copy(newBlockNode.Target[offset:], newTargetBytes)
-
-	// Add the parent target to the depth of the block in the tree.
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Target[:]))
-	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
 
 	///////////////// Can be made into a function for following a fork.
 	// If the new node is .5% heavier than the other node, switch to the new fork.
