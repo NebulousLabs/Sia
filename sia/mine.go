@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Returns true IFF the block id is numerically less than the target.
 func ValidHeader(target Target, b *Block) bool {
 	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) < 0

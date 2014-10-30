@@ -53,8 +53,8 @@ type Block struct {
 type Transaction struct {
 	Version       uint16
 	ArbitraryData []byte
-	MinerFee      Currency
 	Inputs        []Input
+	MinerFee      Currency
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
