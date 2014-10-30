@@ -32,6 +32,11 @@ func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	}
 
 	// Perform work until the block matches the desired header value.
+	err := state.validateHeader(state.BlockMap[state.ConsensusState.CurrentBlock], b)
+	for err != nil {
+		b.Nonce++
+		err = state.validateHeader(state.BlockMap[state.ConsensusState.CurrentBlock], b)
+	}
 
 	return
 }

@@ -75,6 +75,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 		return
 	}
 
+	// Check the id meets the target.
 	blockHash := b.ID()
 	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {
 		err = errors.New("block does not meet target")
