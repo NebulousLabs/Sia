@@ -12,38 +12,55 @@ type InputSignatures struct {
 	UsedKeys            map[uint8]struct{}
 }
 
-// Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
-	bid := b.ID() // Function is not implemented.
-
-	_, exists := s.BadBlocks[bid]
+// checkMaps looks through the maps known to the state and sees if the block id
+// has been cached anywhere.
+func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
+	// See if the block is a known invalid block.
+	_, exists := s.BadBlocks[b.ID()]
 	if exists {
-		err = errors.New("Block is in bad list")
+		err = errors.New("block is known to be invalid")
 		return
 	}
 
-	if b.Version != 1 {
-		s.BadBlocks[bid] = struct{}{}
-		err = errors.New("Block is not version 1")
-		return
-	}
-
-	_, exists = s.BlockMap[bid]
+	// See if the block is a known valid block.
+	_, exists = s.BlockMap[b.ID()]
 	if exists {
 		err = errors.New("Block exists in block map.")
 		return
 	}
 
-	/*_, exists = s.OrphanBlocks[bid]
-	if exists {
-		err = errors.New("Block exists in orphan list")
-		return
-	} */
+	/*
+		// See if the block is a known orphan.
+		_, exists = s.OrphanBlocks[b.ID()]
+		if exists {
+			err = errors.New("Block exists in orphan list")
+			return
+		}
+	*/
 
-	parentBlockNode, exists := s.BlockMap[b.ParentBlock]
+	// See if the block's parent is known.
+	parentBlockNode, exists = s.BlockMap[b.ParentBlock]
 	if !exists {
-		// OrphanBlocks[bid] = b
+		// OrphanBlocks[b.ID()] = b
 		err = errors.New("Block is an orphan")
+		return
+	}
+
+	return
+}
+
+// Add a block to the state struct.
+func (s *State) AcceptBlock(b *Block) (err error) {
+	// Check the version of the block.
+	if b.Version != 1 {
+		s.BadBlocks[b.ID()] = struct{}{}
+		err = errors.New("Block is not version 1")
+		return
+	}
+
+	// Check the maps in the state to see if the block is already known.
+	parentBlockNode, err := s.checkMaps(b)
+	if err != nil {
 		return
 	}
 
@@ -53,7 +70,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	// Check the amount of work done by the block.
 	if !ValidHeader(parentBlockNode.Target, b) {
 		err = errors.New("Block does not meet target")
-		s.BadBlocks[bid] = struct{}{}
+		s.BadBlocks[b.ID()] = struct{}{}
 		return
 	}
 
@@ -65,7 +82,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newBlockNode.Height = parentBlockNode.Height + 1
 	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
 	newBlockNode.RecentTimestamps[10] = b.Timestamp
-	s.BlockMap[bid] = newBlockNode
+	s.BlockMap[b.ID()] = newBlockNode
 
 	var timePassed Timestamp
 	var expectedTimePassed Timestamp
