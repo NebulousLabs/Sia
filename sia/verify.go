@@ -65,6 +65,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newBlockNode.Height = parentBlockNode.Height + 1
 	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
 	newBlockNode.RecentTimestamps[10] = b.Timestamp
+	s.BlockMap[bid] = newBlockNode
 
 	var timePassed Timestamp
 	var expectedTimePassed Timestamp
@@ -125,27 +126,40 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 		// Remove blocks from the ConsensusState until we get to the
 		// same parent that we are forking from.
+		var rewoundBlocks []BlockID
 		for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
+			rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
 			s.RewindABlock()
 		}
 
 		// Validate each block in the parent history in order, updating
-		// the state as we go.
-		// If at some point a block doesn't verify, you get to walk all
-		// the way backwards and forwards again.
+		// the state as we go.  If at some point a block doesn't
+		// verify, you get to walk all the way backwards and forwards
+		// again.
+		validatedBlocks := 0
+		for i := len(parentHistory)-1; i >= 0; i-- {
+			err = s.ValidateBlock(s.BlockMap[b].Block)
+			if err != nil {
+				// Add the whole tree of blocks to BadBlocks,
+				// deleting them from BlockMap
 
-		/*
-		err = s.ValidateBlock(b)
-		if err != nil {
-			s.BadBlocks[bid] = struct{}{}
-			parentBlockNode.Children = parentBlockNode.Children[:len(parentBlockNode.Children)-1]
-			return
+				// Rewind the validated blocks
+				for i := range validatedBlocks {
+					s.RewindABlock()
+				}
+
+				// Integrate the rewound blocks
+				for i := len(rewoundBlocks)-1; i >= 0; i-- {
+					err = s.ValidateBlock(rewoundBlocks[i])
+					if err != nil {
+						panic(err)
+					}
+				}
+
+				break
+			}
+			validatedBlocks += 1
 		}
-
-		s.CurrentBlock = bid
-		s.CurrentDepth = newBlockNode.Depth
-		s.CurrentPath[newBlockNode.Height] = bid
-		*/
 
 		// Do something to the transaction pool.
 	} else {
@@ -198,6 +212,9 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
 
 	// s.BlockMap[b.ID()].Verified = true
+
+	s.CurrentBlock = b.ID()
+	s.CurrentPath[newBlockNode.Height] = b.ID()
 
 	return
 }
