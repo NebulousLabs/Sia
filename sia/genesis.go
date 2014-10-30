@@ -39,7 +39,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 
 	// Fill out the block root node, and add it to the BlockMap.
 	s.BlockRoot = new(BlockNode)
-	s.CurrentBlock = gbid
+	s.ConsensusState.CurrentBlock = gbid
 	s.BlockMap[gbid] = s.BlockRoot
 	s.CurrentPath[BlockHeight(0)] = gbid
 

@@ -107,10 +107,10 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
 
 	// If the new node is .5% heavier than the other node, switch to the new fork.
-	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target))
+	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
 	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
-	requiredDepth = new(big.Rat).Add(s.ConsensusState.CurrentDepth, threshold)
-	if newBlockNode.Depth.Cmp(requiredDepth) == 1 {
+	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
+	if (*big.Rat)(newBlockNode.Depth).Cmp(requiredDepth) == 1 {
 		// Find the common parent between the new fork and the current
 		// fork, keeping track of which path is taken through the
 		// children of the parents so that we can re-trace as we
@@ -137,20 +137,20 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		// verify, you get to walk all the way backwards and forwards
 		// again.
 		validatedBlocks := 0
-		for i := len(parentHistory)-1; i >= 0; i-- {
-			err = s.ValidateBlock(s.BlockMap[b].Block)
+		for i := len(parentHistory) - 1; i >= 0; i-- {
+			err = s.ValidateBlock(b)
 			if err != nil {
 				// Add the whole tree of blocks to BadBlocks,
 				// deleting them from BlockMap
 
 				// Rewind the validated blocks
-				for i := range validatedBlocks {
+				for i := 0; i < validatedBlocks; i++ {
 					s.RewindABlock()
 				}
 
 				// Integrate the rewound blocks
-				for i := len(rewoundBlocks)-1; i >= 0; i-- {
-					err = s.ValidateBlock(rewoundBlocks[i])
+				for i := len(rewoundBlocks) - 1; i >= 0; i-- {
+					err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
 					if err != nil {
 						panic(err)
 					}
@@ -213,8 +213,8 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 
 	// s.BlockMap[b.ID()].Verified = true
 
-	s.CurrentBlock = b.ID()
-	s.CurrentPath[newBlockNode.Height] = b.ID()
+	s.ConsensusState.CurrentBlock = b.ID()
+	s.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
 
 	return
 }
@@ -367,4 +367,5 @@ func (s *State) RewindABlock() {
 	}
 
 	s.ConsensusState.CurrentBlock = block.ParentBlock
+	delete(s.CurrentPath, s.BlockMap[block.ID()].Height)
 }

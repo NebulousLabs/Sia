@@ -30,7 +30,7 @@ func Hashcash(target Hash) (nonce []byte, i int) {
 func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	b = &Block{
 		Version:      1,
-		ParentBlock:  state.CurrentBlock,
+		ParentBlock:  state.ConsensusState.CurrentBlock,
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: w.CoinAddress,
 		// Merkle Root
