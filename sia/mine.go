@@ -7,7 +7,7 @@ import (
 )
 
 func ValidHeader(target Target, b *Block) bool {
-	blockHash := HashBytes(b.HeaderBytes())
+	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) < 0
 }
 

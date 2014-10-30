@@ -77,8 +77,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		blockWindow = newBlockNode.Height
 	} else {
 		// Calculate new target, using block Height-5000 timestamp.
-		timePassed := b.Timestamp - s.BlockMap[s.ConsensusState.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
-		expectedTimePassed := TargetSecondsPerBlock * 5000
+		timePassed = b.Timestamp - s.BlockMap[s.ConsensusState.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * 5000
 		blockWindow = 5000
 	}
 
