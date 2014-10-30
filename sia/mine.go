@@ -6,12 +6,6 @@ import (
 	"time"
 )
 
-// Returns true IFF the block id is numerically less than the target.
-func ValidHeader(target Target, b *Block) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) < 0
-}
-
 // Hashcash brute-forces a nonce that produces a hash less than target.
 func Hashcash(target Hash) (nonce []byte, i int) {
 	nonce = make([]byte, 8)

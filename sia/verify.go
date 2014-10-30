@@ -1,8 +1,11 @@
 package sia
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
+	"sort"
+	"time"
 )
 
 // Used to keep track of how many signatures an input has been signed by.
@@ -49,31 +52,53 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
-// Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
-	// Check the version of the block.
-	if b.Version != 1 {
-		s.BadBlocks[b.ID()] = struct{}{}
-		err = errors.New("Block is not version 1")
+// Returns true if timestamp is valid, and if target value is reached.
+func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
+	// Check that the block is not too far in the future.
+	skew := b.Timestamp - Timestamp(time.Now().Unix())
+	if skew > FutureThreshold {
+		// Do something so that you will return to considering this
+		// block once it's no longer too far in the future.
+		err = errors.New("timestamp too far in future")
 		return
 	}
 
+	// If timestamp is too far in the past, reject and put in bad blocks.
+	var intTimestamps []int
+	for _, timestamp := range parent.RecentTimestamps {
+		intTimestamps = append(intTimestamps, int(timestamp))
+	}
+	sort.Ints(intTimestamps)
+	if Timestamp(intTimestamps[5]) > b.Timestamp {
+		s.BadBlocks[b.ID()] = struct{}{}
+		err = errors.New("timestamp invalid for being in the past")
+		return
+	}
+
+	blockHash := b.ID()
+	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {
+		err = errors.New("block does not meet target")
+		return
+	}
+
+	return
+}
+
+// Add a block to the state struct.
+func (s *State) AcceptBlock(b *Block) (err error) {
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(b)
 	if err != nil {
 		return
 	}
 
-	// If timestamp is in the future, store in future blocks list.
-	// If timestamp is too far in the past, reject and put in bad blocks.
-
-	// Check the amount of work done by the block.
-	if !ValidHeader(parentBlockNode.Target, b) {
-		err = errors.New("Block does not meet target")
-		s.BadBlocks[b.ID()] = struct{}{}
+	// Check that the header of the block is valid.
+	err = s.validateHeader(parentBlockNode, b)
+	if err != nil {
 		return
 	}
 
+	/////////// Can be made into a function for adding a block to the tree.
 	// Add the block to the block tree.
 	newBlockNode := new(BlockNode)
 	newBlockNode.Block = b
@@ -84,6 +109,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	newBlockNode.RecentTimestamps[10] = b.Timestamp
 	s.BlockMap[b.ID()] = newBlockNode
 
+	///////////// Can be made into a function for calculating adjusted difficulty.
 	var timePassed Timestamp
 	var expectedTimePassed Timestamp
 	var blockWindow BlockHeight
@@ -123,6 +149,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentBlockNode.Target[:]))
 	newBlockNode.Depth = BlockWeight(new(big.Rat).Add(parentBlockNode.Depth, blockWeight))
 
+	///////////////// Can be made into a function for following a fork.
 	// If the new node is .5% heavier than the other node, switch to the new fork.
 	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
 	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)

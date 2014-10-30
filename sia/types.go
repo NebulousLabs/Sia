@@ -12,7 +12,9 @@ const (
 	SegmentSize   = 32
 
 	TargetSecondsPerBlock = 300
-	TargetWindow          = 5000
+	TargetWindow          = 5000 // Number of blocks to use when calculating difficulty.
+
+	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
 )
 
 var MaxAdjustmentUp = big.NewRat(10005, 10000)
