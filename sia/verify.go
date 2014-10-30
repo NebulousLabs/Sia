@@ -160,6 +160,66 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
 }
 
+func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
+	// Find the common parent between the new fork and the current
+	// fork, keeping track of which path is taken through the
+	// children of the parents so that we can re-trace as we
+	// validate the blocks.
+	currentNode := parentNode
+	value := s.ConsensusState.CurrentPath[currentNode.Height]
+	var parentHistory []BlockID
+	for value != currentNode.Block.ID() {
+		parentHistory = append(parentHistory, currentNode.Block.ID())
+		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
+		value = s.ConsensusState.CurrentPath[currentNode.Height]
+	}
+
+	// Remove blocks from the ConsensusState until we get to the
+	// same parent that we are forking from.
+	var rewoundBlocks []BlockID
+	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
+		s.RewindABlock()
+	}
+
+	// Validate each block in the parent history in order, updating
+	// the state as we go.  If at some point a block doesn't
+	// verify, you get to walk all the way backwards and forwards
+	// again.
+	validatedBlocks := 0
+	for i := len(parentHistory) - 1; i >= 0; i-- {
+		err = s.ValidateBlock(s.BlockMap[parentHistory[i]].Block)
+		if err != nil {
+			// Add the whole tree of blocks to BadBlocks,
+			// deleting them from BlockMap
+
+			// Rewind the validated blocks
+			for i := 0; i < validatedBlocks; i++ {
+				s.RewindABlock()
+			}
+
+			// Integrate the rewound blocks
+			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
+				err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
+				if err != nil {
+					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
+				}
+			}
+
+			break
+		}
+		validatedBlocks += 1
+	}
+
+	if err != nil {
+		// Do something to the transaction pool.
+	} else {
+		// Maybe still do something to the transaction pool.
+	}
+
+	return
+}
+
 // Add a block to the state struct.
 func (s *State) AcceptBlock(b *Block) (err error) {
 	// Check the maps in the state to see if the block is already known.
@@ -178,60 +238,15 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		// Find the common parent between the new fork and the current
-		// fork, keeping track of which path is taken through the
-		// children of the parents so that we can re-trace as we
-		// validate the blocks.
-		currentNode := parentBlockNode
-		value := s.ConsensusState.CurrentPath[currentNode.Height]
-		var parentHistory []BlockID
-		for value != currentNode.Block.ID() {
-			parentHistory = append(parentHistory, currentNode.Block.ID())
-			currentNode = s.BlockMap[currentNode.Block.ParentBlock]
-			value = s.ConsensusState.CurrentPath[currentNode.Height]
+		err = s.forkBlockchain(parentBlockNode)
+		if err != nil {
+			return
 		}
-
-		// Remove blocks from the ConsensusState until we get to the
-		// same parent that we are forking from.
-		var rewoundBlocks []BlockID
-		for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
-			rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
-			s.RewindABlock()
-		}
-
-		// Validate each block in the parent history in order, updating
-		// the state as we go.  If at some point a block doesn't
-		// verify, you get to walk all the way backwards and forwards
-		// again.
-		validatedBlocks := 0
-		for i := len(parentHistory) - 1; i >= 0; i-- {
-			err = s.ValidateBlock(b)
-			if err != nil {
-				// Add the whole tree of blocks to BadBlocks,
-				// deleting them from BlockMap
-
-				// Rewind the validated blocks
-				for i := 0; i < validatedBlocks; i++ {
-					s.RewindABlock()
-				}
-
-				// Integrate the rewound blocks
-				for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-					err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
-					if err != nil {
-						panic(err)
-					}
-				}
-
-				break
-			}
-			validatedBlocks += 1
-		}
-
-		// Do something to the transaction pool.
 	} else {
 		// Do something to the transaction pool.
 	}
+
+	// Maybe still do something to the transaction pool.
 
 	return
 }
