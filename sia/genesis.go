@@ -23,10 +23,6 @@ func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
 
 // Create the state that contains the genesis block and nothing else.
 func CreateGenesisState(premineAddress CoinAddress) (s *State) {
-	// Create the genesis block using the premine address.
-	genesisBlock := CreateGenesisBlock(premineAddress)
-	gbid := genesisBlock.ID()
-
 	// Create a new state and initialize the maps.
 	s = new(State)
 	s.BlockRoot = new(BlockNode)
@@ -38,6 +34,9 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
 	s.ConsensusState.SpentOutputs = make(map[OutputID]Output)
 
+	// Create the genesis block using the premine address.
+	genesisBlock := CreateGenesisBlock(premineAddress)
+
 	// Fill out the block root node, and add it to the BlockMap.
 	s.BlockRoot.Block = genesisBlock
 	s.BlockRoot.Height = 0
@@ -46,11 +45,11 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	}
 	s.BlockRoot.Target[15] = 1
 	s.BlockRoot.Depth = big.NewRat(0, 1)
-	s.BlockMap[gbid] = s.BlockRoot
+	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
 	// Fill out the ConsensusState
-	s.ConsensusState.CurrentBlock = gbid
-	s.ConsensusState.CurrentPath[BlockHeight(0)] = gbid
+	s.ConsensusState.CurrentBlock = genesisBlock.ID()
+	s.ConsensusState.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
 
 	return
 }

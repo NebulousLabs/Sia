@@ -52,8 +52,10 @@ type ConsensusState struct {
 	// OpenContracts  map[ContractID]OpenContract
 }
 
+/*
 type OpenContract struct {
 	Contract       FileContract
 	RemainingFunds Currency
 	CurrentWindow  bool // true means that a proof has been seen for the current window, false means it hasn't.
 }
+*/
