@@ -85,6 +85,45 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	return
 }
 
+// Calculates the target of a child depending on the timestamp of the child
+// block.
+func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
+	var timePassed, expectedTimePassed Timestamp
+	blockWindow := BlockHeight(5000)
+	if newNode.Height < 5000 {
+		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
+		blockWindow = newNode.Height
+	} else {
+		adjustmentBlock := s.BlockMap[s.ConsensusState.CurrentPath[newNode.Height-5000]].Block
+		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * 5000
+	}
+
+	// Adjustment = timePassed / expectedTimePassed / blockWindow.
+	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+
+	// Enforce a maximum targetAdjustment
+	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
+		targetAdjustment = MaxAdjustmentUp
+	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
+		targetAdjustment = MaxAdjustmentDown
+	}
+
+	// Take the target adjustment and apply it to the target slice,
+	// using rational numbers. Truncate the result.
+	oldTarget := new(big.Int).SetBytes(parentNode.Target[:])
+	ratOldTarget := new(big.Rat).SetInt(oldTarget)
+	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
+	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
+	newTargetBytes := intNewTarget.Bytes()
+	offset := len(target[:]) - len(newTargetBytes)
+	copy(target[offset:], newTargetBytes)
+	return
+}
+
+// Calculates the depth of a child given the parent node - note that the depth
+// of the child is independant of the actual child block.
 func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
 	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
@@ -103,6 +142,7 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	newNode.RecentTimestamps[10] = b.Timestamp
 
 	// Calculate target and depth.
+	newNode.Target = s.childTarget(parentNode, newNode)
 	newNode.Depth = s.childDepth(parentNode)
 
 	// Add the node to the block map and the list of its parents children.
@@ -128,44 +168,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	newBlockNode := s.addBlockToTree(parentBlockNode, b)
 
-	///////////// Can be made into a function for calculating adjusted difficulty.
-	var timePassed Timestamp
-	var expectedTimePassed Timestamp
-	var blockWindow BlockHeight
-	if newBlockNode.Height < 5000 {
-		// Calculate new target, using block 0 timestamp.
-		timePassed = b.Timestamp - s.BlockRoot.Block.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newBlockNode.Height)
-		blockWindow = newBlockNode.Height
-	} else {
-		// Calculate new target, using block Height-5000 timestamp.
-		timePassed = b.Timestamp - s.BlockMap[s.ConsensusState.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * 5000
-		blockWindow = 5000
-	}
-
-	// Adjustment as a float = timePassed / expectedTimePassed / blockWindow.
-	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
-
-	// Enforce a maximum targetAdjustment
-	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
-		targetAdjustment = MaxAdjustmentUp
-	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
-		targetAdjustment = MaxAdjustmentDown
-	}
-
-	// Take the target adjustment and apply it to the target slice,
-	// using rational numbers. Truncate the result.
-	oldTarget := new(big.Int).SetBytes(parentBlockNode.Target[:])
-	ratOldTarget := new(big.Rat).SetInt(oldTarget)
-	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
-	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
-	newTargetBytes := intNewTarget.Bytes()
-	offset := len(newBlockNode.Target[:]) - len(newTargetBytes)
-	copy(newBlockNode.Target[offset:], newTargetBytes)
-
 	///////////////// Can be made into a function for following a fork.
-	// If the new node is .5% heavier than the other node, switch to the new fork.
+	// If the new node is 5% heavier than the current node, switch to the new fork.
 	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
 	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
 	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
