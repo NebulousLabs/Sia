@@ -30,7 +30,6 @@ func Hashcash(target Hash) (nonce []byte, i int) {
 // be updated by listening on channels or something.
 func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	b = &Block{
-		Version:      1,
 		ParentBlock:  state.ConsensusState.CurrentBlock,
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: w.CoinAddress,

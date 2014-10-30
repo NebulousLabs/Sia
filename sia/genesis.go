@@ -10,7 +10,6 @@ import (
 // hardcoded values.
 func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
 	b = &Block{
-		Version: 1,
 		// Parent is 0.
 		Timestamp: Timestamp(time.Now().Unix()),
 		// Nonce is 0.

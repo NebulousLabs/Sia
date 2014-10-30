@@ -41,7 +41,6 @@ type Signature struct {
 }
 
 type Block struct {
-	Version      uint16
 	ParentBlock  BlockID
 	Timestamp    Timestamp
 	Nonce        uint32 // may or may not be needed
@@ -51,7 +50,6 @@ type Block struct {
 }
 
 type Transaction struct {
-	Version       uint16
 	ArbitraryData []byte
 	Inputs        []Input
 	MinerFee      Currency
@@ -86,7 +84,6 @@ type TransactionSignature struct {
 }
 
 type CoveredFields struct {
-	Version         bool
 	ArbitraryData   bool
 	MinerFee        bool
 	Inputs, Outputs []uint8 // each element indicates an index which is signed.
@@ -121,7 +118,6 @@ type StorageProof struct {
 
 func (b *Block) ID() BlockID {
 	return BlockID(HashBytes(MarshalAll(
-		uint64(b.Version),
 		Hash(b.ParentBlock),
 		uint64(b.Timestamp),
 		uint64(b.Nonce),

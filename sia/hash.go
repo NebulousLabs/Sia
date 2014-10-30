@@ -68,7 +68,6 @@ func (t *Transaction) Hash() Hash {
 	// allows you to selectively reveal pieces of a transaction? But what good is that?
 
 	return HashBytes(MarshalAll(
-		uint64(t.Version),
 		HashBytes(t.ArbitraryData),
 		uint64(t.MinerFee),
 		// Inputs

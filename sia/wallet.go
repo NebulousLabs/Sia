@@ -64,9 +64,6 @@ func (w *Wallet) SpendCoins(amount Currency, address CoinAddress, state *State) 
 	// Scan blockchain for outputs.
 	w.Scan(state)
 
-	// Set transaction version.
-	t.Version = 1
-
 	// Add to the list of inputs until enough funds have been allocated.
 	total := Currency(0)
 	for id, output := range w.OwnedOutputs {

@@ -238,12 +238,9 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 
 // Add a function that integrates a block without verifying it.
 
+/// Can probably split the validation of each piece into a different function,
+//but perhaps not.
 func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error) {
-	if t.Version != 1 {
-		err = errors.New("Transaction version is not recognized.")
-		return
-	}
-
 	inputSum := Currency(0)
 	outputSum := t.MinerFee
 	var inputSignaturesMap map[OutputID]InputSignatures
