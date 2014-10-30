@@ -110,10 +110,31 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
 	requiredDepth = new(big.Rat).Add(s.ConsensusState.CurrentDepth, threshold)
 	if newBlockNode.Depth.Cmp(requiredDepth) == 1 {
-		// Rewind the Current state to a common parent, keeping track of who the parents of the other node are.
-		// Forward the state through all of the forked blocks, doing a validation of each.
-			// If at some point a block doesn't verify, you get to walk all the way backwards and forwards again.
+		// Find the common parent between the new fork and the current
+		// fork, keeping track of which path is taken through the
+		// children of the parents so that we can re-trace as we
+		// validate the blocks.
+		currentNode := parentBlockNode
+		value := s.CurrentPath[currentNode.Height]
+		var parentHistory []BlockID
+		for value != currentNode.Block.ID() {
+			parentHistory = append(parentHistory, currentNode.Block.ID())
+			currentNode = s.BlockMap[currentNode.Block.ParentBlock]
+			value = s.CurrentPath[currentNode.Height]
+		}
 
+		// Remove blocks from the ConsensusState until we get to the
+		// same parent that we are forking from.
+		for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
+			s.RewindABlock()
+		}
+
+		// Validate each block in the parent history in order, updating
+		// the state as we go.
+		// If at some point a block doesn't verify, you get to walk all
+		// the way backwards and forwards again.
+
+		/*
 		err = s.ValidateBlock(b)
 		if err != nil {
 			s.BadBlocks[bid] = struct{}{}
@@ -124,6 +145,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		s.CurrentBlock = bid
 		s.CurrentDepth = newBlockNode.Depth
 		s.CurrentPath[newBlockNode.Height] = bid
+		*/
 
 		// Do something to the transaction pool.
 	} else {
@@ -303,6 +325,7 @@ func (s *State) ApplyTransaction(t Transaction) {
 	*/
 }
 
+// Pulls just this transaction out of the ConsensusState.
 func (s *State) ReverseTransaction(t Transaction) {
 	// Remove all outputs created by storage proofs.
 
@@ -317,4 +340,14 @@ func (s *State) ReverseTransaction(t Transaction) {
 		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
 		delete(s.ConsensusState.SpentOutputs, input.OutputID)
 	}
+}
+
+// Pulls the most recent block out of the ConsensusState.
+func (s *State) RewindABlock() {
+	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
+	for i := len(block.Transactions) - 1; i >= 0; i-- {
+		s.ReverseTransaction(block.Transactions[i])
+	}
+
+	s.ConsensusState.CurrentBlock = block.ParentBlock
 }

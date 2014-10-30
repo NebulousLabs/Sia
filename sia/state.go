@@ -46,7 +46,6 @@ type BlockNode struct {
 
 type ConsensusState struct {
 	CurrentBlock BlockID
-	CurrentDepth BlockWeight
 
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
