@@ -152,6 +152,14 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	return
 }
 
+// Returns true if the input node is 5% heavier than the current node.
+func (s *State) heavierFork(newNode *BlockNode) bool {
+	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
+	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
+	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
+	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
+}
+
 // Add a block to the state struct.
 func (s *State) AcceptBlock(b *Block) (err error) {
 	// Check the maps in the state to see if the block is already known.
@@ -168,12 +176,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	newBlockNode := s.addBlockToTree(parentBlockNode, b)
 
-	///////////////// Can be made into a function for following a fork.
 	// If the new node is 5% heavier than the current node, switch to the new fork.
-	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
-	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
-	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
-	if (*big.Rat)(newBlockNode.Depth).Cmp(requiredDepth) == 1 {
+	if s.heavierFork(newBlockNode) {
 		// Find the common parent between the new fork and the current
 		// fork, keeping track of which path is taken through the
 		// children of the parents so that we can re-trace as we
