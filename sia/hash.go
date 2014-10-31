@@ -21,6 +21,11 @@ func joinHash(left, right Hash) Hash {
 // power of 2, the orphan hash(es) are concatenated with a single 0 byte.
 // MerkleRoot will panic if the leaves slice is empty.
 func MerkleRoot(leaves []Hash) Hash {
+	if len(leaves) == 0 {
+		var hash Hash
+		return hash
+	}
+
 	if len(leaves) == 1 {
 		return HashBytes(append(leaves[0][:], 0))
 	} else if len(leaves) == 2 {

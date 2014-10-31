@@ -15,11 +15,14 @@ func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	}
 
 	// Add the transactions from the transaction pool.
+	var transactionHashes []Hash
 	for _, transaction := range state.ConsensusState.TransactionList {
 		b.Transactions = append(b.Transactions, *transaction)
+		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
 	}
 
-	// Add the merkle root of the transactions to the block.
+	// Add the merkle root of the transactions.
+	b.MerkleRoot = MerkleRoot(transactionHashes)
 
 	// Perform work until the block matches the desired header value.
 	err := state.validateHeader(state.BlockMap[state.ConsensusState.CurrentBlock], b)
