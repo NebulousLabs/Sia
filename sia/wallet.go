@@ -5,8 +5,6 @@ package sia
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"errors"
 )
 
@@ -20,12 +18,10 @@ type Wallet struct {
 func CreateWallet() (w *Wallet, err error) {
 	w = new(Wallet)
 
-	curve := elliptic.P256()
-	w.SecretKey, err = ecdsa.GenerateKey(curve, rand.Reader)
-
+	var pk PublicKey
+	w.SecretKey, pk, err = GenerateKeyPair()
+	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
-	w.SpendConditions.PublicKeys = make([]PublicKey, 1)
-	w.SpendConditions.PublicKeys[0] = PublicKey(w.SecretKey.PublicKey)
 	// w.CoinAddress = sc.GetAddress()
 
 	return

@@ -1,35 +1,39 @@
 package sia
 
 import (
-	"crypto/sha512"
+	"crypto/sha256"
 	"errors"
 	"io"
 )
 
-func HashBytes(data []byte) (h Hash) {
-	hash512 := sha512.Sum512(data)
-	copy(h[:], hash512[:])
-	return
+func HashBytes(data []byte) Hash {
+	return sha256.Sum256(data)
 }
 
-// Helper function for merkle trees; takes two hashes, appends them, and then
-// hashes their sum.
+// Helper function for Merkle trees; takes two hashes, concatenates them,
+// and hashes the result.
 func joinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
 
-// Takes as input a slice of hashes, which are the leaves of the merkle tree.
-// Produces the root hash from these leaves. The hashes correspond to some data
-// structure underneath. This function is useful for building merkle trees out
-// of arbitrary stuff, like transactions.
-func BuildMerkleTree(leaves []Hash) (hash Hash, err error) {
-	if len(leaves) == 0 {
-		err = errors.New("Cannot build tree of of length 1 object")
-		return
+// MerkleRoot calculates the "root hash" formed by repeatedly concatenating
+// and hashing a binary tree of hashes.  If the number of leaves is not a
+// power of 2, the orphan hash(es) are concatenated with a single 0 byte.
+// MerkleRoot will panic if the leaves slice is empty.
+func MerkleRoot(leaves []Hash) Hash {
+	if len(leaves) == 1 {
+		return HashBytes(append(leaves[0][:], 0))
+	} else if len(leaves) == 2 {
+		return joinHash(leaves[0], leaves[1])
 	}
 
-	hash = leaves[0]
-	return
+	// locate smallest power of 2 < len(leaves)
+	mid := 1
+	for mid < len(leaves)/2+len(leaves)%2 {
+		mid *= 2
+	}
+
+	return joinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
 }
 
 // MerkleFile splits the provided data into segments. It then recursively
@@ -64,28 +68,17 @@ func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 }
 
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
-		uint64(b.Version),
-		Hash(b.ParentBlock),
-		uint64(b.Timestamp),
-		uint64(b.Nonce),
-		Hash(b.MinerAddress),
-		Hash(b.MerkleRoot),
-	)))
+	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
 }
 
 func (t *Transaction) Hash() Hash {
 	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
 	// allows you to selectively reveal pieces of a transaction? But what good is that?
 
-	return HashBytes(MarshalAll(
-		uint64(t.Version),
-		HashBytes(t.ArbitraryData),
-		uint64(t.MinerFee),
-		// Inputs
-		// Outputs
-		// File Contracts
-		// Storage Proofs
-		// Signatures
-	))
+	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
+	// Inputs
+	// Outputs
+	// File Contracts
+	// Storage Proofs
+	// Signatures
 }
