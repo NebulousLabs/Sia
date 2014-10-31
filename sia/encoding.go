@@ -2,6 +2,7 @@ package sia
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/big"
 	"reflect"
 )
@@ -109,22 +110,31 @@ func marshal(val reflect.Value) (b []byte) {
 		}
 		return
 	}
+	// Marshalling should never fail. If it panics, you're doing something wrong,
+	// like trying to encode an int or a map or an unexported struct field.
 	panic("could not marshal type " + val.Type().String())
 	return
 }
 
 // Unmarshal decodes a byte slice into the provided interface. The interface must be a pointer.
 // The decoding rules are the inverse of those described under Marshal.
-func Unmarshal(b []byte, v interface{}) {
+func Unmarshal(b []byte, v interface{}) (err error) {
 	// v must be a pointer
 	pval := reflect.ValueOf(v)
 	if pval.Kind() != reflect.Ptr || pval.IsNil() {
-		panic("Must pass a valid pointer to Unmarshal")
+		return errors.New("must pass a valid pointer to Unmarshal")
 	}
-	consumed := unmarshal(b, pval.Elem())
-	if consumed != len(b) {
-		panic("could not unmarshal type " + pval.Elem().Type().String())
-	}
+
+	// unmarshal may panic
+	var consumed int
+	defer func() {
+		if r := recover(); r != nil || consumed != len(b) {
+			err = errors.New("could not unmarshal type " + pval.Elem().Type().String())
+		}
+	}()
+
+	consumed = unmarshal(b, pval.Elem())
+	return
 }
 
 func unmarshal(b []byte, val reflect.Value) (consumed int) {
@@ -203,7 +213,9 @@ func (s *Signature) MarshalSia() []byte {
 func (s *Signature) UnmarshalSia(b []byte) int {
 	// inverse of the struct trick used in Signature.MarshalSia
 	str := struct{ R, S []byte }{}
-	Unmarshal(b, &str)
+	if Unmarshal(b, &str) != nil {
+		return 0
+	}
 	s.R = new(big.Int).SetBytes(str.R)
 	s.S = new(big.Int).SetBytes(str.S)
 	return len(str.R) + len(str.S) + 2
@@ -222,7 +234,9 @@ func (pk *PublicKey) MarshalSia() []byte {
 func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	// see Signature.UnmarshalSia
 	str := struct{ X, Y []byte }{}
-	Unmarshal(b, &str)
+	if Unmarshal(b, &str) != nil {
+		return 0
+	}
 	pk.X = new(big.Int).SetBytes(str.X)
 	pk.Y = new(big.Int).SetBytes(str.Y)
 	return len(str.X) + len(str.Y) + 2

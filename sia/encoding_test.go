@@ -43,7 +43,10 @@ var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{
 func TestEncoding(t *testing.T) {
 	for i := range testStructs {
 		b := Marshal(testStructs[i])
-		Unmarshal(b, emptyStructs[i])
+		err := Unmarshal(b, emptyStructs[i])
+		if err != nil {
+			t.Error(err)
+		}
 		t.Log(b)
 	}
 }
