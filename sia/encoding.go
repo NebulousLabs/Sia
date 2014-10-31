@@ -60,9 +60,8 @@ func DecUint64(b []byte) uint64 {
 // Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
 // (This may need to be extended to two bytes.)
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
-// Pointers (unimplemented):
-// 		Valid pointers are prefaced by a 1, followed by the dereferenced value.
-// 		Nil pointers are represented by a 0.
+// Nil pointers are represented by a zero.
+// Valid pointers are prefaced by a non-zero, followed by the dereferenced value.
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
 }
@@ -79,7 +78,11 @@ func marshal(val reflect.Value) (b []byte) {
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		return marshal(val.Elem()) // TODO: handle nil pointers
+		if val.IsNil() {
+			return []byte{0}
+		}
+		b = append([]byte{1}, marshal(val.Elem())...)
+		return
 	case reflect.Bool:
 		if val.Bool() {
 			return []byte{1}
@@ -95,7 +98,7 @@ func marshal(val reflect.Value) (b []byte) {
 	case reflect.String:
 		s := val.String()
 		return append([]byte{byte(len(s))}, []byte(s)...)
-	case reflect.Slice:
+	case reflect.Slice: // TODO: add special case for []byte?
 		// slices are variable length, so prepend the length and then fallthrough to array logic
 		b = []byte{byte(val.Len())}
 		fallthrough
@@ -122,7 +125,7 @@ func Unmarshal(b []byte, v interface{}) {
 	if pval.Kind() != reflect.Ptr || pval.IsNil() {
 		panic("Must pass a valid pointer to Unmarshal")
 	}
-	consumed := unmarshal(b, pval)
+	consumed := unmarshal(b, pval.Elem())
 	if consumed != len(b) {
 		panic("could not unmarshal type " + pval.Elem().Type().String())
 	}
@@ -140,7 +143,15 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		return unmarshal(b, val.Elem()) // TODO: handle decoding into nil pointers
+		// nil pointer, nothing to decode
+		if b[0] == 0 {
+			return 1
+		}
+		// make sure we aren't decoding into nil
+		if val.IsNil() {
+			val.Set(reflect.New(val.Type().Elem()))
+		}
+		return unmarshal(b[1:], val.Elem()) + 1
 	case reflect.Bool:
 		val.SetBool(b[0] != 0)
 		return 1
@@ -156,7 +167,7 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		n, b := int(b[0]), b[1:]
 		val.SetString(string(b[:n]))
 		return n + 1
-	case reflect.Slice:
+	case reflect.Slice: // TODO: add special case for []byte?
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		var sliceLen int
@@ -187,11 +198,14 @@ func (s *Signature) MarshalSia() []byte {
 	if s.R == nil || s.S == nil {
 		return []byte{0, 0}
 	}
+	// pretend Signature is a tuple of []bytes
+	// this lets us use Marshal instead of doing manual length-prefixing
 	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
 }
 
 // MarshalSia implements the Unmarshaler interface for Signatures.
 func (s *Signature) UnmarshalSia(b []byte) int {
+	// inverse of the struct trick used in Signature.MarshalSia
 	str := struct{ R, S []byte }{}
 	Unmarshal(b, &str)
 	s.R = new(big.Int).SetBytes(str.R)
@@ -204,11 +218,13 @@ func (pk *PublicKey) MarshalSia() []byte {
 	if pk.X == nil || pk.Y == nil {
 		return []byte{0, 0}
 	}
+	// see Signature.MarshalSia
 	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
 }
 
 // MarshalSia implements the Unmarshaler interface for PublicKeys.
 func (pk *PublicKey) UnmarshalSia(b []byte) int {
+	// see Signature.UnmarshalSia
 	str := struct{ X, Y []byte }{}
 	Unmarshal(b, &str)
 	pk.X = new(big.Int).SetBytes(str.X)
