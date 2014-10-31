@@ -186,15 +186,15 @@ func (s *State) RewindABlock() {
 	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
 }
 
-/// Can probably split the validation of each piece into a different function,
-//but perhaps not.
-func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (err error) {
+// ValidTransaction returns err = nil if the transaction is valid, otherwise
+// returns an error explaining what wasn't valid.
+func (s *State) validTransaction(t Transaction, currentHeight BlockHeight) (err error) {
 	inputSum := Currency(0)
 	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range t.Inputs {
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
-			err = errors.New("Transaction spends a nonexisting output")
+			err = errors.New("transaction spends a nonexisting output")
 			return
 		}
 
@@ -204,14 +204,14 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 
 		// Check the timelock on the spend conditions is expired.
 		if input.SpendConditions.TimeLock < currentHeight {
-			err = errors.New("Output spent before timelock expiry.")
+			err = errors.New("output spent before timelock expiry.")
 			return
 		}
 
 		// Create the condition for the input signatures and add it to the input signatures map.
 		_, exists = inputSignaturesMap[input.OutputID]
 		if exists {
-			err = errors.New("Output spent twice in same transaction")
+			err = errors.New("output spent twice in same transaction")
 			return
 		}
 		var newInputSignatures InputSignatures
@@ -229,6 +229,7 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 		outputSum += output.Value
 	}
 
+	/*
 	for _, contract := range t.FileContracts {
 		if contract.Start < currentHeight {
 			err = errors.New("Contract starts in the future.")
@@ -239,6 +240,7 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 			return
 		}
 	}
+	*/
 
 	/*
 		for _, proof := range t.StorageProofs {
@@ -248,7 +250,7 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 	*/
 
 	if inputSum != outputSum {
-		err = errors.New("Inputs do not equal outputs for transaction.")
+		err = errors.New("inputs do not equal outputs for transaction.")
 		return
 	}
 
@@ -256,7 +258,7 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
 		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
-			err = errors.New("Friviolous Signature detected.")
+			err = errors.New("friviolous signature detected.")
 			return
 		}
 		_, exists := inputSignaturesMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
@@ -277,7 +279,9 @@ func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (e
 	return
 }
 
-func (s *State) ApplyTransaction(t Transaction) {
+// Takes a transaction and applies it to the ConsensusState. Should only be
+// called in the context of applying a whole block.
+func (s *State) applyTransaction(t Transaction) {
 	// Remove all inputs from the unspent outputs list
 	for _, input := range t.Inputs {
 		s.ConsensusState.SpentOutputs[input.OutputID] = s.ConsensusState.UnspentOutputs[input.OutputID]
@@ -308,22 +312,22 @@ func (s *State) ApplyTransaction(t Transaction) {
 	*/
 }
 
-// ValidateBlock will both verify the block AND update the consensus state.
+// integrateBlock will both verify the block AND update the consensus state.
 // Calling integrate block is not needed.
-func (s *State) ValidateBlock(b *Block) (err error) {
+func (s *State) integrateBlock(b *Block) (err error) {
 	// Check the hash on the merkle tree of transactions.
 
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.ValidateTransaction(txn, s.BlockMap[b.ID()].Height)
+		err = s.validTransaction(txn, s.BlockMap[b.ID()].Height)
 		if err != nil {
 			s.BadBlocks[b.ID()] = struct{}{}
 			break
 		}
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		s.ApplyTransaction(txn)
+		s.applyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
 
 		// Add the miner fees to the miner subsidy.
@@ -387,7 +391,7 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 	// again.
 	validatedBlocks := 0
 	for i := len(parentHistory) - 1; i >= 0; i-- {
-		err = s.ValidateBlock(s.BlockMap[parentHistory[i]].Block)
+		err = s.integrateBlock(s.BlockMap[parentHistory[i]].Block)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
@@ -399,7 +403,7 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
+				err = s.integrateBlock(s.BlockMap[rewoundBlocks[i]].Block)
 				if err != nil {
 					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
 				}
