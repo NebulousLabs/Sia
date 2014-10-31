@@ -21,7 +21,12 @@ type State struct {
 	// FutureBlocks
 	// OrphanBlocks
 
-	// Transaction pool stuff
+	// The transaction pool works by storing a list of outputs that are
+	// spent by transactions in the pool, and pointing to the transaction
+	// that spends them. That makes it really easy to look up conflicts as
+	// new transacitons arrive, and also easy to remove transactions from
+	// the pool (delete every input used in the transaction.)
+	TransactionPool map[OutputID]*Transaction
 
 	ConsensusState ConsensusState
 }

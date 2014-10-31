@@ -188,7 +188,8 @@ func (s *State) RewindABlock() {
 
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
-func (s *State) validTransaction(t Transaction, currentHeight BlockHeight) (err error) {
+func (s *State) validTransaction(t *Transaction) (err error) {
+	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
 	inputSum := Currency(0)
 	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range t.Inputs {
@@ -320,7 +321,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.validTransaction(txn, s.BlockMap[b.ID()].Height)
+		err = s.validTransaction(&txn)
 		if err != nil {
 			s.BadBlocks[b.ID()] = struct{}{}
 			break
@@ -454,8 +455,27 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 	return
 }
 
+// Add a transaction to the state struct.
 func (s *State) AcceptTransaction(t *Transaction) (err error) {
-	// Takes a new transaction and puts it into the transaction pool, which
-	// is used to build and mine on blocks.
+	// Check that the transaction is not in conflict with the transaction
+	// pool.
+	for _, input := range t.Inputs {
+		_, exists := s.TransactionPool[input.OutputID]
+		if exists {
+			err = errors.New("conflicting transaction exists in transaction pool")
+		}
+	}
+
+	// Check that the transaction is potentially valid.
+	err = s.validTransaction(t)
+	if err != nil {
+		return
+	}
+
+	// Add the transaction to the pool.
+	for _, input := range t.Inputs {
+		s.TransactionPool[input.OutputID] = t
+	}
+
 	return
 }
