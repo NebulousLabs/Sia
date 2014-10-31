@@ -188,9 +188,8 @@ func (s *State) RewindABlock() {
 
 /// Can probably split the validation of each piece into a different function,
 //but perhaps not.
-func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error) {
+func (s *State) ValidateTransaction(t Transaction, currentHeight BlockHeight) (err error) {
 	inputSum := Currency(0)
-	outputSum := t.MinerFee
 	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range t.Inputs {
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
@@ -219,6 +218,11 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
 		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
 		inputSignaturesMap[input.OutputID] = newInputSignatures
+	}
+
+	outputSum := Currency(0)
+	for _, minerFee := range t.MinerFees {
+		outputSum += minerFee
 	}
 
 	for _, output := range t.Outputs {
@@ -312,7 +316,7 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
+		err = s.ValidateTransaction(txn, s.BlockMap[b.ID()].Height)
 		if err != nil {
 			s.BadBlocks[b.ID()] = struct{}{}
 			break
@@ -322,7 +326,10 @@ func (s *State) ValidateBlock(b *Block) (err error) {
 		s.ApplyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
 
-		minerSubsidy += txn.MinerFee
+		// Add the miner fees to the miner subsidy.
+		for _, fee := range txn.MinerFees {
+			minerSubsidy += fee
+		}
 	}
 
 	if err != nil {
@@ -440,5 +447,11 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	// Maybe still do something to the transaction pool.
 
+	return
+}
+
+func (s *State) AcceptTransaction(t *Transaction) (err error) {
+	// Takes a new transaction and puts it into the transaction pool, which
+	// is used to build and mine on blocks.
 	return
 }

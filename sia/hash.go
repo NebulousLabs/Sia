@@ -69,7 +69,7 @@ func (t *Transaction) Hash() Hash {
 
 	return HashBytes(MarshalAll(
 		HashBytes(t.ArbitraryData),
-		uint64(t.MinerFee),
+		// uint64(t.MinerFee),
 		// Inputs
 		// Outputs
 		// File Contracts

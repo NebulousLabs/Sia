@@ -54,7 +54,7 @@ type Block struct {
 type Transaction struct {
 	ArbitraryData []byte
 	Inputs        []Input
-	MinerFee      Currency
+	MinerFees     []Currency
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
@@ -86,11 +86,12 @@ type TransactionSignature struct {
 }
 
 type CoveredFields struct {
-	ArbitraryData   bool
-	MinerFee        bool
-	Inputs, Outputs []uint8 // each element indicates an index which is signed.
-	Contracts       []uint8
-	FileProofs      []uint8
+	ArbitraryData bool
+	MinerFees     []uint8 // each element indicates an index which is signed.
+	Inputs        []uint8
+	Outputs       []uint8
+	Contracts     []uint8
+	FileProofs    []uint8
 }
 
 // Not enough flexibility in payments?  With the Start and End times, the only
