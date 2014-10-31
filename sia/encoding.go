@@ -1,187 +1,245 @@
 package sia
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
+	"math/big"
+	"reflect"
 )
 
+type Marshaler interface {
+	MarshalSia() []byte
+}
+
+type Unmarshaler interface {
+	UnmarshalSia([]byte) int
+}
+
+// EncInt64 encodes an int64 as a slice of 8 bytes.
+func EncInt64(i int64) (b []byte) {
+	b = make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(i))
+	return
+}
+
+// DecInt64 decodes a slice of 8 bytes into an int64.
+// If len(b) < 8, the slice is padded with zeros.
+func DecInt64(b []byte) int64 {
+	b2 := b
+	if len(b) < 8 {
+		b2 = make([]byte, 8)
+		copy(b2, b)
+	}
+	return int64(binary.LittleEndian.Uint64(b2))
+}
+
+// EncUint64 encodes a uint64 as a slice of 8 bytes.
 func EncUint64(i uint64) (b []byte) {
 	b = make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, i)
 	return
 }
 
-func MarshalAll(data ...interface{}) []byte {
-	buf := new(bytes.Buffer)
-	var enc []byte
-	for i := range data {
-		switch d := data[i].(type) {
-		case []byte:
-			enc = d
-		case string:
-			enc = []byte(d)
-		case uint64:
-			enc = EncUint64(d)
-		case Hash:
-			enc = d[:]
-		// more to come
-		default:
-			panic(fmt.Sprintf("can't marshal type %T", d))
+// DecUint64 decodes a slice of 8 bytes into a uint64.
+// If len(b) < 8, the slice is padded with zeros.
+func DecUint64(b []byte) uint64 {
+	b2 := b
+	if len(b) < 8 {
+		b2 = make([]byte, 8)
+		copy(b2, b)
+	}
+	return binary.LittleEndian.Uint64(b2)
+}
+
+// Marshal encodes a value as a byte slice. The encoding rules are as follows:
+// Most types are encoded as their binary representation.
+// Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
+// (This may need to be extended to two bytes.)
+// Booleans are encoded as one byte, either zero (false) or non-zero (true).
+// Pointers (unimplemented):
+// 		Valid pointers are prefaced by a 1, followed by the dereferenced value.
+// 		Nil pointers are represented by a 0.
+func Marshal(v interface{}) []byte {
+	return marshal(reflect.ValueOf(v))
+}
+
+func marshal(val reflect.Value) []byte {
+	// check for MarshalSia interface first
+	if m, ok := val.Interface().(Marshaler); ok {
+		return m.MarshalSia()
+	} else if val.CanAddr() {
+		if m, ok := val.Addr().Interface().(Marshaler); ok {
+			return m.MarshalSia()
 		}
-		buf.Write(enc)
 	}
-	return buf.Bytes()
+
+	switch val.Kind() {
+	case reflect.Ptr:
+		return marshal(val.Elem()) // TODO: handle nil pointers
+	case reflect.Bool:
+		if val.Bool() {
+			return []byte{1}
+		} else {
+			return []byte{0}
+		}
+	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		b := EncInt64(val.Int())
+		return b[:val.Type().Bits()/8]
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		b := EncUint64(val.Uint())
+		return b[:val.Type().Bits()/8]
+	case reflect.String:
+		s := val.String()
+		return append([]byte{byte(len(s))}, []byte(s)...)
+	case reflect.Array:
+		var b []byte
+		for i := 0; i < val.Len(); i++ {
+			b = append(b, marshal(val.Index(i))...)
+		}
+		return b
+	case reflect.Slice:
+		b := []byte{byte(val.Len())} // slices are variable length (TODO: fallthrough?)
+		for i := 0; i < val.Len(); i++ {
+			b = append(b, marshal(val.Index(i))...)
+		}
+		return b
+	case reflect.Struct:
+		var b []byte
+		for i := 0; i < val.NumField(); i++ {
+			b = append(b, marshal(val.Field(i))...)
+		}
+		return b
+	}
+	panic("could not marshal type " + val.Type().String())
+	return nil
 }
 
-func (s *Signature) Bytes() []byte {
-	return []byte(s.R.String() + s.S.String())
+// Unmarshal decodes a byte slice into the provided interface. The interface must be a pointer.
+// The decoding rules are the inverse of those described under Marshal.
+func Unmarshal(b []byte, v interface{}) {
+	// v must be a pointer
+	pval := reflect.ValueOf(v)
+	if pval.Kind() != reflect.Ptr || pval.IsNil() {
+		panic("Must pass a valid pointer to Unmarshal")
+	}
+	consumed := unmarshal(b, pval)
+	if consumed != len(b) {
+		panic("could not unmarshal type " + pval.Elem().Type().String())
+	}
 }
 
-func (pk *PublicKey) Bytes() []byte {
-	return []byte(pk.X.String() + pk.Y.String())
+func unmarshal(b []byte, val reflect.Value) int {
+	// check for UnmarshalSia interface first
+	if u, ok := val.Interface().(Unmarshaler); ok {
+		return u.UnmarshalSia(b)
+	} else if val.CanAddr() {
+		if m, ok := val.Addr().Interface().(Unmarshaler); ok {
+			return m.UnmarshalSia(b)
+		}
+	}
+
+	switch val.Kind() {
+	case reflect.Ptr:
+		return unmarshal(b, val.Elem()) // TODO: handle decoding into nil pointers
+	case reflect.Bool:
+		val.SetBool(b[0] != 0)
+		return 1
+	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		size := val.Type().Bits() / 8
+		val.SetInt(DecInt64(b[:size]))
+		return size
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		size := val.Type().Bits() / 8
+		val.SetUint(DecUint64(b[:size]))
+		return size
+	case reflect.String:
+		n, b := int(b[0]), b[1:]
+		val.SetString(string(b[:n]))
+		return n + 1
+	case reflect.Array:
+		var n int
+		for i := 0; i < val.Len(); i++ {
+			elem := val.Index(i)
+			consumed := unmarshal(b, elem)
+			b = b[consumed:]
+			n += consumed
+		}
+		return n
+	case reflect.Slice:
+		var n, sliceLen int
+		sliceLen, b = int(b[0]), b[1:]
+		// extend slice to proper length (TODO: fallthrough?)
+		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+		for i := 0; i < sliceLen; i++ {
+			elem := val.Index(i)
+			consumed := unmarshal(b, elem)
+			b = b[consumed:]
+			n += consumed
+		}
+		return n + 1
+	case reflect.Struct:
+		var n int
+		for i := 0; i < val.NumField(); i++ {
+			f := val.Field(i)
+			consumed := unmarshal(b, f)
+			b = b[consumed:]
+			n += consumed
+		}
+		return n
+	}
+	panic("could not unmarshal type " + val.Type().String())
+	return 0
 }
 
-func (txn *Transaction) Bytes() []byte {
-	b := new(bytes.Buffer)
-	b.Write(EncUint64(uint64(txn.Version)))
-	b.Write(txn.ArbitraryData)
-	b.Write(EncUint64(uint64(txn.MinerFee)))
-	// Inputs
-	b.WriteByte(uint8(len(txn.Inputs)))
-	for i := range txn.Inputs {
-		b.Write(txn.Inputs[i].Bytes())
+// MarshalSia implements the Marshaler interface for Signatures.
+// TODO: encode using struct??
+func (s *Signature) MarshalSia() []byte {
+	if s.R == nil || s.S == nil {
+		return []byte{0, 0}
 	}
-	// Ouputs
-	b.WriteByte(uint8(len(txn.Outputs)))
-	for i := range txn.Outputs {
-		b.Write(txn.Outputs[i].Bytes())
-	}
-	// File Contracts
-	b.WriteByte(uint8(len(txn.FileContracts)))
-	for i := range txn.FileContracts {
-		b.Write(txn.FileContracts[i].Bytes())
-	}
-	// Storage Proofs
-	b.WriteByte(uint8(len(txn.StorageProofs)))
-	for i := range txn.StorageProofs {
-		b.Write(txn.StorageProofs[i].Bytes())
-	}
-	// Signatures
-	b.WriteByte(uint8(len(txn.Signatures)))
-	for i := range txn.Signatures {
-		b.Write(txn.Signatures[i].Bytes())
-	}
-	return b.Bytes()
+	br, bs := s.R.Bytes(), s.S.Bytes()
+	lenr, lens := byte(len(br)), byte(len(bs))
+	br, bs = append([]byte{lenr}, br...), append([]byte{lens}, bs...)
+	return append(br, bs...)
 }
 
-func (i *Input) Bytes() []byte {
-	return append(i.OutputID[:], i.SpendConditions.Bytes()...)
+// MarshalSia implements the Unmarshaler interface for Signatures.
+// TODO: decode using struct??
+func (s *Signature) UnmarshalSia(b []byte) int {
+	lenr, b := int(b[0]), b[1:]
+	s.R, b = new(big.Int).SetBytes(b[:lenr]), b[lenr:]
+	lens, b := int(b[0]), b[1:]
+	s.S = new(big.Int).SetBytes(b[:lens])
+	return lenr + lens + 2
 }
 
-func (o *Output) Bytes() []byte {
-	return append(EncUint64(uint64(o.Value)), o.SpendHash[:]...)
+// MarshalSia implements the Marshaler interface for PublicKeys.
+// TODO: encode using struct??
+func (pk *PublicKey) MarshalSia() []byte {
+	bx, by := pk.X.Bytes(), pk.Y.Bytes()
+	lenx, leny := byte(len(bx)), byte(len(by))
+	bx, by = append([]byte{lenx}, bx...), append([]byte{leny}, by...)
+	return append(bx, by...)
 }
 
-func (sc *SpendConditions) Bytes() []byte {
-	b := new(bytes.Buffer)
-	b.Write(EncUint64(uint64(sc.TimeLock)))
-	b.Write(EncUint64(uint64(sc.NumSignatures)))
-	b.WriteByte(uint8(len(sc.PublicKeys)))
-	for i := range sc.PublicKeys {
-		b.Write(sc.PublicKeys[i].Bytes())
-	}
-	return b.Bytes()
+// MarshalSia implements the Unmarshaler interface for PublicKeys.
+// TODO: decode using struct??
+func (pk *PublicKey) UnmarshalSia(b []byte) int {
+	lenx, b := int(b[0]), b[1:]
+	pk.X, b = new(big.Int).SetBytes(b[:lenx]), b[lenx:]
+	leny, b := int(b[0]), b[1:]
+	pk.Y = new(big.Int).SetBytes(b[:leny])
+	return lenx + leny + 2
 }
 
+// MerkleRoot calculates the Merkle root hash of a SpendConditions object,
+// using the timelock, number of signatures, and the signatures themselves as leaves.
 func (sc *SpendConditions) MerkleRoot() Hash {
 	tlHash := HashBytes(EncUint64(uint64(sc.TimeLock)))
 	nsHash := HashBytes(EncUint64(uint64(sc.NumSignatures)))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(sc.PublicKeys[i].Bytes())
+		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
 	return MerkleRoot(leaves)
-}
-
-func (ts *TransactionSignature) Bytes() []byte {
-	b := new(bytes.Buffer)
-	b.Write(ts.InputID[:])
-	b.WriteByte(ts.PublicKeyIndex)
-	b.Write(EncUint64(uint64(ts.TimeLock)))
-	b.Write(ts.CoveredFields.Bytes())
-	b.Write(ts.Signature.Bytes())
-	return b.Bytes()
-}
-
-func (cf *CoveredFields) Bytes() []byte {
-	b := new(bytes.Buffer)
-	var flags uint8
-	if cf.Version {
-		flags &= 1 << 0
-	}
-	if cf.ArbitraryData {
-		flags &= 1 << 1
-	}
-	if cf.ArbitraryData {
-		flags &= 1 << 2
-	}
-	b.WriteByte(flags)
-
-	// Inputs
-	b.WriteByte(uint8(len(cf.Inputs)))
-	for i := range cf.Inputs {
-		b.WriteByte(cf.Inputs[i])
-	}
-	// Outputs
-	b.WriteByte(uint8(len(cf.Outputs)))
-	for i := range cf.Outputs {
-		b.WriteByte(cf.Outputs[i])
-	}
-	// Contracts
-	b.WriteByte(uint8(len(cf.Contracts)))
-	for i := range cf.Contracts {
-		b.WriteByte(cf.Contracts[i])
-	}
-	// File Proofs
-	b.WriteByte(uint8(len(cf.FileProofs)))
-	for i := range cf.FileProofs {
-		b.WriteByte(cf.FileProofs[i])
-	}
-
-	return b.Bytes()
-}
-
-func (fc *FileContract) Bytes() []byte {
-	return MarshalAll(
-		uint64(fc.ContractFund),
-		fc.FileMerkleRoot,
-		fc.FileSize,
-		uint64(fc.Start), uint64(fc.End),
-		uint64(fc.ChallengeFrequency),
-		uint64(fc.Tolerance),
-		uint64(fc.ValidProofPayout),
-		Hash(fc.ValidProofAddress),
-		uint64(fc.MissedProofPayout),
-		Hash(fc.MissedProofAddress),
-		Hash(fc.SuccessAddress),
-		Hash(fc.FailureAddress),
-	)
-}
-
-func (sp *StorageProof) Bytes() []byte {
-	b := new(bytes.Buffer)
-	b.Write(sp.ContractID[:])
-	b.Write(sp.Segment[:])
-	b.WriteByte(uint8(len(sp.HashSet)))
-	for i := range sp.HashSet {
-		if sp.HashSet[i] == nil {
-			b.WriteByte(0)
-		} else {
-			b.WriteByte(1)
-			b.Write((*sp.HashSet[i])[:])
-		}
-	}
-	return b.Bytes()
 }

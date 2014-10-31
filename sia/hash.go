@@ -68,28 +68,17 @@ func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 }
 
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
-		uint64(b.Version),
-		Hash(b.ParentBlock),
-		uint64(b.Timestamp),
-		uint64(b.Nonce),
-		Hash(b.MinerAddress),
-		Hash(b.MerkleRoot),
-	)))
+	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
 }
 
 func (t *Transaction) Hash() Hash {
 	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
 	// allows you to selectively reveal pieces of a transaction? But what good is that?
 
-	return HashBytes(MarshalAll(
-		uint64(t.Version),
-		HashBytes(t.ArbitraryData),
-		uint64(t.MinerFee),
-		// Inputs
-		// Outputs
-		// File Contracts
-		// Storage Proofs
-		// Signatures
-	))
+	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
+	// Inputs
+	// Outputs
+	// File Contracts
+	// Storage Proofs
+	// Signatures
 }
