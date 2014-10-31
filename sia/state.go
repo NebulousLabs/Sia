@@ -45,6 +45,10 @@ type ConsensusState struct {
 	// spent by transactions in the pool, and pointing to the transaction
 	// that spends them. That makes it really easy to look up conflicts as
 	// new transacitons arrive, and also easy to remove transactions from
-	// the pool (delete every input used in the transaction.)
+	// the pool (delete every input used in the transaction.) The
+	// transaction list contains only the first output, so that when
+	// building blocks you can more easily iterate through every
+	// transaction.
 	TransactionPool map[OutputID]*Transaction
+	TransactionList map[OutputID]*Transaction
 }

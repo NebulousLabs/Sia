@@ -42,7 +42,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	for i := range s.BlockRoot.RecentTimestamps {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
-	s.BlockRoot.Target[1] = 10 // LOL my laptop gets like 10 khash/s
+	s.BlockRoot.Target[0] = 1 // LOL my laptop gets like 10 khash/s
 	s.BlockRoot.Depth = big.NewRat(0, 1)
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 

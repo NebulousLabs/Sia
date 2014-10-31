@@ -19,12 +19,14 @@ func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		s.ConsensusState.TransactionPool[input.OutputID] = t
 	}
+	s.ConsensusState.TransactionList[t.Inputs[0].OutputID] = t
 }
 
 func (s *State) removeTransactionFromPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		delete(s.ConsensusState.TransactionPool, input.OutputID)
 	}
+	delete(s.ConsensusState.TransactionList, t.Inputs[0].OutputID)
 }
 
 // Add a transaction to the state struct.
