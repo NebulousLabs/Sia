@@ -230,16 +230,16 @@ func (s *State) validTransaction(t Transaction, currentHeight BlockHeight) (err 
 	}
 
 	/*
-	for _, contract := range t.FileContracts {
-		if contract.Start < currentHeight {
-			err = errors.New("Contract starts in the future.")
-			return
+		for _, contract := range t.FileContracts {
+			if contract.Start < currentHeight {
+				err = errors.New("Contract starts in the future.")
+				return
+			}
+			if contract.End <= contract.Start {
+				err = errors.New("Contract duration must be at least one block.")
+				return
+			}
 		}
-		if contract.End <= contract.Start {
-			err = errors.New("Contract duration must be at least one block.")
-			return
-		}
-	}
 	*/
 
 	/*

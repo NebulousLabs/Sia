@@ -81,10 +81,11 @@ type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
 	TimeLock       BlockHeight
-	CoveredFields  CoveredFields
-	Signature      Signature
+	// CoveredFields  CoveredFields
+	Signature Signature
 }
 
+/*
 type CoveredFields struct {
 	ArbitraryData bool
 	MinerFees     []uint8 // each element indicates an index which is signed.
@@ -93,6 +94,7 @@ type CoveredFields struct {
 	Contracts     []uint8
 	FileProofs    []uint8
 }
+*/
 
 // Not enough flexibility in payments?  With the Start and End times, the only
 // problem is if the client wishes for the rewards or penalties to scale as
