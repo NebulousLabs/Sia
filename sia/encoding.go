@@ -6,10 +6,14 @@ import (
 	"reflect"
 )
 
+// A Marshaler encodes its data as a byte slice.
+// All Marshalers should also implement the Unmarshaler interface.
 type Marshaler interface {
 	MarshalSia() []byte
 }
 
+// An Unmarshaler decodes bytes into a struct.
+// All Unmarshalers should also implement the Marshaler interface.
 type Unmarshaler interface {
 	UnmarshalSia([]byte) int
 }
@@ -52,6 +56,7 @@ func DecUint64(b []byte) uint64 {
 
 // Marshal encodes a value as a byte slice. The encoding rules are as follows:
 // Most types are encoded as their binary representation.
+// Integers are little-endian.
 // Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
 // (This may need to be extended to two bytes.)
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
@@ -191,51 +196,44 @@ func unmarshal(b []byte, val reflect.Value) int {
 }
 
 // MarshalSia implements the Marshaler interface for Signatures.
-// TODO: encode using struct??
 func (s *Signature) MarshalSia() []byte {
 	if s.R == nil || s.S == nil {
 		return []byte{0, 0}
 	}
-	br, bs := s.R.Bytes(), s.S.Bytes()
-	lenr, lens := byte(len(br)), byte(len(bs))
-	br, bs = append([]byte{lenr}, br...), append([]byte{lens}, bs...)
-	return append(br, bs...)
+	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
 }
 
 // MarshalSia implements the Unmarshaler interface for Signatures.
-// TODO: decode using struct??
 func (s *Signature) UnmarshalSia(b []byte) int {
-	lenr, b := int(b[0]), b[1:]
-	s.R, b = new(big.Int).SetBytes(b[:lenr]), b[lenr:]
-	lens, b := int(b[0]), b[1:]
-	s.S = new(big.Int).SetBytes(b[:lens])
-	return lenr + lens + 2
+	str := struct{ R, S []byte }{}
+	Unmarshal(b, &str)
+	s.R = new(big.Int).SetBytes(str.R)
+	s.S = new(big.Int).SetBytes(str.S)
+	return len(str.R) + len(str.S) + 2
 }
 
 // MarshalSia implements the Marshaler interface for PublicKeys.
-// TODO: encode using struct??
 func (pk *PublicKey) MarshalSia() []byte {
-	bx, by := pk.X.Bytes(), pk.Y.Bytes()
-	lenx, leny := byte(len(bx)), byte(len(by))
-	bx, by = append([]byte{lenx}, bx...), append([]byte{leny}, by...)
-	return append(bx, by...)
+	if pk.X == nil || pk.Y == nil {
+		return []byte{0, 0}
+	}
+	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
 }
 
 // MarshalSia implements the Unmarshaler interface for PublicKeys.
-// TODO: decode using struct??
 func (pk *PublicKey) UnmarshalSia(b []byte) int {
-	lenx, b := int(b[0]), b[1:]
-	pk.X, b = new(big.Int).SetBytes(b[:lenx]), b[lenx:]
-	leny, b := int(b[0]), b[1:]
-	pk.Y = new(big.Int).SetBytes(b[:leny])
-	return lenx + leny + 2
+	str := struct{ X, Y []byte }{}
+	Unmarshal(b, &str)
+	pk.X = new(big.Int).SetBytes(str.X)
+	pk.Y = new(big.Int).SetBytes(str.Y)
+	return len(str.X) + len(str.Y) + 2
 }
 
 // MerkleRoot calculates the Merkle root hash of a SpendConditions object,
 // using the timelock, number of signatures, and the signatures themselves as leaves.
 func (sc *SpendConditions) MerkleRoot() Hash {
-	tlHash := HashBytes(EncUint64(uint64(sc.TimeLock)))
-	nsHash := HashBytes(EncUint64(uint64(sc.NumSignatures)))
+	tlHash := HashBytes(Marshal(sc.TimeLock))
+	nsHash := HashBytes(Marshal(sc.NumSignatures))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
 		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
