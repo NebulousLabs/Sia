@@ -56,7 +56,7 @@ func DecUint64(b []byte) uint64 {
 
 // Marshal encodes a value as a byte slice. The encoding rules are as follows:
 // Most types are encoded as their binary representation.
-// Integers are little-endian.
+// Integers are little-endian. Int and Uint are disallowed; the number of bits must be specified.
 // Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
 // (This may need to be extended to two bytes.)
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
@@ -67,7 +67,7 @@ func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
 }
 
-func marshal(val reflect.Value) []byte {
+func marshal(val reflect.Value) (b []byte) {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(Marshaler); ok {
 		return m.MarshalSia()
@@ -95,27 +95,23 @@ func marshal(val reflect.Value) []byte {
 	case reflect.String:
 		s := val.String()
 		return append([]byte{byte(len(s))}, []byte(s)...)
-	case reflect.Array:
-		var b []byte
-		for i := 0; i < val.Len(); i++ {
-			b = append(b, marshal(val.Index(i))...)
-		}
-		return b
 	case reflect.Slice:
-		b := []byte{byte(val.Len())} // slices are variable length (TODO: fallthrough?)
+		// slices are variable length, so prepend the length and then fallthrough to array logic
+		b = []byte{byte(val.Len())}
+		fallthrough
+	case reflect.Array:
 		for i := 0; i < val.Len(); i++ {
 			b = append(b, marshal(val.Index(i))...)
 		}
-		return b
+		return
 	case reflect.Struct:
-		var b []byte
 		for i := 0; i < val.NumField(); i++ {
 			b = append(b, marshal(val.Field(i))...)
 		}
-		return b
+		return
 	}
 	panic("could not marshal type " + val.Type().String())
-	return nil
+	return
 }
 
 // Unmarshal decodes a byte slice into the provided interface. The interface must be a pointer.
@@ -132,7 +128,7 @@ func Unmarshal(b []byte, v interface{}) {
 	}
 }
 
-func unmarshal(b []byte, val reflect.Value) int {
+func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	// check for UnmarshalSia interface first
 	if u, ok := val.Interface().(Unmarshaler); ok {
 		return u.UnmarshalSia(b)
@@ -160,39 +156,30 @@ func unmarshal(b []byte, val reflect.Value) int {
 		n, b := int(b[0]), b[1:]
 		val.SetString(string(b[:n]))
 		return n + 1
+	case reflect.Slice:
+		// slices are variable length, but otherwise the same as arrays.
+		// just have to allocate them first, then we can fallthrough to the array logic.
+		var sliceLen int
+		sliceLen, b, consumed = int(b[0]), b[1:], 1 // remember to count the length byte as consumed
+		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+		fallthrough
 	case reflect.Array:
-		var n int
 		for i := 0; i < val.Len(); i++ {
 			elem := val.Index(i)
-			consumed := unmarshal(b, elem)
-			b = b[consumed:]
-			n += consumed
+			n := unmarshal(b, elem)
+			consumed, b = consumed+n, b[n:]
 		}
-		return n
-	case reflect.Slice:
-		var n, sliceLen int
-		sliceLen, b = int(b[0]), b[1:]
-		// extend slice to proper length (TODO: fallthrough?)
-		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
-		for i := 0; i < sliceLen; i++ {
-			elem := val.Index(i)
-			consumed := unmarshal(b, elem)
-			b = b[consumed:]
-			n += consumed
-		}
-		return n + 1
+		return
 	case reflect.Struct:
-		var n int
 		for i := 0; i < val.NumField(); i++ {
 			f := val.Field(i)
-			consumed := unmarshal(b, f)
-			b = b[consumed:]
-			n += consumed
+			n := unmarshal(b, f)
+			consumed, b = consumed+n, b[n:]
 		}
-		return n
+		return
 	}
 	panic("could not unmarshal type " + val.Type().String())
-	return 0
+	return
 }
 
 // MarshalSia implements the Marshaler interface for Signatures.
