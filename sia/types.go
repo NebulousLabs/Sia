@@ -12,11 +12,14 @@ const (
 	SegmentSize   = 32
 
 	TargetSecondsPerBlock = 300
-	DifficultyWindow      = 5000
+	TargetWindow          = 5000 // Number of blocks to use when calculating difficulty.
+
+	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
 )
 
 var MaxAdjustmentUp = big.NewRat(10005, 10000)
 var MaxAdjustmentDown = big.NewRat(9995, 10000)
+var SurpassThreshold = big.NewRat(105, 100)
 
 type (
 	Hash      [HashSize]byte
@@ -24,6 +27,7 @@ type (
 
 	Timestamp   int64
 	BlockHeight uint32
+	BlockWeight *big.Rat // inverse of target
 	Currency    uint64
 
 	BlockID       Hash
@@ -31,7 +35,7 @@ type (
 	ContractID    Hash
 	TransactionID Hash
 	CoinAddress   Hash // An address points to spend conditions.
-	Difficulty    Hash
+	Target        Hash
 )
 
 type Signature struct {
@@ -39,7 +43,6 @@ type Signature struct {
 }
 
 type Block struct {
-	Version      uint16
 	ParentBlock  BlockID
 	Timestamp    Timestamp
 	Nonce        uint32 // may or may not be needed
@@ -49,10 +52,9 @@ type Block struct {
 }
 
 type Transaction struct {
-	Version       uint16
 	ArbitraryData []byte
-	MinerFee      Currency
 	Inputs        []Input
+	MinerFees     []Currency
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
@@ -79,18 +81,20 @@ type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint8
 	TimeLock       BlockHeight
-	CoveredFields  CoveredFields
-	Signature      Signature
+	// CoveredFields  CoveredFields
+	Signature Signature
 }
 
+/*
 type CoveredFields struct {
-	Version         bool
-	ArbitraryData   bool
-	MinerFee        bool
-	Inputs, Outputs []uint8 // each element indicates an index which is signed.
-	Contracts       []uint8
-	FileProofs      []uint8
+	ArbitraryData bool
+	MinerFees     []uint8 // each element indicates an index which is signed.
+	Inputs        []uint8
+	Outputs       []uint8
+	Contracts     []uint8
+	FileProofs    []uint8
 }
+*/
 
 // Not enough flexibility in payments?  With the Start and End times, the only
 // problem is if the client wishes for the rewards or penalties to scale as
@@ -171,4 +175,15 @@ func (sc *SpendConditions) MerkleRoot() Hash {
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
 	return MerkleRoot(leaves)
+}
+
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
+}
+
+func (t *Transaction) Hash() Hash {
+	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
+	// allows you to selectively reveal pieces of a transaction? But what good is that?
+
+	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
 }

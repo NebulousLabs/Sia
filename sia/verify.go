@@ -1,8 +1,11 @@
 package sia
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
+	"sort"
+	"time"
 )
 
 // Used to keep track of how many signatures an input has been signed by.
@@ -12,177 +15,186 @@ type InputSignatures struct {
 	UsedKeys            map[uint8]struct{}
 }
 
-// Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
-	bid := b.ID() // Function is not implemented.
-
-	_, exists := s.BadBlocks[bid]
+// checkMaps looks through the maps known to the state and sees if the block id
+// has been cached anywhere.
+func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
+	// See if the block is a known invalid block.
+	_, exists := s.BadBlocks[b.ID()]
 	if exists {
-		err = errors.New("Block is in bad list")
+		err = errors.New("block is known to be invalid")
 		return
 	}
 
-	if b.Version != 1 {
-		s.BadBlocks[bid] = struct{}{}
-		err = errors.New("Block is not version 1")
-		return
-	}
-
-	_, exists = s.BlockMap[bid]
+	// See if the block is a known valid block.
+	_, exists = s.BlockMap[b.ID()]
 	if exists {
 		err = errors.New("Block exists in block map.")
 		return
 	}
 
-	/*_, exists = s.OrphanBlocks[bid]
-	if exists {
-		err = errors.New("Block exists in orphan list")
-		return
-	} */
+	/*
+		// See if the block is a known orphan.
+		_, exists = s.OrphanBlocks[b.ID()]
+		if exists {
+			err = errors.New("Block exists in orphan list")
+			return
+		}
+	*/
 
-	parentBlockNode, exists := s.BlockMap[b.ParentBlock]
+	// See if the block's parent is known.
+	parentBlockNode, exists = s.BlockMap[b.ParentBlock]
 	if !exists {
-		// OrphanBlocks[bid] = b
+		// OrphanBlocks[b.ID()] = b
 		err = errors.New("Block is an orphan")
 		return
 	}
 
-	// If timestamp is in the future, store in future blocks list.
-	// If timestamp is too far in the past, reject and put in bad blocks.
+	return
+}
 
-	// Check the amount of work done by the block.
-	if !ValidHeader(parentBlockNode.Difficulty, b) {
-		err = errors.New("Block does not meet difficulty requirement")
-		s.BadBlocks[bid] = struct{}{}
+// Returns true if timestamp is valid, and if target value is reached.
+func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
+	// Check that the block is not too far in the future.
+	skew := b.Timestamp - Timestamp(time.Now().Unix())
+	if skew > FutureThreshold {
+		// Do something so that you will return to considering this
+		// block once it's no longer too far in the future.
+		err = errors.New("timestamp too far in future")
 		return
 	}
 
-	// Add the block to the block tree.
-	newBlockNode := new(BlockNode)
-	newBlockNode.Block = b
-	parentBlockNode.Children = append(parentBlockNode.Children, newBlockNode)
-	// newBlockNode.Verified = false // implicit value, stated explicity for prosperity.
-	newBlockNode.Height = parentBlockNode.Height + 1
-	copy(newBlockNode.RecentTimestamps[:], parentBlockNode.RecentTimestamps[1:])
-	newBlockNode.RecentTimestamps[10] = b.Timestamp
+	// If timestamp is too far in the past, reject and put in bad blocks.
+	var intTimestamps []int
+	for _, timestamp := range parent.RecentTimestamps {
+		intTimestamps = append(intTimestamps, int(timestamp))
+	}
+	sort.Ints(intTimestamps)
+	if Timestamp(intTimestamps[5]) > b.Timestamp {
+		s.BadBlocks[b.ID()] = struct{}{}
+		err = errors.New("timestamp invalid for being in the past")
+		return
+	}
 
-	var timePassed Timestamp
-	var expectedTimePassed Timestamp
-	var blockWindow BlockHeight
-	if newBlockNode.Height < 5000 {
-		// Calculate new difficulty, using block 0 timestamp.
-		timePassed = b.Timestamp - s.BlockRoot.Block.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newBlockNode.Height)
-		blockWindow = newBlockNode.Height
+	// Check the id meets the target.
+	blockHash := b.ID()
+	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {
+		err = errors.New("block does not meet target")
+		return
+	}
+
+	return
+}
+
+// Calculates the target of a child depending on the timestamp of the child
+// block.
+func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
+	var timePassed, expectedTimePassed Timestamp
+	blockWindow := BlockHeight(5000)
+	if newNode.Height < 5000 {
+		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
+		blockWindow = newNode.Height
 	} else {
-		// Calculate new difficulty, using block Height-5000 timestamp.
-		timePassed = b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		adjustmentBlock := s.BlockMap[s.ConsensusState.CurrentPath[newNode.Height-5000]].Block
+		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
 		expectedTimePassed = TargetSecondsPerBlock * 5000
-		blockWindow = 5000
 	}
 
-	// Adjustment as a float = timePassed / expectedTimePassed / blockWindow.
-	difficultyAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+	// Adjustment = timePassed / expectedTimePassed / blockWindow.
+	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
 
-	// Enforce a maximum difficultyAdjustment
-	if difficultyAdjustment.Cmp(MaxAdjustmentUp) == 1 {
-		difficultyAdjustment = MaxAdjustmentUp
-	} else if difficultyAdjustment.Cmp(MaxAdjustmentDown) == -1 {
-		difficultyAdjustment = MaxAdjustmentDown
+	// Enforce a maximum targetAdjustment
+	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
+		targetAdjustment = MaxAdjustmentUp
+	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
+		targetAdjustment = MaxAdjustmentDown
 	}
 
-	// Take the difficulty adjustment and apply it to the difficulty slice,
+	// Take the target adjustment and apply it to the target slice,
 	// using rational numbers. Truncate the result.
-	oldTarget := new(big.Int).SetBytes(parentBlockNode.Difficulty[:])
+	oldTarget := new(big.Int).SetBytes(parentNode.Target[:])
 	ratOldTarget := new(big.Rat).SetInt(oldTarget)
-	ratNewTarget := ratOldTarget.Mul(difficultyAdjustment, ratOldTarget)
+	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
 	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
 	newTargetBytes := intNewTarget.Bytes()
-	offset := len(newBlockNode.Difficulty[:]) - len(newTargetBytes)
-	copy(newBlockNode.Difficulty[offset:], newTargetBytes)
+	offset := len(target[:]) - len(newTargetBytes)
+	copy(target[offset:], newTargetBytes)
+	return
+}
 
-	// If block adds to the current fork, validate it and advance fork.
-	// Note: current implementation will only ever accept the first block
-	// it sees, instead of picking longest chain.
-	if b.ParentBlock == s.CurrentBlock {
-		err = s.ValidateBlock(b)
-		if err != nil {
-			s.BadBlocks[bid] = struct{}{}
-			parentBlockNode.Children = parentBlockNode.Children[:len(parentBlockNode.Children)-1]
-			return
-		}
+// Calculates the depth of a child given the parent node - note that the depth
+// of the child is independant of the actual child block.
+func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
+	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
+}
 
-		s.CurrentBlock = bid
-		s.CurrentPath[newBlockNode.Height] = bid
-	}
+// Takes a block and a parent node, and adds the block as a child to the parent
+// node.
+func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockNode) {
+	// Create the child node.
+	newNode = new(BlockNode)
+	newNode.Block = b
+	newNode.Height = parentNode.Height + 1
 
-	// Do anything necessary to the transaction pool.
+	// Copy over the timestamps.
+	copy(newNode.RecentTimestamps[:], parentNode.RecentTimestamps[1:])
+	newNode.RecentTimestamps[10] = b.Timestamp
+
+	// Calculate target and depth.
+	newNode.Target = s.childTarget(parentNode, newNode)
+	newNode.Depth = s.childDepth(parentNode)
+
+	// Add the node to the block map and the list of its parents children.
+	s.BlockMap[b.ID()] = newNode
+	parentNode.Children = append(parentNode.Children, newNode)
 
 	return
 }
 
-// ValidateBlock will both verify the block AND update the consensus state.
-// Calling integrate block is not needed.
-func (s *State) ValidateBlock(b *Block) (err error) {
-	// Check the hash on the merkle tree of transactions.
-
-	var appliedTransactions []Transaction
-	minerSubsidy := Currency(0)
-	for _, txn := range b.Transactions {
-		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
-		if err != nil {
-			s.BadBlocks[b.ID()] = struct{}{}
-			break
-		}
-
-		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		s.ApplyTransaction(txn)
-		appliedTransactions = append(appliedTransactions, txn)
-
-		minerSubsidy += txn.MinerFee
-	}
-
-	if err != nil {
-		// Rewind transactions added to ConsensusState.
-		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.ReverseTransaction(appliedTransactions[i])
-		}
-		return
-	}
-
-	// Add outputs for all of the missed proofs in the open transactions.
-
-	// Add coin inflation to the miner subsidy.
-
-	// Add output contianing miner fees + block subsidy.
-	bid := b.ID()
-	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
-	minerSubsidyOutput := Output{
-		Value:     minerSubsidy,
-		SpendHash: b.MinerAddress,
-	}
-	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
-
-	// s.BlockMap[b.ID()].Verified = true
-
-	return
+// Returns true if the input node is 5% heavier than the current node.
+func (s *State) heavierFork(newNode *BlockNode) bool {
+	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
+	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
+	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
+	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
 }
 
-// Add a function that integrates a block without verifying it.
-
-func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error) {
-	if t.Version != 1 {
-		err = errors.New("Transaction version is not recognized.")
-		return
+// Pulls just this transaction out of the ConsensusState.
+func (s *State) ReverseTransaction(t Transaction) {
+	// Remove all outputs created by outputs.
+	for i := range t.Outputs {
+		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
+		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
+	// Add all outputs spent by inputs.
+	for _, input := range t.Inputs {
+		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
+		delete(s.ConsensusState.SpentOutputs, input.OutputID)
+	}
+}
+
+// Pulls the most recent block out of the ConsensusState.
+func (s *State) RewindABlock() {
+	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
+	for i := len(block.Transactions) - 1; i >= 0; i-- {
+		s.ReverseTransaction(block.Transactions[i])
+	}
+
+	s.ConsensusState.CurrentBlock = block.ParentBlock
+	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
+}
+
+// ValidTransaction returns err = nil if the transaction is valid, otherwise
+// returns an error explaining what wasn't valid.
+func (s *State) validTransaction(t Transaction, currentHeight BlockHeight) (err error) {
 	inputSum := Currency(0)
-	outputSum := t.MinerFee
 	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range t.Inputs {
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
-			err = errors.New("Transaction spends a nonexisting output")
+			err = errors.New("transaction spends a nonexisting output")
 			return
 		}
 
@@ -192,14 +204,14 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 
 		// Check the timelock on the spend conditions is expired.
 		if input.SpendConditions.TimeLock < currentHeight {
-			err = errors.New("Output spent before timelock expiry.")
+			err = errors.New("output spent before timelock expiry.")
 			return
 		}
 
 		// Create the condition for the input signatures and add it to the input signatures map.
 		_, exists = inputSignaturesMap[input.OutputID]
 		if exists {
-			err = errors.New("Output spent twice in same transaction")
+			err = errors.New("output spent twice in same transaction")
 			return
 		}
 		var newInputSignatures InputSignatures
@@ -208,20 +220,27 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 		inputSignaturesMap[input.OutputID] = newInputSignatures
 	}
 
+	outputSum := Currency(0)
+	for _, minerFee := range t.MinerFees {
+		outputSum += minerFee
+	}
+
 	for _, output := range t.Outputs {
 		outputSum += output.Value
 	}
 
-	for _, contract := range t.FileContracts {
-		if contract.Start < currentHeight {
-			err = errors.New("Contract starts in the future.")
-			return
+	/*
+		for _, contract := range t.FileContracts {
+			if contract.Start < currentHeight {
+				err = errors.New("Contract starts in the future.")
+				return
+			}
+			if contract.End <= contract.Start {
+				err = errors.New("Contract duration must be at least one block.")
+				return
+			}
 		}
-		if contract.End <= contract.Start {
-			err = errors.New("Contract duration must be at least one block.")
-			return
-		}
-	}
+	*/
 
 	/*
 		for _, proof := range t.StorageProofs {
@@ -231,7 +250,7 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 	*/
 
 	if inputSum != outputSum {
-		err = errors.New("Inputs do not equal outputs for transaction.")
+		err = errors.New("inputs do not equal outputs for transaction.")
 		return
 	}
 
@@ -239,7 +258,7 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
 		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
-			err = errors.New("Friviolous Signature detected.")
+			err = errors.New("friviolous signature detected.")
 			return
 		}
 		_, exists := inputSignaturesMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
@@ -260,7 +279,9 @@ func (s *State) ValidateTxn(t Transaction, currentHeight BlockHeight) (err error
 	return
 }
 
-func (s *State) ApplyTransaction(t Transaction) {
+// Takes a transaction and applies it to the ConsensusState. Should only be
+// called in the context of applying a whole block.
+func (s *State) applyTransaction(t Transaction) {
 	// Remove all inputs from the unspent outputs list
 	for _, input := range t.Inputs {
 		s.ConsensusState.SpentOutputs[input.OutputID] = s.ConsensusState.UnspentOutputs[input.OutputID]
@@ -291,18 +312,150 @@ func (s *State) ApplyTransaction(t Transaction) {
 	*/
 }
 
-func (s *State) ReverseTransaction(t Transaction) {
-	// Remove all outputs created by storage proofs.
+// integrateBlock will both verify the block AND update the consensus state.
+// Calling integrate block is not needed.
+func (s *State) integrateBlock(b *Block) (err error) {
+	// Check the hash on the merkle tree of transactions.
 
-	// Remove all outputs created by outputs.
-	for i := range t.Outputs {
-		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
-		delete(s.ConsensusState.UnspentOutputs, outputID)
+	var appliedTransactions []Transaction
+	minerSubsidy := Currency(0)
+	for _, txn := range b.Transactions {
+		err = s.validTransaction(txn, s.BlockMap[b.ID()].Height)
+		if err != nil {
+			s.BadBlocks[b.ID()] = struct{}{}
+			break
+		}
+
+		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
+		s.applyTransaction(txn)
+		appliedTransactions = append(appliedTransactions, txn)
+
+		// Add the miner fees to the miner subsidy.
+		for _, fee := range txn.MinerFees {
+			minerSubsidy += fee
+		}
 	}
 
-	// Add all outputs spent by inputs.
-	for _, input := range t.Inputs {
-		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
-		delete(s.ConsensusState.SpentOutputs, input.OutputID)
+	if err != nil {
+		// Rewind transactions added to ConsensusState.
+		for i := len(appliedTransactions) - 1; i >= 0; i-- {
+			s.ReverseTransaction(appliedTransactions[i])
+		}
+		return
 	}
+
+	// Add coin inflation to the miner subsidy.
+
+	// Add output contianing miner fees + block subsidy.
+	bid := b.ID()
+	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
+	minerSubsidyOutput := Output{
+		Value:     minerSubsidy,
+		SpendHash: b.MinerAddress,
+	}
+	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
+
+	// s.BlockMap[b.ID()].Verified = true
+
+	s.ConsensusState.CurrentBlock = b.ID()
+	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
+
+	return
+}
+
+func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
+	// Find the common parent between the new fork and the current
+	// fork, keeping track of which path is taken through the
+	// children of the parents so that we can re-trace as we
+	// validate the blocks.
+	currentNode := parentNode
+	value := s.ConsensusState.CurrentPath[currentNode.Height]
+	var parentHistory []BlockID
+	for value != currentNode.Block.ID() {
+		parentHistory = append(parentHistory, currentNode.Block.ID())
+		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
+		value = s.ConsensusState.CurrentPath[currentNode.Height]
+	}
+
+	// Remove blocks from the ConsensusState until we get to the
+	// same parent that we are forking from.
+	var rewoundBlocks []BlockID
+	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
+		s.RewindABlock()
+	}
+
+	// Validate each block in the parent history in order, updating
+	// the state as we go.  If at some point a block doesn't
+	// verify, you get to walk all the way backwards and forwards
+	// again.
+	validatedBlocks := 0
+	for i := len(parentHistory) - 1; i >= 0; i-- {
+		err = s.integrateBlock(s.BlockMap[parentHistory[i]].Block)
+		if err != nil {
+			// Add the whole tree of blocks to BadBlocks,
+			// deleting them from BlockMap
+
+			// Rewind the validated blocks
+			for i := 0; i < validatedBlocks; i++ {
+				s.RewindABlock()
+			}
+
+			// Integrate the rewound blocks
+			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
+				err = s.integrateBlock(s.BlockMap[rewoundBlocks[i]].Block)
+				if err != nil {
+					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
+				}
+			}
+
+			break
+		}
+		validatedBlocks += 1
+	}
+
+	if err != nil {
+		// Do something to the transaction pool.
+	} else {
+		// Maybe still do something to the transaction pool.
+	}
+
+	return
+}
+
+// Add a block to the state struct.
+func (s *State) AcceptBlock(b *Block) (err error) {
+	// Check the maps in the state to see if the block is already known.
+	parentBlockNode, err := s.checkMaps(b)
+	if err != nil {
+		return
+	}
+
+	// Check that the header of the block is valid.
+	err = s.validateHeader(parentBlockNode, b)
+	if err != nil {
+		return
+	}
+
+	newBlockNode := s.addBlockToTree(parentBlockNode, b)
+
+	// If the new node is 5% heavier than the current node, switch to the new fork.
+	if s.heavierFork(newBlockNode) {
+		err = s.forkBlockchain(parentBlockNode)
+		if err != nil {
+			return
+		}
+	} else {
+		// Do something to the transaction pool.
+	}
+
+	// Maybe still do something to the transaction pool.
+
+	return
+}
+
+func (s *State) AcceptTransaction(t *Transaction) (err error) {
+	// Takes a new transaction and puts it into the transaction pool, which
+	// is used to build and mine on blocks.
+	return
 }

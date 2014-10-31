@@ -66,19 +66,3 @@ func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 	hash = joinHash(left, right)
 	return
 }
-
-func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
-}
-
-func (t *Transaction) Hash() Hash {
-	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
-	// allows you to selectively reveal pieces of a transaction? But what good is that?
-
-	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
-	// Inputs
-	// Outputs
-	// File Contracts
-	// Storage Proofs
-	// Signatures
-}
