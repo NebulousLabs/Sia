@@ -76,8 +76,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		blockWindow = newBlockNode.Height
 	} else {
 		// Calculate new difficulty, using block Height-5000 timestamp.
-		timePassed := b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
-		expectedTimePassed := TargetSecondsPerBlock * 5000
+		timePassed = b.Timestamp - s.BlockMap[s.CurrentPath[newBlockNode.Height-5000]].Block.Timestamp
+		expectedTimePassed = TargetSecondsPerBlock * 5000
 		blockWindow = 5000
 	}
 

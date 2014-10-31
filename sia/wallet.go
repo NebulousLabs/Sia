@@ -18,7 +18,8 @@ type Wallet struct {
 func CreateWallet() (w *Wallet, err error) {
 	w = new(Wallet)
 
-	w.SecretKey, pk, err := GenerateKeyPair()
+	var pk PublicKey
+	w.SecretKey, pk, err = GenerateKeyPair()
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 	// w.CoinAddress = sc.GetAddress()
