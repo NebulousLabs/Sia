@@ -92,6 +92,21 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
+// Return the expected merkle root of the block.
+func (b *Block) expectedMerkleRoot() Hash {
+	var transactionHashes []Hash
+	for _, transaction := range b.Transactions {
+		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
+	}
+	return MerkleRoot(transactionHashes)
+}
+
+// Returns true if the block id fultills the target hash.
+func (b *Block) checkTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
 // Returns true if timestamp is valid, and if target value is reached.
 func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check that the block is not too far in the future.
@@ -123,8 +138,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	}
 
 	// Check the id meets the target.
-	blockHash := b.ID()
-	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {
+	if !b.checkTarget(parent.Target) {
 		err = errors.New("block does not meet target")
 		return
 	}
