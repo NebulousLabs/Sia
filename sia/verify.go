@@ -17,13 +17,13 @@ type InputSignatures struct {
 
 func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
-		s.TransactionPool[input.OutputID] = t
+		s.ConsensusState.TransactionPool[input.OutputID] = t
 	}
 }
 
 func (s *State) removeTransactionFromPool(t *Transaction) {
 	for _, input := range t.Inputs {
-		delete(s.TransactionPool, input.OutputID)
+		delete(s.ConsensusState.TransactionPool, input.OutputID)
 	}
 }
 
@@ -32,7 +32,7 @@ func (s *State) AcceptTransaction(t *Transaction) (err error) {
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	for _, input := range t.Inputs {
-		_, exists := s.TransactionPool[input.OutputID]
+		_, exists := s.ConsensusState.TransactionPool[input.OutputID]
 		if exists {
 			err = errors.New("conflicting transaction exists in transaction pool")
 		}
