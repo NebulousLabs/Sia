@@ -31,6 +31,8 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 
 // Add a transaction to the state struct.
 func (s *State) AcceptTransaction(t *Transaction) (err error) {
+	s.Lock()
+
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	for _, input := range t.Inputs {
@@ -49,6 +51,7 @@ func (s *State) AcceptTransaction(t *Transaction) (err error) {
 	// Add the transaction to the pool.
 	s.addTransactionToPool(t)
 
+	s.Unlock()
 	return
 }
 
@@ -472,6 +475,8 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 
 // Add a block to the state struct.
 func (s *State) AcceptBlock(b *Block) (err error) {
+	s.Lock()
+
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(b)
 	if err != nil {
@@ -492,11 +497,8 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		if err != nil {
 			return
 		}
-	} else {
-		// Do something to the transaction pool.
 	}
 
-	// Maybe still do something to the transaction pool.
-
+	s.Unlock()
 	return
 }

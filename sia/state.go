@@ -1,5 +1,9 @@
 package sia
 
+import (
+	"sync"
+)
+
 // A transaction will not make it into the txn pool unless all of the
 // signatures have been verified.  That that's left then is to verify that the
 // outputs are unused.
@@ -22,6 +26,8 @@ type State struct {
 	// OrphanBlocks
 
 	ConsensusState ConsensusState
+
+	sync.Mutex
 }
 
 type BlockNode struct {
