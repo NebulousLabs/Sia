@@ -160,148 +160,31 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
 }
 
-func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
-	// Find the common parent between the new fork and the current
-	// fork, keeping track of which path is taken through the
-	// children of the parents so that we can re-trace as we
-	// validate the blocks.
-	currentNode := parentNode
-	value := s.ConsensusState.CurrentPath[currentNode.Height]
-	var parentHistory []BlockID
-	for value != currentNode.Block.ID() {
-		parentHistory = append(parentHistory, currentNode.Block.ID())
-		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
-		value = s.ConsensusState.CurrentPath[currentNode.Height]
+// Pulls just this transaction out of the ConsensusState.
+func (s *State) ReverseTransaction(t Transaction) {
+	// Remove all outputs created by outputs.
+	for i := range t.Outputs {
+		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
+		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
-	// Remove blocks from the ConsensusState until we get to the
-	// same parent that we are forking from.
-	var rewoundBlocks []BlockID
-	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
-		s.RewindABlock()
+	// Add all outputs spent by inputs.
+	for _, input := range t.Inputs {
+		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
+		delete(s.ConsensusState.SpentOutputs, input.OutputID)
 	}
-
-	// Validate each block in the parent history in order, updating
-	// the state as we go.  If at some point a block doesn't
-	// verify, you get to walk all the way backwards and forwards
-	// again.
-	validatedBlocks := 0
-	for i := len(parentHistory) - 1; i >= 0; i-- {
-		err = s.ValidateBlock(s.BlockMap[parentHistory[i]].Block)
-		if err != nil {
-			// Add the whole tree of blocks to BadBlocks,
-			// deleting them from BlockMap
-
-			// Rewind the validated blocks
-			for i := 0; i < validatedBlocks; i++ {
-				s.RewindABlock()
-			}
-
-			// Integrate the rewound blocks
-			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
-				if err != nil {
-					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
-				}
-			}
-
-			break
-		}
-		validatedBlocks += 1
-	}
-
-	if err != nil {
-		// Do something to the transaction pool.
-	} else {
-		// Maybe still do something to the transaction pool.
-	}
-
-	return
 }
 
-// Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
-	// Check the maps in the state to see if the block is already known.
-	parentBlockNode, err := s.checkMaps(b)
-	if err != nil {
-		return
+// Pulls the most recent block out of the ConsensusState.
+func (s *State) RewindABlock() {
+	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
+	for i := len(block.Transactions) - 1; i >= 0; i-- {
+		s.ReverseTransaction(block.Transactions[i])
 	}
 
-	// Check that the header of the block is valid.
-	err = s.validateHeader(parentBlockNode, b)
-	if err != nil {
-		return
-	}
-
-	newBlockNode := s.addBlockToTree(parentBlockNode, b)
-
-	// If the new node is 5% heavier than the current node, switch to the new fork.
-	if s.heavierFork(newBlockNode) {
-		err = s.forkBlockchain(parentBlockNode)
-		if err != nil {
-			return
-		}
-	} else {
-		// Do something to the transaction pool.
-	}
-
-	// Maybe still do something to the transaction pool.
-
-	return
+	s.ConsensusState.CurrentBlock = block.ParentBlock
+	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
 }
-
-// ValidateBlock will both verify the block AND update the consensus state.
-// Calling integrate block is not needed.
-func (s *State) ValidateBlock(b *Block) (err error) {
-	// Check the hash on the merkle tree of transactions.
-
-	var appliedTransactions []Transaction
-	minerSubsidy := Currency(0)
-	for _, txn := range b.Transactions {
-		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
-		if err != nil {
-			s.BadBlocks[b.ID()] = struct{}{}
-			break
-		}
-
-		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		s.ApplyTransaction(txn)
-		appliedTransactions = append(appliedTransactions, txn)
-
-		minerSubsidy += txn.MinerFee
-	}
-
-	if err != nil {
-		// Rewind transactions added to ConsensusState.
-		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.ReverseTransaction(appliedTransactions[i])
-		}
-		return
-	}
-
-	// Add outputs for all of the missed proofs in the open transactions.
-
-	// Add coin inflation to the miner subsidy.
-
-	// Add output contianing miner fees + block subsidy.
-	bid := b.ID()
-	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
-	minerSubsidyOutput := Output{
-		Value:     minerSubsidy,
-		SpendHash: b.MinerAddress,
-	}
-	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
-
-	// s.BlockMap[b.ID()].Verified = true
-
-	s.ConsensusState.CurrentBlock = b.ID()
-	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
-
-	return
-}
-
-// Add a function that integrates a block without verifying it.
 
 /// Can probably split the validation of each piece into a different function,
 //but perhaps not.
@@ -421,30 +304,141 @@ func (s *State) ApplyTransaction(t Transaction) {
 	*/
 }
 
-// Pulls just this transaction out of the ConsensusState.
-func (s *State) ReverseTransaction(t Transaction) {
-	// Remove all outputs created by storage proofs.
+// ValidateBlock will both verify the block AND update the consensus state.
+// Calling integrate block is not needed.
+func (s *State) ValidateBlock(b *Block) (err error) {
+	// Check the hash on the merkle tree of transactions.
 
-	// Remove all outputs created by outputs.
-	for i := range t.Outputs {
-		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
-		delete(s.ConsensusState.UnspentOutputs, outputID)
+	var appliedTransactions []Transaction
+	minerSubsidy := Currency(0)
+	for _, txn := range b.Transactions {
+		err = s.ValidateTxn(txn, s.BlockMap[b.ID()].Height)
+		if err != nil {
+			s.BadBlocks[b.ID()] = struct{}{}
+			break
+		}
+
+		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
+		s.ApplyTransaction(txn)
+		appliedTransactions = append(appliedTransactions, txn)
+
+		minerSubsidy += txn.MinerFee
 	}
 
-	// Add all outputs spent by inputs.
-	for _, input := range t.Inputs {
-		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
-		delete(s.ConsensusState.SpentOutputs, input.OutputID)
+	if err != nil {
+		// Rewind transactions added to ConsensusState.
+		for i := len(appliedTransactions) - 1; i >= 0; i-- {
+			s.ReverseTransaction(appliedTransactions[i])
+		}
+		return
 	}
+
+	// Add coin inflation to the miner subsidy.
+
+	// Add output contianing miner fees + block subsidy.
+	bid := b.ID()
+	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
+	minerSubsidyOutput := Output{
+		Value:     minerSubsidy,
+		SpendHash: b.MinerAddress,
+	}
+	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
+
+	// s.BlockMap[b.ID()].Verified = true
+
+	s.ConsensusState.CurrentBlock = b.ID()
+	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
+
+	return
 }
 
-// Pulls the most recent block out of the ConsensusState.
-func (s *State) RewindABlock() {
-	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
-	for i := len(block.Transactions) - 1; i >= 0; i-- {
-		s.ReverseTransaction(block.Transactions[i])
+func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
+	// Find the common parent between the new fork and the current
+	// fork, keeping track of which path is taken through the
+	// children of the parents so that we can re-trace as we
+	// validate the blocks.
+	currentNode := parentNode
+	value := s.ConsensusState.CurrentPath[currentNode.Height]
+	var parentHistory []BlockID
+	for value != currentNode.Block.ID() {
+		parentHistory = append(parentHistory, currentNode.Block.ID())
+		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
+		value = s.ConsensusState.CurrentPath[currentNode.Height]
 	}
 
-	s.ConsensusState.CurrentBlock = block.ParentBlock
-	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
+	// Remove blocks from the ConsensusState until we get to the
+	// same parent that we are forking from.
+	var rewoundBlocks []BlockID
+	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
+		s.RewindABlock()
+	}
+
+	// Validate each block in the parent history in order, updating
+	// the state as we go.  If at some point a block doesn't
+	// verify, you get to walk all the way backwards and forwards
+	// again.
+	validatedBlocks := 0
+	for i := len(parentHistory) - 1; i >= 0; i-- {
+		err = s.ValidateBlock(s.BlockMap[parentHistory[i]].Block)
+		if err != nil {
+			// Add the whole tree of blocks to BadBlocks,
+			// deleting them from BlockMap
+
+			// Rewind the validated blocks
+			for i := 0; i < validatedBlocks; i++ {
+				s.RewindABlock()
+			}
+
+			// Integrate the rewound blocks
+			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
+				err = s.ValidateBlock(s.BlockMap[rewoundBlocks[i]].Block)
+				if err != nil {
+					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
+				}
+			}
+
+			break
+		}
+		validatedBlocks += 1
+	}
+
+	if err != nil {
+		// Do something to the transaction pool.
+	} else {
+		// Maybe still do something to the transaction pool.
+	}
+
+	return
+}
+
+// Add a block to the state struct.
+func (s *State) AcceptBlock(b *Block) (err error) {
+	// Check the maps in the state to see if the block is already known.
+	parentBlockNode, err := s.checkMaps(b)
+	if err != nil {
+		return
+	}
+
+	// Check that the header of the block is valid.
+	err = s.validateHeader(parentBlockNode, b)
+	if err != nil {
+		return
+	}
+
+	newBlockNode := s.addBlockToTree(parentBlockNode, b)
+
+	// If the new node is 5% heavier than the current node, switch to the new fork.
+	if s.heavierFork(newBlockNode) {
+		err = s.forkBlockchain(parentBlockNode)
+		if err != nil {
+			return
+		}
+	} else {
+		// Do something to the transaction pool.
+	}
+
+	// Maybe still do something to the transaction pool.
+
+	return
 }
