@@ -112,6 +112,13 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 		return
 	}
 
+	// Check that the MerkleRoot matches the transactions.
+	if b.MerkleRoot != b.expectedMerkleRoot() {
+		s.BadBlocks[b.ID()] = struct{}{}
+		err = errors.New("merkle root does not match transactions sent.")
+		return
+	}
+
 	// Check the id meets the target.
 	blockHash := b.ID()
 	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {

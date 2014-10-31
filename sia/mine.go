@@ -4,6 +4,14 @@ import (
 	"time"
 )
 
+func (b *Block) expectedMerkleRoot() Hash {
+	var transactionHashes []Hash
+	for _, transaction := range b.Transactions {
+		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
+	}
+	return MerkleRoot(transactionHashes)
+}
+
 // Creates a new block.  This function creates a new block given a previous
 // block, isn't happy with being interrupted.  Need a different thread that can
 // be updated by listening on channels or something.
@@ -15,14 +23,11 @@ func (w *Wallet) GenerateBlock(state *State) (b *Block) {
 	}
 
 	// Add the transactions from the transaction pool.
-	var transactionHashes []Hash
 	for _, transaction := range state.ConsensusState.TransactionList {
 		b.Transactions = append(b.Transactions, *transaction)
-		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
 	}
 
-	// Add the merkle root of the transactions.
-	b.MerkleRoot = MerkleRoot(transactionHashes)
+	b.MerkleRoot = b.expectedMerkleRoot()
 
 	// Perform work until the block matches the desired header value.
 	err := state.validateHeader(state.BlockMap[state.ConsensusState.CurrentBlock], b)
