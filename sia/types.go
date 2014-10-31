@@ -39,7 +39,7 @@ type (
 )
 
 type Signature struct {
-	r, s *big.Int
+	R, S *big.Int
 }
 
 type Block struct {
@@ -121,12 +121,69 @@ type StorageProof struct {
 	HashSet    []*Hash
 }
 
+// MarshalSia implements the Marshaler interface for Signatures.
+func (s *Signature) MarshalSia() []byte {
+	if s.R == nil || s.S == nil {
+		return []byte{0, 0}
+	}
+	// pretend Signature is a tuple of []bytes
+	// this lets us use Marshal instead of doing manual length-prefixing
+	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
+}
+
+// MarshalSia implements the Unmarshaler interface for Signatures.
+func (s *Signature) UnmarshalSia(b []byte) int {
+	// inverse of the struct trick used in Signature.MarshalSia
+	str := struct{ R, S []byte }{}
+	if Unmarshal(b, &str) != nil {
+		return 0
+	}
+	s.R = new(big.Int).SetBytes(str.R)
+	s.S = new(big.Int).SetBytes(str.S)
+	return len(str.R) + len(str.S) + 2
+}
+
+// MarshalSia implements the Marshaler interface for PublicKeys.
+func (pk *PublicKey) MarshalSia() []byte {
+	if pk.X == nil || pk.Y == nil {
+		return []byte{0, 0}
+	}
+	// see Signature.MarshalSia
+	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
+}
+
+// MarshalSia implements the Unmarshaler interface for PublicKeys.
+func (pk *PublicKey) UnmarshalSia(b []byte) int {
+	// see Signature.UnmarshalSia
+	str := struct{ X, Y []byte }{}
+	if Unmarshal(b, &str) != nil {
+		return 0
+	}
+	pk.X = new(big.Int).SetBytes(str.X)
+	pk.Y = new(big.Int).SetBytes(str.Y)
+	return len(str.X) + len(str.Y) + 2
+}
+
+// MerkleRoot calculates the Merkle root hash of a SpendConditions object,
+// using the timelock, number of signatures, and the signatures themselves as leaves.
+func (sc *SpendConditions) MerkleRoot() Hash {
+	tlHash := HashBytes(Marshal(sc.TimeLock))
+	nsHash := HashBytes(Marshal(sc.NumSignatures))
+	pkHashes := make([]Hash, len(sc.PublicKeys))
+	for i := range sc.PublicKeys {
+		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
+	}
+	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
+	return MerkleRoot(leaves)
+}
+
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
-		Hash(b.ParentBlock),
-		uint64(b.Timestamp),
-		uint64(b.Nonce),
-		Hash(b.MinerAddress),
-		Hash(b.MerkleRoot),
-	)))
+	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
+}
+
+func (t *Transaction) Hash() Hash {
+	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
+	// allows you to selectively reveal pieces of a transaction? But what good is that?
+
+	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
 }
