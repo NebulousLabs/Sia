@@ -6,15 +6,11 @@ import (
 	"reflect"
 )
 
-// A Marshaler encodes its data as a byte slice.
-// All Marshalers should also implement the Unmarshaler interface.
+// A Marshaler can be encoded to, and decoded from, a byte slice.
+// Note: UnmarshalSia may be passed a byte slice containing more than one encoded type.
+// It should return the number of bytes used to decode itself.
 type Marshaler interface {
 	MarshalSia() []byte
-}
-
-// An Unmarshaler decodes bytes into a struct.
-// All Unmarshalers should also implement the Marshaler interface.
-type Unmarshaler interface {
 	UnmarshalSia([]byte) int
 }
 
@@ -133,10 +129,10 @@ func Unmarshal(b []byte, v interface{}) {
 
 func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	// check for UnmarshalSia interface first
-	if u, ok := val.Interface().(Unmarshaler); ok {
+	if u, ok := val.Interface().(Marshaler); ok {
 		return u.UnmarshalSia(b)
 	} else if val.CanAddr() {
-		if m, ok := val.Addr().Interface().(Unmarshaler); ok {
+		if m, ok := val.Addr().Interface().(Marshaler); ok {
 			return m.UnmarshalSia(b)
 		}
 	}
