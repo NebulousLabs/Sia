@@ -197,3 +197,11 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	panic("could not unmarshal type " + val.Type().String())
 	return
 }
+
+// MarshalAll marshals all of its inputs and returns their concatenation.
+func MarshalAll(v ...interface{}) (b []byte) {
+	for i := range v {
+		b = append(b, Marshal(v[i])...)
+	}
+	return
+}
