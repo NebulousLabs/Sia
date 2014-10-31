@@ -42,10 +42,15 @@ type Signature struct {
 	R, S *big.Int
 }
 
+// Eventually, a block will be separate from a block header, and a block header
+// will contian nothing more than a parent hash, a 64 bit nonce, and a child
+// hash. The child hash will be a merkle tree of different blocks that share a
+// header, for merge mining. The blocks themselves will contain timestamps and
+// additonal nonces as needed.
 type Block struct {
 	ParentBlock  BlockID
 	Timestamp    Timestamp
-	Nonce        uint32 // may or may not be needed
+	Nonce        uint64
 	MinerAddress CoinAddress
 	MerkleRoot   Hash
 	Transactions []Transaction
