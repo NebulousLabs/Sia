@@ -164,6 +164,18 @@ func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	return len(str.X) + len(str.Y) + 2
 }
 
+// ID returns the Block's unique identifier, generated from the hash of its internal data.
+// Transactions are not included in the hash.
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(MarshalAll(
+		b.ParentBlock,
+		b.Timestamp,
+		b.Nonce,
+		b.MinerAddress,
+		b.MerkleRoot,
+	)))
+}
+
 // MerkleRoot calculates the Merkle root hash of a SpendConditions object,
 // using the timelock, number of signatures, and the signatures themselves as leaves.
 func (sc *SpendConditions) MerkleRoot() Hash {
@@ -177,13 +189,18 @@ func (sc *SpendConditions) MerkleRoot() Hash {
 	return MerkleRoot(leaves)
 }
 
-func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(Marshal(b))) // this may be wrong, since it encodes every field
-}
-
-func (t *Transaction) Hash() Hash {
-	// version, hash of arb data, miner fee, each input, each output, each file contract, each sp, each sig
-	// allows you to selectively reveal pieces of a transaction? But what good is that?
-
-	return HashBytes(Marshal(t)) // this may be wrong, since it encodes every field
+// SigHash returns the hash of a transaction for a specific index.
+// The index determines which TransactionSignature is included in the hash.
+func (t *Transaction) SigHash(i int) Hash {
+	return HashBytes(MarshalAll(
+		t.ArbitraryData,
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.Signatures[i].InputID,
+		t.Signatures[i].PublicKeyIndex,
+		t.Signatures[i].TimeLock,
+	))
 }
