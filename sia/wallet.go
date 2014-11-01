@@ -85,7 +85,19 @@ func (w *Wallet) SpendCoins(amount Currency, address CoinAddress, state *State) 
 		{Value: total - amount, SpendHash: w.CoinAddress},
 	}
 
-	// Sign the transaction.
+	// Sign each input.
+	for i, input := range t.Inputs {
+		txnSig := TransactionSignature{
+			InputID: input.OutputID,
+		}
+		t.Signatures = append(t.Signatures, txnSig)
+
+		sigHash := t.SigHash(i)
+		t.Signatures[i].Signature, err = SignBytes(sigHash[:], w.SecretKey)
+		if err != nil {
+			return
+		}
+	}
 
 	return
 }

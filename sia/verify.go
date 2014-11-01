@@ -303,9 +303,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 				return
 			}
 		}
-	*/
 
-	/*
 		for _, proof := range t.StorageProofs {
 			// Check that the proof passes.
 			// Check that the proof has not already been submitted.
@@ -331,7 +329,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock < currentHeight {
+		if sig.TimeLock > currentHeight {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
