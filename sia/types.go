@@ -209,3 +209,7 @@ func (t *Transaction) SigHash(i int) Hash {
 		t.Signatures[i].TimeLock,
 	))
 }
+
+func (sc *SpendConditions) Address() CoinAddress {
+	return CoinAddress(HashBytes(Marshal(sc)))
+}

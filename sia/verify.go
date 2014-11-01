@@ -264,6 +264,10 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		inputSum += utxo.Value
 
 		// Check that the spend conditions match the hash listed in the output.
+		if input.SpendConditions.Address() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
+			err = errors.New("spend conditions do not match hash")
+			return
+		}
 
 		// Check the timelock on the spend conditions is expired.
 		if input.SpendConditions.TimeLock < currentHeight {
