@@ -15,6 +15,41 @@ type InputSignatures struct {
 	UsedKeys            map[uint8]struct{}
 }
 
+func (s *State) addTransactionToPool(t *Transaction) {
+	for _, input := range t.Inputs {
+		s.ConsensusState.TransactionPool[input.OutputID] = t
+	}
+}
+
+func (s *State) removeTransactionFromPool(t *Transaction) {
+	for _, input := range t.Inputs {
+		delete(s.ConsensusState.TransactionPool, input.OutputID)
+	}
+}
+
+// Add a transaction to the state struct.
+func (s *State) AcceptTransaction(t *Transaction) (err error) {
+	// Check that the transaction is not in conflict with the transaction
+	// pool.
+	for _, input := range t.Inputs {
+		_, exists := s.ConsensusState.TransactionPool[input.OutputID]
+		if exists {
+			err = errors.New("conflicting transaction exists in transaction pool")
+		}
+	}
+
+	// Check that the transaction is potentially valid.
+	err = s.validTransaction(t)
+	if err != nil {
+		return
+	}
+
+	// Add the transaction to the pool.
+	s.addTransactionToPool(t)
+
+	return
+}
+
 // checkMaps looks through the maps known to the state and sees if the block id
 // has been cached anywhere.
 func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
@@ -161,7 +196,7 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 }
 
 // Pulls just this transaction out of the ConsensusState.
-func (s *State) ReverseTransaction(t Transaction) {
+func (s *State) reverseTransaction(t Transaction) {
 	// Remove all outputs created by outputs.
 	for i := range t.Outputs {
 		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
@@ -176,10 +211,11 @@ func (s *State) ReverseTransaction(t Transaction) {
 }
 
 // Pulls the most recent block out of the ConsensusState.
-func (s *State) RewindABlock() {
+func (s *State) rewindABlock() {
 	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
 	for i := len(block.Transactions) - 1; i >= 0; i-- {
-		s.ReverseTransaction(block.Transactions[i])
+		s.reverseTransaction(block.Transactions[i])
+		s.addTransactionToPool(&block.Transactions[i])
 	}
 
 	s.ConsensusState.CurrentBlock = block.ParentBlock
@@ -188,7 +224,8 @@ func (s *State) RewindABlock() {
 
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
-func (s *State) validTransaction(t Transaction, currentHeight BlockHeight) (err error) {
+func (s *State) validTransaction(t *Transaction) (err error) {
+	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
 	inputSum := Currency(0)
 	var inputSignaturesMap map[OutputID]InputSignatures
 	for _, input := range t.Inputs {
@@ -320,7 +357,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.validTransaction(txn, s.BlockMap[b.ID()].Height)
+		err = s.validTransaction(&txn)
 		if err != nil {
 			s.BadBlocks[b.ID()] = struct{}{}
 			break
@@ -329,6 +366,9 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
 		s.applyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
+
+		// Remove the inputs from the transaction pool.
+		s.removeTransactionFromPool(&txn)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
@@ -339,7 +379,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	if err != nil {
 		// Rewind transactions added to ConsensusState.
 		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.ReverseTransaction(appliedTransactions[i])
+			s.reverseTransaction(appliedTransactions[i])
 		}
 		return
 	}
@@ -354,8 +394,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		SpendHash: b.MinerAddress,
 	}
 	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
-
-	// s.BlockMap[b.ID()].Verified = true
 
 	s.ConsensusState.CurrentBlock = b.ID()
 	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
@@ -382,7 +420,7 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 	var rewoundBlocks []BlockID
 	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
 		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
-		s.RewindABlock()
+		s.rewindABlock()
 	}
 
 	// Validate each block in the parent history in order, updating
@@ -398,7 +436,7 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 
 			// Rewind the validated blocks
 			for i := 0; i < validatedBlocks; i++ {
-				s.RewindABlock()
+				s.rewindABlock()
 			}
 
 			// Integrate the rewound blocks
@@ -451,11 +489,5 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	// Maybe still do something to the transaction pool.
 
-	return
-}
-
-func (s *State) AcceptTransaction(t *Transaction) (err error) {
-	// Takes a new transaction and puts it into the transaction pool, which
-	// is used to build and mine on blocks.
 	return
 }
