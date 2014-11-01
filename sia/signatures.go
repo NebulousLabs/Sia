@@ -16,12 +16,10 @@ func GenerateKeyPair() (sk *ecdsa.PrivateKey, pk PublicKey, err error) {
 }
 
 func SignBytes(data []byte, sk *ecdsa.PrivateKey) (sig Signature, err error) {
-	hash := HashBytes(data)
-	sig.R, sig.S, err = ecdsa.Sign(rand.Reader, sk, hash[:])
+	sig.R, sig.S, err = ecdsa.Sign(rand.Reader, sk, data)
 	return
 }
 
 func VerifyBytes(data []byte, pubKey PublicKey, sig Signature) bool {
-	hash := HashBytes(data)
-	return ecdsa.Verify((*ecdsa.PublicKey)(&pubKey), hash[:], sig.R, sig.S)
+	return ecdsa.Verify((*ecdsa.PublicKey)(&pubKey), data, sig.R, sig.S)
 }

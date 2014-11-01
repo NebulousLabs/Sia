@@ -317,7 +317,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		return
 	}
 
-	for _, sig := range t.Signatures {
+	for i, sig := range t.Signatures {
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
 		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
@@ -336,7 +336,12 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			return
 		}
 
-		// Check that the actual signature is valid, following the covered fields struct.
+		// Check that the signature matches the public key.
+		sigHash := t.SigHash(i)
+		if !VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
+			err = errors.New("invalid signature in transaction")
+			return
+		}
 	}
 
 	return
