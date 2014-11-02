@@ -30,7 +30,7 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 }
 
 // Add a transaction to the state struct.
-func (s *State) AcceptTransaction(t *Transaction) (err error) {
+func (s *State) AcceptTransaction(t Transaction) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -40,17 +40,18 @@ func (s *State) AcceptTransaction(t *Transaction) (err error) {
 		_, exists := s.ConsensusState.TransactionPool[input.OutputID]
 		if exists {
 			err = errors.New("conflicting transaction exists in transaction pool")
+			return
 		}
 	}
 
 	// Check that the transaction is potentially valid.
-	err = s.validTransaction(t)
+	err = s.validTransaction(&t)
 	if err != nil {
 		return
 	}
 
 	// Add the transaction to the pool.
-	s.addTransactionToPool(t)
+	s.addTransactionToPool(&t)
 
 	return
 }
@@ -488,23 +489,23 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 }
 
 // Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
+func (s *State) AcceptBlock(b Block) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	// Check the maps in the state to see if the block is already known.
-	parentBlockNode, err := s.checkMaps(b)
+	parentBlockNode, err := s.checkMaps(&b)
 	if err != nil {
 		return
 	}
 
 	// Check that the header of the block is valid.
-	err = s.validateHeader(parentBlockNode, b)
+	err = s.validateHeader(parentBlockNode, &b)
 	if err != nil {
 		return
 	}
 
-	newBlockNode := s.addBlockToTree(parentBlockNode, b)
+	newBlockNode := s.addBlockToTree(parentBlockNode, &b)
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {

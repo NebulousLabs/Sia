@@ -47,7 +47,7 @@ func addEmptyBlock(testEnv *testingEnvironment) (err error) {
 	}
 
 	expectedOutputs := len(testEnv.state.ConsensusState.UnspentOutputs) + 1
-	err = testEnv.state.AcceptBlock(emptyBlock)
+	err = testEnv.state.AcceptBlock(*emptyBlock)
 	if err != nil {
 		return
 	}
@@ -59,38 +59,49 @@ func addEmptyBlock(testEnv *testingEnvironment) (err error) {
 	return
 }
 
-// makeSpendingEnvironment spends coins from wallet0 into a set of new wallets,
-// pushing through a block that will commit the transactions.
-func makeSpendingEnvironment(testEnv *testingEnvironment) (err error) {
+// transactionPoolTests adds a few wallets to the test environment, creating
+// transactions that fund each and probes the overall efficiency of the
+// transaction pool structures.
+func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	// The current wallet design means that it will double spend on
 	// sequential transactions - meaning that if you make two transactions
 	// in the same block, the wallet will use the same input for each.
 	// We'll fix this sooner rather than later, but for now the problem has
 	// been left so we can focus on other things.
 
-	// Create the new wallets that will be used for the spending
-	// environment.
-	for i := 0; i < 1; i++ {
-		var wallet *Wallet
-		wallet, err = CreateWallet()
-		if err != nil {
-			return
-		}
-		testEnv.wallets = append(testEnv.wallets, wallet)
+	// Create a new wallet for the test environment.
+	wallet, err := CreateWallet()
+	if err != nil {
+		return
+	}
+	testEnv.wallets = append(testEnv.wallets, wallet)
+
+	// Create a transaction to send to that wallet.
+	transaction, err := testEnv.wallets[0].SpendCoins(Currency(3), testEnv.wallets[len(testEnv.wallets)-1].CoinAddress, testEnv.state)
+	if err != nil {
+		return
+	}
+	err = testEnv.state.AcceptTransaction(transaction)
+	if err != nil {
+		return
 	}
 
-	// Create transactions that send coins to each wallet.
-	for i := 1; i < 2; i++ {
-		var transaction Transaction
-		transaction, err = testEnv.wallets[0].SpendCoins(Currency(i+3), testEnv.wallets[len(testEnv.wallets)-i].CoinAddress, testEnv.state)
-		if err != nil {
-			return
-		}
-		err = testEnv.state.AcceptTransaction(&transaction)
-		if err != nil {
-			return
-		}
+	// Attempt to create a conflicting transaction and see if it is rejected from the pool.
+	transaction.Outputs[0].SpendHash[0] = ^transaction.Outputs[0].SpendHash[0] // Change the output address
+	transactionSigHash := transaction.SigHash(0)
+	transaction.Signatures[0].Signature, err = SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey)
+	if err != nil {
+		return
 	}
+	err = testEnv.state.AcceptTransaction(transaction)
+	if err == nil {
+		err = errors.New("Added a conflicting transaction to the transaction pool without error.")
+		return
+	}
+	err = nil
+
+	// Put a block through, which should clear the transaction pool
+	// completely.
 
 	return
 }
@@ -111,7 +122,7 @@ func TestBlockBuilding(t *testing.T) {
 	}
 
 	// Create a few new wallets and send coins to each in a block.
-	err = makeSpendingEnvironment(testEnv)
+	err = transactionPoolTests(testEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
