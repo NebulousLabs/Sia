@@ -33,6 +33,8 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.CurrentPath = make(map[BlockHeight]BlockID)
 	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
 	s.ConsensusState.SpentOutputs = make(map[OutputID]Output)
+	s.ConsensusState.TransactionPool = make(map[OutputID]*Transaction)
+	s.ConsensusState.TransactionList = make(map[OutputID]*Transaction)
 
 	// Create the genesis block using the premine address.
 	genesisBlock := CreateGenesisBlock(premineAddress)

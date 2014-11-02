@@ -253,7 +253,7 @@ func (s *State) rewindABlock() {
 func (s *State) validTransaction(t *Transaction) (err error) {
 	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
 	inputSum := Currency(0)
-	var inputSignaturesMap map[OutputID]InputSignatures
+	inputSignaturesMap := make(map[OutputID]InputSignatures)
 	for _, input := range t.Inputs {
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
@@ -270,7 +270,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock < currentHeight {
+		if input.SpendConditions.TimeLock > currentHeight {
 			err = errors.New("output spent before timelock expiry.")
 			return
 		}
