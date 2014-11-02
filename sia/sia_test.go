@@ -68,6 +68,15 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	// in the same block, the wallet will use the same input for each.
 	// We'll fix this sooner rather than later, but for now the problem has
 	// been left so we can focus on other things.
+	// Record the size of the transaction pool and the transaction list.
+
+	// One thing we can do to increase the modularity of this function is
+	// create a block at the beginning, and use the coinbase to create a
+	// bunch of new wallets. This would also clear out the transaction pool
+	// right at the beginning of the function.
+
+	txnPoolLen := len(testEnv.state.ConsensusState.TransactionPool)
+	txnListLen := len(testEnv.state.ConsensusState.TransactionList)
 
 	// Create a new wallet for the test environment.
 	wallet, err := CreateWallet()
@@ -89,7 +98,7 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	// Attempt to create a conflicting transaction and see if it is rejected from the pool.
 	transaction.Outputs[0].SpendHash[0] = ^transaction.Outputs[0].SpendHash[0] // Change the output address
 	transactionSigHash := transaction.SigHash(0)
-	transaction.Signatures[0].Signature, err = SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey)
+	transaction.Signatures[0].Signature, err = SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey) // Re-sign
 	if err != nil {
 		return
 	}
@@ -100,8 +109,44 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	}
 	err = nil
 
+	// The length of the transaction list should have grown by 1, and the
+	// transaction pool should have grown by the number of outputs.
+	if len(testEnv.state.ConsensusState.TransactionPool) != txnPoolLen+len(transaction.Inputs) {
+		err = fmt.Errorf(
+			"transaction pool did not grow by expected length. Started at %v and ended at %v but should have grown by %v",
+			txnPoolLen,
+			len(testEnv.state.ConsensusState.TransactionPool),
+			len(transaction.Inputs),
+		)
+		return
+	}
+	if len(testEnv.state.ConsensusState.TransactionList) != txnListLen+1 {
+		err = errors.New("transaction list did not grow by the expected length.")
+		return
+	}
+
 	// Put a block through, which should clear the transaction pool
-	// completely.
+	// completely. Give the subsidy to the old wallet to replenish for
+	// funding new wallets.
+	transactionBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
+	if len(transactionBlock.Transactions) == 0 {
+		err = errors.New("block created without accepting the transactions in the pool.")
+		return
+	}
+	err = testEnv.state.AcceptBlock(*transactionBlock)
+	if err != nil {
+		return
+	}
+
+	// Check that the transaction pool has been cleared out.
+	if len(testEnv.state.ConsensusState.TransactionPool) != 0 {
+		err = errors.New("transaction pool not cleared out after getting a block.")
+		return
+	}
+	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
+		err = errors.New("transaction list not cleared out after getting a block.")
+		return
+	}
 
 	return
 }
