@@ -62,19 +62,21 @@ func addEmptyBlock(testEnv *testingEnvironment) (err error) {
 // For now, this is really just a catch-all test. I'm not really sure how to
 // modularize the various components =/
 func TestBlockBuilding(t *testing.T) {
+	// Initialize the testing evironment.
 	testEnv, err := createEnvironment()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Add an empty block to the testing environment.
 	err = addEmptyBlock(testEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a third block with transactions.
-
 	// Add a transaction to the transaction pool.
+
+	// Create a third block with transactions.
 
 	// Create a thrid block containing the transaction, add it.
 
