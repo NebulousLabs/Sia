@@ -5,16 +5,17 @@ import (
 	"time"
 )
 
+const (
+	GenesisSubsidy = Currency(25000)
+)
+
 // These values will be generated before release, but the code for generating
 // them will never be released.  All that the rest of the world will see is
 // hardcoded values.
 func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
 	b = &Block{
-		// Parent is 0.
-		Timestamp: Timestamp(time.Now().Unix()),
-		// Nonce is 0.
+		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: premineAddress,
-		// No transactions means 0 merkle root.
 	}
 
 	return
@@ -42,13 +43,22 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	for i := range s.BlockRoot.RecentTimestamps {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
-	s.BlockRoot.Target[1] = 16 // LOL my laptop gets like 10 khash/s
+	s.BlockRoot.Target[1] = 16
 	s.BlockRoot.Depth = big.NewRat(0, 1)
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
 	// Fill out the ConsensusState
 	s.ConsensusState.CurrentBlock = genesisBlock.ID()
 	s.ConsensusState.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
+
+	// Create the genesis subsidy output.
+	gbid := genesisBlock.ID()
+	genesisSubsidyID := OutputID(HashBytes(append(gbid[:], []byte("blockReward")...)))
+	genesisSubsidyOutput := Output{
+		Value:     GenesisSubsidy,
+		SpendHash: premineAddress,
+	}
+	s.ConsensusState.UnspentOutputs[genesisSubsidyID] = genesisSubsidyOutput
 
 	return
 }

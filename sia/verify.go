@@ -418,6 +418,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	// Add coin inflation to the miner subsidy.
+	minerSubsidy += Currency(1000)
 
 	// Add output contianing miner fees + block subsidy.
 	bid := b.ID()

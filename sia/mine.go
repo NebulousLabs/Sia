@@ -44,13 +44,13 @@ func solveBlock(b *Block, target Target) (err error) {
 // Creates a new block.  This function creates a new block given a previous
 // block, isn't happy with being interrupted.  Need a different thread that can
 // be updated by listening on channels or something.
-func GenerateBlock(state *State, minerAddress CoinAddress) (b *Block) {
+func (s *State) GenerateBlock(minerAddress CoinAddress) (b *Block) {
 	var target Target
 	err := errors.New("getting started")
 	for err != nil {
-		state.Lock()
-		b, target = state.blockForWork(minerAddress)
-		state.Unlock()
+		s.Lock()
+		b, target = s.blockForWork(minerAddress)
+		s.Unlock()
 
 		err = solveBlock(b, target)
 	}
