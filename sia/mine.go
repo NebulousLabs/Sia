@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	IterationsPerAttempt = 2500000
+	// If it takes less than 1 second to go through all of the iterations,
+	// then repeat work will be performed.
+	IterationsPerAttempt = 10 * 1000 * 1000
 )
 
 func (s *State) blockForWork(minerAddress CoinAddress) (b *Block, target Target) {

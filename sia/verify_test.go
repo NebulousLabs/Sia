@@ -2,6 +2,7 @@ package sia
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -23,8 +24,35 @@ func createEnvironment() (testEnv *testingEnvironment, err error) {
 	testEnv.state = CreateGenesisState(testEnv.wallets[0].CoinAddress)
 
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
-		println(len(testEnv.state.ConsensusState.UnspentOutputs))
-		err = errors.New("Genesis state should have a single unspent output.")
+		err = fmt.Errorf("Genesis state should have a single upspent output, has", len(testEnv.state.ConsensusState.UnspentOutputs))
+		return
+	}
+
+	return
+}
+
+// Creates an empty block and applies it to the state.
+func addEmptyBlock(testEnv *testingEnvironment) (err error) {
+	// Make sure that the block will actually be empty.
+	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
+		err = errors.New("cannot add an empty block without an empty transaction pool.")
+		return
+	}
+
+	// Generate a valid empty block using GenerateBlock.
+	emptyBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
+	if len(emptyBlock.Transactions) != 0 {
+		err = errors.New("failed to make an empty block...")
+		return
+	}
+
+	expectedOutputs := len(testEnv.state.ConsensusState.UnspentOutputs) + 1
+	err = testEnv.state.AcceptBlock(emptyBlock)
+	if err != nil {
+		return
+	}
+	if len(testEnv.state.ConsensusState.UnspentOutputs) != expectedOutputs {
+		err = fmt.Errorf("Expecting", expectedOutputs, "outputs, got", len(testEnv.state.ConsensusState.UnspentOutputs), "outputs")
 		return
 	}
 
@@ -39,11 +67,7 @@ func TestBlockBuilding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create an empty second block.
-	secondBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
-
-	// Add the block to the state.
-	err = testEnv.state.AcceptBlock(secondBlock)
+	err = addEmptyBlock(testEnv)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -385,8 +385,6 @@ func (s *State) applyTransaction(t Transaction) {
 // integrateBlock will both verify the block AND update the consensus state.
 // Calling integrate block is not needed.
 func (s *State) integrateBlock(b *Block) (err error) {
-	// Check the hash on the merkle tree of transactions.
-
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -435,12 +433,12 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	return
 }
 
-func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
 	// children of the parents so that we can re-trace as we
 	// validate the blocks.
-	currentNode := parentNode
+	currentNode := newNode
 	value := s.ConsensusState.CurrentPath[currentNode.Height]
 	var parentHistory []BlockID
 	for value != currentNode.Block.ID() {
@@ -486,12 +484,6 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 		validatedBlocks += 1
 	}
 
-	if err != nil {
-		// Do something to the transaction pool.
-	} else {
-		// Maybe still do something to the transaction pool.
-	}
-
 	return
 }
 
@@ -516,7 +508,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		err = s.forkBlockchain(parentBlockNode)
+		err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}
