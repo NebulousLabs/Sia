@@ -38,9 +38,11 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 	for size := uint16(1); size < numSegments; size <<= 1 {
 		// determine index
 		i := sisterIndex(size)
+
+		// for "orphan" leaves, the hash is omitted. This omission can
+		// be detected and accounted for during verification, provided
+		// the verifier knows the value of numSegments.
 		if i >= numSegments {
-			// append dummy hash
-			sp.HashSet = append(sp.HashSet, nil)
 			continue
 		}
 
@@ -59,7 +61,7 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 		if err != nil {
 			return
 		}
-		sp.HashSet = append(sp.HashSet, &h)
+		sp.HashSet = append(sp.HashSet, h)
 	}
 
 	return
@@ -69,20 +71,27 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 // the root-level hash, which is then checked against the expected result.
 // Care must be taken to ensure that the correct ordering is used when
 // concatenating hashes.
-func verifyProof(sp StorageProof, proofIndex uint16, expected Hash) bool {
+//
+// Implementation note: the "left-right" ordering for a given proofIndex can
+// be determined from its little-endian binary representation, where a 0
+// indicates "left" and a 1 indicates "right." However, this must be modified
+// slightly for "orphan" leaves by skipping the first n "missing" hashes, where
+// n is the depth of the Merkle tree minus the length of the proof's hash set.
+func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected Hash) bool {
 	h := HashBytes(sp.Segment[:])
 
-	var size uint16 = 1
-	for i := 0; i < len(sp.HashSet); i, size = i+1, size*2 {
-		// skip dummy hashes
-		if sp.HashSet[i] == nil {
-			continue
-		}
-		if proofIndex%(size*2) < size { // base is on the left branch
-			h = joinHash(h, *sp.HashSet[i])
+	var depth uint16 = 0
+	for (1 << depth) < numSegments {
+		depth++
+	}
+
+	for i := depth - uint16(len(sp.HashSet)); i < depth; i++ {
+		if proofIndex&(1<<i) == 0 { // left
+			h = joinHash(h, sp.HashSet[0])
 		} else {
-			h = joinHash(*sp.HashSet[i], h)
+			h = joinHash(sp.HashSet[0], h)
 		}
+		sp.HashSet = sp.HashSet[1:]
 	}
 
 	return h == expected

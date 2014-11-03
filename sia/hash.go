@@ -17,8 +17,14 @@ func joinHash(left, right Hash) Hash {
 }
 
 // MerkleRoot calculates the "root hash" formed by repeatedly concatenating
-// and hashing a binary tree of hashes.  If the number of leaves is not a
-// power of 2, the orphan hash(es) are concatenated with a single 0 byte.
+// and hashing a binary tree of hashes. If the number of leaves is not a
+// power of 2, the orphan hash(es) are not rehashed. Examples:
+//
+//       ┌───┴──┐       ┌────┴───┐         ┌─────┴─────┐
+//    ┌──┴──┐   │    ┌──┴──┐     │      ┌──┴──┐     ┌──┴──┐
+//  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
+//     (5-leaf)         (6-leaf)             (7-leaf)
+//
 // MerkleRoot will panic if the leaves slice is empty.
 func MerkleRoot(leaves []Hash) Hash {
 	if len(leaves) == 0 {
@@ -27,12 +33,12 @@ func MerkleRoot(leaves []Hash) Hash {
 	}
 
 	if len(leaves) == 1 {
-		return HashBytes(append(leaves[0][:], 0))
+		return leaves[0]
 	} else if len(leaves) == 2 {
 		return joinHash(leaves[0], leaves[1])
 	}
 
-	// locate smallest power of 2 < len(leaves)
+	// locate largest power of 2 < len(leaves)
 	mid := 1
 	for mid < len(leaves)/2+len(leaves)%2 {
 		mid *= 2
@@ -43,12 +49,13 @@ func MerkleRoot(leaves []Hash) Hash {
 
 // MerkleFile splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
-func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
-	if numAtoms == 0 {
+// See MerkleRoot for a diagram of how Merkle trees are constructed.
+func MerkleFile(reader io.Reader, numSegments uint16) (hash Hash, err error) {
+	if numSegments == 0 {
 		err = errors.New("no data")
 		return
 	}
-	if numAtoms == 1 {
+	if numSegments == 1 {
 		data := make([]byte, SegmentSize)
 		n, _ := reader.Read(data)
 		if n == 0 {
@@ -59,15 +66,15 @@ func MerkleFile(reader io.Reader, numAtoms uint16) (hash Hash, err error) {
 		return
 	}
 
-	// locate smallest power of 2 < numAtoms
+	// locate smallest power of 2 < numSegments
 	var mid uint16 = 1
-	for mid < numAtoms/2+numAtoms%2 {
+	for mid < numSegments/2+numSegments%2 {
 		mid *= 2
 	}
 
 	// since we always read "left to right", no extra Seeking is necessary
 	left, _ := MerkleFile(reader, mid)
-	right, err := MerkleFile(reader, numAtoms-mid)
+	right, err := MerkleFile(reader, numSegments-mid)
 	hash = joinHash(left, right)
 	return
 }

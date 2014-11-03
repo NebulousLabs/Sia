@@ -123,7 +123,7 @@ type FileContract struct {
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
-	HashSet    []*Hash
+	HashSet    []Hash
 }
 
 // MarshalSia implements the Marshaler interface for Signatures.
