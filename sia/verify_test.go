@@ -16,7 +16,7 @@ func TestBlockBuilding(t *testing.T) {
 	state := CreateGenesisState(wallet.CoinAddress)
 
 	// Create an empty second block.
-	secondBlock := wallet.GenerateBlock(state)
+	secondBlock := GenerateBlock(state, wallet.CoinAddress)
 
 	// Add the block to the state.
 	err = state.AcceptBlock(secondBlock)

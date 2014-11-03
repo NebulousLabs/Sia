@@ -19,16 +19,21 @@ func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		s.ConsensusState.TransactionPool[input.OutputID] = t
 	}
+	s.ConsensusState.TransactionList[t.Inputs[0].OutputID] = t
 }
 
 func (s *State) removeTransactionFromPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		delete(s.ConsensusState.TransactionPool, input.OutputID)
 	}
+	delete(s.ConsensusState.TransactionList, t.Inputs[0].OutputID)
 }
 
 // Add a transaction to the state struct.
 func (s *State) AcceptTransaction(t *Transaction) (err error) {
+	s.Lock()
+	defer s.Unlock()
+
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	for _, input := range t.Inputs {
@@ -87,6 +92,21 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
+// Return the expected merkle root of the block.
+func (b *Block) expectedMerkleRoot() Hash {
+	var transactionHashes []Hash
+	for _, transaction := range b.Transactions {
+		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
+	}
+	return MerkleRoot(transactionHashes)
+}
+
+// Returns true if the block id fultills the target hash.
+func (b *Block) checkTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
 // Returns true if timestamp is valid, and if target value is reached.
 func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check that the block is not too far in the future.
@@ -110,9 +130,15 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 		return
 	}
 
+	// Check that the MerkleRoot matches the transactions.
+	if b.MerkleRoot != b.expectedMerkleRoot() {
+		s.BadBlocks[b.ID()] = struct{}{}
+		err = errors.New("merkle root does not match transactions sent.")
+		return
+	}
+
 	// Check the id meets the target.
-	blockHash := b.ID()
-	if bytes.Compare(parent.Target[:], blockHash[:]) < 0 {
+	if !b.checkTarget(parent.Target) {
 		err = errors.New("block does not meet target")
 		return
 	}
@@ -238,6 +264,10 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		inputSum += utxo.Value
 
 		// Check that the spend conditions match the hash listed in the output.
+		if input.SpendConditions.Address() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
+			err = errors.New("spend conditions do not match hash")
+			return
+		}
 
 		// Check the timelock on the spend conditions is expired.
 		if input.SpendConditions.TimeLock < currentHeight {
@@ -277,9 +307,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 				return
 			}
 		}
-	*/
 
-	/*
 		for _, proof := range t.StorageProofs {
 			// Check that the proof passes.
 			// Check that the proof has not already been submitted.
@@ -291,7 +319,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		return
 	}
 
-	for _, sig := range t.Signatures {
+	for i, sig := range t.Signatures {
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
 		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
@@ -305,12 +333,17 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock < currentHeight {
+		if sig.TimeLock > currentHeight {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
 
-		// Check that the actual signature is valid, following the covered fields struct.
+		// Check that the signature matches the public key.
+		sigHash := t.SigHash(i)
+		if !VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
+			err = errors.New("invalid signature in transaction")
+			return
+		}
 	}
 
 	return
@@ -463,6 +496,9 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 
 // Add a block to the state struct.
 func (s *State) AcceptBlock(b *Block) (err error) {
+	s.Lock()
+	defer s.Unlock()
+
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(b)
 	if err != nil {
@@ -483,11 +519,7 @@ func (s *State) AcceptBlock(b *Block) (err error) {
 		if err != nil {
 			return
 		}
-	} else {
-		// Do something to the transaction pool.
 	}
-
-	// Maybe still do something to the transaction pool.
 
 	return
 }

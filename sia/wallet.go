@@ -26,7 +26,7 @@ func CreateWallet() (w *Wallet, err error) {
 	w.SecretKey, pk, err = GenerateKeyPair()
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
-	// w.CoinAddress = sc.GetAddress()
+	w.CoinAddress = w.SpendConditions.Address()
 
 	return
 }
@@ -85,7 +85,19 @@ func (w *Wallet) SpendCoins(amount Currency, address CoinAddress, state *State) 
 		{Value: total - amount, SpendHash: w.CoinAddress},
 	}
 
-	// Sign the transaction.
+	// Sign each input.
+	for i, input := range t.Inputs {
+		txnSig := TransactionSignature{
+			InputID: input.OutputID,
+		}
+		t.Signatures = append(t.Signatures, txnSig)
+
+		sigHash := t.SigHash(i)
+		t.Signatures[i].Signature, err = SignBytes(sigHash[:], w.SecretKey)
+		if err != nil {
+			return
+		}
+	}
 
 	return
 }
