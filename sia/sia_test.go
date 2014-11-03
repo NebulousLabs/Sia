@@ -225,8 +225,11 @@ func TestBlockBuilding(t *testing.T) {
 
 	// Test rewinding a block.
 
+	// Probe the block forking code.
 	err = blockForkingTests(testEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Probe the difficulty adjustment code.
 }

@@ -434,6 +434,15 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	return
 }
 
+func (s *State) invalidateNode(node *BlockNode) {
+	for i := range node.Children {
+		s.invalidateNode(node.Children[i])
+	}
+
+	delete(s.BlockMap, node.Block.ID())
+	s.BadBlocks[node.Block.ID()] = struct{}{}
+}
+
 func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
@@ -466,6 +475,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
+			s.invalidateNode(s.BlockMap[parentHistory[i]])
 
 			// Rewind the validated blocks
 			for i := 0; i < validatedBlocks; i++ {
