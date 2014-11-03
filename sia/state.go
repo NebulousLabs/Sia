@@ -38,12 +38,15 @@ type BlockNode struct {
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Target           Target        // Target for next block.
 	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
+
+	ContractTerminations []ContractTermination
 }
 
 type ConsensusState struct {
 	CurrentBlock BlockID
 	CurrentPath  map[BlockHeight]BlockID // Points to the block id for a given height.
 
+	OpenContracts  map[ContractID]*OpenContract
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output
 
@@ -57,4 +60,18 @@ type ConsensusState struct {
 	// transaction.
 	TransactionPool map[OutputID]*Transaction
 	TransactionList map[OutputID]*Transaction
+}
+
+type OpenContract struct {
+	FileContract    FileContract
+	ContractID      ContractID
+	FundsRemaining  Currency
+	Failures        uint32
+	WindowSatisfied bool
+}
+
+type ContractTermination struct {
+	FileContract    FileContract
+	FinalPayout     Currency
+	ContractSuccess bool
 }

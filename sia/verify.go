@@ -15,6 +15,111 @@ type InputSignatures struct {
 	UsedKeys            map[uint8]struct{}
 }
 
+// ValidTransaction returns err = nil if the transaction is valid, otherwise
+// returns an error explaining what wasn't valid.
+func (s *State) validTransaction(t *Transaction) (err error) {
+	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
+	inputSum := Currency(0)
+	inputSignaturesMap := make(map[OutputID]InputSignatures)
+	for _, input := range t.Inputs {
+		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
+		if !exists {
+			err = errors.New("transaction spends a nonexisting output")
+			return
+		}
+
+		inputSum += utxo.Value
+
+		// Check that the spend conditions match the hash listed in the output.
+		if input.SpendConditions.Address() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
+			err = errors.New("spend conditions do not match hash")
+			return
+		}
+
+		// Check the timelock on the spend conditions is expired.
+		if input.SpendConditions.TimeLock > currentHeight {
+			err = errors.New("output spent before timelock expiry.")
+			return
+		}
+
+		// Create the condition for the input signatures and add it to the input signatures map.
+		_, exists = inputSignaturesMap[input.OutputID]
+		if exists {
+			err = errors.New("output spent twice in same transaction")
+			return
+		}
+		var newInputSignatures InputSignatures
+		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
+		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
+		inputSignaturesMap[input.OutputID] = newInputSignatures
+	}
+
+	outputSum := Currency(0)
+	for _, minerFee := range t.MinerFees {
+		outputSum += minerFee
+	}
+
+	for _, output := range t.Outputs {
+		outputSum += output.Value
+	}
+
+	for _, contract := range t.FileContracts {
+		if contract.ContractFund < 0 {
+			err = errors.New("Contract must be funded.")
+			return
+		}
+		if contract.Start < currentHeight {
+			err = errors.New("Contract starts in the future.")
+			return
+		}
+		if contract.End <= contract.Start {
+			err = errors.New("Contract duration must be at least one block.")
+			return
+		}
+	}
+
+	/*
+		for _, proof := range t.StorageProofs {
+			// Check that the proof passes.
+			// Check that the proof has not already been submitted.
+		}
+	*/
+
+	if inputSum != outputSum {
+		err = errors.New("inputs do not equal outputs for transaction.")
+		return
+	}
+
+	for i, sig := range t.Signatures {
+		// Check that each signature signs a unique pubkey where
+		// RemainingSignatures > 0.
+		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
+			err = errors.New("friviolous signature detected.")
+			return
+		}
+		_, exists := inputSignaturesMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
+		if exists {
+			err = errors.New("public key used twice while signing")
+			return
+		}
+
+		// Check the timelock on the signature.
+		if sig.TimeLock > currentHeight {
+			err = errors.New("signature timelock has not expired")
+			return
+		}
+
+		// Check that the signature matches the public key.
+		sigHash := t.SigHash(i)
+		if !VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
+			err = errors.New("invalid signature in transaction")
+			return
+		}
+	}
+
+	return
+}
+
 func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		s.ConsensusState.TransactionPool[input.OutputID] = t
@@ -249,107 +354,6 @@ func (s *State) rewindABlock() {
 	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
 }
 
-// ValidTransaction returns err = nil if the transaction is valid, otherwise
-// returns an error explaining what wasn't valid.
-func (s *State) validTransaction(t *Transaction) (err error) {
-	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
-	inputSum := Currency(0)
-	inputSignaturesMap := make(map[OutputID]InputSignatures)
-	for _, input := range t.Inputs {
-		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
-		if !exists {
-			err = errors.New("transaction spends a nonexisting output")
-			return
-		}
-
-		inputSum += utxo.Value
-
-		// Check that the spend conditions match the hash listed in the output.
-		if input.SpendConditions.Address() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
-			err = errors.New("spend conditions do not match hash")
-			return
-		}
-
-		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock > currentHeight {
-			err = errors.New("output spent before timelock expiry.")
-			return
-		}
-
-		// Create the condition for the input signatures and add it to the input signatures map.
-		_, exists = inputSignaturesMap[input.OutputID]
-		if exists {
-			err = errors.New("output spent twice in same transaction")
-			return
-		}
-		var newInputSignatures InputSignatures
-		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
-		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
-		inputSignaturesMap[input.OutputID] = newInputSignatures
-	}
-
-	outputSum := Currency(0)
-	for _, minerFee := range t.MinerFees {
-		outputSum += minerFee
-	}
-
-	for _, output := range t.Outputs {
-		outputSum += output.Value
-	}
-
-	/*
-		for _, contract := range t.FileContracts {
-			if contract.Start < currentHeight {
-				err = errors.New("Contract starts in the future.")
-				return
-			}
-			if contract.End <= contract.Start {
-				err = errors.New("Contract duration must be at least one block.")
-				return
-			}
-		}
-
-		for _, proof := range t.StorageProofs {
-			// Check that the proof passes.
-			// Check that the proof has not already been submitted.
-		}
-	*/
-
-	if inputSum != outputSum {
-		err = errors.New("inputs do not equal outputs for transaction.")
-		return
-	}
-
-	for i, sig := range t.Signatures {
-		// Check that each signature signs a unique pubkey where
-		// RemainingSignatures > 0.
-		if inputSignaturesMap[sig.InputID].RemainingSignatures == 0 {
-			err = errors.New("friviolous signature detected.")
-			return
-		}
-		_, exists := inputSignaturesMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
-		if exists {
-			err = errors.New("public key used twice while signing")
-			return
-		}
-
-		// Check the timelock on the signature.
-		if sig.TimeLock > currentHeight {
-			err = errors.New("signature timelock has not expired")
-			return
-		}
-
-		// Check that the signature matches the public key.
-		sigHash := t.SigHash(i)
-		if !VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
-			err = errors.New("invalid signature in transaction")
-			return
-		}
-	}
-
-	return
-}
-
 // Takes a transaction and applies it to the ConsensusState. Should only be
 // called in the context of applying a whole block.
 func (s *State) applyTransaction(t Transaction) {
@@ -365,22 +369,79 @@ func (s *State) applyTransaction(t Transaction) {
 		s.ConsensusState.UnspentOutputs[newOutputID] = output
 	}
 
-	// Add all outputs created by storage proofs.
-	/*
-		for _, sp := range t.StorageProofs {
-			// Need to check that the contract fund has sufficient funds remaining.
-
-			newOutputID := HashBytes(append(ContractID), []byte(n))
-			output := Output {
-				Value: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofPayout,
-				SpendHash: s.ConsensusState.OpenContracts[sp.ContractID].ValidProofAddress,
-			}
-			s.ConsensusState.UnspentOutputs[newOutputID] = output
-
-			// need a counter or some way to determine what the index of
-			// the window is.
+	// Add all new contracts to the OpenContracts list.
+	for i, contract := range t.FileContracts {
+		contractID := ContractID(HashBytes(append((t.Inputs[0].OutputID)[:], append([]byte("contract"), EncUint64(uint64(i))...)...)))
+		openContract := OpenContract{
+			FileContract:    contract,
+			FundsRemaining:  contract.ContractFund,
+			Failures:        0,
+			WindowSatisfied: true,
 		}
-	*/
+		s.ConsensusState.OpenContracts[contractID] = &openContract
+	}
+
+	// Add all outputs created by storage proofs.
+	for _, sp := range t.StorageProofs {
+		// Check for contract termination.
+		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
+		payout := openContract.FileContract.ValidProofPayout
+		if openContract.FundsRemaining < openContract.FileContract.ValidProofPayout {
+			payout = openContract.FundsRemaining
+		}
+
+		windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
+		newOutputID := OutputID(HashBytes(append(sp.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+		output := Output{
+			Value:     payout,
+			SpendHash: openContract.FileContract.ValidProofAddress,
+		}
+		s.ConsensusState.UnspentOutputs[newOutputID] = output
+
+		// Mark the proof as complete for this window.
+		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
+		s.ConsensusState.OpenContracts[sp.ContractID].FundsRemaining -= payout
+	}
+
+	// Perform maintanence on all open contracts.
+	for _, openContract := range s.ConsensusState.OpenContracts {
+		// Check for the window switching over.
+		if (s.BlockMap[s.ConsensusState.CurrentBlock].Height-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 {
+			// Check for a missed proof.
+			if openContract.WindowSatisfied == false {
+				payout := openContract.FileContract.MissedProofPayout
+				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
+					payout = openContract.FundsRemaining
+				}
+
+				windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
+				newOutputID := OutputID(HashBytes(append(openContract.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+				output := Output{
+					Value:     payout,
+					SpendHash: openContract.FileContract.MissedProofAddress,
+				}
+				s.ConsensusState.UnspentOutputs[newOutputID] = output
+
+				// Update the failures count.
+				openContract.Failures += 1
+			} else {
+				openContract.WindowSatisfied = false
+			}
+		}
+
+		// Check for a terminated contract.
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.BlockMap[s.ConsensusState.CurrentBlock].Height || openContract.FileContract.Tolerance == openContract.Failures {
+			newTermination := ContractTermination{
+				FileContract:    openContract.FileContract,
+				FinalPayout:     openContract.FundsRemaining,
+				ContractSuccess: false,
+			}
+			if openContract.FileContract.Tolerance > openContract.Failures {
+				newTermination.ContractSuccess = true
+			}
+			s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations = append(s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations, newTermination)
+		}
+	}
 }
 
 // integrateBlock will both verify the block AND update the consensus state.

@@ -110,8 +110,8 @@ type FileContract struct {
 	FileMerkleRoot     Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
-	ChallengeFrequency uint32 // size of window, one window at a time
-	Tolerance          uint32 // number of missed proofs before triggering unsuccessful termination
+	ChallengeFrequency BlockHeight // size of window, one window at a time
+	Tolerance          uint32      // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
