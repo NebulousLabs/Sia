@@ -151,6 +151,54 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	return
 }
 
+func blockForkingTests(testEnv *testingEnvironment) (err error) {
+	// Fork from the current chain to a different chain, requiring a block
+	// rewind.
+	{
+		// Create two blocks on the same parent.
+		fork1a := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // A block along 1 fork
+		fork2a := testEnv.state.GenerateBlock(testEnv.wallets[1].CoinAddress) // A block along a different fork.
+		err = testEnv.state.AcceptBlock(*fork1a)
+		if err != nil {
+			return
+		}
+
+		// Add one block, mine on it to create a 'heaviest chain' and
+		// then rewind the block, so that you can move the state along
+		// the other chain.
+		fork1b := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // Fork 1 is now heaviest
+		testEnv.state.rewindABlock()                                          // Rewind to parent
+
+		// Make fork2 the chosen fork.
+		err = testEnv.state.AcceptBlock(*fork2a)
+		if err != nil {
+			return
+		}
+		// Verify that fork2a is the current block.
+		if testEnv.state.ConsensusState.CurrentBlock != fork2a.ID() {
+			err = errors.New("fork2 not accepted as farthest node.")
+			return
+		}
+
+		// Add fork1b (rewinding does not remove a block from the
+		// state) to the state and see if the forking happens.
+		err = testEnv.state.AcceptBlock(*fork1b)
+		if err != nil {
+			return
+		}
+		// Verify that fork1b is the current block.
+		if testEnv.state.ConsensusState.CurrentBlock != fork1b.ID() {
+			err = errors.New("switching to a heavier chain did not appear to work.")
+			return
+		}
+	}
+
+	// Fork from the current chain to a different chain, but be required to
+	// double back from validation problems.
+
+	return
+}
+
 // For now, this is really just a catch-all test. I'm not really sure how to
 // modularize the various components =/
 func TestBlockBuilding(t *testing.T) {
@@ -172,10 +220,13 @@ func TestBlockBuilding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a third block with transactions.
+	// Create a test that submits and removes transactions with multiple
+	// inputs and outputs.
 
-	// Create a thrid block containing the transaction, add it.
+	// Test rewinding a block.
 
-	// Create a block with multiple transactions, but one isn't valid.
-	// This will see if the reverse code works correctly.
+	err = blockForkingTests(testEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
