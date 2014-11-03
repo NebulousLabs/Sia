@@ -42,6 +42,8 @@ func (w *Wallet) Scan(state *State) {
 	}
 }
 
+// Problem: the wallet will double-spend itself if multiple transactions are
+// made without blocks being refreshed.
 // Takes a new address, and an amount to send, and adds outputs until the
 // amount is reached. Then sends leftovers back to self.
 func (w *Wallet) SpendCoins(amount Currency, address CoinAddress, state *State) (t Transaction, err error) {

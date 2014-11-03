@@ -30,7 +30,7 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 }
 
 // Add a transaction to the state struct.
-func (s *State) AcceptTransaction(t *Transaction) (err error) {
+func (s *State) AcceptTransaction(t Transaction) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -40,17 +40,18 @@ func (s *State) AcceptTransaction(t *Transaction) (err error) {
 		_, exists := s.ConsensusState.TransactionPool[input.OutputID]
 		if exists {
 			err = errors.New("conflicting transaction exists in transaction pool")
+			return
 		}
 	}
 
 	// Check that the transaction is potentially valid.
-	err = s.validTransaction(t)
+	err = s.validTransaction(&t)
 	if err != nil {
 		return
 	}
 
 	// Add the transaction to the pool.
-	s.addTransactionToPool(t)
+	s.addTransactionToPool(&t)
 
 	return
 }
@@ -253,7 +254,7 @@ func (s *State) rewindABlock() {
 func (s *State) validTransaction(t *Transaction) (err error) {
 	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
 	inputSum := Currency(0)
-	var inputSignaturesMap map[OutputID]InputSignatures
+	inputSignaturesMap := make(map[OutputID]InputSignatures)
 	for _, input := range t.Inputs {
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
@@ -270,7 +271,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock < currentHeight {
+		if input.SpendConditions.TimeLock > currentHeight {
 			err = errors.New("output spent before timelock expiry.")
 			return
 		}
@@ -385,8 +386,6 @@ func (s *State) applyTransaction(t Transaction) {
 // integrateBlock will both verify the block AND update the consensus state.
 // Calling integrate block is not needed.
 func (s *State) integrateBlock(b *Block) (err error) {
-	// Check the hash on the merkle tree of transactions.
-
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -418,6 +417,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	// Add coin inflation to the miner subsidy.
+	minerSubsidy += 1000
 
 	// Add output contianing miner fees + block subsidy.
 	bid := b.ID()
@@ -434,12 +434,21 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	return
 }
 
-func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
+func (s *State) invalidateNode(node *BlockNode) {
+	for i := range node.Children {
+		s.invalidateNode(node.Children[i])
+	}
+
+	delete(s.BlockMap, node.Block.ID())
+	s.BadBlocks[node.Block.ID()] = struct{}{}
+}
+
+func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
 	// children of the parents so that we can re-trace as we
 	// validate the blocks.
-	currentNode := parentNode
+	currentNode := newNode
 	value := s.ConsensusState.CurrentPath[currentNode.Height]
 	var parentHistory []BlockID
 	for value != currentNode.Block.ID() {
@@ -466,6 +475,7 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
+			s.invalidateNode(s.BlockMap[parentHistory[i]])
 
 			// Rewind the validated blocks
 			for i := 0; i < validatedBlocks; i++ {
@@ -485,37 +495,31 @@ func (s *State) forkBlockchain(parentNode *BlockNode) (err error) {
 		validatedBlocks += 1
 	}
 
-	if err != nil {
-		// Do something to the transaction pool.
-	} else {
-		// Maybe still do something to the transaction pool.
-	}
-
 	return
 }
 
 // Add a block to the state struct.
-func (s *State) AcceptBlock(b *Block) (err error) {
+func (s *State) AcceptBlock(b Block) (err error) {
 	s.Lock()
 	defer s.Unlock()
 
 	// Check the maps in the state to see if the block is already known.
-	parentBlockNode, err := s.checkMaps(b)
+	parentBlockNode, err := s.checkMaps(&b)
 	if err != nil {
 		return
 	}
 
 	// Check that the header of the block is valid.
-	err = s.validateHeader(parentBlockNode, b)
+	err = s.validateHeader(parentBlockNode, &b)
 	if err != nil {
 		return
 	}
 
-	newBlockNode := s.addBlockToTree(parentBlockNode, b)
+	newBlockNode := s.addBlockToTree(parentBlockNode, &b)
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		err = s.forkBlockchain(parentBlockNode)
+		err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}

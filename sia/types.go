@@ -19,7 +19,7 @@ const (
 
 var MaxAdjustmentUp = big.NewRat(10005, 10000)
 var MaxAdjustmentDown = big.NewRat(9995, 10000)
-var SurpassThreshold = big.NewRat(105, 100)
+var SurpassThreshold = big.NewRat(5, 100)
 
 type (
 	Hash      [HashSize]byte

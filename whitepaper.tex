@@ -267,9 +267,6 @@ Contracts are also currently permanent, creating what is essentially an uneditab
 There may be value in adding flexibility that allows clients and hosts to negotiate an updated file hash or other updated contract terms.
 Updating the terms of the contract will require consent from all parties.
 
-\subsection{Different Storage Proofs}
-Solutions such as ``Compact Proofs of Retrievability'' \cite{cpr} offer a potentially superior way to verify that hosts are storing files.
-
 \subsection{Proof of Existence Windows}
 In an attempt to partially resolve the closed window attacks, we could use a proof of existence strategy.
 A host can create a hash of the storage proof which they submit to the blockchain within the window.
@@ -290,22 +287,9 @@ This can be mitigated by putting all of the fees into a pool which pays out 33\%
 Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
 It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
 
-\subsection{File Contract Fees}
-Some percent, like 1\% of all coins paid into a file contract would be given to miners.
-This guarantees that as long as Sia is being used for it's core purpose (storage), there will be mining incentive.
-
-\subsection{Reduced Block Time}
-We are comfortable reducing the block time to 5 minutes, with the primary goal being to reduce the variance with which a miner receives payment.
-A 5 minute block time makes the network more vulnerable to attack, but improvements in block technology such as invertible bloom filters \cite{ibf} are enabling faster block propagation times.
-We believe that the risk induced by halving the block time is less than the benefit gained from the reduced incentive to join mining pools.
-
 \subsection{More Frequent Difficulty and Subsidy Adjustments}
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
 We would wish to have more frequent subsidy adjustments, which gives people a more continuous sense of the economic state and prevents moments where many miners turn off simultaneously.
-
-\subsection{Max Block Size Adjustment}
-Max block size will be initially set at 256kb and increased by 256kb every 3 months for 2 years.
-Then it will increase by 25\% anually.
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
@@ -321,18 +305,6 @@ We could follow suggestions similar to those presented in ``Ultimate blockchain 
 %The total payout is still the same, but the number of payouts increases by the number of blocks that would have been valid for both.
 %A block that solves the coin with the highest difficulty will always be valid for both blockchains.
 %(I need to read more about merge mining before I publish this section)
-
-%\subsection{Single Use Signatures}
-%You submit a transaction with a 1-of-N multisig.
-%Each public key would only be allowed to be used once though.
-%This allows one address to be used for many transactions, without needing to reuse signatures.
-
-%Using the concepts applied in HD Wallets \cite{hdw} might help achieve the same goal.
-%Using something like a Merkle signature scheme might also help achieve this goal.
-
-%\subsection{Alternate Mining Structure}
-%Alternatives have been suggested that would address things like block withholding attacks.
-%Additionally it might be useful to have a scheme where multiple miners get paid every block (this allows for high block time, but low block finding variance).
 
 \section{Conclusion}
 Sia takes the Bitcoin cryptocurrency and makes a few major changes.
