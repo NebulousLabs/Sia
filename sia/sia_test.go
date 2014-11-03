@@ -24,7 +24,7 @@ func createEnvironment() (testEnv *testingEnvironment, err error) {
 	testEnv.state = CreateGenesisState(testEnv.wallets[0].CoinAddress)
 
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
-		err = fmt.Errorf("Genesis state should have a single upspent output, has", len(testEnv.state.ConsensusState.UnspentOutputs))
+		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.ConsensusState.UnspentOutputs))
 		return
 	}
 
@@ -52,7 +52,7 @@ func addEmptyBlock(testEnv *testingEnvironment) (err error) {
 		return
 	}
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != expectedOutputs {
-		err = fmt.Errorf("Expecting", expectedOutputs, "outputs, got", len(testEnv.state.ConsensusState.UnspentOutputs), "outputs")
+		err = fmt.Errorf("Expecting %v outputs, got %v outputs", expectedOutputs, len(testEnv.state.ConsensusState.UnspentOutputs))
 		return
 	}
 
