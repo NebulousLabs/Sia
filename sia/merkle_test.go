@@ -1,6 +1,8 @@
 package sia
 
 import (
+	"bytes"
+	"crypto/rand"
 	"testing"
 )
 
@@ -22,5 +24,28 @@ func TestMerkleRoot(t *testing.T) {
 
 	if manualRoot != MerkleRoot(leaves) {
 		t.Fatal("MerkleRoot hash does not match manual hash")
+	}
+}
+
+func TestStorageProof(t *testing.T) {
+	// generate proof data
+	var numSegments uint16 = 7
+	data := make([]byte, numSegments*SegmentSize)
+	rand.Read(data)
+	rootHash, err := MerkleFile(bytes.NewReader(data), numSegments)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create and verify proofs for all indices
+	for i := uint16(0); i < numSegments; i++ {
+		sp, err := buildProof(bytes.NewReader(data), numSegments, i)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if !verifyProof(sp, numSegments, i, rootHash) {
+			t.Error("Proof", i, "did not pass verification")
+		}
 	}
 }
