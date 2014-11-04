@@ -12,7 +12,7 @@ const (
 	SegmentSize   = 32
 
 	TargetSecondsPerBlock = 300
-	TargetWindow          = 5000 // Number of blocks to use when calculating difficulty.
+	TargetWindow          = BlockHeight(5000) // Number of blocks to use when calculating difficulty.
 
 	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
 )

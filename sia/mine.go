@@ -17,12 +17,13 @@ func (s *State) blockForWork(minerAddress CoinAddress) (b *Block, target Target)
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: minerAddress,
 	}
+	// IF TIMESTAMP IS INVALID, CREATE A VALID TIMESTAMP! --> 'future median' attack.
 
 	// Add the transactions from the transaction pool.
 	for _, transaction := range s.ConsensusState.TransactionList {
 		b.Transactions = append(b.Transactions, *transaction)
 	}
-	b.MerkleRoot = b.expectedMerkleRoot()
+	b.MerkleRoot = b.expectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
 	target = s.BlockMap[s.ConsensusState.CurrentBlock].Target

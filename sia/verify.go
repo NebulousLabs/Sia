@@ -59,15 +59,16 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		inputSum += utxo.Value
 	}
 
+	// Tally up the miner fees and output values.
 	outputSum := Currency(0)
 	for _, minerFee := range t.MinerFees {
 		outputSum += minerFee
 	}
-
 	for _, output := range t.Outputs {
 		outputSum += output.Value
 	}
 
+	// Verify the contracts and tally up the expenditures.
 	for _, contract := range t.FileContracts {
 		if contract.ContractFund < 0 {
 			err = errors.New("Contract must be funded.")
@@ -81,6 +82,8 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			err = errors.New("Contract duration must be at least one block.")
 			return
 		}
+
+		outputSum += contract.ContractFund
 	}
 
 	/*
@@ -125,6 +128,8 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	return
 }
 
+// Takes a transaction and adds it to the transaction pool & transaction list,
+// without verifying it.
 func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		s.ConsensusState.TransactionPool[input.OutputID] = t
@@ -132,6 +137,7 @@ func (s *State) addTransactionToPool(t *Transaction) {
 	s.ConsensusState.TransactionList[t.Inputs[0].OutputID] = t
 }
 
+// Takes a transaction out of the transaction pool & transaction list.
 func (s *State) removeTransactionFromPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		delete(s.ConsensusState.TransactionPool, input.OutputID)
@@ -139,7 +145,9 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 	delete(s.ConsensusState.TransactionList, t.Inputs[0].OutputID)
 }
 
-// Add a transaction to the state struct.
+// Checks for a conflict of the transaction with the transaction pool, then
+// checks that the transaction is valid given the current state, then adds the
+// transaction to the transaction pool.
 func (s *State) AcceptTransaction(t Transaction) (err error) {
 	s.Lock()
 	defer s.Unlock()
@@ -166,8 +174,8 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	return
 }
 
-// checkMaps looks through the maps known to the state and sees if the block id
-// has been cached anywhere.
+// state.checkMaps looks through the maps known to the state and sees if the
+// block id has been cached anywhere.
 func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known invalid block.
 	_, exists := s.BadBlocks[b.ID()]
@@ -203,8 +211,8 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
-// Return the expected merkle root of the block.
-func (b *Block) expectedMerkleRoot() Hash {
+// Return the expected transaction merkle root of the block.
+func (b *Block) expectedTransactionMerkleRoot() Hash {
 	var transactionHashes []Hash
 	for _, transaction := range b.Transactions {
 		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
@@ -212,7 +220,7 @@ func (b *Block) expectedMerkleRoot() Hash {
 	return MerkleRoot(transactionHashes)
 }
 
-// Returns true if the block id fultills the target hash.
+// Returns true if the block id is lower than the target.
 func (b *Block) checkTarget(target Target) bool {
 	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
@@ -241,8 +249,9 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 		return
 	}
 
-	// Check that the MerkleRoot matches the transactions.
-	if b.MerkleRoot != b.expectedMerkleRoot() {
+	// Check that the transaction merkle root matches the transactions
+	// included into the block.
+	if b.MerkleRoot != b.expectedTransactionMerkleRoot() {
 		s.BadBlocks[b.ID()] = struct{}{}
 		err = errors.New("merkle root does not match transactions sent.")
 		return
@@ -261,15 +270,20 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 // block.
 func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
 	var timePassed, expectedTimePassed Timestamp
-	blockWindow := BlockHeight(5000)
-	if newNode.Height < 5000 {
+	blockWindow := TargetWindow
+	if newNode.Height < TargetWindow {
+		blockWindow = newNode.Height
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
-		blockWindow = newNode.Height
 	} else {
-		adjustmentBlock := s.BlockMap[s.ConsensusState.CurrentPath[newNode.Height-5000]].Block
+		// WARNING: this code assumes that the block at height
+		// newNode.Height-TargetWindow is the same for both the new
+		// node and the currenct fork. In general, this is a safe
+		// assumption, because there should never be a reorg that's
+		// 5000 blocks long.
+		adjustmentBlock := s.blockAtHeight(newNode.Height - TargetWindow)
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * 5000
+		expectedTimePassed = TargetSecondsPerBlock * Timestamp(TargetWindow)
 	}
 
 	// Adjustment = timePassed / expectedTimePassed / blockWindow.

@@ -88,3 +88,9 @@ type MissedStorageProof struct {
 func (s *State) height() BlockHeight {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
 }
+
+// state.blockAtHeight() returns the block from the current history at the
+// input height.
+func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
+	return s.BlockMap[s.ConsensusState.CurrentPath[height]].Block
+}
