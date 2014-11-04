@@ -340,15 +340,14 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 
 // Returns true if the input node is 5% heavier than the current node.
 func (s *State) heavierFork(newNode *BlockNode) bool {
-	currentWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.BlockMap[s.ConsensusState.CurrentBlock].Target[:]))
-	threshold := new(big.Rat).Mul(currentWeight, SurpassThreshold)
-	requiredDepth := new(big.Rat).Add(s.BlockMap[s.ConsensusState.CurrentBlock].Depth, threshold)
+	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
+	requiredDepth := new(big.Rat).Add(s.currentDepth(), threshold)
 	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
 }
 
 // Pulls just this transaction out of the ConsensusState.
 func (s *State) reverseTransaction(t Transaction) {
-	// Remove all outputs created by outputs.
+	// Remove all outputs.
 	for i := range t.Outputs {
 		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
 		delete(s.ConsensusState.UnspentOutputs, outputID)

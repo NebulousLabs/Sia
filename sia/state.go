@@ -1,6 +1,7 @@
 package sia
 
 import (
+	"math/big"
 	"sync"
 )
 
@@ -89,8 +90,31 @@ func (s *State) height() BlockHeight {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
 }
 
+// state.currentBlockNode returns the node of the most recent block in the
+// ConsensusState.
+func (s *State) currentBlockNode() *BlockNode {
+	return s.BlockMap[s.ConsensusState.CurrentBlock]
+}
+
+// state.CurrentBlock returns the most recent block in the ConsensusState.
+func (s *State) currentBlock() *Block {
+	return s.BlockMap[s.ConsensusState.CurrentBlock].Block
+}
+
 // state.blockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
 	return s.BlockMap[s.ConsensusState.CurrentPath[height]].Block
+}
+
+// state.currentBlockWeight() returns the weight of the current block in the
+// heaviest fork.
+func (s *State) currentBlockWeight() BlockWeight {
+	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
+}
+
+// state.currentDepth() returns the depth of the current block node - the
+// cumulative weight of all the blocks in the current fork.
+func (s *State) currentDepth() BlockWeight {
+	return s.currentBlockNode().Depth
 }
