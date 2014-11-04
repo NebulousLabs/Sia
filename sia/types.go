@@ -181,9 +181,10 @@ func (b *Block) ID() BlockID {
 	)))
 }
 
-// MerkleRoot calculates the Merkle root hash of a SpendConditions object,
-// using the timelock, number of signatures, and the signatures themselves as leaves.
-func (sc *SpendConditions) MerkleRoot() Hash {
+// SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
+// SpendConditions object, using the timelock, number of signatures required,
+// and each public key as leaves.
+func (sc *SpendConditions) CoinAddress() CoinAddress {
 	tlHash := HashBytes(Marshal(sc.TimeLock))
 	nsHash := HashBytes(Marshal(sc.NumSignatures))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
@@ -191,7 +192,7 @@ func (sc *SpendConditions) MerkleRoot() Hash {
 		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
-	return MerkleRoot(leaves)
+	return CoinAddress(MerkleRoot(leaves))
 }
 
 // SigHash returns the hash of a transaction for a specific index.
@@ -208,8 +209,4 @@ func (t *Transaction) SigHash(i int) Hash {
 		t.Signatures[i].PublicKeyIndex,
 		t.Signatures[i].TimeLock,
 	))
-}
-
-func (sc *SpendConditions) Address() CoinAddress {
-	return CoinAddress(HashBytes(Marshal(sc)))
 }

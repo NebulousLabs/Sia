@@ -75,3 +75,8 @@ type MissedStorageProof struct {
 	OutputID   OutputID
 	ContractID ContractID
 }
+
+// state.height() returns the height of the ConsensusState.
+func (s *State) height() BlockHeight {
+	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
+}

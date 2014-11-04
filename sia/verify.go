@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
-// Used to keep track of how many signatures an input has been signed by.
+// Each input has a list of public keys and a required number of signatures.
+// This struct keeps track of which public keys have been used and how many
+// more signatures are needed.
 type InputSignatures struct {
 	RemainingSignatures uint8
 	PossibleKeys        []PublicKey
@@ -18,26 +20,26 @@ type InputSignatures struct {
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
 func (s *State) validTransaction(t *Transaction) (err error) {
-	currentHeight := s.BlockMap[s.ConsensusState.CurrentBlock].Height
+	// Iterate through each input, summing the value, checking for
+	// correctness, and creating an InputSignatures object.
 	inputSum := Currency(0)
 	inputSignaturesMap := make(map[OutputID]InputSignatures)
 	for _, input := range t.Inputs {
+		// Check the input spends an existing and valid output.
 		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
 		if !exists {
 			err = errors.New("transaction spends a nonexisting output")
 			return
 		}
 
-		inputSum += utxo.Value
-
 		// Check that the spend conditions match the hash listed in the output.
-		if input.SpendConditions.Address() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
+		if input.SpendConditions.CoinAddress() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
 			err = errors.New("spend conditions do not match hash")
 			return
 		}
 
 		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock > currentHeight {
+		if input.SpendConditions.TimeLock > s.height() {
 			err = errors.New("output spent before timelock expiry.")
 			return
 		}
@@ -52,6 +54,9 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
 		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
 		inputSignaturesMap[input.OutputID] = newInputSignatures
+
+		// Add the input to the coin sum.
+		inputSum += utxo.Value
 	}
 
 	outputSum := Currency(0)
@@ -68,7 +73,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			err = errors.New("Contract must be funded.")
 			return
 		}
-		if contract.Start < currentHeight {
+		if contract.Start < s.height() {
 			err = errors.New("Contract starts in the future.")
 			return
 		}
@@ -104,7 +109,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock > currentHeight {
+		if sig.TimeLock > s.height() {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
