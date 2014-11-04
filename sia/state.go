@@ -4,16 +4,10 @@ import (
 	"sync"
 )
 
-// A transaction will not make it into the txn pool unless all of the
-// signatures have been verified.  That that's left then is to verify that the
-// outputs are unused.
-
-// state.go manages the state of the network, which in simplified terms is all
-// the blocks ever seen combined with some understanding of how they fit
-// together.
-//
-// For the time being I've made it so that the state struct just stores
-// everything, instead of using pointers.
+// The state struct contains a list of all known blocks, sorted into a tree
+// according to the shape of the network. It also contains the
+// 'ConsensusState', which represents the state of consensus on the current
+// longest fork.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -30,6 +24,9 @@ type State struct {
 	sync.Mutex
 }
 
+// A BlockNode contains a block and the list of children to the block. Also
+// contains some consensus information like which contracts have terminated and
+// where there were missed storage proofs.
 type BlockNode struct {
 	Block    *Block
 	Children []*BlockNode
@@ -43,6 +40,9 @@ type BlockNode struct {
 	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
 }
 
+// The ConsensusState is the state of the network on the current perceived
+// longest fork. This gets updated as transactions are added, as blocks are
+// added and reversed (in the event of a reorg).
 type ConsensusState struct {
 	CurrentBlock BlockID
 	CurrentPath  map[BlockHeight]BlockID // Points to the block id for a given height.
@@ -63,6 +63,8 @@ type ConsensusState struct {
 	TransactionList map[OutputID]*Transaction
 }
 
+// An open contract contains all information necessary to properly enforce a
+// contract with no knowledge of the history of the contract.
 type OpenContract struct {
 	FileContract    FileContract
 	ContractID      ContractID
@@ -71,6 +73,12 @@ type OpenContract struct {
 	WindowSatisfied bool
 }
 
+// A missed storage proof indicates which contract missed the proof, and which
+// output resulted from the missed proof. This is necessary because missed
+// proofs are passive - they happen in the absense of a transaction, not in the
+// presense of one. They must be stored in the block nodes so that a block can
+// be correctly rewound without needing to scroll through the past
+// 'ChallengeFrequency' blocks to figure out if a proof was missed or not.
 type MissedStorageProof struct {
 	OutputID   OutputID
 	ContractID ContractID

@@ -189,7 +189,7 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 	nsHash := HashBytes(Marshal(sc.NumSignatures))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
+		pkHashes[i] = HashBytes(Marshal(&sc.PublicKeys[i]))
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
 	return CoinAddress(MerkleRoot(leaves))
