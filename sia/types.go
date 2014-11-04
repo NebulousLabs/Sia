@@ -126,6 +126,74 @@ type StorageProof struct {
 	HashSet    []Hash
 }
 
+// ID returns the Block's unique identifier, generated from the hash of its internal data.
+// Transactions are not included in the hash.
+func (b *Block) ID() BlockID {
+	return BlockID(HashBytes(MarshalAll(
+		b.ParentBlock,
+		b.Timestamp,
+		b.Nonce,
+		b.MinerAddress,
+		b.MerkleRoot,
+	)))
+}
+
+// SigHash returns the hash of a transaction for a specific index.
+// The index determines which TransactionSignature is included in the hash.
+func (t *Transaction) SigHash(i int) Hash {
+	return HashBytes(MarshalAll(
+		t.ArbitraryData,
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.Signatures[i].InputID,
+		t.Signatures[i].PublicKeyIndex,
+		t.Signatures[i].TimeLock,
+	))
+}
+
+// transaction.ouptutID() takes the index of the output and returns the
+// output's ID.
+func (t *Transaction) outputID(index int) OutputID {
+	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(index)...)...)))
+}
+
+// SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
+// SpendConditions object, using the timelock, number of signatures required,
+// and each public key as leaves.
+func (sc *SpendConditions) CoinAddress() CoinAddress {
+	tlHash := HashBytes(Marshal(sc.TimeLock))
+	nsHash := HashBytes(Marshal(sc.NumSignatures))
+	pkHashes := make([]Hash, len(sc.PublicKeys))
+	for i := range sc.PublicKeys {
+		pkHashes[i] = HashBytes(Marshal(&sc.PublicKeys[i]))
+	}
+	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
+	return CoinAddress(MerkleRoot(leaves))
+}
+
+// Returns the id of a file contract given the transaction it appears in and
+// the index of the contract within the transaction.
+func (t *Transaction) fileContractID(index int) ContractID {
+	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(index)...)...)))
+}
+
+// Returns the index of the current window of a contract, given the current
+// height of the ConsensusState.
+func (fc *FileContract) windowIndex(currentHeight BlockHeight) BlockHeight {
+	return (currentHeight - fc.Start) / fc.ChallengeFrequency
+}
+
+// FileContract.storageProofOutput() returns the OutputID of the output created during window index
+func (t *Transaction) storageProofOutput(fileContractIndex int, height BlockHeight, proofValid bool) OutputID {
+	fileContractID := t.fileContractID(fileContractIndex)
+	proofString := proofString(proofValid)
+	windowIndex := t.FileContracts[fileContractIndex].windowIndex(height)
+	return OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+}
+
 // MarshalSia implements the Marshaler interface for Signatures.
 func (s *Signature) MarshalSia() []byte {
 	if s.R == nil || s.S == nil {
@@ -169,44 +237,10 @@ func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	return len(str.X) + len(str.Y) + 2
 }
 
-// ID returns the Block's unique identifier, generated from the hash of its internal data.
-// Transactions are not included in the hash.
-func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
-		b.ParentBlock,
-		b.Timestamp,
-		b.Nonce,
-		b.MinerAddress,
-		b.MerkleRoot,
-	)))
-}
-
-// SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
-// SpendConditions object, using the timelock, number of signatures required,
-// and each public key as leaves.
-func (sc *SpendConditions) CoinAddress() CoinAddress {
-	tlHash := HashBytes(Marshal(sc.TimeLock))
-	nsHash := HashBytes(Marshal(sc.NumSignatures))
-	pkHashes := make([]Hash, len(sc.PublicKeys))
-	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(Marshal(&sc.PublicKeys[i]))
+func proofString(proofValid bool) []byte {
+	if proofValid {
+		return []byte("validproof")
+	} else {
+		return []byte("missedproof")
 	}
-	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
-	return CoinAddress(MerkleRoot(leaves))
-}
-
-// SigHash returns the hash of a transaction for a specific index.
-// The index determines which TransactionSignature is included in the hash.
-func (t *Transaction) SigHash(i int) Hash {
-	return HashBytes(MarshalAll(
-		t.ArbitraryData,
-		t.Inputs,
-		t.MinerFees,
-		t.Outputs,
-		t.FileContracts,
-		t.StorageProofs,
-		t.Signatures[i].InputID,
-		t.Signatures[i].PublicKeyIndex,
-		t.Signatures[i].TimeLock,
-	))
 }

@@ -349,8 +349,7 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 func (s *State) reverseTransaction(t Transaction) {
 	// Remove all outputs.
 	for i := range t.Outputs {
-		outputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
-		delete(s.ConsensusState.UnspentOutputs, outputID)
+		delete(s.ConsensusState.UnspentOutputs, t.outputID(i))
 	}
 
 	// Add all outputs spent by inputs.
@@ -362,14 +361,13 @@ func (s *State) reverseTransaction(t Transaction) {
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
 		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
-		windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
-		outputID := OutputID(HashBytes(append(sp.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+		outputID := openContract.storageProofOutputID(s.height(), true)
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
-		contractID := ContractID(HashBytes(append((t.Inputs[0].OutputID)[:], append([]byte("contract"), EncUint64(uint64(i))...)...)))
+		contractID := t.fileContractID(i)
 		delete(s.ConsensusState.OpenContracts, contractID)
 	}
 }

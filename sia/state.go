@@ -118,3 +118,12 @@ func (s *State) currentBlockWeight() BlockWeight {
 func (s *State) currentDepth() BlockWeight {
 	return s.currentBlockNode().Depth
 }
+
+// OpenContract.storageProofOutputID() returns the output of a storage proof
+// given the current height and the success status of the proof.
+func (oc *OpenContract) storageProofOutputID(currentHeight BlockHeight, proofValid bool) OutputID {
+	proofString := proofString(proofValid)
+	windowIndex := oc.FileContract.windowIndex(currentHeight)
+	return OutputID(HashBytes(append(oc.ContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	// return statement needs to match code found in transaction.storageProofOutputID ==> should write a function that enforces this similarity.
+}
