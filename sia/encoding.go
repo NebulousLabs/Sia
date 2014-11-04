@@ -6,11 +6,17 @@ import (
 	"reflect"
 )
 
-// A Marshaler can be encoded to, and decoded from, a byte slice.
-// Note: UnmarshalSia may be passed a byte slice containing more than one encoded type.
-// It should return the number of bytes used to decode itself.
+// A Marshaler can be encoded as a byte slice.
+// Marshaler and Unmarshaler are separate interfaces because Unmarshaler must
+// have a pointer receiver, while Marshaler does not.
 type Marshaler interface {
 	MarshalSia() []byte
+}
+
+// An Unmarshaler can be decoded from a byte slice.
+// UnmarshalSia may be passed a byte slice containing more than one encoded type.
+// It should return the number of bytes used to decode itself.
+type Unmarshaler interface {
 	UnmarshalSia([]byte) int
 }
 
@@ -138,10 +144,10 @@ func Unmarshal(b []byte, v interface{}) (err error) {
 
 func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	// check for UnmarshalSia interface first
-	if u, ok := val.Interface().(Marshaler); ok {
+	if u, ok := val.Interface().(Unmarshaler); ok {
 		return u.UnmarshalSia(b)
 	} else if val.CanAddr() {
-		if m, ok := val.Addr().Interface().(Marshaler); ok {
+		if m, ok := val.Addr().Interface().(Unmarshaler); ok {
 			return m.UnmarshalSia(b)
 		}
 	}
@@ -194,7 +200,7 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		}
 		return
 	}
-	panic("could not unmarshal type " + val.Type().String())
+	panic("unknown type")
 	return
 }
 

@@ -28,7 +28,21 @@ type (
 	test4 struct {
 		P *test0
 	}
+	// private field -- need to implement MarshalSia/UnmarshalSia
+	test5 struct {
+		s string
+	}
 )
+
+func (t test5) MarshalSia() []byte {
+	return append([]byte{byte(len(t.s))}, []byte(t.s)...)
+}
+
+func (t *test5) UnmarshalSia(b []byte) int {
+	n, b := int(b[0]), b[1:]
+	t.s = string(b[:n])
+	return n + 1
+}
 
 var testStructs = []interface{}{
 	test0{65537, "foo"},
@@ -36,9 +50,10 @@ var testStructs = []interface{}{
 	test2{test0{65537, "foo"}},
 	test3{test2{test0{65537, "foo"}}},
 	test4{&test0{65537, "foo"}},
+	test5{"foo"},
 }
 
-var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}}
+var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}}
 
 func TestEncoding(t *testing.T) {
 	for i := range testStructs {
