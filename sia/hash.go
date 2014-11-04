@@ -24,17 +24,13 @@ func joinHash(left, right Hash) Hash {
 //    ┌──┴──┐   │    ┌──┴──┐     │      ┌──┴──┐     ┌──┴──┐
 //  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
 //     (5-leaf)         (6-leaf)             (7-leaf)
-//
-// MerkleRoot will panic if the leaves slice is empty.
 func MerkleRoot(leaves []Hash) Hash {
-	if len(leaves) == 0 {
-		var hash Hash
-		return hash
-	}
-
-	if len(leaves) == 1 {
+	switch len(leaves) {
+	case 0:
+		return Hash{}
+	case 1:
 		return leaves[0]
-	} else if len(leaves) == 2 {
+	case 2:
 		return joinHash(leaves[0], leaves[1])
 	}
 
