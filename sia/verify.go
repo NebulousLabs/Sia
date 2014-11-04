@@ -340,11 +340,42 @@ func (s *State) reverseTransaction(t Transaction) {
 		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
 		delete(s.ConsensusState.SpentOutputs, input.OutputID)
 	}
+
+	// Delete all outputs created by storage proofs.
+	for _, sp := range t.StorageProofs {
+		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
+		windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
+		outputID := OutputID(HashBytes(append(sp.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+		delete(s.ConsensusState.UnspentOutputs, outputID)
+	}
+
+	// Delete all the open contracts created by new contracts.
+	for i := range t.FileContracts {
+		contractID := ContractID(HashBytes(append((t.Inputs[0].OutputID)[:], append([]byte("contract"), EncUint64(uint64(i))...)...)))
+		delete(s.ConsensusState.OpenContracts, contractID)
+	}
 }
 
 // Pulls the most recent block out of the ConsensusState.
 func (s *State) rewindABlock() {
 	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
+
+	// Repen all contracts that terminated, and remove the corresponding output.
+	for _, openContract := range s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations {
+		s.ConsensusState.OpenContracts[openContract.ContractID] = openContract
+
+		// Remove termination output.
+		outputID := OutputID(HashBytes(append(openContract.ContractID[:], append([]byte("termination"), []byte(EncUint64(0))...)...)))
+		delete(s.ConsensusState.UnspentOutputs, outputID)
+	}
+
+	// Reverse all outputs created by missed storage proofs.
+	for _, missedProof := range s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs {
+		s.ConsensusState.OpenContracts[missedProof.ContractID].FundsRemaining += s.ConsensusState.UnspentOutputs[missedProof.OutputID].Value
+		s.ConsensusState.OpenContracts[missedProof.ContractID].Failures -= 1
+		delete(s.ConsensusState.UnspentOutputs, missedProof.OutputID)
+	}
+
 	for i := len(block.Transactions) - 1; i >= 0; i-- {
 		s.reverseTransaction(block.Transactions[i])
 		s.addTransactionToPool(&block.Transactions[i])
@@ -402,46 +433,6 @@ func (s *State) applyTransaction(t Transaction) {
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
 		s.ConsensusState.OpenContracts[sp.ContractID].FundsRemaining -= payout
 	}
-
-	// Perform maintanence on all open contracts.
-	for _, openContract := range s.ConsensusState.OpenContracts {
-		// Check for the window switching over.
-		if (s.BlockMap[s.ConsensusState.CurrentBlock].Height-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 {
-			// Check for a missed proof.
-			if openContract.WindowSatisfied == false {
-				payout := openContract.FileContract.MissedProofPayout
-				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
-					payout = openContract.FundsRemaining
-				}
-
-				windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
-				newOutputID := OutputID(HashBytes(append(openContract.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
-				output := Output{
-					Value:     payout,
-					SpendHash: openContract.FileContract.MissedProofAddress,
-				}
-				s.ConsensusState.UnspentOutputs[newOutputID] = output
-
-				// Update the failures count.
-				openContract.Failures += 1
-			} else {
-				openContract.WindowSatisfied = false
-			}
-		}
-
-		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.BlockMap[s.ConsensusState.CurrentBlock].Height || openContract.FileContract.Tolerance == openContract.Failures {
-			newTermination := ContractTermination{
-				FileContract:    openContract.FileContract,
-				FinalPayout:     openContract.FundsRemaining,
-				ContractSuccess: false,
-			}
-			if openContract.FileContract.Tolerance > openContract.Failures {
-				newTermination.ContractSuccess = true
-			}
-			s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations = append(s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations, newTermination)
-		}
-	}
 }
 
 // integrateBlock will both verify the block AND update the consensus state.
@@ -475,6 +466,72 @@ func (s *State) integrateBlock(b *Block) (err error) {
 			s.reverseTransaction(appliedTransactions[i])
 		}
 		return
+	}
+
+	// Perform maintanence on all open contracts.
+	var contractsToDelete []ContractID
+	for _, openContract := range s.ConsensusState.OpenContracts {
+		// Check for the window switching over.
+		if (s.BlockMap[s.ConsensusState.CurrentBlock].Height-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 {
+			// Check for a missed proof.
+			if openContract.WindowSatisfied == false {
+				payout := openContract.FileContract.MissedProofPayout
+				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
+					payout = openContract.FundsRemaining
+				}
+
+				windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
+				newOutputID := OutputID(HashBytes(append(openContract.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+				output := Output{
+					Value:     payout,
+					SpendHash: openContract.FileContract.MissedProofAddress,
+				}
+				s.ConsensusState.UnspentOutputs[newOutputID] = output
+				msp := MissedStorageProof{
+					OutputID:   newOutputID,
+					ContractID: openContract.ContractID,
+				}
+				s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs = append(s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs, msp)
+
+				// Update the FundsRemaining
+				openContract.FundsRemaining -= payout
+
+				// Update the failures count.
+				openContract.Failures += 1
+			} else {
+				openContract.WindowSatisfied = false
+			}
+		}
+
+		// Check for a terminated contract.
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.BlockMap[s.ConsensusState.CurrentBlock].Height || openContract.FileContract.Tolerance == openContract.Failures {
+			if openContract.FundsRemaining != 0 {
+				// Create a new output that terminates the contract.
+				outputID := OutputID(HashBytes(append(openContract.ContractID[:], append([]byte("termination"), []byte(EncUint64(0))...)...)))
+				output := Output{
+					Value: openContract.FundsRemaining,
+				}
+				if openContract.FileContract.Tolerance == openContract.Failures {
+					output.SpendHash = openContract.FileContract.FailureAddress
+				} else {
+					output.SpendHash = openContract.FileContract.SuccessAddress
+				}
+				s.ConsensusState.UnspentOutputs[outputID] = output
+			}
+
+			// Add the contract to contract terminations.
+			s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations = append(s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations, openContract)
+
+			// Mark contract for deletion (can't delete from a map while
+			// iterating through it - results in undefined behavior of the
+			// iterator.
+			contractsToDelete = append(contractsToDelete, openContract.ContractID)
+		}
+	}
+
+	// Delete all of the contracts that terminated.
+	for _, contractID := range contractsToDelete {
+		delete(s.ConsensusState.OpenContracts, contractID)
 	}
 
 	// Add coin inflation to the miner subsidy.

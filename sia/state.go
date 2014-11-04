@@ -39,7 +39,8 @@ type BlockNode struct {
 	Target           Target        // Target for next block.
 	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
 
-	ContractTerminations []ContractTermination
+	ContractTerminations []*OpenContract
+	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
 }
 
 type ConsensusState struct {
@@ -70,8 +71,7 @@ type OpenContract struct {
 	WindowSatisfied bool
 }
 
-type ContractTermination struct {
-	FileContract    FileContract
-	FinalPayout     Currency
-	ContractSuccess bool
+type MissedStorageProof struct {
+	OutputID   OutputID
+	ContractID ContractID
 }
