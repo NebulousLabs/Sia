@@ -157,7 +157,7 @@ func (t *Transaction) SigHash(i int) Hash {
 // transaction.ouptutID() takes the index of the output and returns the
 // output's ID.
 func (t *Transaction) outputID(index int) OutputID {
-	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(index)...)...)))
+	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
@@ -177,7 +177,7 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 // Returns the id of a file contract given the transaction it appears in and
 // the index of the contract within the transaction.
 func (t *Transaction) fileContractID(index int) ContractID {
-	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(index)...)...)))
+	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
 }
 
 // Returns the index of the current window of a contract, given the current
@@ -237,10 +237,24 @@ func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	return len(str.X) + len(str.Y) + 2
 }
 
+// proofString() returns the string to be used when generating the output id of
+// a valid proof if bool is set to true, and it returns the string to be used
+// in a missed proof if the bool is set to false.
 func proofString(proofValid bool) []byte {
 	if proofValid {
 		return []byte("validproof")
 	} else {
 		return []byte("missedproof")
+	}
+}
+
+// terminationString() returns the string to be used when generating the output
+// id of a successful terminated contract if the bool is set to true, and of an
+// unsuccessful termination if the bool is set to false.
+func terminationString(success bool) []byte {
+	if success {
+		return []byte("successfultermination")
+	} else {
+		return []byte("unsuccessfultermination")
 	}
 }

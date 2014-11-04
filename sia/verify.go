@@ -17,7 +17,7 @@ type InputSignatures struct {
 	UsedKeys            map[uint8]struct{}
 }
 
-// ValidTransaction returns err = nil if the transaction is valid, otherwise
+// State.validTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
 func (s *State) validTransaction(t *Transaction) (err error) {
 	// Iterate through each input, summing the value, checking for
@@ -71,15 +71,15 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	// Verify the contracts and tally up the expenditures.
 	for _, contract := range t.FileContracts {
 		if contract.ContractFund < 0 {
-			err = errors.New("Contract must be funded.")
+			err = errors.New("contract must be funded.")
 			return
 		}
 		if contract.Start < s.height() {
-			err = errors.New("Contract starts in the future.")
+			err = errors.New("contract must start in the future.")
 			return
 		}
 		if contract.End <= contract.Start {
-			err = errors.New("Contract duration must be at least one block.")
+			err = errors.New("contract duration must be at least one block.")
 			return
 		}
 
@@ -128,8 +128,8 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	return
 }
 
-// Takes a transaction and adds it to the transaction pool & transaction list,
-// without verifying it.
+// State.addTransactionToPool() adds a transaction to the transaction pool and
+// transaction list without verifying it.
 func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
 		s.ConsensusState.TransactionPool[input.OutputID] = t
@@ -145,9 +145,9 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 	delete(s.ConsensusState.TransactionList, t.Inputs[0].OutputID)
 }
 
-// Checks for a conflict of the transaction with the transaction pool, then
-// checks that the transaction is valid given the current state, then adds the
-// transaction to the transaction pool.
+// State.AcceptTransaction() checks for a conflict of the transaction with the
+// transaction pool, then checks that the transaction is valid given the
+// current state, then adds the transaction to the transaction pool.
 func (s *State) AcceptTransaction(t Transaction) (err error) {
 	s.Lock()
 	defer s.Unlock()
@@ -174,7 +174,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	return
 }
 
-// state.checkMaps looks through the maps known to the state and sees if the
+// State.checkMaps() looks through the maps known to the state and sees if the
 // block id has been cached anywhere.
 func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known invalid block.
@@ -211,7 +211,8 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
-// Return the expected transaction merkle root of the block.
+// Block.expectedTransactionMerkleRoot() returns the expected transaction
+// merkle root of the block.
 func (b *Block) expectedTransactionMerkleRoot() Hash {
 	var transactionHashes []Hash
 	for _, transaction := range b.Transactions {
@@ -220,13 +221,15 @@ func (b *Block) expectedTransactionMerkleRoot() Hash {
 	return MerkleRoot(transactionHashes)
 }
 
-// Returns true if the block id is lower than the target.
+// Block.checkTarget() returns true if the block id is lower than the target.
 func (b *Block) checkTarget(target Target) bool {
 	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
-// Returns true if timestamp is valid, and if target value is reached.
+// State.validateHaeader() returns `err = nil` if the header information in the
+// block (everything except the transactions) is valid, and returns an error
+// explaining why validation failed if the header is invalid.
 func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check that the block is not too far in the future.
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
@@ -266,8 +269,8 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	return
 }
 
-// Calculates the target of a child depending on the timestamp of the child
-// block.
+// State.childTarget() calculates the proper target of a child node given the
+// parent node, and copies the target into the child node.
 func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
 	var timePassed, expectedTimePassed Timestamp
 	blockWindow := TargetWindow
@@ -308,15 +311,15 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 	return
 }
 
-// Calculates the depth of a child given the parent node - note that the depth
-// of the child is independant of the actual child block.
+// State.childDepth() returns the cumulative weight of all the blocks leading
+// up to and including the child block.
 func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
 	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
 }
 
-// Takes a block and a parent node, and adds the block as a child to the parent
-// node.
+// State.addBlockToTree() takes a block and a parent node, and adds a child
+// node to the parent containing the block. No validation is done.
 func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockNode) {
 	// Create the child node.
 	newNode = new(BlockNode)
@@ -338,14 +341,16 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	return
 }
 
-// Returns true if the input node is 5% heavier than the current node.
+// State.heavierFork() returns ture if the input node is 5% heavier than the
+// current node of the ConesnsusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
 	requiredDepth := new(big.Rat).Add(s.currentDepth(), threshold)
 	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
 }
 
-// Pulls just this transaction out of the ConsensusState.
+// State.reverseTransaction removes a given transaction from the
+// ConsensusState, making it as though the transaction had never happened.
 func (s *State) reverseTransaction(t Transaction) {
 	// Remove all outputs.
 	for i := range t.Outputs {
@@ -372,39 +377,39 @@ func (s *State) reverseTransaction(t Transaction) {
 	}
 }
 
-// Pulls the most recent block out of the ConsensusState.
+// State.rewindABlock() removes the most recent block from the ConsensusState,
+// making the ConsensusState as though the block had never been integrated.
 func (s *State) rewindABlock() {
-	block := s.BlockMap[s.ConsensusState.CurrentBlock].Block
-
 	// Repen all contracts that terminated, and remove the corresponding output.
-	for _, openContract := range s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations {
+	for _, openContract := range s.currentBlockNode().ContractTerminations {
 		s.ConsensusState.OpenContracts[openContract.ContractID] = openContract
-
-		// Remove termination output.
-		outputID := OutputID(HashBytes(append(openContract.ContractID[:], append([]byte("termination"), []byte(EncUint64(0))...)...)))
-		delete(s.ConsensusState.UnspentOutputs, outputID)
+		delete(s.ConsensusState.UnspentOutputs, openContract.fileContractTerminationOutputID())
 	}
 
 	// Reverse all outputs created by missed storage proofs.
-	for _, missedProof := range s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs {
+	for _, missedProof := range s.currentBlockNode().MissedStorageProofs {
 		s.ConsensusState.OpenContracts[missedProof.ContractID].FundsRemaining += s.ConsensusState.UnspentOutputs[missedProof.OutputID].Value
 		s.ConsensusState.OpenContracts[missedProof.ContractID].Failures -= 1
 		delete(s.ConsensusState.UnspentOutputs, missedProof.OutputID)
 	}
 
-	for i := len(block.Transactions) - 1; i >= 0; i-- {
-		s.reverseTransaction(block.Transactions[i])
-		s.addTransactionToPool(&block.Transactions[i])
+	// Reverse each transaction in the block, in reverse order from how
+	// they appear in the block.
+	for i := len(s.currentBlock().Transactions) - 1; i >= 0; i-- {
+		s.reverseTransaction(s.currentBlock().Transactions[i])
+		s.addTransactionToPool(&s.currentBlock().Transactions[i])
 	}
 
-	s.ConsensusState.CurrentBlock = block.ParentBlock
-	delete(s.ConsensusState.CurrentPath, s.BlockMap[block.ID()].Height)
+	// Update the CurrentBlock and CurrentPath variables of the
+	// ConsensusState.
+	s.ConsensusState.CurrentBlock = s.currentBlock().ParentBlock
+	delete(s.ConsensusState.CurrentPath, s.height())
 }
 
-// Takes a transaction and applies it to the ConsensusState. Should only be
-// called in the context of applying a whole block.
+// State.applyTransaction() takes a transaction and adds it to the
+// ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) {
-	// Remove all inputs from the unspent outputs list
+	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
 		s.ConsensusState.SpentOutputs[input.OutputID] = s.ConsensusState.UnspentOutputs[input.OutputID]
 		delete(s.ConsensusState.UnspentOutputs, input.OutputID)
@@ -412,18 +417,18 @@ func (s *State) applyTransaction(t Transaction) {
 
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
-		newOutputID := OutputID(HashBytes(append((t.Inputs[0].OutputID)[:], EncUint64(uint64(i))...)))
-		s.ConsensusState.UnspentOutputs[newOutputID] = output
+		s.ConsensusState.UnspentOutputs[t.outputID(i)] = output
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		contractID := ContractID(HashBytes(append((t.Inputs[0].OutputID)[:], append([]byte("contract"), EncUint64(uint64(i))...)...)))
+		contractID := t.fileContractID(i)
 		openContract := OpenContract{
 			FileContract:    contract,
+			ContractID:      contractID,
 			FundsRemaining:  contract.ContractFund,
 			Failures:        0,
-			WindowSatisfied: true,
+			WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
 		}
 		s.ConsensusState.OpenContracts[contractID] = &openContract
 	}

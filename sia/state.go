@@ -85,35 +85,35 @@ type MissedStorageProof struct {
 	ContractID ContractID
 }
 
-// state.height() returns the height of the ConsensusState.
+// State.height() returns the height of the ConsensusState.
 func (s *State) height() BlockHeight {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
 }
 
-// state.currentBlockNode returns the node of the most recent block in the
+// State.currentBlockNode returns the node of the most recent block in the
 // ConsensusState.
 func (s *State) currentBlockNode() *BlockNode {
 	return s.BlockMap[s.ConsensusState.CurrentBlock]
 }
 
-// state.CurrentBlock returns the most recent block in the ConsensusState.
+// State.CurrentBlock returns the most recent block in the ConsensusState.
 func (s *State) currentBlock() *Block {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Block
 }
 
-// state.blockAtHeight() returns the block from the current history at the
+// State.blockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
 	return s.BlockMap[s.ConsensusState.CurrentPath[height]].Block
 }
 
-// state.currentBlockWeight() returns the weight of the current block in the
+// State.currentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) currentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
 }
 
-// state.currentDepth() returns the depth of the current block node - the
+// State.currentDepth() returns the depth of the current block node - the
 // cumulative weight of all the blocks in the current fork.
 func (s *State) currentDepth() BlockWeight {
 	return s.currentBlockNode().Depth
@@ -126,4 +126,19 @@ func (oc *OpenContract) storageProofOutputID(currentHeight BlockHeight, proofVal
 	windowIndex := oc.FileContract.windowIndex(currentHeight)
 	return OutputID(HashBytes(append(oc.ContractID[:], append(proofString, Marshal(windowIndex)...)...)))
 	// return statement needs to match code found in transaction.storageProofOutputID ==> should write a function that enforces this similarity.
+}
+
+// OpenContract.fileContractTerminationOutputID() is a function with a rather
+// silly name that returns the output id of a contract that has terminated.
+//
+// This function will only work on contracts that have already terminated,
+// otherwise it will yield potentially incorrect results.
+func (oc *OpenContract) fileContractTerminationOutputID() OutputID {
+	var terminationBytes []byte
+	if oc.Failures == oc.FileContract.Tolerance {
+		terminationBytes = terminationString(false)
+	} else {
+		terminationBytes = terminationString(true)
+	}
+	return OutputID(HashBytes(append(oc.ContractID[:], append(terminationBytes)...)))
 }
