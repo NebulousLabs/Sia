@@ -12,11 +12,14 @@ const (
 	maxMsgLen = 1 << 16
 )
 
-// A NetAddress contains the information needed to contact a peer over the
-// Internet.
+// A NetAddress contains the information needed to contact a peer over TCP.
 type NetAddress struct {
 	Host string
 	Port uint16
+}
+
+func (na *NetAddress) String() string {
+	return net.JoinHostPort(addr.Host, strconv.Itoa(int(addr.Port)))
 }
 
 // TBD
@@ -115,7 +118,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 // send initiates a TCP connection and writes a message to it.
 // TODO: add timeout
 func (tcps *TCPServer) send(msg []byte, addr NetAddress) (err error) {
-	conn, err := net.Dial("tcp", net.JoinHostPort(addr.Host, strconv.Itoa(int(addr.Port))))
+	conn, err := net.Dial("tcp", addr.String())
 	if err != nil {
 		return
 	}
