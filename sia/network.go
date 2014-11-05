@@ -124,6 +124,18 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	return
 }
 
+// Ping returns whether a NetAddress is reachable. It accomplishes this by
+// initiating a TCP connection and immediately closes it. This is pretty
+// unsophisticated. I'll add a Pong later.
+func (tcps *TCPServer) Ping(addr NetAddress) bool {
+	conn, err := net.Dial("tcp", addr.String())
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
 // send initiates a TCP connection and writes a message to it.
 // TODO: add timeout
 func (tcps *TCPServer) send(msg []byte, addr NetAddress) (err error) {
