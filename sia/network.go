@@ -22,6 +22,9 @@ func (na *NetAddress) String() string {
 	return net.JoinHostPort(addr.Host, strconv.Itoa(int(addr.Port)))
 }
 
+// TODO: add Dial
+// takes fn as an arg??
+
 // TBD
 var BootstrapPeers = []NetAddress{}
 
@@ -66,8 +69,8 @@ func (tcps *TCPServer) listen() {
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	var (
-		msgType   = make([]byte, 1)
-		msgLenBuf = make([]byte, 4)
+		msgType   []byte = make([]byte, 1)
+		msgLenBuf []byte = make([]byte, 4)
 		msgData   []byte // length determined by msgLen
 	)
 	// TODO: make this DRYer?
@@ -98,6 +101,14 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 			// TODO: log error
 			return
 		}
+
+	// Peer discovery
+	case 'P':
+		if msgLen != 1 {
+			// TODO: log error
+			return
+		}
+		tcps.sharePeers(conn, msgData[0])
 
 	// Block
 	case 'B':
@@ -177,12 +188,74 @@ func (tcps *TCPServer) learnHostname(addr NetAddress) (err error) {
 	return
 }
 
-// Bootstrap calls Request on a predefined set of peers in order to build up an
-// initial peer list. It returns the number of peers added.
-func (tcps *TCPServer) Bootstrap() int {
-	n := len(tcps.addressbook)
-	// for _, host := range BootstrapPeers {
+// sharePeers transmits at most 'num' peers over the connection.
+// TODO: choose random peers?
+func (tcps *TCPServer) sharePeers(conn net.Conn, num uint8) {
+	var addrs []NetAddress
+	for addr := range tcps.addressbook {
+		if num == 0 {
+			break
+		}
+		addrs = append(addrs, addr)
+		num--
+	}
+	conn.Write(Marshal(addrs))
+	// log error?
+}
 
-	// }
-	return len(tcps.addressbook) - n
+// requestPeers queries a peer for additional peers, and adds any new peers to
+// the address book.
+func (tcps *TCPServer) requestPeers(addr NetAddress) (err error) {
+	conn, err := net.Dial("tcp", addr.String())
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	// request 10 peers
+	if _, err = conn.Write([]byte{'P', 1, 10}); err != nil {
+		return
+	}
+	// read response
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	var addrs []NetAddress
+	if err = Unmarshal(buf[:n], &addrs); err != nil {
+		return
+	}
+	// add peers
+	// TODO: make sure we don't add ourself
+	for _, addr := range addrs {
+		if tcps.Ping(addr) {
+			tcps.addressbook[addr] = struct{}{}
+		}
+	}
+	return
+}
+
+// Bootstrap discovers the external IP of the TCPServer, requests peers from
+// the initial peer list, and announces itself to those peers.
+func (tcps *TCPServer) Bootstrap() (err error) {
+	// populate initial peer list
+	for _, addr := range BootstrapPeers {
+		if tcps.Ping(addr) {
+			tcps.addressbook[addr] = struct{}{}
+		}
+	}
+
+	// learn hostname
+	for addr := range tcps.addressbook {
+		if tcps.learnHostname() == nil {
+			break
+		}
+	}
+	// request peers
+	// TODO: maybe iterate until we have enough new peers?
+	for addr := range tcps.addressbook {
+		tcps.requestPeers(addr)
+	}
+	// TODO: announce ourselves to new peers
+	return
 }
