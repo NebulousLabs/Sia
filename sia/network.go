@@ -29,6 +29,7 @@ var BootstrapPeers = []NetAddress{}
 // of peers to broadcast to and make requests of.
 type TCPServer struct {
 	net.Listener
+	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
 }
 
@@ -90,6 +91,14 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	}
 
 	switch msgType[0] {
+	// Hostname discovery
+	case 'H':
+		_, err := conn.Write([]byte(conn.RemoteAddr().String()))
+		if err != nil {
+			// TODO: log error
+			return
+		}
+
 	// Block
 	case 'B':
 		var b Block
@@ -126,11 +135,34 @@ func (tcps *TCPServer) send(msg []byte, addr NetAddress) (err error) {
 	return
 }
 
-// PeerList is an RPC that fills 'addr' with at most 'num' peers known to the TCPServer.
-// TODO: add a random set of peers (map iteration may already handle this...)
-func (tcps *TCPServer) PeerList(num int, addr *map[NetAddress]struct{}) error {
-	//
-	return nil
+// learnHostname learns the external IP of the TCPServer.
+func (tcps *TCPServer) learnHostname(addr NetAddress) (err error) {
+	conn, err := net.Dial("tcp", addr.String())
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	// send hostname request
+	if _, err = conn.Write([]byte{'H', 0}); err != nil {
+		return
+	}
+	// read response
+	buf = make([]byte, 128)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	// TODO: try to ping ourselves?
+	host, portStr, err := net.SplitHostPort(string(buf[:n]))
+	if err != nil {
+		return
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return
+	}
+	tcps.myAddr = NetAddress{host, uint16(port)}
+	return
 }
 
 // Bootstrap calls Request on a predefined set of peers in order to build up an
