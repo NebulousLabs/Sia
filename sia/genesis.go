@@ -54,13 +54,11 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
 
 	// Create the genesis subsidy output.
-	gbid := genesisBlock.ID()
-	genesisSubsidyID := OutputID(HashBytes(append(gbid[:], []byte("blockReward")...)))
 	genesisSubsidyOutput := Output{
 		Value:     GenesisSubsidy,
 		SpendHash: premineAddress,
 	}
-	s.ConsensusState.UnspentOutputs[genesisSubsidyID] = genesisSubsidyOutput
+	s.ConsensusState.UnspentOutputs[genesisBlock.subsidyID()] = genesisSubsidyOutput
 
 	return
 }
