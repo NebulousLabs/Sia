@@ -26,7 +26,7 @@ func (s *State) blockForWork(minerAddress CoinAddress) (b *Block, target Target)
 	b.MerkleRoot = b.expectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
-	target = s.BlockMap[s.ConsensusState.CurrentBlock].Target
+	target = s.currentBlockNode().Target
 
 	return
 }
