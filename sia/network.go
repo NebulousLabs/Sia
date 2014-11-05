@@ -18,12 +18,22 @@ type NetAddress struct {
 	Port uint16
 }
 
+// String returns the NetAddress as a string, concatentating the hostname and
+// port number.
 func (na *NetAddress) String() string {
-	return net.JoinHostPort(addr.Host, strconv.Itoa(int(addr.Port)))
+	return net.JoinHostPort(na.Host, strconv.Itoa(int(na.Port)))
 }
 
-// TODO: add Dial
-// takes fn as an arg??
+// call establishes a TCP connection to the NetAddress, calls the provided
+// function on it, and closes the connection.
+func (na *NetAddress) Call(fn func(net.Conn) error) error {
+	conn, err := net.Dial("tcp", na.String())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	return fn(conn)
+}
 
 // TBD
 var BootstrapPeers = []NetAddress{}
@@ -117,7 +127,8 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 			// TODO: log error
 			return
 		}
-		//state.ProcessBlock(b)?
+		//state.AcceptBlock(b)
+		// TODO: log error
 
 	// Transaction
 	case 'T':
@@ -126,65 +137,13 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 			// TODO: log error
 			return
 		}
-		//state.ProcessTransaction(t)?
+		//state.AcceptTransaction(&t)
+		// TODO: log error
 
 	// Unknown
 	default:
 		// TODO: log error
 	}
-	return
-}
-
-// Ping returns whether a NetAddress is reachable. It accomplishes this by
-// initiating a TCP connection and immediately closes it. This is pretty
-// unsophisticated. I'll add a Pong later.
-func (tcps *TCPServer) Ping(addr NetAddress) bool {
-	conn, err := net.Dial("tcp", addr.String())
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
-
-// send initiates a TCP connection and writes a message to it.
-// TODO: add timeout
-func (tcps *TCPServer) send(msg []byte, addr NetAddress) (err error) {
-	conn, err := net.Dial("tcp", addr.String())
-	if err != nil {
-		return
-	}
-	_, err = conn.Write(msg)
-	return
-}
-
-// learnHostname learns the external IP of the TCPServer.
-func (tcps *TCPServer) learnHostname(addr NetAddress) (err error) {
-	conn, err := net.Dial("tcp", addr.String())
-	if err != nil {
-		return
-	}
-	defer conn.Close()
-	// send hostname request
-	if _, err = conn.Write([]byte{'H', 0}); err != nil {
-		return
-	}
-	// read response
-	buf = make([]byte, 128)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return
-	}
-	// TODO: try to ping ourselves?
-	host, portStr, err := net.SplitHostPort(string(buf[:n]))
-	if err != nil {
-		return
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return
-	}
-	tcps.myAddr = NetAddress{host, uint16(port)}
 	return
 }
 
@@ -203,14 +162,46 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, num uint8) {
 	// log error?
 }
 
-// requestPeers queries a peer for additional peers, and adds any new peers to
-// the address book.
-func (tcps *TCPServer) requestPeers(addr NetAddress) (err error) {
+// Ping returns whether a NetAddress is reachable. It accomplishes this by
+// initiating a TCP connection and immediately closes it. This is pretty
+// unsophisticated. I'll add a Pong later.
+func (tcps *TCPServer) Ping(addr NetAddress) bool {
 	conn, err := net.Dial("tcp", addr.String())
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// learnHostname learns the external IP of the TCPServer.
+func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
+	// send hostname request
+	if _, err = conn.Write([]byte{'H', 0}); err != nil {
+		return
+	}
+	// read response
+	buf := make([]byte, 128)
+	n, err := conn.Read(buf)
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	// TODO: try to ping ourselves?
+	host, portStr, err := net.SplitHostPort(string(buf[:n]))
+	if err != nil {
+		return
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return
+	}
+	tcps.myAddr = NetAddress{host, uint16(port)}
+	return
+}
+
+// requestPeers queries a peer for additional peers, and adds any new peers to
+// the address book.
+func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	// request 10 peers
 	if _, err = conn.Write([]byte{'P', 1, 10}); err != nil {
 		return
@@ -247,14 +238,14 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 
 	// learn hostname
 	for addr := range tcps.addressbook {
-		if tcps.learnHostname() == nil {
+		if addr.Call(tcps.learnHostname) == nil {
 			break
 		}
 	}
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
 	for addr := range tcps.addressbook {
-		tcps.requestPeers(addr)
+		addr.Call(tcps.requestPeers)
 	}
 	// TODO: announce ourselves to new peers
 	return
