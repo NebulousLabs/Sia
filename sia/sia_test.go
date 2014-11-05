@@ -28,7 +28,7 @@ func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 	}
 	testEnv.wallets = append(testEnv.wallets, firstWallet)
 
-	testEnv.state = CreateGenesisState(testEnv.wallets[0].CoinAddress)
+	testEnv.state = CreateGenesisState(testEnv.wallets[0].SpendConditions.CoinAddress())
 
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
 		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.ConsensusState.UnspentOutputs))
@@ -46,7 +46,7 @@ func addEmptyBlock(testEnv *testingEnvironment) {
 	}
 
 	// Generate a valid empty block using GenerateBlock.
-	emptyBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
+	emptyBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].SpendConditions.CoinAddress())
 	if len(emptyBlock.Transactions) != 0 {
 		testEnv.t.Fatal("failed to make an empty block...")
 	}
@@ -91,7 +91,7 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	testEnv.wallets = append(testEnv.wallets, wallet)
 
 	// Create a transaction to send to that wallet.
-	transaction, err := testEnv.wallets[0].SpendCoins(Currency(3), testEnv.wallets[len(testEnv.wallets)-1].CoinAddress, testEnv.state)
+	transaction, err := testEnv.wallets[0].SpendCoins(Currency(3), Currency(1), testEnv.wallets[len(testEnv.wallets)-1].SpendConditions.CoinAddress(), testEnv.state)
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	// Put a block through, which should clear the transaction pool
 	// completely. Give the subsidy to the old wallet to replenish for
 	// funding new wallets.
-	transactionBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
+	transactionBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].SpendConditions.CoinAddress())
 	if len(transactionBlock.Transactions) == 0 {
 		testEnv.t.Fatal("block created without accepting the transactions in the pool.")
 	}
@@ -155,8 +155,8 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 // except that the state realizes the second fork is invalid as it switches.
 func blockForkingTests(testEnv *testingEnvironment) {
 	// Create two blocks on the same parent.
-	fork1a := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // A block along 1 fork
-	fork2a := testEnv.state.GenerateBlock(testEnv.wallets[1].CoinAddress) // A block along a different fork.
+	fork1a := testEnv.state.GenerateBlock(testEnv.wallets[0].SpendConditions.CoinAddress()) // A block along 1 fork
+	fork2a := testEnv.state.GenerateBlock(testEnv.wallets[1].SpendConditions.CoinAddress()) // A block along a different fork.
 	err := testEnv.state.AcceptBlock(*fork1a)
 	if err != nil {
 		testEnv.t.Fatal(err)
@@ -165,8 +165,8 @@ func blockForkingTests(testEnv *testingEnvironment) {
 	// Add one block, mine on it to create a 'heaviest chain' and
 	// then rewind the block, so that you can move the state along
 	// the other chain.
-	fork1b := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // Fork 1 is now heaviest
-	testEnv.state.rewindABlock()                                          // Rewind to parent
+	fork1b := testEnv.state.GenerateBlock(testEnv.wallets[0].SpendConditions.CoinAddress()) // Fork 1 is now heaviest
+	testEnv.state.rewindABlock()                                                            // Rewind to parent
 
 	// Make fork2 the chosen fork.
 	err = testEnv.state.AcceptBlock(*fork2a)
@@ -193,6 +193,12 @@ func blockForkingTests(testEnv *testingEnvironment) {
 	// double back from validation problems.
 }
 
+// successContractTests() creates a contract and does successful proofs on the
+// contract, until successful termination is achieved.
+func singleContractTests(testEnv *testingEnvironment) {
+	// DO STUFF HERE
+}
+
 // For now, this is really just a catch-all test. I'm not really sure how to
 // modularize the various components =/
 func TestBlockBuilding(t *testing.T) {
@@ -216,5 +222,5 @@ func TestBlockBuilding(t *testing.T) {
 	// Probe the difficulty adjustment code.
 
 	// Test adding a contract to the blockchain.
-	// 	singleContractTests(testEnv)
+	singleContractTests(testEnv)
 }
