@@ -240,6 +240,26 @@ func successContractTests(testEnv *testingEnvironment) {
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}
+
+	// Check that the correct OpenContracts object has been created, and
+	// contains the expected values.
+	contractID := fcp.Transaction.fileContractID(0)
+	openContract, exists := testEnv.state.ConsensusState.OpenContracts[contractID]
+	if !exists {
+		testEnv.t.Fatal("open contract not found")
+	}
+	if openContract.ContractID != contractID {
+		testEnv.t.Fatal("open contract has wrong contract id")
+	}
+	if openContract.FundsRemaining != fcp.Transaction.FileContracts[0].ContractFund {
+		testEnv.t.Fatal("open contract has wrong listed number of remaining funds.")
+	}
+	if openContract.Failures != 0 {
+		testEnv.t.Fatal("open contract has non-zero number of failures")
+	}
+	if !openContract.WindowSatisfied {
+		testEnv.t.Fatal("open contract has started with WindowSatisfied = false")
+	}
 }
 
 // For now, this is really just a catch-all test. I'm not really sure how to
@@ -251,7 +271,8 @@ func TestBlockBuilding(t *testing.T) {
 	// Add an empty block to the testing environment.
 	addEmptyBlock(testEnv)
 
-	// Add a block with a transaction and see if the proper outputs are created.
+	// Add a block with a transaction and see if the proper outputs are
+	// created, checking the values and spendhashes in the state.
 
 	// Create a few new wallets and send coins to each in a block.
 	transactionPoolTests(testEnv)
