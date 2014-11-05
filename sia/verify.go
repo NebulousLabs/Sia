@@ -86,12 +86,15 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		outputSum += contract.ContractFund
 	}
 
-	/*
-		for _, proof := range t.StorageProofs {
-			// Check that the proof passes.
-			// Check that the proof has not already been submitted.
+	for _, proof := range t.StorageProofs {
+		// Check that the proof has not already been submitted.
+		if s.ConsensusState.OpenContracts[proof.ContractID].WindowSatisfied {
+			err = errors.New("storage proof has already been completed for this contract")
+			return
 		}
-	*/
+
+		// Check that the proof passes.
+	}
 
 	if inputSum != outputSum {
 		err = errors.New("inputs do not equal outputs for transaction.")
@@ -148,6 +151,7 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 // State.AcceptTransaction() checks for a conflict of the transaction with the
 // transaction pool, then checks that the transaction is valid given the
 // current state, then adds the transaction to the transaction pool.
+// AcceptTransaction() is thread safe, and can be called concurrently.
 func (s *State) AcceptTransaction(t Transaction) (err error) {
 	s.Lock()
 	defer s.Unlock()
@@ -442,13 +446,11 @@ func (s *State) applyTransaction(t Transaction) {
 			payout = openContract.FundsRemaining
 		}
 
-		windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
-		newOutputID := OutputID(HashBytes(append(sp.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
 		output := Output{
 			Value:     payout,
 			SpendHash: openContract.FileContract.ValidProofAddress,
 		}
-		s.ConsensusState.UnspentOutputs[newOutputID] = output
+		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.height(), true)] = output
 
 		// Mark the proof as complete for this window.
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
@@ -456,8 +458,8 @@ func (s *State) applyTransaction(t Transaction) {
 	}
 }
 
-// integrateBlock will both verify the block AND update the consensus state.
-// Calling integrate block is not needed.
+// s.integrateBlock() will verify the block and then integrate it into the
+// consensus state.
 func (s *State) integrateBlock(b *Block) (err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
@@ -490,10 +492,12 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	// Perform maintanence on all open contracts.
+	//
+	// This could be split into its own function.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.ConsensusState.OpenContracts {
 		// Check for the window switching over.
-		if (s.BlockMap[s.ConsensusState.CurrentBlock].Height-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 {
+		if (s.height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.height() > openContract.FileContract.Start {
 			// Check for a missed proof.
 			if openContract.WindowSatisfied == false {
 				payout := openContract.FileContract.MissedProofPayout
@@ -501,8 +505,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					payout = openContract.FundsRemaining
 				}
 
-				windowIndex := (s.BlockMap[s.ConsensusState.CurrentBlock].Height - openContract.FileContract.Start) / openContract.FileContract.ChallengeFrequency
-				newOutputID := OutputID(HashBytes(append(openContract.ContractID[:], []byte(EncUint64(uint64(windowIndex)))...)))
+				newOutputID := openContract.storageProofOutputID(s.height(), false)
 				output := Output{
 					Value:     payout,
 					SpendHash: openContract.FileContract.MissedProofAddress,
@@ -512,23 +515,22 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					OutputID:   newOutputID,
 					ContractID: openContract.ContractID,
 				}
-				s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs = append(s.BlockMap[s.ConsensusState.CurrentBlock].MissedStorageProofs, msp)
+				s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
 
 				// Update the FundsRemaining
 				openContract.FundsRemaining -= payout
 
 				// Update the failures count.
 				openContract.Failures += 1
-			} else {
-				openContract.WindowSatisfied = false
 			}
+			openContract.WindowSatisfied = false
 		}
 
 		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.BlockMap[s.ConsensusState.CurrentBlock].Height || openContract.FileContract.Tolerance == openContract.Failures {
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
-				outputID := OutputID(HashBytes(append(openContract.ContractID[:], append([]byte("termination"), []byte(EncUint64(0))...)...)))
+				outputID := openContract.fileContractTerminationOutputID()
 				output := Output{
 					Value: openContract.FundsRemaining,
 				}
@@ -541,7 +543,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 			}
 
 			// Add the contract to contract terminations.
-			s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations = append(s.BlockMap[s.ConsensusState.CurrentBlock].ContractTerminations, openContract)
+			s.currentBlockNode().ContractTerminations = append(s.currentBlockNode().ContractTerminations, openContract)
 
 			// Mark contract for deletion (can't delete from a map while
 			// iterating through it - results in undefined behavior of the
@@ -549,7 +551,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 			contractsToDelete = append(contractsToDelete, openContract.ContractID)
 		}
 	}
-
 	// Delete all of the contracts that terminated.
 	for _, contractID := range contractsToDelete {
 		delete(s.ConsensusState.OpenContracts, contractID)
@@ -559,20 +560,21 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	minerSubsidy += 1000
 
 	// Add output contianing miner fees + block subsidy.
-	bid := b.ID()
-	minerSubsidyID := OutputID(HashBytes(append(bid[:], []byte("blockReward")...)))
 	minerSubsidyOutput := Output{
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
-	s.ConsensusState.UnspentOutputs[minerSubsidyID] = minerSubsidyOutput
+	s.ConsensusState.UnspentOutputs[b.subsidyID()] = minerSubsidyOutput
 
+	// Update the current block and current path variables of the ConsensusState.
 	s.ConsensusState.CurrentBlock = b.ID()
 	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
 
 	return
 }
 
+// State.invalidateNode() is a recursive function that deletes all of the
+// children of a block and puts them on the bad blocks list.
 func (s *State) invalidateNode(node *BlockNode) {
 	for i := range node.Children {
 		s.invalidateNode(node.Children[i])
@@ -582,6 +584,9 @@ func (s *State) invalidateNode(node *BlockNode) {
 	s.BadBlocks[node.Block.ID()] = struct{}{}
 }
 
+// State.forkBlockchain() will go from the current block over to a block on a
+// different fork, rewinding and integrating blocks as needed. forkBlockchain()
+// will return an error if any of the blocks in the new fork are invalid.
 func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
@@ -637,7 +642,9 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	return
 }
 
-// Add a block to the state struct.
+// State.AcceptBlock() is a thread-safe function that will add blocks to the
+// state, forking the blockchain if they are on a fork that is heavier than the
+// current fork. AcceptBlock() can be called concurrently.
 func (s *State) AcceptBlock(b Block) (err error) {
 	s.Lock()
 	defer s.Unlock()

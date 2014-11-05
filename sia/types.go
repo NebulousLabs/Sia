@@ -138,6 +138,11 @@ func (b *Block) ID() BlockID {
 	)))
 }
 
+func (b *Block) subsidyID() OutputID {
+	bid := b.ID()
+	return OutputID(HashBytes(append(bid[:], []byte("blockreward")...)))
+}
+
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
 func (t *Transaction) SigHash(i int) Hash {
