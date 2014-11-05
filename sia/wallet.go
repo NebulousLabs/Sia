@@ -24,7 +24,8 @@ type Wallet struct {
 // much comes from the host. This specifies how much the client is to add to
 // the contract.
 type FileContractParameters struct {
-	FileContract       FileContract
+	Transaction        Transaction
+	FileContractIndex  int
 	ClientContribution Currency
 }
 
@@ -159,12 +160,12 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) ClientFundFileContract(params FileContractParameters, state *State) (t Transaction, err error) {
+func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {
 	// Scan the blockchain for outputs.
 	w.scan(state)
 
 	// Add money to the transaction to fund the client's portion of the contract fund.
-	err = w.fundTransaction(params.ClientContribution, &t)
+	err = w.fundTransaction(params.ClientContribution, &params.Transaction)
 	if err != nil {
 		return
 	}
@@ -174,13 +175,15 @@ func (w *Wallet) ClientFundFileContract(params FileContractParameters, state *St
 
 // Wallet.HostFundFileContract() take a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) HostFundFileContract(params FileContractParameters, state *State) (t Transaction, err error) {
+func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
 	// Scan the blockchain for outputs.
 	w.scan(state)
 
 	// Add money t othe transaction to fund the hosts' portion of the contract fund.
-	err = w.fundTransaction(params.FileContract.ContractFund - params.ClientContribution)
+	err = w.fundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
 	if err != nil {
 		return
 	}
+
+	return
 }

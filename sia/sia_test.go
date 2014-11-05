@@ -195,8 +195,51 @@ func blockForkingTests(testEnv *testingEnvironment) {
 
 // successContractTests() creates a contract and does successful proofs on the
 // contract, until successful termination is achieved.
-func singleContractTests(testEnv *testingEnvironment) {
-	// DO STUFF HERE
+func successContractTests(testEnv *testingEnvironment) {
+	// Create a contract with funds from wallet 0 and wallet 1.
+	fcp := FileContractParameters{
+		Transaction: Transaction{
+			FileContracts: []FileContract{
+				FileContract{
+					ContractFund:       5,
+					Start:              testEnv.state.height() + 1,
+					End:                testEnv.state.height() + 2,
+					ChallengeFrequency: 1,
+					Tolerance:          1,
+					ValidProofPayout:   1,
+					ValidProofAddress:  testEnv.wallets[0].SpendConditions.CoinAddress(),
+					MissedProofPayout:  3,
+					MissedProofAddress: testEnv.wallets[1].SpendConditions.CoinAddress(),
+				},
+			},
+		},
+		ClientContribution: 3,
+	}
+
+	// Add funds to the contract from each wallet.
+	err := testEnv.wallets[0].ClientFundFileContract(&fcp, testEnv.state)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
+	err = testEnv.wallets[1].HostFundFileContract(&fcp, testEnv.state)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
+
+	// Sign the transaction using each wallet.
+	testEnv.wallets[0].signTransaction(&fcp.Transaction)
+	testEnv.wallets[1].signTransaction(&fcp.Transaction)
+
+	// Get the transaction into a block and get the block into the state.
+	err = testEnv.state.AcceptTransaction(fcp.Transaction)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
+	block := testEnv.state.GenerateBlock(testEnv.wallets[1].SpendConditions.CoinAddress())
+	err = testEnv.state.AcceptBlock(*block)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
 }
 
 // For now, this is really just a catch-all test. I'm not really sure how to
@@ -207,6 +250,8 @@ func TestBlockBuilding(t *testing.T) {
 
 	// Add an empty block to the testing environment.
 	addEmptyBlock(testEnv)
+
+	// Add a block with a transaction and see if the proper outputs are created.
 
 	// Create a few new wallets and send coins to each in a block.
 	transactionPoolTests(testEnv)
@@ -221,6 +266,7 @@ func TestBlockBuilding(t *testing.T) {
 
 	// Probe the difficulty adjustment code.
 
-	// Test adding a contract to the blockchain.
-	singleContractTests(testEnv)
+	// Test adding a contract to the blockchain where proofs are submitted
+	// until succesful termination.
+	successContractTests(testEnv)
 }

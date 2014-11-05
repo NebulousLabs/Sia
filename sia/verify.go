@@ -535,9 +535,9 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					Value: openContract.FundsRemaining,
 				}
 				if openContract.FileContract.Tolerance == openContract.Failures {
-					output.SpendHash = openContract.FileContract.FailureAddress
+					output.SpendHash = openContract.FileContract.MissedProofAddress
 				} else {
-					output.SpendHash = openContract.FileContract.SuccessAddress
+					output.SpendHash = openContract.FileContract.ValidProofAddress
 				}
 				s.ConsensusState.UnspentOutputs[outputID] = output
 			}

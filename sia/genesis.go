@@ -31,6 +31,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 
 	// Initialize ConsensusState maps.
 	s.ConsensusState.CurrentPath = make(map[BlockHeight]BlockID)
+	s.ConsensusState.OpenContracts = make(map[ContractID]*OpenContract)
 	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
 	s.ConsensusState.SpentOutputs = make(map[OutputID]Output)
 	s.ConsensusState.TransactionPool = make(map[OutputID]*Transaction)
