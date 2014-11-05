@@ -157,8 +157,30 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	return
 }
 
-// Wallet.InitiateContract() takes a template FileContract and returns a
+// Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) InitiateContract(params FileContractParameters) (partial Transaction) {
+func (w *Wallet) ClientFundFileContract(params FileContractParameters, state *State) (t Transaction, err error) {
+	// Scan the blockchain for outputs.
+	w.scan(state)
+
+	// Add money to the transaction to fund the client's portion of the contract fund.
+	err = w.fundTransaction(params.ClientContribution, &t)
+	if err != nil {
+		return
+	}
+
 	return
+}
+
+// Wallet.HostFundFileContract() take a template FileContract and returns a
+// partial transaction containing an input for the contract, but no signatures.
+func (w *Wallet) HostFundFileContract(params FileContractParameters, state *State) (t Transaction, err error) {
+	// Scan the blockchain for outputs.
+	w.scan(state)
+
+	// Add money t othe transaction to fund the hosts' portion of the contract fund.
+	err = w.fundTransaction(params.FileContract.ContractFund - params.ClientContribution)
+	if err != nil {
+		return
+	}
 }
