@@ -1,23 +1,30 @@
 package sia
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 )
 
+// testingEnvironment() is a struc that contains a state and a list of wallets,
+// as well as a testing.T object. This creates a variable that can be passed to
+// functions during testing to perform various the various tests on the
+// codebase in a more functional way.
 type testingEnvironment struct {
+	t       *testing.T
 	wallets []*Wallet
 	state   *State
 }
 
-// Creates a wallet and a state to use for testing.
-func createEnvironment() (testEnv *testingEnvironment, err error) {
+// createEnvironment() creates the genesis state and returns it in a testing
+// environment that has a single wallet that has claimed all of the premined
+// funds.
+func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 	testEnv = new(testingEnvironment)
+	testEnv.t = t
 
 	firstWallet, err := CreateWallet()
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 	testEnv.wallets = append(testEnv.wallets, firstWallet)
 
@@ -25,44 +32,42 @@ func createEnvironment() (testEnv *testingEnvironment, err error) {
 
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
 		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.ConsensusState.UnspentOutputs))
-		return
+		testEnv.t.Fatal(err)
 	}
 
 	return
 }
 
-// Creates an empty block and applies it to the state.
-func addEmptyBlock(testEnv *testingEnvironment) (err error) {
+// addEmptyBlock() generates an empty block and inserts it into the state.
+func addEmptyBlock(testEnv *testingEnvironment) {
 	// Make sure that the block will actually be empty.
 	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
-		err = errors.New("cannot add an empty block without an empty transaction pool.")
-		return
+		testEnv.t.Fatal("cannot add an empty block without an empty transaction pool.")
 	}
 
 	// Generate a valid empty block using GenerateBlock.
 	emptyBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
 	if len(emptyBlock.Transactions) != 0 {
-		err = errors.New("failed to make an empty block...")
-		return
+		testEnv.t.Fatal("failed to make an empty block...")
 	}
 
+	// Get the state to accept the block, and then check that at least one new
+	// unspent output has been added.
 	expectedOutputs := len(testEnv.state.ConsensusState.UnspentOutputs) + 1
-	err = testEnv.state.AcceptBlock(*emptyBlock)
+	err := testEnv.state.AcceptBlock(*emptyBlock)
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != expectedOutputs {
-		err = fmt.Errorf("Expecting %v outputs, got %v outputs", expectedOutputs, len(testEnv.state.ConsensusState.UnspentOutputs))
-		return
+		err := fmt.Errorf("Expecting %v outputs, got %v outputs", expectedOutputs, len(testEnv.state.ConsensusState.UnspentOutputs))
+		testEnv.t.Fatal(err)
 	}
-
-	return
 }
 
 // transactionPoolTests adds a few wallets to the test environment, creating
 // transactions that fund each and probes the overall efficiency of the
 // transaction pool structures.
-func transactionPoolTests(testEnv *testingEnvironment) (err error) {
+func transactionPoolTests(testEnv *testingEnvironment) {
 	// The current wallet design means that it will double spend on
 	// sequential transactions - meaning that if you make two transactions
 	// in the same block, the wallet will use the same input for each.
@@ -81,18 +86,18 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	// Create a new wallet for the test environment.
 	wallet, err := CreateWallet()
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 	testEnv.wallets = append(testEnv.wallets, wallet)
 
 	// Create a transaction to send to that wallet.
 	transaction, err := testEnv.wallets[0].SpendCoins(Currency(3), testEnv.wallets[len(testEnv.wallets)-1].CoinAddress, testEnv.state)
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 	err = testEnv.state.AcceptTransaction(transaction)
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 
 	// Attempt to create a conflicting transaction and see if it is rejected from the pool.
@@ -100,12 +105,11 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	transactionSigHash := transaction.SigHash(0)
 	transaction.Signatures[0].Signature, err = SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey) // Re-sign
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 	err = testEnv.state.AcceptTransaction(transaction)
 	if err == nil {
-		err = errors.New("Added a conflicting transaction to the transaction pool without error.")
-		return
+		testEnv.t.Fatal("Added a conflicting transaction to the transaction pool without error.")
 	}
 	err = nil
 
@@ -118,11 +122,10 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 			len(testEnv.state.ConsensusState.TransactionPool),
 			len(transaction.Inputs),
 		)
-		return
+		testEnv.t.Fatal(err)
 	}
 	if len(testEnv.state.ConsensusState.TransactionList) != txnListLen+1 {
-		err = errors.New("transaction list did not grow by the expected length.")
-		return
+		testEnv.t.Fatal("transaction list did not grow by the expected length.")
 	}
 
 	// Put a block through, which should clear the transaction pool
@@ -130,95 +133,77 @@ func transactionPoolTests(testEnv *testingEnvironment) (err error) {
 	// funding new wallets.
 	transactionBlock := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress)
 	if len(transactionBlock.Transactions) == 0 {
-		err = errors.New("block created without accepting the transactions in the pool.")
-		return
+		testEnv.t.Fatal("block created without accepting the transactions in the pool.")
 	}
 	err = testEnv.state.AcceptBlock(*transactionBlock)
 	if err != nil {
-		return
+		testEnv.t.Fatal(err)
 	}
 
 	// Check that the transaction pool has been cleared out.
 	if len(testEnv.state.ConsensusState.TransactionPool) != 0 {
-		err = errors.New("transaction pool not cleared out after getting a block.")
-		return
+		testEnv.t.Fatal("transaction pool not cleared out after getting a block.")
 	}
 	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
-		err = errors.New("transaction list not cleared out after getting a block.")
-		return
+		testEnv.t.Fatal("transaction list not cleared out after getting a block.")
 	}
-
-	return
 }
 
-func blockForkingTests(testEnv *testingEnvironment) (err error) {
-	// Fork from the current chain to a different chain, requiring a block
-	// rewind.
-	{
-		// Create two blocks on the same parent.
-		fork1a := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // A block along 1 fork
-		fork2a := testEnv.state.GenerateBlock(testEnv.wallets[1].CoinAddress) // A block along a different fork.
-		err = testEnv.state.AcceptBlock(*fork1a)
-		if err != nil {
-			return
-		}
+// blockForkingTests() creates two competing chains, and puts the state on the
+// shortest of the chains. Then the longest is introduced to the state, causing
+// the state to switch form one fork to the other. This is then repeated,
+// except that the state realizes the second fork is invalid as it switches.
+func blockForkingTests(testEnv *testingEnvironment) {
+	// Create two blocks on the same parent.
+	fork1a := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // A block along 1 fork
+	fork2a := testEnv.state.GenerateBlock(testEnv.wallets[1].CoinAddress) // A block along a different fork.
+	err := testEnv.state.AcceptBlock(*fork1a)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
 
-		// Add one block, mine on it to create a 'heaviest chain' and
-		// then rewind the block, so that you can move the state along
-		// the other chain.
-		fork1b := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // Fork 1 is now heaviest
-		testEnv.state.rewindABlock()                                          // Rewind to parent
+	// Add one block, mine on it to create a 'heaviest chain' and
+	// then rewind the block, so that you can move the state along
+	// the other chain.
+	fork1b := testEnv.state.GenerateBlock(testEnv.wallets[0].CoinAddress) // Fork 1 is now heaviest
+	testEnv.state.rewindABlock()                                          // Rewind to parent
 
-		// Make fork2 the chosen fork.
-		err = testEnv.state.AcceptBlock(*fork2a)
-		if err != nil {
-			return
-		}
-		// Verify that fork2a is the current block.
-		if testEnv.state.ConsensusState.CurrentBlock != fork2a.ID() {
-			err = errors.New("fork2 not accepted as farthest node.")
-			return
-		}
+	// Make fork2 the chosen fork.
+	err = testEnv.state.AcceptBlock(*fork2a)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
+	// Verify that fork2a is the current block.
+	if testEnv.state.ConsensusState.CurrentBlock != fork2a.ID() {
+		testEnv.t.Fatal("fork2 not accepted as farthest node.")
+	}
 
-		// Add fork1b (rewinding does not remove a block from the
-		// state) to the state and see if the forking happens.
-		err = testEnv.state.AcceptBlock(*fork1b)
-		if err != nil {
-			return
-		}
-		// Verify that fork1b is the current block.
-		if testEnv.state.ConsensusState.CurrentBlock != fork1b.ID() {
-			err = errors.New("switching to a heavier chain did not appear to work.")
-			return
-		}
+	// Add fork1b (rewinding does not remove a block from the
+	// state) to the state and see if the forking happens.
+	err = testEnv.state.AcceptBlock(*fork1b)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
+	// Verify that fork1b is the current block.
+	if testEnv.state.ConsensusState.CurrentBlock != fork1b.ID() {
+		testEnv.t.Fatal("switching to a heavier chain did not appear to work.")
 	}
 
 	// Fork from the current chain to a different chain, but be required to
 	// double back from validation problems.
-
-	return
 }
 
 // For now, this is really just a catch-all test. I'm not really sure how to
 // modularize the various components =/
 func TestBlockBuilding(t *testing.T) {
 	// Initialize the testing evironment.
-	testEnv, err := createEnvironment()
-	if err != nil {
-		t.Fatal(err)
-	}
+	testEnv := createEnvironment(t)
 
 	// Add an empty block to the testing environment.
-	err = addEmptyBlock(testEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
+	addEmptyBlock(testEnv)
 
 	// Create a few new wallets and send coins to each in a block.
-	err = transactionPoolTests(testEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
+	transactionPoolTests(testEnv)
 
 	// Create a test that submits and removes transactions with multiple
 	// inputs and outputs.
@@ -226,10 +211,10 @@ func TestBlockBuilding(t *testing.T) {
 	// Test rewinding a block.
 
 	// Probe the block forking code.
-	err = blockForkingTests(testEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
+	blockForkingTests(testEnv)
 
 	// Probe the difficulty adjustment code.
+
+	// Test adding a contract to the blockchain.
+	// 	singleContractTests(testEnv)
 }
