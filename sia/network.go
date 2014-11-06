@@ -92,20 +92,14 @@ func (tcps *TCPServer) listen() {
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	var (
-		msgType   []byte = make([]byte, 1)
-		msgLenBuf []byte = make([]byte, 4)
-		msgData   []byte // length determined by msgLen
+		msgHead []byte = make([]byte, 5)
+		msgData []byte // length determined by msgHead
 	)
-	// TODO: make this DRYer?
-	if n, err := conn.Read(msgType); err != nil || n != 1 {
+	if n, err := conn.Read(msgHead); err != nil || n != 5 {
 		// TODO: log error
 		return
 	}
-	if n, err := conn.Read(msgLenBuf); err != nil || n != 4 {
-		// TODO: log error
-		return
-	}
-	msgLen := DecUint64(msgLenBuf)
+	msgLen := DecUint64(msgHead[1:])
 	if msgLen > maxMsgLen {
 		// TODO: log error
 		return
@@ -117,7 +111,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	}
 
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[msgType[0]]; ok {
+	if fn, ok := tcps.handlerMap[msgHead[0]]; ok {
 		fn(conn, msgData)
 		// TODO: log error
 	}
