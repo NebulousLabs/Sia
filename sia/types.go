@@ -116,8 +116,6 @@ type FileContract struct {
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
-	SuccessAddress     CoinAddress
-	FailureAddress     CoinAddress
 }
 
 type StorageProof struct {
@@ -173,7 +171,7 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 	nsHash := HashBytes(Marshal(sc.NumSignatures))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(Marshal(&sc.PublicKeys[i]))
+		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
 	return CoinAddress(MerkleRoot(leaves))
@@ -222,7 +220,7 @@ func (s *Signature) UnmarshalSia(b []byte) int {
 }
 
 // MarshalSia implements the Marshaler interface for PublicKeys.
-func (pk *PublicKey) MarshalSia() []byte {
+func (pk PublicKey) MarshalSia() []byte {
 	if pk.X == nil || pk.Y == nil {
 		return []byte{0, 0}
 	}
