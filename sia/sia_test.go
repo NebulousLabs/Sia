@@ -227,8 +227,8 @@ func successContractTests(testEnv *testingEnvironment) {
 	}
 
 	// Sign the transaction using each wallet.
-	testEnv.wallets[0].signTransaction(&fcp.Transaction)
-	testEnv.wallets[1].signTransaction(&fcp.Transaction)
+	testEnv.wallets[0].SignTransaction(&fcp.Transaction)
+	testEnv.wallets[1].SignTransaction(&fcp.Transaction)
 
 	// Get the transaction into a block and get the block into the state.
 	err = testEnv.state.AcceptTransaction(fcp.Transaction)
