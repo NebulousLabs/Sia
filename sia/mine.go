@@ -95,3 +95,8 @@ func (s *State) ToggleMining(minerAddress CoinAddress) (b *Block) {
 		}
 	}
 }
+
+// SendBlock sends a block to addr.
+func SendBlock(b Block, addr NetAddress) error {
+	return addr.SendVal('B', b)
+}

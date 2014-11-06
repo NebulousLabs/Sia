@@ -35,6 +35,21 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 	return fn(conn)
 }
 
+// SendVal sends a value to a NetAddress. It prefixes the encoded data with a
+// header, comprising a message type and message length.
+func (na *NetAddress) SendVal(t byte, val interface{}) error {
+	conn, err := net.DialTimeout("tcp", na.String(), timeout)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	encVal := Marshal(val)
+	encLen := EncUint64(uint64(len(encVal)))
+	_, err = conn.Write(append([]byte{t},
+		append(encLen[:4], encVal...)...))
+	return err
+}
+
 // TBD
 var BootstrapPeers = []NetAddress{}
 
