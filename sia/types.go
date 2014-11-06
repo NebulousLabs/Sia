@@ -11,15 +11,15 @@ const (
 	SignatureSize = 32
 	SegmentSize   = 32
 
-	TargetSecondsPerBlock = 300
-	TargetWindow          = BlockHeight(5000) // Number of blocks to use when calculating difficulty.
+	TargetSecondsPerBlock = 600
+	TargetWindow          = BlockHeight(2000) // Number of blocks to use when calculating difficulty.
 
 	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
 )
 
-var MaxAdjustmentUp = big.NewRat(10005, 10000)
-var MaxAdjustmentDown = big.NewRat(9995, 10000)
-var SurpassThreshold = big.NewRat(5, 100)
+var MaxAdjustmentUp = big.NewRat(1001, 1000)
+var MaxAdjustmentDown = big.NewRat(999, 1000)
+var SurpassThreshold = big.NewRat(25, 100)
 
 type (
 	Hash      [HashSize]byte

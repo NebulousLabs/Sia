@@ -294,7 +294,11 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 	}
 
 	// Adjustment = timePassed / expectedTimePassed / blockWindow.
-	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+	// Adjustment = ((((timePassed / expectedTimePassed) - 1) / blockWindow) + 1)
+	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
+	targetAdjustment = targetAdjustment.Sub(targetAdjustment, big.NewRat(1, 1))
+	targetAdjustment = targetAdjustment.Mul(targetAdjustment, big.NewRat(1, int64(blockWindow)))
+	targetAdjustment = targetAdjustment.Add(targetAdjustment, big.NewRat(1, 1))
 
 	// Enforce a maximum targetAdjustment
 	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {

@@ -94,6 +94,16 @@ func (s *State) height() BlockHeight {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
 }
 
+// Height() does the same thing as height() - need to merge the functions.
+func (s *State) Height() BlockHeight {
+	return s.height()
+}
+
+// Depth() returns the depth of the current block of the state.
+func (s *State) Depth() BlockWeight {
+	return s.currentBlockNode().Depth
+}
+
 // State.currentBlockNode returns the node of the most recent block in the
 // ConsensusState.
 func (s *State) currentBlockNode() *BlockNode {
