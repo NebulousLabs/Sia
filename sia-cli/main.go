@@ -24,7 +24,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 func genesisStart(cmd *cobra.Command, args []string) {
 	fmt.Println("Creating a new wallet and blockchain...")
 
-	var env walletEnvironment
+	env := new(walletEnvironment)
 
 	wallet, err := sia.CreateWallet()
 	if err != nil {
