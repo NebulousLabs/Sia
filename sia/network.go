@@ -47,6 +47,19 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+// Register registers a message type with a message handler. The existing
+// handler for that type will be overwritten.
+func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
+	tcps.handlerMap[t] = fn
+}
+
+// Broadcast calls the specified function on each peer in the address book.
+func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
+	for addr := range tcps.addressbook {
+		addr.Call(fn)
+	}
+}
+
 // NewTCPServer creates a TCPServer that listens on the specified port.
 func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcpServ, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
@@ -66,12 +79,6 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	// spawn listener
 	go tcps.listen()
 	return
-}
-
-// Register registers a message type with a message handler. The existing
-// handler for that type will be overwritten.
-func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
-	tcps.handlerMap[t] = fn
 }
 
 // listen runs in the background, accepting incoming connections and serving
