@@ -12,7 +12,7 @@ const (
 // These values will be generated before release, but the code for generating
 // them will never be released.  All that the rest of the world will see is
 // hardcoded values.
-func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
+func createGenesisBlock(premineAddress CoinAddress) (b *Block) {
 	b = &Block{
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: premineAddress,
@@ -38,7 +38,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.TransactionList = make(map[OutputID]*Transaction)
 
 	// Create the genesis block using the premine address.
-	genesisBlock := CreateGenesisBlock(premineAddress)
+	genesisBlock := createGenesisBlock(premineAddress)
 
 	// Fill out the block root node, and add it to the BlockMap.
 	s.BlockRoot.Block = genesisBlock

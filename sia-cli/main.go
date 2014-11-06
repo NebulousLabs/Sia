@@ -8,25 +8,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func walletStart(cmd *cobra.Command, args []string) {
-	// Create a state object, and then bootstrap to the network using the
-	// hardcoded starting addresses.
-
-	fmt.Println("You are trying to start the wallet!.")
+type walletEnvironment struct {
+	state   *sia.State
+	wallets []*sia.Wallet
 }
 
+func walletStart(cmd *cobra.Command, args []string) {
+	// state := sia.BootstrapToNetwork()
+
+	fmt.Println("Wallet bootstrapping not implemented.")
+}
+
+// Creates a new network using sia's genesis tools, then polls using the
+// standard function.
 func genesisStart(cmd *cobra.Command, args []string) {
+	fmt.Println("Creating a new wallet and blockchain...")
+
+	var env walletEnvironment
+
 	wallet, err := sia.CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	env.wallets = append(env.wallets, wallet)
 
-	state := sia.CreateGenesisState(wallet.SpendConditions.CoinAddress())
-	genesisBlock := sia.CreateGenesisBlock(wallet.SpendConditions.CoinAddress())
-	state.AcceptBlock(*genesisBlock)
+	env.state = sia.CreateGenesisState(wallet.SpendConditions.CoinAddress())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	fmt.Println("Success!")
+	fmt.Println("New blockchain created.")
+
+	pollHome(env)
 }
 
 func main() {
