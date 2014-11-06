@@ -1,7 +1,7 @@
 package sia
 
 import (
-	//"errors"
+	"errors"
 	"net"
 	"strconv"
 	"time"
@@ -44,6 +44,7 @@ type TCPServer struct {
 	net.Listener
 	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
+	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
 func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
@@ -54,9 +55,21 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcps = &TCPServer{
 		Listener:    tcpServ,
 		addressbook: make(map[NetAddress]struct{}),
+		handlerMap:  make(map[byte]func(net.Conn, []byte) error),
 	}
+	// default handlers
+	tcps.handlerMap['H'] = tcps.sendHostname
+	tcps.handlerMap['P'] = tcps.sendHostname
+
+	// spawn listener
 	go tcps.listen()
 	return
+}
+
+// Register registers a message type with a message handler. The existing
+// handler for that type will be overwritten.
+func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
+	tcps.handlerMap[t] = fn
 }
 
 // listen runs in the background, accepting incoming connections and serving
@@ -103,53 +116,27 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		return
 	}
 
-	switch msgType[0] {
-	// Hostname discovery
-	case 'H':
-		_, err := conn.Write([]byte(conn.RemoteAddr().String()))
-		if err != nil {
-			// TODO: log error
-			return
-		}
-
-	// Peer discovery
-	case 'P':
-		if msgLen != 1 {
-			// TODO: log error
-			return
-		}
-		tcps.sharePeers(conn, msgData[0])
-
-	// Block
-	case 'B':
-		var b Block
-		if err := Unmarshal(msgData, &b); err != nil {
-			// TODO: log error
-			return
-		}
-		//state.AcceptBlock(b)
-		// TODO: log error
-
-	// Transaction
-	case 'T':
-		var t Transaction
-		if err := Unmarshal(msgData, &t); err != nil {
-			// TODO: log error
-			return
-		}
-		//state.AcceptTransaction(&t)
-		// TODO: log error
-
-	// Unknown
-	default:
+	// call registered handler for this message type
+	if fn, ok := tcps.handlerMap[msgType[0]]; ok {
+		fn(conn, msgData)
 		// TODO: log error
 	}
 	return
 }
 
+// sendHostname replies to the send with the sender's external IP.
+func (tcps *TCPServer) sendHostname(conn net.Conn, _ []byte) error {
+	_, err := conn.Write([]byte(conn.RemoteAddr().String()))
+	return err
+}
+
 // sharePeers transmits at most 'num' peers over the connection.
 // TODO: choose random peers?
-func (tcps *TCPServer) sharePeers(conn net.Conn, num uint8) {
+func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
+	if len(msgData) != 1 {
+		return errors.New("invalid number of peers")
+	}
+	num := msgData[0]
 	var addrs []NetAddress
 	for addr := range tcps.addressbook {
 		if num == 0 {
@@ -158,8 +145,8 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, num uint8) {
 		addrs = append(addrs, addr)
 		num--
 	}
-	conn.Write(Marshal(addrs))
-	// log error?
+	_, err := conn.Write(Marshal(addrs))
+	return err
 }
 
 // Ping returns whether a NetAddress is reachable. It accomplishes this by
