@@ -6,6 +6,15 @@ import (
 	"github.com/NebulousLabs/Andromeda/sia"
 )
 
+// printWalletAddresses prints out all of the addresses that are spendable by
+// this cli.
+func printWalletAddresses(env *walletEnvironment) {
+	fmt.Println("Printing all valid wallet addresses.")
+	for _, wallet := range env.wallets {
+		fmt.Printf("\t%x\n", wallet.SpendConditions.CoinAddress())
+	}
+}
+
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
 // address that is provided through the command line.
 func sendCoinsWalkthrough(env *walletEnvironment) (err error) {
@@ -75,6 +84,9 @@ func pollHome(env *walletEnvironment) {
 
 		case "q", "quit":
 			return
+
+		case "p", "print":
+			printWalletAddresses(env)
 
 			/*
 				case "S", "save":
