@@ -22,6 +22,10 @@ type State struct {
 
 	ConsensusState ConsensusState
 
+	// Mining Variables
+	Mining     bool
+	KillMining chan struct{}
+
 	sync.Mutex
 }
 

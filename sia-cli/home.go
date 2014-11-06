@@ -2,16 +2,37 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/sia"
 )
 
+func toggleMining(env *walletEnvironment) {
+	go env.state.ToggleMining(env.wallets[0].SpendConditions.CoinAddress())
+}
+
 // printWalletAddresses prints out all of the addresses that are spendable by
 // this cli.
 func printWalletAddresses(env *walletEnvironment) {
-	fmt.Println("Printing all valid wallet addresses.")
+	fmt.Println("General Information:")
+
+	// Dispaly whether or not the miner is mining.
+	if env.state.Mining {
+		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
+	} else {
+		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
+	}
+	fmt.Println()
+
+	float, _ := (*big.Rat)(env.state.Depth()).Float64()
+	fmt.Println("\tCurrent Block Height:", env.state.Height())
+	fmt.Println("\tCurrent Block Depth:", float)
+	fmt.Println("\tDepth as a String:", (*big.Rat)(env.state.Depth()).String())
+	fmt.Println()
+
+	fmt.Println("\tPrinting all valid wallet addresses.")
 	for _, wallet := range env.wallets {
-		fmt.Printf("\t%x\n", wallet.SpendConditions.CoinAddress())
+		fmt.Printf("\t\t%x\n", wallet.SpendConditions.CoinAddress())
 	}
 }
 
@@ -56,9 +77,11 @@ func sendCoinsWalkthrough(env *walletEnvironment) (err error) {
 // descriptions.
 func displayHomeHelp() {
 	fmt.Println(
-		" h:\tHelp\n",
-		"q:\tQuit\n",
-		"s:\tSend coins to another wallet.\n",
+		" h:\tHelp - display this message\n",
+		"q:\tQuit - quit the program\n",
+		"m:\tMine - turn mining on or off\n",
+		"p\tPrint - list all of the wallets, plus some stats about the program\n",
+		"s:\tSend - send coins to another wallet\n",
 	)
 }
 
@@ -84,6 +107,9 @@ func pollHome(env *walletEnvironment) {
 
 		case "q", "quit":
 			return
+
+		case "m", "mine", "toggle", "mining":
+			toggleMining(env)
 
 		case "p", "print":
 			printWalletAddresses(env)
