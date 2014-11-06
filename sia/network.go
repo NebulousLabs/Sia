@@ -24,10 +24,10 @@ func (na *NetAddress) String() string {
 	return net.JoinHostPort(na.Host, strconv.Itoa(int(na.Port)))
 }
 
-// call establishes a TCP connection to the NetAddress, calls the provided
+// Call establishes a TCP connection to the NetAddress, calls the provided
 // function on it, and closes the connection.
 func (na *NetAddress) Call(fn func(net.Conn) error) error {
-	conn, err := net.Dial("tcp", na.String())
+	conn, err := net.DialTimeout("tcp", na.String(), timeout)
 	if err != nil {
 		return err
 	}
@@ -47,6 +47,7 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+// NewTCPServer creates a TCPServer that listens on the specified port.
 func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcpServ, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
 	if err != nil {
@@ -89,6 +90,7 @@ func (tcps *TCPServer) listen() {
 // handleConn reads header data from a connection, unmarshals the data
 // structures it contains, and routes the data to other functions for
 // processing.
+// TODO: set deadlines?
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	var (
@@ -147,7 +149,7 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 // initiating a TCP connection and immediately closes it. This is pretty
 // unsophisticated. I'll add a Pong later.
 func (tcps *TCPServer) Ping(addr NetAddress) bool {
-	conn, err := net.Dial("tcp", addr.String())
+	conn, err := net.DialTimeout("tcp", addr.String(), timeout)
 	if err != nil {
 		return false
 	}
