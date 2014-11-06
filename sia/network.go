@@ -56,11 +56,12 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcps = &TCPServer{
 		Listener:    tcpServ,
 		addressbook: make(map[NetAddress]struct{}),
-		handlerMap:  make(map[byte]func(net.Conn, []byte) error),
+		// default handlers
+		handlerMap: map[byte]func(net.Conn, []byte) error{
+			'H': sendHostname,
+			'P': tcps.sharePeers,
+		},
 	}
-	// default handlers
-	tcps.handlerMap['H'] = tcps.sendHostname
-	tcps.handlerMap['P'] = tcps.sendHostname
 
 	// spawn listener
 	go tcps.listen()
@@ -121,7 +122,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 }
 
 // sendHostname replies to the send with the sender's external IP.
-func (tcps *TCPServer) sendHostname(conn net.Conn, _ []byte) error {
+func sendHostname(conn net.Conn, _ []byte) error {
 	_, err := conn.Write([]byte(conn.RemoteAddr().String()))
 	return err
 }
@@ -160,7 +161,7 @@ func (tcps *TCPServer) Ping(addr NetAddress) bool {
 // learnHostname learns the external IP of the TCPServer.
 func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 	// send hostname request
-	if _, err = conn.Write([]byte{'H', 0}); err != nil {
+	if _, err = conn.Write([]byte{'H', 0, 0, 0, 0}); err != nil {
 		return
 	}
 	// read response
@@ -186,7 +187,7 @@ func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 // the address book.
 func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	// request 10 peers
-	if _, err = conn.Write([]byte{'P', 1, 10}); err != nil {
+	if _, err = conn.Write([]byte{'P', 1, 0, 0, 0, 10}); err != nil {
 		return
 	}
 	// read response
