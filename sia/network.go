@@ -3,6 +3,7 @@ package sia
 import (
 	"errors"
 	"net"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -62,17 +63,41 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+// Broadcast calls the specified function on each peer in the address book.
+func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
+	for addr := range tcps.addressbook {
+		addr.Call(fn)
+	}
+}
+
 // Register registers a message type with a message handler. The existing
 // handler for that type will be overwritten.
 func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
 	tcps.handlerMap[t] = fn
 }
 
-// Broadcast calls the specified function on each peer in the address book.
-func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
-	for addr := range tcps.addressbook {
-		addr.Call(fn)
+// RegisterSimple is for simple handlers. A simple handler decodes the message
+// data and passes it to fn. fn must have the type signature:
+//   func(Type) error
+// i.e. a 1-adic function that returns an error.
+func (tcps *TCPServer) RegisterSimple(t byte, fn interface{}) error {
+	// if fn not correct type, panic
+	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
+	if typ.Kind() != reflect.Func || typ.NumIn() != 1 ||
+		typ.NumOut() != 1 || typ.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+		return errors.New("registered function has wrong type signature")
 	}
+
+	// create function:
+	sfn := func(_ net.Conn, b []byte) error {
+		v := reflect.New(typ.In(0)).Elem()
+		Unmarshal(b, v.Interface())
+		err := val.Call([]reflect.Value{v})[0]
+		return err.Interface().(error)
+	}
+
+	tcps.Register(t, sfn)
+	return nil
 }
 
 // NewTCPServer creates a TCPServer that listens on the specified port.
