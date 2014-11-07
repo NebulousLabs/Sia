@@ -243,10 +243,35 @@ Additionally complexity could potentially allow clients to rate providers based 
 Such a review system would need careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
 A centralized storage tracker could provide a more reasonable environment for a reputation system, and could manage the whole system out of band.
 
-% \section{Sianotes}
-% \subsection{Taxing Contracts}
-% \subsection{Avoiding Taxes}
-% \subsection{Sianotes outputs}
+\section{Siafunds}
+Sia is a product released by Nebulous Incorporated.
+Nebulous is a for profit company, and Sia is meant to be a primary source of income for the company.
+Currency premining is not a stable source of income, as it requires creating a new currency, and tethering the company to the new currency's increasing value.
+When the company needs to spend money, it must trade away portions of its source of income.
+Additionally, premining means that one entity has control over a large volume of the currency, and therefore potentially large and disruptive control over the market.
+This seems like a less than ideal way of doing things.
+
+Instead, Nebulous pulls an income from Sia that is directly related to the value added by Sia, which is meaured by the value of the contracts set up between clients and hosts.
+This is essentially a fee established on creating contracts.
+When a contract is created, 10\% of the contract fund is set aside and distributed to the holders of siafunds.
+Nebulous Inc. will initially hold ~95\% of the siafunds, and the early crowd-fund backers of Sia will hold the remaining ~5\%.
+
+Every 4000 blocks, there will be a 'payday', where all of the funds set aside for the siafunds holders will be turned into unspent outputs that are valid on the network.
+To limit the amount of bloat that this can cause, siafunds will be composed of 25,000 indivisible units, meaning that at most 25,000 outputs can be created per 4000 blocks as a result of siafunds.
+Multiple siafunds in the same address will only result in 1 output.
+As Nebulous will be holding ~23,740 sianotes, early on a maximum of ~1261 outputs per 4000 blocks will be created.
+Furthermore, these outputs are implicit, meaning they only consume space on disk, and do not contribute to network bandwidth.
+An output is merely a 64bit unsigned int and a 32 byte hash, for a total of 40 bytes each, or ~50kb per 4000 blocks.
+
+Sianotes can be sent to other addresses, in the same way that siacoins can be sent to other addresses.
+Sianotes cannot however be used to fund contracts or as a miner fee.
+
+\section{Fee Exemption}
+High reliability hosts are penalized by the 10\% fee on the contract fund.
+If a host wishes to promise a 10x or 100x payout for losing a file, then the 10\% fee will greatly exceed the actual cost of the contract.
+We wish to provide hosts with an avenue for dodging the fees on penalities, without giving clients a way to dodge the fees.
+Any of the contract outputs that go to a null address (to an address that cannot be spent) will dodge the fees.
+High reliability hosts can send funds for missing proofs to the 0 address, which means the client is not compensated, but the host is still penalized, and the fees are not severe.
 
 % \section{Economics of Sia}
 % \subsection{Sianotes, income, no premining}
@@ -254,6 +279,7 @@ A centralized storage tracker could provide a more reasonable environment for a 
 % \subsection{Locking Coins Down}
 
 % \section{Soft Forking Sia}
+% \subsection{Increasing the block size via softfork}
 
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
@@ -283,6 +309,12 @@ Updating the terms of the contract will require consent from all parties.
 
 % A further improvement would enable Merkle Tree proofs of existence.
 % This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
+
+\subsection{Siafund outputs compression}
+There's probably a better way to manage siafunds outputs than to just create 1200 outputs every 4000 blocks. Plus, 4000 blocks is a long time!
+
+\subsection{Siafund the Miner fees}
+Have siafunds that somehow pay out in the block subsidy.
 
 \subsection{Miner Fee Adjustments}
 If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
