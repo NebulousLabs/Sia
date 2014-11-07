@@ -13,10 +13,12 @@ type walletEnvironment struct {
 	wallets []*sia.Wallet
 }
 
+// Creates the genesis state and then requests a bunch of blocks from the
+// network.
 func walletStart(cmd *cobra.Command, args []string) {
-	// state := sia.BootstrapToNetwork()
+	state := sia.CreateGenesisState(sia.CoinAddress{})
 
-	fmt.Println("Wallet bootstrapping not implemented.")
+	// Do bootstrapping stuff here.
 }
 
 // Creates a new network using sia's genesis tools, then polls using the
