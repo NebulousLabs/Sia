@@ -92,8 +92,10 @@ func (tcps *TCPServer) RegisterSimple(t byte, fn interface{}) error {
 	sfn := func(_ net.Conn, b []byte) error {
 		v := reflect.New(typ.In(0)).Elem()
 		Unmarshal(b, v.Interface())
-		err := val.Call([]reflect.Value{v})[0]
-		return err.Interface().(error)
+		if err := val.Call([]reflect.Value{v})[0].Interface(); err != nil {
+			return err.(error)
+		}
+		return nil
 	}
 
 	tcps.Register(t, sfn)
@@ -154,10 +156,12 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		// TODO: log error
 		return
 	}
-	msgData = make([]byte, msgLen)
-	if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
-		// TODO: log error
-		return
+	if msgLen > 0 {
+		msgData = make([]byte, msgLen)
+		if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
+			// TODO: log error
+			return
+		}
 	}
 
 	// call registered handler for this message type
