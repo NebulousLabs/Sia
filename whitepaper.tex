@@ -23,11 +23,11 @@ Sia is a platform for decentralized storage.
 Storage providers agree produce regular proofs of storage in return for compensation.
 Failure to provide storage proofs results in financial penalty.
 
-Sia is a Bitcoin-based altcoin with added support for decentralized storage.
+Sia is a Bitcoin-based altchain with added support for decentralized storage.
 With the primary goal of security, few changes have been made to the Bitcoin protocol.
 
 \section{Introduction}
-We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions cloud storage, both at the p2p level and the enterprise level.
+We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions for cloud storage, both at the p2p level and the enterprise level.
 We wish to achieve the following goals:
 \begin{itemize}
 	\item Anyone can join the network as a storage provider and be compensated.
@@ -44,8 +44,8 @@ Failure to submit a proof of storage results in a penalty for the storage provid
 A blockchain is necessary to enforce that storage providers are paid or penalized appropriately regardless of client behavior.
 
 The initial implementation of our decentralized storage platform will be a blockchain with an altcoin.
-Future support for a two way peg with Bitcoin is planned, once there is a well established method for creating Bitcoin sidechains.
-With security in mind as the highest priority, our blockchain mimics Bitcoin except for the changes noted below.
+Future support for a two way peg with Bitcoin is planned, as discussed in ``Enabling Blockchain Innovations with Pegged Sidechains'' \cite{side}.
+Our blockchain mimics the Bitcoin blockchain except for the changes noted below.
 
 \section{General Structure}
 The general rules for mining blocks, handling orphan blocks, etc. on Sia will be the same as Bitcoin.
@@ -76,32 +76,31 @@ A transaction contains the following fields:
 	Signatures     & Signatures from each input \\ \hline
 \end{tabular}
 
-A more detailed breakdown of these fields follows.
-
 \subsection{Inputs}
 Each input comprises a previous output ID and the spend conditions associated with that output.
 
 \subsection{Outputs}
 Each output holds an amount to be sent, along with a hash of the output spend conditions.
 Each output has an associated identifier, which is derived from the transaction that the output appeared in.
-The ID of output $i$ is defined as $H(\text{input}_0 || i)$,
+The ID of output $i$ is defined as $H(\text{transaction containing output} || "coinsend" || i)$,
 where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
 
-The miner subsidy and fees each block are given output ID = $H(H(Block) || "blockReward")$.
+The miner subsidy and fees each block are given output ID = $H(H(Block Header) || "blockreward")$.
 
 \subsection{Spend Conditions}
 Both inputs and outputs make use of spend conditions, which dictate the circumstances under which an output can be spent.
 The two allowed conditions are a time lock (which locks the output until a certain time) and an $M$ of $N$ signature scheme.
 In such a scheme, there are $N$ public keys on the ``whitelist''.
-Some subset $M <= N$ must sign the transaction in order to unlock the output. 
+Some subset $M$ must sign the transaction in order to unlock the output. 
 
 \subsection{Signatures}
 Each cryptographic signature is paired with an input ID and a time lock. 
 The input ID indicates which input the signature is being applied to.
 It must match one of the inputs in the transaction.
 The time lock prevents the signature from being used before a certain time.
-A bit array is also provided with the signature, which marks which fields of the transaction were signed.
-Any field in the transaction can be marked as signed, including any subset of inputs and outputs---except for the signatures themselves.
+A structure is also included which indicates which parts of the transaction have been signed.
+Any subset of fields in the transaction can be signed, including other signatures.
+There is also a flag to indicate that the whole transaction should be signed, except for other signatures.
 This allows for more nuanced transaction schemes.
 
 The actual data being signed, then, is a concatenation of the time lock, input ID, bit array, and every field specified by the bit array.
@@ -194,6 +193,9 @@ They can advertise themselves as minimally reliable, offering a low price and a 
 Or, they can advertise themselves as highly reliable, offering a higher price and agreeing to high penalties for losing files.
 An efficient market will optimize storage strategies.
 
+Storage providers are potentially vulnerable to denial of service attacks, which could prevent the provider from giving storage proofs to the network, or prevent the provider from uploading a file to the client.
+The storage providers themselves must take responsibility for protecting themselves, and must make sure that the penalties they agree to pay for missing storage proofs do not incentivize DoS attacks against the provider.
+
 \subsection{Client Protections}
 Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
 Each piece is then encrypted and stored on many storage providers.
@@ -251,6 +253,8 @@ A centralized storage tracker could provide a more reasonable environment for a 
 % \subsection{Permanent inflation}
 % \subsection{Locking Coins Down}
 
+% \section{Soft Forking Sia}
+
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
 Other considerations, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
@@ -267,18 +271,18 @@ Contracts are also currently permanent, creating what is essentially an uneditab
 There may be value in adding flexibility that allows clients and hosts to negotiate an updated file hash or other updated contract terms.
 Updating the terms of the contract will require consent from all parties.
 
-\subsection{Proof of Existence Windows}
-In an attempt to partially resolve the closed window attacks, we could use a proof of existence strategy.
-A host can create a hash of the storage proof which they submit to the blockchain within the window.
-The host then has a greatly extended window in which they can demonstrate that the proof of storage was created during the required window.
+% \subsection{Proof of Existence Windows}
+% In an attempt to partially resolve the closed window attacks, we could use a proof of existence strategy.
+% A host can create a hash of the storage proof which they submit to the blockchain within the window.
+% The host then has a greatly extended window in which they can demonstrate that the proof of storage was created during the required window.
 
-This has two advantages.
-First, an attacker cannot selectively exclude proof of existence hashes, because there's no way to figure out who owns each hash.
-Either the attacker doesn't include any unknown proof of existence hashes, or the attacker risks including undesired proof of existence hashes.
-Second, this allows hosts to submit small transactions to the network during peak hours and then the larger transactions when the traffic has died down.
+% This has two advantages.
+% First, an attacker cannot selectively exclude proof of existence hashes, because there's no way to figure out who owns each hash.
+% Either the attacker doesn't include any unknown proof of existence hashes, or the attacker risks including undesired proof of existence hashes.
+% Second, this allows hosts to submit small transactions to the network during peak hours and then the larger transactions when the traffic has died down.
 
-A further improvement would enable Merkle Tree proofs of existence.
-This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
+% A further improvement would enable Merkle Tree proofs of existence.
+% This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
 
 \subsection{Miner Fee Adjustments}
 If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
@@ -290,6 +294,13 @@ It may be possible to construct a system using fee deterioration that means a mi
 \subsection{More Frequent Difficulty and Subsidy Adjustments}
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
 We would wish to have more frequent subsidy adjustments, which gives people a more continuous sense of the economic state and prevents moments where many miners turn off simultaneously.
+
+Adjusting the difficulty every block solves the following issues:
+\begin{itemize}
+	\item Stronger defense against difficulty raising attacks, as difficulty raising must be staggered instead of jumping.
+	\item Stronger defense against the timewarp attack.
+	\item Smoother difficulty curve means less minining equipment being turned off simultaneously.
+\end{itemize}
 
 \subsection{Committing to State}
 One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
@@ -336,6 +347,10 @@ We do intend to explore these proposed changes further and decide concretely on 
 \bibitem{reg}
 	K. V. Rashmi, Nihar B. Shah, and P. Vijay Kumar,
 	\emph{Optimal Exact-Regenerating Codes for Distributed Storage at the MSR and MBR Points via a Product-Matrix Construction}.
+
+\bibitem{side}
+	Adam Back, Matt Corallo, Luke Dashjr, Mark Friedenbach, Gregory Maxwell, Andrew Miller, Andrew Peolstra, Jorge Timon, Pieter Wuille,
+	\emph{Enabling Blockchain Innovations with Pegged Sidechains}.
 
 \bibitem{alts}
 	Andrew Poelstra,
