@@ -46,7 +46,7 @@ func CreateWallet() (w *Wallet, err error) {
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) scan(state *State) {
+func (w *Wallet) Scan(state *State) {
 	w.OwnedOutputs = make(map[OutputID]Output)
 	for id, output := range state.ConsensusState.UnspentOutputs {
 		if output.SpendHash == w.SpendConditions.CoinAddress() {
@@ -57,7 +57,7 @@ func (w *Wallet) scan(state *State) {
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) fundTransaction(amount Currency, t *Transaction) (err error) {
+func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
 	if amount == Currency(0) {
 		err = errors.New("cannot send 0 coins")
@@ -108,7 +108,7 @@ func (w *Wallet) fundTransaction(amount Currency, t *Transaction) (err error) {
 
 // Wallet.signTransaction() takes a transaction and adds a signature for every input
 // that the wallet understands how to spend.
-func (w *Wallet) signTransaction(t *Transaction) (err error) {
+func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 	for i, input := range t.Inputs {
 		// If we recognize the input as something we are able to sign, we sign
 		// the input.
@@ -135,10 +135,10 @@ func (w *Wallet) signTransaction(t *Transaction) (err error) {
 // amount is reached. Then sends leftovers back to self.
 func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, state *State) (t Transaction, err error) {
 	// Scan blockchain for outputs.
-	w.scan(state)
+	w.Scan(state)
 
 	// Add `amount` of free coins to the transaction.
-	err = w.fundTransaction(amount+minerFee, &t)
+	err = w.FundTransaction(amount+minerFee, &t)
 	if err != nil {
 		return
 	}
@@ -150,7 +150,7 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	t.Outputs = append(t.Outputs, Output{Value: amount, SpendHash: address})
 
 	// Sign each input.
-	err = w.signTransaction(&t)
+	err = w.SignTransaction(&t)
 	if err != nil {
 		return
 	}
@@ -162,10 +162,10 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 // partial transaction containing an input for the contract, but no signatures.
 func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {
 	// Scan the blockchain for outputs.
-	w.scan(state)
+	w.Scan(state)
 
 	// Add money to the transaction to fund the client's portion of the contract fund.
-	err = w.fundTransaction(params.ClientContribution, &params.Transaction)
+	err = w.FundTransaction(params.ClientContribution, &params.Transaction)
 	if err != nil {
 		return
 	}
@@ -177,10 +177,10 @@ func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *S
 // partial transaction containing an input for the contract, but no signatures.
 func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
 	// Scan the blockchain for outputs.
-	w.scan(state)
+	w.Scan(state)
 
 	// Add money t othe transaction to fund the hosts' portion of the contract fund.
-	err = w.fundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
+	err = w.FundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
 	if err != nil {
 		return
 	}

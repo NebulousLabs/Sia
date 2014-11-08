@@ -1,7 +1,6 @@
 package sia
 
 import (
-	"math/big"
 	"time"
 )
 
@@ -12,7 +11,7 @@ const (
 // These values will be generated before release, but the code for generating
 // them will never be released.  All that the rest of the world will see is
 // hardcoded values.
-func CreateGenesisBlock(premineAddress CoinAddress) (b *Block) {
+func createGenesisBlock(premineAddress CoinAddress) (b *Block) {
 	b = &Block{
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: premineAddress,
@@ -38,7 +37,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.TransactionList = make(map[OutputID]*Transaction)
 
 	// Create the genesis block using the premine address.
-	genesisBlock := CreateGenesisBlock(premineAddress)
+	genesisBlock := createGenesisBlock(premineAddress)
 
 	// Fill out the block root node, and add it to the BlockMap.
 	s.BlockRoot.Block = genesisBlock
@@ -47,7 +46,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
 	s.BlockRoot.Target[1] = 16
-	s.BlockRoot.Depth = big.NewRat(0, 1)
+	s.BlockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
 	// Fill out the ConsensusState

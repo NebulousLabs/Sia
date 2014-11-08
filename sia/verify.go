@@ -39,7 +39,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock > s.height() {
+		if input.SpendConditions.TimeLock > s.Height() {
 			err = errors.New("output spent before timelock expiry.")
 			return
 		}
@@ -74,7 +74,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			err = errors.New("contract must be funded.")
 			return
 		}
-		if contract.Start < s.height() {
+		if contract.Start < s.Height() {
 			err = errors.New("contract must start in the future.")
 			return
 		}
@@ -115,7 +115,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock > s.height() {
+		if sig.TimeLock > s.Height() {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
@@ -277,9 +277,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 // parent node, and copies the target into the child node.
 func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
 	var timePassed, expectedTimePassed Timestamp
-	blockWindow := TargetWindow
 	if newNode.Height < TargetWindow {
-		blockWindow = newNode.Height
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
 	} else {
@@ -293,8 +291,8 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(TargetWindow)
 	}
 
-	// Adjustment = timePassed / expectedTimePassed / blockWindow.
-	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed)*int64(blockWindow))
+	// Adjustment = timePassed / expectedTimePassed.
+	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
 
 	// Enforce a maximum targetAdjustment
 	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
@@ -317,9 +315,15 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
-func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
-	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
+func (s *State) childDepth(parentNode *BlockNode) (depth BlockDepth) {
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:])) // WRITE A FUNCTION TO GO FROM TARGET TO WEIGHT
+	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
+	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
+	intChildDepth := new(big.Int).Div(ratChildDepth.Denom(), ratChildDepth.Num())
+	bytesChildDepth := intChildDepth.Bytes()
+	offset := len(depth[:]) - len(bytesChildDepth[:])
+	copy(depth[offset:], bytesChildDepth[:])
+	return
 }
 
 // State.addBlockToTree() takes a block and a parent node, and adds a child
@@ -349,8 +353,11 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 // current node of the ConesnsusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
-	requiredDepth := new(big.Rat).Add(s.currentDepth(), threshold)
-	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
+	sdepth := s.Depth()
+	currentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(sdepth[:]))
+	requiredDepth := new(big.Rat).Add(currentDepth, threshold)
+	newNodeDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(newNode.Depth[:]))
+	return newNodeDepth.Cmp(requiredDepth) == 1
 }
 
 // State.reverseTransaction removes a given transaction from the
@@ -370,7 +377,7 @@ func (s *State) reverseTransaction(t Transaction) {
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
 		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
-		outputID := openContract.storageProofOutputID(s.height(), true)
+		outputID := openContract.storageProofOutputID(s.Height(), true)
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
@@ -407,7 +414,7 @@ func (s *State) rewindABlock() {
 	// Update the CurrentBlock and CurrentPath variables of the
 	// ConsensusState.
 	s.ConsensusState.CurrentBlock = s.currentBlock().ParentBlock
-	delete(s.ConsensusState.CurrentPath, s.height())
+	delete(s.ConsensusState.CurrentPath, s.Height())
 }
 
 // State.applyTransaction() takes a transaction and adds it to the
@@ -450,7 +457,7 @@ func (s *State) applyTransaction(t Transaction) {
 			Value:     payout,
 			SpendHash: openContract.FileContract.ValidProofAddress,
 		}
-		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.height(), true)] = output
+		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.Height(), true)] = output
 
 		// Mark the proof as complete for this window.
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
@@ -497,7 +504,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	var contractsToDelete []ContractID
 	for _, openContract := range s.ConsensusState.OpenContracts {
 		// Check for the window switching over.
-		if (s.height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.height() > openContract.FileContract.Start {
+		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
 			// Check for a missed proof.
 			if openContract.WindowSatisfied == false {
 				payout := openContract.FileContract.MissedProofPayout
@@ -505,7 +512,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					payout = openContract.FundsRemaining
 				}
 
-				newOutputID := openContract.storageProofOutputID(s.height(), false)
+				newOutputID := openContract.storageProofOutputID(s.Height(), false)
 				output := Output{
 					Value:     payout,
 					SpendHash: openContract.FileContract.MissedProofAddress,
@@ -527,7 +534,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		}
 
 		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.height() || openContract.FileContract.Tolerance == openContract.Failures {
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
 				outputID := openContract.fileContractTerminationOutputID()

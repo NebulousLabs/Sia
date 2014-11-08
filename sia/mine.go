@@ -1,6 +1,7 @@
 package sia
 
 import (
+	"errors"
 	"time"
 )
 
@@ -50,12 +51,47 @@ func solveBlock(b *Block, target Target) bool {
 // be updated by listening on channels or something.
 func (s *State) GenerateBlock(minerAddress CoinAddress) (b *Block) {
 	for {
-		s.Lock()
-		b, target := s.blockForWork(minerAddress)
-		s.Unlock()
-
-		if solveBlock(b, target) {
+		var err error
+		b, err = s.AttemptToGenerateBlock(minerAddress)
+		if err == nil {
 			return b
+		}
+	}
+}
+
+// AttemptToGenerateBlock attempts to generate a block, but instead of running
+// until a block is found, it just tries a single time.
+func (s *State) AttemptToGenerateBlock(minerAddress CoinAddress) (b *Block, err error) {
+	s.Lock()
+	b, target := s.blockForWork(minerAddress)
+	s.Unlock()
+
+	if solveBlock(b, target) {
+		return b, nil
+	} else {
+		err = errors.New("could not find block")
+		return
+	}
+}
+
+// ToggleMining creates a channel and mines until it receives a kill signal.
+func (s *State) ToggleMining(minerAddress CoinAddress) (b *Block) {
+	if !s.Mining {
+		s.KillMining = make(chan struct{})
+		s.Mining = true
+	}
+
+	// Need some channel to wait on to kill the function.
+	for {
+		select {
+		case <-s.KillMining:
+			return
+
+		default:
+			block, err := s.AttemptToGenerateBlock(minerAddress)
+			if err == nil {
+				s.AcceptBlock(*block)
+			}
 		}
 	}
 }

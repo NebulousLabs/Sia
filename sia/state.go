@@ -1,6 +1,7 @@
 package sia
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 )
@@ -22,6 +23,10 @@ type State struct {
 
 	ConsensusState ConsensusState
 
+	// Mining Variables
+	Mining     bool
+	KillMining chan struct{}
+
 	sync.Mutex
 }
 
@@ -35,7 +40,7 @@ type BlockNode struct {
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Target           Target        // Target for next block.
-	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
+	Depth            BlockDepth    // Sum of weights of all blocks in this chain.
 
 	ContractTerminations []*OpenContract
 	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
@@ -85,9 +90,40 @@ type MissedStorageProof struct {
 	ContractID ContractID
 }
 
-// State.height() returns the height of the ConsensusState.
-func (s *State) height() BlockHeight {
+// WinningBlockchain returns all of the blocks between `start` and `end` that
+// are a part of the winning fork. If end == 0, then all blocks after start are
+// included. If start or end is out of bounds, an error is returned. If start
+// is greater than end, then an error is returned.
+func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err error) {
+	if end == 0 {
+		end = uint64(len(s.ConsensusState.CurrentPath))
+	}
+	if start > uint64(len(s.ConsensusState.CurrentPath)) || end > uint64(len(s.ConsensusState.CurrentPath)) {
+		err = fmt.Errorf("only %v blocks are known to the state.", len(s.ConsensusState.CurrentPath))
+		return
+	}
+	if start > end {
+		err = fmt.Errorf("start is greater than end")
+		return
+	}
+
+	blockList = make([]*Block, end-start)
+	for i := start; i <= end; i++ {
+		blockList[i] = s.BlockMap[s.ConsensusState.CurrentPath[BlockHeight(i)]].Block
+	}
+
+	return
+
+}
+
+// State.Height() returns the height of the ConsensusState.
+func (s *State) Height() BlockHeight {
 	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
+}
+
+// Depth() returns the depth of the current block of the state.
+func (s *State) Depth() BlockDepth {
+	return s.currentBlockNode().Depth
 }
 
 // State.currentBlockNode returns the node of the most recent block in the
@@ -111,12 +147,6 @@ func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
 // heaviest fork.
 func (s *State) currentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
-}
-
-// State.currentDepth() returns the depth of the current block node - the
-// cumulative weight of all the blocks in the current fork.
-func (s *State) currentDepth() BlockWeight {
-	return s.currentBlockNode().Depth
 }
 
 // OpenContract.storageProofOutputID() returns the output of a storage proof
