@@ -315,9 +315,15 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
-func (s *State) childDepth(parentNode *BlockNode) BlockWeight {
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
-	return BlockWeight(new(big.Rat).Add(parentNode.Depth, blockWeight))
+func (s *State) childDepth(parentNode *BlockNode) (depth BlockDepth) {
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:])) // WRITE A FUNCTION TO GO FROM TARGET TO WEIGHT
+	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
+	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
+	intChildDepth := new(big.Int).Div(ratChildDepth.Denom(), ratChildDepth.Num())
+	bytesChildDepth := intChildDepth.Bytes()
+	offset := len(depth[:]) - len(bytesChildDepth[:])
+	copy(depth[offset:], bytesChildDepth[:])
+	return
 }
 
 // State.addBlockToTree() takes a block and a parent node, and adds a child
@@ -347,8 +353,11 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 // current node of the ConesnsusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
-	requiredDepth := new(big.Rat).Add(s.currentDepth(), threshold)
-	return (*big.Rat)(newNode.Depth).Cmp(requiredDepth) == 1
+	sdepth := s.Depth()
+	currentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(sdepth[:]))
+	requiredDepth := new(big.Rat).Add(currentDepth, threshold)
+	newNodeDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(newNode.Depth[:]))
+	return newNodeDepth.Cmp(requiredDepth) == 1
 }
 
 // State.reverseTransaction removes a given transaction from the

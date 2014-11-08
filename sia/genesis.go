@@ -1,7 +1,6 @@
 package sia
 
 import (
-	"math/big"
 	"time"
 )
 
@@ -47,7 +46,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
 	}
 	s.BlockRoot.Target[1] = 16
-	s.BlockRoot.Depth = big.NewRat(0, 1)
+	s.BlockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
 	// Fill out the ConsensusState

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/sia"
 )
@@ -24,10 +23,8 @@ func printWalletAddresses(env *walletEnvironment) {
 	}
 	fmt.Println()
 
-	float, _ := (*big.Rat)(env.state.Depth()).Float64()
 	fmt.Println("\tCurrent Block Height:", env.state.Height())
-	fmt.Println("\tCurrent Block Depth:", float)
-	fmt.Println("\tDepth as a String:", (*big.Rat)(env.state.Depth()).String())
+	fmt.Println("\tCurrent Block Depth:", env.state.Depth())
 	fmt.Println()
 
 	fmt.Println("\tPrinting all valid wallet addresses.")

@@ -40,7 +40,7 @@ type BlockNode struct {
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Target           Target        // Target for next block.
-	Depth            BlockWeight   // Sum of weights of all blocks in this chain.
+	Depth            BlockDepth    // Sum of weights of all blocks in this chain.
 
 	ContractTerminations []*OpenContract
 	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
@@ -127,7 +127,7 @@ func (s *State) Height() BlockHeight {
 }
 
 // Depth() returns the depth of the current block of the state.
-func (s *State) Depth() BlockWeight {
+func (s *State) Depth() BlockDepth {
 	return s.currentBlockNode().Depth
 }
 
@@ -152,12 +152,6 @@ func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
 // heaviest fork.
 func (s *State) currentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
-}
-
-// State.currentDepth() returns the depth of the current block node - the
-// cumulative weight of all the blocks in the current fork.
-func (s *State) currentDepth() BlockWeight {
-	return s.currentBlockNode().Depth
 }
 
 // OpenContract.storageProofOutputID() returns the output of a storage proof

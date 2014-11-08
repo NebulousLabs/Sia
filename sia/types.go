@@ -27,8 +27,10 @@ type (
 
 	Timestamp   int64
 	BlockHeight uint32
-	BlockWeight *big.Rat // inverse of target
 	Currency    uint64
+
+	BlockWeight *big.Rat // BlockWeight should never appear in a struct.
+	BlockDepth  Hash
 
 	BlockID       Hash
 	OutputID      Hash // An output id points to a specific output.
