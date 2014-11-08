@@ -39,7 +39,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock > s.height() {
+		if input.SpendConditions.TimeLock > s.Height() {
 			err = errors.New("output spent before timelock expiry.")
 			return
 		}
@@ -74,7 +74,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			err = errors.New("contract must be funded.")
 			return
 		}
-		if contract.Start < s.height() {
+		if contract.Start < s.Height() {
 			err = errors.New("contract must start in the future.")
 			return
 		}
@@ -115,7 +115,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock > s.height() {
+		if sig.TimeLock > s.Height() {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
@@ -377,7 +377,7 @@ func (s *State) reverseTransaction(t Transaction) {
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
 		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
-		outputID := openContract.storageProofOutputID(s.height(), true)
+		outputID := openContract.storageProofOutputID(s.Height(), true)
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
@@ -414,7 +414,7 @@ func (s *State) rewindABlock() {
 	// Update the CurrentBlock and CurrentPath variables of the
 	// ConsensusState.
 	s.ConsensusState.CurrentBlock = s.currentBlock().ParentBlock
-	delete(s.ConsensusState.CurrentPath, s.height())
+	delete(s.ConsensusState.CurrentPath, s.Height())
 }
 
 // State.applyTransaction() takes a transaction and adds it to the
@@ -457,7 +457,7 @@ func (s *State) applyTransaction(t Transaction) {
 			Value:     payout,
 			SpendHash: openContract.FileContract.ValidProofAddress,
 		}
-		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.height(), true)] = output
+		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.Height(), true)] = output
 
 		// Mark the proof as complete for this window.
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
@@ -504,7 +504,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	var contractsToDelete []ContractID
 	for _, openContract := range s.ConsensusState.OpenContracts {
 		// Check for the window switching over.
-		if (s.height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.height() > openContract.FileContract.Start {
+		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
 			// Check for a missed proof.
 			if openContract.WindowSatisfied == false {
 				payout := openContract.FileContract.MissedProofPayout
@@ -512,7 +512,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					payout = openContract.FundsRemaining
 				}
 
-				newOutputID := openContract.storageProofOutputID(s.height(), false)
+				newOutputID := openContract.storageProofOutputID(s.Height(), false)
 				output := Output{
 					Value:     payout,
 					SpendHash: openContract.FileContract.MissedProofAddress,
@@ -534,7 +534,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		}
 
 		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.height() || openContract.FileContract.Tolerance == openContract.Failures {
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
 				outputID := openContract.fileContractTerminationOutputID()

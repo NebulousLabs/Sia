@@ -202,8 +202,8 @@ func successContractTests(testEnv *testingEnvironment) {
 			FileContracts: []FileContract{
 				FileContract{
 					ContractFund:       5,
-					Start:              testEnv.state.height() + 1,
-					End:                testEnv.state.height() + 2,
+					Start:              testEnv.state.Height() + 1,
+					End:                testEnv.state.Height() + 2,
 					ChallengeFrequency: 1,
 					Tolerance:          1,
 					ValidProofPayout:   1,

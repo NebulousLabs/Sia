@@ -116,14 +116,9 @@ func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err er
 
 }
 
-// State.height() returns the height of the ConsensusState.
-func (s *State) height() BlockHeight {
-	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
-}
-
-// Height() does the same thing as height() - need to merge the functions.
+// State.Height() returns the height of the ConsensusState.
 func (s *State) Height() BlockHeight {
-	return s.height()
+	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
 }
 
 // Depth() returns the depth of the current block of the state.
