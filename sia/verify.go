@@ -277,9 +277,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 // parent node, and copies the target into the child node.
 func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
 	var timePassed, expectedTimePassed Timestamp
-	blockWindow := TargetWindow
 	if newNode.Height < TargetWindow {
-		blockWindow = newNode.Height
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
 	} else {
@@ -293,12 +291,8 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		expectedTimePassed = TargetSecondsPerBlock * Timestamp(TargetWindow)
 	}
 
-	// Adjustment = timePassed / expectedTimePassed / blockWindow.
-	// Adjustment = ((((timePassed / expectedTimePassed) - 1) / blockWindow) + 1)
+	// Adjustment = timePassed / expectedTimePassed.
 	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
-	targetAdjustment = targetAdjustment.Sub(targetAdjustment, big.NewRat(1, 1))
-	targetAdjustment = targetAdjustment.Mul(targetAdjustment, big.NewRat(1, int64(blockWindow)))
-	targetAdjustment = targetAdjustment.Add(targetAdjustment, big.NewRat(1, 1))
 
 	// Enforce a maximum targetAdjustment
 	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {

@@ -109,8 +109,8 @@ func pollHome(env *walletEnvironment) {
 			return
 
 		/*
-		case "H", "host", "store", "advertise", "storage":
-			becomeHostWalkthrough(env)
+			case "H", "host", "store", "advertise", "storage":
+				becomeHostWalkthrough(env)
 		*/
 
 		case "m", "mine", "toggle", "mining":
@@ -120,14 +120,14 @@ func pollHome(env *walletEnvironment) {
 			printWalletAddresses(env)
 
 		/*
-		case "r", "rent":
-			becomeClientWalkthrough(env)
+			case "r", "rent":
+				becomeClientWalkthrough(env)
 		*/
 
-			/*
-				case "S", "save":
-					saveWalletEnvironmentWalkthorugh()
-			*/
+		/*
+			case "S", "save":
+				saveWalletEnvironmentWalkthorugh()
+		*/
 
 		case "s", "send":
 			err = sendCoinsWalkthrough(env)

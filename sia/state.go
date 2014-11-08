@@ -94,11 +94,11 @@ type MissedStorageProof struct {
 // are a part of the winning fork. If end == 0, then all blocks after start are
 // included. If start or end is out of bounds, an error is returned. If start
 // is greater than end, then an error is returned.
-func (s *State) WinningBlockchain(start, end uint) (blockList []*Block, err error) {
+func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err error) {
 	if end == 0 {
-		end = len(s.ConsensusState.CurrentPath)
+		end = uint64(len(s.ConsensusState.CurrentPath))
 	}
-	if start > len(s.ConsensusState.CurrentPath) || end > len(s.ConsensusState.CurrentPath) {
+	if start > uint64(len(s.ConsensusState.CurrentPath)) || end > uint64(len(s.ConsensusState.CurrentPath)) {
 		err = fmt.Errorf("only %v blocks are known to the state.", len(s.ConsensusState.CurrentPath))
 		return
 	}
@@ -107,7 +107,7 @@ func (s *State) WinningBlockchain(start, end uint) (blockList []*Block, err erro
 		return
 	}
 
-	blockList := make([]*Block, end-start)
+	blockList = make([]*Block, end-start)
 	for i := start; i <= end; i++ {
 		blockList[i] = s.BlockMap[s.ConsensusState.CurrentPath[BlockHeight(i)]].Block
 	}

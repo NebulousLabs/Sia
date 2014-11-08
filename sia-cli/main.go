@@ -16,7 +16,7 @@ type walletEnvironment struct {
 // Creates the genesis state and then requests a bunch of blocks from the
 // network.
 func walletStart(cmd *cobra.Command, args []string) {
-	state := sia.CreateGenesisState(sia.CoinAddress{})
+	_ = sia.CreateGenesisState(sia.CoinAddress{})
 
 	// Do bootstrapping stuff here.
 }

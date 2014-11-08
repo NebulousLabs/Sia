@@ -51,11 +51,9 @@ func solveBlock(b *Block, target Target) bool {
 // be updated by listening on channels or something.
 func (s *State) GenerateBlock(minerAddress CoinAddress) (b *Block) {
 	for {
-		s.Lock()
-		b, target := s.blockForWork(minerAddress)
-		s.Unlock()
-
-		if solveBlock(b, target) {
+		var err error
+		b, err = s.AttemptToGenerateBlock(minerAddress)
+		if err == nil {
 			return b
 		}
 	}
