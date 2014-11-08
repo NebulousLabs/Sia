@@ -21,9 +21,9 @@ func TestRegister(t *testing.T) {
 	addr := NetAddress{"localhost", 9988}
 
 	// register some handlers
-	tcps.Register('F', func(net.Conn, []byte) error { call2 = true; return nil })
+	tcps.RegisterHandler('F', func(net.Conn, []byte) error { call2 = true; return nil })
 
-	if err = tcps.RegisterSimple('B', new(Foo).Bar); err != nil {
+	if err = tcps.RegisterRPC('B', new(Foo).Bar); err != nil {
 		t.Fatal(err)
 	}
 

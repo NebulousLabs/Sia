@@ -70,17 +70,17 @@ func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
 	}
 }
 
-// Register registers a message type with a message handler. The existing
-// handler for that type will be overwritten.
-func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
+// RegisterHandler registers a message type with a message handler. The
+// existing handler for that type will be overwritten.
+func (tcps *TCPServer) RegisterHandler(t byte, fn func(net.Conn, []byte) error) {
 	tcps.handlerMap[t] = fn
 }
 
-// RegisterSimple is for simple handlers. A simple handler decodes the message
+// RegisterRPC is for simple handlers. A simple handler decodes the message
 // data and passes it to fn. fn must have the type signature:
 //   func(Type) error
 // i.e. a 1-adic function that returns an error.
-func (tcps *TCPServer) RegisterSimple(t byte, fn interface{}) error {
+func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
 	// if fn not correct type, panic
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
 	if typ.Kind() != reflect.Func || typ.NumIn() != 1 ||
@@ -98,7 +98,7 @@ func (tcps *TCPServer) RegisterSimple(t byte, fn interface{}) error {
 		return nil
 	}
 
-	tcps.Register(t, sfn)
+	tcps.RegisterHandler(t, sfn)
 	return nil
 }
 
