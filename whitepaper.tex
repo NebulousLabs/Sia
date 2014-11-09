@@ -302,12 +302,6 @@ Hosts are only dependent on the stability of the value of the siacoin for the du
 Hosts can continually reprice contracts as the sianote shifts in value.
 Siacoins also derive value from the fact that you must have siacoins in order to create a contract.
 
-% \section{Soft Forking Sia}
-% \subsection{Increasing the block size via softfork}
-
-% \section{Soft Forking Sia}
-% \subsection{Increasing the block size via softfork}
-
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
 Other considerations, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
@@ -337,22 +331,20 @@ Updating the terms of the contract will require consent from all parties.
 % A further improvement would enable Merkle Tree proofs of existence.
 % This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
 
-\subsection{Siafund outputs compression}
-There's probably a better way to manage siafunds outputs than to just create 1200 outputs every 4000 blocks. Plus, 4000 blocks is a long time!
-
 \subsection{Siafund the Miner fees}
-Have siafunds that somehow pay out in the block subsidy.
+Have some portion of siafunds contribute to the miner fees, which ensures that miners have compensation so long as Sia is being used for its core purpose - storage.
 
 \subsection{Miner Fee Adjustments}
 If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
-This can be mitigated by putting all of the fees into a pool which pays out 33\% every block, making re-mining unprofitable for any party with less than 40\% of the network hashing power.
+This can be mitigated by putting all of the fees into a pool which pays out 50\% every block, making re-mining unprofitable for any party with less than 50\% of the network hashing power.
+% Link to discussion threads of this potential change.
 
 Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
 It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
+% Link to discussion threads of this potential change.
 
-\subsection{More Frequent Difficulty and Subsidy Adjustments}
+\subsection{More Frequent Difficulty Adjustments}
 We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
-We would wish to have more frequent subsidy adjustments, which gives people a more continuous sense of the economic state and prevents moments where many miners turn off simultaneously.
 
 Adjusting the difficulty every block solves the following issues:
 \begin{itemize}
@@ -360,6 +352,7 @@ Adjusting the difficulty every block solves the following issues:
 	\item Stronger defense against the timewarp attack.
 	\item Smoother difficulty curve means less minining equipment being turned off simultaneously.
 \end{itemize}
+% Link to discussion threads for this potential change.
 
 % \subsection{Committing to State}
 % One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
@@ -377,13 +370,28 @@ Adjusting the difficulty every block solves the following issues:
 % (I need to read more about merge mining before I publish this section)
 
 \section{Conclusion}
-Sia takes the Bitcoin cryptocurrency and makes a few major changes.
-The first is removing the scripting system and instead enforcing a multisig solution, to reduce complexity and attack surface.
-The second is to introduce a file contract, which enables storage providers to claim that they will store a file in return for compensation, and that they will pay a penalty for losing the file.
-Finally, arbitrary data fields have been added to all transactions to enable coordination among decentralized storage providers, and among decentralized file sharing systems.
+Sia takes the Bitcoin blockchain and modifies it to include file contracts and remove the scripting system.
+These contracts can be used to enforce agreements between clients and hosts that establish a host will store a file in return for monetary compensation.
+The host will be compensated for storing the file regardless of the behavior of the client.
+The storage proof challenges are presented to the hosts on a regular basis and do not require interaction from the client, which means the client can ``set and forget''.
 
-We have additionally proposed an array of potential changes that range from simple and probably safe to complex and probably unsafe.
-We do intend to explore these proposed changes further and decide concretely on which ones are worth integrating into Sia.
+While these contracts force a host to store a file and be online regularly, these contracts do not force hosts to give up the file.
+Instead, an out-of-band ecosystem is created which rewards hosts for being available and uploading the files upon request.
+Clients and hosts can use the arbitrary data fields in the blockchain as an expensive mechanism for coordinating, or the clients and hosts can use entirely out-of-band methods for coordinating.
+A basic system has been explained which provides moderate protection against sybil attacks and the general unreliability of hosts.
+
+Siafunds are used as a mechanism of generating revenue for Nebulous Inc., the company responsible for the release of Sia.
+By using Siafunds instead of premining, Nebulous more directly correlates revenue to actual use of the network, and is largely unaffected by market games that malicious entities may play with the network currency.
+Miners may also derive a part of their block subsidy from Siafunds, which would help to insulate miners from market games as well.
+Long term, we hope to add support for two-way-pegs with various currencies, which would enable consumers to insulate themselves from the instability of a single currency.
+
+The Siacoin as a currency is a permanently inflationary currency, with 1000 coins being generated per block, forever.
+There is a consideration to have the minimum annual inflation set to 2\%, which would provide miners with a proportional permanent source of income regardless of the size of transaction fees.
+
+Experimental changes have also been proposed to the way mining fees are distributed, and to provide miners with an incentive to propagate transactions.
+Changing the difficulty every block instead of every 2016 blocks provides a more consistent block time and a more tapered shutting down of obsolete mining hardware.
+
+Altogether, we believe Sia will provide a fertile platform for decentralizing cloud storage in minimal trust and zero trust environments.
 
 \onecolumn
 \begin{thebibliography}{9}
