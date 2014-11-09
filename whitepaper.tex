@@ -270,15 +270,10 @@ This is essentially a fee established on creating contracts.
 When a contract is created, 10\% of the contract fund is set aside and distributed to the holders of siafunds.
 Nebulous Inc. will initially hold ~95\% of the siafunds, and the early crowd-fund backers of Sia will hold the remaining ~5\%.
 
-Every 4000 blocks, there will be a 'payday', where all of the funds set aside for the siafunds holders will be turned into unspent outputs that are valid on the network.
-To limit the amount of bloat that this can cause, siafunds will be composed of 25,000 indivisible units, meaning that at most 25,000 outputs can be created per 4000 blocks as a result of siafunds.
-Multiple siafunds in the same address will only result in 1 output.
-As Nebulous will be holding ~23,740 sianotes, early on a maximum of ~1261 outputs per 4000 blocks will be created.
-Furthermore, these outputs are implicit, meaning they only consume space on disk, and do not contribute to network bandwidth.
-An output is merely a 64bit unsigned int and a 32 byte hash, for a total of 40 bytes each, or ~50kb per 4000 blocks.
-
-Sianotes can be sent to other addresses, in the same way that siacoins can be sent to other addresses.
-Sianotes cannot however be used to fund contracts or as a miner fee.
+Siafunds can be sent to other addresses, in the same way that siacoins can be sent to other addresses.
+Siafunds cannot however be used to fund contracts or as a miner fee.
+When siafunds are transferred to a new address, an additional unspent output is created containing all of the siacoins that have been earned by the siafunds since their previous transfer.
+These siacoins are sent to the same address as the siafunds.
 
 \subsection{Fee Exemption}
 High reliability hosts are penalized by the 10\% fee on the contract fund.
