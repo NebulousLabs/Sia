@@ -481,6 +481,7 @@ func (s *State) applyTransaction(t Transaction) {
 			host.Price = ha.PricePerKilobyte
 			host.Burn = ha.BurnPerKilobyte
 			host.Freeze = Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[0].Value
+			host.Duration = ha.MaxDuration
 			if host.Freeze < 0 {
 				return
 			}

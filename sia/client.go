@@ -7,6 +7,7 @@ type Host struct {
 	Freeze    Currency
 	Burn      Currency
 	Price     Currency
+	Duration  BlockHeight
 }
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a

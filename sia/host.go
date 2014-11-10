@@ -12,6 +12,7 @@ type HostAnnouncement struct {
 	PricePerKilobyte   Currency
 	BurnPerKilobyte    Currency
 	ChallengeFrequency BlockHeight
+	MaxDuration        BlockHeight
 
 	SpendConditions SpendConditions
 }
