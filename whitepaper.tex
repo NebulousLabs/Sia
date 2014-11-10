@@ -48,65 +48,68 @@ Future support for a two-way peg with Bitcoin is planned, as discussed in ``Enab
 The Sia protocol largely resembles Bitcoin except for the changes noted below.
 
 \section{General Structure}
-The general rules for mining blocks, choosing forks, etc. will be the same as Bitcoin.
 Sia's primary departure from Bitcoin lies in its transactions.
 Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
-Sia opts instead to use an $M$ of $N$ multi-signature hash scheme for all transactions.
+Sia opts instead to use an $M$--of--$N$ multi-signature hash scheme for all transactions, eschewing the scripting system entirely.
 This reduces complexity and attack surface.
 
-Sia further extends transactions to enable file storage on the network.
-Two extensions are needed to accomplish this: file contracts and storage proofs.
+Sia also extends transactions to enable the creation and enforcement of storage contracts.
+Two extensions are needed to accomplish this: contracts and proofs.
 File contracts declare the intention of a storage provider to store a file with a certain size and hash.
-They specify that a provider must periodically prove that they are still storing the file.
-Providers accomplish this by submitting storage proofs to the network.
-The specifics of this arrangement are defined in sections \ref{sec:contracts} and \ref{sec:storage}, respectively.
+They define the regularity with which a provider must submit storage proofs.
+The specifics of these transaction types are defined in sections \ref{sec:contracts} and \ref{sec:storage}, respectively.
 
 \section{Transactions}
-A transaction contains the following fields:
+A transaction contains the following fields: \\
 \begin{tabular}{| l | l |}
 	\hline
 	\textbf{Field} & \textbf{Description} \\ \hline
 	Version        & Protocol version number \\ \hline
 	Arbitrary Data & Used for metadata or otherwise \\ \hline
-	Miner Fee      & A fee for the miner \\ \hline
-	Input List     & Incoming funds \\ \hline
-	Output List    & Outgoing funds (optional) \\ \hline
+	Miner Fee      & Reward given to miner \\ \hline
+	Inputs         & Incoming funds \\ \hline
+	Outputs        & Outgoing funds (optional) \\ \hline
 	File Contract  & See: File Contracts (optional) \\ \hline
 	Storage Proof  & See: Proof of Storage (optional) \\ \hline
 	Signatures     & Signatures from each input \\ \hline
 \end{tabular}
 
-\subsection{Inputs}
-Each input comprises a previous output ID and the spend conditions associated with that output.
-
-\subsection{Outputs}
-Each output holds an amount to be sent, along with a hash of the output spend conditions.
+\subsection{Inputs and Outputs}
+An output comprises a volume of coins.
 Each output has an associated identifier, which is derived from the transaction that the output appeared in.
-The ID of output $i$ is defined as $H(\text{transaction containing output} || "coinsend" || i)$,
-where input$_0$ is the ID of the first transaction input and $H$ is a cryptographic hashing function.
+The ID of output $i$ in transaction $t$ is defined as:
+\[
+	H(t || \text{``output''} || i)
+\]
+where $H$ is a cryptographic hashing function, and ``output'' is a string literal.
+The block reward and miner fees have special output IDs, given by:
+\[
+	H(H(\text{Block Header}) || \text{``blockreward''})
+\]
 
-The miner subsidy and fees each block are given output ID = $H(H(Block Header) || "blockreward")$.
+Every input must come from a prior output, so an input is simply an output ID along with its spend conditions.
 
 \subsection{Spend Conditions}
 Outputs have a list of spend conditions which must be met before the coins are ``unlocked'' and can be spent.
-The spend conditions include a time lock and a set of public keys, and an integer indicating how many public keys must be signed to unlock the coins.
-The output cannot be spent until the time lock has been expired.
+The spend conditions include a time lock and a set of public keys, and the number of signatures required.
+The output cannot be spent until the time lock has expired and enough of the specified keys have added their signature.
 
-The spend conditions are wrapped up into a Merkle tree, with the leaves being the time lock, the number of signatures required, and each public key.
-The root hash of the Merkle tree is used as the 'address' to which the coins are spent.
-When the coins are being spent, the spend conditions that match the address must be included along with the signatures.
-We have chosen to make the spend conditions a Merkle tree so that selective information can be revealed.
-For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required.
+The spend conditions are hashed as a Merkle tree, using the time lock, number of signatures required, and each public key as leaves.
+The root hash of this tree is used as the ``address'' to which the coins are sent.
+In order to spend the coins, the spend conditions corresponding to the address hash must be provided.
+The use of a Merkle tree allows parties to selectively reveal information in the spend conditions.
+For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required. % note: time lock and num signatures would be very easy to brute force
 
 \subsection{Signatures}
-Each cryptographic signature is paired with an input ID, a time lock, and a field indicating which parts of the transaction have been signed.
-The input ID indicates which input in the transaction the signature is being applied to.
-The signature cannot be used until the time lock has expired.
-Any subset of fields in the transaction can be signed, including other signatures. (The arbitrary data, the miner fees, the inputs, the outputs, the contracts, the storage proofs, and the other signatures).
-There is also a flag to indicate that the whole transaction should be signed, except for other signatures.
+Each input in a transaction must be signed.
+The cryptographic signature itself is paired with an input ID, a time lock, and a set of flags indicating which parts of the transaction have been signed.
+The input ID indicates which input the signature is being applied to.
+The time lock specifies when the signature becomes valid.
+Any subset of fields in the transaction can be signed, with the exception of the Version and the signature itself (as this would be impossible).
+There is also a flag to indicate that the whole transaction should be signed, except for the signatures.
 This allows for more nuanced transaction schemes.
 
-The actual data being signed, then, is a concatenation of the time lock, input ID, bit array, and every field specified by the bit array.
+The actual data being signed, then, is a concatenation of the time lock, input ID, flags, and every flagged field.
 Every such signature in the transaction must be valid for the transaction to be accepted.
 
 \section{File Contracts}
