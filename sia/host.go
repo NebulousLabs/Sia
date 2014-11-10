@@ -11,7 +11,7 @@ type HostAnnouncement struct {
 	AvailableStorage   uint64
 	PricePerKilobyte   Currency
 	BurnPerKilobyte    Currency
-	ChallengeFrequency uint64
+	ChallengeFrequency BlockHeight
 
 	SpendConditions SpendConditions
 }
@@ -39,6 +39,7 @@ func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, 
 	} else {
 		w.OpenFreezeConditions[freezeUnlockHeight] = 1
 	}
+	info.SpendConditions = freezeConditions
 
 	// Add the announcement as arbitrary data.
 	prefixBytes := Marshal(HostAnnouncementPrefix)

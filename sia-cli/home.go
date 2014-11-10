@@ -6,6 +6,63 @@ import (
 	"github.com/NebulousLabs/Andromeda/sia"
 )
 
+// Pulls a bunch of information and announces the host to the network.
+func becomeHostWalkthrough(env *walletEnvironment) (err error) {
+	// Get a volume of days to freeze the coins.
+	// Burn will be equal to price.
+	// Frequency will be 100.
+
+	// Get a volume of storage to sell.
+	fmt.Print("Amount of storage to sell (in MB): ")
+	var storage uint64
+	_, err = fmt.Scanln(&storage)
+	if err != nil {
+		return
+	}
+
+	// Get a price to sell it at.
+	fmt.Print("Price of storage (siacoins per kilobyte): ")
+	var price uint64
+	_, err = fmt.Scanln(&price)
+	if err != nil {
+		return
+	}
+
+	// Get a volume of coins to freeze.
+	fmt.Print("How many coins to freeze (more is better): ")
+	var freezeCoins uint64
+	_, err = fmt.Scanln(&freezeCoins)
+	if err != nil {
+		return
+	}
+
+	fmt.Print("How many blocks to freeze the coins (more is better): ")
+	var freezeBlocks uint64
+	_, err = fmt.Scanln(&freezeBlocks)
+	if err != nil {
+		return
+	}
+
+	// NEED TO GET IP ADDRESS SOMEWHERE.
+
+	// Create the host announcement structure.
+	ha := sia.HostAnnouncement{
+		// IPAddress: "asdf",
+		AvailableStorage:   storage * 1024 * 1024,
+		PricePerKilobyte:   sia.Currency(price),
+		BurnPerKilobyte:    sia.Currency(price),
+		ChallengeFrequency: sia.BlockHeight(100),
+	}
+
+	// Have the wallet make the announcement.
+	_, err = env.wallets[0].HostAnnounceSelf(ha, sia.Currency(freezeCoins), sia.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func toggleMining(env *walletEnvironment) {
 	go env.state.ToggleMining(env.wallets[0].SpendConditions.CoinAddress())
 }
@@ -79,6 +136,7 @@ func displayHomeHelp() {
 	fmt.Println(
 		" h:\tHelp - display this message\n",
 		"q:\tQuit - quit the program\n",
+		"H:\tHost - become a host and announce to the network\n",
 		"m:\tMine - turn mining on or off\n",
 		"p\tPrint - list all of the wallets, plus some stats about the program\n",
 		"s:\tSend - send coins to another wallet\n",
@@ -108,10 +166,8 @@ func pollHome(env *walletEnvironment) {
 		case "q", "quit":
 			return
 
-		/*
-			case "H", "host", "store", "advertise", "storage":
-				becomeHostWalkthrough(env)
-		*/
+		case "H", "host", "store", "advertise", "storage":
+			err = becomeHostWalkthrough(env)
 
 		case "m", "mine", "toggle", "mining":
 			toggleMining(env)
