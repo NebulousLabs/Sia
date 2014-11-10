@@ -329,25 +329,31 @@ Updating the terms of the contract will require consent from all parties.
 \subsection{Siafund the Miner fees}
 Have some portion of siafunds contribute to the miner fees, which ensures that miners have compensation so long as Sia is being used for its core purpose - storage.
 
-\subsection{Miner Fee Adjustments}
-If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
-This can be mitigated by putting all of the fees into a pool which pays out 50\% every block, making re-mining unprofitable for any party with less than 50\% of the network hashing power.
+% \subsection{Miner Fee Adjustments}
+% If a block has miner fees which are significantly higher than the fees in the current block, there is incentive for miners to re-mine the previous block and change who gets the miner fees.
+% This can be mitigated by putting all of the fees into a pool which pays out 50\% every block, making re-mining unprofitable for any party with less than 50\% of the network hashing power.
 % Link to discussion threads of this potential change.
 
-Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
-It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
+% Additionally, miners have incentives not to propagate high fee transactions, because this will prevent other miners from mining the transaction and collecting the fees.
+% It may be possible to construct a system using fee deterioration that means a miner has the highest expected total reward when the transaction is mined as soon as possible - regardless of who mines the transaction.
 % Link to discussion threads of this potential change.
 
-\subsection{More Frequent Difficulty Adjustments}
-We would wish to preserve the maximum difficulty adjustment of 4x every 2 weeks, however we would like to have more frequent difficulty adjustments.
+\subsection{More Frequent Target Adjustments}
+% This section could use a few citations, but the discussion on this seems pretty well scattered. I could find things like the Kimoto Gravity Well, but other than alts.pdf I couldn't find any comments by respected individuals. I know that these discussions are out there, I've seen them before, just can't find them.
+Changing the target every block instead of every 2016 blocks has advantages.
+Assuming exponential growth in mining power, the number of blocks produced is closer to one every 10 minutes.
+In Bitcoin, the final blocks in each difficulty window are produced faster than every 10 minutes (sometimes substantially) on account of massive week-over-week growth in mining power.
+Adjusting the difficulty every block mitigates this to some extent.
 
-Adjusting the difficulty every block solves the following issues:
-\begin{itemize}
-	\item Stronger defense against difficulty raising attacks, as difficulty raising must be staggered instead of jumping.
-	\item Stronger defense against the timewarp attack.
-	\item Smoother difficulty curve means less minining equipment being turned off simultaneously.
-\end{itemize}
-% Link to discussion threads for this potential change.
+The bi-weekly adjustments to the Bitcoin difficulty can also cause coordinated drops in mining power - all at once miners lose a percentage of their dollars-per-energy efficiency.
+Difficulty adjustments every block creates a much smoother function for when mining rigs are no longer profitable.
+
+The clamp on mining growth can also be increased.
+The clamp on mining grwoth is there to prevent an attacker from being trivially able to dramatically jump or drop the difficulty.
+In Bitcoin, raising the difficulty from 1000 to 4000 requires a minimum of 2,016,000 of work, and the difficulty can adjust by a maximum of 4x every week.
+If the difficulty is being adjusted every block however, clamped at 1.001\% per block, an attacker will need 3,000,050 work to raise the difficulty from 1000 to 4000, and the difficulty can adjust by a maximum of 7.5x every week, which both increases the flexibility of the difficulty and makes difficulty raising attacks more difficult.
+
+Though the difficulty will be adjusted every block, it will still be adjusted according to the amount of time taken to produce the previous 2016 blocks, preventing randomly fast or slow blocks from having large impact on the network.
 
 % \subsection{Committing to State}
 % One thing that could allow for substantially lighter weight clients is if the miners committed to the current state of the network, instead of just to the new transactions.
