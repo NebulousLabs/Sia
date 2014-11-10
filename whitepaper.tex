@@ -283,19 +283,21 @@ Any of the contract outputs that go to a null address (to an address that cannot
 High reliability hosts can send funds for missing proofs to the 0 address, which means the client is not compensated, but the host is still penalized, and the fees are not severe.
 
 \section{Economics of Sia}
-Sia is going to be a permanently inflationary currency.
-The inflation will be to the tune of 2\% annually.
-There will initially be 1000 coins released every block, and this will continue until 1000 coins per block matches 2\% annual inflation.
-Then, the number of coins released every block will be increased slightly every 20,000 blocks to maintain a 2\% annual inflation.
+The supply of siacoins is going to increase permanently.
+Intially, 300,000 coins will be minted every block.
+Each block, the number of coins minted will be reduced by 1, until the minimum of 30,000 coins per block is reached.
+At the end of year 1, the annual growth in supply will be 90\%.
+Years 2, 3, 4, 5, 8, and 20 will have annaul growths of 39\%, 21\%, 11.5\%, 4.4\%, 3.2\%, and 2.3\%, respectively.
 
 Coins must be locked down when creating contracts.
 A contract lasting 1 month will have a months worth of coins in a spent output that are not in circulation.
 The number of coins locked down will be even greater if the host is offering a large refund for losing the file.
-As Sia's usage as a storage platform goes up, the scarcity of the coin will also go up.
+As Sia's usage as a storage platform goes up, the scarcity of the coin being used will also go up.
 
 Hosts are only dependent on the stability of the value of the siacoin for the duration of their contracts.
 Hosts can continually reprice contracts as the sianote shifts in value.
 Siacoins also derive value from the fact that you must have siacoins in order to create a contract.
+Future additions to support more currencies through the use of two way pegs will provide additional security for hosts.
 
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
@@ -385,12 +387,6 @@ Siafunds are used as a mechanism of generating revenue for Nebulous Inc., the co
 By using Siafunds instead of premining, Nebulous more directly correlates revenue to actual use of the network, and is largely unaffected by market games that malicious entities may play with the network currency.
 Miners may also derive a part of their block subsidy from Siafunds, which would help to insulate miners from market games as well.
 Long term, we hope to add support for two-way-pegs with various currencies, which would enable consumers to insulate themselves from the instability of a single currency.
-
-The Siacoin as a currency is a permanently inflationary currency, with 1000 coins being generated per block, forever.
-There is a consideration to have the minimum annual inflation set to 2\%, which would provide miners with a proportional permanent source of income regardless of the size of transaction fees.
-
-Experimental changes have also been proposed to the way mining fees are distributed, and to provide miners with an incentive to propagate transactions.
-Changing the difficulty every block instead of every 2016 blocks provides a more consistent block time and a more tapered shutting down of obsolete mining hardware.
 
 Altogether, we believe Sia will provide a fertile platform for decentralizing cloud storage in minimal trust and zero trust environments.
 
