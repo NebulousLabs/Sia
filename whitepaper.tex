@@ -19,33 +19,33 @@ luke@nebulouslabs.com
 \maketitle
 
 \subsection*{Abstract}
-Sia is a platform for decentralized storage.
-Storage providers agree produce regular proofs of storage in return for compensation.
-Failure to provide storage proofs results in financial penalty.
+The authors introduce Sia, a platform for decentralized storage.
+Sia enables the formation of storage contracts between peers.
+These contracts define who is hosting what, and at what price.
+They also require the host to prove, at regular intervals, that they are still storing their client's data.
 
-Sia is a Bitcoin-based POW altchain that has added support for a specific type of storage contract.
-Sia will initially be implemented as an altcoin, and later financially connected to Bitcoin through a two way peg.
+Contracts are stored in a blockchain, making them publicly auditable.
+In this respect, Sia can be viewed as a Bitcoin derivative that includes support for such contracts.
+Sia will initially be implemented as an altcoin, and later financially connected to Bitcoin via a two-way peg.
 
 \section{Introduction}
-We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions for cloud storage, both at the P2P level and the enterprise level.
-We wish to achieve the following goals:
-\begin{itemize}
-	\item Anyone can join the network as a storage provider and be compensated.
-	\item Clients can upload files to the network, but do not need to remain online to submit proof of storage challenges to storage providers.
-	\item Storage providers will suffer a financial penalty for losing a file, even if the client is not online to submit storage challenges.
-	\item Storage providers will be compensated for successfully storing a file, regardless of client behavior.
-	\item Clients can achieve high file reliability, even when the average storage provider is not reliable.
-\end{itemize}
+Sia is a decentralized cloud storage platform that intends to compete with existing storage solutions, at both the P2P and enterprise level.
+Instead of renting storage from a centralized provider, peers on Sia rent storage from each other.
+Sia itself stores only the storage contracts formed between parties, defining the terms of their arrangement.
+A blockchain, similar to Bitcoin \cite{btc, btcdg}, is used for this purpose.
 
-We have chosen to use a blockchain similar to Bitcoin \cite{btc, btcdg} as the foundation for our platform.
-This is accomplished by adding a smart contract transaction type to the blockchain.
-With this contract, a storage provider agrees to store a file for a period of time, submitting publicly auditable proofs of storage at some frequency.
-Failure to submit a proof of storage results in a penalty for the storage provider, but succeeding results in compensation.
-Global consensus combined with publicly auditable proofs of storage are used to enforce the contracts between clients and hosts.
+By forming a contract, a storage provider agrees to store a client's data, and to periodically submit proof of their continued storage until the contract expires.
+The provider is compensated for every proof they submit, and penalized for missing a proof.
+Since these proofs are publicly verifiable (and are publicly available in the blockchain), network consensus can be used to automatically enforce storage contracts.
+Importantly, this means that clients do not need to personally verify storage proofs; they can simply upload their file and let the network do the rest.
 
-The initial implementation of our decentralized storage platform will be a blockchain with an altcoin.
-Future support for a two way peg with Bitcoin is planned, as discussed in ``Enabling Blockchain Innovations with Pegged Sidechains'' \cite{side}.
-Our blockchain mimics the Bitcoin blockchain except for the changes noted below.
+We acknowledge that storing data on a single untrusted host guarantees little in the way of availability, bandwidth, or general quality of service.
+Instead, we recommend storing data redundantly across multiple hosts.
+In particular, the use of erasure codes can enable high availability without excessive redundancy.
+
+Sia will initially be implemented as a blockchain-based altcoin.
+Future support for a two-way peg with Bitcoin is planned, as discussed in ``Enabling Blockchain Innovations with Pegged Sidechains'' \cite{side}.
+The Sia protocol largely resembles Bitcoin except for the changes noted below.
 
 \section{General Structure}
 The general rules for mining blocks, choosing forks, etc. will be the same as Bitcoin.
