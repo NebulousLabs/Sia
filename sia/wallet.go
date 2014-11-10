@@ -15,8 +15,9 @@ type Wallet struct {
 	SecretKey       *ecdsa.PrivateKey
 	SpendConditions SpendConditions
 
-	OwnedOutputs map[OutputID]Output // All outputs to CoinAddress
-	SpentOutputs map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OwnedOutputs         map[OutputID]Output // All outputs to CoinAddress
+	SpentOutputs         map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OpenFreezeConditions map[BlockHeight]int // A list of all heights at which freeze conditions are being used.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -27,6 +28,13 @@ type FileContractParameters struct {
 	Transaction        Transaction
 	FileContractIndex  int
 	ClientContribution Currency
+}
+
+// Wallet.FreezeConditions
+func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc SpendConditions) {
+	fc = w.SpendConditions
+	fc.TimeLock = unlockHeight
+	return
 }
 
 // Creates a new wallet that can receive and spend coins.
