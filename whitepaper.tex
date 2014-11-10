@@ -181,15 +181,16 @@ Because providers consent to all file contracts, the storage provider is able to
 \section{Arbitrary Transaction Data}
 Each transaction has an arbitrary data field which can be used for any type of information.
 Nodes will be required to store the arbitrary data if there is a signature in the transaction which includes the arbitary data in the signed fields.
-Miners will initially accept up to 16kb of arbitrary data per block.
-The reference node (non-mining) will accept any volume of arbitrary data, which allows soft-forks in the future to adjust how much arbitrary data is allowed.
+Nodes will initially accept up to 16kb of arbitrary data per block.
 
 The arbitrary data provides storage providers and clients a decentralized way to organize themselves.
 Standards can be agreed upon that are used to announce providers, announce files, or create an entire decentralized file tracker.
 
-It is possible that arbitrary data could be used for other types of soft forks, by creating an 'anyone can spend (0 sigs required)' output but then adding arbitrary data that the miners recognize as a new set of conditions on the output.
+It is possible that arbitrary data could be used for other types of soft forks, by creating an ``anyone can spend'' output but then adding arbitrary data that the miners recognize as a new set of conditions on the output.
 The miners block any transaction that spends the output without also satisfying the stipulations placed in the arbitrary data.
 Old nodes will stay synchronized without needing to be able to parse the arbitrary data.
+The amount of arbitrary data per block can be extended with a similar style of soft fork, where an anyone-can-spend transaction is visible to older clients, but data in the arbitrary field indicates that a longer block was signed, perhaps containing substantially more arbitrary data.
+Older clients would get the short block, and updated clients would demand the longer block or otherwise refuse to recognize the block.
 
 \section{Storage Ecosystem}
 Sia relies on an ecosystem that facilitates decentralized storage.
