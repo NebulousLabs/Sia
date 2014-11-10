@@ -129,10 +129,9 @@ func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 	return
 }
 
-// Problem: the wallet will double-spend itself if multiple transactions are
-// made without blocks being refreshed.
-// Takes a new address, and an amount to send, and adds outputs until the
-// amount is reached. Then sends leftovers back to self.
+// Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
+// allocateding 'minerFee' as a miner fee. The transaction is submitted to the
+// miner pool, but is also returned.
 func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, state *State) (t Transaction, err error) {
 	// Scan blockchain for outputs.
 	w.Scan(state)
@@ -154,6 +153,8 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	if err != nil {
 		return
 	}
+
+	err = state.AcceptTransaction(t)
 
 	return
 }

@@ -95,10 +95,6 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}
-	err = testEnv.state.AcceptTransaction(transaction)
-	if err != nil {
-		testEnv.t.Fatal(err)
-	}
 
 	// Attempt to create a conflicting transaction and see if it is rejected from the pool.
 	transaction.Outputs[0].SpendHash[0] = ^transaction.Outputs[0].SpendHash[0] // Change the output address
