@@ -24,10 +24,10 @@ Storage providers agree produce regular proofs of storage in return for compensa
 Failure to provide storage proofs results in financial penalty.
 
 Sia is a Bitcoin-based POW altchain that has added support for a specific type of storage contract.
-Sia will initally be implemented as an altcoin, and later financially connected to Bitcoin through a two way peg.
+Sia will initially be implemented as an altcoin, and later financially connected to Bitcoin through a two way peg.
 
 \section{Introduction}
-We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions for cloud storage, both at the p2p level and the enterprise level.
+We wish to create a decentralized cloud storage platform that has the ability to compete with existing solutions for cloud storage, both at the P2P level and the enterprise level.
 We wish to achieve the following goals:
 \begin{itemize}
 	\item Anyone can join the network as a storage provider and be compensated.
@@ -119,7 +119,7 @@ File contracts also specify a duration, challenge frequency, and payout paramete
 The challenge frequency determines the size of the window in which storage proofs can be submitted.
 As soon as one challenge window closes, the next opens.
 If a storage proof appears during the challenge window, an output is created sending coins to the valid proof address (presumably the host).
-If no valid proof appears during the challenge winodw, an output is created sending coins to the missed proof address (either the client, or perhaps the '0' address, which cannot be spent).
+If no valid proof appears during the challenge window, an output is created sending coins to the missed proof address (either the client, or perhaps the '0' address, which cannot be spent).
 
 A contract becomes invalid if a threshold of missed proofs is reached.
 If the file contract is still valid at the end of the specified duration, it ``successfully terminates.''
@@ -166,7 +166,7 @@ Furthermore, withholding a block to manipulate the random number will cost the a
 
 If an attacker is able to mine 50\% of the blocks, then 50\% of the challenges can be manipulated.
 However, the remaining 50\% are still random, so even in this scenario, an attacker storing only 50\% of a file will still fail 25\% of its storage proofs.
-Clients can therefore protect themselves against random number attacks by having many challenges and large penalites for missing proofs.
+Clients can therefore protect themselves against random number attacks by having many challenges and large penalties for missing proofs.
 Assuming the attacker is financially motivated, large windows and severe penalties should be sufficient to deter any attacker that controls less than 50\% of the network's hashing power.
 Clients are nonetheless advised to plan around potential Byzantine attacks which may not be financially motivated.
 
@@ -180,8 +180,8 @@ Because providers consent to all file contracts, the storage provider is able to
 
 \section{Arbitrary Transaction Data}
 Each transaction has an arbitrary data field which can be used for any type of information.
-Nodes will be required to store the arbitrary data if there is a signature in the transaction which includes the arbitary data in the signed fields.
-Nodes will initially accept up to 16kb of arbitrary data per block.
+Nodes will be required to store the arbitrary data if there is a signature in the transaction which includes the arbitrary data in the signed fields.
+Nodes will initially accept up to 16 KB of arbitrary data per block.
 
 The arbitrary data provides storage providers and clients a decentralized way to organize themselves.
 Standards can be agreed upon that are used to announce providers, announce files, or create an entire decentralized file tracker.
@@ -266,7 +266,7 @@ When the company needs to spend money, it must trade away portions of its source
 Additionally, premining means that one entity has control over a large volume of the currency, and therefore potentially large and disruptive control over the market.
 This seems like a less than ideal way of doing things.
 
-Instead, Nebulous pulls an income from Sia that is directly related to the value added by Sia, which is meaured by the value of the contracts set up between clients and hosts.
+Instead, Nebulous pulls an income from Sia that is directly related to the value added by Sia, which is measured by the value of the contracts set up between clients and hosts.
 This is essentially a fee established on creating contracts.
 When a contract is created, 10\% of the contract fund is set aside and distributed to the holders of siafunds.
 Nebulous Inc. will initially hold ~95\% of the siafunds, and the early crowd-fund backers of Sia will hold the remaining ~5\%.
@@ -279,13 +279,13 @@ These siacoins are sent to the same address as the siafunds.
 \subsection{Fee Exemption}
 High reliability hosts are penalized by the 10\% fee on the contract fund.
 If a host wishes to promise a 10x or 100x payout for losing a file, then the 10\% fee will greatly exceed the actual cost of the contract.
-We wish to provide hosts with an avenue for dodging the fees on penalities, without giving clients a way to dodge the fees.
+We wish to provide hosts with an avenue for dodging the fees on penalties, without giving clients a way to dodge the fees.
 Any of the contract outputs that go to a null address (to an address that cannot be spent) will dodge the fees.
 High reliability hosts can send funds for missing proofs to the 0 address, which means the client is not compensated, but the host is still penalized, and the fees are not severe.
 
 \section{Economics of Sia}
 The supply of siacoins is going to increase permanently.
-Intially, 300,000 coins will be minted every block.
+Initially, 300,000 coins will be minted every block.
 Each block, the number of coins minted will be reduced by 1, until the minimum of 30,000 coins per block is reached.
 At the end of year 1, the annual growth in supply will be 90\%.
 Years 2, 3, 4, 5, 8, and 20 will have annual growths of 39\%, 21\%, 11.5\%, 4.4\%, 3.2\%, and 2.3\%, respectively.
@@ -297,7 +297,7 @@ The number of coins locked down will be even greater if the host is offering a l
 As Sia's usage as a storage platform goes up, the scarcity of the coin being used will also go up.
 
 Hosts are only dependent on the stability of the value of the siacoin for the duration of their contracts.
-Hosts can continually reprice contracts as the sianote shifts in value.
+Hosts can continually reprice contracts as the siacoin shifts in value.
 Siacoins also derive value from the fact that you must have siacoins in order to create a contract.
 Future additions to support more currencies through the use of two way pegs will provide additional security for hosts.
 
@@ -353,7 +353,7 @@ The bi-weekly adjustments to the Bitcoin difficulty can also cause coordinated d
 Difficulty adjustments every block creates a much smoother function for when mining rigs are no longer profitable.
 
 The clamp on mining growth can also be increased.
-The clamp on mining grwoth is there to prevent an attacker from being trivially able to dramatically jump or drop the difficulty.
+The clamp on mining growth is there to prevent an attacker from being trivially able to dramatically jump or drop the difficulty.
 In Bitcoin, raising the difficulty from 1000 to 4000 requires a minimum of 2,016,000 of work, and the difficulty can adjust by a maximum of 4x every week.
 If the difficulty is being adjusted every block however, clamped at 1.001\% per block, an attacker will need 3,000,050 work to raise the difficulty from 1000 to 4000, and the difficulty can adjust by a maximum of 7.5x every week, which both increases the flexibility of the difficulty and makes difficulty raising attacks more difficult.
 
@@ -383,7 +383,7 @@ The storage proof challenges are presented to the hosts on a regular basis and d
 While these contracts force a host to store a file and be online regularly, these contracts do not force hosts to give up the file.
 Instead, an out-of-band ecosystem is created which rewards hosts for being available and uploading the files upon request.
 Clients and hosts can use the arbitrary data fields in the blockchain as an expensive mechanism for coordinating, or the clients and hosts can use entirely out-of-band methods for coordinating.
-A basic system has been explained which provides moderate protection against sybil attacks and the general unreliability of hosts.
+A basic system has been explained which provides moderate protection against Sybil attacks and the general unreliability of hosts.
 
 Siafunds are used as a mechanism of generating revenue for Nebulous Inc., the company responsible for the release of Sia.
 By using Siafunds instead of premining, Nebulous more directly correlates revenue to actual use of the network, and is largely unaffected by market games that malicious entities may play with the network currency.
