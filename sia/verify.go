@@ -463,6 +463,31 @@ func (s *State) applyTransaction(t Transaction) {
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
 		s.ConsensusState.OpenContracts[sp.ContractID].FundsRemaining -= payout
 	}
+
+	// Check the arbitrary data of the transaction to fill out the host database.
+	if len(t.ArbitraryData) > 8 {
+		dataIndicator := DecUint64(t.ArbitraryData[0:8])
+		if dataIndicator == 1 {
+			var ha HostAnnouncement
+			Unmarshal(t.ArbitraryData[1:], ha)
+
+			// Verify that the spend condiitons match.
+			if ha.SpendConditions.CoinAddress() != t.Outputs[0].SpendHash {
+				return
+			}
+
+			var host Host
+			host.IPAddress = string(ha.IPAddress)
+			host.Price = ha.PricePerKilobyte
+			host.Burn = ha.BurnPerKilobyte
+			host.Freeze = Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[0].Value
+			if host.Freeze < 0 {
+				return
+			}
+
+			s.HostList = append(s.HostList, host)
+		}
+	}
 }
 
 // s.integrateBlock() will verify the block and then integrate it into the

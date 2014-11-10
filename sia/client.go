@@ -1,5 +1,14 @@
 package sia
 
+// the Host struct is kept in the client package because it's what the client
+// uses to weigh hosts and pick them out when storing files.
+type Host struct {
+	IPAddress string
+	Freeze    Currency
+	Burn      Currency
+	Price     Currency
+}
+
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
 func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {

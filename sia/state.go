@@ -27,6 +27,10 @@ type State struct {
 	Mining     bool
 	KillMining chan struct{}
 
+	// Tracking which hosts have announced through the blockchain and how much
+	// weight they have.
+	HostList []Host
+
 	sync.Mutex
 }
 
