@@ -48,6 +48,7 @@ func CreateWallet() (w *Wallet, err error) {
 
 	w.OwnedOutputs = make(map[OutputID]Output)
 	w.SpentOutputs = make(map[OutputID]Output)
+	w.OpenFreezeConditions = make(map[BlockHeight]int)
 
 	return
 }
@@ -56,11 +57,15 @@ func CreateWallet() (w *Wallet, err error) {
 // wallet.
 func (w *Wallet) Scan(state *State) {
 	w.OwnedOutputs = make(map[OutputID]Output)
+
+	// Check for owned outputs from the standard SpendConditions.
 	for id, output := range state.ConsensusState.UnspentOutputs {
 		if output.SpendHash == w.SpendConditions.CoinAddress() {
 			w.OwnedOutputs[id] = output
 		}
 	}
+
+	// Check for spendable outputs from the freeze conditions.
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
@@ -175,21 +180,6 @@ func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *S
 
 	// Add money to the transaction to fund the client's portion of the contract fund.
 	err = w.FundTransaction(params.ClientContribution, &params.Transaction)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// Wallet.HostFundFileContract() take a template FileContract and returns a
-// partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
-	// Scan the blockchain for outputs.
-	w.Scan(state)
-
-	// Add money t othe transaction to fund the hosts' portion of the contract fund.
-	err = w.FundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
 	if err != nil {
 		return
 	}

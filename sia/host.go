@@ -53,3 +53,18 @@ func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, 
 
 	return
 }
+
+// Wallet.HostFundFileContract() take a template FileContract and returns a
+// partial transaction containing an input for the contract, but no signatures.
+func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
+	// Scan the blockchain for outputs.
+	w.Scan(state)
+
+	// Add money t othe transaction to fund the hosts' portion of the contract fund.
+	err = w.FundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
+	if err != nil {
+		return
+	}
+
+	return
+}
