@@ -39,14 +39,14 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 // SendVal returns a closure that can be used in conjuction with Call to send
 // a value to a NetAddress. It prefixes the encoded data with a header,
 // containing the message's type and length
-func (na *NetAddress) SendVal(t byte, val interface{}) func(net.Conn) error {
+func SendVal(t byte, val interface{}) func(net.Conn) error {
 	encVal := Marshal(val)
 	encLen := EncUint64(uint64(len(encVal)))
 	msg := append([]byte{t},
 		append(encLen[:4], encVal...)...)
 
 	return func(conn net.Conn) error {
-		_, err = conn.Write(msg)
+		_, err := conn.Write(msg)
 		return err
 	}
 }

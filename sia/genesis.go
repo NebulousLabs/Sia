@@ -1,6 +1,7 @@
 package sia
 
 import (
+	"errors"
 	"net"
 	"time"
 )
@@ -70,8 +71,10 @@ func (s *State) requestBlock(bh BlockHeight) func(net.Conn) error {
 	encbh := EncUint64(uint64(bh))
 	return func(conn net.Conn) error {
 		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
-		conn.Read()
-		b, err := Unmarshal(blockData)
+		var b Block
+		blockData := make([]byte, 1000)
+		conn.Read(blockData)
+		err := Unmarshal(blockData, &b)
 		if err != nil {
 			return err
 		}
@@ -86,9 +89,9 @@ func (s *State) sendBlock(conn net.Conn, data []byte) error {
 	if b == nil {
 		return errors.New("invalid block height")
 	}
-	encBlock := Marshal(val)
+	encBlock := Marshal(*b)
 	encLen := EncUint64(uint64(len(encBlock)))
-	_, err = conn.Write(append(encLen[:4], encBlock...))
+	_, err := conn.Write(append(encLen[:4], encBlock...))
 	return err
 }
 
@@ -96,7 +99,7 @@ func (s *State) sendBlock(conn net.Conn, data []byte) error {
 func (s *State) Bootstrap() {
 	i := BlockHeight(0)
 	for { // when do we break?
-		s.tcps.Broadcast(s.requestBlock(i))
+		s.Server.Broadcast(s.requestBlock(i))
 		i++
 	}
 }
