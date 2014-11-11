@@ -29,7 +29,8 @@ type State struct {
 
 	// Tracking which hosts have announced through the blockchain and how much
 	// weight they have.
-	HostList []Host
+	HostList    []Host
+	TotalWeight Currency
 
 	sync.Mutex
 }

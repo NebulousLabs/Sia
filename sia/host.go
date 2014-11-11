@@ -8,7 +8,8 @@ const (
 // It is preceded by 8 bytes matching the numerical integer '1'.
 type HostAnnouncement struct {
 	IPAddress          []byte
-	AvailableStorage   uint64
+	MinFilesize        uint64
+	MaxFilesize        uint64
 	PricePerKilobyte   Currency
 	BurnPerKilobyte    Currency
 	ChallengeFrequency BlockHeight

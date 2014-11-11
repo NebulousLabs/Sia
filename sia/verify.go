@@ -487,6 +487,7 @@ func (s *State) applyTransaction(t Transaction) {
 			}
 
 			s.HostList = append(s.HostList, host)
+			s.TotalWeight += host.Weight()
 		}
 	}
 }
