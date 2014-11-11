@@ -117,6 +117,7 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 		handlerMap: map[byte]func(net.Conn, []byte) error{
 			'H': sendHostname,
 			'P': tcps.sharePeers,
+			'A': tcps.addPeer,
 		},
 	}
 
@@ -200,6 +201,20 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 	return err
 }
 
+// addPeer adds the connecting peer to its address book
+func (tcps *TCPServer) addPeer(conn net.Conn, _ []byte) (err error) {
+	host, portStr, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return
+	}
+	tcps.addressbook[NetAddress{host, uint16(port)}] = struct{}{}
+	return
+}
+
 // Ping returns whether a NetAddress is reachable. It accomplishes this by
 // initiating a TCP connection and immediately closes it. This is pretty
 // unsophisticated. I'll add a Pong later.
@@ -264,6 +279,12 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	return
 }
 
+// addMe announces the TCPServer's NetAddress to a peer
+func (tcps *TCPServer) addMe(conn net.Conn) error {
+	_, err := conn.Write([]byte{'A', 0, 0, 0, 0})
+	return err
+}
+
 // Bootstrap discovers the external IP of the TCPServer, requests peers from
 // the initial peer list, and announces itself to those peers.
 func (tcps *TCPServer) Bootstrap() (err error) {
@@ -280,11 +301,13 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 			break
 		}
 	}
+
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
-	for addr := range tcps.addressbook {
-		addr.Call(tcps.requestPeers)
-	}
-	// TODO: announce ourselves to new peers
+	tcps.Broadcast(tcps.requestPeers)
+
+	// announce ourselves to new peers
+	tcps.Broadcast(tcps.addMe)
+
 	return
 }
