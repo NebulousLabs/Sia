@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/NebulousLabs/Andromeda/sia"
 
@@ -46,6 +47,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 	state.Bootstrap()
 
 	// start generating and sending blocks
+	state.ToggleMining(sia.CoinAddress{})
 }
 
 // Creates a new network using sia's genesis tools, then polls using the
@@ -68,7 +70,7 @@ func genesisStart(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("New blockchain created.")
+	fmt.Println("New blockchain created")
 
 	pollHome(env)
 }
@@ -76,9 +78,9 @@ func genesisStart(cmd *cobra.Command, args []string) {
 func main() {
 	// Create the basic command.
 	root := &cobra.Command{
-		Use:   "sia-cli",
-		Short: "Sia Cli v0.1.0",
-		Long:  "Sia command line wallet version 0.1.0",
+		Use:   os.Args[0],
+		Short: "Sia CLI v0.1.0",
+		Long:  "Sia Command Line Wallet, version 0.1.0",
 		Run:   walletStart,
 	}
 
@@ -86,15 +88,15 @@ func main() {
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Long:  "Prints version information about the Sia command line wallet.",
+		Long:  "Print version information about the Sia Command Line Wallet.",
 		Run:   func(_ *cobra.Command, _ []string) { fmt.Println("Sia Command Line Wallet v0.1.0") },
 	})
 
 	// Create a genesis command.
 	root.AddCommand(&cobra.Command{
 		Use:   "genesis",
-		Short: "Create a genesis block.",
-		Long:  "Create a genesis block and begin mining on a new network instead of joining an existing network.",
+		Short: "Create a genesis block",
+		Long:  "Create a genesis block and begin mining on a new network instead of joining an existing network",
 		Run:   genesisStart,
 	})
 
