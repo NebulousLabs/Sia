@@ -478,10 +478,12 @@ func (s *State) applyTransaction(t Transaction) {
 
 			var host Host
 			host.IPAddress = string(ha.IPAddress)
-			host.Price = ha.PricePerKilobyte
-			host.Burn = ha.BurnPerKilobyte
 			host.Freeze = Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[0].Value
+			host.Burn = ha.BurnPerKilobyte
+			host.Price = ha.PricePerKilobyte
 			host.Duration = ha.MaxDuration
+			host.MinSize = ha.MinFilesize
+			host.MaxSize = ha.MaxFilesize
 			if host.Freeze < 0 {
 				return
 			}

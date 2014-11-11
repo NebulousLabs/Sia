@@ -53,6 +53,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 		PricePerKilobyte:   sia.Currency(price),
 		BurnPerKilobyte:    sia.Currency(price),
 		ChallengeFrequency: sia.BlockHeight(100),
+		MaxDuration:        10000,
 	}
 
 	// Have the wallet make the announcement.
