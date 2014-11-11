@@ -16,9 +16,36 @@ type walletEnvironment struct {
 // Creates the genesis state and then requests a bunch of blocks from the
 // network.
 func walletStart(cmd *cobra.Command, args []string) {
-	_ = sia.CreateGenesisState(sia.CoinAddress{})
+	// create TCP server
+	tcps, err := sia.NewTCPServer(9988)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer tcps.Close()
 
-	// Do bootstrapping stuff here.
+	// establish an initial peer list
+	if err = tcps.Bootstrap(); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// create genesis state and register it with the server
+	state := sia.CreateGenesisState(sia.CoinAddress{})
+	if err = tcps.RegisterRPC('B', state.AcceptBlock); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err = tcps.RegisterRPC('T', state.AcceptTransaction); err != nil {
+		fmt.Println(err)
+		return
+	}
+	state.Server = tcps
+
+	// download blocks
+	state.Bootstrap()
+
+	// start generating and sending blocks
 }
 
 // Creates a new network using sia's genesis tools, then polls using the

@@ -1,6 +1,7 @@
 package sia
 
 import (
+	"net"
 	"time"
 )
 
@@ -61,4 +62,41 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.UnspentOutputs[genesisBlock.subsidyID()] = genesisSubsidyOutput
 
 	return
+}
+
+// requestBlock returns a closure that can be used with addr.Call to request a
+// block at a specific height.
+func (s *State) requestBlock(bh BlockHeight) func(net.Conn) error {
+	encbh := EncUint64(uint64(bh))
+	return func(conn net.Conn) error {
+		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
+		conn.Read()
+		b, err := Unmarshal(blockData)
+		if err != nil {
+			return err
+		}
+		return s.AcceptBlock(b)
+	}
+}
+
+// sendBlock responds to a block request with the desired block
+func (s *State) sendBlock(conn net.Conn, data []byte) error {
+	height := BlockHeight(DecUint64(data))
+	b := s.blockAtHeight(height)
+	if b == nil {
+		return errors.New("invalid block height")
+	}
+	encBlock := Marshal(val)
+	encLen := EncUint64(uint64(len(encBlock)))
+	_, err = conn.Write(append(encLen[:4], encBlock...))
+	return err
+}
+
+// Bootstrap requests blocks from peers until the full blockchain has been download.
+func (s *State) Bootstrap() {
+	i := BlockHeight(0)
+	for { // when do we break?
+		s.tcps.Broadcast(s.requestBlock(i))
+		i++
+	}
 }
