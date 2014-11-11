@@ -6,6 +6,10 @@ import (
 	"io"
 )
 
+const (
+	SegmentSize = 64 // size of the leaves of a file Merkle tree
+)
+
 func HashBytes(data []byte) Hash {
 	return sha256.Sum256(data)
 }
@@ -46,7 +50,13 @@ func MerkleRoot(leaves []Hash) Hash {
 // MerkleFile splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
 // See MerkleRoot for a diagram of how Merkle trees are constructed.
-func MerkleFile(reader io.Reader, numSegments uint16) (hash Hash, err error) {
+func MerkleFile(reader io.Reader, fileSize uint64) (hash Hash, err error) {
+	// Calculate the number of segments given the file size.
+	numSegments := fileSize / SegmentSize
+	if fileSize % SegmentSize != 0 {
+		numSegments++
+	}
+
 	if numSegments == 0 {
 		err = errors.New("no data")
 		return
@@ -63,7 +73,7 @@ func MerkleFile(reader io.Reader, numSegments uint16) (hash Hash, err error) {
 	}
 
 	// locate smallest power of 2 < numSegments
-	var mid uint16 = 1
+	var mid uint64 = 1
 	for mid < numSegments/2+numSegments%2 {
 		mid *= 2
 	}

@@ -24,7 +24,7 @@ func (h *Host) Weight() Currency {
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {
+func (w *Wallet) ClientProposeContract(filename string, state *State) (err error) {
 	// Scan the blockchain for outputs.
 	w.Scan(state)
 
@@ -33,6 +33,17 @@ func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *S
 	if err != nil {
 		return
 	}
+
+	// open the file, create a merkle hash.
+
+	// find a host
+
+	// fill out the contract according to the whims of the host
+
+	// fund it, send it to the host.
+
+	// after getting a response, sign the reponse transaction and send the
+	// signed transaction to the host along with the file itself.
 
 	return
 }
