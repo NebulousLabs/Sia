@@ -36,19 +36,19 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 	return fn(conn)
 }
 
-// SendVal sends a value to a NetAddress. It prefixes the encoded data with a
-// header, comprising a message type and message length.
-func (na *NetAddress) SendVal(t byte, val interface{}) error {
-	conn, err := net.DialTimeout("tcp", na.String(), timeout)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
+// SendVal returns a closure that can be used in conjuction with Call to send
+// a value to a NetAddress. It prefixes the encoded data with a header,
+// containing the message's type and length
+func (na *NetAddress) SendVal(t byte, val interface{}) func(net.Conn) error {
 	encVal := Marshal(val)
 	encLen := EncUint64(uint64(len(encVal)))
-	_, err = conn.Write(append([]byte{t},
-		append(encLen[:4], encVal...)...))
-	return err
+	msg := append([]byte{t},
+		append(encLen[:4], encVal...)...)
+
+	return func(conn net.Conn) error {
+		_, err = conn.Write(msg)
+		return err
+	}
 }
 
 // TBD
@@ -91,7 +91,9 @@ func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
 	// create function:
 	sfn := func(_ net.Conn, b []byte) error {
 		v := reflect.New(typ.In(0)).Elem()
-		Unmarshal(b, v.Interface())
+		if err := Unmarshal(b, v.Interface()); err != nil {
+			return err
+		}
 		if err := val.Call([]reflect.Value{v})[0].Interface(); err != nil {
 			return err.(error)
 		}
@@ -168,6 +170,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	if fn, ok := tcps.handlerMap[msgHead[0]]; ok {
 		fn(conn, msgData)
 		// TODO: log error
+		// no wait, send the error?
 	}
 	return
 }

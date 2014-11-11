@@ -27,6 +27,9 @@ type State struct {
 	Mining     bool
 	KillMining chan struct{}
 
+	// Network Variables
+	Server *TCPServer
+
 	sync.Mutex
 }
 

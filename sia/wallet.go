@@ -187,8 +187,3 @@ func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *Sta
 
 	return
 }
-
-// SendTransaction sends a transaction to addr.
-func SendTransaction(t Transaction, addr NetAddress) error {
-	return addr.SendVal('T', t)
-}

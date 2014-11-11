@@ -175,6 +175,9 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Add the transaction to the pool.
 	s.addTransactionToPool(&t)
 
+	// forward transaction to peers
+	s.tcps.Broadcast(SendVal('T', t))
+
 	return
 }
 
@@ -677,6 +680,9 @@ func (s *State) AcceptBlock(b Block) (err error) {
 			return
 		}
 	}
+
+	// forward block to peers
+	s.tcps.Broadcast(SendVal('B', b))
 
 	return
 }
