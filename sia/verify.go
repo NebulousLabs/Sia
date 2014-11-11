@@ -472,22 +472,29 @@ func (s *State) applyTransaction(t Transaction) {
 			Unmarshal(t.ArbitraryData[1:], ha)
 
 			// Verify that the spend condiitons match.
-			if ha.SpendConditions.CoinAddress() != t.Outputs[0].SpendHash {
+			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
 				return
 			}
 
-			var host Host
-			host.IPAddress = string(ha.IPAddress)
-			host.Freeze = Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[0].Value
-			host.Burn = ha.BurnPerKilobyte
-			host.Price = ha.PricePerKilobyte
-			host.Duration = ha.MaxDuration
-			host.MinSize = ha.MinFilesize
-			host.MaxSize = ha.MaxFilesize
-			if host.Freeze < 0 {
+			// Add the host to the host database.
+			host := Host{
+				IPAddress:   string(ha.IPAddress),
+				MinSize:     ha.MinFilesize,
+				MaxSize:     ha.MaxFilesize,
+				Duration:    ha.MaxDuration,
+				Frequency:   ha.MaxChallengeFrequency,
+				Tolerance:   ha.MinTolerance,
+				Price:       ha.Price,
+				Burn:        ha.Burn,
+				Freeze:      Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[ha.FreezeIndex].Value,
+				CoinAddress: ha.CoinAddress,
+			}
+			if host.Freeze <= 0 {
 				return
 			}
 
+			// Add the weight of the host to the total weight of the hosts in
+			// the host database.
 			s.HostList = append(s.HostList, host)
 			s.TotalWeight += host.Weight()
 		}

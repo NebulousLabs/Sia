@@ -48,12 +48,14 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	// Create the host announcement structure.
 	ha := sia.HostAnnouncement{
 		// IPAddress: "asdf",
-		MinFilesize:        1024 * 1024, // 1mb
-		MaxFilesize:        storage * 1024 * 1024,
-		PricePerKilobyte:   sia.Currency(price),
-		BurnPerKilobyte:    sia.Currency(price),
-		ChallengeFrequency: sia.BlockHeight(100),
-		MaxDuration:        10000,
+		MinFilesize:           1024 * 1024, // 1mb
+		MaxFilesize:           storage * 1024 * 1024,
+		MaxDuration:           10000,
+		MaxChallengeFrequency: sia.BlockHeight(100),
+		MinTolerance:          10,
+		Price:                 sia.Currency(price),
+		Burn:                  sia.Currency(price),
+		CoinAddress:           env.wallets[0].SpendConditions.CoinAddress(),
 	}
 
 	// Have the wallet make the announcement.

@@ -213,11 +213,13 @@ func successContractTests(testEnv *testingEnvironment) {
 	}
 
 	// Add funds to the contract from each wallet.
-	err := testEnv.wallets[0].ClientFundFileContract(&fcp, testEnv.state)
+	testEnv.wallets[0].Scan(testEnv.state)
+	err := testEnv.wallets[0].FundTransaction(fcp.ClientContribution, &fcp.Transaction)
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}
-	err = testEnv.wallets[1].HostFundFileContract(&fcp, testEnv.state)
+	testEnv.wallets[1].Scan(testEnv.state)
+	err = testEnv.wallets[1].FundTransaction(fcp.Transaction.FileContracts[0].ContractFund-fcp.ClientContribution, &fcp.Transaction)
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}

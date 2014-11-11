@@ -80,7 +80,7 @@ type OpenContract struct {
 	FileContract    FileContract
 	ContractID      ContractID
 	FundsRemaining  Currency
-	Failures        uint32
+	Failures        uint64
 	WindowSatisfied bool
 }
 
