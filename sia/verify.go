@@ -318,7 +318,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
-func (s *State) childDepth(parentNode *BlockNode) (depth BlockDepth) {
+func (s *State) childDepth(parentNode *BlockNode) (depth Target) {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:])) // WRITE A FUNCTION TO GO FROM TARGET TO WEIGHT
 	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
 	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
@@ -400,7 +400,8 @@ func (s *State) rewindABlock() {
 	// Repen all contracts that terminated, and remove the corresponding output.
 	for _, openContract := range s.currentBlockNode().ContractTerminations {
 		s.OpenContracts[openContract.ContractID] = openContract
-		delete(s.UnspentOutputs, openContract.fileContractTerminationOutputID())
+		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
+		delete(s.UnspentOutputs, openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus))
 	}
 
 	// Reverse all outputs created by missed storage proofs.
@@ -587,7 +588,8 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
-				outputID := openContract.fileContractTerminationOutputID()
+				contractStatus := openContract.Failures == openContract.FileContract.Tolerance // MAKE A FUNCTION TO GET THIS VALUE
+				outputID := openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus)
 				output := Output{
 					Value: openContract.FundsRemaining,
 				}

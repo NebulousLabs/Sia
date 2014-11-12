@@ -1,7 +1,6 @@
 package sia
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 )
@@ -25,14 +24,6 @@ type State struct {
 	// FutureBlocks
 	// OrphanBlocks
 
-	// Consensus Variables - the current state of consensus according to the
-	// longest fork.
-	CurrentBlock   BlockID
-	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
-	OpenContracts  map[ContractID]*OpenContract
-	UnspentOutputs map[OutputID]Output
-	SpentOutputs   map[OutputID]Output
-
 	// The transaction pool works by storing a list of outputs that are
 	// spent by transactions in the pool, and pointing to the transaction
 	// that spends them. That makes it really easy to look up conflicts as
@@ -44,19 +35,26 @@ type State struct {
 	TransactionPool map[OutputID]*Transaction
 	TransactionList map[OutputID]*Transaction
 
+	// Consensus Variables - the current state of consensus according to the
+	// longest fork.
+	CurrentBlock   BlockID
+	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
+	OpenContracts  map[ContractID]*OpenContract
+	UnspentOutputs map[OutputID]Output
+	SpentOutputs   map[OutputID]Output
+
 	// Mining Variables
 	Mining     bool
 	KillMining chan struct{}
 
-	// Tracking which hosts have announced through the blockchain and how much
-	// weight they have.
+	// A database of hosts that can be used to choose where to upload files.
 	HostList    []Host
 	TotalWeight Currency
 
 	// Network Variables
 	Server *TCPServer
 
-	sync.Mutex
+	sync.Mutex // AcceptBlock() and AcceptTransaction() can be called concurrently.
 }
 
 // A BlockNode contains a block and the list of children to the block. Also
@@ -69,9 +67,9 @@ type BlockNode struct {
 	Height           BlockHeight
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 	Target           Target        // Target for next block.
-	Depth            BlockDepth    // Sum of weights of all blocks in this chain.
+	Depth            Target        // What the target would need to be to have a weight equal to all blocks up to this block.
 
-	ContractTerminations []*OpenContract
+	ContractTerminations []*OpenContract      // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
 }
 
@@ -96,39 +94,13 @@ type MissedStorageProof struct {
 	ContractID ContractID
 }
 
-// WinningBlockchain returns all of the blocks between `start` and `end` that
-// are a part of the winning fork. If end == 0, then all blocks after start are
-// included. If start or end is out of bounds, an error is returned. If start
-// is greater than end, then an error is returned.
-func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err error) {
-	if end == 0 {
-		end = uint64(len(s.CurrentPath))
-	}
-	if start > uint64(len(s.CurrentPath)) || end > uint64(len(s.CurrentPath)) {
-		err = fmt.Errorf("only %v blocks are known to the state.", len(s.CurrentPath))
-		return
-	}
-	if start > end {
-		err = fmt.Errorf("start is greater than end")
-		return
-	}
-
-	blockList = make([]*Block, end-start)
-	for i := start; i <= end; i++ {
-		blockList[i] = s.BlockMap[s.CurrentPath[BlockHeight(i)]].Block
-	}
-
-	return
-
-}
-
 // State.Height() returns the height of the longest fork.
 func (s *State) Height() BlockHeight {
 	return s.BlockMap[s.CurrentBlock].Height
 }
 
 // Depth() returns the depth of the current block of the state.
-func (s *State) Depth() BlockDepth {
+func (s *State) Depth() Target {
 	return s.currentBlockNode().Depth
 }
 
@@ -153,19 +125,4 @@ func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
 // heaviest fork.
 func (s *State) currentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
-}
-
-// OpenContract.fileContractTerminationOutputID() is a function with a rather
-// silly name that returns the output id of a contract that has terminated.
-//
-// This function will only work on contracts that have already terminated,
-// otherwise it will yield potentially incorrect results.
-func (oc *OpenContract) fileContractTerminationOutputID() OutputID {
-	var terminationBytes []byte
-	if oc.Failures == oc.FileContract.Tolerance {
-		terminationBytes = terminationString(false)
-	} else {
-		terminationBytes = terminationString(true)
-	}
-	return OutputID(HashBytes(append(oc.ContractID[:], append(terminationBytes)...)))
 }

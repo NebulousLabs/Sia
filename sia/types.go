@@ -35,7 +35,6 @@ type (
 	TransactionID Hash
 	CoinAddress   Hash // An address is the hash of the spend conditions that unlock the output.
 	Target        Hash
-	BlockDepth    Hash
 )
 
 // A Signature follows the crypto/ecdsa golang standard for signatures.
@@ -222,7 +221,7 @@ func (t *Transaction) FileContractID(index int) ContractID {
 	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...)))
 }
 
-// FileContract.WindowIndex returns the index of the challenge window that is
+// WindowIndex returns the index of the challenge window that is
 // open during block height 'height'.
 func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
 	if height < fc.Start {
@@ -237,17 +236,24 @@ func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight
 	return
 }
 
-// FileContract.StorageProofOutput() returns the OutputID of the output created
+// StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
-func (fc *FileContract) StorageProofOutputID(fileContractID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
+func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
 	proofString := proofString(proofValid)
 	windowIndex, err := fc.WindowIndex(height)
 	if err != nil {
 		return
 	}
 
-	outputID = OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	outputID = OutputID(HashBytes(append(fcID[:], append(proofString, Marshal(windowIndex)...)...)))
 	return
+}
+
+// ContractTerminationOutputID() returns the ID of a contract termination
+// output, given the id of the contract and the status of the termination.
+func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
+	terminationString := terminationString(successfulTermination)
+	return OutputID(HashBytes(append(fcID[:], terminationString...)))
 }
 
 // Signature.MarshalSia implements the Marshaler interface for Signatures.

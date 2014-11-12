@@ -4,4 +4,4 @@ import (
 	"math/big"
 )
 
-var SurpassThreshold = big.NewRat(25, 100)
+var SurpassThreshold = big.NewRat(5, 100)
