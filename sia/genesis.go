@@ -65,41 +65,47 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	return
 }
 
-// requestBlock returns a closure that can be used with addr.Call to request a
-// block at a specific height.
-func (s *State) requestBlock(bh BlockHeight) func(net.Conn) error {
-	encbh := EncUint64(uint64(bh))
+// sendBlock responds to a block request with the desired block
+func (s *State) SendBlocks(conn net.Conn, data []byte) error {
+	start := BlockHeight(DecUint64(data))
+	end := s.Height()
+	blocks := make([]Block, end-start)
+	for i := range blocks {
+		b := s.blockAtHeight(start + BlockHeight(i))
+		if b == nil {
+			return errors.New("unexpected nil block")
+		}
+		blocks[i] = *b
+	}
+	encBlocks := Marshal(blocks)
+	encLen := EncUint64(uint64(len(encBlocks)))
+	_, err := conn.Write(append(encLen[:4], encBlocks...))
+	return err
+}
+
+func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
+	encbh := EncUint64(uint64(start))
 	return func(conn net.Conn) error {
 		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
-		var b Block
-		blockData := make([]byte, 1000)
-		conn.Read(blockData)
-		err := Unmarshal(blockData, &b)
+		var blocks []Block
+		encBlocks, err := ReadPrefix(conn)
 		if err != nil {
 			return err
 		}
-		return s.AcceptBlock(b)
+		if err = Unmarshal(encBlocks, &blocks); err != nil {
+			return err
+		}
+		for i := range blocks {
+			if err = s.AcceptBlock(blocks[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-}
-
-// sendBlock responds to a block request with the desired block
-func (s *State) sendBlock(conn net.Conn, data []byte) error {
-	height := BlockHeight(DecUint64(data))
-	b := s.blockAtHeight(height)
-	if b == nil {
-		return errors.New("invalid block height")
-	}
-	encBlock := Marshal(*b)
-	encLen := EncUint64(uint64(len(encBlock)))
-	_, err := conn.Write(append(encLen[:4], encBlock...))
-	return err
 }
 
 // Bootstrap requests blocks from peers until the full blockchain has been download.
 func (s *State) Bootstrap() {
-	i := BlockHeight(0)
-	for { // when do we break?
-		s.Server.Broadcast(s.requestBlock(i))
-		i++
-	}
+	addr := s.Server.RandomPeer()
+	addr.Call(s.catchUp(0))
 }

@@ -41,6 +41,10 @@ func walletStart(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 		return
 	}
+	if err = tcps.RegisterRPC('R', state.SendBlocks); err != nil {
+		fmt.Println(err)
+		return
+	}
 	state.Server = tcps
 
 	// download blocks

@@ -81,6 +81,16 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+// RandomPeer selects and returns a random peer from the address book.
+// TODO: probably not smart to depend on map iteration...
+func (tcps *TCPServer) RandomPeer() (rand NetAddress) {
+	for addr := range tcps.addressbook {
+		rand = addr
+		break
+	}
+	return
+}
+
 // Broadcast calls the specified function on each peer in the address book.
 func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
 	for addr := range tcps.addressbook {
