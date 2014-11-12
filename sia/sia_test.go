@@ -29,6 +29,10 @@ func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 	testEnv.wallets = append(testEnv.wallets, firstWallet)
 
 	testEnv.state = CreateGenesisState(testEnv.wallets[0].SpendConditions.CoinAddress())
+	testEnv.state.Server, err = NewTCPServer(9989)
+	if err != nil {
+		testEnv.t.Fatal(err)
+	}
 
 	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
 		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.ConsensusState.UnspentOutputs))

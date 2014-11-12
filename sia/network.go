@@ -90,11 +90,11 @@ func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
 
 	// create function:
 	sfn := func(_ net.Conn, b []byte) error {
-		v := reflect.New(typ.In(0)).Elem()
+		v := reflect.New(typ.In(0))
 		if err := Unmarshal(b, v.Interface()); err != nil {
 			return err
 		}
-		if err := val.Call([]reflect.Value{v})[0].Interface(); err != nil {
+		if err := val.Call([]reflect.Value{v.Elem()})[0].Interface(); err != nil {
 			return err.(error)
 		}
 		return nil
