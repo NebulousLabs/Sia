@@ -429,6 +429,8 @@ func (s *State) applyTransaction(t Transaction) {
 		delete(s.ConsensusState.UnspentOutputs, input.OutputID)
 	}
 
+	// REMOVE ALL CONFLICTING TRANSACTIONS FROM THE TRANSACTION POOL.
+
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
 		s.ConsensusState.UnspentOutputs[t.outputID(i)] = output

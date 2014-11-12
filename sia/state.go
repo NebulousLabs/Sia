@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+type (
+	BlockWeight *big.Rat
+)
+
+var SurpassThreshold = big.NewRat(25, 100)
+
 // The state struct contains a list of all known blocks, sorted into a tree
 // according to the shape of the network. It also contains the
 // 'ConsensusState', which represents the state of consensus on the current
