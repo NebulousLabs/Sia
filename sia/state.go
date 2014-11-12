@@ -163,15 +163,6 @@ func (s *State) currentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
 }
 
-// OpenContract.storageProofOutputID() returns the output of a storage proof
-// given the current height and the success status of the proof.
-func (oc *OpenContract) storageProofOutputID(currentHeight BlockHeight, proofValid bool) OutputID {
-	proofString := proofString(proofValid)
-	windowIndex := oc.FileContract.WindowIndex(currentHeight)
-	return OutputID(HashBytes(append(oc.ContractID[:], append(proofString, Marshal(windowIndex)...)...)))
-	// return statement needs to match code found in transaction.storageProofOutputID ==> should write a function that enforces this similarity.
-}
-
 // OpenContract.fileContractTerminationOutputID() is a function with a rather
 // silly name that returns the output id of a contract that has terminated.
 //

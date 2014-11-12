@@ -2,6 +2,7 @@ package sia
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 )
 
@@ -223,19 +224,30 @@ func (t *Transaction) FileContractID(index int) ContractID {
 
 // FileContract.WindowIndex returns the index of the challenge window that is
 // open during block height 'height'.
-//
-// PROBLEM: FOR SOME HEIGHTS, THIS COULD RETURN WEIRD OVERFLOWED VALUES.
-func (fc *FileContract) WindowIndex(height BlockHeight) BlockHeight {
-	return (height - fc.Start) / fc.ChallengeFrequency
+func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
+	if height < fc.Start {
+		err = errors.New("height below start point")
+		return
+	}
+	if height >= fc.End {
+		err = errors.New("height above end point")
+	}
+
+	windowIndex = (height - fc.Start) / fc.ChallengeFrequency
+	return
 }
 
 // FileContract.StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
-func (t *Transaction) StorageProofOutput(fileContractIndex int, height BlockHeight, proofValid bool) OutputID {
-	fileContractID := t.FileContractID(fileContractIndex)
+func (fc *FileContract) StorageProofOutputID(fileContractID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
 	proofString := proofString(proofValid)
-	windowIndex := t.FileContracts[fileContractIndex].WindowIndex(height)
-	return OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	windowIndex, err := fc.WindowIndex(height)
+	if err != nil {
+		return
+	}
+
+	outputID = OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	return
 }
 
 // Signature.MarshalSia implements the Marshaler interface for Signatures.

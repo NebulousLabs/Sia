@@ -380,7 +380,10 @@ func (s *State) reverseTransaction(t Transaction) {
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
 		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
-		outputID := openContract.storageProofOutputID(s.Height(), true)
+		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+		if err != nil {
+			panic(err)
+		}
 		delete(s.ConsensusState.UnspentOutputs, outputID)
 	}
 
@@ -462,7 +465,11 @@ func (s *State) applyTransaction(t Transaction) {
 			Value:     payout,
 			SpendHash: openContract.FileContract.ValidProofAddress,
 		}
-		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.Height(), true)] = output
+		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+		if err != nil {
+			panic(err)
+		}
+		s.ConsensusState.UnspentOutputs[outputID] = output
 
 		// Mark the proof as complete for this window.
 		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
@@ -553,7 +560,10 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					payout = openContract.FundsRemaining
 				}
 
-				newOutputID := openContract.storageProofOutputID(s.Height(), false)
+				newOutputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
+				if err != nil {
+					panic(err)
+				}
 				output := Output{
 					Value:     payout,
 					SpendHash: openContract.FileContract.MissedProofAddress,
