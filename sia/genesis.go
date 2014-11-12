@@ -1,6 +1,8 @@
 package sia
 
 import (
+	"errors"
+	"net"
 	"time"
 )
 
@@ -61,4 +63,49 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.ConsensusState.UnspentOutputs[genesisBlock.subsidyID()] = genesisSubsidyOutput
 
 	return
+}
+
+// sendBlock responds to a block request with the desired block
+func (s *State) SendBlocks(conn net.Conn, data []byte) error {
+	start := BlockHeight(DecUint64(data))
+	end := s.Height()
+	blocks := make([]Block, end-start)
+	for i := range blocks {
+		b := s.blockAtHeight(start + BlockHeight(i))
+		if b == nil {
+			return errors.New("unexpected nil block")
+		}
+		blocks[i] = *b
+	}
+	encBlocks := Marshal(blocks)
+	encLen := EncUint64(uint64(len(encBlocks)))
+	_, err := conn.Write(append(encLen[:4], encBlocks...))
+	return err
+}
+
+func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
+	encbh := EncUint64(uint64(start))
+	return func(conn net.Conn) error {
+		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
+		var blocks []Block
+		encBlocks, err := ReadPrefix(conn)
+		if err != nil {
+			return err
+		}
+		if err = Unmarshal(encBlocks, &blocks); err != nil {
+			return err
+		}
+		for i := range blocks {
+			if err = s.AcceptBlock(blocks[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+// Bootstrap requests blocks from peers until the full blockchain has been download.
+func (s *State) Bootstrap() {
+	addr := s.Server.RandomPeer()
+	addr.Call(s.catchUp(0))
 }

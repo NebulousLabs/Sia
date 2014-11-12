@@ -75,7 +75,7 @@ func (s *State) AttemptToGenerateBlock(minerAddress CoinAddress) (b *Block, err 
 }
 
 // ToggleMining creates a channel and mines until it receives a kill signal.
-func (s *State) ToggleMining(minerAddress CoinAddress) (b *Block) {
+func (s *State) ToggleMining(minerAddress CoinAddress) {
 	if !s.Mining {
 		s.KillMining = make(chan struct{})
 		s.Mining = true

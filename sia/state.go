@@ -32,6 +32,9 @@ type State struct {
 	HostList    []Host
 	TotalWeight Currency
 
+	// Network Variables
+	Server *TCPServer
+
 	sync.Mutex
 }
 
