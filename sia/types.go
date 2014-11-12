@@ -156,19 +156,44 @@ func (b *Block) SubsidyID() OutputID {
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
 func (t *Transaction) SigHash(i int) Hash {
-	return HashBytes(MarshalAll(
-		t.ArbitraryData,
-		t.Inputs,
-		t.MinerFees,
-		t.Outputs,
-		t.FileContracts,
-		t.StorageProofs,
-		t.Signatures[i].InputID,
-		t.Signatures[i].PublicKeyIndex,
-		t.Signatures[i].TimeLock,
-	))
+	if t.Signatures[i].CoveredFields.WholeTransaction {
+		return HashBytes(MarshalAll(
+			t.ArbitraryData,
+			t.Inputs,
+			t.MinerFees,
+			t.Outputs,
+			t.FileContracts,
+			t.StorageProofs,
+			t.Signatures[i].InputID,
+			t.Signatures[i].PublicKeyIndex,
+			t.Signatures[i].TimeLock,
+		))
+	}
 
-	// ADD LOGIC TO DEAL WITH COVERED FIELDS
+	var signedData []byte
+	if t.Signatures[i].CoveredFields.ArbitraryData {
+		signedData = append(signedData, Marshal(t.ArbitraryData)...)
+	}
+	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+		signedData = append(signedData, Marshal(minerFee)...)
+	}
+	for _, input := range t.Signatures[i].CoveredFields.Inputs {
+		signedData = append(signedData, Marshal(input)...)
+	}
+	for _, output := range t.Signatures[i].CoveredFields.Outputs {
+		signedData = append(signedData, Marshal(output)...)
+	}
+	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+		signedData = append(signedData, Marshal(contract)...)
+	}
+	for _, fileProof := range t.Signatures[i].CoveredFields.FileProofs {
+		signedData = append(signedData, Marshal(fileProof)...)
+	}
+	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
+		signedData = append(signedData, Marshal(sig)...)
+	}
+
+	return HashBytes(signedData)
 }
 
 // Transaction.OuptutID() takes the index of the output and returns the
