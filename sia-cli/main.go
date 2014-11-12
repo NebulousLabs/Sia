@@ -31,27 +31,35 @@ func walletStart(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	env := new(walletEnvironment)
+
 	// create genesis state and register it with the server
-	state := sia.CreateGenesisState(sia.CoinAddress{})
-	if err = tcps.RegisterRPC('B', state.AcceptBlock); err != nil {
+	env.state = sia.CreateGenesisState(sia.CoinAddress{})
+	if err = tcps.RegisterRPC('B', env.state.AcceptBlock); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = tcps.RegisterRPC('T', state.AcceptTransaction); err != nil {
+	if err = tcps.RegisterRPC('T', env.state.AcceptTransaction); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = tcps.RegisterRPC('R', state.SendBlocks); err != nil {
+	if err = tcps.RegisterRPC('R', env.state.SendBlocks); err != nil {
 		fmt.Println(err)
 		return
 	}
-	state.Server = tcps
+	env.state.Server = tcps
 
 	// download blocks
-	state.Bootstrap()
+	env.state.Bootstrap()
 
-	// start generating and sending blocks
-	state.ToggleMining(sia.CoinAddress{})
+	wallet, err := sia.CreateWallet()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	env.wallets = append(env.wallets, wallet)
+
+	pollHome(env)
 }
 
 // Creates a new network using sia's genesis tools, then polls using the
