@@ -36,6 +36,24 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 	return fn(conn)
 }
 
+func ReadPrefix(conn net.Conn) ([]byte, error) {
+	prefix := make([]byte, 4)
+	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
+		return nil, errors.New("could not read length prefix")
+	}
+	msgLen := DecUint64(prefix)
+	if msgLen > maxMsgLen {
+		return nil, errors.New("bad message length")
+	}
+	msgData := make([]byte, msgLen)
+	if msgLen > 0 {
+		if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
+			return nil, errors.New("could not read message content")
+		}
+	}
+	return msgData, nil
+}
+
 // SendVal returns a closure that can be used in conjuction with Call to send
 // a value to a NetAddress. It prefixes the encoded data with a header,
 // containing the message's type and length
@@ -146,29 +164,18 @@ func (tcps *TCPServer) listen() {
 // TODO: set deadlines?
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
-	var (
-		msgHead []byte = make([]byte, 5)
-		msgData []byte // length determined by msgHead
-	)
-	if n, err := conn.Read(msgHead); err != nil || n != 5 {
+	msgType := make([]byte, 1)
+	if n, err := conn.Read(msgType); err != nil || n != 1 {
 		// TODO: log error
 		return
 	}
-	msgLen := DecUint64(msgHead[1:])
-	if msgLen > maxMsgLen {
+	msgData, err := ReadPrefix(conn)
+	if err != nil {
 		// TODO: log error
 		return
 	}
-	if msgLen > 0 {
-		msgData = make([]byte, msgLen)
-		if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
-			// TODO: log error
-			return
-		}
-	}
-
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[msgHead[0]]; ok {
+	if fn, ok := tcps.handlerMap[msgType[0]]; ok {
 		fn(conn, msgData)
 		// TODO: log error
 		// no wait, send the error?
