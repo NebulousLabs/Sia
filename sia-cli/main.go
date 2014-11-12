@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/NebulousLabs/Andromeda/sia"
 
@@ -16,9 +17,49 @@ type walletEnvironment struct {
 // Creates the genesis state and then requests a bunch of blocks from the
 // network.
 func walletStart(cmd *cobra.Command, args []string) {
-	_ = sia.CreateGenesisState(sia.CoinAddress{})
+	// create TCP server
+	tcps, err := sia.NewTCPServer(9988)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer tcps.Close()
 
-	// Do bootstrapping stuff here.
+	// establish an initial peer list
+	if err = tcps.Bootstrap(); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	env := new(walletEnvironment)
+
+	// create genesis state and register it with the server
+	env.state = sia.CreateGenesisState(sia.CoinAddress{})
+	if err = tcps.RegisterRPC('B', env.state.AcceptBlock); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err = tcps.RegisterRPC('T', env.state.AcceptTransaction); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err = tcps.RegisterRPC('R', env.state.SendBlocks); err != nil {
+		fmt.Println(err)
+		return
+	}
+	env.state.Server = tcps
+
+	// download blocks
+	env.state.Bootstrap()
+
+	wallet, err := sia.CreateWallet()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	env.wallets = append(env.wallets, wallet)
+
+	pollHome(env)
 }
 
 // Creates a new network using sia's genesis tools, then polls using the
@@ -41,7 +82,7 @@ func genesisStart(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("New blockchain created.")
+	fmt.Println("New blockchain created")
 
 	pollHome(env)
 }
@@ -49,9 +90,9 @@ func genesisStart(cmd *cobra.Command, args []string) {
 func main() {
 	// Create the basic command.
 	root := &cobra.Command{
-		Use:   "sia-cli",
-		Short: "Sia Cli v0.1.0",
-		Long:  "Sia command line wallet version 0.1.0",
+		Use:   os.Args[0],
+		Short: "Sia CLI v0.1.0",
+		Long:  "Sia Command Line Wallet, version 0.1.0",
 		Run:   walletStart,
 	}
 
@@ -59,15 +100,15 @@ func main() {
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Long:  "Prints version information about the Sia command line wallet.",
+		Long:  "Print version information about the Sia Command Line Wallet.",
 		Run:   func(_ *cobra.Command, _ []string) { fmt.Println("Sia Command Line Wallet v0.1.0") },
 	})
 
 	// Create a genesis command.
 	root.AddCommand(&cobra.Command{
 		Use:   "genesis",
-		Short: "Create a genesis block.",
-		Long:  "Create a genesis block and begin mining on a new network instead of joining an existing network.",
+		Short: "Create a genesis block",
+		Long:  "Create a genesis block and begin mining on a new network instead of joining an existing network",
 		Run:   genesisStart,
 	})
 

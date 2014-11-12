@@ -3,6 +3,7 @@ package sia
 import (
 	"errors"
 	"net"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -24,15 +25,48 @@ func (na *NetAddress) String() string {
 	return net.JoinHostPort(na.Host, strconv.Itoa(int(na.Port)))
 }
 
-// call establishes a TCP connection to the NetAddress, calls the provided
+// Call establishes a TCP connection to the NetAddress, calls the provided
 // function on it, and closes the connection.
 func (na *NetAddress) Call(fn func(net.Conn) error) error {
-	conn, err := net.Dial("tcp", na.String())
+	conn, err := net.DialTimeout("tcp", na.String(), timeout)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	return fn(conn)
+}
+
+func ReadPrefix(conn net.Conn) ([]byte, error) {
+	prefix := make([]byte, 4)
+	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
+		return nil, errors.New("could not read length prefix")
+	}
+	msgLen := DecUint64(prefix)
+	if msgLen > maxMsgLen {
+		return nil, errors.New("bad message length")
+	}
+	msgData := make([]byte, msgLen)
+	if msgLen > 0 {
+		if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
+			return nil, errors.New("could not read message content")
+		}
+	}
+	return msgData, nil
+}
+
+// SendVal returns a closure that can be used in conjuction with Call to send
+// a value to a NetAddress. It prefixes the encoded data with a header,
+// containing the message's type and length
+func SendVal(t byte, val interface{}) func(net.Conn) error {
+	encVal := Marshal(val)
+	encLen := EncUint64(uint64(len(encVal)))
+	msg := append([]byte{t},
+		append(encLen[:4], encVal...)...)
+
+	return func(conn net.Conn) error {
+		_, err := conn.Write(msg)
+		return err
+	}
 }
 
 // TBD
@@ -47,6 +81,58 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+// RandomPeer selects and returns a random peer from the address book.
+// TODO: probably not smart to depend on map iteration...
+func (tcps *TCPServer) RandomPeer() (rand NetAddress) {
+	for addr := range tcps.addressbook {
+		rand = addr
+		break
+	}
+	return
+}
+
+// Broadcast calls the specified function on each peer in the address book.
+func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
+	for addr := range tcps.addressbook {
+		addr.Call(fn)
+	}
+}
+
+// RegisterHandler registers a message type with a message handler. The
+// existing handler for that type will be overwritten.
+func (tcps *TCPServer) RegisterHandler(t byte, fn func(net.Conn, []byte) error) {
+	tcps.handlerMap[t] = fn
+}
+
+// RegisterRPC is for simple handlers. A simple handler decodes the message
+// data and passes it to fn. fn must have the type signature:
+//   func(Type) error
+// i.e. a 1-adic function that returns an error.
+func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
+	// if fn not correct type, panic
+	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
+	if typ.Kind() != reflect.Func || typ.NumIn() != 1 ||
+		typ.NumOut() != 1 || typ.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+		return errors.New("registered function has wrong type signature")
+	}
+
+	// create function:
+	sfn := func(_ net.Conn, b []byte) error {
+		v := reflect.New(typ.In(0))
+		if err := Unmarshal(b, v.Interface()); err != nil {
+			return err
+		}
+		if err := val.Call([]reflect.Value{v.Elem()})[0].Interface(); err != nil {
+			return err.(error)
+		}
+		return nil
+	}
+
+	tcps.RegisterHandler(t, sfn)
+	return nil
+}
+
+// NewTCPServer creates a TCPServer that listens on the specified port.
 func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcpServ, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
 	if err != nil {
@@ -55,21 +141,17 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcps = &TCPServer{
 		Listener:    tcpServ,
 		addressbook: make(map[NetAddress]struct{}),
-		handlerMap:  make(map[byte]func(net.Conn, []byte) error),
+		// default handlers
+		handlerMap: map[byte]func(net.Conn, []byte) error{
+			'H': sendHostname,
+			'P': tcps.sharePeers,
+			'A': tcps.addPeer,
+		},
 	}
-	// default handlers
-	tcps.handlerMap['H'] = tcps.sendHostname
-	tcps.handlerMap['P'] = tcps.sendHostname
 
 	// spawn listener
 	go tcps.listen()
 	return
-}
-
-// Register registers a message type with a message handler. The existing
-// handler for that type will be overwritten.
-func (tcps *TCPServer) Register(t byte, fn func(net.Conn, []byte) error) {
-	tcps.handlerMap[t] = fn
 }
 
 // listen runs in the background, accepting incoming connections and serving
@@ -89,37 +171,30 @@ func (tcps *TCPServer) listen() {
 // handleConn reads header data from a connection, unmarshals the data
 // structures it contains, and routes the data to other functions for
 // processing.
+// TODO: set deadlines?
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
-	var (
-		msgHead []byte = make([]byte, 5)
-		msgData []byte // length determined by msgHead
-	)
-	if n, err := conn.Read(msgHead); err != nil || n != 5 {
+	msgType := make([]byte, 1)
+	if n, err := conn.Read(msgType); err != nil || n != 1 {
 		// TODO: log error
 		return
 	}
-	msgLen := DecUint64(msgHead[1:])
-	if msgLen > maxMsgLen {
+	msgData, err := ReadPrefix(conn)
+	if err != nil {
 		// TODO: log error
 		return
 	}
-	msgData = make([]byte, msgLen)
-	if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
-		// TODO: log error
-		return
-	}
-
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[msgHead[0]]; ok {
+	if fn, ok := tcps.handlerMap[msgType[0]]; ok {
 		fn(conn, msgData)
 		// TODO: log error
+		// no wait, send the error?
 	}
 	return
 }
 
 // sendHostname replies to the send with the sender's external IP.
-func (tcps *TCPServer) sendHostname(conn net.Conn, _ []byte) error {
+func sendHostname(conn net.Conn, _ []byte) error {
 	_, err := conn.Write([]byte(conn.RemoteAddr().String()))
 	return err
 }
@@ -143,11 +218,25 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 	return err
 }
 
+// addPeer adds the connecting peer to its address book
+func (tcps *TCPServer) addPeer(conn net.Conn, _ []byte) (err error) {
+	host, portStr, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return
+	}
+	tcps.addressbook[NetAddress{host, uint16(port)}] = struct{}{}
+	return
+}
+
 // Ping returns whether a NetAddress is reachable. It accomplishes this by
 // initiating a TCP connection and immediately closes it. This is pretty
 // unsophisticated. I'll add a Pong later.
 func (tcps *TCPServer) Ping(addr NetAddress) bool {
-	conn, err := net.Dial("tcp", addr.String())
+	conn, err := net.DialTimeout("tcp", addr.String(), timeout)
 	if err != nil {
 		return false
 	}
@@ -158,7 +247,7 @@ func (tcps *TCPServer) Ping(addr NetAddress) bool {
 // learnHostname learns the external IP of the TCPServer.
 func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 	// send hostname request
-	if _, err = conn.Write([]byte{'H', 0}); err != nil {
+	if _, err = conn.Write([]byte{'H', 0, 0, 0, 0}); err != nil {
 		return
 	}
 	// read response
@@ -184,7 +273,7 @@ func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 // the address book.
 func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	// request 10 peers
-	if _, err = conn.Write([]byte{'P', 1, 10}); err != nil {
+	if _, err = conn.Write([]byte{'P', 1, 0, 0, 0, 10}); err != nil {
 		return
 	}
 	// read response
@@ -207,6 +296,12 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	return
 }
 
+// addMe announces the TCPServer's NetAddress to a peer
+func (tcps *TCPServer) addMe(conn net.Conn) error {
+	_, err := conn.Write([]byte{'A', 0, 0, 0, 0})
+	return err
+}
+
 // Bootstrap discovers the external IP of the TCPServer, requests peers from
 // the initial peer list, and announces itself to those peers.
 func (tcps *TCPServer) Bootstrap() (err error) {
@@ -223,11 +318,13 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 			break
 		}
 	}
+
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
-	for addr := range tcps.addressbook {
-		addr.Call(tcps.requestPeers)
-	}
-	// TODO: announce ourselves to new peers
+	tcps.Broadcast(tcps.requestPeers)
+
+	// announce ourselves to new peers
+	tcps.Broadcast(tcps.addMe)
+
 	return
 }
