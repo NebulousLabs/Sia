@@ -167,7 +167,7 @@ func (s *State) currentBlockWeight() BlockWeight {
 // given the current height and the success status of the proof.
 func (oc *OpenContract) storageProofOutputID(currentHeight BlockHeight, proofValid bool) OutputID {
 	proofString := proofString(proofValid)
-	windowIndex := oc.FileContract.windowIndex(currentHeight)
+	windowIndex := oc.FileContract.WindowIndex(currentHeight)
 	return OutputID(HashBytes(append(oc.ContractID[:], append(proofString, Marshal(windowIndex)...)...)))
 	// return statement needs to match code found in transaction.storageProofOutputID ==> should write a function that enforces this similarity.
 }

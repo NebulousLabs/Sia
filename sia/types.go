@@ -11,7 +11,7 @@ const (
 	SignatureSize = 32
 	SegmentSize   = 64 // Size of smallest piece of a file which gets hashed when building the Merkle tree.
 
-	BlockFrequency = 600 // In seconds.
+	BlockFrequency = 600               // In seconds.
 	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
 
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
@@ -97,11 +97,10 @@ type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
 	PublicKeyIndex uint64
 	TimeLock       BlockHeight
-	// CoveredFields  CoveredFields
-	Signature Signature
+	CoveredFields  CoveredFields
+	Signature      Signature
 }
 
-/*
 type CoveredFields struct {
 	WholeTransaction bool
 	ArbitraryData    bool
@@ -112,7 +111,6 @@ type CoveredFields struct {
 	FileProofs       []uint8
 	Signatures       []uint8
 }
-*/
 
 // A FileContract contains the information necessary to enforce that a host
 // stores a file.
@@ -157,7 +155,7 @@ func (b *Block) SubsidyID() OutputID {
 
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
-func (t *Transaction) SigHash(i uint64) Hash {
+func (t *Transaction) SigHash(i int) Hash {
 	return HashBytes(MarshalAll(
 		t.ArbitraryData,
 		t.Inputs,
@@ -175,8 +173,8 @@ func (t *Transaction) SigHash(i uint64) Hash {
 
 // Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
-func (t *Transaction) OutputID(index uint64) OutputID {
-	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(index)...)...)))
+func (t *Transaction) OutputID(index int) OutputID {
+	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...)))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
@@ -194,8 +192,8 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 }
 
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
-func (t *Transaction) FileContractID(index uint64) ContractID {
-	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(index)...)...)))
+func (t *Transaction) FileContractID(index int) ContractID {
+	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...)))
 }
 
 // FileContract.WindowIndex returns the index of the challenge window that is
@@ -209,9 +207,9 @@ func (fc *FileContract) WindowIndex(height BlockHeight) BlockHeight {
 // FileContract.StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
 func (t *Transaction) StorageProofOutput(fileContractIndex int, height BlockHeight, proofValid bool) OutputID {
-	fileContractID := t.fileContractID(fileContractIndex)
+	fileContractID := t.FileContractID(fileContractIndex)
 	proofString := proofString(proofValid)
-	windowIndex := t.FileContracts[fileContractIndex].windowIndex(height)
+	windowIndex := t.FileContracts[fileContractIndex].WindowIndex(height)
 	return OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
 }
 

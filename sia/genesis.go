@@ -60,7 +60,7 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 		Value:     GenesisSubsidy,
 		SpendHash: premineAddress,
 	}
-	s.ConsensusState.UnspentOutputs[genesisBlock.subsidyID()] = genesisSubsidyOutput
+	s.ConsensusState.UnspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
 	return
 }

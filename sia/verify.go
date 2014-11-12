@@ -12,9 +12,9 @@ import (
 // This struct keeps track of which public keys have been used and how many
 // more signatures are needed.
 type InputSignatures struct {
-	RemainingSignatures uint8
+	RemainingSignatures uint64
 	PossibleKeys        []PublicKey
-	UsedKeys            map[uint8]struct{}
+	UsedKeys            map[uint64]struct{}
 }
 
 // State.validTransaction returns err = nil if the transaction is valid, otherwise
@@ -282,7 +282,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 	var timePassed, expectedTimePassed Timestamp
 	if newNode.Height < TargetWindow {
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
+		expectedTimePassed = BlockFrequency * Timestamp(newNode.Height)
 	} else {
 		// WARNING: this code assumes that the block at height
 		// newNode.Height-TargetWindow is the same for both the new
@@ -291,7 +291,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		// 5000 blocks long.
 		adjustmentBlock := s.blockAtHeight(newNode.Height - TargetWindow)
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(TargetWindow)
+		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
 	}
 
 	// Adjustment = timePassed / expectedTimePassed.
@@ -368,7 +368,7 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 func (s *State) reverseTransaction(t Transaction) {
 	// Remove all outputs.
 	for i := range t.Outputs {
-		delete(s.ConsensusState.UnspentOutputs, t.outputID(i))
+		delete(s.ConsensusState.UnspentOutputs, t.OutputID(i))
 	}
 
 	// Add all outputs spent by inputs.
@@ -386,7 +386,7 @@ func (s *State) reverseTransaction(t Transaction) {
 
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
-		contractID := t.fileContractID(i)
+		contractID := t.FileContractID(i)
 		delete(s.ConsensusState.OpenContracts, contractID)
 	}
 }
@@ -433,12 +433,12 @@ func (s *State) applyTransaction(t Transaction) {
 
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
-		s.ConsensusState.UnspentOutputs[t.outputID(i)] = output
+		s.ConsensusState.UnspentOutputs[t.OutputID(i)] = output
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		contractID := t.fileContractID(i)
+		contractID := t.FileContractID(i)
 		openContract := OpenContract{
 			FileContract:    contract,
 			ContractID:      contractID,
@@ -612,7 +612,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
-	s.ConsensusState.UnspentOutputs[b.subsidyID()] = minerSubsidyOutput
+	s.ConsensusState.UnspentOutputs[b.SubsidyID()] = minerSubsidyOutput
 
 	// Update the current block and current path variables of the ConsensusState.
 	s.ConsensusState.CurrentBlock = b.ID()

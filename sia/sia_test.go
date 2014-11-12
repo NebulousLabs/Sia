@@ -245,7 +245,7 @@ func successContractTests(testEnv *testingEnvironment) {
 
 	// Check that the correct OpenContracts object has been created, and
 	// contains the expected values.
-	contractID := fcp.Transaction.fileContractID(0)
+	contractID := fcp.Transaction.FileContractID(0)
 	openContract, exists := testEnv.state.ConsensusState.OpenContracts[contractID]
 	if !exists {
 		testEnv.t.Fatal("open contract not found")
