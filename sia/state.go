@@ -10,8 +10,6 @@ type (
 	BlockWeight *big.Rat
 )
 
-var SurpassThreshold = big.NewRat(25, 100)
-
 // The state struct contains a list of all known blocks, sorted into a tree
 // according to the shape of the network. It also contains the
 // 'ConsensusState', which represents the state of consensus on the current
@@ -27,7 +25,24 @@ type State struct {
 	// FutureBlocks
 	// OrphanBlocks
 
-	ConsensusState ConsensusState
+	// Consensus Variables - the current state of consensus according to the
+	// longest fork.
+	CurrentBlock   BlockID
+	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
+	OpenContracts  map[ContractID]*OpenContract
+	UnspentOutputs map[OutputID]Output
+	SpentOutputs   map[OutputID]Output
+
+	// The transaction pool works by storing a list of outputs that are
+	// spent by transactions in the pool, and pointing to the transaction
+	// that spends them. That makes it really easy to look up conflicts as
+	// new transacitons arrive, and also easy to remove transactions from
+	// the pool (delete every input used in the transaction.) The
+	// transaction list contains only the first output, so that when
+	// building blocks you can more easily iterate through every
+	// transaction.
+	TransactionPool map[OutputID]*Transaction
+	TransactionList map[OutputID]*Transaction
 
 	// Mining Variables
 	Mining     bool
@@ -60,29 +75,6 @@ type BlockNode struct {
 	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
 }
 
-// The ConsensusState is the state of the network on the current perceived
-// longest fork. This gets updated as transactions are added, as blocks are
-// added and reversed (in the event of a reorg).
-type ConsensusState struct {
-	CurrentBlock BlockID
-	CurrentPath  map[BlockHeight]BlockID // Points to the block id for a given height.
-
-	OpenContracts  map[ContractID]*OpenContract
-	UnspentOutputs map[OutputID]Output
-	SpentOutputs   map[OutputID]Output
-
-	// The transaction pool works by storing a list of outputs that are
-	// spent by transactions in the pool, and pointing to the transaction
-	// that spends them. That makes it really easy to look up conflicts as
-	// new transacitons arrive, and also easy to remove transactions from
-	// the pool (delete every input used in the transaction.) The
-	// transaction list contains only the first output, so that when
-	// building blocks you can more easily iterate through every
-	// transaction.
-	TransactionPool map[OutputID]*Transaction
-	TransactionList map[OutputID]*Transaction
-}
-
 // An open contract contains all information necessary to properly enforce a
 // contract with no knowledge of the history of the contract.
 type OpenContract struct {
@@ -110,10 +102,10 @@ type MissedStorageProof struct {
 // is greater than end, then an error is returned.
 func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err error) {
 	if end == 0 {
-		end = uint64(len(s.ConsensusState.CurrentPath))
+		end = uint64(len(s.CurrentPath))
 	}
-	if start > uint64(len(s.ConsensusState.CurrentPath)) || end > uint64(len(s.ConsensusState.CurrentPath)) {
-		err = fmt.Errorf("only %v blocks are known to the state.", len(s.ConsensusState.CurrentPath))
+	if start > uint64(len(s.CurrentPath)) || end > uint64(len(s.CurrentPath)) {
+		err = fmt.Errorf("only %v blocks are known to the state.", len(s.CurrentPath))
 		return
 	}
 	if start > end {
@@ -123,16 +115,16 @@ func (s *State) WinningBlockchain(start, end uint64) (blockList []*Block, err er
 
 	blockList = make([]*Block, end-start)
 	for i := start; i <= end; i++ {
-		blockList[i] = s.BlockMap[s.ConsensusState.CurrentPath[BlockHeight(i)]].Block
+		blockList[i] = s.BlockMap[s.CurrentPath[BlockHeight(i)]].Block
 	}
 
 	return
 
 }
 
-// State.Height() returns the height of the ConsensusState.
+// State.Height() returns the height of the longest fork.
 func (s *State) Height() BlockHeight {
-	return s.BlockMap[s.ConsensusState.CurrentBlock].Height
+	return s.BlockMap[s.CurrentBlock].Height
 }
 
 // Depth() returns the depth of the current block of the state.
@@ -141,20 +133,20 @@ func (s *State) Depth() BlockDepth {
 }
 
 // State.currentBlockNode returns the node of the most recent block in the
-// ConsensusState.
+// longest fork.
 func (s *State) currentBlockNode() *BlockNode {
-	return s.BlockMap[s.ConsensusState.CurrentBlock]
+	return s.BlockMap[s.CurrentBlock]
 }
 
-// State.CurrentBlock returns the most recent block in the ConsensusState.
+// State.CurrentBlock returns the most recent block in the longest fork.
 func (s *State) currentBlock() *Block {
-	return s.BlockMap[s.ConsensusState.CurrentBlock].Block
+	return s.BlockMap[s.CurrentBlock].Block
 }
 
 // State.blockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
-	return s.BlockMap[s.ConsensusState.CurrentPath[height]].Block
+	return s.BlockMap[s.CurrentPath[height]].Block
 }
 
 // State.currentBlockWeight() returns the weight of the current block in the

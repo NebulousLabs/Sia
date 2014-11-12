@@ -34,8 +34,8 @@ func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 		testEnv.t.Fatal(err)
 	}
 
-	if len(testEnv.state.ConsensusState.UnspentOutputs) != 1 {
-		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.ConsensusState.UnspentOutputs))
+	if len(testEnv.state.UnspentOutputs) != 1 {
+		err = fmt.Errorf("Genesis state should have a single upspent output, has %v", len(testEnv.state.UnspentOutputs))
 		testEnv.t.Fatal(err)
 	}
 
@@ -45,7 +45,7 @@ func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 // addEmptyBlock() generates an empty block and inserts it into the state.
 func addEmptyBlock(testEnv *testingEnvironment) {
 	// Make sure that the block will actually be empty.
-	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
+	if len(testEnv.state.TransactionList) != 0 {
 		testEnv.t.Fatal("cannot add an empty block without an empty transaction pool.")
 	}
 
@@ -57,13 +57,13 @@ func addEmptyBlock(testEnv *testingEnvironment) {
 
 	// Get the state to accept the block, and then check that at least one new
 	// unspent output has been added.
-	expectedOutputs := len(testEnv.state.ConsensusState.UnspentOutputs) + 1
+	expectedOutputs := len(testEnv.state.UnspentOutputs) + 1
 	err := testEnv.state.AcceptBlock(*emptyBlock)
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}
-	if len(testEnv.state.ConsensusState.UnspentOutputs) != expectedOutputs {
-		err := fmt.Errorf("Expecting %v outputs, got %v outputs", expectedOutputs, len(testEnv.state.ConsensusState.UnspentOutputs))
+	if len(testEnv.state.UnspentOutputs) != expectedOutputs {
+		err := fmt.Errorf("Expecting %v outputs, got %v outputs", expectedOutputs, len(testEnv.state.UnspentOutputs))
 		testEnv.t.Fatal(err)
 	}
 }
@@ -84,8 +84,8 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	// bunch of new wallets. This would also clear out the transaction pool
 	// right at the beginning of the function.
 
-	txnPoolLen := len(testEnv.state.ConsensusState.TransactionPool)
-	txnListLen := len(testEnv.state.ConsensusState.TransactionList)
+	txnPoolLen := len(testEnv.state.TransactionPool)
+	txnListLen := len(testEnv.state.TransactionList)
 
 	// Create a new wallet for the test environment.
 	wallet, err := CreateWallet()
@@ -115,16 +115,16 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 
 	// The length of the transaction list should have grown by 1, and the
 	// transaction pool should have grown by the number of outputs.
-	if len(testEnv.state.ConsensusState.TransactionPool) != txnPoolLen+len(transaction.Inputs) {
+	if len(testEnv.state.TransactionPool) != txnPoolLen+len(transaction.Inputs) {
 		err = fmt.Errorf(
 			"transaction pool did not grow by expected length. Started at %v and ended at %v but should have grown by %v",
 			txnPoolLen,
-			len(testEnv.state.ConsensusState.TransactionPool),
+			len(testEnv.state.TransactionPool),
 			len(transaction.Inputs),
 		)
 		testEnv.t.Fatal(err)
 	}
-	if len(testEnv.state.ConsensusState.TransactionList) != txnListLen+1 {
+	if len(testEnv.state.TransactionList) != txnListLen+1 {
 		testEnv.t.Fatal("transaction list did not grow by the expected length.")
 	}
 
@@ -141,10 +141,10 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	}
 
 	// Check that the transaction pool has been cleared out.
-	if len(testEnv.state.ConsensusState.TransactionPool) != 0 {
+	if len(testEnv.state.TransactionPool) != 0 {
 		testEnv.t.Fatal("transaction pool not cleared out after getting a block.")
 	}
-	if len(testEnv.state.ConsensusState.TransactionList) != 0 {
+	if len(testEnv.state.TransactionList) != 0 {
 		testEnv.t.Fatal("transaction list not cleared out after getting a block.")
 	}
 }
@@ -174,7 +174,7 @@ func blockForkingTests(testEnv *testingEnvironment) {
 		testEnv.t.Fatal(err)
 	}
 	// Verify that fork2a is the current block.
-	if testEnv.state.ConsensusState.CurrentBlock != fork2a.ID() {
+	if testEnv.state.CurrentBlock != fork2a.ID() {
 		testEnv.t.Fatal("fork2 not accepted as farthest node.")
 	}
 
@@ -185,7 +185,7 @@ func blockForkingTests(testEnv *testingEnvironment) {
 		testEnv.t.Fatal(err)
 	}
 	// Verify that fork1b is the current block.
-	if testEnv.state.ConsensusState.CurrentBlock != fork1b.ID() {
+	if testEnv.state.CurrentBlock != fork1b.ID() {
 		testEnv.t.Fatal("switching to a heavier chain did not appear to work.")
 	}
 
@@ -246,7 +246,7 @@ func successContractTests(testEnv *testingEnvironment) {
 	// Check that the correct OpenContracts object has been created, and
 	// contains the expected values.
 	contractID := fcp.Transaction.FileContractID(0)
-	openContract, exists := testEnv.state.ConsensusState.OpenContracts[contractID]
+	openContract, exists := testEnv.state.OpenContracts[contractID]
 	if !exists {
 		testEnv.t.Fatal("open contract not found")
 	}

@@ -59,7 +59,7 @@ func (w *Wallet) Scan(state *State) {
 	w.OwnedOutputs = make(map[OutputID]Output)
 
 	// Check for owned outputs from the standard SpendConditions.
-	for id, output := range state.ConsensusState.UnspentOutputs {
+	for id, output := range state.UnspentOutputs {
 		if output.SpendHash == w.SpendConditions.CoinAddress() {
 			w.OwnedOutputs[id] = output
 		}

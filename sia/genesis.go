@@ -30,13 +30,13 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.BadBlocks = make(map[BlockID]struct{})
 	s.BlockMap = make(map[BlockID]*BlockNode)
 
-	// Initialize ConsensusState maps.
-	s.ConsensusState.CurrentPath = make(map[BlockHeight]BlockID)
-	s.ConsensusState.OpenContracts = make(map[ContractID]*OpenContract)
-	s.ConsensusState.UnspentOutputs = make(map[OutputID]Output)
-	s.ConsensusState.SpentOutputs = make(map[OutputID]Output)
-	s.ConsensusState.TransactionPool = make(map[OutputID]*Transaction)
-	s.ConsensusState.TransactionList = make(map[OutputID]*Transaction)
+	// Initialize Consensus maps.
+	s.CurrentPath = make(map[BlockHeight]BlockID)
+	s.OpenContracts = make(map[ContractID]*OpenContract)
+	s.UnspentOutputs = make(map[OutputID]Output)
+	s.SpentOutputs = make(map[OutputID]Output)
+	s.TransactionPool = make(map[OutputID]*Transaction)
+	s.TransactionList = make(map[OutputID]*Transaction)
 
 	// Create the genesis block using the premine address.
 	genesisBlock := createGenesisBlock(premineAddress)
@@ -51,16 +51,16 @@ func CreateGenesisState(premineAddress CoinAddress) (s *State) {
 	s.BlockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
-	// Fill out the ConsensusState
-	s.ConsensusState.CurrentBlock = genesisBlock.ID()
-	s.ConsensusState.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
+	// Fill out the consensus informaiton for the genesis block.
+	s.CurrentBlock = genesisBlock.ID()
+	s.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
 
 	// Create the genesis subsidy output.
 	genesisSubsidyOutput := Output{
 		Value:     GenesisSubsidy,
 		SpendHash: premineAddress,
 	}
-	s.ConsensusState.UnspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
+	s.UnspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
 	return
 }
