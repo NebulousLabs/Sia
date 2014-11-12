@@ -114,72 +114,79 @@ Every such signature in the transaction must be valid for the transaction to be 
 
 \section{File Contracts}
 \label{sec:contracts}
-A file contract is an agreement between a storage provider and a client requiring the provider to store a certain file.
+A file contract is an agreement between a storage provider and a client.
 At the core of a file contract is the file's Merkle root hash \cite{merkle}.
-This hash, along with the total size of the file, can be used to verify storage proofs.
+To construct this hash, the file is split into segments of constant size and hashed into a Merkle tree.
+The root hash, along with the total size of the file, can be used to verify storage proofs.
 
 File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the reward for an invalid or missing proof, and the maximum number of proofs that can be missed.
-The challenge frequency determines the size of the window in which storage proofs can be submitted.
-As soon as one challenge window closes, the next opens.
-If a storage proof appears during the challenge window, an output is created sending coins to the valid proof address (presumably the host).
-If no valid proof appears during the challenge window, an output is created sending coins to the missed proof address (either the client, or perhaps the '0' address, which cannot be spent).
+The challenge frequency is the maximum number of blocks that can elapse between storage proofs (also called a \textit{challenge window}).
+As soon as one challenge window closes, the next opens. % can windows be either blocks or timestamps?
+Submitting a valid proof during the challenge window triggers an automatic payment to the ``valid proof'' address (presumably the host).
+If, at the end of the challenge window, no valid proof has been submitted, coins are instead sent to the ``missed proof'' address (presumably the client).
+A contract becomes invalid if too many proofs are missed.
 
-A contract becomes invalid if a threshold of missed proofs is reached.
-If the file contract is still valid at the end of the specified duration, it ``successfully terminates.''
-Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract ``unsuccessfully terminates.''
+If the file contract is still valid at the end of the specified duration, it \textit{successfully terminates}.
+Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract \textit{unsuccessfully terminates}.
 Each of these potential outcomes (valid proof, invalid proof, successful termination, unsuccessful termination) has an associated recipient.
 The funds for these various payouts are provided by the inputs to the transaction.
 
 The rewards for completed proofs and missed proofs create a new transaction output belonging to the recipient specified in the contract.
 The recipient will be a hash of the output spend conditions for the new output.
-The ID of a contract is defined by $H(\text{transaction} || "contract" || i)$, where ``contract'' is the string ``contract'', and $i$ is the index of the contract within the transaction.
-The output ID of a storage proof is defined as $H(\text{contractID} || \text{outcome} || \text{window index})$.
-The outcome has four possible values, corresponding to the four potential outcomes listed above.
-The index is the index of the window which resulted in the creation of the output.
-For example, the output created in the first window will have index 0.
+The ID of a contract is defined as:
+\[
+	H(\text{transaction} || \text{``contract''} || i)
+\]
+where $i$ is the index of the contract within the transaction.
+The output ID of a storage proof is defined as:
+\[
+	H(\text{contract ID} || \text{outcome} || W_i)
+\]
+Where $W_i$ is the window index, i.e. the number of windows that have elapsed since the contract was formed.
+The outcome has four possible values, corresponding to the four potential outcomes listed above. % how are they represented? 2 bits? strings?
 
 \section{Proof of Storage}
 \label{sec:storage}
 Storage proof transactions are periodically submitted in order to fulfill file contracts.
-Each storage proof targets a specific file.
+Each storage proof targets a specific file. % or does it target the contract?
 A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
 
 \subsection{Algorithm}
-Each contract has a challenge frequency, which requires the storage provider to submit a storage proof every $N$ blocks.
-Each interval of $N$ blocks then constitutes a ``window'' in which to submit the proof.
-The first such window, $W_0$, begins at a time which is specified in the contract.
-Contracts can be submitted to the blockchain before the first window begins, which will lock down the funds and guarantee enforcement of the contract.
-
-The storage challenge requires a random number as a seed.
-The random number for window $W_i$ is generated by concatenating contract ID to the hash of the block prior to $W_i$ (i.e. $W_i + i \times N - 1$) and hashing the result.
-This seed is used to select one of the file segments used as a leaf when creating the Merkle tree of the file.
-The provider supplies this segment data, along with the set of hashes that can be used to reconstruct the root of the tree.
-The verifier can use these hashes to verify that the segment provided is indeed part of the original file.
-Because the proofs are submitted to the blockchain, everyone can verify that the provider has provided the correct random segment.
-
-% Need to find a reference to some literature explaining how Merkle proofs work.
+Hosts prove their storage by providing a segment of the original file, along with a list of hashes from the file's Merkle tree.
+This information is sufficient to prove that the segment came from the original file.
+Because the proofs are submitted to the blockchain, everyone can verify that the provider has provided a valid proof.
+Each storage proof uses a randomly selected segment.
+The random seed for challenge window $W_i$ is given by:
+\[
+	H(\text{contract ID} || H(B_(i-1)))
+\]
+where $B_(i-1)$ is the block immediately prior to the beginning of $W_i$.
 
 If the provider is consistently able to demonstrate possession of a random segment, then the provider is very likely storing the whole file.
 A provider storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
 
-\subsection{Random Number Generation}
-The random number generator is subject to manipulation via block withholding attacks.
-Because the random number is derived from a specific block, an attacker has only one chance to manipulate the random number for a particular challenge.
+\subsection{Block Withholding Attacks}
+The random number generator is subject to manipulation via block withholding attacks, in which the attacker withholds blocks until they find one that will produce a favorable random number.
+However, the attacker has only one chance to manipulate the random number for a particular challenge.
 Furthermore, withholding a block to manipulate the random number will cost the attacker the block reward.
 
 If an attacker is able to mine 50\% of the blocks, then 50\% of the challenges can be manipulated.
-However, the remaining 50\% are still random, so even in this scenario, an attacker storing only 50\% of a file will still fail 25\% of its storage proofs.
-Clients can therefore protect themselves against random number attacks by having many challenges and large penalties for missing proofs.
-Assuming the attacker is financially motivated, large windows and severe penalties should be sufficient to deter any attacker that controls less than 50\% of the network's hashing power.
-Clients are nonetheless advised to plan around potential Byzantine attacks which may not be financially motivated.
+Nevertheless, the remaining 50\% are still random, so the attacker will still fail some storage proofs.
+Specifically, they will fail half as many as they would without the withholding attack.
+
+To protect against such attacks, clients can specify a high challenge frequency and large penalties for missing proofs.
+These precautions should be sufficient to deter any financially-motivated attacker that controls less than 50\% of the network's hashing power.
+Of course, clients are advised to plan around potential Byzantine attacks, which may not be financially motivated.
 
 \subsection{Closed Window Attacks}
-Storage providers can only complete a proof of storage if they can get a transaction with the storage proof into the blockchain.
-Miners could maliciously exclude storage proofs from blocks, depriving themselves of transactions fees but forcing a penalty on storage providers.
-We call this a 'closed window' attack, because though the storage provider has created a storage proof within the required window of time, they are unable to get the proof onto the blockchain.
+Hosts can only complete a storage proof if their proof transaction makes it into the blockchain.
+Miners could maliciously exclude storage proofs from blocks, depriving themselves of transaction fees but forcing a penalty on storage providers.
+Alternatively, miners could extort hosts by requiring large fees to include storage proofs, knowing that they are more important than the average transaction.
+This is termed a \textit{closed window attack}, because the malicious miner has artificially ``closed the window.''
 
-The defense for this is having large windows, and assuming that at least some percentage of miners will be content submitting the storage proof in a block in return for a transaction fee.
-Because providers consent to all file contracts, the storage provider is able to reject any contract that they feel leaves them vulnerable to closed window attacks.
+The defense for this is to use a large window size.
+Hosts can reasonably assume that some percentage of miners will include their proofs in return for a transaction fee.
+Because hosts consent to all file contracts, they are free to reject any contract that they feel leaves them vulnerable to closed window attacks.
 
 \section{Arbitrary Transaction Data}
 Each transaction has an arbitrary data field which can be used for any type of information.
