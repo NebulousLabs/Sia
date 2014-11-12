@@ -279,13 +279,6 @@ Siafunds cannot however be used to fund contracts or as a miner fee.
 When siafunds are transferred to a new address, an additional unspent output is created containing all of the siacoins that have been earned by the siafunds since their previous transfer.
 These siacoins are sent to the same address as the siafunds.
 
-\subsection{Fee Exemption}
-High reliability hosts are penalized by the 10\% fee on the contract fund.
-If a host wishes to promise a 10x or 100x payout for losing a file, then the 10\% fee will greatly exceed the actual cost of the contract.
-We wish to provide hosts with an avenue for dodging the fees on penalties, without giving clients a way to dodge the fees.
-Any of the contract outputs that go to a null address (to an address that cannot be spent) will dodge the fees.
-High reliability hosts can send funds for missing proofs to the 0 address, which means the client is not compensated, but the host is still penalized, and the fees are not severe.
-
 \section{Economics of Sia}
 The supply of siacoins is going to increase permanently.
 Initially, 300,000 coins will be minted every block.
