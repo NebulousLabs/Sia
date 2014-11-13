@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math/big"
 	"os"
+
+	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 // the Host struct is kept in the client package because it's what the client
@@ -41,7 +43,7 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 	if err != nil {
 		return
 	}
-	merkle, err := MerkleFile(file, CalculateSegments(info.Size()))
+	merkle, err := hash.MerkleFile(file, calculateSegments(info.Size()))
 	if err != nil {
 		return
 	}

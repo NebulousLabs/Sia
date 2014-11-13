@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -222,12 +223,12 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 
 // Block.expectedTransactionMerkleRoot() returns the expected transaction
 // merkle root of the block.
-func (b *Block) expectedTransactionMerkleRoot() Hash {
-	var transactionHashes []Hash
+func (b *Block) expectedTransactionMerkleRoot() hash.Hash {
+	var transactionHashes []hash.Hash
 	for _, transaction := range b.Transactions {
-		transactionHashes = append(transactionHashes, HashBytes(encoding.Marshal(transaction)))
+		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
 	}
-	return MerkleRoot(transactionHashes)
+	return hash.MerkleRoot(transactionHashes)
 }
 
 // Block.checkTarget() returns true if the block id is lower than the target.

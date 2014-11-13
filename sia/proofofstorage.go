@@ -2,7 +2,19 @@ package sia
 
 import (
 	"io"
+
+	"github.com/NebulousLabs/Andromeda/hash"
 )
+
+// Calculates the number of segments in the file when building a merkle tree.
+// Should probably be renamed to CountLeaves() or something.
+func calculateSegments(fileSize int64) (numSegments uint16) {
+	numSegments = uint16(fileSize / SegmentSize)
+	if fileSize%SegmentSize != 0 {
+		numSegments++
+	}
+	return
+}
 
 // buildProof constructs a list of hashes using the following procedure. The
 // storage proof requires traversing the Merkle tree from the proofIndex node
@@ -43,8 +55,8 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 		}
 
 		// calculate and append hash
-		var h Hash
-		h, err = MerkleFile(rs, truncSize)
+		var h hash.Hash
+		h, err = hash.MerkleFile(rs, truncSize)
 		if err != nil {
 			return
 		}
@@ -66,8 +78,8 @@ func buildProof(rs io.ReadSeeker, numSegments, proofIndex uint16) (sp StoragePro
 // be skipped. As it turns out, the branches to skip can be determined from the
 // binary representation of numSegments-1, where a 0 indicates "skip" and a 1
 // indicates "keep." I don't know why this works, I just noticed the pattern.
-func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected Hash) bool {
-	h := HashBytes(sp.Segment[:])
+func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected hash.Hash) bool {
+	h := hash.HashBytes(sp.Segment[:])
 
 	var depth uint16 = 0
 	for (1 << depth) < numSegments {
@@ -84,9 +96,9 @@ func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected Hash)
 		}
 		// left or right?
 		if proofIndex&(1<<i) == 0 {
-			h = joinHash(h, sp.HashSet[0])
+			h = hash.JoinHash(h, sp.HashSet[0])
 		} else {
-			h = joinHash(sp.HashSet[0], h)
+			h = hash.JoinHash(sp.HashSet[0], h)
 		}
 		sp.HashSet = sp.HashSet[1:]
 	}

@@ -6,13 +6,14 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 const (
 	HashSize      = 32
 	PublicKeySize = 32
 	SignatureSize = 32
-	SegmentSize   = 64 // Size of smallest piece of a file which gets hashed when building the Merkle tree.
+	SegmentSize   = 64
 
 	BlockFrequency = 600               // In seconds.
 	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
@@ -27,19 +28,18 @@ var MaxAdjustmentUp = big.NewRat(1001, 1000)
 var MaxAdjustmentDown = big.NewRat(999, 1000)
 
 type (
-	Hash      [HashSize]byte
 	PublicKey ecdsa.PublicKey
 
 	Timestamp   int64
 	BlockHeight uint64
 	Currency    uint64
 
-	BlockID       Hash
-	OutputID      Hash // An output id points to a specific output.
-	ContractID    Hash
-	TransactionID Hash
-	CoinAddress   Hash // An address is the hash of the spend conditions that unlock the output.
-	Target        Hash
+	BlockID       hash.Hash
+	OutputID      hash.Hash // An output id points to a specific output.
+	ContractID    hash.Hash
+	TransactionID hash.Hash
+	CoinAddress   hash.Hash // An address is the hash of the spend conditions that unlock the output.
+	Target        hash.Hash
 )
 
 // A Signature follows the crypto/ecdsa golang standard for signatures.
@@ -56,7 +56,7 @@ type Block struct {
 	Timestamp    Timestamp
 	Nonce        uint64
 	MinerAddress CoinAddress
-	MerkleRoot   Hash
+	MerkleRoot   hash.Hash
 	Transactions []Transaction
 }
 
@@ -121,7 +121,7 @@ type CoveredFields struct {
 // stores a file.
 type FileContract struct {
 	ContractFund       Currency
-	FileMerkleRoot     Hash
+	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
 	ChallengeFrequency BlockHeight // size of window, one window at a time
@@ -137,7 +137,7 @@ type FileContract struct {
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
-	HashSet    []Hash
+	HashSet    []hash.Hash
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
@@ -152,7 +152,7 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // Block.ID() returns a hash of the block, which is used as the block
 // identifier. Transactions are not included in the hash.
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(encoding.MarshalAll(
+	return BlockID(hash.HashBytes(encoding.MarshalAll(
 		b.ParentBlock,
 		b.Timestamp,
 		b.Nonce,
@@ -164,14 +164,14 @@ func (b *Block) ID() BlockID {
 // SubisdyID() returns the id of the output created by the block subsidy.
 func (b *Block) SubsidyID() OutputID {
 	bid := b.ID()
-	return OutputID(HashBytes(append(bid[:], []byte("blockreward")...)))
+	return OutputID(hash.HashBytes(append(bid[:], []byte("blockreward")...)))
 }
 
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
-func (t *Transaction) SigHash(i int) Hash {
+func (t *Transaction) SigHash(i int) hash.Hash {
 	if t.Signatures[i].CoveredFields.WholeTransaction {
-		return HashBytes(encoding.MarshalAll(
+		return hash.HashBytes(encoding.MarshalAll(
 			t.ArbitraryData,
 			t.Inputs,
 			t.MinerFees,
@@ -207,32 +207,32 @@ func (t *Transaction) SigHash(i int) Hash {
 		signedData = append(signedData, encoding.Marshal(sig)...)
 	}
 
-	return HashBytes(signedData)
+	return hash.HashBytes(signedData)
 }
 
 // Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
 func (t *Transaction) OutputID(index int) OutputID {
-	return OutputID(HashBytes(append(encoding.Marshal(t), append([]byte("coinsend"), encoding.Marshal(uint64(index))...)...)))
+	return OutputID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("coinsend"), encoding.Marshal(uint64(index))...)...)))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
 // SpendConditions object, using the timelock, number of signatures required,
 // and each public key as leaves.
 func (sc *SpendConditions) CoinAddress() CoinAddress {
-	tlHash := HashBytes(encoding.Marshal(sc.TimeLock))
-	nsHash := HashBytes(encoding.Marshal(sc.NumSignatures))
-	pkHashes := make([]Hash, len(sc.PublicKeys))
+	tlHash := hash.HashBytes(encoding.Marshal(sc.TimeLock))
+	nsHash := hash.HashBytes(encoding.Marshal(sc.NumSignatures))
+	pkHashes := make([]hash.Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(encoding.Marshal(sc.PublicKeys[i]))
+		pkHashes[i] = hash.HashBytes(encoding.Marshal(sc.PublicKeys[i]))
 	}
-	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
-	return CoinAddress(MerkleRoot(leaves))
+	leaves := append([]hash.Hash{tlHash, nsHash}, pkHashes...)
+	return CoinAddress(hash.MerkleRoot(leaves))
 }
 
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
 func (t *Transaction) FileContractID(index int) ContractID {
-	return ContractID(HashBytes(append(encoding.Marshal(t), append([]byte("contract"), encoding.Marshal(uint64(index))...)...)))
+	return ContractID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("contract"), encoding.Marshal(uint64(index))...)...)))
 }
 
 // WindowIndex returns the index of the challenge window that is
@@ -259,7 +259,7 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 		return
 	}
 
-	outputID = OutputID(HashBytes(append(fcID[:], append(proofString, encoding.Marshal(windowIndex)...)...)))
+	outputID = OutputID(hash.HashBytes(append(fcID[:], append(proofString, encoding.Marshal(windowIndex)...)...)))
 	return
 }
 
@@ -267,7 +267,7 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 // output, given the id of the contract and the status of the termination.
 func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
 	terminationString := terminationString(successfulTermination)
-	return OutputID(HashBytes(append(fcID[:], terminationString...)))
+	return OutputID(hash.HashBytes(append(fcID[:], terminationString...)))
 }
 
 // Signature.MarshalSia implements the Marshaler interface for Signatures.

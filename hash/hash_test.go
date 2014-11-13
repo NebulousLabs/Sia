@@ -1,4 +1,4 @@
-package sia
+package hash
 
 import (
 	"bytes"
@@ -10,37 +10,37 @@ func TestMerkleRoot(t *testing.T) {
 	// compare MerkleRoot fn to manual hashing
 	leaves := []Hash{Hash{0}, Hash{1}, Hash{2}, Hash{3}, Hash{4}, Hash{5}, Hash{6}, Hash{7}}
 
-	root8 := joinHash(
-		joinHash(
-			joinHash(leaves[0], leaves[1]),
-			joinHash(leaves[2], leaves[3]),
+	root8 := JoinHash(
+		JoinHash(
+			JoinHash(leaves[0], leaves[1]),
+			JoinHash(leaves[2], leaves[3]),
 		),
-		joinHash(
-			joinHash(leaves[4], leaves[5]),
-			joinHash(leaves[6], leaves[7]),
+		JoinHash(
+			JoinHash(leaves[4], leaves[5]),
+			JoinHash(leaves[6], leaves[7]),
 		),
 	)
-	root7 := joinHash(
-		joinHash(
-			joinHash(leaves[0], leaves[1]),
-			joinHash(leaves[2], leaves[3]),
+	root7 := JoinHash(
+		JoinHash(
+			JoinHash(leaves[0], leaves[1]),
+			JoinHash(leaves[2], leaves[3]),
 		),
-		joinHash(
-			joinHash(leaves[4], leaves[5]),
+		JoinHash(
+			JoinHash(leaves[4], leaves[5]),
 			leaves[6],
 		),
 	)
-	root6 := joinHash(
-		joinHash(
-			joinHash(leaves[0], leaves[1]),
-			joinHash(leaves[2], leaves[3]),
+	root6 := JoinHash(
+		JoinHash(
+			JoinHash(leaves[0], leaves[1]),
+			JoinHash(leaves[2], leaves[3]),
 		),
-		joinHash(leaves[4], leaves[5]),
+		JoinHash(leaves[4], leaves[5]),
 	)
-	root5 := joinHash(
-		joinHash(
-			joinHash(leaves[0], leaves[1]),
-			joinHash(leaves[2], leaves[3]),
+	root5 := JoinHash(
+		JoinHash(
+			JoinHash(leaves[0], leaves[1]),
+			JoinHash(leaves[2], leaves[3]),
 		),
 		leaves[4],
 	)

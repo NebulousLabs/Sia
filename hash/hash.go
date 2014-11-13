@@ -1,9 +1,18 @@
-package sia
+package hash
 
 import (
 	"crypto/sha256"
 	"errors"
 	"io"
+)
+
+const (
+	HashSize    = 32
+	SegmentSize = 64 // Size of smallest piece of a file which gets hashed when building the Merkle tree.
+)
+
+type (
+	Hash [HashSize]byte
 )
 
 func HashBytes(data []byte) Hash {
@@ -12,7 +21,7 @@ func HashBytes(data []byte) Hash {
 
 // Helper function for Merkle trees; takes two hashes, concatenates them,
 // and hashes the result.
-func joinHash(left, right Hash) Hash {
+func JoinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
 
@@ -24,6 +33,8 @@ func joinHash(left, right Hash) Hash {
 //    ┌──┴──┐   │    ┌──┴──┐     │      ┌──┴──┐     ┌──┴──┐
 //  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
 //     (5-leaf)         (6-leaf)             (7-leaf)
+//
+// I AM THINKING ABOUT CHANGING THIS SO INSTEAD OF TAKING A SLICE OF HASHES, IT TAKES A SLICE OF LEAVES.
 func MerkleRoot(leaves []Hash) Hash {
 	switch len(leaves) {
 	case 0:
@@ -31,7 +42,7 @@ func MerkleRoot(leaves []Hash) Hash {
 	case 1:
 		return leaves[0]
 	case 2:
-		return joinHash(leaves[0], leaves[1])
+		return JoinHash(leaves[0], leaves[1])
 	}
 
 	// locate largest power of 2 < len(leaves)
@@ -40,17 +51,7 @@ func MerkleRoot(leaves []Hash) Hash {
 		mid *= 2
 	}
 
-	return joinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
-}
-
-// Calculates the number of segments in the file when building a merkle tree.
-// Should probably be renamed to CountLeaves() or something.
-func CalculateSegments(fileSize int64) (numSegments uint16) {
-	numSegments = uint16(fileSize / SegmentSize)
-	if fileSize%SegmentSize != 0 {
-		numSegments++
-	}
-	return
+	return JoinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
 }
 
 // MerkleFile splits the provided data into segments. It then recursively
@@ -81,6 +82,6 @@ func MerkleFile(reader io.Reader, numSegments uint16) (hash Hash, err error) {
 	// since we always read "left to right", no extra Seeking is necessary
 	left, _ := MerkleFile(reader, mid)
 	right, err := MerkleFile(reader, numSegments-mid)
-	hash = joinHash(left, right)
+	hash = JoinHash(left, right)
 	return
 }
