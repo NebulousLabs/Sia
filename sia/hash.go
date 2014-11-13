@@ -43,6 +43,16 @@ func MerkleRoot(leaves []Hash) Hash {
 	return joinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
 }
 
+// Calculates the number of segments in the file when building a merkle tree.
+// Should probably be renamed to CountLeaves() or something.
+func CalculateSegments(fileSize int64) (numSegments uint16) {
+	numSegments = uint16(fileSize / SegmentSize)
+	if fileSize%SegmentSize != 0 {
+		numSegments++
+	}
+	return
+}
+
 // MerkleFile splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
 // See MerkleRoot for a diagram of how Merkle trees are constructed.

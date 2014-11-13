@@ -14,14 +14,14 @@ const (
 // Creates a block that is ready for nonce grinding.
 func (s *State) blockForWork(minerAddress CoinAddress) (b *Block, target Target) {
 	b = &Block{
-		ParentBlock:  s.ConsensusState.CurrentBlock,
+		ParentBlock:  s.CurrentBlock,
 		Timestamp:    Timestamp(time.Now().Unix()),
 		MinerAddress: minerAddress,
 	}
 	// IF TIMESTAMP IS INVALID, CREATE A VALID TIMESTAMP! --> 'future median' attack.
 
 	// Add the transactions from the transaction pool.
-	for _, transaction := range s.ConsensusState.TransactionList {
+	for _, transaction := range s.TransactionList {
 		b.Transactions = append(b.Transactions, *transaction)
 	}
 	b.MerkleRoot = b.expectedTransactionMerkleRoot()

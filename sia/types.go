@@ -2,6 +2,7 @@ package sia
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 )
 
@@ -9,46 +10,45 @@ const (
 	HashSize      = 32
 	PublicKeySize = 32
 	SignatureSize = 32
-	SegmentSize   = 32
+	SegmentSize   = 64 // Size of smallest piece of a file which gets hashed when building the Merkle tree.
 
-	TargetSecondsPerBlock = 600
-	TargetWindow          = BlockHeight(2000) // Number of blocks to use when calculating difficulty.
+	BlockFrequency = 600               // In seconds.
+	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
 
-	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
+	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
+
+	InitialCoinbase = 300000
+	MinimumCoinbase = 30000
 )
 
 var MaxAdjustmentUp = big.NewRat(1001, 1000)
 var MaxAdjustmentDown = big.NewRat(999, 1000)
-var SurpassThreshold = big.NewRat(25, 100)
 
 type (
 	Hash      [HashSize]byte
 	PublicKey ecdsa.PublicKey
 
 	Timestamp   int64
-	BlockHeight uint32
+	BlockHeight uint64
 	Currency    uint64
-
-	BlockWeight *big.Rat // BlockWeight should never appear in a struct.
-	BlockDepth  Hash
 
 	BlockID       Hash
 	OutputID      Hash // An output id points to a specific output.
 	ContractID    Hash
 	TransactionID Hash
-	CoinAddress   Hash // An address points to spend conditions.
+	CoinAddress   Hash // An address is the hash of the spend conditions that unlock the output.
 	Target        Hash
 )
 
+// A Signature follows the crypto/ecdsa golang standard for signatures.
+// Eventually we plan to switch to a more standard library such as NaCl or
+// OpenSSL.
 type Signature struct {
 	R, S *big.Int
 }
 
-// Eventually, a block will be separate from a block header, and a block header
-// will contian nothing more than a parent hash, a 64 bit nonce, and a child
-// hash. The child hash will be a merkle tree of different blocks that share a
-// header, for merge mining. The blocks themselves will contain timestamps and
-// additonal nonces as needed.
+// Eventually, the Block and the block header will be two separate structs.
+// This will be put into practice when we implement merged mining.
 type Block struct {
 	ParentBlock  BlockID
 	Timestamp    Timestamp
@@ -58,6 +58,8 @@ type Block struct {
 	Transactions []Transaction
 }
 
+// A Transaction is an update to the state of the network, can move money
+// around, make contracts, etc.
 type Transaction struct {
 	ArbitraryData []byte
 	Inputs        []Input
@@ -68,66 +70,85 @@ type Transaction struct {
 	Signatures    []TransactionSignature
 }
 
+// An Input contains the ID of the output it's trying to spend, and the spend
+// conditions that unlock the output.
 type Input struct {
 	OutputID        OutputID // the source of coins for the input
 	SpendConditions SpendConditions
 }
 
+// An Output contains a volume of currency and a 'CoinAddress', which is just a
+// hash of the spend conditions which unlock the output.
 type Output struct {
 	Value     Currency // how many coins are in the output
 	SpendHash CoinAddress
 }
 
+// SpendConditions is a timelock and a set of public keys that are used to
+// unlock ouptuts.
 type SpendConditions struct {
 	TimeLock      BlockHeight
-	NumSignatures uint8
+	NumSignatures uint64
 	PublicKeys    []PublicKey
 }
 
+// A TransactionSignature signs a single input to a transaction to help fulfill
+// the unlock conditions of the transaction. It points to an input, a
+// particular public key, has a timelock, and also indicates which parts of the
+// transaction have been signed.
 type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
-	PublicKeyIndex uint8
+	PublicKeyIndex uint64
 	TimeLock       BlockHeight
-	// CoveredFields  CoveredFields
-	Signature Signature
+	CoveredFields  CoveredFields
+	Signature      Signature
 }
 
-/*
 type CoveredFields struct {
-	ArbitraryData bool
-	MinerFees     []uint8 // each element indicates an index which is signed.
-	Inputs        []uint8
-	Outputs       []uint8
-	Contracts     []uint8
-	FileProofs    []uint8
+	WholeTransaction bool
+	ArbitraryData    bool
+	MinerFees        []uint8 // each element indicates an index which is signed.
+	Inputs           []uint8
+	Outputs          []uint8
+	Contracts        []uint8
+	FileProofs       []uint8
+	Signatures       []uint8
 }
-*/
 
-// Not enough flexibility in payments?  With the Start and End times, the only
-// problem is if the client wishes for the rewards or penalties to scale as
-// more are submitted or missed, and if they want things to scale harder in the
-// case of consecutive misses.
+// A FileContract contains the information necessary to enforce that a host
+// stores a file.
 type FileContract struct {
 	ContractFund       Currency
 	FileMerkleRoot     Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
 	ChallengeFrequency BlockHeight // size of window, one window at a time
-	Tolerance          uint32      // number of missed proofs before triggering unsuccessful termination
+	Tolerance          uint64      // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
 }
 
+// A StorageProof contains the fields needed for a host to prove that they are
+// still storing a file.
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []Hash
 }
 
-// ID returns the Block's unique identifier, generated from the hash of its internal data.
-// Transactions are not included in the hash.
+// CalculateCoinbase takes a height and from that derives the coinbase.
+func CalculateCoinbase(height BlockHeight) Currency {
+	if height >= InitialCoinbase-MinimumCoinbase {
+		return MinimumCoinbase
+	} else {
+		return InitialCoinbase - Currency(height)
+	}
+}
+
+// Block.ID() returns a hash of the block, which is used as the block
+// identifier. Transactions are not included in the hash.
 func (b *Block) ID() BlockID {
 	return BlockID(HashBytes(MarshalAll(
 		b.ParentBlock,
@@ -138,7 +159,8 @@ func (b *Block) ID() BlockID {
 	)))
 }
 
-func (b *Block) subsidyID() OutputID {
+// SubisdyID() returns the id of the output created by the block subsidy.
+func (b *Block) SubsidyID() OutputID {
 	bid := b.ID()
 	return OutputID(HashBytes(append(bid[:], []byte("blockreward")...)))
 }
@@ -146,23 +168,50 @@ func (b *Block) subsidyID() OutputID {
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
 func (t *Transaction) SigHash(i int) Hash {
-	return HashBytes(MarshalAll(
-		t.ArbitraryData,
-		t.Inputs,
-		t.MinerFees,
-		t.Outputs,
-		t.FileContracts,
-		t.StorageProofs,
-		t.Signatures[i].InputID,
-		t.Signatures[i].PublicKeyIndex,
-		t.Signatures[i].TimeLock,
-	))
+	if t.Signatures[i].CoveredFields.WholeTransaction {
+		return HashBytes(MarshalAll(
+			t.ArbitraryData,
+			t.Inputs,
+			t.MinerFees,
+			t.Outputs,
+			t.FileContracts,
+			t.StorageProofs,
+			t.Signatures[i].InputID,
+			t.Signatures[i].PublicKeyIndex,
+			t.Signatures[i].TimeLock,
+		))
+	}
+
+	var signedData []byte
+	if t.Signatures[i].CoveredFields.ArbitraryData {
+		signedData = append(signedData, Marshal(t.ArbitraryData)...)
+	}
+	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+		signedData = append(signedData, Marshal(minerFee)...)
+	}
+	for _, input := range t.Signatures[i].CoveredFields.Inputs {
+		signedData = append(signedData, Marshal(input)...)
+	}
+	for _, output := range t.Signatures[i].CoveredFields.Outputs {
+		signedData = append(signedData, Marshal(output)...)
+	}
+	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+		signedData = append(signedData, Marshal(contract)...)
+	}
+	for _, fileProof := range t.Signatures[i].CoveredFields.FileProofs {
+		signedData = append(signedData, Marshal(fileProof)...)
+	}
+	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
+		signedData = append(signedData, Marshal(sig)...)
+	}
+
+	return HashBytes(signedData)
 }
 
-// transaction.ouptutID() takes the index of the output and returns the
+// Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
-func (t *Transaction) outputID(index int) OutputID {
-	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
+func (t *Transaction) OutputID(index int) OutputID {
+	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...)))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
@@ -179,27 +228,47 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 	return CoinAddress(MerkleRoot(leaves))
 }
 
-// Returns the id of a file contract given the transaction it appears in and
-// the index of the contract within the transaction.
-func (t *Transaction) fileContractID(index int) ContractID {
-	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
+// Transaction.fileContractID returns the id of a file contract given the index of the contract.
+func (t *Transaction) FileContractID(index int) ContractID {
+	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...)))
 }
 
-// Returns the index of the current window of a contract, given the current
-// height of the ConsensusState.
-func (fc *FileContract) windowIndex(currentHeight BlockHeight) BlockHeight {
-	return (currentHeight - fc.Start) / fc.ChallengeFrequency
+// WindowIndex returns the index of the challenge window that is
+// open during block height 'height'.
+func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
+	if height < fc.Start {
+		err = errors.New("height below start point")
+		return
+	}
+	if height >= fc.End {
+		err = errors.New("height above end point")
+	}
+
+	windowIndex = (height - fc.Start) / fc.ChallengeFrequency
+	return
 }
 
-// FileContract.storageProofOutput() returns the OutputID of the output created during window index
-func (t *Transaction) storageProofOutput(fileContractIndex int, height BlockHeight, proofValid bool) OutputID {
-	fileContractID := t.fileContractID(fileContractIndex)
+// StorageProofOutput() returns the OutputID of the output created
+// during the window index that was active at height 'height'.
+func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
 	proofString := proofString(proofValid)
-	windowIndex := t.FileContracts[fileContractIndex].windowIndex(height)
-	return OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	windowIndex, err := fc.WindowIndex(height)
+	if err != nil {
+		return
+	}
+
+	outputID = OutputID(HashBytes(append(fcID[:], append(proofString, Marshal(windowIndex)...)...)))
+	return
 }
 
-// MarshalSia implements the Marshaler interface for Signatures.
+// ContractTerminationOutputID() returns the ID of a contract termination
+// output, given the id of the contract and the status of the termination.
+func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
+	terminationString := terminationString(successfulTermination)
+	return OutputID(HashBytes(append(fcID[:], terminationString...)))
+}
+
+// Signature.MarshalSia implements the Marshaler interface for Signatures.
 func (s *Signature) MarshalSia() []byte {
 	if s.R == nil || s.S == nil {
 		return []byte{0, 0}
@@ -209,7 +278,7 @@ func (s *Signature) MarshalSia() []byte {
 	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
 }
 
-// MarshalSia implements the Unmarshaler interface for Signatures.
+// Signature.UnmarshalSia implements the Unmarshaler interface for Signatures.
 func (s *Signature) UnmarshalSia(b []byte) int {
 	// inverse of the struct trick used in Signature.MarshalSia
 	str := struct{ R, S []byte }{}
@@ -221,7 +290,7 @@ func (s *Signature) UnmarshalSia(b []byte) int {
 	return len(str.R) + len(str.S) + 2
 }
 
-// MarshalSia implements the Marshaler interface for PublicKeys.
+// PublicKey.MarshalSia implements the Marshaler interface for PublicKeys.
 func (pk PublicKey) MarshalSia() []byte {
 	if pk.X == nil || pk.Y == nil {
 		return []byte{0, 0}
@@ -230,7 +299,7 @@ func (pk PublicKey) MarshalSia() []byte {
 	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
 }
 
-// MarshalSia implements the Unmarshaler interface for PublicKeys.
+// PublicKey.UnmarshalSia implements the Unmarshaler interface for PublicKeys.
 func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	// see Signature.UnmarshalSia
 	str := struct{ X, Y []byte }{}

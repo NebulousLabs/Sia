@@ -15,8 +15,9 @@ type Wallet struct {
 	SecretKey       *ecdsa.PrivateKey
 	SpendConditions SpendConditions
 
-	OwnedOutputs map[OutputID]Output // All outputs to CoinAddress
-	SpentOutputs map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OwnedOutputs         map[OutputID]Output // All outputs to CoinAddress
+	SpentOutputs         map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OpenFreezeConditions map[BlockHeight]int // A list of all heights at which freeze conditions are being used.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -27,6 +28,13 @@ type FileContractParameters struct {
 	Transaction        Transaction
 	FileContractIndex  int
 	ClientContribution Currency
+}
+
+// Wallet.FreezeConditions
+func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc SpendConditions) {
+	fc = w.SpendConditions
+	fc.TimeLock = unlockHeight
+	return
 }
 
 // Creates a new wallet that can receive and spend coins.
@@ -40,6 +48,7 @@ func CreateWallet() (w *Wallet, err error) {
 
 	w.OwnedOutputs = make(map[OutputID]Output)
 	w.SpentOutputs = make(map[OutputID]Output)
+	w.OpenFreezeConditions = make(map[BlockHeight]int)
 
 	return
 }
@@ -48,11 +57,15 @@ func CreateWallet() (w *Wallet, err error) {
 // wallet.
 func (w *Wallet) Scan(state *State) {
 	w.OwnedOutputs = make(map[OutputID]Output)
-	for id, output := range state.ConsensusState.UnspentOutputs {
+
+	// Check for owned outputs from the standard SpendConditions.
+	for id, output := range state.UnspentOutputs {
 		if output.SpendHash == w.SpendConditions.CoinAddress() {
 			w.OwnedOutputs[id] = output
 		}
 	}
+
+	// Check for spendable outputs from the freeze conditions.
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
@@ -129,10 +142,9 @@ func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 	return
 }
 
-// Problem: the wallet will double-spend itself if multiple transactions are
-// made without blocks being refreshed.
-// Takes a new address, and an amount to send, and adds outputs until the
-// amount is reached. Then sends leftovers back to self.
+// Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
+// allocateding 'minerFee' as a miner fee. The transaction is submitted to the
+// miner pool, but is also returned.
 func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, state *State) (t Transaction, err error) {
 	// Scan blockchain for outputs.
 	w.Scan(state)
@@ -155,35 +167,7 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 		return
 	}
 
-	return
-}
-
-// Wallet.ClientFundFileContract() takes a template FileContract and returns a
-// partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {
-	// Scan the blockchain for outputs.
-	w.Scan(state)
-
-	// Add money to the transaction to fund the client's portion of the contract fund.
-	err = w.FundTransaction(params.ClientContribution, &params.Transaction)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// Wallet.HostFundFileContract() take a template FileContract and returns a
-// partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
-	// Scan the blockchain for outputs.
-	w.Scan(state)
-
-	// Add money t othe transaction to fund the hosts' portion of the contract fund.
-	err = w.FundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
-	if err != nil {
-		return
-	}
+	err = state.AcceptTransaction(t)
 
 	return
 }

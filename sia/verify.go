@@ -12,9 +12,9 @@ import (
 // This struct keeps track of which public keys have been used and how many
 // more signatures are needed.
 type InputSignatures struct {
-	RemainingSignatures uint8
+	RemainingSignatures uint64
 	PossibleKeys        []PublicKey
-	UsedKeys            map[uint8]struct{}
+	UsedKeys            map[uint64]struct{}
 }
 
 // State.validTransaction returns err = nil if the transaction is valid, otherwise
@@ -26,14 +26,14 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	inputSignaturesMap := make(map[OutputID]InputSignatures)
 	for _, input := range t.Inputs {
 		// Check the input spends an existing and valid output.
-		utxo, exists := s.ConsensusState.UnspentOutputs[input.OutputID]
+		utxo, exists := s.UnspentOutputs[input.OutputID]
 		if !exists {
 			err = errors.New("transaction spends a nonexisting output")
 			return
 		}
 
 		// Check that the spend conditions match the hash listed in the output.
-		if input.SpendConditions.CoinAddress() != s.ConsensusState.UnspentOutputs[input.OutputID].SpendHash {
+		if input.SpendConditions.CoinAddress() != s.UnspentOutputs[input.OutputID].SpendHash {
 			err = errors.New("spend conditions do not match hash")
 			return
 		}
@@ -88,7 +88,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 
 	for _, proof := range t.StorageProofs {
 		// Check that the proof has not already been submitted.
-		if s.ConsensusState.OpenContracts[proof.ContractID].WindowSatisfied {
+		if s.OpenContracts[proof.ContractID].WindowSatisfied {
 			err = errors.New("storage proof has already been completed for this contract")
 			return
 		}
@@ -135,17 +135,17 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 // transaction list without verifying it.
 func (s *State) addTransactionToPool(t *Transaction) {
 	for _, input := range t.Inputs {
-		s.ConsensusState.TransactionPool[input.OutputID] = t
+		s.TransactionPool[input.OutputID] = t
 	}
-	s.ConsensusState.TransactionList[t.Inputs[0].OutputID] = t
+	s.TransactionList[t.Inputs[0].OutputID] = t
 }
 
 // Takes a transaction out of the transaction pool & transaction list.
 func (s *State) removeTransactionFromPool(t *Transaction) {
 	for _, input := range t.Inputs {
-		delete(s.ConsensusState.TransactionPool, input.OutputID)
+		delete(s.TransactionPool, input.OutputID)
 	}
-	delete(s.ConsensusState.TransactionList, t.Inputs[0].OutputID)
+	delete(s.TransactionList, t.Inputs[0].OutputID)
 }
 
 // State.AcceptTransaction() checks for a conflict of the transaction with the
@@ -159,7 +159,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	for _, input := range t.Inputs {
-		_, exists := s.ConsensusState.TransactionPool[input.OutputID]
+		_, exists := s.TransactionPool[input.OutputID]
 		if exists {
 			err = errors.New("conflicting transaction exists in transaction pool")
 			return
@@ -282,7 +282,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 	var timePassed, expectedTimePassed Timestamp
 	if newNode.Height < TargetWindow {
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(newNode.Height)
+		expectedTimePassed = BlockFrequency * Timestamp(newNode.Height)
 	} else {
 		// WARNING: this code assumes that the block at height
 		// newNode.Height-TargetWindow is the same for both the new
@@ -291,7 +291,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		// 5000 blocks long.
 		adjustmentBlock := s.blockAtHeight(newNode.Height - TargetWindow)
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
-		expectedTimePassed = TargetSecondsPerBlock * Timestamp(TargetWindow)
+		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
 	}
 
 	// Adjustment = timePassed / expectedTimePassed.
@@ -318,7 +318,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
-func (s *State) childDepth(parentNode *BlockNode) (depth BlockDepth) {
+func (s *State) childDepth(parentNode *BlockNode) (depth Target) {
 	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:])) // WRITE A FUNCTION TO GO FROM TARGET TO WEIGHT
 	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
 	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
@@ -368,26 +368,29 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 func (s *State) reverseTransaction(t Transaction) {
 	// Remove all outputs.
 	for i := range t.Outputs {
-		delete(s.ConsensusState.UnspentOutputs, t.outputID(i))
+		delete(s.UnspentOutputs, t.OutputID(i))
 	}
 
 	// Add all outputs spent by inputs.
 	for _, input := range t.Inputs {
-		s.ConsensusState.UnspentOutputs[input.OutputID] = s.ConsensusState.SpentOutputs[input.OutputID]
-		delete(s.ConsensusState.SpentOutputs, input.OutputID)
+		s.UnspentOutputs[input.OutputID] = s.SpentOutputs[input.OutputID]
+		delete(s.SpentOutputs, input.OutputID)
 	}
 
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
-		outputID := openContract.storageProofOutputID(s.Height(), true)
-		delete(s.ConsensusState.UnspentOutputs, outputID)
+		openContract := s.OpenContracts[sp.ContractID]
+		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+		if err != nil {
+			panic(err)
+		}
+		delete(s.UnspentOutputs, outputID)
 	}
 
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
-		contractID := t.fileContractID(i)
-		delete(s.ConsensusState.OpenContracts, contractID)
+		contractID := t.FileContractID(i)
+		delete(s.OpenContracts, contractID)
 	}
 }
 
@@ -396,15 +399,16 @@ func (s *State) reverseTransaction(t Transaction) {
 func (s *State) rewindABlock() {
 	// Repen all contracts that terminated, and remove the corresponding output.
 	for _, openContract := range s.currentBlockNode().ContractTerminations {
-		s.ConsensusState.OpenContracts[openContract.ContractID] = openContract
-		delete(s.ConsensusState.UnspentOutputs, openContract.fileContractTerminationOutputID())
+		s.OpenContracts[openContract.ContractID] = openContract
+		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
+		delete(s.UnspentOutputs, openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus))
 	}
 
 	// Reverse all outputs created by missed storage proofs.
 	for _, missedProof := range s.currentBlockNode().MissedStorageProofs {
-		s.ConsensusState.OpenContracts[missedProof.ContractID].FundsRemaining += s.ConsensusState.UnspentOutputs[missedProof.OutputID].Value
-		s.ConsensusState.OpenContracts[missedProof.ContractID].Failures -= 1
-		delete(s.ConsensusState.UnspentOutputs, missedProof.OutputID)
+		s.OpenContracts[missedProof.ContractID].FundsRemaining += s.UnspentOutputs[missedProof.OutputID].Value
+		s.OpenContracts[missedProof.ContractID].Failures -= 1
+		delete(s.UnspentOutputs, missedProof.OutputID)
 	}
 
 	// Reverse each transaction in the block, in reverse order from how
@@ -414,10 +418,9 @@ func (s *State) rewindABlock() {
 		s.addTransactionToPool(&s.currentBlock().Transactions[i])
 	}
 
-	// Update the CurrentBlock and CurrentPath variables of the
-	// ConsensusState.
-	s.ConsensusState.CurrentBlock = s.currentBlock().ParentBlock
-	delete(s.ConsensusState.CurrentPath, s.Height())
+	// Update the CurrentBlock and CurrentPath variables of the longest fork.
+	s.CurrentBlock = s.currentBlock().ParentBlock
+	delete(s.CurrentPath, s.Height())
 }
 
 // State.applyTransaction() takes a transaction and adds it to the
@@ -425,18 +428,20 @@ func (s *State) rewindABlock() {
 func (s *State) applyTransaction(t Transaction) {
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
-		s.ConsensusState.SpentOutputs[input.OutputID] = s.ConsensusState.UnspentOutputs[input.OutputID]
-		delete(s.ConsensusState.UnspentOutputs, input.OutputID)
+		s.SpentOutputs[input.OutputID] = s.UnspentOutputs[input.OutputID]
+		delete(s.UnspentOutputs, input.OutputID)
 	}
+
+	// REMOVE ALL CONFLICTING TRANSACTIONS FROM THE TRANSACTION POOL.
 
 	// Add all outputs to the unspent outputs list
 	for i, output := range t.Outputs {
-		s.ConsensusState.UnspentOutputs[t.outputID(i)] = output
+		s.UnspentOutputs[t.OutputID(i)] = output
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		contractID := t.fileContractID(i)
+		contractID := t.FileContractID(i)
 		openContract := OpenContract{
 			FileContract:    contract,
 			ContractID:      contractID,
@@ -444,13 +449,13 @@ func (s *State) applyTransaction(t Transaction) {
 			Failures:        0,
 			WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
 		}
-		s.ConsensusState.OpenContracts[contractID] = &openContract
+		s.OpenContracts[contractID] = &openContract
 	}
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
 		// Check for contract termination.
-		openContract := s.ConsensusState.OpenContracts[sp.ContractID]
+		openContract := s.OpenContracts[sp.ContractID]
 		payout := openContract.FileContract.ValidProofPayout
 		if openContract.FundsRemaining < openContract.FileContract.ValidProofPayout {
 			payout = openContract.FundsRemaining
@@ -460,11 +465,51 @@ func (s *State) applyTransaction(t Transaction) {
 			Value:     payout,
 			SpendHash: openContract.FileContract.ValidProofAddress,
 		}
-		s.ConsensusState.UnspentOutputs[openContract.storageProofOutputID(s.Height(), true)] = output
+		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+		if err != nil {
+			panic(err)
+		}
+		s.UnspentOutputs[outputID] = output
 
 		// Mark the proof as complete for this window.
-		s.ConsensusState.OpenContracts[sp.ContractID].WindowSatisfied = true
-		s.ConsensusState.OpenContracts[sp.ContractID].FundsRemaining -= payout
+		s.OpenContracts[sp.ContractID].WindowSatisfied = true
+		s.OpenContracts[sp.ContractID].FundsRemaining -= payout
+	}
+
+	// Check the arbitrary data of the transaction to fill out the host database.
+	if len(t.ArbitraryData) > 8 {
+		dataIndicator := DecUint64(t.ArbitraryData[0:8])
+		if dataIndicator == 1 {
+			var ha HostAnnouncement
+			Unmarshal(t.ArbitraryData[1:], ha)
+
+			// Verify that the spend condiitons match.
+			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+				return
+			}
+
+			// Add the host to the host database.
+			host := Host{
+				IPAddress:   string(ha.IPAddress),
+				MinSize:     ha.MinFilesize,
+				MaxSize:     ha.MaxFilesize,
+				Duration:    ha.MaxDuration,
+				Frequency:   ha.MaxChallengeFrequency,
+				Tolerance:   ha.MinTolerance,
+				Price:       ha.Price,
+				Burn:        ha.Burn,
+				Freeze:      Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[ha.FreezeIndex].Value,
+				CoinAddress: ha.CoinAddress,
+			}
+			if host.Freeze <= 0 {
+				return
+			}
+
+			// Add the weight of the host to the total weight of the hosts in
+			// the host database.
+			s.HostList = append(s.HostList, host)
+			s.TotalWeight += host.Weight()
+		}
 	}
 }
 
@@ -494,7 +539,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	if err != nil {
-		// Rewind transactions added to ConsensusState.
+		// Rewind transactions added to
 		for i := len(appliedTransactions) - 1; i >= 0; i-- {
 			s.reverseTransaction(appliedTransactions[i])
 		}
@@ -505,7 +550,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	//
 	// This could be split into its own function.
 	var contractsToDelete []ContractID
-	for _, openContract := range s.ConsensusState.OpenContracts {
+	for _, openContract := range s.OpenContracts {
 		// Check for the window switching over.
 		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
 			// Check for a missed proof.
@@ -515,12 +560,15 @@ func (s *State) integrateBlock(b *Block) (err error) {
 					payout = openContract.FundsRemaining
 				}
 
-				newOutputID := openContract.storageProofOutputID(s.Height(), false)
+				newOutputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
+				if err != nil {
+					panic(err)
+				}
 				output := Output{
 					Value:     payout,
 					SpendHash: openContract.FileContract.MissedProofAddress,
 				}
-				s.ConsensusState.UnspentOutputs[newOutputID] = output
+				s.UnspentOutputs[newOutputID] = output
 				msp := MissedStorageProof{
 					OutputID:   newOutputID,
 					ContractID: openContract.ContractID,
@@ -540,7 +588,8 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
-				outputID := openContract.fileContractTerminationOutputID()
+				contractStatus := openContract.Failures == openContract.FileContract.Tolerance // MAKE A FUNCTION TO GET THIS VALUE
+				outputID := openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus)
 				output := Output{
 					Value: openContract.FundsRemaining,
 				}
@@ -549,7 +598,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 				} else {
 					output.SpendHash = openContract.FileContract.ValidProofAddress
 				}
-				s.ConsensusState.UnspentOutputs[outputID] = output
+				s.UnspentOutputs[outputID] = output
 			}
 
 			// Add the contract to contract terminations.
@@ -563,7 +612,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 	// Delete all of the contracts that terminated.
 	for _, contractID := range contractsToDelete {
-		delete(s.ConsensusState.OpenContracts, contractID)
+		delete(s.OpenContracts, contractID)
 	}
 
 	// Add coin inflation to the miner subsidy.
@@ -574,11 +623,11 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
-	s.ConsensusState.UnspentOutputs[b.subsidyID()] = minerSubsidyOutput
+	s.UnspentOutputs[b.SubsidyID()] = minerSubsidyOutput
 
-	// Update the current block and current path variables of the ConsensusState.
-	s.ConsensusState.CurrentBlock = b.ID()
-	s.ConsensusState.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
+	// Update the current block and current path variables of the longest fork.
+	s.CurrentBlock = b.ID()
+	s.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
 
 	return
 }
@@ -603,19 +652,19 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// children of the parents so that we can re-trace as we
 	// validate the blocks.
 	currentNode := newNode
-	value := s.ConsensusState.CurrentPath[currentNode.Height]
+	value := s.CurrentPath[currentNode.Height]
 	var parentHistory []BlockID
 	for value != currentNode.Block.ID() {
 		parentHistory = append(parentHistory, currentNode.Block.ID())
 		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
-		value = s.ConsensusState.CurrentPath[currentNode.Height]
+		value = s.CurrentPath[currentNode.Height]
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	var rewoundBlocks []BlockID
-	for s.ConsensusState.CurrentBlock != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.ConsensusState.CurrentBlock)
+	for s.CurrentBlock != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock)
 		s.rewindABlock()
 	}
 
