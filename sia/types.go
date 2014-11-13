@@ -4,6 +4,8 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
 const (
@@ -150,7 +152,7 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // Block.ID() returns a hash of the block, which is used as the block
 // identifier. Transactions are not included in the hash.
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
+	return BlockID(HashBytes(encoding.MarshalAll(
 		b.ParentBlock,
 		b.Timestamp,
 		b.Nonce,
@@ -169,7 +171,7 @@ func (b *Block) SubsidyID() OutputID {
 // The index determines which TransactionSignature is included in the hash.
 func (t *Transaction) SigHash(i int) Hash {
 	if t.Signatures[i].CoveredFields.WholeTransaction {
-		return HashBytes(MarshalAll(
+		return HashBytes(encoding.MarshalAll(
 			t.ArbitraryData,
 			t.Inputs,
 			t.MinerFees,
@@ -184,25 +186,25 @@ func (t *Transaction) SigHash(i int) Hash {
 
 	var signedData []byte
 	if t.Signatures[i].CoveredFields.ArbitraryData {
-		signedData = append(signedData, Marshal(t.ArbitraryData)...)
+		signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
 	}
 	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
-		signedData = append(signedData, Marshal(minerFee)...)
+		signedData = append(signedData, encoding.Marshal(minerFee)...)
 	}
 	for _, input := range t.Signatures[i].CoveredFields.Inputs {
-		signedData = append(signedData, Marshal(input)...)
+		signedData = append(signedData, encoding.Marshal(input)...)
 	}
 	for _, output := range t.Signatures[i].CoveredFields.Outputs {
-		signedData = append(signedData, Marshal(output)...)
+		signedData = append(signedData, encoding.Marshal(output)...)
 	}
 	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
-		signedData = append(signedData, Marshal(contract)...)
+		signedData = append(signedData, encoding.Marshal(contract)...)
 	}
 	for _, fileProof := range t.Signatures[i].CoveredFields.FileProofs {
-		signedData = append(signedData, Marshal(fileProof)...)
+		signedData = append(signedData, encoding.Marshal(fileProof)...)
 	}
 	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
-		signedData = append(signedData, Marshal(sig)...)
+		signedData = append(signedData, encoding.Marshal(sig)...)
 	}
 
 	return HashBytes(signedData)
@@ -211,18 +213,18 @@ func (t *Transaction) SigHash(i int) Hash {
 // Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
 func (t *Transaction) OutputID(index int) OutputID {
-	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...)))
+	return OutputID(HashBytes(append(encoding.Marshal(t), append([]byte("coinsend"), encoding.Marshal(uint64(index))...)...)))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
 // SpendConditions object, using the timelock, number of signatures required,
 // and each public key as leaves.
 func (sc *SpendConditions) CoinAddress() CoinAddress {
-	tlHash := HashBytes(Marshal(sc.TimeLock))
-	nsHash := HashBytes(Marshal(sc.NumSignatures))
+	tlHash := HashBytes(encoding.Marshal(sc.TimeLock))
+	nsHash := HashBytes(encoding.Marshal(sc.NumSignatures))
 	pkHashes := make([]Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
+		pkHashes[i] = HashBytes(encoding.Marshal(sc.PublicKeys[i]))
 	}
 	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
 	return CoinAddress(MerkleRoot(leaves))
@@ -230,7 +232,7 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
 func (t *Transaction) FileContractID(index int) ContractID {
-	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...)))
+	return ContractID(HashBytes(append(encoding.Marshal(t), append([]byte("contract"), encoding.Marshal(uint64(index))...)...)))
 }
 
 // WindowIndex returns the index of the challenge window that is
@@ -257,7 +259,7 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 		return
 	}
 
-	outputID = OutputID(HashBytes(append(fcID[:], append(proofString, Marshal(windowIndex)...)...)))
+	outputID = OutputID(HashBytes(append(fcID[:], append(proofString, encoding.Marshal(windowIndex)...)...)))
 	return
 }
 
@@ -275,14 +277,14 @@ func (s *Signature) MarshalSia() []byte {
 	}
 	// pretend Signature is a tuple of []bytes
 	// this lets us use Marshal instead of doing manual length-prefixing
-	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
+	return encoding.Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
 }
 
 // Signature.UnmarshalSia implements the Unmarshaler interface for Signatures.
 func (s *Signature) UnmarshalSia(b []byte) int {
 	// inverse of the struct trick used in Signature.MarshalSia
 	str := struct{ R, S []byte }{}
-	if Unmarshal(b, &str) != nil {
+	if encoding.Unmarshal(b, &str) != nil {
 		return 0
 	}
 	s.R = new(big.Int).SetBytes(str.R)
@@ -296,14 +298,14 @@ func (pk PublicKey) MarshalSia() []byte {
 		return []byte{0, 0}
 	}
 	// see Signature.MarshalSia
-	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
+	return encoding.Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
 }
 
 // PublicKey.UnmarshalSia implements the Unmarshaler interface for PublicKeys.
 func (pk *PublicKey) UnmarshalSia(b []byte) int {
 	// see Signature.UnmarshalSia
 	str := struct{ X, Y []byte }{}
-	if Unmarshal(b, &str) != nil {
+	if encoding.Unmarshal(b, &str) != nil {
 		return 0
 	}
 	pk.X = new(big.Int).SetBytes(str.X)

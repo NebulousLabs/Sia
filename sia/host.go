@@ -1,5 +1,9 @@
 package sia
 
+import (
+	"github.com/NebulousLabs/Andromeda/encoding"
+)
+
 const (
 	HostAnnouncementPrefix = uint64(1)
 )
@@ -47,8 +51,8 @@ func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, 
 	info.SpendConditions = freezeConditions
 
 	// Add the announcement as arbitrary data.
-	prefixBytes := Marshal(HostAnnouncementPrefix)
-	announcementBytes := Marshal(info)
+	prefixBytes := encoding.Marshal(HostAnnouncementPrefix)
+	announcementBytes := encoding.Marshal(info)
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
 	err = state.AcceptTransaction(t)

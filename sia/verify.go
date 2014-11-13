@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"sort"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -223,7 +225,7 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 func (b *Block) expectedTransactionMerkleRoot() Hash {
 	var transactionHashes []Hash
 	for _, transaction := range b.Transactions {
-		transactionHashes = append(transactionHashes, HashBytes(Marshal(transaction)))
+		transactionHashes = append(transactionHashes, HashBytes(encoding.Marshal(transaction)))
 	}
 	return MerkleRoot(transactionHashes)
 }
@@ -478,10 +480,10 @@ func (s *State) applyTransaction(t Transaction) {
 
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) > 8 {
-		dataIndicator := DecUint64(t.ArbitraryData[0:8])
+		dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
 		if dataIndicator == 1 {
 			var ha HostAnnouncement
-			Unmarshal(t.ArbitraryData[1:], ha)
+			encoding.Unmarshal(t.ArbitraryData[1:], ha)
 
 			// Verify that the spend condiitons match.
 			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {

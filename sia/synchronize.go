@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
 var (
@@ -11,7 +13,8 @@ var (
 	GenesisTimestamp = 1415904418    // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
-// Create the state that contains the genesis block and nothing else.
+// CreateGenesisState will create the state that contains the genesis block and
+// nothing else.
 func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = new(State)
@@ -57,7 +60,7 @@ func CreateGenesisState() (s *State) {
 // longest known fork.
 func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	// Get the starting point.
-	start := BlockHeight(DecUint64(data))
+	start := BlockHeight(encoding.DecUint64(data))
 	end := s.Height()
 	if start > end {
 		err = errors.New("start is greater than the height of the longest known fork.")
@@ -75,8 +78,8 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	}
 
 	// Encode and send the blocks.
-	encBlocks := Marshal(blocks)
-	encLen := EncUint64(uint64(len(encBlocks)))
+	encBlocks := encoding.Marshal(blocks)
+	encLen := encoding.EncUint64(uint64(len(encBlocks)))
 	_, err = conn.Write(append(encLen[:4], encBlocks...))
 	if err != nil {
 		return
@@ -87,8 +90,11 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 
 // catchUp handles orphan blocks and situations where the node has fallen
 // behind the longest fork.
+//
+// NOTE: CATCHUP IS BROKEN FOR ANY VALUES OTHER THAN 1.
+// NOTE: CATCHUP MIGHT SEND A SINGLE MESSAGE ASKING FOR MANY MEGABYTES WORTH OF BLOCKS.
 func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
-	encbh := EncUint64(uint64(start))
+	encbh := encoding.EncUint64(uint64(start))
 	return func(conn net.Conn) error {
 		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
 		var blocks []Block
@@ -96,7 +102,7 @@ func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
 		if err != nil {
 			return err
 		}
-		if err = Unmarshal(encBlocks, &blocks); err != nil {
+		if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
 			return err
 		}
 		for i := range blocks {
@@ -112,5 +118,5 @@ func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
 // download.
 func (s *State) Bootstrap() {
 	addr := s.Server.RandomPeer()
-	addr.Call(s.catchUp(0))
+	addr.Call(s.catchUp(1))
 }

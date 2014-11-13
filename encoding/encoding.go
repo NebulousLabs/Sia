@@ -1,4 +1,4 @@
-package sia
+package encoding
 
 import (
 	"encoding/binary"
