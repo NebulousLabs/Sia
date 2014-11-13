@@ -28,7 +28,7 @@ func createEnvironment(t *testing.T) (testEnv *testingEnvironment) {
 	}
 	testEnv.wallets = append(testEnv.wallets, firstWallet)
 
-	testEnv.state = CreateGenesisState(testEnv.wallets[0].SpendConditions.CoinAddress())
+	testEnv.state = CreateGenesisState()
 	testEnv.state.Server, err = NewTCPServer(9989)
 	if err != nil {
 		testEnv.t.Fatal(err)
