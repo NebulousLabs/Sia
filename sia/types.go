@@ -16,6 +16,9 @@ const (
 	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
 
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
+
+	InitialCoinbase = 300000
+	MinimumCoinbase = 30000
 )
 
 var MaxAdjustmentUp = big.NewRat(1001, 1000)
@@ -133,6 +136,15 @@ type StorageProof struct {
 	ContractID ContractID
 	Segment    [SegmentSize]byte
 	HashSet    []Hash
+}
+
+// CalculateCoinbase takes a height and from that derives the coinbase.
+func CalculateCoinbase(height BlockHeight) Currency {
+	if height >= InitialCoinbase-MinimumCoinbase {
+		return MinimumCoinbase
+	} else {
+		return InitialCoinbase - Currency(height)
+	}
 }
 
 // Block.ID() returns a hash of the block, which is used as the block

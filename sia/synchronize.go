@@ -6,10 +6,6 @@ import (
 	"time"
 )
 
-const (
-	GenesisSubsidy = Currency(25000)
-)
-
 // These values will be generated before release, but the code for generating
 // them will never be released.  All that the rest of the world will see is
 // hardcoded values.
