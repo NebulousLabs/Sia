@@ -35,7 +35,6 @@ func walletStart(cmd *cobra.Command, args []string) {
 
 	// create genesis state and register it with the server
 	env.state = sia.CreateGenesisState()
-	/*
 		if err = tcps.RegisterRPC('B', env.state.AcceptBlock); err != nil {
 			fmt.Println(err)
 			return
@@ -44,11 +43,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 			fmt.Println(err)
 			return
 		}
-		if err = tcps.RegisterRPC('R', env.state.SendBlocks); err != nil {
-			fmt.Println(err)
-			return
-		}
-	*/
+	tcps.RegisterHandler('R', env.state.SendBlocks)
 	env.state.Server = tcps
 
 	// download blocks
