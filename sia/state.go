@@ -9,6 +9,43 @@ type (
 	BlockWeight *big.Rat
 )
 
+// An open contract contains all information necessary to properly enforce a
+// contract with no knowledge of the history of the contract.
+type OpenContract struct {
+	FileContract    FileContract
+	ContractID      ContractID
+	FundsRemaining  Currency
+	Failures        uint64
+	WindowSatisfied bool
+}
+
+// A missed storage proof indicates which contract missed the proof, and which
+// output resulted from the missed proof. This is necessary because missed
+// proofs are passive - they happen in the absense of a transaction, not in the
+// presense of one. They must be stored in the block nodes so that a block can
+// be correctly rewound without needing to scroll through the past
+// 'ChallengeFrequency' blocks to figure out if a proof was missed or not.
+type MissedStorageProof struct {
+	OutputID   OutputID
+	ContractID ContractID
+}
+
+// A BlockNode contains a block and the list of children to the block. Also
+// contains some consensus information like which contracts have terminated and
+// where there were missed storage proofs.
+type BlockNode struct {
+	Block    *Block
+	Children []*BlockNode
+
+	Height           BlockHeight
+	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
+	Target           Target        // Target for next block.
+	Depth            Target        // What the target would need to be to have a weight equal to all blocks up to this block.
+
+	ContractTerminations []*OpenContract      // Contracts that terminated this block.
+	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
+}
+
 // The state struct contains a list of all known blocks, sorted into a tree
 // according to the shape of the network. It also contains the
 // 'ConsensusState', which represents the state of consensus on the current
@@ -55,43 +92,6 @@ type State struct {
 	Server *TCPServer
 
 	sync.Mutex // AcceptBlock() and AcceptTransaction() can be called concurrently.
-}
-
-// A BlockNode contains a block and the list of children to the block. Also
-// contains some consensus information like which contracts have terminated and
-// where there were missed storage proofs.
-type BlockNode struct {
-	Block    *Block
-	Children []*BlockNode
-
-	Height           BlockHeight
-	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
-	Target           Target        // Target for next block.
-	Depth            Target        // What the target would need to be to have a weight equal to all blocks up to this block.
-
-	ContractTerminations []*OpenContract      // Contracts that terminated this block.
-	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
-}
-
-// An open contract contains all information necessary to properly enforce a
-// contract with no knowledge of the history of the contract.
-type OpenContract struct {
-	FileContract    FileContract
-	ContractID      ContractID
-	FundsRemaining  Currency
-	Failures        uint64
-	WindowSatisfied bool
-}
-
-// A missed storage proof indicates which contract missed the proof, and which
-// output resulted from the missed proof. This is necessary because missed
-// proofs are passive - they happen in the absense of a transaction, not in the
-// presense of one. They must be stored in the block nodes so that a block can
-// be correctly rewound without needing to scroll through the past
-// 'ChallengeFrequency' blocks to figure out if a proof was missed or not.
-type MissedStorageProof struct {
-	OutputID   OutputID
-	ContractID ContractID
 }
 
 // State.Height() returns the height of the longest fork.
