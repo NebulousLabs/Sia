@@ -53,22 +53,36 @@ func CreateGenesisState() (s *State) {
 	return
 }
 
-// sendBlock responds to a block request with the desired block.
-func (s *State) SendBlocks(conn net.Conn, data []byte) error {
+// SendBlocks sends all known blocks from the given height forward from the
+// longest known fork.
+func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
+	// Get the starting point.
 	start := BlockHeight(DecUint64(data))
 	end := s.Height()
-	blocks := make([]Block, end-start)
+	if start > end {
+		err = errors.New("start is greater than the height of the longest known fork.")
+		return
+	}
+
+	// Build an array of blocks.
+	blocks := make([]Block, end-start+1)
 	for i := range blocks {
 		b := s.blockAtHeight(start + BlockHeight(i))
 		if b == nil {
-			return errors.New("unexpected nil block")
+			panic("nil block in state!")
 		}
 		blocks[i] = *b
 	}
+
+	// Encode and send the blocks.
 	encBlocks := Marshal(blocks)
 	encLen := EncUint64(uint64(len(encBlocks)))
-	_, err := conn.Write(append(encLen[:4], encBlocks...))
-	return err
+	_, err = conn.Write(append(encLen[:4], encBlocks...))
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // catchUp handles orphan blocks and situations where the node has fallen
