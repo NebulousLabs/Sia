@@ -7,35 +7,13 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
-// State.addTransactionToPool() adds a transaction to the transaction pool and
-// transaction list without verifying it.
-func (s *State) addTransactionToPool(t *Transaction) {
-	for _, input := range t.Inputs {
-		s.TransactionPool[input.OutputID] = t
-	}
-	s.TransactionList[t.Inputs[0].OutputID] = t
-}
-
-// Takes a transaction out of the transaction pool & transaction list.
-func (s *State) removeTransactionFromPool(t *Transaction) {
-	for _, input := range t.Inputs {
-		delete(s.TransactionPool, input.OutputID)
-	}
-	delete(s.TransactionList, t.Inputs[0].OutputID)
-}
-
 // State.reverseTransaction removes a given transaction from the
 // ConsensusState, making it as though the transaction had never happened.
 func (s *State) reverseTransaction(t Transaction) {
-	// Remove all outputs.
-	for i := range t.Outputs {
-		delete(s.UnspentOutputs, t.OutputID(i))
-	}
-
-	// Add all outputs spent by inputs.
-	for _, input := range t.Inputs {
-		s.UnspentOutputs[input.OutputID] = s.SpentOutputs[input.OutputID]
-		delete(s.SpentOutputs, input.OutputID)
+	// Delete all the open contracts created by new contracts.
+	for i := range t.FileContracts {
+		contractID := t.FileContractID(i)
+		delete(s.OpenContracts, contractID)
 	}
 
 	// Delete all outputs created by storage proofs.
@@ -48,40 +26,36 @@ func (s *State) reverseTransaction(t Transaction) {
 		delete(s.UnspentOutputs, outputID)
 	}
 
-	// Delete all the open contracts created by new contracts.
-	for i := range t.FileContracts {
-		contractID := t.FileContractID(i)
-		delete(s.OpenContracts, contractID)
+	// Delete all financial outputs created by the transaction.
+	for i := range t.Outputs {
+		delete(s.UnspentOutputs, t.OutputID(i))
 	}
+
+	// Restore all inputs to the unspent outputs list.
+	for _, input := range t.Inputs {
+		s.UnspentOutputs[input.OutputID] = s.SpentOutputs[input.OutputID]
+		delete(s.SpentOutputs, input.OutputID)
+	}
+
+	// Add the transaction to the transaction pool.
+	s.addTransactionToPool(&t)
 }
 
 // State.applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) {
+	// Update the transaction pool to resolve any conflicts.
+	s.removeTransactionConflictsFromPool(&t)
+
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
 		s.SpentOutputs[input.OutputID] = s.UnspentOutputs[input.OutputID]
 		delete(s.UnspentOutputs, input.OutputID)
 	}
 
-	// REMOVE ALL CONFLICTING TRANSACTIONS FROM THE TRANSACTION POOL.
-
-	// Add all outputs to the unspent outputs list
+	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
 		s.UnspentOutputs[t.OutputID(i)] = output
-	}
-
-	// Add all new contracts to the OpenContracts list.
-	for i, contract := range t.FileContracts {
-		contractID := t.FileContractID(i)
-		openContract := OpenContract{
-			FileContract:    contract,
-			ContractID:      contractID,
-			FundsRemaining:  contract.ContractFund,
-			Failures:        0,
-			WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
-		}
-		s.OpenContracts[contractID] = &openContract
 	}
 
 	// Add all outputs created by storage proofs.
@@ -106,6 +80,19 @@ func (s *State) applyTransaction(t Transaction) {
 		// Mark the proof as complete for this window.
 		s.OpenContracts[sp.ContractID].WindowSatisfied = true
 		s.OpenContracts[sp.ContractID].FundsRemaining -= payout
+	}
+
+	// Add all new contracts to the OpenContracts list.
+	for i, contract := range t.FileContracts {
+		contractID := t.FileContractID(i)
+		openContract := OpenContract{
+			FileContract:    contract,
+			ContractID:      contractID,
+			FundsRemaining:  contract.ContractFund,
+			Failures:        0,
+			WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
+		}
+		s.OpenContracts[contractID] = &openContract
 	}
 
 	// Check the arbitrary data of the transaction to fill out the host database.

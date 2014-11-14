@@ -78,7 +78,7 @@ type State struct {
 	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	OpenContracts  map[ContractID]*OpenContract
 	UnspentOutputs map[OutputID]Output
-	SpentOutputs   map[OutputID]Output
+	SpentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
 
 	// Mining Variables
 	Mining     bool

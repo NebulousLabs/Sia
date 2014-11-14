@@ -103,6 +103,14 @@ type CoveredFields struct {
 	Signatures       []uint8
 }
 
+// A StorageProof contains the fields needed for a host to prove that they are
+// still storing a file.
+type StorageProof struct {
+	ContractID ContractID
+	Segment    [hash.SegmentSize]byte
+	HashSet    []hash.Hash
+}
+
 // A FileContract contains the information necessary to enforce that a host
 // stores a file.
 type FileContract struct {
@@ -116,14 +124,6 @@ type FileContract struct {
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
-}
-
-// A StorageProof contains the fields needed for a host to prove that they are
-// still storing a file.
-type StorageProof struct {
-	ContractID ContractID
-	Segment    [hash.SegmentSize]byte
-	HashSet    []hash.Hash
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
