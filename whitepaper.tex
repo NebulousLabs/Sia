@@ -190,16 +190,19 @@ Because hosts consent to all file contracts, they are free to reject any contrac
 
 \section{Arbitrary Transaction Data}
 Each transaction has an arbitrary data field which can be used for any type of information.
-Nodes will be required to store the arbitrary data if there is a signature in the transaction which includes the arbitrary data in the signed fields.
+Nodes will be required to store the arbitrary data if it is signed by any signature in the transaction.
 Nodes will initially accept up to 16 KB of arbitrary data per block.
 
-The arbitrary data provides storage providers and clients a decentralized way to organize themselves.
-Standards can be agreed upon that are used to announce providers, announce files, or create an entire decentralized file tracker.
+The arbitrary data provides storage providers and clients with a decentralized way to organize themselves.
+It can be used to advertise available space or files seeking a host, or to create a decentralized file tracker.
 
-It is possible that arbitrary data could be used for other types of soft forks, by creating an ``anyone can spend'' output but then adding arbitrary data that the miners recognize as a new set of conditions on the output.
-The miners block any transaction that spends the output without also satisfying the stipulations placed in the arbitrary data.
-Old nodes will stay synchronized without needing to be able to parse the arbitrary data.
-The amount of arbitrary data per block can be extended with a similar style of soft fork, where an anyone-can-spend transaction is visible to older clients, but data in the arbitrary field indicates that a longer block was signed, perhaps containing substantially more arbitrary data.
+Arbitrary data could also be used to implement other types of soft forks.
+This would be done by creating an ``anyone-can-spend'' output but with restrictions specified in the arbitrary data.
+Miners that understand the restrictions can block any transaction that spends the output without satisfying the necessary stipulations.
+Naive nodes will stay synchronized without needing to be able to parse the arbitrary data.
+
+% need clarification on this part
+The amount of arbitrary data per block can be extended with a similar style of soft fork, where an anyone-can-spend transaction is visible to older clients, but data in the arbitrary field indicates that a longer block was signed.
 Older clients would get the short block, and updated clients would demand the longer block or otherwise refuse to recognize the block.
 
 \section{Storage Ecosystem}
@@ -207,11 +210,11 @@ Sia relies on an ecosystem that facilitates decentralized storage.
 Storage providers can use the arbitrary data field to announce themselves as providers to the network.
 This can be done using standardized template that clients will be able to read.
 Clients can read these announcements and create a database of providers.
-They can then determine a set of providers that they trust (as a set) and create file contracts with those providers.
-Storage providers and clients can then create micropayment channels \cite{mpc} which can be used to negotiate downloading the file.
+They can then determine a set of providers that they trust and create file contracts with those providers.
+Micropayment channels \cite{mpc} can be used to negotiate downloading the file. % should probably expand this a bit, or move it to another section.
 
 \subsection{Storage Provider Protections}
-A contract requires consent from both the storage provider and the client, allowing the provider to reject unfavorable terms and illegal files.
+A contract requires consent from both the storage provider and the client, allowing the provider to reject unfavorable terms or unwanted (e.g. illegal) files.
 The provider additionally does not need to sign a contract until the full file has been uploaded.
 The contract terms give storage providers flexibility.
 They can advertise themselves as minimally reliable, offering a low price and a agreeing to minimal penalties for losing files.
