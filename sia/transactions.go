@@ -70,7 +70,7 @@ func (s *State) applyTransaction(t Transaction) {
 	}
 
 	// Scan the arbitrary data for items relevent to the host database.
-	s.scanArbitraryData(&t)
+	s.scanAndApplyHosts(&t)
 }
 
 // Each input has a list of public keys and a required number of signatures.
@@ -206,12 +206,9 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
-	for _, input := range t.Inputs {
-		_, exists := s.TransactionPool[input.OutputID]
-		if exists {
-			err = errors.New("conflicting transaction exists in transaction pool")
-			return
-		}
+	if s.transactionPoolConflict(&t) {
+		err = errors.New("conflicting transaction exists in transaction pool")
+		return
 	}
 
 	// Check that the transaction is potentially valid.

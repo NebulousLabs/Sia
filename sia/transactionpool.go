@@ -66,3 +66,16 @@ func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
 		}
 	}
 }
+
+// transactionPoolConflict compares a transaction to the transaction pool and
+// returns true if there is already a transaction in the transaction pool that
+// is in conflict with the current transaction.
+func (s *State) transactionPoolConflict(t *Transaction) (conflict bool) {
+	for _, input := range t.Inputs {
+		_, exists := s.TransactionPool[input.OutputID]
+		if exists {
+			conflict = true
+		}
+	}
+	return
+}
