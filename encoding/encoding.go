@@ -9,6 +9,8 @@ import (
 // A Marshaler can be encoded as a byte slice.
 // Marshaler and Unmarshaler are separate interfaces because Unmarshaler must
 // have a pointer receiver, while Marshaler does not.
+//
+// SHOULD PROBABLY HAVE A DIFFERENT NAME. SIAMARSHALLER IF ALL ELSE FAILS.
 type Marshaler interface {
 	MarshalSia() []byte
 }
@@ -16,6 +18,8 @@ type Marshaler interface {
 // An Unmarshaler can be decoded from a byte slice.
 // UnmarshalSia may be passed a byte slice containing more than one encoded type.
 // It should return the number of bytes used to decode itself.
+//
+// SHOULD PROBABLY HAVE A DIFFERENT NAME. SIAUNMARSHALLER IF ALL ELSE FAILS.
 type Unmarshaler interface {
 	UnmarshalSia([]byte) int
 }
@@ -96,6 +100,7 @@ func marshal(val reflect.Value) (b []byte) {
 		return b[:val.Type().Bits()/8]
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		b := EncUint64(val.Uint())
+		// PLEASE ADJUST SO INT AND UINT ARE ACCEPTED, ALL INTEGERS ENCODED AS 8 BYTES.
 		return b[:val.Type().Bits()/8]
 	case reflect.String:
 		s := val.String()
