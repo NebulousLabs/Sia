@@ -10,12 +10,14 @@ Adding a block:
 	3c. Add all financial outputs to the unspent outputs list.
 	3d. Add all outputs created by the storage proofs.
 	3e. Add all open contracts created by the file contracts.
+	3f. (scan arbitrary data to fill out the host db)
 
 Removing a block (the inverse of adding a block):
 
 1. ?
 2. ?
 3. Remove all transactions:
+	3-. (scan arbitrary data and remove any hosts from the host db)
 	3a. Delete all open contracts created by the file contracts.
 	3b. Delete all outputs created by the storage proofs.
 	3c. Delete all financial outputs created by the transaction.
