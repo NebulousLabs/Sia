@@ -13,7 +13,6 @@ const (
 	HashSize      = 32
 	PublicKeySize = 32
 	SignatureSize = 32
-	SegmentSize   = 64
 
 	BlockFrequency = 600               // In seconds.
 	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
@@ -136,7 +135,7 @@ type FileContract struct {
 // still storing a file.
 type StorageProof struct {
 	ContractID ContractID
-	Segment    [SegmentSize]byte
+	Segment    [hash.SegmentSize]byte
 	HashSet    []hash.Hash
 }
 
