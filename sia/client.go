@@ -43,7 +43,11 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 	if err != nil {
 		return
 	}
-	merkle, err := hash.MerkleFile(file, calculateSegments(info.Size()))
+	segments, err := hash.CalculateSegments(info.Size())
+	if err != nil {
+		return
+	}
+	merkle, err := hash.ReaderMerkleRoot(file, segments)
 	if err != nil {
 		return
 	}

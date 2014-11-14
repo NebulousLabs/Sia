@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-// MerkleFile splits the provided data into segments. It then recursively
+// ReaderMerkleRoot splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
 // See MerkleRoot for a diagram of how Merkle trees are constructed.
 func ReaderMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err error) {
@@ -39,7 +39,7 @@ func ReaderMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err erro
 
 // Calculates the number of segments in the file when building a merkle tree.
 // Should probably be renamed to CountLeaves() or something.
-func calculateSegments(fileSize int64) (numSegments uint64, err error) {
+func CalculateSegments(fileSize int64) (numSegments uint64, err error) {
 	if fileSize < 0 {
 		err = errors.New("cannot have a negative file size")
 		return
@@ -59,16 +59,25 @@ func calculateSegments(fileSize int64) (numSegments uint64, err error) {
 // node with the same parent as us.) To obtain this hash, we call
 // ReaderMerkleRoot on the segment of data corresponding to the sister. This
 // segment will double in size on each iteration until we reach the root.
-func buildFileProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (sp StorageProof, err error) {
-	// get base segment
+//
+// SOME SORT OF MATH PROOF FOR WHY IT WORKS WOULD BE PREFERABLE. I CAN DO THAT
+// IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
+// PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
+// IMPLEMENTATION IS CORRECT.
+func buildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSegment [SegmentSize]byte, hashSet []Hash, err error) {
+	// Find the base segment that is being requested.
 	if _, err = rs.Seek(int64(proofIndex)*int64(SegmentSize), 0); err != nil {
 		return
 	}
-	if _, err = rs.Read(sp.Segment[:]); err != nil {
+	if _, err = rs.Read(baseSegment[:]); err != nil {
 		return
 	}
 
-	// calculate hashes of each sister
+	// THIS FOR LOOP IS MESSY AND I DONT UNDERSTAND IT VERY WELL. THERE SHOULD
+	// BE MORE COMMENTS AND SOME EXPLAINATION FOR WHY ITS CORRECT.
+	// Construct the hash set that proves the base segment is a part of the
+	// merkle tree of the reader. (Verifier needs to know the merkle root of
+	// the file in advance.)
 	for size := uint64(1); size < numSegments; size <<= 1 {
 		// determine sister index
 		// I'd love to simplify this somehow...
@@ -96,7 +105,7 @@ func buildFileProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (sp Storag
 		if err != nil {
 			return
 		}
-		sp.HashSet = append(sp.HashSet, h)
+		hashSet = append(hashSet, h)
 	}
 
 	return
@@ -114,17 +123,23 @@ func buildFileProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (sp Storag
 // be skipped. As it turns out, the branches to skip can be determined from the
 // binary representation of numSegments-1, where a 0 indicates "skip" and a 1
 // indicates "keep." I don't know why this works, I just noticed the pattern.
-func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected Hash) bool {
-	h := HashBytes(sp.Segment[:])
+//
+// SOME SORT OF MATH PROOF FOR WHY IT WORKS WOULD BE PREFERABLE. I CAN DO THAT
+// IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
+// PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
+// IMPLEMENTATION IS CORRECT.
+func verifyReaderProof(baseSegment [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, expected Hash) bool {
+	h := HashBytes(baseSegment[:])
 
-	var depth uint16 = 0
+	// NEED MORE COMMENTS, AND SOME EXPLAINATION FOR WHY ITS CORRECT.
+	depth := uint64(0)
 	for (1 << depth) < numSegments {
 		depth++
 	}
 	// does this hashset contain orphans?
-	orphanFlag := len(sp.HashSet) < int(depth)
+	orphanFlag := len(hashSet) < int(depth)
 
-	for i := uint16(0); i < depth; i++ {
+	for i := uint64(0); i < depth; i++ {
 		// is this an orphan?
 		// (not sure why this works...)
 		if orphanFlag && (numSegments-1)&(1<<i) == 0 {
@@ -132,11 +147,11 @@ func verifyProof(sp StorageProof, numSegments, proofIndex uint16, expected Hash)
 		}
 		// left or right?
 		if proofIndex&(1<<i) == 0 {
-			h = JoinHash(h, sp.HashSet[0])
+			h = JoinHash(h, hashSet[0])
 		} else {
-			h = JoinHash(sp.HashSet[0], h)
+			h = JoinHash(hashSet[0], h)
 		}
-		sp.HashSet = sp.HashSet[1:]
+		hashSet = hashSet[1:]
 	}
 
 	return h == expected

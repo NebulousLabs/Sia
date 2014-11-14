@@ -61,22 +61,22 @@ func TestMerkleRoot(t *testing.T) {
 
 func TestStorageProof(t *testing.T) {
 	// generate proof data
-	var numSegments uint16 = 7
+	numSegments := uint64(7)
 	data := make([]byte, numSegments*SegmentSize)
 	rand.Read(data)
-	rootHash, err := MerkleFile(bytes.NewReader(data), numSegments)
+	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data), numSegments)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// create and verify proofs for all indices
-	for i := uint16(0); i < numSegments; i++ {
-		sp, err := buildProof(bytes.NewReader(data), numSegments, i)
+	for i := uint64(0); i < numSegments; i++ {
+		baseSegment, hashSet, err := buildReaderProof(bytes.NewReader(data), numSegments, i)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
-		if !verifyProof(sp, numSegments, i, rootHash) {
+		if !verifyReaderProof(baseSegment, hashSet, numSegments, i, rootHash) {
 			t.Error("Proof", i, "did not pass verification")
 		}
 	}
