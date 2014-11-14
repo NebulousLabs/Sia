@@ -206,7 +206,6 @@ func (s *State) rewindABlock() {
 	// they appear in the block.
 	for i := len(s.currentBlock().Transactions) - 1; i >= 0; i-- {
 		s.reverseTransaction(s.currentBlock().Transactions[i])
-		s.addTransactionToPool(&s.currentBlock().Transactions[i])
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
@@ -229,9 +228,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
 		s.applyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
-
-		// Remove the inputs from the transaction pool.
-		s.removeTransactionFromPool(&txn)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
