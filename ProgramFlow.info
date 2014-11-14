@@ -1,0 +1,23 @@
+This file is meant to document the flow of information in the codebase.
+
+Adding a block:
+
+1. ?
+2. ?
+3. Integrate all transactions.
+	3a. Remove the transaction from the transaction pool.
+	3b. Delete all inputs from the unspent outputs list.
+	3c. Add all financial outputs to the unspent outputs list.
+	3d. Add all outputs created by the storage proofs.
+	3e. Add all open contracts created by the file contracts.
+
+Removing a block (the inverse of adding a block):
+
+1. ?
+2. ?
+3. Remove all transactions:
+	3a. Delete all open contracts created by the file contracts.
+	3b. Delete all outputs created by the storage proofs.
+	3c. Delete all financial outputs created by the transaction.
+	3d. Restore all transaction inputs to the unspent outputs list.
+	3e. Add the transaction back to the transaction pool.
