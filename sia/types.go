@@ -1,19 +1,15 @@
 package sia
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 const (
-	HashSize      = 32
-	PublicKeySize = 32
-	SignatureSize = 32
-
 	BlockFrequency = 600               // In seconds.
 	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
 
@@ -27,8 +23,6 @@ var MaxAdjustmentUp = big.NewRat(1001, 1000)
 var MaxAdjustmentDown = big.NewRat(999, 1000)
 
 type (
-	PublicKey ecdsa.PublicKey
-
 	Timestamp   int64
 	BlockHeight uint64
 	Currency    uint64
@@ -40,13 +34,6 @@ type (
 	CoinAddress   hash.Hash // An address is the hash of the spend conditions that unlock the output.
 	Target        hash.Hash
 )
-
-// A Signature follows the crypto/ecdsa golang standard for signatures.
-// Eventually we plan to switch to a more standard library such as NaCl or
-// OpenSSL.
-type Signature struct {
-	R, S *big.Int
-}
 
 // Eventually, the Block and the block header will be two separate structs.
 // This will be put into practice when we implement merged mining.
@@ -90,7 +77,7 @@ type Output struct {
 type SpendConditions struct {
 	TimeLock      BlockHeight
 	NumSignatures uint64
-	PublicKeys    []PublicKey
+	PublicKeys    []signatures.PublicKey
 }
 
 // A TransactionSignature signs a single input to a transaction to help fulfill
@@ -102,7 +89,7 @@ type TransactionSignature struct {
 	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
-	Signature      Signature
+	Signature      signatures.Signature
 }
 
 type CoveredFields struct {
@@ -267,49 +254,6 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
 	terminationString := terminationString(successfulTermination)
 	return OutputID(hash.HashBytes(append(fcID[:], terminationString...)))
-}
-
-// Signature.MarshalSia implements the Marshaler interface for Signatures.
-func (s *Signature) MarshalSia() []byte {
-	if s.R == nil || s.S == nil {
-		return []byte{0, 0}
-	}
-	// pretend Signature is a tuple of []bytes
-	// this lets us use Marshal instead of doing manual length-prefixing
-	return encoding.Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
-}
-
-// Signature.UnmarshalSia implements the Unmarshaler interface for Signatures.
-func (s *Signature) UnmarshalSia(b []byte) int {
-	// inverse of the struct trick used in Signature.MarshalSia
-	str := struct{ R, S []byte }{}
-	if encoding.Unmarshal(b, &str) != nil {
-		return 0
-	}
-	s.R = new(big.Int).SetBytes(str.R)
-	s.S = new(big.Int).SetBytes(str.S)
-	return len(str.R) + len(str.S) + 2
-}
-
-// PublicKey.MarshalSia implements the Marshaler interface for PublicKeys.
-func (pk PublicKey) MarshalSia() []byte {
-	if pk.X == nil || pk.Y == nil {
-		return []byte{0, 0}
-	}
-	// see Signature.MarshalSia
-	return encoding.Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
-}
-
-// PublicKey.UnmarshalSia implements the Unmarshaler interface for PublicKeys.
-func (pk *PublicKey) UnmarshalSia(b []byte) int {
-	// see Signature.UnmarshalSia
-	str := struct{ X, Y []byte }{}
-	if encoding.Unmarshal(b, &str) != nil {
-		return 0
-	}
-	pk.X = new(big.Int).SetBytes(str.X)
-	pk.Y = new(big.Int).SetBytes(str.Y)
-	return len(str.X) + len(str.Y) + 2
 }
 
 // proofString() returns the string to be used when generating the output id of

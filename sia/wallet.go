@@ -4,15 +4,16 @@ package sia
 // available funds that can be spent.
 
 import (
-	"crypto/ecdsa"
 	"errors"
+
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 // Contains a secret key, the spend conditions associated with that key, the
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
-	SecretKey       *ecdsa.PrivateKey
+	SecretKey       signatures.SecretKey
 	SpendConditions SpendConditions
 
 	OwnedOutputs         map[OutputID]Output // All outputs to CoinAddress
@@ -41,8 +42,8 @@ func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc SpendConditions)
 func CreateWallet() (w *Wallet, err error) {
 	w = new(Wallet)
 
-	var pk PublicKey
-	w.SecretKey, pk, err = GenerateKeyPair()
+	var pk signatures.PublicKey
+	w.SecretKey, pk, err = signatures.GenerateKeyPair()
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 
@@ -132,7 +133,7 @@ func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 			t.Signatures = append(t.Signatures, txnSig)
 
 			sigHash := t.SigHash(i)
-			t.Signatures[i].Signature, err = SignBytes(sigHash[:], w.SecretKey)
+			t.Signatures[i].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
 			if err != nil {
 				return
 			}

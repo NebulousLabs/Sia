@@ -3,6 +3,8 @@ package sia
 import (
 	"fmt"
 	"testing"
+
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 // testingEnvironment() is a struc that contains a state and a list of wallets,
@@ -103,7 +105,7 @@ func transactionPoolTests(testEnv *testingEnvironment) {
 	// Attempt to create a conflicting transaction and see if it is rejected from the pool.
 	transaction.Outputs[0].SpendHash[0] = ^transaction.Outputs[0].SpendHash[0] // Change the output address
 	transactionSigHash := transaction.SigHash(0)
-	transaction.Signatures[0].Signature, err = SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey) // Re-sign
+	transaction.Signatures[0].Signature, err = signatures.SignBytes(transactionSigHash[:], testEnv.wallets[0].SecretKey) // Re-sign
 	if err != nil {
 		testEnv.t.Fatal(err)
 	}

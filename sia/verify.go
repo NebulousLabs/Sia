@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -16,7 +17,7 @@ import (
 // more signatures are needed.
 type InputSignatures struct {
 	RemainingSignatures uint64
-	PossibleKeys        []PublicKey
+	PossibleKeys        []signatures.PublicKey
 	UsedKeys            map[uint64]struct{}
 }
 
@@ -125,7 +126,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 
 		// Check that the signature matches the public key.
 		sigHash := t.SigHash(i)
-		if !VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
+		if !signatures.VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
 			err = errors.New("invalid signature in transaction")
 			return
 		}
