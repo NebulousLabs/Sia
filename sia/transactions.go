@@ -60,39 +60,12 @@ func (s *State) applyTransaction(t Transaction) {
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		// Check for contract termination.
-		openContract := s.OpenContracts[sp.ContractID]
-		payout := openContract.FileContract.ValidProofPayout
-		if openContract.FundsRemaining < openContract.FileContract.ValidProofPayout {
-			payout = openContract.FundsRemaining
-		}
-
-		output := Output{
-			Value:     payout,
-			SpendHash: openContract.FileContract.ValidProofAddress,
-		}
-		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
-		if err != nil {
-			panic(err)
-		}
-		s.UnspentOutputs[outputID] = output
-
-		// Mark the proof as complete for this window.
-		s.OpenContracts[sp.ContractID].WindowSatisfied = true
-		s.OpenContracts[sp.ContractID].FundsRemaining -= payout
+		s.applyStorageProof(sp)
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		contractID := t.FileContractID(i)
-		openContract := OpenContract{
-			FileContract:    contract,
-			ContractID:      contractID,
-			FundsRemaining:  contract.ContractFund,
-			Failures:        0,
-			WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
-		}
-		s.OpenContracts[contractID] = &openContract
+		s.addContract(contract, t.FileContractID(i))
 	}
 
 	// Check the arbitrary data of the transaction to fill out the host database.
@@ -217,7 +190,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			return
 		}
 
-		// Check that the proof passes.
+		// CHECK THAT THE PROOF IS VALID.
 	}
 
 	if inputSum != outputSum {
