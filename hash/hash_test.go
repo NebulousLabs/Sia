@@ -71,12 +71,12 @@ func TestStorageProof(t *testing.T) {
 
 	// create and verify proofs for all indices
 	for i := uint64(0); i < numSegments; i++ {
-		baseSegment, hashSet, err := buildReaderProof(bytes.NewReader(data), numSegments, i)
+		baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), numSegments, i)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
-		if !verifyReaderProof(baseSegment, hashSet, numSegments, i, rootHash) {
+		if !VerifyReaderProof(baseSegment, hashSet, numSegments, i, rootHash) {
 			t.Error("Proof", i, "did not pass verification")
 		}
 	}

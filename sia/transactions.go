@@ -156,14 +156,12 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		outputSum += contract.ContractFund
 	}
 
+	// Check that all provided proofs are valid.
 	for _, proof := range t.StorageProofs {
-		// Check that the proof has not already been submitted.
-		if s.OpenContracts[proof.ContractID].WindowSatisfied {
-			err = errors.New("storage proof has already been completed for this contract")
+		err = s.validProof(proof)
+		if err != nil {
 			return
 		}
-
-		// CHECK THAT THE PROOF IS VALID.
 	}
 
 	// Check that the outputs are less than or equal to the outputs.

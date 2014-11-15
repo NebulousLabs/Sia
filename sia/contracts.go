@@ -2,7 +2,58 @@ package sia
 
 import (
 	"errors"
+	"math/big"
+
+	"github.com/NebulousLabs/Andromeda/hash"
 )
+
+// currentProofIndex returns the index that should be used when building and
+// verifying the storage proof for a file at the given window.
+func (s *State) currentProofIndex(sp StorageProof) (proofIndex uint64) {
+	contract := s.OpenContracts[sp.ContractID].FileContract
+
+	windowIndex, err := contract.WindowIndex(s.Height())
+	if err != nil {
+		return
+	}
+	triggerBlock := windowIndex*contract.Start - 1
+	triggerBlockID := s.CurrentPath[triggerBlock]
+
+	indexSeed := hash.HashBytes(append(triggerBlockID[:], sp.ContractID[:]...))
+	seedInt := new(big.Int).SetBytes(indexSeed[:])
+	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
+	proofIndex = uint64(modSeed.Int64())
+
+	return
+}
+
+// validProof returns err = nil if the storage proof provided is valid given
+// the state context, otherwise returning an error to indicate what is invalid.
+func (s *State) validProof(sp StorageProof) (err error) {
+	openContract, exists := s.OpenContracts[sp.ContractID]
+	if !exists {
+		err = errors.New("unrecognized contract id in storage proof")
+		return
+	}
+
+	// Check that the proof has not already been submitted.
+	if openContract.WindowSatisfied {
+		err = errors.New("storage proof has already been completed for this contract")
+		return
+	}
+
+	// Check that the storage proof itself is valid.
+	numSegments, err := hash.CalculateSegments(int64(openContract.FileContract.FileSize))
+	if err != nil {
+		return
+	}
+	if !hash.VerifyReaderProof(sp.Segment, sp.HashSet, numSegments, s.currentProofIndex(sp), openContract.FileContract.FileMerkleRoot) {
+		err = errors.New("provided storage proof is invalid")
+		return
+	}
+
+	return
+}
 
 // applyStorageProof takes a storage proof and adds any outputs created by it
 // to the consensus state.

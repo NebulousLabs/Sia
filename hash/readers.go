@@ -64,7 +64,7 @@ func CalculateSegments(fileSize int64) (numSegments uint64, err error) {
 // IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
 // PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
 // IMPLEMENTATION IS CORRECT.
-func buildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSegment [SegmentSize]byte, hashSet []Hash, err error) {
+func BuildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSegment [SegmentSize]byte, hashSet []Hash, err error) {
 	// Find the base segment that is being requested.
 	if _, err = rs.Seek(int64(proofIndex)*int64(SegmentSize), 0); err != nil {
 		return
@@ -128,7 +128,7 @@ func buildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSeg
 // IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
 // PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
 // IMPLEMENTATION IS CORRECT.
-func verifyReaderProof(baseSegment [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, expected Hash) bool {
+func VerifyReaderProof(baseSegment [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, expectedRoot Hash) bool {
 	h := HashBytes(baseSegment[:])
 
 	// NEED MORE COMMENTS, AND SOME EXPLAINATION FOR WHY ITS CORRECT.
@@ -154,5 +154,5 @@ func verifyReaderProof(baseSegment [SegmentSize]byte, hashSet []Hash, numSegment
 		hashSet = hashSet[1:]
 	}
 
-	return h == expected
+	return h == expectedRoot
 }
