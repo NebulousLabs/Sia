@@ -6,6 +6,15 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
+// Each input has a list of public keys and a required number of signatures.
+// InputSignatures keeps track of which public keys have been used and how many
+// more signatures are needed.
+type InputSignatures struct {
+	RemainingSignatures uint64
+	PossibleKeys        []signatures.PublicKey
+	UsedKeys            map[uint64]struct{}
+}
+
 // reverseTransaction removes a given transaction from the
 // ConsensusState, making it as though the transaction had never happened.
 func (s *State) reverseTransaction(t Transaction) {
@@ -73,16 +82,32 @@ func (s *State) applyTransaction(t Transaction) {
 	s.scanAndApplyHosts(&t)
 }
 
-// Each input has a list of public keys and a required number of signatures.
-// This struct keeps track of which public keys have been used and how many
-// more signatures are needed.
-type InputSignatures struct {
-	RemainingSignatures uint64
-	PossibleKeys        []signatures.PublicKey
-	UsedKeys            map[uint64]struct{}
+// validInput returns err = nil if the input is valid within the current state,
+// otherwise returns an error explaining what wasn't valid.
+func (s *State) validInput(input Input) (err error) {
+	// Check the input spends an existing and valid output.
+	_, exists := s.UnspentOutputs[input.OutputID]
+	if !exists {
+		err = errors.New("transaction spends a nonexisting output")
+		return
+	}
+
+	// Check that the spend conditions match the hash listed in the output.
+	if input.SpendConditions.CoinAddress() != s.UnspentOutputs[input.OutputID].SpendHash {
+		err = errors.New("spend conditions do not match hash")
+		return
+	}
+
+	// Check the timelock on the spend conditions is expired.
+	if input.SpendConditions.TimeLock > s.Height() {
+		err = errors.New("output spent before timelock expiry.")
+		return
+	}
+
+	return
 }
 
-// State.validTransaction returns err = nil if the transaction is valid, otherwise
+// validTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
 func (s *State) validTransaction(t *Transaction) (err error) {
 	// Iterate through each input, summing the value, checking for
@@ -90,38 +115,26 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	inputSum := Currency(0)
 	inputSignaturesMap := make(map[OutputID]InputSignatures)
 	for _, input := range t.Inputs {
-		// Check the input spends an existing and valid output.
-		utxo, exists := s.UnspentOutputs[input.OutputID]
-		if !exists {
-			err = errors.New("transaction spends a nonexisting output")
-			return
-		}
-
-		// Check that the spend conditions match the hash listed in the output.
-		if input.SpendConditions.CoinAddress() != s.UnspentOutputs[input.OutputID].SpendHash {
-			err = errors.New("spend conditions do not match hash")
-			return
-		}
-
-		// Check the timelock on the spend conditions is expired.
-		if input.SpendConditions.TimeLock > s.Height() {
-			err = errors.New("output spent before timelock expiry.")
+		// Check that the input is valid.
+		err = s.validInput(input)
+		if err != nil {
 			return
 		}
 
 		// Create the condition for the input signatures and add it to the input signatures map.
-		_, exists = inputSignaturesMap[input.OutputID]
+		_, exists := inputSignaturesMap[input.OutputID]
 		if exists {
 			err = errors.New("output spent twice in same transaction")
 			return
 		}
-		var newInputSignatures InputSignatures
-		newInputSignatures.RemainingSignatures = input.SpendConditions.NumSignatures
-		newInputSignatures.PossibleKeys = input.SpendConditions.PublicKeys
+		newInputSignatures := InputSignatures{
+			RemainingSignatures: input.SpendConditions.NumSignatures,
+			PossibleKeys:        input.SpendConditions.PublicKeys,
+		}
 		inputSignaturesMap[input.OutputID] = newInputSignatures
 
-		// Add the input to the coin sum.
-		inputSum += utxo.Value
+		// Add the input value to the coin sum.
+		inputSum += s.UnspentOutputs[input.OutputID].Value
 	}
 
 	// Tally up the miner fees and output values.
@@ -135,16 +148,8 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 
 	// Verify the contracts and tally up the expenditures.
 	for _, contract := range t.FileContracts {
-		if contract.ContractFund < 0 {
-			err = errors.New("contract must be funded.")
-			return
-		}
-		if contract.Start < s.Height() {
-			err = errors.New("contract must start in the future.")
-			return
-		}
-		if contract.End <= contract.Start {
-			err = errors.New("contract duration must be at least one block.")
+		err = s.validContract(contract)
+		if err != nil {
 			return
 		}
 

@@ -23,3 +23,13 @@ Removing a block (the inverse of adding a block):
 	3c. Delete all financial outputs created by the transaction.
 	3d. Restore all transaction inputs to the unspent outputs list.
 	3e. Add the transaction back to the transaction pool.
+
+Verifying a Transaction:
+
+1. Sum all of the inputs
+2. Check that all inputs spend existing outputs.
+3. Check that the spend conditions for each input match the hash of the output they spend.
+4. Check that the timelock on each output has expired.
+5. Check that no inputs are spent twice.
+6. Add up miner fees, outputs, and contract funds, make sure that's less than the sum of all inputs.
+7. Make sure there are no illegal values in the contracts.
