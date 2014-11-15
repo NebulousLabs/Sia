@@ -56,16 +56,24 @@ func (b *Block) checkTarget(target Target) bool {
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
-// State.validateHaeader() returns `err = nil` if the header information in the
+// State.validateHaeader() returns err = nil if the header information in the
 // block (everything except the transactions) is valid, and returns an error
 // explaining why validation failed if the header is invalid.
 func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
+	// Check the id meets the target.
+	if !b.checkTarget(parent.Target) {
+		err = errors.New("block does not meet target")
+		return
+	}
+
 	// Check that the block is not too far in the future.
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
 	if skew > FutureThreshold {
-		// Do something so that you will return to considering this
-		// block once it's no longer too far in the future.
-		err = errors.New("timestamp too far in future")
+		go func(skew Timestamp, parent *BlockNode, b *Block) {
+			time.Sleep(time.Duration(skew-FutureThreshold) * time.Second)
+			s.AcceptBlock(*b)
+		}(skew, parent, b)
+		err = errors.New("timestamp too far in future, waiting.")
 		return
 	}
 
@@ -86,12 +94,6 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	if b.MerkleRoot != b.expectedTransactionMerkleRoot() {
 		s.BadBlocks[b.ID()] = struct{}{}
 		err = errors.New("merkle root does not match transactions sent.")
-		return
-	}
-
-	// Check the id meets the target.
-	if !b.checkTarget(parent.Target) {
-		err = errors.New("block does not meet target")
 		return
 	}
 
