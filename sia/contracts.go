@@ -115,3 +115,92 @@ func (s *State) addContract(contract FileContract, id ContractID) {
 	}
 	s.OpenContracts[id] = &openContract
 }
+
+// contractMaintenance checks the contract windows and storage proofs and to
+// create outputs for missed proofs and contract terminations, and to advance
+// any storage proof windows.
+func (s *State) contractMaintenance() {
+	var contractsToDelete []ContractID
+	for _, openContract := range s.OpenContracts {
+		// Check for the window switching over.
+		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
+			// Check for a missed proof.
+			if openContract.WindowSatisfied == false {
+				payout := openContract.FileContract.MissedProofPayout
+				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
+					payout = openContract.FundsRemaining
+				}
+
+				newOutputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
+				if err != nil {
+					panic(err)
+				}
+				output := Output{
+					Value:     payout,
+					SpendHash: openContract.FileContract.MissedProofAddress,
+				}
+				s.UnspentOutputs[newOutputID] = output
+				msp := MissedStorageProof{
+					OutputID:   newOutputID,
+					ContractID: openContract.ContractID,
+				}
+				s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
+
+				// Update the FundsRemaining
+				openContract.FundsRemaining -= payout
+
+				// Update the failures count.
+				openContract.Failures += 1
+			}
+			openContract.WindowSatisfied = false
+		}
+
+		// Check for a terminated contract.
+		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
+			if openContract.FundsRemaining != 0 {
+				// Create a new output that terminates the contract.
+				contractStatus := openContract.Failures == openContract.FileContract.Tolerance // MAKE A FUNCTION TO GET THIS VALUE
+				outputID := openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus)
+				output := Output{
+					Value: openContract.FundsRemaining,
+				}
+				if openContract.FileContract.Tolerance == openContract.Failures {
+					output.SpendHash = openContract.FileContract.MissedProofAddress
+				} else {
+					output.SpendHash = openContract.FileContract.ValidProofAddress
+				}
+				s.UnspentOutputs[outputID] = output
+			}
+
+			// Add the contract to contract terminations.
+			s.currentBlockNode().ContractTerminations = append(s.currentBlockNode().ContractTerminations, openContract)
+
+			// Mark contract for deletion (can't delete from a map while
+			// iterating through it - results in undefined behavior of the
+			// iterator.
+			contractsToDelete = append(contractsToDelete, openContract.ContractID)
+		}
+	}
+	// Delete all of the contracts that terminated.
+	for _, contractID := range contractsToDelete {
+		delete(s.OpenContracts, contractID)
+	}
+}
+
+// inverseContractMaintenance does the inverse of contract maintenance, moving
+// the state of contracts backwards instead forwards.
+func (s *State) inverseContractMaintenance() {
+	// Repen all contracts that terminated, and remove the corresponding output.
+	for _, openContract := range s.currentBlockNode().ContractTerminations {
+		s.OpenContracts[openContract.ContractID] = openContract
+		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
+		delete(s.UnspentOutputs, openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus))
+	}
+
+	// Reverse all outputs created by missed storage proofs.
+	for _, missedProof := range s.currentBlockNode().MissedStorageProofs {
+		s.OpenContracts[missedProof.ContractID].FundsRemaining += s.UnspentOutputs[missedProof.OutputID].Value
+		s.OpenContracts[missedProof.ContractID].Failures -= 1
+		delete(s.UnspentOutputs, missedProof.OutputID)
+	}
+}

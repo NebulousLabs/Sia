@@ -14,10 +14,12 @@ Verifying and Applying a Block:
 10. For each block that needs to be added, repeat the remaining steps.
 11. If a block fails, add it and all of its children (recursively) to the bad blocks list, rewind back to the common parent, and then re-apply all the blocks to restore the state to the old haviest fork.
 12. Verify and then apply each transaction, adding up the total volume of miner fees in each.
-13. Create any outputs from contracts with missed storage proofs.
-14. Create any outputs from terminated contracts, and then delete the contract.
-15. Add coin inflation to the miner subsidy, and create an output for the miner subsidy.
-16. Update the values for the current block and current path.
+13 Perform Contract Maintenance
+	13a. Create any outputs from contracts with missed storage proofs.
+	13b. Create any outputs from terminated contracts, and then delete the contract.
+	13c. Update contract states to reset any storage proof windows that have progressed.
+14. Add coin inflation to the miner subsidy, and create an output for the miner subsidy.
+15. Update the values for the current block and current path.
 
 Verifying a Transaction:
 
@@ -44,10 +46,12 @@ Applying a Transaction:
 Removing a Block:
 
 1. Remove the output responsible for the miner subsidy.
-2. Remove any outputs created from terminated contracts, and then restore the contract.
-3. Remove any outputs created from missed storage proofs.
-4. Remove each transaction that was in the block.
-5. Update the values for the current block and current path.
+2. Perform Inverse Contract Maintenance
+	2a. Update contract states to set any storage proof windows that have retreated to the previous window.
+	2b. Remove any outputs created from terminated contracts, and then restore the contract.
+	2c. Remove any outputs created from missed storage proofs.
+3. Remove each transaction that was in the block.
+4. Update the values for the current block and current path.
 
 Removing a Transaction:
 
