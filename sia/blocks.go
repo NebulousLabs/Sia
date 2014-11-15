@@ -56,6 +56,16 @@ func (b *Block) checkTarget(target Target) bool {
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
+// Block.expectedTransactionMerkleRoot() returns the expected transaction
+// merkle root of the block.
+func (b *Block) expectedTransactionMerkleRoot() hash.Hash {
+	var transactionHashes []hash.Hash
+	for _, transaction := range b.Transactions {
+		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
+	}
+	return hash.MerkleRoot(transactionHashes)
+}
+
 // State.validateHaeader() returns err = nil if the header information in the
 // block (everything except the transactions) is valid, and returns an error
 // explaining why validation failed if the header is invalid.
@@ -73,7 +83,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 			time.Sleep(time.Duration(skew-FutureThreshold) * time.Second)
 			s.AcceptBlock(*b)
 		}(skew, parent, b)
-		err = errors.New("timestamp too far in future, waiting.")
+		err = errors.New("timestamp too far in future, will try again later.")
 		return
 	}
 
@@ -108,11 +118,11 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
 		expectedTimePassed = BlockFrequency * Timestamp(newNode.Height)
 	} else {
-		// WARNING: this code assumes that the block at height
-		// newNode.Height-TargetWindow is the same for both the new
-		// node and the currenct fork. In general, this is a safe
-		// assumption, because there should never be a reorg that's
-		// 5000 blocks long.
+		// THIS CODE ASSUMES THAT THE BLOCK AT HEIGHT
+		// NEWNODE.HEIGHT-TARGETWINDOW IS THE SAME FOR BOTH THE NEW NODE AND
+		// THE CURRENT FORK. IN GENERAL THIS IS A PRETTY SAFE ASSUMPTION AS ITS
+		// LOOKING BACKWARDS BY 5000 BLOCKS. BUT WE SHOULD PROBABLY IMPLEMENT
+		// SOMETHING THATS FULLY SAFE REGARDLESS.
 		adjustmentBlock := s.blockAtHeight(newNode.Height - TargetWindow)
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
 		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
@@ -143,7 +153,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
 func (s *State) childDepth(parentNode *BlockNode) (depth Target) {
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:])) // WRITE A FUNCTION TO GO FROM TARGET TO WEIGHT
+	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
 	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
 	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
 	intChildDepth := new(big.Int).Div(ratChildDepth.Denom(), ratChildDepth.Num())
@@ -190,6 +200,9 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 // State.rewindABlock() removes the most recent block from the ConsensusState,
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) rewindABlock() {
+	// Remove the output for the miner subsidy.
+	delete(s.UnspentOutputs, s.currentBlock().SubsidyID())
+
 	// Repen all contracts that terminated, and remove the corresponding output.
 	for _, openContract := range s.currentBlockNode().ContractTerminations {
 		s.OpenContracts[openContract.ContractID] = openContract
@@ -315,7 +328,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	// Add coin inflation to the miner subsidy.
-	minerSubsidy += 1000
+	minerSubsidy += CalculateCoinbase(s.Height())
 
 	// Add output contianing miner fees + block subsidy.
 	minerSubsidyOutput := Output{
@@ -331,7 +344,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	return
 }
 
-// State.invalidateNode() is a recursive function that deletes all of the
+// invalidateNode() is a recursive function that deletes all of the
 // children of a block and puts them on the bad blocks list.
 func (s *State) invalidateNode(node *BlockNode) {
 	for i := range node.Children {
@@ -342,7 +355,7 @@ func (s *State) invalidateNode(node *BlockNode) {
 	s.BadBlocks[node.Block.ID()] = struct{}{}
 }
 
-// State.forkBlockchain() will go from the current block over to a block on a
+// forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
 func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
@@ -398,16 +411,6 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	}
 
 	return
-}
-
-// Block.expectedTransactionMerkleRoot() returns the expected transaction
-// merkle root of the block.
-func (b *Block) expectedTransactionMerkleRoot() hash.Hash {
-	var transactionHashes []hash.Hash
-	for _, transaction := range b.Transactions {
-		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
-	}
-	return hash.MerkleRoot(transactionHashes)
 }
 
 // State.AcceptBlock() is a thread-safe function that will add blocks to the
