@@ -113,7 +113,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 	// Iterate through each input, summing the value, checking for
 	// correctness, and creating an InputSignatures object.
 	inputSum := Currency(0)
-	inputSignaturesMap := make(map[OutputID]InputSignatures)
+	inputSignaturesMap := make(map[OutputID]*InputSignatures)
 	for _, input := range t.Inputs {
 		// Check that the input is valid.
 		err = s.validInput(input)
@@ -127,7 +127,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 			err = errors.New("output spent twice in same transaction")
 			return
 		}
-		newInputSignatures := InputSignatures{
+		newInputSignatures := &InputSignatures{
 			RemainingSignatures: input.SpendConditions.NumSignatures,
 			PossibleKeys:        input.SpendConditions.PublicKeys,
 		}
@@ -166,11 +166,13 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		// CHECK THAT THE PROOF IS VALID.
 	}
 
-	if inputSum != outputSum {
+	// Check that the outputs are less than or equal to the outputs.
+	if inputSum < outputSum {
 		err = errors.New("inputs do not equal outputs for transaction.")
 		return
 	}
 
+	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
@@ -194,6 +196,17 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		sigHash := t.SigHash(i)
 		if !signatures.VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
 			err = errors.New("invalid signature in transaction")
+			return
+		}
+
+		// Subtract the number of signatures remaining in the InputSignatures field.
+		inputSignaturesMap[sig.InputID].RemainingSignatures -= 1
+	}
+
+	// Check that all inputs have been signed by sufficient public keys.
+	for _, inputSignatures := range inputSignaturesMap {
+		if inputSignatures.RemainingSignatures != 0 {
+			err = errors.New("an input has not been fully signed")
 			return
 		}
 	}

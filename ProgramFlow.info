@@ -33,3 +33,6 @@ Verifying a Transaction:
 5. Check that no inputs are spent twice.
 6. Add up miner fees, outputs, and contract funds, make sure that's less than the sum of all inputs.
 7. Make sure there are no illegal values in the contracts.
+8. Make sure all storage proofs are valid.
+9. Make sure all signatures are non-frivilous and valid.
+10. Make sure each input has fully satisfied its signature requirements.

@@ -169,6 +169,9 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	}
 
 	err = state.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
 
 	return
 }
