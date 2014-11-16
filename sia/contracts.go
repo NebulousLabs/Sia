@@ -120,17 +120,20 @@ func (s *State) addContract(contract FileContract, id ContractID) {
 // create outputs for missed proofs and contract terminations, and to advance
 // any storage proof windows.
 func (s *State) contractMaintenance() {
+	// Scan all open contracts and perform any required maintenance on each.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.OpenContracts {
 		// Check for the window switching over.
 		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
 			// Check for a missed proof.
 			if openContract.WindowSatisfied == false {
+				// Determine payout of missed proof.
 				payout := openContract.FileContract.MissedProofPayout
 				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
 					payout = openContract.FundsRemaining
 				}
 
+				// Create the output for the missed proof.
 				newOutputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
 				if err != nil {
 					panic(err)
@@ -159,7 +162,7 @@ func (s *State) contractMaintenance() {
 		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
-				contractStatus := openContract.Failures == openContract.FileContract.Tolerance // MAKE A FUNCTION TO GET THIS VALUE
+				contractStatus := openContract.Failures == openContract.FileContract.Tolerance
 				outputID := openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus)
 				output := Output{
 					Value: openContract.FundsRemaining,
@@ -181,6 +184,7 @@ func (s *State) contractMaintenance() {
 			contractsToDelete = append(contractsToDelete, openContract.ContractID)
 		}
 	}
+
 	// Delete all of the contracts that terminated.
 	for _, contractID := range contractsToDelete {
 		delete(s.OpenContracts, contractID)

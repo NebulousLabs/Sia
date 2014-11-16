@@ -34,6 +34,9 @@ func (s *State) reverseTransaction(t Transaction) {
 			panic(err)
 		}
 		delete(s.UnspentOutputs, outputID)
+
+		// Restore the contract window to being incomplete.
+		s.OpenContracts[sp.ContractID].WindowSatisfied = false
 	}
 
 	// Delete all financial outputs created by the transaction.
