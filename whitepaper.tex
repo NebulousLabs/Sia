@@ -95,7 +95,7 @@ The spend conditions include a time lock and a set of public keys, and the numbe
 The output cannot be spent until the time lock has expired and enough of the specified keys have added their signature.
 
 The spend conditions are hashed as a Merkle tree, using the time lock, number of signatures required, and each public key as leaves.
-The root hash of this tree is used as the ``address'' to which the coins are sent.
+The root hash of this tree is used as the address to which the coins are sent.
 In order to spend the coins, the spend conditions corresponding to the address hash must be provided.
 The use of a Merkle tree allows parties to selectively reveal information in the spend conditions.
 For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required. % note: time lock and num signatures would be very easy to brute force
@@ -160,7 +160,7 @@ The random seed for challenge window $W_i$ is given by:
 \[
 	H(\text{contract ID} || H(B_(i-1)))
 \]
-where $B_(i-1)$ is the block immediately prior to the beginning of $W_i$.
+where $B_{i-1}$ is the block immediately prior to the beginning of $W_i$.
 
 If the provider is consistently able to demonstrate possession of a random segment, then the provider is very likely storing the whole file.
 A provider storing only 50\% of the file will be unable to complete approximately 50\% of the proofs.
@@ -442,7 +442,7 @@ We believe Sia will provide a fertile platform for decentralized cloud storage i
 
 \bibitem{poc}
 	Gregory Maxwell,
-	\emph{Proof of Storage to make distributed resource consumption costly.}
+	\emph{Proof of Storage to make distributed resource consumption costly.} \newline
 	https://bitcointalk.org/index.php?topic=310323.0
 
 \bibitem{mpc}
@@ -451,7 +451,7 @@ We believe Sia will provide a fertile platform for decentralized cloud storage i
 	https://en.bitcoin.it/wiki/Contracts\#Example\_7:\_Rapidly-adjusted\_.28micro.29payments\_to\_a\_pre-determined\_party
 
 \bibitem{btcdg}
-	Bitcoin Developer Guide
+	Bitcoin Developer Guide,
 	https://bitcoin.org/en/developer-guide
 
 
