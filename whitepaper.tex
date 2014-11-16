@@ -215,51 +215,43 @@ Micropayment channels \cite{mpc} can be used to negotiate downloading the file. 
 
 \subsection{Storage Provider Protections}
 A contract requires consent from both the storage provider and the client, allowing the provider to reject unfavorable terms or unwanted (e.g. illegal) files.
-The provider additionally does not need to sign a contract until the full file has been uploaded.
+The provider may also refuse to sign a contract until the entire file has been uploaded to them.
 The contract terms give storage providers flexibility.
-They can advertise themselves as minimally reliable, offering a low price and a agreeing to minimal penalties for losing files.
-Or, they can advertise themselves as highly reliable, offering a higher price and agreeing to high penalties for losing files.
+They can advertise themselves as minimally reliable, offering a low price and a agreeing to minimal penalties for losing files;
+or they can advertise themselves as highly reliable, offering a higher price and agreeing to harsher penalties for losing files.
 An efficient market will optimize storage strategies.
 
-Storage providers are potentially vulnerable to denial of service attacks, which could prevent the provider from giving storage proofs to the network, or prevent the provider from uploading a file to the client.
-The storage providers themselves must take responsibility for protecting themselves, and must make sure that the penalties they agree to pay for missing storage proofs do not incentivize DoS attacks against the provider.
+Storage providers are vulnerable to denial of service attacks, which could prevent them from submitting storage proofs or transferring files.
+We note that certain penalty structures may incentivize DoS attacks against the provider.
+It is the responsibility of the provider to protect themselves from such attacks.
 
 \subsection{Client Protections}
-Clients can use erasure coding such as regenerating codes \cite{reg} codes to split files up into many pieces, of which only some need to be recovered.
-Each piece is then encrypted and stored on many storage providers.
-By encrypting the pieces after encoding them, the client ensures that collaborating providers are unable to reduce the redundancy.
-
-Even if the average network reliability is very low, the client can maximize the reliability of its files by putting the files on many providers.
-By only needing 10\% out of 100 providers, the client is relying on the most reliable 10\% of the 100, instead of the average reliability or least reliable subset.
-If the client is able to restore lost pieces on occasion, reliability goes up even more.
-
-By putting a file in many places, the client also benefits from an increased number of sources from which it can download data.
-By only needing to connect to the closet 10\%, the client can reduce latency.
-By only needing to connect to the fastest 10\%, the client can increase throughput.
-
-Finally, this strategy also protects the client from malicious storage providers.
-A storage provider that is demanding ransom for a file is the same to the client as a provider that is offline.
-As long as 10\% of the providers are not acting maliciously, the client can retrieve the file.
+Clients can use erasure codes, such as regenerating codes \cite{reg}, to safeguard against hosts going offline.
+In an erasure coding scheme, file data is split into $n$ overlapping pieces, such that the file can be recovered from any subset of at least $m$ unique pieces.
+Each piece is then encrypted and stored across many storage providers.
+This allows a client to attain high file availability even if the average network reliability is low.
+As an extreme example, if only 10 out of 100 pieces are needed to recover the file, then the client is actually relying on the 10 most reliable hosts, rather than the average reliability.
+Availability can be further improved by rehosting file pieces whose hosts have gone offline.
+Other metrics benefit from this strategy as well; the client can reduce latency by downloading from the closest 10 hosts, or increase download speed by downloading from the 10 fastest hosts.
+These downloads can be run in parallel to maximize available bandwidth.
 
 \subsection{Uptime Incentives}
-The storage proofs contain no provisions that require constant uptime.
+The storage proofs contain no mechanism to enforce constant uptime.
 There are also no provisions that require storage providers to upload files to clients upon request.
 
 However, providers and clients can create micropayment channels to facilitate downloads.
-If the client is offering a nontrivial fee for downloading a file, providers will be incentivized to collect the fee.
-If one provider is unavailable or expensive, the client will pay the fee to a provider that is available and reasonably priced.
-Providers are then incentivized to be online all the time, so that they can collect the bandwidth fees from clients.
-If clients behaviorally pay providers well, then providers are more heavily incentivized to be online all the time.
-Clients can also more heavily reward greater throughput and lower latency.
-Clients could even do random "checkups" that pay providers some nontrivial reward simply for being online, even if they do not wish to download anything.
-This further incentivizes providers to be online and available.
+If the client is offering a reward for sending them a file, providers will be incentivized to collect the reward.
+Providers are thus incentivized to maximum uptime, in order to collect as many rewards as possible.
+Clients can also incentivize greater throughput and lower latency via proportionally larger rewards.
+Clients could even perform random ``checkups'' that reward providers simply for being online, even if they do not wish to download anything.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
 \subsection{Basic Reputation System}
-Clients need a reliable method for picking storage providers.
-Hosts could potentially Sybil attack the network, and use false files to build up a fake reputation.
-One defense for a Sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
+Clients need a reliable method for picking quality storage providers.
+Hosts could potentially launch a Sybil attack on the network, using false files to build up their reputation.
 
+% whole section needs clarification...
+One defense for a Sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
 Storage providers declare themselves using the arbitrary data in a transaction that creates a large time locked output.
 The time locked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform Sybil attacks, as they will need large time locked outputs.
 When clients are scanning the blockchain, they select providers at random, but weight them according to the number of coins that are time locked for more than a certain period of time.
@@ -267,9 +259,9 @@ Clients can also weight providers according to the size of the refund for losing
 Choosing a careful scheme for weighting providers during random selection will protect clients and ensure that malicious providers need to make significant investment to maintain a majority weight during the selection process.
 
 This scheme does not leave clients any way to leave reviews for storage providers.
-Additionally complexity could potentially allow clients to rate providers based on throughput, latency, and availability.
-Such a review system would need careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
-A centralized storage tracker could provide a more reasonable environment for a reputation system, and could manage the whole system out of band.
+Additionally complexity could allow clients to rate providers based on throughput, latency, and availability.
+Such a review system would require careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
+A centralized storage tracker could provide a more reasonable platform for a reputation system, and could manage the whole system out of band.
 
 \section{Siafunds}
 Sia is a product released by Nebulous Incorporated.
