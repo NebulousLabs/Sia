@@ -154,6 +154,8 @@ func (s *State) contractMaintenance() {
 
 				// Update the failures count.
 				openContract.Failures += 1
+			} else {
+				s.currentBlockNode().SuccessfulWindows = append(s.currentBlockNode().SuccessfulWindows, openContract.ContractID)
 			}
 			openContract.WindowSatisfied = false
 		}
@@ -206,5 +208,10 @@ func (s *State) inverseContractMaintenance() {
 		s.OpenContracts[missedProof.ContractID].FundsRemaining += s.UnspentOutputs[missedProof.OutputID].Value
 		s.OpenContracts[missedProof.ContractID].Failures -= 1
 		delete(s.UnspentOutputs, missedProof.OutputID)
+	}
+
+	// Reset the window satisfied variable to true for all successful windows.
+	for _, id := range s.currentBlockNode().SuccessfulWindows {
+		s.OpenContracts[id].WindowSatisfied = true
 	}
 }

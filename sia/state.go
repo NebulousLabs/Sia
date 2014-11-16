@@ -42,8 +42,9 @@ type BlockNode struct {
 	Target           Target        // Target for next block.
 	Depth            Target        // What the target would need to be to have a weight equal to all blocks up to this block.
 
-	ContractTerminations []*OpenContract      // Contracts that terminated this block.
-	MissedStorageProofs  []MissedStorageProof // Only need the output id because the only thing we do is delete the output.
+	ContractTerminations []*OpenContract // Contracts that terminated this block.
+	MissedStorageProofs  []MissedStorageProof
+	SuccessfulWindows    []ContractID
 }
 
 // The state struct contains a list of all known blocks, sorted into a tree
