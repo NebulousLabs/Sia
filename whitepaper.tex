@@ -264,40 +264,42 @@ Such a review system would require careful design to prevent malicious providers
 A centralized storage tracker could provide a more reasonable platform for a reputation system, and could manage the whole system out of band.
 
 \section{Siafunds}
-Sia is a product released by Nebulous Incorporated.
-Nebulous is a for profit company, and Sia is meant to be a primary source of income for the company.
-Currency premining is not a stable source of income, as it requires creating a new currency, and tethering the company to the new currency's increasing value.
+Sia is a product of Nebulous Incorporated.
+Nebulous is a for-profit company, and Sia is intended to become a primary source of income for the company.
+Currency premining is not a stable source of income, as it requires creating a new currency and tethering the company to the currency's increasing value. %clarify
 When the company needs to spend money, it must trade away portions of its source of income.
 Additionally, premining means that one entity has control over a large volume of the currency, and therefore potentially large and disruptive control over the market.
-This seems like a less than ideal way of doing things.
 
-Instead, Nebulous pulls an income from Sia that is directly related to the value added by Sia, which is measured by the value of the contracts set up between clients and hosts.
-This is essentially a fee established on creating contracts.
-When a contract is created, 10\% of the contract fund is set aside and distributed to the holders of siafunds.
+Instead, Nebulous intends to generate revenue from Sia in a manner proportional to the value added by Sia, as determined by the value of the contracts set up between clients and hosts.
+This is accomplished by imposing a fee on all contracts.
+When a contract is created, 10\% of the contract fund is removed and distributed to the holders of \textit{siafunds}.
 Nebulous Inc. will initially hold ~95\% of the siafunds, and the early crowd-fund backers of Sia will hold the remaining ~5\%.
 
 Siafunds can be sent to other addresses, in the same way that siacoins can be sent to other addresses.
-Siafunds cannot however be used to fund contracts or as a miner fee.
-When siafunds are transferred to a new address, an additional unspent output is created containing all of the siacoins that have been earned by the siafunds since their previous transfer.
+They cannot, however, be used to fund contracts or miner fees.
+When siafunds are transferred to a new address, an additional unspent output is created, containing all of the siacoins that have been earned by the siafunds since their previous transfer.
 These siacoins are sent to the same address as the siafunds.
 
+% this section feels very disjointed.
 \section{Economics of Sia}
-The supply of siacoins is going to increase permanently.
+The supply of siacoins will increase permanently.
 Initially, 300,000 coins will be minted every block.
-Each block, the number of coins minted will be reduced by 1, until the minimum of 30,000 coins per block is reached.
+This number will decrease by 1 coin per block, until a minimum of 30,000 coins per block is reached.
+% need equation/explanation; maybe use a table for growth rates
 At the end of year 1, the annual growth in supply will be 90\%.
 Years 2, 3, 4, 5, 8, and 20 will have annual growths of 39\%, 21\%, 11.5\%, 4.4\%, 3.2\%, and 2.3\%, respectively.
 
+% is this paragraph necessary? I don't really understand why it's included.
 Coins must be locked down when creating contracts.
-When contracts are created, the coins funding the contract are taken out of circulation until the contract beings making payments.
+When contracts are created, the coins funding the contract are taken out of circulation until the contract begins making payments.
 The full amount of coins are not returned to circulation until the contract has terminated.
 The number of coins locked down will be even greater if the host is offering a large refund for losing the file.
 As Sia's usage as a storage platform goes up, the scarcity of the coin being used will also go up.
 
 Hosts are only dependent on the stability of the value of the siacoin for the duration of their contracts.
 Hosts can continually reprice contracts as the siacoin shifts in value.
-Siacoins also derive value from the fact that you must have siacoins in order to create a contract.
-Future additions to support more currencies through the use of two way pegs will provide additional security for hosts.
+Siacoins also derive value from the simple fact that they enable the formation of contracts.
+Future additions to support more currencies through the use of two-way pegs will provide additional security for hosts.
 
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
