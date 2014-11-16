@@ -303,19 +303,19 @@ Future additions to support more currencies through the use of two-way pegs will
 
 \section{Under Consideration}
 The primary foundation of Sia has been established above.
-Other considerations, such as mining algorithm, block time, etc., can be assumed to mirror the settings found in Bitcoin.
+Other considerations, such as mining algorithms, block time, etc., can be assumed to mirror those found in Bitcoin.
 
 Giving careful attention to ``A Treatise on Altcoins'' \cite{alts}, we are considering the following changes to Sia for the overall improvement of the cryptocurrency.
 We caution that these propositions have not yet been rigorously examined from a security standpoint.
 
 \subsection{Flexible Contracts}
-Contracts are currently strict.
-There is a set penalty for each missed storage proof, and a termination upon N total missed storage proofs.
+Contracts, in their present form, are fairly strict.
+There is a set penalty for each missed storage proof, and a termination upon $n$ total missed storage proofs.
 Increased flexibility in the penalty schedule may be desirable.
 
-Contracts are also currently permanent, creating what is essentially an uneditable file on the network.
-There may be value in adding flexibility that allows clients and hosts to negotiate an updated file hash or other updated contract terms.
-Updating the terms of the contract will require consent from all parties.
+Contracts are also permanent, creating what is essentially an uneditable file on the network.
+There may be value in enabling clients and hosts to negotiate an updated file hash or other updated contract terms.
+Updating the terms of the contract would require consent from all parties.
 
 % \subsection{Proof of Existence Windows}
 % In an attempt to partially resolve the closed window attacks, we could use a proof of existence strategy.
@@ -330,6 +330,7 @@ Updating the terms of the contract will require consent from all parties.
 % A further improvement would enable Merkle Tree proofs of existence.
 % This would enable a host to submit multiple proofs of storage in a single proof of existence hash.
 
+% delete/expand this section?
 \subsection{Siafund the Miner fees}
 Have some portion of siafunds contribute to the miner fees, which ensures that miners have compensation so long as Sia is being used for its core purpose - storage.
 
@@ -344,18 +345,20 @@ Have some portion of siafunds contribute to the miner fees, which ensures that m
 
 \subsection{More Frequent Target Adjustments}
 % This section could use a few citations, but the discussion on this seems pretty well scattered. I could find things like the Kimoto Gravity Well, but other than alts.pdf I couldn't find any comments by respected individuals. I know that these discussions are out there, I've seen them before, just can't find them.
-Changing the target every block instead of every 2016 blocks has advantages.
-Assuming exponential growth in mining power, the number of blocks produced is closer to one every 10 minutes.
-In Bitcoin, the final blocks in each difficulty window are produced faster than every 10 minutes (sometimes substantially) on account of massive week-over-week growth in mining power.
-Adjusting the difficulty every block mitigates this to some extent.
+Bitcoin adjusts its block difficulty every 2016 blocks, with a target of 10 minutes per block.
+This often means that the final blocks in a difficulty window are produced faster than 10 minutes (sometimes substantially) on account of rapid growth in available mining power.
+To mitigate this effect, we are considering adjusting the difficulty after every block.
 
-The bi-weekly adjustments to the Bitcoin difficulty can also cause coordinated drops in mining power - all at once miners lose a percentage of their dollars-per-energy efficiency.
+% I don't understand this paragraph
+The bi-weekly adjustments to the Bitcoin difficulty can also cause coordinated drops in mining power---all at once, miners lose a percentage of their dollars-per-energy efficiency.
 Difficulty adjustments every block creates a much smoother function for when mining rigs are no longer profitable.
 
 The clamp on mining growth can also be increased.
-The clamp on mining growth is there to prevent an attacker from being trivially able to dramatically jump or drop the difficulty.
+The clamp serves to prevent an attacker from being easily manipulating the difficulty.
+% 2,016,000 what?
 In Bitcoin, raising the difficulty from 1000 to 4000 requires a minimum of 2,016,000 of work, and the difficulty can adjust by a maximum of 4x every week.
-If the difficulty is being adjusted every block however, clamped at 1.001\% per block, an attacker will need 3,000,050 work to raise the difficulty from 1000 to 4000, and the difficulty can adjust by a maximum of 7.5x every week, which both increases the flexibility of the difficulty and makes difficulty raising attacks more difficult.
+If the difficulty is being adjusted every block, however, and clamped at 1.001\% per block, an attacker will need 3,000,050 work to raise the difficulty from 1000 to 4000.
+At this rate, the difficulty can shift by a maximum of 7.5x every week, which both increases the flexibility of the difficulty and makes difficulty raising attacks more difficult.
 
 Though the difficulty will be adjusted every block, it will still be adjusted according to the amount of time taken to produce the previous 2016 blocks, preventing randomly fast or slow blocks from having large impact on the network.
 
@@ -375,22 +378,22 @@ Though the difficulty will be adjusted every block, it will still be adjusted ac
 % (I need to read more about merge mining before I publish this section)
 
 \section{Conclusion}
-Sia takes the Bitcoin blockchain and modifies it to include file contracts and remove the scripting system.
-These contracts can be used to enforce agreements between clients and hosts that establish a host will store a file in return for monetary compensation.
-The host will be compensated for storing the file regardless of the behavior of the client.
-The storage proof challenges are presented to the hosts on a regular basis and do not require interaction from the client, which means the client can ``set and forget''.
+Sia is a variant on the Bitcoin protocol that enables decentralized file storage via cryptographic contracts.
+These contracts can be used to enforce storage agreements between clients and hosts.
+After agreeing to store a file, a host must regularly submit storage proofs to the network.
+The host will automatically be compensated for storing the file regardless of the behavior of the client.
 
-While these contracts force a host to store a file and be online regularly, these contracts do not force hosts to give up the file.
-Instead, an out-of-band ecosystem is created which rewards hosts for being available and uploading the files upon request.
-Clients and hosts can use the arbitrary data fields in the blockchain as an expensive mechanism for coordinating, or the clients and hosts can use entirely out-of-band methods for coordinating.
-A basic system has been explained which provides moderate protection against Sybil attacks and the general unreliability of hosts.
+Importantly, contracts do not require hosts to transfer files back to their client when requested.
+Instead, an out-of-band ecosystem must be created to reward hosts for uploading. % what about the micropayments?
+Clients and hosts must also find a way to coordinate; one mechanism would be the arbitrary data field in the blockchain.
+Various precautions have been enumerated which mitigate Sybil attacks and the unreliability of hosts.
 
-Siafunds are used as a mechanism of generating revenue for Nebulous Inc., the company responsible for the release of Sia.
+Siafunds are used as a mechanism of generating revenue for Nebulous Inc., the company responsible for the release and maintenance of Sia.
 By using Siafunds instead of premining, Nebulous more directly correlates revenue to actual use of the network, and is largely unaffected by market games that malicious entities may play with the network currency.
-Miners may also derive a part of their block subsidy from Siafunds, which would help to insulate miners from market games as well.
+Miners may also derive a part of their block subsidy from siafunds, with similar benefits.
 Long term, we hope to add support for two-way-pegs with various currencies, which would enable consumers to insulate themselves from the instability of a single currency.
 
-Altogether, we believe Sia will provide a fertile platform for decentralizing cloud storage in minimal trust and zero trust environments.
+We believe Sia will provide a fertile platform for decentralized cloud storage in trustless environments.
 
 \onecolumn
 \begin{thebibliography}{9}
