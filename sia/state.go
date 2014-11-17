@@ -81,18 +81,23 @@ type State struct {
 	UnspentOutputs map[OutputID]Output
 	SpentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
 
-	// Mining Variables
+	// AcceptBlock() and AcceptTransaction() can be called concurrently.
+	sync.Mutex
+
+	/////////////////
+	// TO BE MOVED //
+	/////////////////
+
+	// Varibales important to a miner.
 	Mining     bool
 	KillMining chan struct{}
 
-	// A database of hosts that can be used to choose where to upload files.
+	// Variables important to a tenet.
 	HostList    []Host
 	TotalWeight Currency
 
 	// Network Variables
 	Server *TCPServer
-
-	sync.Mutex // AcceptBlock() and AcceptTransaction() can be called concurrently.
 }
 
 // State.Height() returns the height of the longest fork.

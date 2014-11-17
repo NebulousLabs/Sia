@@ -19,6 +19,9 @@ type Wallet struct {
 	OwnedOutputs         map[OutputID]Output // All outputs to CoinAddress
 	SpentOutputs         map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
 	OpenFreezeConditions map[BlockHeight]int // A list of all heights at which freeze conditions are being used.
+
+	// Host variables.
+	HostSettings HostAnnouncement
 }
 
 // Most of the parameters are already in the file contract, but what's not

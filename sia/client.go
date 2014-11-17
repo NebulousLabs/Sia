@@ -24,8 +24,36 @@ type Host struct {
 	CoinAddress CoinAddress
 }
 
+// host.Weight() determines the weight of a specific host.
 func (h *Host) Weight() Currency {
 	return h.Freeze * h.Burn / h.Price
+}
+
+// ChooseHost orders the hosts by weight and picks one at random.
+func (w *Wallet) ChooseHost(state *State) (h Host, err error) {
+	if len(state.HostList) == 0 {
+		err = errors.New("no hosts found")
+		return
+	}
+	if state.TotalWeight == 0 {
+		panic("state has 0 total weight but not 0 length host list?")
+	}
+
+	// Get a random number between 0 and state.TotalWeight and then scroll
+	// through state.HostList until at least that much weight has been passed.
+	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(state.TotalWeight)))
+	if err != nil {
+		return
+	}
+	randCurrency := Currency(randInt.Int64())
+	weightPassed := Currency(0)
+	var i int
+	for i = 0; randCurrency >= weightPassed; i++ {
+		weightPassed += state.HostList[i].Weight()
+	}
+
+	h = state.HostList[i]
+	return
 }
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
@@ -92,32 +120,5 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 	// after getting a response, sign the reponse transaction and send the
 	// signed transaction to the host along with the file itself.
 
-	return
-}
-
-// ChooseHost orders the hosts by weight and picks one at random.
-func (w *Wallet) ChooseHost(state *State) (h Host, err error) {
-	if len(state.HostList) == 0 {
-		err = errors.New("no hosts found")
-		return
-	}
-	if state.TotalWeight == 0 {
-		panic("state has 0 total weight but not 0 length host list?")
-	}
-
-	// Get a random number between 0 and state.TotalWeight and then scroll
-	// through state.HostList until at least that much weight has been passed.
-	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(state.TotalWeight)))
-	if err != nil {
-		return
-	}
-	randCurrency := Currency(randInt.Int64())
-	weightPassed := Currency(0)
-	var i int
-	for i = 0; randCurrency >= weightPassed; i++ {
-		weightPassed += state.HostList[i].Weight()
-	}
-
-	h = state.HostList[i]
 	return
 }

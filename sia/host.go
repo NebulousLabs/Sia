@@ -1,6 +1,8 @@
 package sia
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
@@ -8,27 +10,12 @@ const (
 	HostAnnouncementPrefix = uint64(1)
 )
 
-// A HostAnnouncement is a struct that can appear in the arbitrary data field.
-// It is preceded by 8 bytes matching the numerical integer '1'.
-type HostAnnouncement struct {
-	IPAddress             []byte
-	MinFilesize           uint64
-	MaxFilesize           uint64
-	MaxDuration           BlockHeight
-	MaxChallengeFrequency BlockHeight
-	MinTolerance          uint64
-	Price                 Currency
-	Burn                  Currency
-	CoinAddress           CoinAddress
-
-	SpendConditions SpendConditions
-	FreezeIndex     uint64
-}
-
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, freezeUnlockHeight BlockHeight, minerFee Currency, state *State) (t Transaction, err error) {
+func (w *Wallet) HostAnnounceSelf(freezeVolume Currency, freezeUnlockHeight BlockHeight, minerFee Currency, state *State) (t Transaction, err error) {
 	w.Scan(state)
+
+	info := w.HostSettings
 
 	// Fund the transaction.
 	err = w.FundTransaction(freezeVolume+minerFee, &t)
@@ -49,6 +36,7 @@ func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, 
 		w.OpenFreezeConditions[freezeUnlockHeight] = 1
 	}
 	info.SpendConditions = freezeConditions
+	info.FreezeIndex = 0
 
 	// Add the announcement as arbitrary data.
 	prefixBytes := encoding.Marshal(HostAnnouncementPrefix)
@@ -59,6 +47,64 @@ func (w *Wallet) HostAnnounceSelf(info HostAnnouncement, freezeVolume Currency, 
 	if err != nil {
 		return
 	}
+
+	return
+}
+
+func (w *Wallet) ConsiderContract(t Transaction) (nt Transaction, err error) {
+	// Set the new transaction equal to the old transaction. Pretty sure that
+	// go does not allow you to return the same variable that was used as
+	// input. We could use a pointer, but that might be a bad idea. This call
+	// is happening over the network anyway.
+	nt = t
+
+	// Check that there is only one file contract.
+	if len(nt.FileContracts) != 1 {
+		err = errors.New("will not accept a transaction with more than one file contract")
+		return
+	}
+
+	// Verify that the client has put in the correct number of funds.
+
+	// Check that the file size listed in the contract is in bounds.
+	if nt.FileContracts[0].FileSize < w.HostSettings.MinFilesize || nt.FileContracts[0].FileSize > w.HostSettings.MaxFilesize {
+		err = errors.New("file is of incorrect size")
+		return
+	}
+
+	// Check that the duration of the contract is in bounds.
+	currentHeight := BlockHeight(0) // GET THE CURRENT HEIGHT OF THE STATE AND PUT IT HERE.
+	if nt.FileContracts[0].End-currentHeight < w.HostSettings.MinDuration || nt.FileContracts[0].End-currentHeight < w.HostSettings.MinDuration {
+		err = errors.New("contract duration is out of bounds")
+		return
+	}
+
+	// Check that challenges will not be happening too frequently.
+	if nt.FileContracts[0].ChallengeFrequency < w.HostSettings.MaxChallengeFrequency {
+		err = errors.New("challenges frequency is too often")
+		return
+	}
+
+	// Check that tolerance is acceptible.
+	if nt.FileContracts[0].Tolerance < w.HostSettings.MinTolerance {
+		err = errors.New("tolerance is too low")
+		return
+	}
+
+	// Outputs for successful proofs need to be appropriate.
+	if nt.FileContracts[0].ValidProofAddress != w.SpendConditions.CoinAddress() {
+		err = errors.New("coins are not paying out to correct address")
+		return
+	}
+
+	// Output for failed proofs needs to be the 0 address.
+	emptyAddress := CoinAddress{}
+	if nt.FileContracts[0].MissedProofAddress != emptyAddress {
+		err = errors.New("burn payout needs to go to the empty address")
+		return
+	}
+
+	// Add some inputs and outputs to the transaction to fund the burn half.
 
 	return
 }

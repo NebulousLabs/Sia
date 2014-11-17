@@ -46,7 +46,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	// NEED TO GET IP ADDRESS SOMEWHERE.
 
 	// Create the host announcement structure.
-	ha := sia.HostAnnouncement{
+	env.wallets[0].HostSettings = sia.HostAnnouncement{
 		// IPAddress: "asdf",
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,
@@ -56,10 +56,11 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 		Price:                 sia.Currency(price),
 		Burn:                  sia.Currency(price),
 		CoinAddress:           env.wallets[0].SpendConditions.CoinAddress(),
+		// SpendConditions and FreezeIndex handled by HostAnnounceSelg
 	}
 
 	// Have the wallet make the announcement.
-	_, err = env.wallets[0].HostAnnounceSelf(ha, sia.Currency(freezeCoins), sia.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
+	_, err = env.wallets[0].HostAnnounceSelf(sia.Currency(freezeCoins), sia.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
 	if err != nil {
 		return
 	}
@@ -67,6 +68,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	return
 }
 
+// toggleMining asks the state to switch mining on or off.
 func toggleMining(env *walletEnvironment) {
 	go env.state.ToggleMining(env.wallets[0].SpendConditions.CoinAddress())
 }
