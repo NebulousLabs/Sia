@@ -18,8 +18,6 @@ type InputSignatures struct {
 // reverseTransaction removes a given transaction from the
 // ConsensusState, making it as though the transaction had never happened.
 func (s *State) reverseTransaction(t Transaction) {
-	// SCAN THE ARBITRARY DATA AND REMOVE ANY VALID HOSTS FROM THE HOSTDB.
-
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
 		contractID := t.FileContractID(i)

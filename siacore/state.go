@@ -59,8 +59,6 @@ type State struct {
 	// One map for each potential type of block.
 	BadBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
 	BlockMap  map[BlockID]*BlockNode // A list of all blocks in the blocktree.
-	// FutureBlocks
-	// OrphanBlocks
 
 	// The transaction pool works by storing a list of outputs that are
 	// spent by transactions in the pool, and pointing to the transaction

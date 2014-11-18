@@ -1,5 +1,6 @@
 package siacore
 
+/*
 import (
 	"fmt"
 	"testing"
@@ -295,3 +296,4 @@ func TestBlockBuilding(t *testing.T) {
 	// until succesful termination.
 	successContractTests(testEnv)
 }
+*/

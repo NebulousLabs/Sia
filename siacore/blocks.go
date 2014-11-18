@@ -30,15 +30,6 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 		return
 	}
 
-	/*
-		// See if the block is a known orphan.
-		_, exists = s.OrphanBlocks[b.ID()]
-		if exists {
-			err = errors.New("Block exists in orphan list")
-			return
-		}
-	*/
-
 	// See if the block's parent is known.
 	parentBlockNode, exists = s.BlockMap[b.ParentBlock]
 	if !exists {
