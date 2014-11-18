@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Andromeda/sia"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // Pulls a bunch of information and announces the host to the network.
@@ -46,21 +46,21 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	// NEED TO GET IP ADDRESS SOMEWHERE.
 
 	// Create the host announcement structure.
-	env.wallets[0].HostSettings = sia.HostAnnouncement{
+	env.wallets[0].HostSettings = siacore.HostAnnouncement{
 		// IPAddress: "asdf",
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,
 		MaxDuration:           10000,
-		MaxChallengeFrequency: sia.BlockHeight(100),
+		MaxChallengeFrequency: siacore.BlockHeight(100),
 		MinTolerance:          10,
-		Price:                 sia.Currency(price),
-		Burn:                  sia.Currency(price),
+		Price:                 siacore.Currency(price),
+		Burn:                  siacore.Currency(price),
 		CoinAddress:           env.wallets[0].SpendConditions.CoinAddress(),
 		// SpendConditions and FreezeIndex handled by HostAnnounceSelg
 	}
 
 	// Have the wallet make the announcement.
-	_, err = env.wallets[0].HostAnnounceSelf(sia.Currency(freezeCoins), sia.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
+	_, err = env.wallets[0].HostAnnounceSelf(siacore.Currency(freezeCoins), siacore.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
 	if err != nil {
 		return
 	}
@@ -122,13 +122,13 @@ func sendCoinsWalkthrough(env *walletEnvironment) (err error) {
 		return
 	}
 
-	// Convert the address to a sia.CoinAddress
-	var address sia.CoinAddress
+	// Convert the address to a siacore.CoinAddress
+	var address siacore.CoinAddress
 	copy(address[:], addressBytes)
 
 	// Use the wallet api to send. ==> Only uses wallets[0] for the time being.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = env.wallets[0].SpendCoins(sia.Currency(amount), sia.Currency(minerFee), address, env.state)
+	_, err = env.wallets[0].SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address, env.state)
 	if err != nil {
 		return
 	}

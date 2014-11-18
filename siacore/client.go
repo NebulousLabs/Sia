@@ -1,4 +1,4 @@
-package sia
+package siacore
 
 import (
 	"crypto/rand"
@@ -86,7 +86,7 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 		if err != nil {
 			return
 		}
-		if host.Frequency <= 100 && host.Tolerance < 10 {
+		if host.Frequency <= 100 && host.Tolerance < 10 { // Better just to block the host from the db in the first place than have checking here. Or maybe have something fancier that allows different files to select hosts based on different criteria.
 			break
 		}
 		host, err = w.ChooseHost(state)

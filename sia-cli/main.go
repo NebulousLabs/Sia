@@ -4,21 +4,21 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NebulousLabs/Andromeda/sia"
+	"github.com/NebulousLabs/Andromeda/siacore"
 
 	"github.com/spf13/cobra"
 )
 
 type walletEnvironment struct {
-	state   *sia.State
-	wallets []*sia.Wallet
+	state   *siacore.State
+	wallets []*siacore.Wallet
 }
 
 // Creates the genesis state and then requests a bunch of blocks from the
 // network.
 func walletStart(cmd *cobra.Command, args []string) {
 	// create TCP server
-	tcps, err := sia.NewTCPServer(9988)
+	tcps, err := siacore.NewTCPServer(9988)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -34,7 +34,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 	env := new(walletEnvironment)
 
 	// create genesis state and register it with the server
-	env.state = sia.CreateGenesisState()
+	env.state = siacore.CreateGenesisState()
 	if err = tcps.RegisterRPC('B', env.state.AcceptBlock); err != nil {
 		fmt.Println(err)
 		return
@@ -49,7 +49,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 	// download blocks
 	env.state.Bootstrap()
 
-	wallet, err := sia.CreateWallet()
+	wallet, err := siacore.CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return

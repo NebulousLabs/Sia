@@ -1,4 +1,4 @@
-package sia
+package siacore
 
 // State.addTransactionToPool() adds a transaction to the transaction pool and
 // transaction list. A panic will trigger if there is a conflicting transaction

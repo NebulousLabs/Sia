@@ -1,4 +1,4 @@
-package sia
+package siacore
 
 import (
 	"math/big"
