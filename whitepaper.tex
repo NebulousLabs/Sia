@@ -151,7 +151,7 @@ These are represented by the strings ``validproof'', ``missedproof'', ``successf
 \section{Proof of Storage}
 \label{sec:storage}
 Storage proof transactions are periodically submitted in order to fulfill file contracts.
-Each storage proof targets a specific file. % or does it target the contract?
+Each storage proof targets a specific file contract.
 A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
 
 \subsection{Algorithm}
@@ -179,7 +179,7 @@ Specifically, they will fail half as many as they would without the withholding 
 
 To protect against such attacks, clients can specify a high challenge frequency and large penalties for missing proofs.
 These precautions should be sufficient to deter any financially-motivated attacker that controls less than 50\% of the network's hashing power.
-Of course, clients are advised to plan around potential Byzantine attacks, which may not be financially motivated.
+Regardless, clients are advised to plan around potential Byzantine attacks, which may not be financially motivated.
 
 \subsection{Closed Window Attacks}
 Hosts can only complete a storage proof if their proof transaction makes it into the blockchain.
@@ -203,10 +203,6 @@ Arbitrary data could also be used to implement other types of soft forks.
 This would be done by creating an ``anyone-can-spend'' output but with restrictions specified in the arbitrary data.
 Miners that understand the restrictions can block any transaction that spends the output without satisfying the necessary stipulations.
 Naive nodes will stay synchronized without needing to be able to parse the arbitrary data.
-
-% need clarification on this part
-The amount of arbitrary data per block can be extended with a similar style of soft fork, where an anyone-can-spend transaction is visible to older clients, but data in the arbitrary field indicates that a longer block was signed.
-Older clients would get the short block, and updated clients would demand the longer block or otherwise refuse to recognize the block.
 
 \section{Storage Ecosystem}
 Sia relies on an ecosystem that facilitates decentralized storage.
