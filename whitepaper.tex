@@ -227,6 +227,7 @@ It is the responsibility of the provider to protect themselves from such attacks
 \subsection{Client Protections}
 Clients can use erasure codes, such as regenerating codes \cite{reg}, to safeguard against hosts going offline.
 In an erasure coding scheme, file data is split into $n$ overlapping pieces, such that the file can be recovered from any subset of at least $m$ unique pieces.
+(The values of $n$ and $m$ vary based on the erasure code and redundancy factor.)
 Each piece is then encrypted and stored across many storage providers.
 This allows a client to attain high file availability even if the average network reliability is low.
 As an extreme example, if only 10 out of 100 pieces are needed to recover the file, then the client is actually relying on the 10 most reliable hosts, rather than the average reliability.
