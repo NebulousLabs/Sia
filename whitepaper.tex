@@ -86,19 +86,21 @@ The block reward and miner fees have special output IDs, given by:
 \[
 	H(H(\text{Block Header}) || \text{``blockreward''})
 \]
+Every input must come from a prior output, so an input is simply an output ID.
 
-Every input must come from a prior output, so an input is simply an output ID along with its spend conditions.
+Inputs and outputs are also paired with a set of \textit{spend conditions}.
+Inputs contain the spend conditions themselves, while outputs contain their Merkle root hash \cite{merkle}.
 
 \subsection{Spend Conditions}
-Outputs have a list of spend conditions which must be met before the coins are ``unlocked'' and can be spent.
+Spend conditions are properties that must be met before coins are ``unlocked'' and can be spent.
 The spend conditions include a time lock and a set of public keys, and the number of signatures required.
-The output cannot be spent until the time lock has expired and enough of the specified keys have added their signature.
+An output cannot be spent until the time lock has expired and enough of the specified keys have added their signature.
 
-The spend conditions are hashed as a Merkle tree, using the time lock, number of signatures required, and each public key as leaves.
+The spend conditions are hashed into a Merkle tree, using the time lock, the number of signatures required, and the public keys as leaves.
 The root hash of this tree is used as the address to which the coins are sent.
 In order to spend the coins, the spend conditions corresponding to the address hash must be provided.
 The use of a Merkle tree allows parties to selectively reveal information in the spend conditions.
-For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required. % note: time lock and num signatures would be very easy to brute force
+For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required.
 
 \subsection{Signatures}
 Each input in a transaction must be signed.
@@ -115,7 +117,7 @@ Every such signature in the transaction must be valid for the transaction to be 
 \section{File Contracts}
 \label{sec:contracts}
 A file contract is an agreement between a storage provider and a client.
-At the core of a file contract is the file's Merkle root hash \cite{merkle}.
+At the core of a file contract is the file's Merkle root hash.
 To construct this hash, the file is split into segments of constant size and hashed into a Merkle tree.
 The root hash, along with the total size of the file, can be used to verify storage proofs.
 
