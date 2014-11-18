@@ -123,10 +123,10 @@ The root hash, along with the total size of the file, can be used to verify stor
 
 File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the reward for an invalid or missing proof, and the maximum number of proofs that can be missed.
 The challenge frequency is the maximum number of blocks that can elapse between storage proofs (also called a \textit{challenge window}).
-As soon as one challenge window closes, the next opens. % can windows be either blocks or timestamps?
+As soon as one challenge window closes, the next opens.
 Submitting a valid proof during the challenge window triggers an automatic payment to the ``valid proof'' address (presumably the host).
 If, at the end of the challenge window, no valid proof has been submitted, coins are instead sent to the ``missed proof'' address (presumably the client).
-A contract becomes invalid if too many proofs are missed.
+Contracts define a maximum number of proofs that can be missed; if this number is exceeded, the contract becomes invalid.
 
 If the file contract is still valid at the end of the specified duration, it \textit{successfully terminates}.
 Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract \textit{unsuccessfully terminates}.
@@ -145,7 +145,8 @@ The output ID of a storage proof is defined as:
 	H(\text{contract ID} || \text{outcome} || W_i)
 \]
 Where $W_i$ is the window index, i.e. the number of windows that have elapsed since the contract was formed.
-The outcome has four possible values, corresponding to the four potential outcomes listed above. % how are they represented? 2 bits? strings?
+The outcome has four possible values, corresponding to the four potential outcomes listed above.
+These are represented by the strings ``validproof'', ``missedproof'', ``successfultermination'', and ``unsucessfultermination''.
 
 \section{Proof of Storage}
 \label{sec:storage}
