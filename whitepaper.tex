@@ -248,20 +248,16 @@ However, we reiterate that uptime incentives are not part of the Sia protocol; t
 
 \subsection{Basic Reputation System}
 Clients need a reliable method for picking quality storage providers.
-Hosts could potentially launch a Sybil attack on the network, using false files to build up their reputation.
+Looking at provider history is insufficient, because the history could be faked.
+A provider could repeatedly form contracts with itself, agreeing to store large ``fake'' files, such as a file containing only zeros or a similar pattern.
+It would be trivial to perform storage proofs on such data without actually storing anything.
 
-% whole section needs clarification...
-One defense for a Sybil attack would be for clients to only consider hosts that have X coin-days locked in an unspendable output.
-Storage providers declare themselves using the arbitrary data in a transaction that creates a large time locked output.
-The time locked output represents a commitment on the part of the storage provider to be reliable and inhibits the ability of malicious providers to perform Sybil attacks, as they will need large time locked outputs.
-When clients are scanning the blockchain, they select providers at random, but weight them according to the number of coins that are time locked for more than a certain period of time.
-Clients can also weight providers according to the size of the refund for losing files, and the price of the files.
-Choosing a careful scheme for weighting providers during random selection will protect clients and ensure that malicious providers need to make significant investment to maintain a majority weight during the selection process.
+To mitigate this Sybil attack, clients can require that providers that announce themselves in the arbitrary data section also include a large volume of time locked coins.
+If 10 coins are time locked 14 days into the future, then the host can be said to have created a lock valued at 140 coin-days.
+By favoring hosts that have created high-value locks, clients can mitigate the risk of Sybil attacks, as valuable locks are not trivial to create.
 
-This scheme does not leave clients any way to leave reviews for storage providers.
-Additionally complexity could allow clients to rate providers based on throughput, latency, and availability.
-Such a review system would require careful design to prevent malicious providers from creating fake clients and files to boost their ratings.
-A centralized storage tracker could provide a more reasonable platform for a reputation system, and could manage the whole system out of band.
+Each client can choose their own equation for picking hosts, and can use a large number of factors, including price, lock value, volume of storage being offered, and the penalties hosts are willing to pay for losing files.
+More complex systems, such as those that use human review or other metrics, could be implemented out-of-band in a more centralized setting.
 
 \section{Siafunds}
 Sia is a product of Nebulous Incorporated.
