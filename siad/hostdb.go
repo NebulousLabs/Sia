@@ -11,7 +11,7 @@ import (
 
 type HostDatabase struct {
 	state       *siacore.State
-	HostList    []Host
+	HostList    []HostEntry
 	TotalWeight siacore.Currency
 }
 
@@ -31,6 +31,26 @@ type HostAnnouncement struct {
 
 	SpendConditions siacore.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
+}
+
+// the Host struct is kept in the client package because it's what the client
+// uses to weigh hosts and pick them out when storing files.
+type HostEntry struct {
+	IPAddress   string
+	MinSize     uint64
+	MaxSize     uint64
+	Duration    siacore.BlockHeight
+	Frequency   siacore.BlockHeight
+	Tolerance   uint64
+	Price       siacore.Currency
+	Burn        siacore.Currency
+	Freeze      siacore.Currency
+	CoinAddress siacore.CoinAddress
+}
+
+// host.Weight() determines the weight of a specific host.
+func (h *HostEntry) Weight() siacore.Currency {
+	return h.Freeze * h.Burn / h.Price
 }
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
@@ -63,7 +83,7 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 		}
 
 		// Add the host to the host database.
-		host := Host{
+		host := HostEntry{
 			IPAddress:   string(ha.IPAddress),
 			MinSize:     ha.MinFilesize,
 			MaxSize:     ha.MaxFilesize,
@@ -84,7 +104,7 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 }
 
 // ChooseHost orders the hosts by weight and picks one at random.
-func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h Host, err error) {
+func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	if len(hdb.HostList) == 0 {
 		err = errors.New("no hosts found")
 		return

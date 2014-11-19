@@ -4,63 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NebulousLabs/Andromeda/siacore"
-	"github.com/NebulousLabs/Andromeda/siad"
-
 	"github.com/spf13/cobra"
 )
 
-type walletEnvironment struct {
-	state *siacore.State
-
-	miner  *siad.Miner
-	renter *siad.Renter
-	wallet *siad.Wallet
-
-	// networking stuff here?
-}
-
-// Creates the genesis state and then requests a bunch of blocks from the
-// network.
 func walletStart(cmd *cobra.Command, args []string) {
-	// create TCP server
-	tcps, err := siacore.NewTCPServer(9988)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer tcps.Close()
-
-	// establish an initial peer list
-	if err = tcps.Bootstrap(); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	env := new(walletEnvironment)
-
-	// create genesis state and register it with the server
-	env.state = siacore.CreateGenesisState()
-	if err = tcps.RegisterRPC('B', env.state.AcceptBlock); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err = tcps.RegisterRPC('T', env.state.AcceptTransaction); err != nil {
-		fmt.Println(err)
-		return
-	}
-	tcps.RegisterHandler('R', env.state.SendBlocks)
-	env.state.Server = tcps
-
-	// download blocks
-	env.state.Bootstrap()
-
-	env.wallet, err = siad.CreateWallet()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
+	env := createEnvironment()
 	pollHome(env)
 }
 

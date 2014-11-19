@@ -8,7 +8,7 @@ import (
 )
 
 // Pulls a bunch of information and announces the host to the network.
-func becomeHostWalkthrough(env *walletEnvironment) (err error) {
+func becomeHostWalkthrough(env *environment) (err error) {
 	// Get a volume of days to freeze the coins.
 	// Burn will be equal to price.
 	// Frequency will be 100.
@@ -70,13 +70,13 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 }
 
 // toggleMining asks the state to switch mining on or off.
-func toggleMining(env *walletEnvironment) {
+func toggleMining(env *environment) {
 	go env.miner.ToggleMining(env.state, env.wallet.SpendConditions.CoinAddress())
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by
 // this cli.
-func printWalletAddresses(env *walletEnvironment) {
+func printWalletAddresses(env *environment) {
 	fmt.Println("General Information:")
 
 	// Dispaly whether or not the miner is mining.
@@ -97,7 +97,7 @@ func printWalletAddresses(env *walletEnvironment) {
 
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
 // address that is provided through the command line.
-func sendCoinsWalkthrough(env *walletEnvironment) (err error) {
+func sendCoinsWalkthrough(env *environment) (err error) {
 	fmt.Println("Send Coins Walkthrough:")
 
 	fmt.Print("Amount to send: ")
@@ -149,7 +149,7 @@ func displayHomeHelp() {
 }
 
 // pollHome repeatedly querys the user for input.
-func pollHome(env *walletEnvironment) {
+func pollHome(env *environment) {
 	var input string
 	var err error
 	for {

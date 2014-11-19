@@ -106,3 +106,7 @@ func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddr
 		}
 	}
 }
+
+func CreateMiner() *Miner {
+	return new(Miner)
+}
