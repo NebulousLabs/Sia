@@ -1,5 +1,14 @@
 package siacore
 
+// TransactionPoolDump() returns the list of transactions that are valid but
+// haven't yet appeared in a block.
+func (s *State) TransactionPoolDump() (transactions []Transaction) {
+	for _, transaction := range s.TransactionList {
+		transactions = append(transactions, *transaction)
+	}
+	return
+}
+
 // State.addTransactionToPool() adds a transaction to the transaction pool and
 // transaction list. A panic will trigger if there is a conflicting transaction
 // in the pool.

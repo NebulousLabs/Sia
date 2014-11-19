@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
+	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -11,6 +12,23 @@ import (
 )
 
 var SurpassThreshold = big.NewRat(5, 100)
+
+// EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
+// of a BlockNode to be legal.
+func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
+	var intTimestamps []int
+	for _, timestamp := range bn.RecentTimestamps {
+		intTimestamps = append(intTimestamps, int(timestamp))
+	}
+	sort.Ints(intTimestamps)
+	return Timestamp(intTimestamps[5])
+}
+
+// CheckTarget() returns true if the block id is lower than the target.
+func (b *Block) CheckTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
 
 // State.checkMaps() looks through the maps known to the state and sees if the
 // block id has been cached anywhere.
@@ -39,15 +57,9 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
-// Block.checkTarget() returns true if the block id is lower than the target.
-func (b *Block) checkTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
-}
-
-// Block.expectedTransactionMerkleRoot() returns the expected transaction
+// ExpectedTransactionMerkleRoot() returns the expected transaction
 // merkle root of the block.
-func (b *Block) expectedTransactionMerkleRoot() hash.Hash {
+func (b *Block) ExpectedTransactionMerkleRoot() hash.Hash {
 	var transactionHashes []hash.Hash
 	for _, transaction := range b.Transactions {
 		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
@@ -60,7 +72,7 @@ func (b *Block) expectedTransactionMerkleRoot() hash.Hash {
 // explaining why validation failed if the header is invalid.
 func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check the id meets the target.
-	if !b.checkTarget(parent.Target) {
+	if !b.CheckTarget(parent.Target) {
 		err = errors.New("block does not meet target")
 		return
 	}
@@ -85,7 +97,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 
 	// Check that the transaction merkle root matches the transactions
 	// included into the block.
-	if b.MerkleRoot != b.expectedTransactionMerkleRoot() {
+	if b.MerkleRoot != b.ExpectedTransactionMerkleRoot() {
 		s.BadBlocks[b.ID()] = struct{}{}
 		err = errors.New("merkle root does not match transactions sent.")
 		return

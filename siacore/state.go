@@ -2,7 +2,6 @@ package siacore
 
 import (
 	"math/big"
-	"sort"
 	"sync"
 )
 
@@ -83,14 +82,6 @@ type State struct {
 	// AcceptBlock() and AcceptTransaction() can be called concurrently.
 	sync.Mutex
 
-	/////////////////
-	// TO BE MOVED //
-	/////////////////
-
-	// Varibales important to a miner.
-	Mining     bool
-	KillMining chan struct{}
-
 	// Network Variables
 	Server *TCPServer
 }
@@ -126,15 +117,4 @@ func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.CurrentBlockNode().Target[:])))
-}
-
-// EarliestLegalTimestamp returns the earliest a timestamp can be for the child
-// of a BlockNode to be legal.
-func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
-	var intTimestamps []int
-	for _, timestamp := range bn.RecentTimestamps {
-		intTimestamps = append(intTimestamps, int(timestamp))
-	}
-	sort.Ints(intTimestamps)
-	return Timestamp(intTimestamps[5])
 }
