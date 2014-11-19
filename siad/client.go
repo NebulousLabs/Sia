@@ -1,4 +1,4 @@
-package siacore
+package siad
 
 import (
 	"crypto/rand"
@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // the Host struct is kept in the client package because it's what the client
@@ -15,22 +16,22 @@ type Host struct {
 	IPAddress   string
 	MinSize     uint64
 	MaxSize     uint64
-	Duration    BlockHeight
-	Frequency   BlockHeight
+	Duration    siacore.BlockHeight
+	Frequency   siacore.BlockHeight
 	Tolerance   uint64
-	Price       Currency
-	Burn        Currency
-	Freeze      Currency
-	CoinAddress CoinAddress
+	Price       siacore.Currency
+	Burn        siacore.Currency
+	Freeze      siacore.Currency
+	CoinAddress siacore.CoinAddress
 }
 
 // host.Weight() determines the weight of a specific host.
-func (h *Host) Weight() Currency {
+func (h *Host) Weight() siacore.Currency {
 	return h.Freeze * h.Burn / h.Price
 }
 
 // ChooseHost orders the hosts by weight and picks one at random.
-func (w *Wallet) ChooseHost(state *State) (h Host, err error) {
+func (w *Wallet) ChooseHost(state *siacore.State) (h Host, err error) {
 	if len(state.HostList) == 0 {
 		err = errors.New("no hosts found")
 		return
@@ -45,8 +46,8 @@ func (w *Wallet) ChooseHost(state *State) (h Host, err error) {
 	if err != nil {
 		return
 	}
-	randCurrency := Currency(randInt.Int64())
-	weightPassed := Currency(0)
+	randWeight := siacore.Currency(randInt.Int64())
+	weightPassed := siacore.Currency(0)
 	var i int
 	for i = 0; randCurrency >= weightPassed; i++ {
 		weightPassed += state.HostList[i].Weight()
@@ -58,7 +59,7 @@ func (w *Wallet) ChooseHost(state *State) (h Host, err error) {
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) ClientProposeContract(filename string, state *State) (err error) {
+func (w *Wallet) ClientProposeContract(filename string, state *siacore.State) (err error) {
 	// Scan the blockchain for outputs.
 	w.Scan(state)
 
@@ -93,7 +94,7 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 	}
 
 	// Fill out the contract according to the whims of the host.
-	fileContract := FileContract{
+	fileContract := siacore.FileContract{
 		ContractFund:       (host.Price + host.Burn) * 5000, // 5000 blocks.
 		FileMerkleRoot:     merkle,
 		FileSize:           uint64(info.Size()),
@@ -108,7 +109,7 @@ func (w *Wallet) ClientProposeContract(filename string, state *State) (err error
 	}
 
 	// Fund the client portion of the transaction.
-	var t Transaction
+	var t siacore.Transaction
 	t.FileContracts = append(t.FileContracts, fileContract)
 	err = w.FundTransaction(host.Price*5000, &t)
 	if err != nil {

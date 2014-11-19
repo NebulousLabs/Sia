@@ -80,7 +80,7 @@ func (s *State) applyTransaction(t Transaction) {
 	}
 
 	// Scan the arbitrary data for items relevent to the host database.
-	s.scanAndApplyHosts(&t)
+	// s.scanAndApplyHosts(&t)
 }
 
 // validInput returns err = nil if the input is valid within the current state,

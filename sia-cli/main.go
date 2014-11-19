@@ -5,13 +5,14 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Andromeda/siad"
 
 	"github.com/spf13/cobra"
 )
 
 type walletEnvironment struct {
 	state   *siacore.State
-	wallets []*siacore.Wallet
+	wallets []*siad.Wallet
 }
 
 // Creates the genesis state and then requests a bunch of blocks from the
@@ -49,7 +50,7 @@ func walletStart(cmd *cobra.Command, args []string) {
 	// download blocks
 	env.state.Bootstrap()
 
-	wallet, err := siacore.CreateWallet()
+	wallet, err := siad.CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -1,4 +1,4 @@
-package siacore
+package siad
 
 // wallet.go contains things like signatures and scans the blockchain for
 // available funds that can be spent.
@@ -6,6 +6,7 @@ package siacore
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
@@ -14,11 +15,11 @@ import (
 // the wallet knows how to spend.
 type Wallet struct {
 	SecretKey       signatures.SecretKey
-	SpendConditions SpendConditions
+	SpendConditions siacore.SpendConditions
 
-	OwnedOutputs         map[OutputID]Output // All outputs to CoinAddress
-	SpentOutputs         map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
-	OpenFreezeConditions map[BlockHeight]int // A list of all heights at which freeze conditions are being used.
+	OwnedOutputs         map[siacore.OutputID]siacore.Output // All outputs to CoinAddress
+	SpentOutputs         map[siacore.OutputID]siacore.Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OpenFreezeConditions map[siacore.BlockHeight]int         // A list of all heights at which freeze conditions are being used.
 
 	// Host variables.
 	HostSettings HostAnnouncement
@@ -29,13 +30,13 @@ type Wallet struct {
 // much comes from the host. This specifies how much the client is to add to
 // the contract.
 type FileContractParameters struct {
-	Transaction        Transaction
+	Transaction        siacore.Transaction
 	FileContractIndex  int
-	ClientContribution Currency
+	ClientContribution siacore.Currency
 }
 
 // Wallet.FreezeConditions
-func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc SpendConditions) {
+func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc siacore.SpendConditions) {
 	fc = w.SpendConditions
 	fc.TimeLock = unlockHeight
 	return

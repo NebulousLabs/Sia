@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Andromeda/siad"
 )
 
 // Pulls a bunch of information and announces the host to the network.
@@ -46,7 +47,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	// NEED TO GET IP ADDRESS SOMEWHERE.
 
 	// Create the host announcement structure.
-	env.wallets[0].HostSettings = siacore.HostAnnouncement{
+	env.wallets[0].HostSettings = siad.HostAnnouncement{
 		// IPAddress: "asdf",
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,

@@ -1,9 +1,10 @@
-package siacore
+package siad
 
 import (
 	"errors"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
@@ -12,7 +13,7 @@ const (
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (w *Wallet) HostAnnounceSelf(freezeVolume Currency, freezeUnlockHeight BlockHeight, minerFee Currency, state *State) (t Transaction, err error) {
+func (w *Wallet) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency, state *siacore.State) (t siacore.Transaction, err error) {
 	w.Scan(state)
 
 	info := w.HostSettings
@@ -51,7 +52,7 @@ func (w *Wallet) HostAnnounceSelf(freezeVolume Currency, freezeUnlockHeight Bloc
 	return
 }
 
-func (w *Wallet) ConsiderContract(t Transaction) (nt Transaction, err error) {
+func (w *Wallet) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
 	// Set the new transaction equal to the old transaction. Pretty sure that
 	// go does not allow you to return the same variable that was used as
 	// input. We could use a pointer, but that might be a bad idea. This call

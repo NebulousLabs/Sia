@@ -1,8 +1,14 @@
-package siacore
+package siad
 
 import (
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
+
+type Renter struct {
+	HostList    []Host
+	TotalWeight siacore.Currency
+}
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
@@ -10,21 +16,21 @@ type HostAnnouncement struct {
 	IPAddress             []byte
 	MinFilesize           uint64
 	MaxFilesize           uint64
-	MinDuration           BlockHeight
-	MaxDuration           BlockHeight
-	MaxChallengeFrequency BlockHeight
+	MinDuration           siacore.BlockHeight
+	MaxDuration           siacore.BlockHeight
+	MaxChallengeFrequency siacore.BlockHeight
 	MinTolerance          uint64
-	Price                 Currency
-	Burn                  Currency
-	CoinAddress           CoinAddress
+	Price                 siacore.Currency
+	Burn                  siacore.Currency
+	CoinAddress           siacore.CoinAddress
 
-	SpendConditions SpendConditions
+	SpendConditions siacore.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
 }
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database.
-func (s *State) scanAndApplyHosts(t *Transaction) {
+func (r *Renter) scanAndApplyHosts(t *siacore.Transaction) {
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) < 8 {
 		return
@@ -50,7 +56,7 @@ func (s *State) scanAndApplyHosts(t *Transaction) {
 			Tolerance:   ha.MinTolerance,
 			Price:       ha.Price,
 			Burn:        ha.Burn,
-			Freeze:      Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[ha.FreezeIndex].Value,
+			Freeze:      siacore.Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[ha.FreezeIndex].Value,
 			CoinAddress: ha.CoinAddress,
 		}
 		if host.Freeze <= 0 {
@@ -59,7 +65,7 @@ func (s *State) scanAndApplyHosts(t *Transaction) {
 
 		// Add the weight of the host to the total weight of the hosts in
 		// the host database.
-		s.HostList = append(s.HostList, host)
-		s.TotalWeight += host.Weight()
+		r.HostList = append(r.HostList, host)
+		r.TotalWeight += host.Weight()
 	}
 }

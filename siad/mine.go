@@ -1,8 +1,10 @@
-package siacore
+package siad
 
 import (
 	"errors"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
@@ -12,10 +14,10 @@ const (
 )
 
 // Creates a block that is ready for nonce grinding.
-func (s *State) blockForWork(minerAddress CoinAddress) (b *Block, target Target) {
-	b = &Block{
+func (s *siacore.State) blockForWork(minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
+	b = &siacore.Block{
 		ParentBlock:  s.CurrentBlock,
-		Timestamp:    Timestamp(time.Now().Unix()),
+		Timestamp:    siacore.Timestamp(time.Now().Unix()),
 		MinerAddress: minerAddress,
 	}
 	// IF TIMESTAMP IS INVALID, CREATE A VALID TIMESTAMP! --> 'future median' attack.

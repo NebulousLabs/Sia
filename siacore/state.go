@@ -90,10 +90,6 @@ type State struct {
 	Mining     bool
 	KillMining chan struct{}
 
-	// Variables important to a tenet.
-	HostList    []Host
-	TotalWeight Currency
-
 	// Network Variables
 	Server *TCPServer
 }
