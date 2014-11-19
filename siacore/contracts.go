@@ -147,7 +147,7 @@ func (s *State) contractMaintenance() {
 					OutputID:   newOutputID,
 					ContractID: openContract.ContractID,
 				}
-				s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
+				s.CurrentBlockNode().MissedStorageProofs = append(s.CurrentBlockNode().MissedStorageProofs, msp)
 
 				// Update the FundsRemaining
 				openContract.FundsRemaining -= payout
@@ -155,7 +155,7 @@ func (s *State) contractMaintenance() {
 				// Update the failures count.
 				openContract.Failures += 1
 			} else {
-				s.currentBlockNode().SuccessfulWindows = append(s.currentBlockNode().SuccessfulWindows, openContract.ContractID)
+				s.CurrentBlockNode().SuccessfulWindows = append(s.CurrentBlockNode().SuccessfulWindows, openContract.ContractID)
 			}
 			openContract.WindowSatisfied = false
 		}
@@ -178,7 +178,7 @@ func (s *State) contractMaintenance() {
 			}
 
 			// Add the contract to contract terminations.
-			s.currentBlockNode().ContractTerminations = append(s.currentBlockNode().ContractTerminations, openContract)
+			s.CurrentBlockNode().ContractTerminations = append(s.CurrentBlockNode().ContractTerminations, openContract)
 
 			// Mark contract for deletion (can't delete from a map while
 			// iterating through it - results in undefined behavior of the
@@ -197,21 +197,21 @@ func (s *State) contractMaintenance() {
 // the state of contracts backwards instead forwards.
 func (s *State) inverseContractMaintenance() {
 	// Repen all contracts that terminated, and remove the corresponding output.
-	for _, openContract := range s.currentBlockNode().ContractTerminations {
+	for _, openContract := range s.CurrentBlockNode().ContractTerminations {
 		s.OpenContracts[openContract.ContractID] = openContract
 		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
 		delete(s.UnspentOutputs, openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus))
 	}
 
 	// Reverse all outputs created by missed storage proofs.
-	for _, missedProof := range s.currentBlockNode().MissedStorageProofs {
+	for _, missedProof := range s.CurrentBlockNode().MissedStorageProofs {
 		s.OpenContracts[missedProof.ContractID].FundsRemaining += s.UnspentOutputs[missedProof.OutputID].Value
 		s.OpenContracts[missedProof.ContractID].Failures -= 1
 		delete(s.UnspentOutputs, missedProof.OutputID)
 	}
 
 	// Reset the window satisfied variable to true for all successful windows.
-	for _, id := range s.currentBlockNode().SuccessfulWindows {
+	for _, id := range s.CurrentBlockNode().SuccessfulWindows {
 		s.OpenContracts[id].WindowSatisfied = true
 	}
 }

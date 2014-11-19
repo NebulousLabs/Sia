@@ -74,7 +74,7 @@ type State struct {
 
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
-	CurrentBlock   BlockID
+	CurrentBlockID BlockID
 	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	OpenContracts  map[ContractID]*OpenContract
 	UnspentOutputs map[OutputID]Output
@@ -97,23 +97,23 @@ type State struct {
 
 // State.Height() returns the height of the longest fork.
 func (s *State) Height() BlockHeight {
-	return s.BlockMap[s.CurrentBlock].Height
+	return s.BlockMap[s.CurrentBlockID].Height
 }
 
 // Depth() returns the depth of the current block of the state.
 func (s *State) Depth() Target {
-	return s.currentBlockNode().Depth
+	return s.CurrentBlockNode().Depth
 }
 
 // State.currentBlockNode returns the node of the most recent block in the
 // longest fork.
 func (s *State) CurrentBlockNode() *BlockNode {
-	return s.BlockMap[s.CurrentBlock]
+	return s.BlockMap[s.CurrentBlockID]
 }
 
 // State.CurrentBlock returns the most recent block in the longest fork.
 func (s *State) CurrentBlock() *Block {
-	return s.BlockMap[s.CurrentBlock].Block
+	return s.BlockMap[s.CurrentBlockID].Block
 }
 
 // State.blockAtHeight() returns the block from the current history at the
@@ -125,14 +125,14 @@ func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 // State.currentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
-	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
+	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.CurrentBlockNode().Target[:])))
 }
 
 // EarliestLegalTimestamp returns the earliest a timestamp can be for the child
 // of a BlockNode to be legal.
 func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
 	var intTimestamps []int
-	for _, timestamp := range parent.RecentTimestamps {
+	for _, timestamp := range bn.RecentTimestamps {
 		intTimestamps = append(intTimestamps, int(timestamp))
 	}
 	sort.Ints(intTimestamps)

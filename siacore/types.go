@@ -38,12 +38,12 @@ type (
 // Eventually, the Block and the block header will be two separate structs.
 // This will be put into practice when we implement merged mining.
 type Block struct {
-	ParentBlock  BlockID
-	Timestamp    Timestamp
-	Nonce        uint64
-	MinerAddress CoinAddress
-	MerkleRoot   hash.Hash
-	Transactions []Transaction
+	ParentBlockID BlockID
+	Timestamp     Timestamp
+	Nonce         uint64
+	MinerAddress  CoinAddress
+	MerkleRoot    hash.Hash
+	Transactions  []Transaction
 }
 
 // A Transaction is an update to the state of the network, can move money
@@ -139,7 +139,7 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // identifier. Transactions are not included in the hash.
 func (b *Block) ID() BlockID {
 	return BlockID(hash.HashBytes(encoding.MarshalAll(
-		b.ParentBlock,
+		b.ParentBlockID,
 		b.Timestamp,
 		b.Nonce,
 		b.MinerAddress,

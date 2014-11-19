@@ -43,7 +43,7 @@ func CreateGenesisState() (s *State) {
 	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
 
 	// Fill out the consensus informaiton for the genesis block.
-	s.CurrentBlock = genesisBlock.ID()
+	s.CurrentBlockID = genesisBlock.ID()
 	s.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
 
 	// Create the genesis subsidy output.
@@ -70,7 +70,7 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	// Build an array of blocks.
 	blocks := make([]Block, end-start+1)
 	for i := range blocks {
-		b := s.blockAtHeight(start + BlockHeight(i))
+		b := s.BlockAtHeight(start + BlockHeight(i))
 		if b == nil {
 			panic("nil block in state!")
 		}

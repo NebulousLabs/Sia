@@ -30,7 +30,7 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	}
 
 	// See if the block's parent is known.
-	parentBlockNode, exists = s.BlockMap[b.ParentBlock]
+	parentBlockNode, exists = s.BlockMap[b.ParentBlockID]
 	if !exists {
 		err = errors.New("Block is an orphan")
 		return
@@ -107,7 +107,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		// THE CURRENT FORK. IN GENERAL THIS IS A PRETTY SAFE ASSUMPTION AS ITS
 		// LOOKING BACKWARDS BY 5000 BLOCKS. BUT WE SHOULD PROBABLY IMPLEMENT
 		// SOMETHING THATS FULLY SAFE REGARDLESS.
-		adjustmentBlock := s.blockAtHeight(newNode.Height - TargetWindow)
+		adjustmentBlock := s.BlockAtHeight(newNode.Height - TargetWindow)
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
 		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
 	}
@@ -173,7 +173,7 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 // State.heavierFork() returns ture if the input node is 5% heavier than the
 // current node of the ConesnsusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
-	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
+	threshold := new(big.Rat).Mul(s.CurrentBlockWeight(), SurpassThreshold)
 	sdepth := s.Depth()
 	currentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(sdepth[:]))
 	requiredDepth := new(big.Rat).Add(currentDepth, threshold)
@@ -185,19 +185,19 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) rewindABlock() {
 	// Remove the output for the miner subsidy.
-	delete(s.UnspentOutputs, s.currentBlock().SubsidyID())
+	delete(s.UnspentOutputs, s.CurrentBlock().SubsidyID())
 
 	// Perform inverse contract maintenance.
 	s.inverseContractMaintenance()
 
 	// Reverse each transaction in the block, in reverse order from how
 	// they appear in the block.
-	for i := len(s.currentBlock().Transactions) - 1; i >= 0; i-- {
-		s.reverseTransaction(s.currentBlock().Transactions[i])
+	for i := len(s.CurrentBlock().Transactions) - 1; i >= 0; i-- {
+		s.reverseTransaction(s.CurrentBlock().Transactions[i])
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
-	s.CurrentBlock = s.currentBlock().ParentBlock
+	s.CurrentBlockID = s.CurrentBlock().ParentBlockID
 	delete(s.CurrentPath, s.Height())
 }
 
@@ -245,7 +245,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	s.UnspentOutputs[b.SubsidyID()] = minerSubsidyOutput
 
 	// Update the current block and current path variables of the longest fork.
-	s.CurrentBlock = b.ID()
+	s.CurrentBlockID = b.ID()
 	s.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
 
 	return
@@ -275,15 +275,15 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	var parentHistory []BlockID
 	for value != currentNode.Block.ID() {
 		parentHistory = append(parentHistory, currentNode.Block.ID())
-		currentNode = s.BlockMap[currentNode.Block.ParentBlock]
+		currentNode = s.BlockMap[currentNode.Block.ParentBlockID]
 		value = s.CurrentPath[currentNode.Height]
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	var rewoundBlocks []BlockID
-	for s.CurrentBlock != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock)
+	for s.CurrentBlockID != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.CurrentBlockID)
 		s.rewindABlock()
 	}
 
