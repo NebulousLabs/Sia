@@ -13,14 +13,21 @@ const (
 	IterationsPerAttempt = 10 * 1000 * 1000
 )
 
+type Miner struct {
+	state *siacore.State
+}
+
 // Creates a block that is ready for nonce grinding.
-func (s *siacore.State) blockForWork(minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
+func (m *Miner) blockForWork(minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
 	b = &siacore.Block{
 		ParentBlock:  s.CurrentBlock,
 		Timestamp:    siacore.Timestamp(time.Now().Unix()),
 		MinerAddress: minerAddress,
 	}
-	// IF TIMESTAMP IS INVALID, CREATE A VALID TIMESTAMP! --> 'future median' attack.
+	// Fudge the timestamp if the block would otherwise be illegal.
+	if b.Timestamp < m.state.CurrentBlockNode().EarliestLegalChildTimestamp() {
+		b.Timestamp = m.state.CurrentBlockNode().EarliestLegalChildTimestamp()
+	}
 
 	// Add the transactions from the transaction pool.
 	for _, transaction := range s.TransactionList {

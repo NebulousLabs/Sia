@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -33,7 +32,6 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block's parent is known.
 	parentBlockNode, exists = s.BlockMap[b.ParentBlock]
 	if !exists {
-		// OrphanBlocks[b.ID()] = b
 		err = errors.New("Block is an orphan")
 		return
 	}
@@ -79,12 +77,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
-	var intTimestamps []int
-	for _, timestamp := range parent.RecentTimestamps {
-		intTimestamps = append(intTimestamps, int(timestamp))
-	}
-	sort.Ints(intTimestamps)
-	if Timestamp(intTimestamps[5]) > b.Timestamp {
+	if parent.EarliestLegalChildTimestamp() > b.Timestamp {
 		s.BadBlocks[b.ID()] = struct{}{}
 		err = errors.New("timestamp invalid for being in the past")
 		return

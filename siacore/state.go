@@ -2,6 +2,7 @@ package siacore
 
 import (
 	"math/big"
+	"sort"
 	"sync"
 )
 
@@ -106,23 +107,34 @@ func (s *State) Depth() Target {
 
 // State.currentBlockNode returns the node of the most recent block in the
 // longest fork.
-func (s *State) currentBlockNode() *BlockNode {
+func (s *State) CurrentBlockNode() *BlockNode {
 	return s.BlockMap[s.CurrentBlock]
 }
 
 // State.CurrentBlock returns the most recent block in the longest fork.
-func (s *State) currentBlock() *Block {
+func (s *State) CurrentBlock() *Block {
 	return s.BlockMap[s.CurrentBlock].Block
 }
 
 // State.blockAtHeight() returns the block from the current history at the
 // input height.
-func (s *State) blockAtHeight(height BlockHeight) (b *Block) {
+func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 	return s.BlockMap[s.CurrentPath[height]].Block
 }
 
 // State.currentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
-func (s *State) currentBlockWeight() BlockWeight {
+func (s *State) CurrentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
+}
+
+// EarliestLegalTimestamp returns the earliest a timestamp can be for the child
+// of a BlockNode to be legal.
+func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
+	var intTimestamps []int
+	for _, timestamp := range parent.RecentTimestamps {
+		intTimestamps = append(intTimestamps, int(timestamp))
+	}
+	sort.Ints(intTimestamps)
+	return Timestamp(intTimestamps[5])
 }
