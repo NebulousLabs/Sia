@@ -47,7 +47,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 	// NEED TO GET IP ADDRESS SOMEWHERE.
 
 	// Create the host announcement structure.
-	env.wallets[0].HostSettings = siad.HostAnnouncement{
+	env.wallet.HostSettings = siad.HostAnnouncement{
 		// IPAddress: "asdf",
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,
@@ -56,12 +56,12 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 		MinTolerance:          10,
 		Price:                 siacore.Currency(price),
 		Burn:                  siacore.Currency(price),
-		CoinAddress:           env.wallets[0].SpendConditions.CoinAddress(),
+		CoinAddress:           env.wallet.SpendConditions.CoinAddress(),
 		// SpendConditions and FreezeIndex handled by HostAnnounceSelg
 	}
 
 	// Have the wallet make the announcement.
-	_, err = env.wallets[0].HostAnnounceSelf(siacore.Currency(freezeCoins), siacore.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
+	_, err = env.wallet.HostAnnounceSelf(siacore.Currency(freezeCoins), siacore.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
 	if err != nil {
 		return
 	}
@@ -71,7 +71,7 @@ func becomeHostWalkthrough(env *walletEnvironment) (err error) {
 
 // toggleMining asks the state to switch mining on or off.
 func toggleMining(env *walletEnvironment) {
-	go env.state.ToggleMining(env.wallets[0].SpendConditions.CoinAddress())
+	go env.miner.ToggleMining(env.state, env.wallet.SpendConditions.CoinAddress())
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by
@@ -80,7 +80,7 @@ func printWalletAddresses(env *walletEnvironment) {
 	fmt.Println("General Information:")
 
 	// Dispaly whether or not the miner is mining.
-	if env.state.Mining {
+	if env.miner.Mining() {
 		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
 	} else {
 		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
@@ -91,10 +91,8 @@ func printWalletAddresses(env *walletEnvironment) {
 	fmt.Println("\tCurrent Block Depth:", env.state.Depth())
 	fmt.Println()
 
-	fmt.Println("\tPrinting all valid wallet addresses.")
-	for _, wallet := range env.wallets {
-		fmt.Printf("\t\t%x\n", wallet.SpendConditions.CoinAddress())
-	}
+	fmt.Println("\tPrinting wallet address.")
+	fmt.Printf("\t\t%x\n", env.wallet.SpendConditions.CoinAddress())
 }
 
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
@@ -127,9 +125,9 @@ func sendCoinsWalkthrough(env *walletEnvironment) (err error) {
 	var address siacore.CoinAddress
 	copy(address[:], addressBytes)
 
-	// Use the wallet api to send. ==> Only uses wallets[0] for the time being.
+	// Use the wallet api to send.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = env.wallets[0].SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address, env.state)
+	_, err = env.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address, env.state)
 	if err != nil {
 		return
 	}

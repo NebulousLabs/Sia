@@ -11,8 +11,13 @@ import (
 )
 
 type walletEnvironment struct {
-	state   *siacore.State
-	wallets []*siad.Wallet
+	state *siacore.State
+
+	miner  *siad.Miner
+	renter *siad.Renter
+	wallet *siad.Wallet
+
+	// networking stuff here?
 }
 
 // Creates the genesis state and then requests a bunch of blocks from the
@@ -50,12 +55,11 @@ func walletStart(cmd *cobra.Command, args []string) {
 	// download blocks
 	env.state.Bootstrap()
 
-	wallet, err := siad.CreateWallet()
+	env.wallet, err = siad.CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	env.wallets = append(env.wallets, wallet)
 
 	pollHome(env)
 }
