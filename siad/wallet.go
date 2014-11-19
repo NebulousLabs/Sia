@@ -36,7 +36,7 @@ type FileContractParameters struct {
 }
 
 // Wallet.FreezeConditions
-func (w *Wallet) FreezeConditions(unlockHeight BlockHeight) (fc siacore.SpendConditions) {
+func (w *Wallet) FreezeConditions(unlockHeight siacore.BlockHeight) (fc siacore.SpendConditions) {
 	fc = w.SpendConditions
 	fc.TimeLock = unlockHeight
 	return
@@ -51,17 +51,17 @@ func CreateWallet() (w *Wallet, err error) {
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 
-	w.OwnedOutputs = make(map[OutputID]Output)
-	w.SpentOutputs = make(map[OutputID]Output)
-	w.OpenFreezeConditions = make(map[BlockHeight]int)
+	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
+	w.SpentOutputs = make(map[siacore.OutputID]siacore.Output)
+	w.OpenFreezeConditions = make(map[siacore.BlockHeight]int)
 
 	return
 }
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) Scan(state *State) {
-	w.OwnedOutputs = make(map[OutputID]Output)
+func (w *Wallet) Scan(state *siacore.State) {
+	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
 
 	// Check for owned outputs from the standard SpendConditions.
 	for id, output := range state.UnspentOutputs {
@@ -75,16 +75,16 @@ func (w *Wallet) Scan(state *State) {
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
+func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
-	if amount == Currency(0) {
+	if amount == siacore.Currency(0) {
 		err = errors.New("cannot send 0 coins")
 		return
 	}
 
 	// Add to the list of inputs until enough funds have been allocated.
-	total := Currency(0)
-	var newInputs []Input
+	total := siacore.Currency(0)
+	var newInputs []siacore.Input
 	for id, output := range w.OwnedOutputs {
 		if total >= amount {
 			break
@@ -97,7 +97,7 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 		}
 
 		// Create an input to add to the transaction.
-		newInput := Input{
+		newInput := siacore.Input{
 			OutputID:        id,
 			SpendConditions: w.SpendConditions,
 		}
@@ -118,7 +118,7 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
-		t.Outputs = append(t.Outputs, Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
+		t.Outputs = append(t.Outputs, siacore.Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
 	}
 
 	return
@@ -126,12 +126,12 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 
 // Wallet.signTransaction() takes a transaction and adds a signature for every input
 // that the wallet understands how to spend.
-func (w *Wallet) SignTransaction(t *Transaction) (err error) {
+func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 	for i, input := range t.Inputs {
 		// If we recognize the input as something we are able to sign, we sign
 		// the input.
 		if input.SpendConditions.CoinAddress() == w.SpendConditions.CoinAddress() {
-			txnSig := TransactionSignature{
+			txnSig := siacore.TransactionSignature{
 				InputID: input.OutputID,
 			}
 			t.Signatures = append(t.Signatures, txnSig)
@@ -150,7 +150,7 @@ func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 // Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, state *State) (t Transaction, err error) {
+func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress, state *siacore.State) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
 	w.Scan(state)
 
@@ -164,7 +164,7 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	t.MinerFees = append(t.MinerFees, minerFee)
 
 	// Add the output to `address`.
-	t.Outputs = append(t.Outputs, Output{Value: amount, SpendHash: address})
+	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: address})
 
 	// Sign each input.
 	err = w.SignTransaction(&t)

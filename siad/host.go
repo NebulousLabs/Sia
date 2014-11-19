@@ -29,7 +29,7 @@ func (w *Wallet) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHei
 
 	// Add the output with the freeze volume.
 	freezeConditions := w.FreezeConditions(freezeUnlockHeight)
-	t.Outputs = append(t.Outputs, Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
+	t.Outputs = append(t.Outputs, siacore.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
 	num, exists := w.OpenFreezeConditions[freezeUnlockHeight]
 	if exists {
 		w.OpenFreezeConditions[freezeUnlockHeight] = num + 1
@@ -74,7 +74,7 @@ func (w *Wallet) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction
 	}
 
 	// Check that the duration of the contract is in bounds.
-	currentHeight := BlockHeight(0) // GET THE CURRENT HEIGHT OF THE STATE AND PUT IT HERE.
+	currentHeight := siacore.BlockHeight(0) // GET THE CURRENT HEIGHT OF THE STATE AND PUT IT HERE.
 	if nt.FileContracts[0].End-currentHeight < w.HostSettings.MinDuration || nt.FileContracts[0].End-currentHeight < w.HostSettings.MinDuration {
 		err = errors.New("contract duration is out of bounds")
 		return
@@ -99,7 +99,7 @@ func (w *Wallet) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction
 	}
 
 	// Output for failed proofs needs to be the 0 address.
-	emptyAddress := CoinAddress{}
+	emptyAddress := siacore.CoinAddress{}
 	if nt.FileContracts[0].MissedProofAddress != emptyAddress {
 		err = errors.New("burn payout needs to go to the empty address")
 		return

@@ -17,15 +17,16 @@ type Miner struct {
 	state *siacore.State
 
 	mining     bool
-	KillMining chan struct{}
+	killMining chan struct{}
 }
 
 // Creates a block that is ready for nonce grinding.
 func (m *Miner) blockForWork(minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
 	b = &siacore.Block{
-		ParentBlockID: m.state.CurrentBlock(),
+		ParentBlockID: m.state.CurrentBlockID,
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
 		MinerAddress:  minerAddress,
+		Transactions:  m.state.TransactionPoolDump(),
 	}
 	// Fudge the timestamp if the block would otherwise be illegal.
 	if b.Timestamp < m.state.CurrentBlockNode().EarliestLegalChildTimestamp() {
@@ -33,11 +34,10 @@ func (m *Miner) blockForWork(minerAddress siacore.CoinAddress) (b *siacore.Block
 	}
 
 	// Add the transactions from the transaction pool.
-	transactionSet := m.state.TransactionPoolDump()
 	b.MerkleRoot = b.ExpectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
-	target = s.currentBlockNode().Target
+	target = m.state.CurrentBlockNode().Target
 
 	return
 }
@@ -59,9 +59,9 @@ func solveBlock(b *siacore.Block, target siacore.Target) bool {
 // attemptToGenerateBlock attempts to generate a block, but instead of running
 // until a block is found, it just tries a single time.
 func (m *Miner) attemptToGenerateBlock(minerAddress siacore.CoinAddress) (b *siacore.Block, err error) {
-	s.Lock()
-	b, target := s.blockForWork(minerAddress)
-	s.Unlock()
+	m.state.Lock()
+	b, target := m.blockForWork(minerAddress)
+	m.state.Unlock()
 
 	if solveBlock(b, target) {
 		return
@@ -85,15 +85,15 @@ func (m *Miner) generateBlock(minerAddress siacore.CoinAddress) (b *siacore.Bloc
 
 // ToggleMining creates a channel and mines until it receives a kill signal.
 func (m *Miner) ToggleMining(minerAddress siacore.CoinAddress) {
-	if !m.Mining {
-		m.KillMining = make(chan struct{})
-		m.Mining = true
+	if !m.mining {
+		m.killMining = make(chan struct{})
+		m.mining = true
 	}
 
 	// Need some channel to wait on to kill the function.
 	for {
 		select {
-		case <-m.KillMining:
+		case <-m.killMining:
 			return
 
 		default:

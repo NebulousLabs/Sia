@@ -1,11 +1,16 @@
 package siad
 
 import (
+	"crypto/rand"
+	"errors"
+	"math/big"
+
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-type Renter struct {
+type HostDatabase struct {
+	state       *siacore.State
 	HostList    []Host
 	TotalWeight siacore.Currency
 }
@@ -30,7 +35,7 @@ type HostAnnouncement struct {
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database.
-func (r *Renter) scanAndApplyHosts(t *siacore.Transaction) {
+func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) < 8 {
 		return
@@ -41,8 +46,19 @@ func (r *Renter) scanAndApplyHosts(t *siacore.Transaction) {
 		var ha HostAnnouncement
 		encoding.Unmarshal(t.ArbitraryData[1:], ha)
 
-		// Verify that the spend condiitons match.
+		// Verify that the host has declared values that are relevant to our
+		// interests.
 		if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+			return
+		}
+		if ha.MaxChallengeFrequency > 100 {
+			return
+		}
+		if ha.MinTolerance > 10 {
+			return
+		}
+		freeze := siacore.Currency(ha.SpendConditions.TimeLock-hdb.state.Height()) * t.Outputs[ha.FreezeIndex].Value
+		if freeze <= 0 {
 			return
 		}
 
@@ -56,16 +72,40 @@ func (r *Renter) scanAndApplyHosts(t *siacore.Transaction) {
 			Tolerance:   ha.MinTolerance,
 			Price:       ha.Price,
 			Burn:        ha.Burn,
-			Freeze:      siacore.Currency(ha.SpendConditions.TimeLock-s.Height()) * t.Outputs[ha.FreezeIndex].Value,
+			Freeze:      freeze,
 			CoinAddress: ha.CoinAddress,
-		}
-		if host.Freeze <= 0 {
-			return
 		}
 
 		// Add the weight of the host to the total weight of the hosts in
 		// the host database.
-		r.HostList = append(r.HostList, host)
-		r.TotalWeight += host.Weight()
+		hdb.HostList = append(hdb.HostList, host)
+		hdb.TotalWeight += host.Weight()
 	}
+}
+
+// ChooseHost orders the hosts by weight and picks one at random.
+func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h Host, err error) {
+	if len(hdb.HostList) == 0 {
+		err = errors.New("no hosts found")
+		return
+	}
+	if hdb.TotalWeight == 0 {
+		panic("state has 0 total weight but not 0 length host list?")
+	}
+
+	// Get a random number between 0 and state.TotalWeight and then scroll
+	// through state.HostList until at least that much weight has been passed.
+	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(hdb.TotalWeight)))
+	if err != nil {
+		return
+	}
+	randWeight := siacore.Currency(randInt.Int64())
+	weightPassed := siacore.Currency(0)
+	var i int
+	for i = 0; randWeight >= weightPassed; i++ {
+		weightPassed += hdb.HostList[i].Weight()
+	}
+
+	h = hdb.HostList[i]
+	return
 }
