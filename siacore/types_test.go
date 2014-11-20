@@ -2,19 +2,13 @@ package siacore
 
 import (
 	"crypto/rand"
+	"math"
 	"math/big"
 	"testing"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
 )
-
-// maxInt64() returns the maximum possible int64.
-func minInt64() int64 {
-	maxUint64 := ^uint64(0)
-	maxInt64 := int64(maxUint64 >> 1)
-	return 0 - maxInt64 - 1
-}
 
 // randomInt64() returns a randomly generated int64 from [int64Min, int64Max].
 func randomInt64(t *testing.T) int64 {
@@ -27,7 +21,7 @@ func randomInt64(t *testing.T) int64 {
 
 	// Subtract the minimum possible int to adjust the range from [0, uintMax]
 	// to [intMin, intMax].
-	bigInt.Add(bigInt, big.NewInt(minInt64()))
+	bigInt.Add(bigInt, big.NewInt(math.MinInt64))
 	return bigInt.Int64()
 }
 

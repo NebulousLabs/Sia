@@ -33,11 +33,8 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 
 	// Find a host.
 	host, err := r.hostdb.ChooseHost(wallet)
-	for {
-		if err != nil {
-			return
-		}
-		host, err = r.hostdb.ChooseHost(wallet)
+	if err != nil {
+		return
 	}
 
 	// Fill out the contract according to the whims of the host.
