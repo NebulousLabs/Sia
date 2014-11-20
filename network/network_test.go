@@ -1,4 +1,4 @@
-package siacore
+package network
 
 import (
 	"net"

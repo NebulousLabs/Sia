@@ -237,8 +237,5 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Add the transaction to the pool.
 	s.addTransactionToPool(&t)
 
-	// forward transaction to peers
-	s.Server.Broadcast(SendVal('T', t))
-
 	return
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/network"
 )
 
 var (
@@ -93,12 +94,12 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 //
 // NOTE: CATCHUP IS BROKEN FOR ANY VALUES OTHER THAN 1.
 // NOTE: CATCHUP MIGHT SEND A SINGLE MESSAGE ASKING FOR MANY MEGABYTES WORTH OF BLOCKS.
-func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
+func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 	encbh := encoding.EncUint64(uint64(start))
 	return func(conn net.Conn) error {
 		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
 		var blocks []Block
-		encBlocks, err := ReadPrefix(conn)
+		encBlocks, err := network.ReadPrefix(conn)
 		if err != nil {
 			return err
 		}
@@ -112,11 +113,4 @@ func (s *State) catchUp(start BlockHeight) func(net.Conn) error {
 		}
 		return nil
 	}
-}
-
-// Bootstrap requests blocks from peers until the full blockchain has been
-// download.
-func (s *State) Bootstrap() {
-	addr := s.Server.RandomPeer()
-	addr.Call(s.catchUp(1))
 }

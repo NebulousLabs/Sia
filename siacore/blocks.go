@@ -361,8 +361,5 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		}
 	}
 
-	// forward block to peers
-	s.Server.Broadcast(SendVal('B', b))
-
 	return
 }

@@ -81,9 +81,6 @@ type State struct {
 
 	// AcceptBlock() and AcceptTransaction() can be called concurrently.
 	sync.Mutex
-
-	// Network Variables
-	Server *TCPServer
 }
 
 // State.Height() returns the height of the longest fork.

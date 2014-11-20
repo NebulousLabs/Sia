@@ -8,7 +8,13 @@ import (
 )
 
 func walletStart(cmd *cobra.Command, args []string) {
-	env := createEnvironment()
+	env, err := createEnvironment()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer env.Close()
+
 	pollHome(env)
 }
 

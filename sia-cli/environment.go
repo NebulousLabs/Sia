@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/siad"
 )
@@ -11,48 +12,53 @@ import (
 type environment struct {
 	state *siacore.State
 
+	server *network.TCPServer
+
 	host   *siad.Host
 	miner  *siad.Miner
 	renter *siad.Renter
 	wallet *siad.Wallet
-
-	// networking stuff here?
 }
 
-func createEnvironment() (env *environment) {
-	env = new(environment)
-
-	// create TCP server
-	tcps, err := siacore.NewTCPServer(9988)
+func (e *environment) initializeNetwork() (err error) {
+	e.server, err = network.NewTCPServer(9988)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
-	defer tcps.Close()
 
 	// establish an initial peer list
-	if err = tcps.Bootstrap(); err != nil {
+	if err = e.server.Bootstrap(); err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// create genesis state and register it with the server
-	env.state = siacore.CreateGenesisState()
-	if err = tcps.RegisterRPC('B', env.AcceptBlock); err != nil {
+	e.state = siacore.CreateGenesisState()
+	if err = e.server.RegisterRPC('B', e.AcceptBlock); err != nil {
 		fmt.Println(err)
 		return
 	}
-	if err = tcps.RegisterRPC('T', env.AcceptTransaction); err != nil {
+	if err = e.server.RegisterRPC('T', e.AcceptTransaction); err != nil {
 		fmt.Println(err)
 		return
 	}
-	tcps.RegisterHandler('R', env.SendBlocks)
-	env.state.Server = tcps
+	e.server.RegisterHandler('R', e.SendBlocks)
 
-	// download blocks
-	env.state.Bootstrap()
+	randomPeer := e.server.RandomPeer()
+	randomPeer.Call(e.state.CatchUp(1))
 
-	// Create a miner, provider, renter, and wallet.
+	return
+}
+
+// createEnvironment() creates a server, host, miner, renter and wallet and
+// puts it all in a single environment struct that's used as the state for the
+// main package.
+func createEnvironment() (env *environment, err error) {
+	env = new(environment)
+	err = env.initializeNetwork()
+	if err != nil {
+		return
+	}
 	env.miner = siad.CreateMiner()
 	env.host = siad.CreateHost()
 	env.renter = siad.CreateRenter()
@@ -65,13 +71,27 @@ func createEnvironment() (env *environment) {
 	return
 }
 
+func (e *environment) Close() {
+	e.server.Close()
+}
+
 func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
+
+	if err != nil {
+		e.server.Broadcast(network.SendVal('B', b))
+	}
+
 	return
 }
 
 func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
+
+	if err != nil {
+		e.server.Broadcast(network.SendVal('T', t))
+	}
+
 	return
 }
 
