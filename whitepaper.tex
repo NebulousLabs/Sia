@@ -50,14 +50,14 @@ The Sia protocol largely resembles Bitcoin except for the changes noted below.
 \section{General Structure}
 Sia's primary departure from Bitcoin lies in its transactions.
 Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
-Sia opts instead to use an $M$--of--$N$ multi-signature hash scheme for all transactions, eschewing the scripting system entirely.
+Sia opts instead to use a hashed $M$--of--$N$ multi-signature scheme for all transactions, eschewing the scripting system entirely.
 This reduces complexity and attack surface.
 
 Sia also extends transactions to enable the creation and enforcement of storage contracts.
-Two extensions are needed to accomplish this: contracts and proofs.
+Three extensions are used to accomplish this: contracts, proofs, and contract updates.
 File contracts declare the intention of a host to store a file with a certain size and hash.
 They define the regularity with which a host must submit storage proofs.
-The specifics of these transaction types are defined in sections \ref{sec:contracts} and \ref{sec:storage}, respectively.
+The specifics of these transaction types are defined in sections \ref{sec:contracts} and \ref{sec:storage}.
 
 \section{Transactions}
 A transaction contains the following fields: \\
@@ -103,12 +103,15 @@ In order to spend the coins, the spend conditions corresponding to the address h
 The use of a Merkle tree allows parties to selectively reveal information in the spend conditions.
 For example, the time lock can be revealed without revealing the number of public keys or the number of signatures required.
 
+It is noted that, given a partial set of information, a party could potentially grind hashes to determine the timelock or the number of signatures required, because the range of potential values for these fields is small.
+This could be potentially resolved by adding a random nonce to each of the low-entropy fields, which would make grinding more difficult, at the cost of space efficiency.
+
 \subsection{Signatures}
 Each input in a transaction must be signed.
 The cryptographic signature itself is paired with an input ID, a time lock, and a set of flags indicating which parts of the transaction have been signed.
 The input ID indicates which input the signature is being applied to.
 The time lock specifies when the signature becomes valid.
-Any subset of fields in the transaction can be signed, with the exception of the Version and the signature itself (as this would be impossible).
+Any subset of fields in the transaction can be signed, with the exception of the signature itself (as this would be impossible).
 There is also a flag to indicate that the whole transaction should be signed, except for the signatures.
 This allows for more nuanced transaction schemes.
 
@@ -156,13 +159,13 @@ Each storage proof targets a specific file contract.
 A storage proof does not need to have any inputs or outputs; only a contract ID and the proof data are required.
 
 \subsection{Algorithm}
-Hosts prove their storage by providing a segment of the original file, along with a list of hashes from the file's Merkle tree.
+Hosts prove their storage by providing a segment of the original file along with a list of hashes from the file's Merkle tree.
 This information is sufficient to prove that the segment came from the original file.
 Because proofs are submitted to the blockchain, anyone can verify their validity or invalidity.
 Each storage proof uses a randomly selected segment.
 The random seed for challenge window $W_i$ is given by:
 \[
-	H(\text{contract ID} || H(B_(i-1)))
+	H(\text{contract ID} || H(B_{i-1}))
 \]
 where $B_{i-1}$ is the block immediately prior to the beginning of $W_i$.
 
@@ -195,7 +198,7 @@ Because hosts consent to all file contracts, they are free to reject any contrac
 \section{Arbitrary Transaction Data}
 Each transaction has an arbitrary data field which can be used for any type of information.
 Nodes will be required to store the arbitrary data if it is signed by any signature in the transaction.
-Nodes will initially accept up to 16 KB of arbitrary data per block.
+Nodes will initially accept up to 64 KB of arbitrary data per block.
 
 This arbitrary data provides hosts and clients with a decentralized way to organize themselves.
 It can be used to advertise available space or files seeking a host, or to create a decentralized file tracker.
@@ -226,7 +229,7 @@ It is the responsibility of the host to protect themselves from such attacks.
 
 \subsection{Client Protections}
 Clients can use erasure codes, such as regenerating codes \cite{reg}, to safeguard against hosts going offline.
-In an erasure coding scheme, file data is split into $n$ overlapping pieces, such that the file can be recovered from any subset of at least $m$ unique pieces.
+In the case of the codes presented in \cite{reg}, file data is split into $n$ pieces, such that the file can be recovered from any subset of $m$ unique pieces.
 (The values of $n$ and $m$ vary based on the erasure code and redundancy factor.)
 Each piece is then encrypted and stored across many hosts.
 This allows a client to attain high file availability even if the average network reliability is low.
@@ -261,7 +264,7 @@ More complex systems, such as those that use human review or other metrics, coul
 \section{Siafunds}
 Sia is a product of Nebulous Incorporated.
 Nebulous is a for-profit company, and Sia is intended to become a primary source of income for the company.
-Currency premining is not a stable source of income, as it requires creating a new currency and tethering the company to the currency's increasing value.
+Currency premining is not a stable source of income, as it requires creating a new currency and tethering the company's coffers to the currency's increasing value.
 When the company needs to spend money, it must trade away portions of its source of income.
 Additionally, premining means that one entity has control over a large volume of the currency, and therefore potentially large and disruptive control over the market.
 
