@@ -14,3 +14,5 @@ test-long: install
 
 whitepaper:
 	pdflatex whitepaper.tex
+	pdflatex whitepaper.tex
+	pdflatex whitepaper.tex # pdfatex is dumb, therefore we run it 3 times - fixes errors that could occur from only running it once or twice.

@@ -154,6 +154,13 @@ The output ID of a contract termination is defined as:
 \]
 Where outcome has the potential values ``successfultermination'' and ``unsucessfultermination'', corresponding to the termination status of the contract.
 
+File contracts are also created with a list of ``edit conditions'' which operate exactly like the spend conditions of a transaction.
+If the edit conditions are fulfilled, the contract is allowed to be modified.
+Any of the values can be modified, including changes to the contracts funds, the file hash, and the output addresses.
+As contract editing can affect how storage proofs are interpreted, contract edits must indicate a specific block that they become effective, and this block must be in the future.
+This block must also be aligned with the beginning of a challenge window.
+It is possible to create ``micro-edit channels'' that operate in the same way as micropayment channels, dicussed in section \ref{sec:uptime}.
+
 \section{Proof of Storage}
 \label{sec:storage}
 Storage proof transactions are periodically submitted in order to fulfill file contracts.
@@ -240,6 +247,7 @@ Other metrics benefit from this strategy as well; the client can reduce latency 
 These downloads can be run in parallel to maximize available bandwidth.
 
 \subsection{Uptime Incentives}
+\label{sec:uptime}
 The storage proofs contain no mechanism to enforce constant uptime.
 There are also no provisions that require hosts to upload files to clients upon request.
 However, clients can offer payment to hosts when trying to download a file.
