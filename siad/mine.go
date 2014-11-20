@@ -90,21 +90,26 @@ func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddr
 	if !m.mining {
 		m.killMining = make(chan struct{})
 		m.mining = true
+	} else {
+		m.killMining <- struct{}{}
+		return
 	}
 
 	// Need some channel to wait on to kill the function.
-	for {
-		select {
-		case <-m.killMining:
-			return
+	go func() {
+		for {
+			select {
+			case <-m.killMining:
+				return
 
-		default:
-			block, err := m.attemptToGenerateBlock(state, minerAddress)
-			if err == nil {
-				state.AcceptBlock(*block)
+			default:
+				block, err := m.attemptToGenerateBlock(state, minerAddress)
+				if err == nil {
+					state.AcceptBlock(*block)
+				}
 			}
 		}
-	}
+	}()
 }
 
 func CreateMiner() *Miner {

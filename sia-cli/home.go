@@ -71,7 +71,7 @@ func becomeHostWalkthrough(env *environment) (err error) {
 
 // toggleMining asks the state to switch mining on or off.
 func toggleMining(env *environment) {
-	go env.miner.ToggleMining(env.state, env.wallet.SpendConditions.CoinAddress())
+	env.miner.ToggleMining(env.state, env.wallet.SpendConditions.CoinAddress())
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by
