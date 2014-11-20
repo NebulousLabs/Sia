@@ -12,7 +12,9 @@ test: install
 test-long: install
 	go test -v -race ./...
 
+# run twice to ensure references are updated properly
 whitepaper:
+	@pdflatex whitepaper.tex > /dev/null
 	pdflatex whitepaper.tex
 
 race-libs:
