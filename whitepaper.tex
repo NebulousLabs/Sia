@@ -215,7 +215,6 @@ Sia relies on an ecosystem that facilitates decentralized storage.
 Storage providers can use the arbitrary data field to announce themselves to the network.
 This can be done using standardized template that clients will be able to read.
 Clients can use these announcements to create a database of potential hosts, and form contracts with only those they trust.
-Micropayment channels \cite{mpc} can be used to negotiate downloading the file. % should probably expand this a bit, or move it to another section.
 
 \subsection{Storage Provider Protections}
 A contract requires consent from both the storage provider and their client, allowing the provider to reject unfavorable terms or unwanted (e.g. illegal) files.
@@ -243,17 +242,24 @@ These downloads can be run in parallel to maximize available bandwidth.
 \subsection{Uptime Incentives}
 The storage proofs contain no mechanism to enforce constant uptime.
 There are also no provisions that require hosts to upload files to clients upon request.
-However, hosts and clients can create micropayment channels to facilitate downloads.
-If the client is offering a reward for sending them a file, hosts will be incentivized to collect the reward.
-Providers are thus incentivized to maximum uptime, in order to collect as many rewards as possible.
+However, clients can offer payment to hosts when trying to download a file.
+If the client is offering a reward for being sent a file, hosts will be incentivized to send the file and collect the reward.
+Clients may request a file at any time, which incentivizes hosts to maximize uptime, and therefore collect as many rewards as possible.
 Clients can also incentivize greater throughput and lower latency via proportionally larger rewards.
 Clients could even perform random ``checkups'' that reward hosts simply for being online, even if they do not wish to download anything.
 However, we reiterate that uptime incentives are not part of the Sia protocol; they are entirely dependent on client behavior.
 
+Payment for downloads is expected to be offered through preexisting micropayment channels \cite{mpc}.
+Micropayment channels would allow clients to make many consecutive small payments with minimal latency and minimal blockchain bloat.
+Hosts could upload a small amount of data and wait to receive a small amount of payment before uploading additional data.
+Clients could wait to make payments until they had the data.
+Use of many consecutive payments allows each party to minimize the risk of being cheated.
+Micropayments are small enough and fast enough that payments could be made every few seconds without having any major effect on throughput.
+
 \subsection{Basic Reputation System}
 Clients need a reliable method for picking quality hosts.
-Analyzing their history is insufficient, because the history could be faked.
-A host could repeatedly form contracts with itself, agreeing to store large ``fake'' files, such as a file containing only zeros or a similar pattern.
+Analyzing their history is insufficient, because the history could be spoofed.
+A host could repeatedly form contracts with itself, agreeing to store large ``fake'' files, such as an encrypted file containing only zeros.
 It would be trivial to perform storage proofs on such data without actually storing anything.
 
 To mitigate this Sybil attack, clients can require that hosts that announce themselves in the arbitrary data section also include a large volume of time locked coins.
@@ -280,12 +286,12 @@ They cannot, however, be used to fund contracts or miner fees.
 When siafunds are transferred to a new address, an additional unspent output is created, containing all of the siacoins that have been earned by the siafunds since their previous transfer.
 These siacoins are sent to the same address as the siafunds.
 
-% this section feels very disjointed.
 \section{Economics of Sia}
-The supply of siacoins will increase permanently.
-Initially, 300,000 coins will be minted every block.
+The primary currency of Sia is the siacoin.
+The supply of siacoins will increase permanently, and all fresh supply will be given to miners as a block subisdy.
+The first block will have 300,000 coins minted.
 This number will decrease by 1 coin per block, until a minimum of 30,000 coins per block is reached.
-With a target of 1 block/minute, the annual growth in supply is:\\
+Following a target of 10 minutes between blocks, the annual growth in supply is:\\
 
 \tabcolsep=0.11cm \noindent
 \begin{tabular}{ l | *{7}{c} }
@@ -293,10 +299,15 @@ With a target of 1 block/minute, the annual growth in supply is:\\
 	Growth & 90\% & 39\% & 21\% & 11.5\% & 4.4\% & 3.2\% & 2.3\%
 \end{tabular} \\
 
+There are inefficiencies within the Sia incentive scheme.
+The primary goal of Sia is to provide a blockchain that enforces storage contracts.
+The mining reward however is only indirectly related to the total value of contracts being created.
+
+The siacoin, especially initially, is likely to have high volatility.
 Hosts are only dependent on the stability of the value of the siacoin for the duration of their contracts.
-Hosts can continually reprice contracts as the siacoin shifts in value.
-Siacoins also derive value from the simple fact that they enable the formation of contracts.
-Future additions to support more currencies through the use of two-way pegs will provide additional security for hosts.
+By adjusting the price of contracts to account for the risks associated with longer duration contracts, hosts can insulate themselves.
+Additionally, hosts can advertise their prices in another currency (like USD) and settle on a siacoin price in the same minute that they finalize a contract with a client.
+Eventually, the use of two way pegs with other crypto assets (like Bitcoin) will give hosts additional means to insulate themselves from volatility.
 
 % \section{Under Consideration}
 % The primary foundation of Sia has been established above.
