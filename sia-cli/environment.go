@@ -77,20 +77,20 @@ func (e *environment) Close() {
 
 func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
-
 	if err != nil {
-		e.server.Broadcast(network.SendVal('B', b))
+		return
 	}
+	e.server.Broadcast(network.SendVal('B', b))
 
 	return
 }
 
 func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
-
 	if err != nil {
-		e.server.Broadcast(network.SendVal('T', t))
+		return
 	}
+	e.server.Broadcast(network.SendVal('T', t))
 
 	return
 }
