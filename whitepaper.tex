@@ -146,8 +146,13 @@ The output ID of a storage proof is defined as:
 	H(\text{contract ID} || \text{outcome} || W_i)
 \]
 Where $W_i$ is the window index, i.e. the number of windows that have elapsed since the contract was formed.
-The outcome has four possible values, corresponding to the four potential outcomes listed above.
-These are represented by the strings ``validproof'', ``missedproof'', ``successfultermination'', and ``unsucessfultermination''.
+The outcome has possible values ``validproof'' and ``missedproof'', corresponding whether the host submitted a valid proof or not.
+
+The output ID of a contract termination is defined as:
+\[
+	H(\text{contract ID} || \text{outcome})
+\]
+Where outcome has the potential values ``successfultermination'' and ``unsucessfultermination'', corresponding to the termination status of the contract.
 
 \section{Proof of Storage}
 \label{sec:storage}
