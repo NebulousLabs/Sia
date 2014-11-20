@@ -1,4 +1,4 @@
-package sia
+package encoding
 
 import (
 	"encoding/binary"
@@ -9,6 +9,8 @@ import (
 // A Marshaler can be encoded as a byte slice.
 // Marshaler and Unmarshaler are separate interfaces because Unmarshaler must
 // have a pointer receiver, while Marshaler does not.
+//
+// SHOULD PROBABLY HAVE A DIFFERENT NAME. SIAMARSHALLER IF ALL ELSE FAILS.
 type Marshaler interface {
 	MarshalSia() []byte
 }
@@ -16,6 +18,8 @@ type Marshaler interface {
 // An Unmarshaler can be decoded from a byte slice.
 // UnmarshalSia may be passed a byte slice containing more than one encoded type.
 // It should return the number of bytes used to decode itself.
+//
+// SHOULD PROBABLY HAVE A DIFFERENT NAME. SIAUNMARSHALLER IF ALL ELSE FAILS.
 type Unmarshaler interface {
 	UnmarshalSia([]byte) int
 }
@@ -91,12 +95,10 @@ func marshal(val reflect.Value) (b []byte) {
 		} else {
 			return []byte{0}
 		}
-	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		b := EncInt64(val.Int())
-		return b[:val.Type().Bits()/8]
-	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		b := EncUint64(val.Uint())
-		return b[:val.Type().Bits()/8]
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return EncInt64(val.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return EncUint64(val.Uint())
 	case reflect.String:
 		s := val.String()
 		return append([]byte{byte(len(s))}, []byte(s)...)
@@ -166,14 +168,12 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	case reflect.Bool:
 		val.SetBool(b[0] != 0)
 		return 1
-	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		size := val.Type().Bits() / 8
-		val.SetInt(DecInt64(b[:size]))
-		return size
-	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		size := val.Type().Bits() / 8
-		val.SetUint(DecUint64(b[:size]))
-		return size
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		val.SetInt(DecInt64(b[:8]))
+		return 8
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		val.SetUint(DecUint64(b[:8]))
+		return 8
 	case reflect.String:
 		n, b := int(b[0]), b[1:]
 		val.SetString(string(b[:n]))

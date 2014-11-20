@@ -1,63 +1,53 @@
 package sia
 
 import (
-	"crypto/ecdsa"
+	"errors"
 	"math/big"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 const (
-	HashSize      = 32
-	PublicKeySize = 32
-	SignatureSize = 32
-	SegmentSize   = 32
+	BlockFrequency = 600               // In seconds.
+	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
 
-	TargetSecondsPerBlock = 600
-	TargetWindow          = BlockHeight(2000) // Number of blocks to use when calculating difficulty.
+	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 
-	FutureThreshold = Timestamp(2 * 60 * 60) // Seconds into the future block timestamps are valid.
+	InitialCoinbase = 300000
+	MinimumCoinbase = 30000
 )
 
 var MaxAdjustmentUp = big.NewRat(1001, 1000)
 var MaxAdjustmentDown = big.NewRat(999, 1000)
-var SurpassThreshold = big.NewRat(25, 100)
 
 type (
-	Hash      [HashSize]byte
-	PublicKey ecdsa.PublicKey
-
 	Timestamp   int64
-	BlockHeight uint32
+	BlockHeight uint64
 	Currency    uint64
 
-	BlockWeight *big.Rat // BlockWeight should never appear in a struct.
-	BlockDepth  Hash
-
-	BlockID       Hash
-	OutputID      Hash // An output id points to a specific output.
-	ContractID    Hash
-	TransactionID Hash
-	CoinAddress   Hash // An address points to spend conditions.
-	Target        Hash
+	BlockID       hash.Hash
+	OutputID      hash.Hash // An output id points to a specific output.
+	ContractID    hash.Hash
+	TransactionID hash.Hash
+	CoinAddress   hash.Hash // An address is the hash of the spend conditions that unlock the output.
+	Target        hash.Hash
 )
 
-type Signature struct {
-	R, S *big.Int
-}
-
-// Eventually, a block will be separate from a block header, and a block header
-// will contian nothing more than a parent hash, a 64 bit nonce, and a child
-// hash. The child hash will be a merkle tree of different blocks that share a
-// header, for merge mining. The blocks themselves will contain timestamps and
-// additonal nonces as needed.
+// Eventually, the Block and the block header will be two separate structs.
+// This will be put into practice when we implement merged mining.
 type Block struct {
 	ParentBlock  BlockID
 	Timestamp    Timestamp
 	Nonce        uint64
 	MinerAddress CoinAddress
-	MerkleRoot   Hash
+	MerkleRoot   hash.Hash
 	Transactions []Transaction
 }
 
+// A Transaction is an update to the state of the network, can move money
+// around, make contracts, etc.
 type Transaction struct {
 	ArbitraryData []byte
 	Inputs        []Input
@@ -68,68 +58,87 @@ type Transaction struct {
 	Signatures    []TransactionSignature
 }
 
+// An Input contains the ID of the output it's trying to spend, and the spend
+// conditions that unlock the output.
 type Input struct {
 	OutputID        OutputID // the source of coins for the input
 	SpendConditions SpendConditions
 }
 
+// An Output contains a volume of currency and a 'CoinAddress', which is just a
+// hash of the spend conditions which unlock the output.
 type Output struct {
 	Value     Currency // how many coins are in the output
 	SpendHash CoinAddress
 }
 
+// SpendConditions is a timelock and a set of public keys that are used to
+// unlock ouptuts.
 type SpendConditions struct {
 	TimeLock      BlockHeight
-	NumSignatures uint8
-	PublicKeys    []PublicKey
+	NumSignatures uint64
+	PublicKeys    []signatures.PublicKey
 }
 
+// A TransactionSignature signs a single input to a transaction to help fulfill
+// the unlock conditions of the transaction. It points to an input, a
+// particular public key, has a timelock, and also indicates which parts of the
+// transaction have been signed.
 type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
-	PublicKeyIndex uint8
+	PublicKeyIndex uint64
 	TimeLock       BlockHeight
-	// CoveredFields  CoveredFields
-	Signature Signature
+	CoveredFields  CoveredFields
+	Signature      signatures.Signature
 }
 
-/*
 type CoveredFields struct {
-	ArbitraryData bool
-	MinerFees     []uint8 // each element indicates an index which is signed.
-	Inputs        []uint8
-	Outputs       []uint8
-	Contracts     []uint8
-	FileProofs    []uint8
+	WholeTransaction bool
+	ArbitraryData    bool
+	MinerFees        []uint8 // each element indicates an index which is signed.
+	Inputs           []uint8
+	Outputs          []uint8
+	Contracts        []uint8
+	FileProofs       []uint8
+	Signatures       []uint8
 }
-*/
 
-// Not enough flexibility in payments?  With the Start and End times, the only
-// problem is if the client wishes for the rewards or penalties to scale as
-// more are submitted or missed, and if they want things to scale harder in the
-// case of consecutive misses.
+// A StorageProof contains the fields needed for a host to prove that they are
+// still storing a file.
+type StorageProof struct {
+	ContractID ContractID
+	Segment    [hash.SegmentSize]byte
+	HashSet    []hash.Hash
+}
+
+// A FileContract contains the information necessary to enforce that a host
+// stores a file.
 type FileContract struct {
 	ContractFund       Currency
-	FileMerkleRoot     Hash
+	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
 	ChallengeFrequency BlockHeight // size of window, one window at a time
-	Tolerance          uint32      // number of missed proofs before triggering unsuccessful termination
+	Tolerance          uint64      // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
 }
 
-type StorageProof struct {
-	ContractID ContractID
-	Segment    [SegmentSize]byte
-	HashSet    []Hash
+// CalculateCoinbase takes a height and from that derives the coinbase.
+func CalculateCoinbase(height BlockHeight) Currency {
+	if height >= InitialCoinbase-MinimumCoinbase {
+		return MinimumCoinbase
+	} else {
+		return InitialCoinbase - Currency(height)
+	}
 }
 
-// ID returns the Block's unique identifier, generated from the hash of its internal data.
-// Transactions are not included in the hash.
+// Block.ID() returns a hash of the block, which is used as the block
+// identifier. Transactions are not included in the hash.
 func (b *Block) ID() BlockID {
-	return BlockID(HashBytes(MarshalAll(
+	return BlockID(hash.HashBytes(encoding.MarshalAll(
 		b.ParentBlock,
 		b.Timestamp,
 		b.Nonce,
@@ -138,108 +147,113 @@ func (b *Block) ID() BlockID {
 	)))
 }
 
-func (b *Block) subsidyID() OutputID {
+// SubisdyID() returns the id of the output created by the block subsidy.
+func (b *Block) SubsidyID() OutputID {
 	bid := b.ID()
-	return OutputID(HashBytes(append(bid[:], []byte("blockreward")...)))
+	return OutputID(hash.HashBytes(append(bid[:], []byte("blockreward")...)))
 }
 
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
-func (t *Transaction) SigHash(i int) Hash {
-	return HashBytes(MarshalAll(
-		t.ArbitraryData,
-		t.Inputs,
-		t.MinerFees,
-		t.Outputs,
-		t.FileContracts,
-		t.StorageProofs,
-		t.Signatures[i].InputID,
-		t.Signatures[i].PublicKeyIndex,
-		t.Signatures[i].TimeLock,
-	))
+func (t *Transaction) SigHash(i int) hash.Hash {
+	if t.Signatures[i].CoveredFields.WholeTransaction {
+		return hash.HashBytes(encoding.MarshalAll(
+			t.ArbitraryData,
+			t.Inputs,
+			t.MinerFees,
+			t.Outputs,
+			t.FileContracts,
+			t.StorageProofs,
+			t.Signatures[i].InputID,
+			t.Signatures[i].PublicKeyIndex,
+			t.Signatures[i].TimeLock,
+		))
+	}
+
+	var signedData []byte
+	if t.Signatures[i].CoveredFields.ArbitraryData {
+		signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
+	}
+	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+		signedData = append(signedData, encoding.Marshal(minerFee)...)
+	}
+	for _, input := range t.Signatures[i].CoveredFields.Inputs {
+		signedData = append(signedData, encoding.Marshal(input)...)
+	}
+	for _, output := range t.Signatures[i].CoveredFields.Outputs {
+		signedData = append(signedData, encoding.Marshal(output)...)
+	}
+	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+		signedData = append(signedData, encoding.Marshal(contract)...)
+	}
+	for _, fileProof := range t.Signatures[i].CoveredFields.FileProofs {
+		signedData = append(signedData, encoding.Marshal(fileProof)...)
+	}
+	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
+		signedData = append(signedData, encoding.Marshal(sig)...)
+	}
+
+	return hash.HashBytes(signedData)
 }
 
-// transaction.ouptutID() takes the index of the output and returns the
+// Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
-func (t *Transaction) outputID(index int) OutputID {
-	return OutputID(HashBytes(append(Marshal(t), append([]byte("coinsend"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
+func (t *Transaction) OutputID(index int) OutputID {
+	return OutputID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("coinsend"), encoding.Marshal(uint64(index))...)...)))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
 // SpendConditions object, using the timelock, number of signatures required,
 // and each public key as leaves.
 func (sc *SpendConditions) CoinAddress() CoinAddress {
-	tlHash := HashBytes(Marshal(sc.TimeLock))
-	nsHash := HashBytes(Marshal(sc.NumSignatures))
-	pkHashes := make([]Hash, len(sc.PublicKeys))
+	tlHash := hash.HashBytes(encoding.Marshal(sc.TimeLock))
+	nsHash := hash.HashBytes(encoding.Marshal(sc.NumSignatures))
+	pkHashes := make([]hash.Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = HashBytes(Marshal(sc.PublicKeys[i]))
+		pkHashes[i] = hash.HashBytes(encoding.Marshal(sc.PublicKeys[i]))
 	}
-	leaves := append([]Hash{tlHash, nsHash}, pkHashes...)
-	return CoinAddress(MerkleRoot(leaves))
+	leaves := append([]hash.Hash{tlHash, nsHash}, pkHashes...)
+	return CoinAddress(hash.MerkleRoot(leaves))
 }
 
-// Returns the id of a file contract given the transaction it appears in and
-// the index of the contract within the transaction.
-func (t *Transaction) fileContractID(index int) ContractID {
-	return ContractID(HashBytes(append(Marshal(t), append([]byte("contract"), Marshal(uint64(index))...)...))) // typecast to uint64 shouldn't be needed.
+// Transaction.fileContractID returns the id of a file contract given the index of the contract.
+func (t *Transaction) FileContractID(index int) ContractID {
+	return ContractID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("contract"), encoding.Marshal(uint64(index))...)...)))
 }
 
-// Returns the index of the current window of a contract, given the current
-// height of the ConsensusState.
-func (fc *FileContract) windowIndex(currentHeight BlockHeight) BlockHeight {
-	return (currentHeight - fc.Start) / fc.ChallengeFrequency
+// WindowIndex returns the index of the challenge window that is
+// open during block height 'height'.
+func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
+	if height < fc.Start {
+		err = errors.New("height below start point")
+		return
+	}
+	if height >= fc.End {
+		err = errors.New("height above end point")
+	}
+
+	windowIndex = (height - fc.Start) / fc.ChallengeFrequency
+	return
 }
 
-// FileContract.storageProofOutput() returns the OutputID of the output created during window index
-func (t *Transaction) storageProofOutput(fileContractIndex int, height BlockHeight, proofValid bool) OutputID {
-	fileContractID := t.fileContractID(fileContractIndex)
+// StorageProofOutput() returns the OutputID of the output created
+// during the window index that was active at height 'height'.
+func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
 	proofString := proofString(proofValid)
-	windowIndex := t.FileContracts[fileContractIndex].windowIndex(height)
-	return OutputID(HashBytes(append(fileContractID[:], append(proofString, Marshal(windowIndex)...)...)))
+	windowIndex, err := fc.WindowIndex(height)
+	if err != nil {
+		return
+	}
+
+	outputID = OutputID(hash.HashBytes(append(fcID[:], append(proofString, encoding.Marshal(windowIndex)...)...)))
+	return
 }
 
-// MarshalSia implements the Marshaler interface for Signatures.
-func (s *Signature) MarshalSia() []byte {
-	if s.R == nil || s.S == nil {
-		return []byte{0, 0}
-	}
-	// pretend Signature is a tuple of []bytes
-	// this lets us use Marshal instead of doing manual length-prefixing
-	return Marshal(struct{ R, S []byte }{s.R.Bytes(), s.S.Bytes()})
-}
-
-// MarshalSia implements the Unmarshaler interface for Signatures.
-func (s *Signature) UnmarshalSia(b []byte) int {
-	// inverse of the struct trick used in Signature.MarshalSia
-	str := struct{ R, S []byte }{}
-	if Unmarshal(b, &str) != nil {
-		return 0
-	}
-	s.R = new(big.Int).SetBytes(str.R)
-	s.S = new(big.Int).SetBytes(str.S)
-	return len(str.R) + len(str.S) + 2
-}
-
-// MarshalSia implements the Marshaler interface for PublicKeys.
-func (pk PublicKey) MarshalSia() []byte {
-	if pk.X == nil || pk.Y == nil {
-		return []byte{0, 0}
-	}
-	// see Signature.MarshalSia
-	return Marshal(struct{ X, Y []byte }{pk.X.Bytes(), pk.Y.Bytes()})
-}
-
-// MarshalSia implements the Unmarshaler interface for PublicKeys.
-func (pk *PublicKey) UnmarshalSia(b []byte) int {
-	// see Signature.UnmarshalSia
-	str := struct{ X, Y []byte }{}
-	if Unmarshal(b, &str) != nil {
-		return 0
-	}
-	pk.X = new(big.Int).SetBytes(str.X)
-	pk.Y = new(big.Int).SetBytes(str.Y)
-	return len(str.X) + len(str.Y) + 2
+// ContractTerminationOutputID() returns the ID of a contract termination
+// output, given the id of the contract and the status of the termination.
+func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
+	terminationString := terminationString(successfulTermination)
+	return OutputID(hash.HashBytes(append(fcID[:], terminationString...)))
 }
 
 // proofString() returns the string to be used when generating the output id of
