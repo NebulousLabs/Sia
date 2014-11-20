@@ -3,15 +3,14 @@ package siacore
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/network"
 )
 
 var (
-	GenesisAddress   = CoinAddress{} // NEED TO CREATE A HARDCODED ADDRESS.
-	GenesisTimestamp = 1415904418    // Approx. 1:47pm EST Nov. 13th, 2014
+	GenesisAddress   = CoinAddress{}         // NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
 // CreateGenesisState will create the state that contains the genesis block and
@@ -31,13 +30,13 @@ func CreateGenesisState() (s *State) {
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := &Block{
-		Timestamp:    Timestamp(time.Now().Unix()),
+		Timestamp:    GenesisTimestamp,
 		MinerAddress: GenesisAddress,
 	}
 	s.BlockRoot.Block = genesisBlock
 	s.BlockRoot.Height = 0
 	for i := range s.BlockRoot.RecentTimestamps {
-		s.BlockRoot.RecentTimestamps[i] = Timestamp(time.Now().Unix())
+		s.BlockRoot.RecentTimestamps[i] = GenesisTimestamp
 	}
 	s.BlockRoot.Target[1] = 16 // Easy enough for a home computer to be able to mine on.
 	s.BlockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...

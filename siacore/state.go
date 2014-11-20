@@ -2,7 +2,11 @@ package siacore
 
 import (
 	"math/big"
+	"sort"
 	"sync"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 type (
@@ -38,9 +42,9 @@ type BlockNode struct {
 	Children []*BlockNode
 
 	Height           BlockHeight
-	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
-	Target           Target        // Target for next block.
 	Depth            Target        // What the target would need to be to have a weight equal to all blocks up to this block.
+	Target           Target        // Target for next block.
+	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof
@@ -75,8 +79,8 @@ type State struct {
 	// longest fork.
 	CurrentBlockID BlockID
 	CurrentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
-	OpenContracts  map[ContractID]*OpenContract
 	UnspentOutputs map[OutputID]Output
+	OpenContracts  map[ContractID]*OpenContract
 	SpentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
 
 	// AcceptBlock() and AcceptTransaction() can be called concurrently.
@@ -114,4 +118,65 @@ func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.CurrentBlockNode().Target[:])))
+}
+
+// StateHash returns the markle root of the current state of consensus.
+func (s *State) StateHash() hash.Hash {
+	// Items of interest:
+	// 1. Current Height
+	// 2. Current Target
+	// 3. Current Depth
+	// 4. Earliest Allowed Timestamp of Next Block
+	// 5. Genesis Block
+	// 6. CurrentBlockID
+	// 7. CurrentPath, ordered by height.
+	// 8. UnspentOutputs, sorted by id.
+	// 9. OpenContracts, sorted by id.
+
+	// Create a slice of hashes representing all items of interest.
+	var leaves []hash.Hash
+	leaves = append(
+		leaves,
+		hash.HashBytes(encoding.Marshal(s.Height())),
+		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Target)),
+		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Depth)),
+		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().EarliestLegalChildTimestamp())),
+		hash.Hash(s.BlockRoot.Block.ID()),
+		hash.Hash(s.CurrentBlockID),
+	)
+
+	// Add all the blocks in the current path.
+	for i := 0; i < len(s.CurrentPath); i++ {
+		leaves = append(leaves, hash.Hash(s.CurrentPath[BlockHeight(i)]))
+	}
+
+	// Sort the unspent outputs by the string value of their ID.
+	var unspentOutputStrings []string
+	for outputID := range s.UnspentOutputs {
+		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
+	}
+	sort.Strings(unspentOutputStrings)
+
+	// Add the unspent outputs in sorted order.
+	for _, stringOutputID := range unspentOutputStrings {
+		var outputID OutputID
+		copy(outputID[:], []byte(stringOutputID))
+		leaves = append(leaves, hash.HashBytes(encoding.Marshal(s.UnspentOutputs[outputID])))
+	}
+
+	// Sort the open contracts by the string value of their ID.
+	var openContractStrings []string
+	for contractID := range s.OpenContracts {
+		openContractStrings = append(openContractStrings, string(contractID[:]))
+	}
+	sort.Strings(unspentOutputStrings)
+
+	// Add the open contracts in sorted order.
+	for _, stringContractID := range openContractStrings {
+		var contractID ContractID
+		copy(contractID[:], []byte(stringContractID))
+		leaves = append(leaves, hash.HashBytes(encoding.Marshal(s.OpenContracts[contractID])))
+	}
+
+	return hash.MerkleRoot(leaves)
 }
