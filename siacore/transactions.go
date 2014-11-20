@@ -60,6 +60,12 @@ func (s *State) applyTransaction(t Transaction) {
 
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
+		// Sanity check.
+		_, exists := s.UnspentOutputs[input.OutputID]
+		if !exists {
+			panic("Applying a transaction with an invalid unspent output!")
+		}
+
 		s.SpentOutputs[input.OutputID] = s.UnspentOutputs[input.OutputID]
 		delete(s.UnspentOutputs, input.OutputID)
 	}

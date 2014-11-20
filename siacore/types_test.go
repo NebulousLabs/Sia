@@ -64,27 +64,25 @@ func testBlockMarshalling(t *testing.T) {
 
 	marshalledBlock := encoding.Marshal(originalBlock)
 	var unmarshalledBlock Block
-	encoding.Unmarshal(marshalledBlock, unmarshalledBlock)
+	encoding.Unmarshal(marshalledBlock, &unmarshalledBlock)
 
 	// Check for equality across all fields.
 	a := originalBlock
 	b := unmarshalledBlock
 	if a.ParentBlockID != b.ParentBlockID {
-		t.Error(a.ParentBlockID)
-		t.Error(b.ParentBlockID)
-		t.Fatal("ParentBlockID marshalling problems.")
+		t.Error("ParentBlockID marshalling problems.")
 	}
 	if a.Timestamp != b.Timestamp {
-		t.Fatal("Timestamp marshalling problems.")
+		t.Error("Timestamp marshalling problems.")
 	}
 	if a.Nonce != b.Nonce {
-		t.Fatal("Nonce marshalling problems.")
+		t.Error("Nonce marshalling problems.")
 	}
 	if a.MinerAddress != b.MinerAddress {
-		t.Fatal("MinerAddress marshalling problems.")
+		t.Error("MinerAddress marshalling problems.")
 	}
 	if a.MerkleRoot != b.MerkleRoot {
-		t.Fatal("MerkleRoot marshalling problems.")
+		t.Error("MerkleRoot marshalling problems.")
 	}
 }
 
