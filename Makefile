@@ -14,3 +14,11 @@ test-long: install
 
 whitepaper:
 	pdflatex whitepaper.tex
+
+race-libs:
+	go install -race std
+
+dependencies: race-libs
+	go get -u github.com/spf13/cobra
+
+.PHONY: all fmt install test test-long whitepaper dependencies race-libs
