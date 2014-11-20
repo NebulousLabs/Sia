@@ -50,7 +50,7 @@ The Sia protocol largely resembles Bitcoin except for the changes noted below.
 \section{General Structure}
 Sia's primary departure from Bitcoin lies in its transactions.
 Bitcoin uses a scripting system to enable a range of transaction types, such as pay-to-public-key-hash and pay-to-script-hash.
-Sia opts instead to use a hashed $M$--of--$N$ multi-signature scheme for all transactions, eschewing the scripting system entirely.
+Sia opts instead to use an $M$--of--$N$ multi-signature scheme for all transactions, eschewing the scripting system entirely.
 This reduces complexity and attack surface.
 
 Sia also extends transactions to enable the creation and enforcement of storage contracts.
@@ -126,7 +126,7 @@ To construct this hash, the file is split into segments of constant size and has
 The root hash, along with the total size of the file, can be used to verify storage proofs.
 
 File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the reward for an invalid or missing proof, and the maximum number of proofs that can be missed.
-The challenge frequency specifies how often a storage proof must be submitted, and creates discreet \textit{challenge windows} during which a host must submit storage proofs (one proof per window).
+The challenge frequency specifies how often a storage proof must be submitted, and creates discrete \textit{challenge windows} during which a host must submit storage proofs (one proof per window).
 Submitting a valid proof during the challenge window triggers an automatic payment to the ``valid proof'' address (presumably the host).
 If, at the end of the challenge window, no valid proof has been submitted, coins are instead sent to the ``missed proof'' address (generally the '0' address, which is unspendable. The client address is also a likely option.)
 Contracts define a maximum number of proofs that can be missed; if this number is exceeded, the contract becomes invalid.
@@ -313,7 +313,7 @@ The mining reward however is only indirectly related to the total value of contr
 
 The siacoin, especially initially, is likely to have high volatility.
 Hosts are only dependent on the stability of the value of the siacoin for the duration of their contracts.
-By adjusting the price of contracts to account for the risks associated with longer duration contracts, hosts can insulate themselves.
+By adjusting the price of contracts to account for the risks associated with longer duration contracts, hosts can insulate themselves from volatility.
 Additionally, hosts can advertise their prices in another currency (like USD) and settle on a siacoin price in the same minute that they finalize a contract with a client.
 Eventually, the use of two way pegs with other crypto assets (like Bitcoin) will give hosts additional means to insulate themselves from volatility.
 
