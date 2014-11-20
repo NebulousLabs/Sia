@@ -126,16 +126,13 @@ To construct this hash, the file is split into segments of constant size and has
 The root hash, along with the total size of the file, can be used to verify storage proofs.
 
 File contracts also specify a duration, challenge frequency, and payout parameters, including the reward for a valid proof, the reward for an invalid or missing proof, and the maximum number of proofs that can be missed.
-The challenge frequency is the maximum number of blocks that can elapse between storage proofs (also called a \textit{challenge window}).
-As soon as one challenge window closes, the next opens.
+The challenge frequency specifies how often a storage proof must be submitted, and creates discreet \textit{challenge windows} during which a host must submit storage proofs (one proof per window).
 Submitting a valid proof during the challenge window triggers an automatic payment to the ``valid proof'' address (presumably the host).
-If, at the end of the challenge window, no valid proof has been submitted, coins are instead sent to the ``missed proof'' address (presumably the client).
+If, at the end of the challenge window, no valid proof has been submitted, coins are instead sent to the ``missed proof'' address (generally the '0' address, which is unspendable. The client address is also a likely option.)
 Contracts define a maximum number of proofs that can be missed; if this number is exceeded, the contract becomes invalid.
 
-If the file contract is still valid at the end of the specified duration, it \textit{successfully terminates}.
-Conversely, if the contract funds are exhausted before the duration elapses, or if the maximum number of missed proofs is exceeded, the contract \textit{unsuccessfully terminates}.
-Each of these potential outcomes (valid proof, invalid proof, successful termination, unsuccessful termination) has an associated recipient.
-The funds for these various payouts are provided by the inputs to the transaction.
+If the file contract is still valid at the end of the specified duration, it \textit{successfully terminates} and any remaining coins are sent to the valid proof address.
+Conversely, if the contract funds are exhausted before the duration elapses or if the maximum number of missed proofs is exceeded, the contract \textit{unsuccessfully terminates} and any remaining coins are sent to the missed proof address.
 
 The rewards for completed proofs and missed proofs create a new transaction output belonging to the recipient specified in the contract.
 The recipient will be a hash of the output spend conditions for the new output.
