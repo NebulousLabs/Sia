@@ -22,7 +22,7 @@ func (s *State) currentProofIndex(sp StorageProof) (proofIndex uint64) {
 	indexSeed := hash.HashBytes(append(triggerBlockID[:], sp.ContractID[:]...))
 	seedInt := new(big.Int).SetBytes(indexSeed[:])
 	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
-	proofIndex = uint64(modSeed.Int64())
+	proofIndex = modSeed.Uint64()
 
 	return
 }
@@ -43,11 +43,13 @@ func (s *State) validProof(sp StorageProof) (err error) {
 	}
 
 	// Check that the storage proof itself is valid.
-	numSegments, err := hash.CalculateSegments(int64(openContract.FileContract.FileSize))
-	if err != nil {
-		return
-	}
-	if !hash.VerifyReaderProof(sp.Segment, sp.HashSet, numSegments, s.currentProofIndex(sp), openContract.FileContract.FileMerkleRoot) {
+	if !hash.VerifyReaderProof(
+		sp.Segment,
+		sp.HashSet,
+		hash.CalculateSegments(openContract.FileContract.FileSize),
+		s.currentProofIndex(sp),
+		openContract.FileContract.FileMerkleRoot,
+	) {
 		err = errors.New("provided storage proof is invalid")
 		return
 	}
@@ -106,14 +108,13 @@ func (s *State) validContract(c FileContract) (err error) {
 // addContract takes a FileContract and its corresponding ContractID and adds
 // it to the state.
 func (s *State) addContract(contract FileContract, id ContractID) {
-	openContract := OpenContract{
+	s.OpenContracts[id] = &OpenContract{
 		FileContract:    contract,
 		ContractID:      id,
 		FundsRemaining:  contract.ContractFund,
 		Failures:        0,
 		WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
 	}
-	s.OpenContracts[id] = &openContract
 }
 
 // contractMaintenance checks the contract windows and storage proofs and to

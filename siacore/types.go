@@ -99,7 +99,7 @@ type CoveredFields struct {
 	Inputs           []uint8
 	Outputs          []uint8
 	Contracts        []uint8
-	FileProofs       []uint8
+	StorageProofs    []uint8
 	Signatures       []uint8
 }
 
@@ -175,22 +175,22 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 		signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
 	}
 	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
-		signedData = append(signedData, encoding.Marshal(minerFee)...)
+		signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 	}
 	for _, input := range t.Signatures[i].CoveredFields.Inputs {
-		signedData = append(signedData, encoding.Marshal(input)...)
+		signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
 	}
 	for _, output := range t.Signatures[i].CoveredFields.Outputs {
-		signedData = append(signedData, encoding.Marshal(output)...)
+		signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
 	}
 	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
-		signedData = append(signedData, encoding.Marshal(contract)...)
+		signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
 	}
-	for _, fileProof := range t.Signatures[i].CoveredFields.FileProofs {
-		signedData = append(signedData, encoding.Marshal(fileProof)...)
+	for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
+		signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
 	}
 	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
-		signedData = append(signedData, encoding.Marshal(sig)...)
+		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
 	}
 
 	return hash.HashBytes(signedData)

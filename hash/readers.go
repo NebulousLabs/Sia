@@ -39,13 +39,8 @@ func ReaderMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err erro
 
 // Calculates the number of segments in the file when building a merkle tree.
 // Should probably be renamed to CountLeaves() or something.
-func CalculateSegments(fileSize int64) (numSegments uint64, err error) {
-	if fileSize < 0 {
-		err = errors.New("cannot have a negative file size")
-		return
-	}
-
-	numSegments = uint64(fileSize / SegmentSize)
+func CalculateSegments(fileSize uint64) (numSegments uint64) {
+	numSegments = fileSize / SegmentSize
 	if fileSize%SegmentSize != 0 {
 		numSegments++
 	}

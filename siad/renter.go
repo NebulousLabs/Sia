@@ -26,11 +26,7 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 	if err != nil {
 		return
 	}
-	segments, err := hash.CalculateSegments(info.Size())
-	if err != nil {
-		return
-	}
-	merkle, err := hash.ReaderMerkleRoot(file, segments)
+	merkle, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(uint64(info.Size())))
 	if err != nil {
 		return
 	}
