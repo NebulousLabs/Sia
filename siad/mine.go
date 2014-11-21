@@ -1,7 +1,6 @@
 package siad
 
 import (
-	"errors"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -15,6 +14,7 @@ const (
 
 type Miner struct {
 	mining     bool
+	BlockChan  chan *siacore.Block
 	killMining chan struct{}
 }
 
@@ -24,6 +24,8 @@ func (m *Miner) Mining() bool {
 
 // Creates a block that is ready for nonce grinding.
 func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
+	state.Lock()
+	defer state.Unlock()
 	b = &siacore.Block{
 		ParentBlockID: state.CurrentBlockID,
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
@@ -47,71 +49,57 @@ func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddr
 // solveBlock() tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
 func solveBlock(b *siacore.Block, target siacore.Target) bool {
-	for i := 0; i < IterationsPerAttempt; i++ {
+	maxNonce := b.Nonce + IterationsPerAttempt
+	for ; b.Nonce < maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
 			return true
 		}
-
-		b.Nonce++
 	}
 
 	return false
 }
 
-// attemptToGenerateBlock attempts to generate a block, but instead of running
-// until a block is found, it just tries a single time.
-func (m *Miner) attemptToGenerateBlock(state *siacore.State, minerAddress siacore.CoinAddress) (b *siacore.Block, err error) {
-	state.Lock()
-	b, target := m.blockForWork(state, minerAddress)
-	state.Unlock()
-
-	if solveBlock(b, target) {
-		return
+// ToggleMining creates a channel and mines until it receives a kill signal.
+func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddress) {
+	if !m.mining {
+		m.mining = true
+		go m.mine(state, minerAddress)
 	} else {
-		err = errors.New("could not find block")
-		return
+		m.killMining <- struct{}{}
+	}
+}
+
+// mine attempts to generate blocks, and sends any found blocks down a channel.
+func (m *Miner) mine(state *siacore.State, minerAddress siacore.CoinAddress) {
+	for {
+		select {
+		case <-m.killMining:
+			return
+
+		default:
+			b, target := m.blockForWork(state, minerAddress)
+			if solveBlock(b, target) {
+				m.BlockChan <- b
+			}
+		}
 	}
 }
 
 // generateBlock() creates a new block, will keep working until a block is
 // found, which may take a long time.
 func (m *Miner) generateBlock(state *siacore.State, minerAddress siacore.CoinAddress) (b *siacore.Block) {
-	for {
-		var err error
-		b, err = m.attemptToGenerateBlock(state, minerAddress)
-		if err == nil {
-			return b
-		}
-	}
-}
-
-// ToggleMining creates a channel and mines until it receives a kill signal.
-func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddress) {
 	if !m.mining {
-		m.killMining = make(chan struct{})
 		m.mining = true
-	} else {
-		m.killMining <- struct{}{}
-		return
+		go m.mine(state, minerAddress)
 	}
-
-	// Need some channel to wait on to kill the function.
-	go func() {
-		for {
-			select {
-			case <-m.killMining:
-				return
-
-			default:
-				block, err := m.attemptToGenerateBlock(state, minerAddress)
-				if err == nil {
-					state.AcceptBlock(*block)
-				}
-			}
-		}
-	}()
+	b = <-m.BlockChan
+	m.killMining <- struct{}{}
+	return b
 }
 
 func CreateMiner() *Miner {
-	return new(Miner)
+	m := new(Miner)
+	m.killMining = make(chan struct{})
+	m.BlockChan = make(chan *siacore.Block, 10)
+	return m
 }

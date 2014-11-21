@@ -68,6 +68,14 @@ func createEnvironment() (env *environment, err error) {
 		return
 	}
 
+	// accept mined blocks
+	// TODO: when should this terminate?
+	go func() {
+		for {
+			env.AcceptBlock(*<-env.miner.BlockChan)
+		}
+	}()
+
 	return
 }
 
@@ -80,7 +88,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	if err != nil {
 		return
 	}
-	e.server.Broadcast(network.SendVal('B', b))
+	go e.server.Broadcast(network.SendVal('B', b))
 
 	return
 }
