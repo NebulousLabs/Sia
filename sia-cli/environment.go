@@ -88,7 +88,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	if err != nil {
 		return
 	}
-	e.server.Broadcast(network.SendVal('B', b))
+	go e.server.Broadcast(network.SendVal('B', b))
 
 	return
 }

@@ -100,6 +100,6 @@ func (m *Miner) generateBlock(state *siacore.State, minerAddress siacore.CoinAdd
 func CreateMiner() *Miner {
 	m := new(Miner)
 	m.killMining = make(chan struct{})
-	m.BlockChan = make(chan *siacore.Block)
+	m.BlockChan = make(chan *siacore.Block, 10)
 	return m
 }
