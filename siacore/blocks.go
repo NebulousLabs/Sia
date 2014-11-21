@@ -141,8 +141,16 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
 	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
 	newTargetBytes := intNewTarget.Bytes()
+
+	// Set the new target - target cannot have more than 32 bytes.
 	offset := len(target[:]) - len(newTargetBytes)
-	copy(target[offset:], newTargetBytes)
+	if offset < 0 {
+		for i := range target {
+			target[i] = 255
+		}
+	} else {
+		copy(target[offset:], newTargetBytes)
+	}
 	return
 }
 
