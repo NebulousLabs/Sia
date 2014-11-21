@@ -13,6 +13,8 @@ import (
 
 var SurpassThreshold = big.NewRat(5, 100)
 
+var OrphanErr = errors.New("block is an orphan")
+
 // EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
 // of a BlockNode to be legal.
 func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
@@ -43,14 +45,14 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known valid block.
 	_, exists = s.BlockMap[b.ID()]
 	if exists {
-		err = errors.New("Block exists in block map.")
+		err = errors.New("block exists in block map.")
 		return
 	}
 
 	// See if the block's parent is known.
 	parentBlockNode, exists = s.BlockMap[b.ParentBlockID]
 	if !exists {
-		err = errors.New("Block is an orphan")
+		err = OrphanErr
 		return
 	}
 

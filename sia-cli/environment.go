@@ -86,6 +86,10 @@ func (e *environment) Close() {
 func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
 	if err != nil {
+		fmt.Println("AcceptBlock Error: ", err)
+		if err = saicore.OrphanErr {
+			// e.findParents(b)
+		}
 		return
 	}
 	go e.server.Broadcast(network.SendVal('B', b))
@@ -96,6 +100,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
 	if err != nil {
+		fmt.Println("AcceptTransaction Error:", err)
 		return
 	}
 	e.server.Broadcast(network.SendVal('T', t))
