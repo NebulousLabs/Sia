@@ -21,6 +21,7 @@ func CreateGenesisState() (s *State) {
 	s.BlockRoot = new(BlockNode)
 	s.BadBlocks = make(map[BlockID]struct{})
 	s.BlockMap = make(map[BlockID]*BlockNode)
+	s.OrphanMap = make(map[BlockID]map[BlockID]*Block)
 	s.CurrentPath = make(map[BlockHeight]BlockID)
 	s.OpenContracts = make(map[ContractID]*OpenContract)
 	s.UnspentOutputs = make(map[OutputID]Output)

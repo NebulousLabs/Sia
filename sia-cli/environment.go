@@ -87,8 +87,8 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
 	if err != nil {
 		fmt.Println("AcceptBlock Error: ", err)
-		if err = saicore.OrphanErr {
-			// e.findParents(b)
+		if err == siacore.UnknownOrphanErr {
+			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
 		}
 		return
 	}
