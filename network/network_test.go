@@ -1,4 +1,4 @@
-package sia
+package network
 
 import (
 	"net"
@@ -36,7 +36,8 @@ func TestRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = addr.Call(func(conn net.Conn) error {
-		_, err := conn.Write([]byte{'B', 4, 0, 0, 0, 0, 0, 0, 0})
+		_, err := conn.Write([]byte{'B', 8, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0})
 		return err
 	})
 	if err != nil {

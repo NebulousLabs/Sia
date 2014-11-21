@@ -1,22 +1,28 @@
-package sia
+package siad
 
 // wallet.go contains things like signatures and scans the blockchain for
 // available funds that can be spent.
 
 import (
-	"crypto/ecdsa"
 	"errors"
+
+	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
 // Contains a secret key, the spend conditions associated with that key, the
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
-	SecretKey       *ecdsa.PrivateKey
-	SpendConditions SpendConditions
+	SecretKey       signatures.SecretKey
+	SpendConditions siacore.SpendConditions
 
-	OwnedOutputs map[OutputID]Output // All outputs to CoinAddress
-	SpentOutputs map[OutputID]Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OwnedOutputs         map[siacore.OutputID]siacore.Output // All outputs to CoinAddress
+	SpentOutputs         map[siacore.OutputID]siacore.Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
+	OpenFreezeConditions map[siacore.BlockHeight]int         // A list of all heights at which freeze conditions are being used.
+
+	// Host variables.
+	HostSettings HostAnnouncement
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -24,49 +30,61 @@ type Wallet struct {
 // much comes from the host. This specifies how much the client is to add to
 // the contract.
 type FileContractParameters struct {
-	Transaction        Transaction
+	Transaction        siacore.Transaction
 	FileContractIndex  int
-	ClientContribution Currency
+	ClientContribution siacore.Currency
+}
+
+// Wallet.FreezeConditions
+func (w *Wallet) FreezeConditions(unlockHeight siacore.BlockHeight) (fc siacore.SpendConditions) {
+	fc = w.SpendConditions
+	fc.TimeLock = unlockHeight
+	return
 }
 
 // Creates a new wallet that can receive and spend coins.
 func CreateWallet() (w *Wallet, err error) {
 	w = new(Wallet)
 
-	var pk PublicKey
-	w.SecretKey, pk, err = GenerateKeyPair()
+	var pk signatures.PublicKey
+	w.SecretKey, pk, err = signatures.GenerateKeyPair()
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 
-	w.OwnedOutputs = make(map[OutputID]Output)
-	w.SpentOutputs = make(map[OutputID]Output)
+	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
+	w.SpentOutputs = make(map[siacore.OutputID]siacore.Output)
+	w.OpenFreezeConditions = make(map[siacore.BlockHeight]int)
 
 	return
 }
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) Scan(state *State) {
-	w.OwnedOutputs = make(map[OutputID]Output)
-	for id, output := range state.ConsensusState.UnspentOutputs {
+func (w *Wallet) Scan(state *siacore.State) {
+	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
+
+	// Check for owned outputs from the standard SpendConditions.
+	for id, output := range state.UnspentOutputs {
 		if output.SpendHash == w.SpendConditions.CoinAddress() {
 			w.OwnedOutputs[id] = output
 		}
 	}
+
+	// Check for spendable outputs from the freeze conditions.
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
+func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
-	if amount == Currency(0) {
+	if amount == siacore.Currency(0) {
 		err = errors.New("cannot send 0 coins")
 		return
 	}
 
 	// Add to the list of inputs until enough funds have been allocated.
-	total := Currency(0)
-	var newInputs []Input
+	total := siacore.Currency(0)
+	var newInputs []siacore.Input
 	for id, output := range w.OwnedOutputs {
 		if total >= amount {
 			break
@@ -79,7 +97,7 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 		}
 
 		// Create an input to add to the transaction.
-		newInput := Input{
+		newInput := siacore.Input{
 			OutputID:        id,
 			SpendConditions: w.SpendConditions,
 		}
@@ -100,7 +118,7 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
-		t.Outputs = append(t.Outputs, Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
+		t.Outputs = append(t.Outputs, siacore.Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
 	}
 
 	return
@@ -108,18 +126,18 @@ func (w *Wallet) FundTransaction(amount Currency, t *Transaction) (err error) {
 
 // Wallet.signTransaction() takes a transaction and adds a signature for every input
 // that the wallet understands how to spend.
-func (w *Wallet) SignTransaction(t *Transaction) (err error) {
+func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 	for i, input := range t.Inputs {
 		// If we recognize the input as something we are able to sign, we sign
 		// the input.
 		if input.SpendConditions.CoinAddress() == w.SpendConditions.CoinAddress() {
-			txnSig := TransactionSignature{
+			txnSig := siacore.TransactionSignature{
 				InputID: input.OutputID,
 			}
 			t.Signatures = append(t.Signatures, txnSig)
 
 			sigHash := t.SigHash(i)
-			t.Signatures[i].Signature, err = SignBytes(sigHash[:], w.SecretKey)
+			t.Signatures[i].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
 			if err != nil {
 				return
 			}
@@ -129,11 +147,10 @@ func (w *Wallet) SignTransaction(t *Transaction) (err error) {
 	return
 }
 
-// Problem: the wallet will double-spend itself if multiple transactions are
-// made without blocks being refreshed.
-// Takes a new address, and an amount to send, and adds outputs until the
-// amount is reached. Then sends leftovers back to self.
-func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, state *State) (t Transaction, err error) {
+// Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
+// allocateding 'minerFee' as a miner fee. The transaction is submitted to the
+// miner pool, but is also returned.
+func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress, state *siacore.State) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
 	w.Scan(state)
 
@@ -147,7 +164,7 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 	t.MinerFees = append(t.MinerFees, minerFee)
 
 	// Add the output to `address`.
-	t.Outputs = append(t.Outputs, Output{Value: amount, SpendHash: address})
+	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: address})
 
 	// Sign each input.
 	err = w.SignTransaction(&t)
@@ -155,32 +172,7 @@ func (w *Wallet) SpendCoins(amount, minerFee Currency, address CoinAddress, stat
 		return
 	}
 
-	return
-}
-
-// Wallet.ClientFundFileContract() takes a template FileContract and returns a
-// partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) ClientFundFileContract(params *FileContractParameters, state *State) (err error) {
-	// Scan the blockchain for outputs.
-	w.Scan(state)
-
-	// Add money to the transaction to fund the client's portion of the contract fund.
-	err = w.FundTransaction(params.ClientContribution, &params.Transaction)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// Wallet.HostFundFileContract() take a template FileContract and returns a
-// partial transaction containing an input for the contract, but no signatures.
-func (w *Wallet) HostFundFileContract(params *FileContractParameters, state *State) (err error) {
-	// Scan the blockchain for outputs.
-	w.Scan(state)
-
-	// Add money t othe transaction to fund the hosts' portion of the contract fund.
-	err = w.FundTransaction(params.Transaction.FileContracts[params.FileContractIndex].ContractFund-params.ClientContribution, &params.Transaction)
+	err = state.AcceptTransaction(t)
 	if err != nil {
 		return
 	}

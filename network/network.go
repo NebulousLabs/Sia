@@ -1,4 +1,4 @@
-package sia
+package network
 
 import (
 	"errors"
@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
 const (
@@ -41,7 +43,7 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
 		return nil, errors.New("could not read length prefix")
 	}
-	msgLen := DecUint64(prefix)
+	msgLen := encoding.DecUint64(prefix)
 	if msgLen > maxMsgLen {
 		return nil, errors.New("bad message length")
 	}
@@ -58,8 +60,8 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 // a value to a NetAddress. It prefixes the encoded data with a header,
 // containing the message's type and length
 func SendVal(t byte, val interface{}) func(net.Conn) error {
-	encVal := Marshal(val)
-	encLen := EncUint64(uint64(len(encVal)))
+	encVal := encoding.Marshal(val)
+	encLen := encoding.EncUint64(uint64(len(encVal)))
 	msg := append([]byte{t},
 		append(encLen[:4], encVal...)...)
 
@@ -119,7 +121,7 @@ func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
 	// create function:
 	sfn := func(_ net.Conn, b []byte) error {
 		v := reflect.New(typ.In(0))
-		if err := Unmarshal(b, v.Interface()); err != nil {
+		if err := encoding.Unmarshal(b, v.Interface()); err != nil {
 			return err
 		}
 		if err := val.Call([]reflect.Value{v.Elem()})[0].Interface(); err != nil {
@@ -214,7 +216,7 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 		addrs = append(addrs, addr)
 		num--
 	}
-	_, err := conn.Write(Marshal(addrs))
+	_, err := conn.Write(encoding.Marshal(addrs))
 	return err
 }
 
@@ -283,7 +285,7 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 		return
 	}
 	var addrs []NetAddress
-	if err = Unmarshal(buf[:n], &addrs); err != nil {
+	if err = encoding.Unmarshal(buf[:n], &addrs); err != nil {
 		return
 	}
 	// add peers

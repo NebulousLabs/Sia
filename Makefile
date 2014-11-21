@@ -10,9 +10,15 @@ test: install
 	go test -short ./...
 
 test-long: install
-	got test -v -race ./...
+	go test -v -race ./...
 
 whitepaper:
 	pdflatex whitepaper.tex
-	pdflatex whitepaper.tex
-	pdflatex whitepaper.tex # pdfatex is dumb, therefore we run it 3 times - fixes errors that could occur from only running it once or twice.
+
+race-libs:
+	go install -race std
+
+dependencies: race-libs
+	go get -u github.com/spf13/cobra
+
+.PHONY: all fmt install test test-long whitepaper dependencies race-libs
