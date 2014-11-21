@@ -68,6 +68,14 @@ func createEnvironment() (env *environment, err error) {
 		return
 	}
 
+	// accept mined blocks
+	// TODO: when should this terminate?
+	go func() {
+		for {
+			env.AcceptBlock(*<-env.miner.BlockChan)
+		}
+	}()
+
 	return
 }
 
