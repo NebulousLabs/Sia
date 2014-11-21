@@ -330,3 +330,10 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 
 	return
 }
+
+func (tcps *TCPServer) AddressBook() (book []NetAddress) {
+	for address := range tcps.addressbook {
+		book = append(book, address)
+	}
+	return
+}

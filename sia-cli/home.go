@@ -87,12 +87,19 @@ func printWalletAddresses(env *environment) {
 	}
 	fmt.Println()
 
+	fmt.Printf("\tWallet Address: %x\n", env.wallet.SpendConditions.CoinAddress())
+	fmt.Println()
+
 	fmt.Println("\tCurrent Block Height:", env.state.Height())
+	fmt.Println("\tCurrent Block Target:", env.state.CurrentBlockNode().Target)
 	fmt.Println("\tCurrent Block Depth:", env.state.Depth())
 	fmt.Println()
 
-	fmt.Println("\tPrinting wallet address.")
-	fmt.Printf("\t\t%x\n", env.wallet.SpendConditions.CoinAddress())
+	fmt.Println("\tPrinting Networked Peers:")
+	addresses := env.server.AddressBook()
+	for _, address := range addresses {
+		fmt.Printf("\t\t%v:%v", address.Host, address.Port)
+	}
 }
 
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
