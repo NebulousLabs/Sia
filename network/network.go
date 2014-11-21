@@ -143,12 +143,12 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcps = &TCPServer{
 		Listener:    tcpServ,
 		addressbook: make(map[NetAddress]struct{}),
-		// default handlers
-		handlerMap: map[byte]func(net.Conn, []byte) error{
-			'H': sendHostname,
-			'P': tcps.sharePeers,
-			'A': tcps.addPeer,
-		},
+	}
+	// default handlers
+	tcps.handlerMap = map[byte]func(net.Conn, []byte) error{
+		'H': sendHostname,
+		'P': tcps.sharePeers,
+		'A': tcps.addPeer,
 	}
 
 	// spawn listener
