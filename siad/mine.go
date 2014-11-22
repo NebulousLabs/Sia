@@ -65,6 +65,7 @@ func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddr
 		m.mining = true
 		go m.mine(state, minerAddress)
 	} else {
+		m.mining = false
 		m.killMining <- struct{}{}
 	}
 }
