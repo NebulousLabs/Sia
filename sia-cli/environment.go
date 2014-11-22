@@ -91,6 +91,8 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
 			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
+			peer := e.server.RandomPeer()
+			peer.Call(e.state.CatchUp(e.state.Height()))
 		}
 		return
 	}
