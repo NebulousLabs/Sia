@@ -8,6 +8,10 @@ import (
 	"github.com/NebulousLabs/Andromeda/network"
 )
 
+const (
+	MaxCatchUpBlocks = 100
+)
+
 var (
 	GenesisAddress   = CoinAddress{}         // NEED TO CREATE A HARDCODED ADDRESS.
 	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
@@ -62,20 +66,19 @@ func CreateGenesisState() (s *State) {
 func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	// Get the starting point.
 	start := BlockHeight(encoding.DecUint64(data))
-	end := s.Height()
-	if start > end {
+	if start > s.Height() {
 		err = errors.New("start is greater than the height of the longest known fork.")
 		return
 	}
 
 	// Build an array of blocks.
-	blocks := make([]Block, end-start+1)
-	for i := range blocks {
-		b := s.BlockAtHeight(start + BlockHeight(i))
+	var blocks []Block
+	for i := start; i < start+MaxCatchUpBlocks; i++ {
+		b := s.BlockAtHeight(i)
 		if b == nil {
-			panic("nil block in state!")
+			break
 		}
-		blocks[i] = *b
+		blocks = append(blocks, *b)
 	}
 
 	// Encode and send the blocks.
@@ -89,11 +92,8 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-// catchUp handles orphan blocks and situations where the node has fallen
-// behind the longest fork.
-//
-// NOTE: CATCHUP IS BROKEN FOR ANY VALUES OTHER THAN 1.
-// NOTE: CATCHUP MIGHT SEND A SINGLE MESSAGE ASKING FOR MANY MEGABYTES WORTH OF BLOCKS.
+// CatchUp requests a maximum of 100 blocks from a peer, starting from the
+// current height. It can be called repeatedly to download the full chain.
 func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 	encbh := encoding.EncUint64(uint64(start))
 	return func(conn net.Conn) error {
@@ -110,6 +110,9 @@ func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 			if err = s.AcceptBlock(blocks[i]); err != nil {
 				return err
 			}
+		}
+		if len(blocks) < MaxCatchUpBlocks {
+			return errors.New("finished catching up")
 		}
 		return nil
 	}

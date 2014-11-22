@@ -44,8 +44,10 @@ func (e *environment) initializeNetwork() (err error) {
 	}
 	e.server.RegisterHandler('R', e.SendBlocks)
 
+	// download blockchain
 	randomPeer := e.server.RandomPeer()
-	randomPeer.Call(e.state.CatchUp(1))
+	for randomPeer.Call(e.state.CatchUp(e.state.Height())) == nil {
+	}
 
 	return
 }
