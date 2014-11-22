@@ -142,6 +142,7 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	}
 	tcps = &TCPServer{
 		Listener:    tcpServ,
+		myAddr:      NetAddress{"", port},
 		addressbook: make(map[NetAddress]struct{}),
 	}
 	// default handlers
@@ -221,16 +222,12 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 }
 
 // addPeer adds the connecting peer to its address book
-func (tcps *TCPServer) addPeer(conn net.Conn, _ []byte) (err error) {
-	host, portStr, err := net.SplitHostPort(conn.RemoteAddr().String())
-	if err != nil {
+func (tcps *TCPServer) addPeer(_ net.Conn, data []byte) (err error) {
+	var addr NetAddress
+	if err = encoding.Unmarshal(data, &addr); err != nil {
 		return
 	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return
-	}
-	tcps.addressbook[NetAddress{host, uint16(port)}] = struct{}{}
+	tcps.addressbook[addr] = struct{}{}
 	return
 }
 
@@ -259,15 +256,11 @@ func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 		return
 	}
 	// TODO: try to ping ourselves?
-	host, portStr, err := net.SplitHostPort(string(buf[:n]))
+	host, _, err := net.SplitHostPort(string(buf[:n]))
 	if err != nil {
 		return
 	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return
-	}
-	tcps.myAddr = NetAddress{host, uint16(port)}
+	tcps.myAddr.Host = host
 	return
 }
 
@@ -298,12 +291,6 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	return
 }
 
-// addMe announces the TCPServer's NetAddress to a peer
-func (tcps *TCPServer) addMe(conn net.Conn) error {
-	_, err := conn.Write([]byte{'A', 0, 0, 0, 0})
-	return err
-}
-
 // Bootstrap discovers the external IP of the TCPServer, requests peers from
 // the initial peer list, and announces itself to those peers.
 func (tcps *TCPServer) Bootstrap() (err error) {
@@ -326,7 +313,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	tcps.Broadcast(tcps.requestPeers)
 
 	// announce ourselves to new peers
-	tcps.Broadcast(tcps.addMe)
+	tcps.Broadcast(SendVal('A', tcps.myAddr))
 
 	return
 }
