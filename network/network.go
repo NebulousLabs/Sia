@@ -282,9 +282,8 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 		return
 	}
 	// add peers
-	// TODO: make sure we don't add ourself
 	for _, addr := range addrs {
-		if tcps.Ping(addr) {
+		if addr != tcps.myAddr && tcps.Ping(addr) {
 			tcps.addressbook[addr] = struct{}{}
 		}
 	}
