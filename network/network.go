@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"io/ioutil"
 	"net"
 	"reflect"
 	"strconv"
@@ -45,15 +46,13 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 	}
 	msgLen := encoding.DecUint64(prefix)
 	if msgLen > maxMsgLen {
-		return nil, errors.New("bad message length")
+		return nil, errors.New("message too long")
 	}
-	msgData := make([]byte, msgLen)
-	if msgLen > 0 {
-		if n, err := conn.Read(msgData); err != nil || uint64(n) != msgLen {
-			return nil, errors.New("could not read message content")
-		}
+	data, err := ioutil.ReadAll(conn)
+	if uint64(len(data)) != msgLen {
+		return nil, errors.New("message length mismatch")
 	}
-	return msgData, nil
+	return data, err
 }
 
 // SendVal returns a closure that can be used in conjuction with Call to send
@@ -250,13 +249,12 @@ func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 		return
 	}
 	// read response
-	buf := make([]byte, 128)
-	n, err := conn.Read(buf)
+	data, err := ioutil.ReadAll(conn)
 	if err != nil {
 		return
 	}
 	// TODO: try to ping ourselves?
-	host, _, err := net.SplitHostPort(string(buf[:n]))
+	host, _, err := net.SplitHostPort(string(data))
 	if err != nil {
 		return
 	}
@@ -272,13 +270,12 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 		return
 	}
 	// read response
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+	data, err := ioutil.ReadAll(conn)
 	if err != nil {
 		return
 	}
 	var addrs []NetAddress
-	if err = encoding.Unmarshal(buf[:n], &addrs); err != nil {
+	if err = encoding.Unmarshal(data, &addrs); err != nil {
 		return
 	}
 	// add peers
