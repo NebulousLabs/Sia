@@ -13,6 +13,12 @@ import (
 
 var SurpassThreshold = big.NewRat(5, 100)
 
+// Exported Errors
+var (
+	UnknownOrphanErr = errors.New("block is an unknown orphan")
+	KnownOrphanErr   = errors.New("block is a known orphan")
+)
+
 // EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
 // of a BlockNode to be legal.
 func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
@@ -43,14 +49,29 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known valid block.
 	_, exists = s.BlockMap[b.ID()]
 	if exists {
-		err = errors.New("Block exists in block map.")
+		err = errors.New("block exists in block map.")
 		return
 	}
 
 	// See if the block's parent is known.
 	parentBlockNode, exists = s.BlockMap[b.ParentBlockID]
 	if !exists {
-		err = errors.New("Block is an orphan")
+		// See if the block is a known orphan block.
+		orphansOfParent, exists := s.OrphanMap[b.ParentBlockID]
+		if !exists {
+			// Make the map for the parent - parent has not been seen before.
+			s.OrphanMap[b.ParentBlockID] = make(map[BlockID]*Block)
+		} else {
+			_, exists = orphansOfParent[b.ID()]
+			if exists {
+				err = KnownOrphanErr
+				return
+			}
+		}
+		// Add the block to the list of known orphans.
+		s.OrphanMap[b.ParentBlockID][b.ID()] = b
+
+		err = UnknownOrphanErr
 		return
 	}
 

@@ -44,8 +44,10 @@ func (e *environment) initializeNetwork() (err error) {
 	}
 	e.server.RegisterHandler('R', e.SendBlocks)
 
+	// download blockchain
 	randomPeer := e.server.RandomPeer()
-	randomPeer.Call(e.state.CatchUp(1))
+	for randomPeer.Call(e.state.CatchUp(e.state.Height())) == nil {
+	}
 
 	return
 }
@@ -86,6 +88,10 @@ func (e *environment) Close() {
 func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
 	if err != nil {
+		fmt.Println("AcceptBlock Error: ", err)
+		if err == siacore.UnknownOrphanErr {
+			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
+		}
 		return
 	}
 	go e.server.Broadcast(network.SendVal('B', b))
@@ -96,6 +102,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
 	if err != nil {
+		fmt.Println("AcceptTransaction Error:", err)
 		return
 	}
 	e.server.Broadcast(network.SendVal('T', t))
