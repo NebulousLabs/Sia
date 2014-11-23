@@ -1,8 +1,8 @@
 package network
 
 import (
+	"bytes"
 	"errors"
-	"io/ioutil"
 	"net"
 	"reflect"
 	"strconv"
@@ -44,15 +44,28 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
 		return nil, errors.New("could not read length prefix")
 	}
-	msgLen := encoding.DecUint64(prefix)
+	msgLen := int(encoding.DecUint64(prefix))
 	if msgLen > maxMsgLen {
 		return nil, errors.New("message too long")
 	}
-	data, err := ioutil.ReadAll(conn)
-	if uint64(len(data)) != msgLen {
+	// read msgLen bytes
+	data := new(bytes.Buffer)
+	for total := 0; total < msgLen; {
+		n, err := data.ReadFrom(conn)
+		if err != nil {
+			return nil, err
+		}
+		total += int(n)
+	}
+	if data.Len() != msgLen {
 		return nil, errors.New("message length mismatch")
 	}
-	return data, err
+	return data.Bytes(), nil
+}
+
+func WritePrefix(conn net.Conn, data []byte) (int, error) {
+	encLen := encoding.EncUint64(uint64(len(data)))
+	return conn.Write(append(encLen[:4], data...))
 }
 
 // SendVal returns a closure that can be used in conjuction with Call to send
@@ -197,7 +210,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 
 // sendHostname replies to the send with the sender's external IP.
 func sendHostname(conn net.Conn, _ []byte) error {
-	_, err := conn.Write([]byte(conn.RemoteAddr().String()))
+	_, err := WritePrefix(conn, []byte(conn.RemoteAddr().String()))
 	return err
 }
 
@@ -216,7 +229,7 @@ func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
 		addrs = append(addrs, addr)
 		num--
 	}
-	_, err := conn.Write(encoding.Marshal(addrs))
+	_, err := WritePrefix(conn, encoding.Marshal(addrs))
 	return err
 }
 
@@ -249,7 +262,7 @@ func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
 		return
 	}
 	// read response
-	data, err := ioutil.ReadAll(conn)
+	data, err := ReadPrefix(conn)
 	if err != nil {
 		return
 	}
@@ -270,7 +283,7 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 		return
 	}
 	// read response
-	data, err := ioutil.ReadAll(conn)
+	data, err := ReadPrefix(conn)
 	if err != nil {
 		return
 	}
