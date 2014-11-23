@@ -110,12 +110,19 @@ func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 		}
 		for i := range blocks {
 			if err = s.AcceptBlock(blocks[i]); err != nil {
-				if err == UnknownOrphanErr {
+				if err == UnknownOrphanErr && i == 0 {
 					if start > 6 && start > s.Height()-20 {
-						// TODO: HAVE LUKE FIX THIS LINE OF CODE.
+						// TODO: HAVE LUKE FIX THIS LINE OF CODE. IDEALLY, THIS
+						// CODE ALSO ONLY ASKS FOR BLOCKS FROM START-6 TO
+						// START, BECAUSE WE'RE ALREADY CAUGHT UP FROM START
+						// FORWARD.
 						s.CatchUp(start - 6)
 					}
 				}
+			} else if err != BlockKnownErr && err != FutureBlockErr {
+				// Return if there's an error, but don't return for benign
+				// errors: BlockKnownErr and FutureBlockErr are both benign.
+				return
 			}
 		}
 		if len(blocks) < MaxCatchUpBlocks {

@@ -15,8 +15,10 @@ var SurpassThreshold = big.NewRat(5, 100)
 
 // Exported Errors
 var (
-	UnknownOrphanErr = errors.New("block is an unknown orphan")
+	BlockKnownErr    = errors.New("block exists in block map.")
+	FutureBlockErr   = errors.New("timestamp too far in future, will try again later.")
 	KnownOrphanErr   = errors.New("block is a known orphan")
+	UnknownOrphanErr = errors.New("block is an unknown orphan")
 )
 
 // EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
@@ -49,7 +51,7 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known valid block.
 	_, exists = s.BlockMap[b.ID()]
 	if exists {
-		err = errors.New("block exists in block map.")
+		err = BlockKnownErr
 		return
 	}
 
@@ -105,7 +107,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 			time.Sleep(time.Duration(skew-FutureThreshold) * time.Second)
 			s.AcceptBlock(*b)
 		}(skew, parent, b)
-		err = errors.New("timestamp too far in future, will try again later.")
+		err = FutureBlockErr
 		return
 	}
 
