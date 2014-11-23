@@ -112,7 +112,10 @@ func (s *State) CurrentBlock() *Block {
 // State.blockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
-	return s.BlockMap[s.CurrentPath[height]].Block
+	if bn, ok := s.BlockMap[s.CurrentPath[height]]; ok {
+		b = bn.Block
+	}
+	return
 }
 
 // State.currentBlockWeight() returns the weight of the current block in the

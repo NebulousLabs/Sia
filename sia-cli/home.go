@@ -98,8 +98,9 @@ func printWalletAddresses(env *environment) {
 	fmt.Println("\tPrinting Networked Peers:")
 	addresses := env.server.AddressBook()
 	for _, address := range addresses {
-		fmt.Printf("\t\t%v:%v", address.Host, address.Port)
+		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
 	}
+	fmt.Println()
 }
 
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
