@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bytes"
 	"errors"
 	"net"
 	"reflect"
@@ -49,18 +48,20 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 		return nil, errors.New("message too long")
 	}
 	// read msgLen bytes
-	data := new(bytes.Buffer)
+	var data []byte
+	buf := make([]byte, 1024)
 	for total := 0; total < msgLen; {
-		n, err := data.ReadFrom(conn)
+		n, err := conn.Read(buf)
 		if err != nil {
 			return nil, err
 		}
-		total += int(n)
+		data = append(data, buf[:n]...)
+		total += n
 	}
-	if data.Len() != msgLen {
+	if len(data) != msgLen {
 		return nil, errors.New("message length mismatch")
 	}
-	return data.Bytes(), nil
+	return data, nil
 }
 
 func WritePrefix(conn net.Conn, data []byte) (int, error) {
