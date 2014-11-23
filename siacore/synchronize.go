@@ -13,7 +13,7 @@ const (
 )
 
 var (
-	GenesisAddress   = CoinAddress{}         // NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
 	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
@@ -96,6 +96,8 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 // current height. It can be called repeatedly to download the full chain.
 func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 	encbh := encoding.EncUint64(uint64(start))
+
+	// TODO: WHY ARE WE RETURNING A FUNCTION? THIS CODE IS REALLY SLOPPY ALSO.
 	return func(conn net.Conn) error {
 		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
 		var blocks []Block
@@ -108,7 +110,12 @@ func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
 		}
 		for i := range blocks {
 			if err = s.AcceptBlock(blocks[i]); err != nil {
-				return err
+				if err == UnknownOrphanErr {
+					if start > 6 && start > s.Height()-20 {
+						// TODO: HAVE LUKE FIX THIS LINE OF CODE.
+						s.CatchUp(start - 6)
+					}
+				}
 			}
 		}
 		if len(blocks) < MaxCatchUpBlocks {

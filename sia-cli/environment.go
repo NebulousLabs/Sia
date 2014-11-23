@@ -78,7 +78,7 @@ func createEnvironment() (env *environment, err error) {
 	}
 
 	// accept mined blocks
-	// TODO: when should this terminate?
+	// TODO: WHEN SHOULD THIS TERMINATE?
 	go func() {
 		for {
 			env.AcceptBlock(*<-env.miner.BlockChan)
@@ -97,11 +97,11 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	if err != nil {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
-			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
 			peer := e.server.RandomPeer()
 			err2 := peer.Call(e.state.CatchUp(e.state.Height() + 1))
 			if err2 != nil {
-				fmt.Println(err2)
+				// Logging
+				// fmt.Println(err2)
 			}
 		}
 		return
