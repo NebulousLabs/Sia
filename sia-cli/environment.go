@@ -46,7 +46,14 @@ func (e *environment) initializeNetwork() (err error) {
 
 	// download blockchain
 	randomPeer := e.server.RandomPeer()
-	for randomPeer.Call(e.state.CatchUp(e.state.Height())) == nil {
+	fmt.Println(randomPeer)
+	for {
+		err2 := randomPeer.Call(e.state.CatchUp(e.state.Height() + 1))
+
+		if err2 != nil {
+			fmt.Println("Stopped catching up:", err2)
+			break
+		}
 	}
 
 	return
@@ -92,7 +99,10 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 		if err == siacore.UnknownOrphanErr {
 			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
 			peer := e.server.RandomPeer()
-			peer.Call(e.state.CatchUp(e.state.Height()))
+			err2 := peer.Call(e.state.CatchUp(e.state.Height() + 1))
+			if err2 != nil {
+				fmt.Println(err2)
+			}
 		}
 		return
 	}
