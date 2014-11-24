@@ -15,8 +15,6 @@ const (
 var (
 	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
 	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
-
-	OrphanFirstErr = errors.New("first block during CatchUp() was an orphan")
 )
 
 // CreateGenesisState will create the state that contains the genesis block and
@@ -66,16 +64,43 @@ func CreateGenesisState() (s *State) {
 // SendBlocks sends all known blocks from the given height forward from the
 // longest known fork.
 func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
-	// Get the starting point.
-	start := BlockHeight(encoding.DecUint64(data))
-	if start > s.Height() {
-		err = errors.New("start is greater than the height of the longest known fork.")
+	// Decode the set of blocks that the triggering node knows about.
+	var knownBlocks [32]BlockID
+	err = encoding.Unmarshal(data, &knownBlocks)
+	if err != nil {
+		return
+	}
+
+	// Find the most recent block that is in our current path.
+	found := false
+	var closestHeight BlockHeight
+	for i := range knownBlocks {
+		// See if we know which block it is, get the node to know the height.
+		blockNode, exists := s.BlockMap[knownBlocks[i]]
+		if !exists {
+			continue
+		}
+
+		// See if the known block is in the current path, and if it is see if
+		// its height is greater than the closest yet known height.
+		id, exists := s.CurrentPath[blockNode.Height]
+		if exists && id == knownBlocks[i] {
+			found = true
+			if closestHeight < blockNode.Height {
+				closestHeight = blockNode.Height
+			}
+		}
+	}
+
+	// See that a match was actually found.
+	if !found {
+		err = errors.New("no matching block found during SendBlocks")
 		return
 	}
 
 	// Build an array of blocks.
 	var blocks []Block
-	for i := start; i < start+MaxCatchUpBlocks; i++ {
+	for i := closestHeight; i < closestHeight+MaxCatchUpBlocks; i++ {
 		b := s.BlockAtHeight(i)
 		if b == nil {
 			break
@@ -94,11 +119,33 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-func (s *State) networkCatchUp(start BlockHeight) func(net.Conn) error {
-	encbh := encoding.EncUint64(uint64(start))
+func (s *State) CatchUp() func(net.Conn) error {
+	var knownBlocks [32]BlockID
+	for i := BlockHeight(0); i < 12; i++ {
+		// Prevent underflows
+		if i > s.Height() {
+			break
+		}
 
+		knownBlocks[i] = s.CurrentPath[s.Height()-i]
+	}
+
+	backtrace := BlockHeight(10)
+	for i := 12; i < 31; i++ {
+		backtrace = BlockHeight(float64(backtrace) * 1.75)
+		// Prevent underflows
+		if backtrace > s.Height() {
+			break
+		}
+
+		knownBlocks[i] = s.CurrentPath[s.Height()-backtrace]
+	}
+
+	knownBlocks[31] = s.CurrentPath[0]
+
+	encodedKnownBlocks := encoding.Marshal(knownBlocks)
 	return func(conn net.Conn) error {
-		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
+		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encodedKnownBlocks...))
 		var blocks []Block
 		encBlocks, err := network.ReadPrefix(conn)
 		if err != nil {
@@ -110,48 +157,21 @@ func (s *State) networkCatchUp(start BlockHeight) func(net.Conn) error {
 
 		for i := range blocks {
 			if err = s.AcceptBlock(blocks[i]); err != nil {
-				if i == 0 && err == UnknownOrphanErr {
-					// If the first block received is an orphan, we need to ask
-					// for an earlier block.
-					return OrphanFirstErr
-				} else if err != BlockKnownErr && err != FutureBlockErr {
+				if err != BlockKnownErr && err != FutureBlockErr {
 					// Return if there's an error, but don't return for benign
 					// errors: BlockKnownErr and FutureBlockErr are both benign.
 					return err
 				}
 			}
 		}
-		if len(blocks) < MaxCatchUpBlocks {
-			return errors.New("finished catching up")
-		}
+
+		// Is this just a debugging statement?
+		/*
+			if len(blocks) < MaxCatchUpBlocks {
+				return errors.New("finished catching up")
+			}
+		*/
 
 		return nil
 	}
-}
-
-// CatchUp requests a maximum of 100 blocks from a peer, starting from the
-// current height. It can be called repeatedly to download the full chain.
-func (s *State) CatchUp(address network.NetAddress, start BlockHeight) (err error) {
-	err = address.Call(s.networkCatchUp(start))
-
-	// If the first block received when calling networkCatchUp is an orphan, we
-	// need to call CatchUp() from an earlier block. We will not rewind more
-	// than 20 blocks when looking for a parent, instead relying on network
-	// keepalives to detect if the network has found a different, larger fork
-	// that rewinds further than 20 blocks.
-	if err == OrphanFirstErr {
-		if s.Height() <= 20 && start > 1 {
-			err = s.CatchUp(address, 1)
-		} else if start > s.Height()-20 {
-			err = s.CatchUp(address, start-20)
-		}
-	}
-
-	// One point of inefficiency is that you already have a bunch of orphan
-	// blocks that you don't need to download again, and yet you download them
-	// anyway. If you already downloaded a bunch of blocks but the first one
-	// was an orphan, you'll end up downloading all of those blocks again when
-	// you try to get the orphan's parent.
-
-	return
 }
