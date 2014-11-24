@@ -64,24 +64,40 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 	return data, nil
 }
 
+func ReadObject(conn net.Conn, obj interface{}) error {
+	data, err := ReadPrefix(conn)
+	if err != nil {
+		return err
+	}
+	return encoding.Unmarshal(data, obj)
+}
+
 func WritePrefix(conn net.Conn, data []byte) (int, error) {
 	encLen := encoding.EncUint64(uint64(len(data)))
 	return conn.Write(append(encLen[:4], data...))
 }
 
-// SendVal returns a closure that can be used in conjuction with Call to send
-// a value to a NetAddress. It prefixes the encoded data with a header,
-// containing the message's type and length
-func SendVal(t byte, val interface{}) func(net.Conn) error {
-	encVal := encoding.Marshal(val)
-	encLen := encoding.EncUint64(uint64(len(encVal)))
-	msg := append([]byte{t},
-		append(encLen[:4], encVal...)...)
+func WriteObject(conn net.Conn, obj interface{}) (int, error) {
+	return WritePrefix(conn, encoding.Marshal(obj))
+}
 
-	return func(conn net.Conn) error {
-		_, err := conn.Write(msg)
-		return err
-	}
+// RPC performs a Remote Procedure Call by sending the procedure name and
+// encoded argument, and decoding the response into the supplied object.
+// 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
+// nil, no response is read.
+func (na *NetAddress) RPC(t byte, arg, resp interface{}) error {
+	return na.Call(func(conn net.Conn) error {
+		conn.Write([]byte{t})
+		if arg != nil {
+			if _, err := WriteObject(conn, arg); err != nil {
+				return err
+			}
+		}
+		if resp != nil {
+			return ReadObject(conn, resp)
+		}
+		return nil
+	})
 }
 
 // TBD
@@ -113,37 +129,83 @@ func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
 	}
 }
 
-// RegisterHandler registers a message type with a message handler. The
-// existing handler for that type will be overwritten.
-func (tcps *TCPServer) RegisterHandler(t byte, fn func(net.Conn, []byte) error) {
-	tcps.handlerMap[t] = fn
-}
-
-// RegisterRPC is for simple handlers. A simple handler decodes the message
-// data and passes it to fn. fn must have the type signature:
-//   func(Type) error
-// i.e. a 1-adic function that returns an error.
-func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) {
-	// if fn not correct type, panic
+func (tcps *TCPServer) Register(t byte, fn interface{}) {
+	// all handlers are function with at least one in and one error out
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
-	if typ.Kind() != reflect.Func || typ.NumIn() != 1 ||
+	if typ.Kind() != reflect.Func || typ.NumIn() < 1 ||
 		typ.NumOut() != 1 || typ.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
 		panic("registered function has wrong type signature")
 	}
 
-	// create and register function
-	tcps.RegisterHandler(t, func(_ net.Conn, b []byte) error {
+	switch {
+	// func(net.Conn, []byte) error
+	case typ.NumIn() == 2 && typ.In(0) == reflect.TypeOf((*net.Conn)(nil)).Elem() && typ.In(1) == reflect.TypeOf([]byte{}):
+		tcps.handlerMap[t] = fn.(func(net.Conn, []byte) error)
+	// func(Type, *Type) error
+	case typ.NumIn() == 2 && typ.In(0).Kind() != reflect.Ptr && typ.In(1).Kind() == reflect.Ptr:
+		tcps.registerRPC(t, val, typ)
+	// func(Type) error
+	case typ.NumIn() == 1 && typ.In(0).Kind() != reflect.Ptr:
+		tcps.registerArg(t, val, typ)
+	// func(*Type) error
+	case typ.NumIn() == 1 && typ.In(0).Kind() == reflect.Ptr:
+		tcps.registerResp(t, val, typ)
+	default:
+		panic("registered function has wrong type signature")
+	}
+}
+
+// registerRPC is for handlers that return a value. The input is decoded and
+// passed to fn, which stores its result in a pointer argument. This argument
+// is then written back to the caller. fn must have the type signature:
+//     func(Type, *Type) error
+func (tcps *TCPServer) registerRPC(t byte, fn reflect.Value, typ reflect.Type) {
+	tcps.handlerMap[t] = func(conn net.Conn, b []byte) error {
 		// create object to decode into
-		v := reflect.New(typ.In(0))
-		if err := encoding.Unmarshal(b, v.Interface()); err != nil {
+		arg := reflect.New(typ.In(0))
+		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
 			return err
 		}
 		// call fn on object
-		if err := val.Call([]reflect.Value{v.Elem()})[0].Interface(); err != nil {
+		resp := reflect.New(typ.In(1))
+		if err := fn.Call([]reflect.Value{arg.Elem(), resp})[0].Interface(); err != nil {
+			return err.(error)
+		}
+		// write response
+		_, err := WriteObject(conn, resp.Elem().Interface())
+		return err
+	}
+}
+
+// registerArg is for RPCs that do not return a value.
+func (tcps *TCPServer) registerArg(t byte, fn reflect.Value, typ reflect.Type) {
+	tcps.handlerMap[t] = func(_ net.Conn, b []byte) error {
+		// create object to decode into
+		arg := reflect.New(typ.In(0))
+		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
+			return err
+		}
+		// call fn on object
+		if err := fn.Call([]reflect.Value{arg.Elem()})[0].Interface(); err != nil {
 			return err.(error)
 		}
 		return nil
-	})
+	}
+}
+
+// registerResp is for RPCs that do not take a value.
+func (tcps *TCPServer) registerResp(t byte, fn reflect.Value, typ reflect.Type) {
+	tcps.handlerMap[t] = func(conn net.Conn, _ []byte) error {
+		// create object to hold response
+		resp := reflect.New(typ.In(0))
+		// call fn
+		if err := fn.Call([]reflect.Value{resp})[0].Interface(); err != nil {
+			return err.(error)
+		}
+		// write response
+		_, err := WriteObject(conn, resp.Elem().Interface())
+		return err
+	}
 }
 
 // NewTCPServer creates a TCPServer that listens on the specified port.
@@ -300,6 +362,13 @@ func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
 	return
 }
 
+// anounce announces the TCPServer's NetAddress to other peers.
+func (tcps *TCPServer) announce(conn net.Conn) error {
+	conn.Write([]byte{'A'})
+	_, err := WriteObject(conn, tcps.myAddr)
+	return err
+}
+
 // Bootstrap discovers the external IP of the TCPServer, requests peers from
 // the initial peer list, and announces itself to those peers.
 func (tcps *TCPServer) Bootstrap() (err error) {
@@ -322,7 +391,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	tcps.Broadcast(tcps.requestPeers)
 
 	// announce ourselves to new peers
-	tcps.Broadcast(SendVal('A', tcps.myAddr))
+	tcps.Broadcast(tcps.announce)
 
 	return
 }
