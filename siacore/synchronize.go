@@ -119,7 +119,7 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-func (s *State) CatchUp() func(net.Conn) error {
+func (s *State) CatchUp(conn net.Conn) error {
 	var knownBlocks [32]BlockID
 	for i := BlockHeight(0); i < 12; i++ {
 		// Prevent underflows
@@ -143,27 +143,25 @@ func (s *State) CatchUp() func(net.Conn) error {
 
 	knownBlocks[31] = s.CurrentPath[0]
 
-	return func(conn net.Conn) error {
-		network.SendVal('R', knownBlocks)(conn)
-		var blocks []Block
-		encBlocks, err := network.ReadPrefix(conn)
-		if err != nil {
-			return err
-		}
-		if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
-			return err
-		}
+	network.SendVal('R', knownBlocks)(conn)
+	var blocks []Block
+	encBlocks, err := network.ReadPrefix(conn)
+	if err != nil {
+		return err
+	}
+	if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
+		return err
+	}
 
-		for i := range blocks {
-			if err = s.AcceptBlock(blocks[i]); err != nil {
-				if err != BlockKnownErr && err != FutureBlockErr {
-					// Return if there's an error, but don't return for benign
-					// errors: BlockKnownErr and FutureBlockErr are both benign.
-					return err
-				}
+	for i := range blocks {
+		if err = s.AcceptBlock(blocks[i]); err != nil {
+			if err != BlockKnownErr && err != FutureBlockErr {
+				// Return if there's an error, but don't return for benign
+				// errors: BlockKnownErr and FutureBlockErr are both benign.
+				return err
 			}
 		}
-
-		return nil
 	}
+
+	return nil
 }

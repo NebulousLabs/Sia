@@ -52,7 +52,7 @@ func (e *environment) initializeNetwork() (err error) {
 	// empty batch is sent.
 	for {
 		prevHeight := e.state.Height()
-		err2 := randomPeer.Call(e.state.CatchUp())
+		err2 := randomPeer.Call(e.state.CatchUp)
 
 		if err2 != nil {
 			fmt.Println("Error during CatchUp:", err2)
@@ -106,7 +106,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
 			peer := e.server.RandomPeer()
-			err2 := peer.Call(e.state.CatchUp())
+			err2 := peer.Call(e.state.CatchUp)
 			if err2 != nil {
 				// Logging
 				// fmt.Println(err2)
