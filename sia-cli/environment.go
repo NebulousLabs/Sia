@@ -44,14 +44,22 @@ func (e *environment) initializeNetwork() (err error) {
 	}
 	e.server.RegisterHandler('R', e.SendBlocks)
 
-	// download blockchain
+	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
 	fmt.Println(randomPeer)
+
+	// Download the blockchain, getting blocks one batch at a time until an
+	// empty batch is sent.
 	for {
-		err2 := randomPeer.Call(e.state.CatchUp(e.state.Height() + 1))
+		prevHeight := e.state.Height()
+		err2 := randomPeer.Call(e.state.CatchUp)
 
 		if err2 != nil {
-			fmt.Println("Stopped catching up:", err2)
+			fmt.Println("Error during CatchUp:", err2)
+			break
+		}
+
+		if prevHeight == e.state.Height() {
 			break
 		}
 	}
@@ -78,7 +86,7 @@ func createEnvironment() (env *environment, err error) {
 	}
 
 	// accept mined blocks
-	// TODO: when should this terminate?
+	// TODO: WHEN SHOULD THIS TERMINATE?
 	go func() {
 		for {
 			env.AcceptBlock(*<-env.miner.BlockChan)
@@ -97,11 +105,11 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	if err != nil {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
-			// ASK THE SENDING NODE FOR THE ORPHANS PARENTS.
 			peer := e.server.RandomPeer()
-			err2 := peer.Call(e.state.CatchUp(e.state.Height() + 1))
+			err2 := peer.Call(e.state.CatchUp)
 			if err2 != nil {
-				fmt.Println(err2)
+				// Logging
+				// fmt.Println(err2)
 			}
 		}
 		return

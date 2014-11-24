@@ -13,7 +13,7 @@ const (
 )
 
 var (
-	GenesisAddress   = CoinAddress{}         // NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
 	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
@@ -64,16 +64,43 @@ func CreateGenesisState() (s *State) {
 // SendBlocks sends all known blocks from the given height forward from the
 // longest known fork.
 func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
-	// Get the starting point.
-	start := BlockHeight(encoding.DecUint64(data))
-	if start > s.Height() {
-		err = errors.New("start is greater than the height of the longest known fork.")
+	// Decode the set of blocks that the triggering node knows about.
+	var knownBlocks [32]BlockID
+	err = encoding.Unmarshal(data, &knownBlocks)
+	if err != nil {
+		return
+	}
+
+	// Find the most recent block that is in our current path.
+	found := false
+	var closestHeight BlockHeight
+	for i := range knownBlocks {
+		// See if we know which block it is, get the node to know the height.
+		blockNode, exists := s.BlockMap[knownBlocks[i]]
+		if !exists {
+			continue
+		}
+
+		// See if the known block is in the current path, and if it is see if
+		// its height is greater than the closest yet known height.
+		id, exists := s.CurrentPath[blockNode.Height]
+		if exists && id == knownBlocks[i] {
+			found = true
+			if closestHeight < blockNode.Height {
+				closestHeight = blockNode.Height
+			}
+		}
+	}
+
+	// See that a match was actually found.
+	if !found {
+		err = errors.New("no matching block found during SendBlocks")
 		return
 	}
 
 	// Build an array of blocks.
 	var blocks []Block
-	for i := start; i < start+MaxCatchUpBlocks; i++ {
+	for i := closestHeight; i < closestHeight+MaxCatchUpBlocks; i++ {
 		b := s.BlockAtHeight(i)
 		if b == nil {
 			break
@@ -92,28 +119,49 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-// CatchUp requests a maximum of 100 blocks from a peer, starting from the
-// current height. It can be called repeatedly to download the full chain.
-func (s *State) CatchUp(start BlockHeight) func(net.Conn) error {
-	encbh := encoding.EncUint64(uint64(start))
-	return func(conn net.Conn) error {
-		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encbh[:4]...))
-		var blocks []Block
-		encBlocks, err := network.ReadPrefix(conn)
-		if err != nil {
-			return err
+func (s *State) CatchUp(conn net.Conn) error {
+	var knownBlocks [32]BlockID
+	for i := BlockHeight(0); i < 12; i++ {
+		// Prevent underflows
+		if i > s.Height() {
+			break
 		}
-		if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
-			return err
+
+		knownBlocks[i] = s.CurrentPath[s.Height()-i]
+	}
+
+	backtrace := BlockHeight(10)
+	for i := 12; i < 31; i++ {
+		backtrace = BlockHeight(float64(backtrace) * 1.75)
+		// Prevent underflows
+		if backtrace > s.Height() {
+			break
 		}
-		for i := range blocks {
-			if err = s.AcceptBlock(blocks[i]); err != nil {
+
+		knownBlocks[i] = s.CurrentPath[s.Height()-backtrace]
+	}
+
+	knownBlocks[31] = s.CurrentPath[0]
+
+	network.SendVal('R', knownBlocks)(conn)
+	var blocks []Block
+	encBlocks, err := network.ReadPrefix(conn)
+	if err != nil {
+		return err
+	}
+	if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
+		return err
+	}
+
+	for i := range blocks {
+		if err = s.AcceptBlock(blocks[i]); err != nil {
+			if err != BlockKnownErr && err != FutureBlockErr {
+				// Return if there's an error, but don't return for benign
+				// errors: BlockKnownErr and FutureBlockErr are both benign.
 				return err
 			}
 		}
-		if len(blocks) < MaxCatchUpBlocks {
-			return errors.New("finished catching up")
-		}
-		return nil
 	}
+
+	return nil
 }
