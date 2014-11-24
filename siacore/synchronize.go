@@ -143,9 +143,8 @@ func (s *State) CatchUp() func(net.Conn) error {
 
 	knownBlocks[31] = s.CurrentPath[0]
 
-	encodedKnownBlocks := encoding.Marshal(knownBlocks)
 	return func(conn net.Conn) error {
-		conn.Write(append([]byte{'R', 4, 0, 0, 0}, encodedKnownBlocks...))
+		network.SendVal('R', knownBlocks)(conn)
 		var blocks []Block
 		encBlocks, err := network.ReadPrefix(conn)
 		if err != nil {
