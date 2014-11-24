@@ -151,75 +151,25 @@ func (tcps *TCPServer) registerResp(t byte, fn reflect.Value, typ reflect.Type) 
 
 // sendHostname replies to the send with the sender's external IP.
 func sendHostname(conn net.Conn, _ []byte) error {
-	_, err := WritePrefix(conn, []byte(conn.RemoteAddr().String()))
+	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	_, err := WritePrefix(conn, []byte(host))
 	return err
 }
 
 // sharePeers transmits at most 'num' peers over the connection.
 // TODO: choose random peers?
-func (tcps *TCPServer) sharePeers(conn net.Conn, msgData []byte) error {
-	var addrs []NetAddress
+func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
 	for addr := range tcps.addressbook {
-		if len(addrs) == 10 { // arbitrary
+		if len(*addrs) == 10 { // arbitrary
 			break
 		}
-		addrs = append(addrs, addr)
+		*addrs = append(*addrs, addr)
 	}
-	_, err := WritePrefix(conn, encoding.Marshal(addrs))
-	return err
+	return nil
 }
 
 // addPeer adds the connecting peer to its address book
-func (tcps *TCPServer) addPeer(_ net.Conn, data []byte) (err error) {
-	var addr NetAddress
-	if err = encoding.Unmarshal(data, &addr); err != nil {
-		return
-	}
-	tcps.addressbook[addr] = struct{}{}
-	return
-}
-
-// learnHostname learns the external IP of the TCPServer.
-func (tcps *TCPServer) learnHostname(conn net.Conn) (err error) {
-	// send hostname request
-	if _, err = conn.Write([]byte{'H', 0, 0, 0, 0}); err != nil {
-		return
-	}
-	// read response
-	data, err := ReadPrefix(conn)
-	if err != nil {
-		return
-	}
-	// TODO: try to ping ourselves?
-	host, _, err := net.SplitHostPort(string(data))
-	if err != nil {
-		return
-	}
-	tcps.myAddr.Host = host
-	return
-}
-
-// requestPeers queries a peer for additional peers, and adds any new peers to
-// the address book.
-func (tcps *TCPServer) requestPeers(conn net.Conn) (err error) {
-	// request 10 peers
-	if _, err = conn.Write([]byte{'P', 0, 0, 0, 0}); err != nil {
-		return
-	}
-	// read response
-	data, err := ReadPrefix(conn)
-	if err != nil {
-		return
-	}
-	var addrs []NetAddress
-	if err = encoding.Unmarshal(data, &addrs); err != nil {
-		return
-	}
-	// add peers
-	for _, addr := range addrs {
-		if addr != tcps.myAddr && tcps.Ping(addr) {
-			tcps.addressbook[addr] = struct{}{}
-		}
-	}
-	return
+func (tcps *TCPServer) addPeer(peer NetAddress) error {
+	tcps.addressbook[peer] = struct{}{}
+	return nil
 }

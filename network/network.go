@@ -56,13 +56,12 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 		Listener:    tcpServ,
 		myAddr:      NetAddress{"", port},
 		addressbook: make(map[NetAddress]struct{}),
+		handlerMap:  make(map[byte]func(net.Conn, []byte) error),
 	}
 	// default handlers
-	tcps.handlerMap = map[byte]func(net.Conn, []byte) error{
-		'H': sendHostname,
-		'P': tcps.sharePeers,
-		'A': tcps.addPeer,
-	}
+	tcps.Register('H', sendHostname)
+	tcps.Register('P', tcps.sharePeers)
+	tcps.Register('A', tcps.addPeer)
 
 	// spawn listener
 	go tcps.listen()
@@ -81,14 +80,26 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 
 	// learn hostname
 	for addr := range tcps.addressbook {
-		if addr.Call(tcps.learnHostname) == nil {
+		var hostname string
+		if addr.RPC('H', nil, &hostname) == nil {
+			tcps.myAddr.Host = hostname
 			break
 		}
 	}
 
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
-	tcps.Broadcast(tcps.requestPeers)
+	var peers []NetAddress
+	for addr := range tcps.addressbook {
+		var resp []NetAddress
+		addr.RPC('P', nil, &resp)
+		peers = append(peers, resp...)
+	}
+	for _, addr := range peers {
+		if addr != tcps.myAddr && tcps.Ping(addr) {
+			tcps.addressbook[addr] = struct{}{}
+		}
+	}
 
 	// announce ourselves to new peers
 	tcps.Announce('A', tcps.myAddr)
