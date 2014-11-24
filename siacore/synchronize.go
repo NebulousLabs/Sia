@@ -2,9 +2,7 @@ package siacore
 
 import (
 	"errors"
-	"net"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/network"
 )
 
@@ -63,14 +61,7 @@ func CreateGenesisState() (s *State) {
 
 // SendBlocks sends all known blocks from the given height forward from the
 // longest known fork.
-func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
-	// Decode the set of blocks that the triggering node knows about.
-	var knownBlocks [32]BlockID
-	err = encoding.Unmarshal(data, &knownBlocks)
-	if err != nil {
-		return
-	}
-
+func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 	// Find the most recent block that is in our current path.
 	found := false
 	var closestHeight BlockHeight
@@ -94,32 +85,22 @@ func (s *State) SendBlocks(conn net.Conn, data []byte) (err error) {
 
 	// See that a match was actually found.
 	if !found {
-		err = errors.New("no matching block found during SendBlocks")
-		return
+		return errors.New("no matching block found during SendBlocks")
 	}
 
 	// Build an array of blocks.
-	var blocks []Block
 	for i := closestHeight; i < closestHeight+MaxCatchUpBlocks; i++ {
 		b := s.BlockAtHeight(i)
 		if b == nil {
 			break
 		}
-		blocks = append(blocks, *b)
+		*blocks = append(*blocks, *b)
 	}
 
-	// Encode and send the blocks.
-	encBlocks := encoding.Marshal(blocks)
-	encLen := encoding.EncUint64(uint64(len(encBlocks)))
-	_, err = conn.Write(append(encLen[:4], encBlocks...))
-	if err != nil {
-		return
-	}
-
-	return
+	return nil
 }
 
-func (s *State) CatchUp(conn net.Conn) error {
+func (s *State) CatchUp(peer network.NetAddress) (err error) {
 	var knownBlocks [32]BlockID
 	for i := BlockHeight(0); i < 12; i++ {
 		// Prevent underflows
@@ -143,15 +124,8 @@ func (s *State) CatchUp(conn net.Conn) error {
 
 	knownBlocks[31] = s.CurrentPath[0]
 
-	network.SendVal('R', knownBlocks)(conn)
 	var blocks []Block
-	encBlocks, err := network.ReadPrefix(conn)
-	if err != nil {
-		return err
-	}
-	if err = encoding.Unmarshal(encBlocks, &blocks); err != nil {
-		return err
-	}
+	peer.RPC('R', knownBlocks, &blocks)
 
 	for i := range blocks {
 		if err = s.AcceptBlock(blocks[i]); err != nil {
