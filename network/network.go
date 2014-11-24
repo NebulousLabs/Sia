@@ -123,28 +123,27 @@ func (tcps *TCPServer) RegisterHandler(t byte, fn func(net.Conn, []byte) error) 
 // data and passes it to fn. fn must have the type signature:
 //   func(Type) error
 // i.e. a 1-adic function that returns an error.
-func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) error {
+func (tcps *TCPServer) RegisterRPC(t byte, fn interface{}) {
 	// if fn not correct type, panic
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
 	if typ.Kind() != reflect.Func || typ.NumIn() != 1 ||
 		typ.NumOut() != 1 || typ.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return errors.New("registered function has wrong type signature")
+		panic("registered function has wrong type signature")
 	}
 
-	// create function:
-	sfn := func(_ net.Conn, b []byte) error {
+	// create and register function
+	tcps.RegisterHandler(t, func(_ net.Conn, b []byte) error {
+		// create object to decode into
 		v := reflect.New(typ.In(0))
 		if err := encoding.Unmarshal(b, v.Interface()); err != nil {
 			return err
 		}
+		// call fn on object
 		if err := val.Call([]reflect.Value{v.Elem()})[0].Interface(); err != nil {
 			return err.(error)
 		}
 		return nil
-	}
-
-	tcps.RegisterHandler(t, sfn)
-	return nil
+	})
 }
 
 // NewTCPServer creates a TCPServer that listens on the specified port.
