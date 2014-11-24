@@ -164,13 +164,6 @@ func (s *State) CatchUp() func(net.Conn) error {
 			}
 		}
 
-		// Is this just a debugging statement?
-		/*
-			if len(blocks) < MaxCatchUpBlocks {
-				return errors.New("finished catching up")
-			}
-		*/
-
 		return nil
 	}
 }
