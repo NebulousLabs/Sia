@@ -17,6 +17,8 @@ type environment struct {
 	miner  *siad.Miner
 	renter *siad.Renter
 	wallet *siad.Wallet
+
+	caughtUp bool
 }
 
 func (e *environment) initializeNetwork() (err error) {
@@ -43,19 +45,23 @@ func (e *environment) initializeNetwork() (err error) {
 
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
-	for {
-		prevHeight := e.state.Height()
-		err = e.state.CatchUp(randomPeer)
+	go func() {
+		for {
+			prevHeight := e.state.Height()
+			err = e.state.CatchUp(randomPeer)
 
-		if err != nil {
-			fmt.Println("Error during CatchUp:", err)
-			break
+			if err != nil {
+				fmt.Println("Error during CatchUp:", err)
+				break
+			}
+
+			if prevHeight == e.state.Height() {
+				break
+			}
 		}
 
-		if prevHeight == e.state.Height() {
-			break
-		}
-	}
+		e.caughtUp = true
+	}()
 
 	return nil
 }

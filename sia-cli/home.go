@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -149,6 +150,7 @@ func displayHomeHelp() {
 	fmt.Println(
 		" h:\tHelp - display this message\n",
 		"q:\tQuit - quit the program\n",
+		"c:\tCatch Up - collect blocks you are missing.\n",
 		"H:\tHost - become a host and announce to the network\n",
 		"m:\tMine - turn mining on or off\n",
 		"p\tPrint - list all of the wallets, plus some stats about the program\n",
@@ -179,11 +181,28 @@ func pollHome(env *environment) {
 		case "q", "quit":
 			return
 
+		case "c", "catch":
+			// Dirty that the error just inserts itself into whatever the user
+			// is doing.
+			go func() {
+				// Need a lock here.
+				env.caughtUp = false
+				err := env.state.CatchUp(env.server.RandomPeer())
+				if err != nil {
+					fmt.Println("CatchUp Error:", err)
+				}
+				env.caughtUp = true
+			}()
+
 		case "H", "host", "store", "advertise", "storage":
 			err = becomeHostWalkthrough(env)
 
 		case "m", "mine", "toggle", "mining":
-			toggleMining(env)
+			if !env.caughtUp {
+				err = errors.New("not caught up to peers yet. Please wait.")
+			} else {
+				toggleMining(env)
+			}
 
 		case "p", "print":
 			printWalletAddresses(env)
