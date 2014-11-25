@@ -17,6 +17,8 @@ type environment struct {
 	miner  *siad.Miner
 	renter *siad.Renter
 	wallet *siad.Wallet
+
+	caughtUp bool
 }
 
 func (e *environment) initializeNetwork() (err error) {
@@ -57,6 +59,8 @@ func (e *environment) initializeNetwork() (err error) {
 				break
 			}
 		}
+
+		e.caughtUp = true
 	}()
 
 	return nil
