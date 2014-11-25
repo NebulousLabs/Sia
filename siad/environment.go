@@ -1,27 +1,26 @@
-package main
+package siad
 
 import (
 	"fmt"
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
-	"github.com/NebulousLabs/Andromeda/siad"
 )
 
-type environment struct {
+type Environment struct {
 	state *siacore.State
 
 	server *network.TCPServer
 
-	host   *siad.Host
-	miner  *siad.Miner
-	renter *siad.Renter
-	wallet *siad.Wallet
+	host   *Host
+	miner  *Miner
+	renter *Renter
+	wallet *Wallet
 
 	caughtUp bool
 }
 
-func (e *environment) initializeNetwork() (err error) {
+func (e *Environment) initializeNetwork() (err error) {
 	e.server, err = network.NewTCPServer(9988)
 	if err != nil {
 		return
@@ -69,42 +68,42 @@ func (e *environment) initializeNetwork() (err error) {
 // createEnvironment() creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func createEnvironment() (env *environment, err error) {
-	env = new(environment)
-	err = env.initializeNetwork()
+func createEnvironment() (e *Environment, err error) {
+	e = new(Environment)
+	err = e.initializeNetwork()
 	if err != nil {
 		return
 	}
-	env.miner = siad.CreateMiner()
-	env.host = siad.CreateHost()
-	env.renter = siad.CreateRenter()
-	env.wallet, err = siad.CreateWallet()
+	e.miner = CreateMiner()
+	e.host = CreateHost()
+	e.renter = CreateRenter()
+	e.wallet, err = CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	env.miner.State = env.state
-	env.host.State = env.state
-	env.renter.State = env.state
-	env.wallet.State = env.state
+	e.miner.State = e.state
+	e.host.State = e.state
+	e.renter.State = e.state
+	e.wallet.State = e.state
 
 	// accept mined blocks
 	// TODO: WHEN SHOULD THIS TERMINATE?
 	go func() {
 		for {
-			env.AcceptBlock(*<-env.miner.BlockChan)
+			e.AcceptBlock(*<-e.miner.BlockChan)
 		}
 	}()
 
 	return
 }
 
-func (e *environment) Close() {
+func (e *Environment) Close() {
 	e.server.Close()
 }
 
-func (e *environment) AcceptBlock(b siacore.Block) (err error) {
+func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
 	if err != nil && err != siacore.BlockKnownErr {
 		fmt.Println("AcceptBlock Error: ", err)
@@ -122,7 +121,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	return
 }
 
-func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
+func (e *Environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
 	if err != nil {
 		fmt.Println("AcceptTransaction Error:", err)

@@ -9,7 +9,7 @@ import (
 )
 
 // Pulls a bunch of information and announces the host to the network.
-func becomeHostWalkthrough(env *environment) (err error) {
+func becomeHostWalkthrough(e *siad.Environment) (err error) {
 	// Get a volume of days to freeze the coins.
 	// Burn will be equal to price.
 	// Frequency will be 100.
@@ -46,8 +46,8 @@ func becomeHostWalkthrough(env *environment) (err error) {
 	}
 
 	// Create the host announcement structure.
-	env.wallet.HostSettings = siad.HostAnnouncement{
-		IPAddress:             env.server.NetAddress(),
+	e.wallet.HostSettings = siad.HostAnnouncement{
+		IPAddress:             e.server.NetAddress(),
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,
 		MaxDuration:           10000,
@@ -55,12 +55,12 @@ func becomeHostWalkthrough(env *environment) (err error) {
 		MinTolerance:          10,
 		Price:                 siacore.Currency(price),
 		Burn:                  siacore.Currency(price),
-		CoinAddress:           env.wallet.SpendConditions.CoinAddress(),
+		CoinAddress:           e.wallet.SpendConditions.CoinAddress(),
 		// SpendConditions and FreezeIndex handled by HostAnnounceSelg
 	}
 
 	// Have the wallet make the announcement.
-	_, err = env.wallet.HostAnnounceSelf(siacore.Currency(freezeCoins), siacore.BlockHeight(freezeBlocks)+env.state.Height(), 0, env.state)
+	_, err = e.wallet.HostAnnounceSelf(siacore.Currency(freezeCoins), siacore.BlockHeight(freezeBlocks)+e.state.Height(), 0, e.state)
 	if err != nil {
 		return
 	}
@@ -69,33 +69,33 @@ func becomeHostWalkthrough(env *environment) (err error) {
 }
 
 // toggleMining asks the state to switch mining on or off.
-func toggleMining(env *environment) {
-	env.miner.ToggleMining(env.state, env.wallet.SpendConditions.CoinAddress())
+func toggleMining(e *siad.Environment) {
+	e.miner.ToggleMining(e.state, e.wallet.SpendConditions.CoinAddress())
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by
 // this cli.
-func printWalletAddresses(env *environment) {
+func printWalletAddresses(e *siad.Environment) {
 	fmt.Println("General Information:")
 
 	// Dispaly whether or not the miner is mining.
-	if env.miner.Mining() {
+	if e.miner.Mining() {
 		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
 	} else {
 		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
 	}
 	fmt.Println()
 
-	fmt.Printf("\tWallet Address: %x\n", env.wallet.SpendConditions.CoinAddress())
+	fmt.Printf("\tWallet Address: %x\n", e.wallet.SpendConditions.CoinAddress())
 	fmt.Println()
 
-	fmt.Println("\tCurrent Block Height:", env.state.Height())
-	fmt.Println("\tCurrent Block Target:", env.state.CurrentTarget())
-	fmt.Println("\tCurrent Block Depth:", env.state.Depth())
+	fmt.Println("\tCurrent Block Height:", e.state.Height())
+	fmt.Println("\tCurrent Block Target:", e.state.CurrentTarget())
+	fmt.Println("\tCurrent Block Depth:", e.state.Depth())
 	fmt.Println()
 
 	fmt.Println("\tPrinting Networked Peers:")
-	addresses := env.server.AddressBook()
+	addresses := e.server.AddressBook()
 	for _, address := range addresses {
 		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
 	}
@@ -104,7 +104,7 @@ func printWalletAddresses(env *environment) {
 
 // sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
 // address that is provided through the command line.
-func sendCoinsWalkthrough(env *environment) (err error) {
+func sendCoinsWalkthrough(e *siad.Environment) (err error) {
 	fmt.Println("Send Coins Walkthrough:")
 
 	fmt.Print("Amount to send: ")
@@ -134,7 +134,7 @@ func sendCoinsWalkthrough(env *environment) (err error) {
 
 	// Use the wallet api to send.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = env.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
+	_, err = e.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
 	if err != nil {
 		return
 	}
@@ -157,7 +157,7 @@ func displayHomeHelp() {
 }
 
 // pollHome repeatedly querys the user for input.
-func pollHome(env *environment) {
+func pollHome(e *siad.Environment) {
 	var input string
 	var err error
 	for {
@@ -184,30 +184,30 @@ func pollHome(env *environment) {
 			// is doing.
 			go func() {
 				// Need a lock here.
-				env.caughtUp = false
-				err := env.state.CatchUp(env.server.RandomPeer())
+				e.caughtUp = false
+				err := e.state.CatchUp(e.server.RandomPeer())
 				if err != nil {
 					fmt.Println("CatchUp Error:", err)
 				}
-				env.caughtUp = true
+				e.caughtUp = true
 			}()
 
 		case "H", "host", "store", "advertise", "storage":
-			err = becomeHostWalkthrough(env)
+			err = becomeHostWalkthrough(e)
 
 		case "m", "mine", "toggle", "mining":
-			if !env.caughtUp {
+			if !e.caughtUp {
 				err = errors.New("not caught up to peers yet. Please wait.")
 			} else {
-				toggleMining(env)
+				toggleMining(e)
 			}
 
 		case "p", "print":
-			printWalletAddresses(env)
+			printWalletAddresses(e)
 
 		/*
 			case "r", "rent":
-				becomeClientWalkthrough(env)
+				becomeClientWalkthrough(e)
 		*/
 
 		/*
@@ -216,7 +216,7 @@ func pollHome(env *environment) {
 		*/
 
 		case "s", "send":
-			err = sendCoinsWalkthrough(env)
+			err = sendCoinsWalkthrough(e)
 		}
 
 		if err != nil {
