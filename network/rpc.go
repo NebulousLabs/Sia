@@ -58,10 +58,12 @@ func WriteObject(conn net.Conn, obj interface{}) (int, error) {
 func (na *NetAddress) RPC(t byte, arg, resp interface{}) error {
 	return na.Call(func(conn net.Conn) error {
 		conn.Write([]byte{t})
+		var data []byte
 		if arg != nil {
-			if _, err := WriteObject(conn, arg); err != nil {
-				return err
-			}
+			data = encoding.Marshal(arg)
+		}
+		if _, err := WritePrefix(conn, data); err != nil {
+			return err
 		}
 		if resp != nil {
 			return ReadObject(conn, resp)
