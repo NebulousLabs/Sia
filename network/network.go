@@ -8,7 +8,7 @@ import (
 
 const (
 	timeout   = time.Second * 5
-	maxMsgLen = 1 << 16
+	maxMsgLen = 1 << 24
 )
 
 // A NetAddress contains the information needed to contact a peer over TCP.
