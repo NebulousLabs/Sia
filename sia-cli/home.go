@@ -67,10 +67,11 @@ func becomeHostWalkthrough(e *siad.Environment) (err error) {
 
 	return
 }
+*/
 
 // toggleMining asks the state to switch mining on or off.
 func toggleMining(e *siad.Environment) {
-	e.miner.ToggleMining(e.state, e.wallet.SpendConditions.CoinAddress())
+	e.ToggleMining(e.state, e.wallet.SpendConditions.CoinAddress())
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by

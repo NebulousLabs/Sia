@@ -74,16 +74,16 @@ func CreateEnvironment() (e *Environment, err error) {
 	if err != nil {
 		return
 	}
-	e.miner = CreateMiner()
-	// e.host = CreateHost()
-	// e.renter = CreateRenter()
 	e.wallet, err = CreateWallet()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	e.miner = CreateMiner(e.wallet.SpendConditions.CoinAddress())
+	// e.host = CreateHost()
+	// e.renter = CreateRenter()
 
-	e.miner.State = e.state
+	e.miner.state = e.state
 	// e.host.State = e.state
 	// e.renter.State = e.state
 	e.wallet.State = e.state
@@ -91,7 +91,7 @@ func CreateEnvironment() (e *Environment, err error) {
 	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
 	go func() {
 		for {
-			e.AcceptBlock(*<-e.miner.BlockChan)
+			e.AcceptBlock(*<-e.miner.blockChan)
 		}
 	}()
 

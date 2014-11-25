@@ -13,11 +13,13 @@ const (
 )
 
 type Miner struct {
-	State *siacore.State
+	state *siacore.State
 
 	mining     bool
-	BlockChan  chan *siacore.Block
+	blockChan  chan *siacore.Block
 	killMining chan struct{}
+
+	subsidyAddress siacore.CoinAddress
 }
 
 func (m *Miner) Mining() bool {
@@ -25,25 +27,25 @@ func (m *Miner) Mining() bool {
 }
 
 // Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddress) (b *siacore.Block, target siacore.Target) {
-	state.Lock()
-	defer state.Unlock()
+func (m *Miner) blockForWork() (b *siacore.Block, target siacore.Target) {
+	m.state.Lock()
+	defer m.state.Unlock()
 	b = &siacore.Block{
-		ParentBlockID: state.CurrentBlock().ID(),
+		ParentBlockID: m.state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
-		MinerAddress:  minerAddress,
-		Transactions:  state.TransactionPoolDump(),
+		MinerAddress:  m.subsidyAddress,
+		Transactions:  m.state.TransactionPoolDump(),
 	}
 	// Fudge the timestamp if the block would otherwise be illegal.
-	if b.Timestamp < state.CurrentEarliestLegalTimestamp() {
-		b.Timestamp = state.CurrentEarliestLegalTimestamp()
+	if b.Timestamp < m.state.CurrentEarliestLegalTimestamp() {
+		b.Timestamp = m.state.CurrentEarliestLegalTimestamp()
 	}
 
 	// Add the transactions from the transaction pool.
 	b.MerkleRoot = b.ExpectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
-	target = state.CurrentTarget()
+	target = m.state.CurrentTarget()
 
 	return
 }
@@ -61,48 +63,39 @@ func solveBlock(b *siacore.Block, target siacore.Target) bool {
 	return false
 }
 
-// ToggleMining creates a channel and mines until it receives a kill signal.
-func (m *Miner) ToggleMining(state *siacore.State, minerAddress siacore.CoinAddress) {
-	if !m.mining {
-		m.mining = true
-		go m.mine(state, minerAddress)
-	} else {
-		m.mining = false
-		m.killMining <- struct{}{}
-	}
-}
-
 // mine attempts to generate blocks, and sends any found blocks down a channel.
-func (m *Miner) mine(state *siacore.State, minerAddress siacore.CoinAddress) {
+func (m *Miner) mine() {
 	for {
 		select {
 		case <-m.killMining:
 			return
 
 		default:
-			b, target := m.blockForWork(state, minerAddress)
+			b, target := m.blockForWork()
 			if solveBlock(b, target) {
-				m.BlockChan <- b
+				m.blockChan <- b
 			}
 		}
 	}
 }
 
-// generateBlock() creates a new block, will keep working until a block is
-// found, which may take a long time.
-func (m *Miner) generateBlock(state *siacore.State, minerAddress siacore.CoinAddress) (b *siacore.Block) {
-	if !m.mining {
-		m.mining = true
-		go m.mine(state, minerAddress)
-	}
-	b = <-m.BlockChan
-	m.killMining <- struct{}{}
-	return b
-}
-
-func CreateMiner() *Miner {
+// CreateMiner takes an address as input and returns a miner. All blocks mined
+// by the miner will have the subsidies sent to the subsidyAddress.
+func CreateMiner(subsidyAddress siacore.CoinAddress) *Miner {
 	m := new(Miner)
 	m.killMining = make(chan struct{})
-	m.BlockChan = make(chan *siacore.Block, 10)
+	m.blockChan = make(chan *siacore.Block, 10)
+	m.subsidyAddress = subsidyAddress
 	return m
+}
+
+// ToggleMining creates a channel and mines until it receives a kill signal.
+func (e *Environment) ToggleMining() {
+	if !e.miner.mining {
+		e.miner.mining = true
+		go e.miner.mine()
+	} else {
+		e.miner.mining = false
+		e.miner.killMining <- struct{}{}
+	}
 }
