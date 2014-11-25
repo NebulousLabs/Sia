@@ -12,9 +12,9 @@ type Environment struct {
 
 	server *network.TCPServer
 
-	host   *Host
-	miner  *Miner
-	renter *Renter
+	// host   *Host
+	miner *Miner
+	// renter *Renter
 	wallet *Wallet
 
 	caughtUp bool
@@ -68,15 +68,15 @@ func (e *Environment) initializeNetwork() (err error) {
 // createEnvironment() creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func createEnvironment() (e *Environment, err error) {
+func CreateEnvironment() (e *Environment, err error) {
 	e = new(Environment)
 	err = e.initializeNetwork()
 	if err != nil {
 		return
 	}
 	e.miner = CreateMiner()
-	e.host = CreateHost()
-	e.renter = CreateRenter()
+	// e.host = CreateHost()
+	// e.renter = CreateRenter()
 	e.wallet, err = CreateWallet()
 	if err != nil {
 		fmt.Println(err)
@@ -84,12 +84,11 @@ func createEnvironment() (e *Environment, err error) {
 	}
 
 	e.miner.State = e.state
-	e.host.State = e.state
-	e.renter.State = e.state
+	// e.host.State = e.state
+	// e.renter.State = e.state
 	e.wallet.State = e.state
 
-	// accept mined blocks
-	// TODO: WHEN SHOULD THIS TERMINATE?
+	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
 	go func() {
 		for {
 			e.AcceptBlock(*<-e.miner.BlockChan)
@@ -103,6 +102,7 @@ func (e *Environment) Close() {
 	e.server.Close()
 }
 
+// TODO: Handle all accepting of things through a single channel.
 func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
 	if err != nil && err != siacore.BlockKnownErr {
@@ -121,6 +121,7 @@ func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
 	return
 }
 
+// TODO: Handle all accepting of things through a single channel.
 func (e *Environment) AcceptTransaction(t siacore.Transaction) (err error) {
 	err = e.state.AcceptTransaction(t)
 	if err != nil {

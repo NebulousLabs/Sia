@@ -1,5 +1,6 @@
 package siad
 
+/*
 import (
 	"crypto/rand"
 	"errors"
@@ -130,3 +131,4 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	h = hdb.HostList[i]
 	return
 }
+*/
