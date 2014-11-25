@@ -10,7 +10,7 @@ import (
 )
 
 type HostDatabase struct {
-	state       *siacore.State
+	State       *siacore.State
 	HostList    []HostEntry
 	TotalWeight siacore.Currency
 }
@@ -77,7 +77,7 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 		if ha.MinTolerance > 10 {
 			return
 		}
-		freeze := siacore.Currency(ha.SpendConditions.TimeLock-hdb.state.Height()) * t.Outputs[ha.FreezeIndex].Value
+		freeze := siacore.Currency(ha.SpendConditions.TimeLock-hdb.State.Height()) * t.Outputs[ha.FreezeIndex].Value
 		if freeze <= 0 {
 			return
 		}

@@ -13,6 +13,8 @@ const (
 )
 
 type Miner struct {
+	State *siacore.State
+
 	mining     bool
 	BlockChan  chan *siacore.Block
 	killMining chan struct{}

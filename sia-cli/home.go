@@ -136,7 +136,7 @@ func sendCoinsWalkthrough(env *environment) (err error) {
 
 	// Use the wallet api to send.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = env.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address, env.state)
+	_, err = env.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
 	if err != nil {
 		return
 	}
