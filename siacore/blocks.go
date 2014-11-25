@@ -24,7 +24,7 @@ var (
 
 // EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
 // of a BlockNode to be legal.
-func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
+func (bn *BlockNode) earliestLegalChildTimestamp() Timestamp {
 	var intTimestamps []int
 	for _, timestamp := range bn.RecentTimestamps {
 		intTimestamps = append(intTimestamps, int(timestamp))
@@ -34,7 +34,7 @@ func (bn *BlockNode) EarliestLegalChildTimestamp() Timestamp {
 }
 
 // CheckTarget() returns true if the block id is lower than the target.
-func (b *Block) CheckTarget(target Target) bool {
+func (b Block) CheckTarget(target Target) bool {
 	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
@@ -83,7 +83,7 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 
 // ExpectedTransactionMerkleRoot() returns the expected transaction
 // merkle root of the block.
-func (b *Block) ExpectedTransactionMerkleRoot() hash.Hash {
+func (b Block) ExpectedTransactionMerkleRoot() hash.Hash {
 	var transactionHashes []hash.Hash
 	for _, transaction := range b.Transactions {
 		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
@@ -113,7 +113,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
-	if parent.EarliestLegalChildTimestamp() > b.Timestamp {
+	if parent.earliestLegalChildTimestamp() > b.Timestamp {
 		s.BadBlocks[b.ID()] = struct{}{}
 		err = errors.New("timestamp invalid for being in the past")
 		return

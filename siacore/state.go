@@ -93,23 +93,12 @@ func (s *State) Height() BlockHeight {
 	return s.BlockMap[s.CurrentBlockID].Height
 }
 
-// Depth() returns the depth of the current block of the state.
+// State.Depth() returns the depth of the current block of the state.
 func (s *State) Depth() Target {
 	return s.CurrentBlockNode().Depth
 }
 
-// State.currentBlockNode returns the node of the most recent block in the
-// longest fork.
-func (s *State) CurrentBlockNode() *BlockNode {
-	return s.BlockMap[s.CurrentBlockID]
-}
-
-// State.CurrentBlock returns the most recent block in the longest fork.
-func (s *State) CurrentBlock() *Block {
-	return s.BlockMap[s.CurrentBlockID].Block
-}
-
-// State.blockAtHeight() returns the block from the current history at the
+// BlockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 	if bn, ok := s.BlockMap[s.CurrentPath[height]]; ok {
@@ -122,10 +111,27 @@ func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 	return
 }
 
-// State.currentBlockWeight() returns the weight of the current block in the
+// CurrentBlockNode returns the node of the most recent block in the
+// longest fork.
+func (s *State) CurrentBlockNode() *BlockNode {
+	return s.BlockMap[s.CurrentBlockID]
+}
+
+// CurrentBlock returns the most recent block in the longest fork.
+func (s *State) CurrentBlock() *Block {
+	return s.BlockMap[s.CurrentBlockID].Block
+}
+
+// CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.CurrentBlockNode().Target[:])))
+}
+
+// CurrentEarliestLegalTimestamp returns the earliest legal timestamp of the
+// next block - earlier timestamps will render the block invalid.
+func (s *State) CurrentEarliestLegalTimestamp() Timestamp {
+	return s.CurrentBlockNode().earliestLegalChildTimestamp()
 }
 
 // StateHash returns the markle root of the current state of consensus.
@@ -148,7 +154,7 @@ func (s *State) StateHash() hash.Hash {
 		hash.HashBytes(encoding.Marshal(s.Height())),
 		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Target)),
 		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Depth)),
-		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().EarliestLegalChildTimestamp())),
+		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().earliestLegalChildTimestamp())),
 		hash.Hash(s.BlockRoot.Block.ID()),
 		hash.Hash(s.CurrentBlockID),
 	)

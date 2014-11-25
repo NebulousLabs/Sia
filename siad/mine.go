@@ -33,8 +33,8 @@ func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddr
 		Transactions:  state.TransactionPoolDump(),
 	}
 	// Fudge the timestamp if the block would otherwise be illegal.
-	if b.Timestamp < state.CurrentBlockNode().EarliestLegalChildTimestamp() {
-		b.Timestamp = state.CurrentBlockNode().EarliestLegalChildTimestamp()
+	if b.Timestamp < state.CurrentEarliestLegalTimestamp() {
+		b.Timestamp = state.CurrentEarliestLegalTimestamp()
 	}
 
 	// Add the transactions from the transaction pool.
