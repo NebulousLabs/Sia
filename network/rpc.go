@@ -110,7 +110,7 @@ func (tcps *TCPServer) registerRPC(t byte, fn reflect.Value, typ reflect.Type) {
 			return err
 		}
 		// call fn on object
-		resp := reflect.New(typ.In(1))
+		resp := reflect.New(typ.In(1).Elem())
 		if err := fn.Call([]reflect.Value{arg.Elem(), resp})[0].Interface(); err != nil {
 			return err.(error)
 		}
@@ -140,7 +140,7 @@ func (tcps *TCPServer) registerArg(t byte, fn reflect.Value, typ reflect.Type) {
 func (tcps *TCPServer) registerResp(t byte, fn reflect.Value, typ reflect.Type) {
 	tcps.handlerMap[t] = func(conn net.Conn, _ []byte) error {
 		// create object to hold response
-		resp := reflect.New(typ.In(0))
+		resp := reflect.New(typ.In(0).Elem())
 		// call fn
 		if err := fn.Call([]reflect.Value{resp})[0].Interface(); err != nil {
 			return err.(error)
