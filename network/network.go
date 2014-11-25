@@ -147,7 +147,7 @@ func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
 func (tcps *TCPServer) Announce(t byte, obj interface{}) {
 	for addr := range tcps.addressbook {
 		addr.Call(func(conn net.Conn) error {
-			conn.Write([]byte{'A'})
+			conn.Write([]byte{t})
 			_, err := WriteObject(conn, obj)
 			return err
 		})
