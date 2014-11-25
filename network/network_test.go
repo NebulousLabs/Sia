@@ -21,25 +21,15 @@ func TestRegister(t *testing.T) {
 	addr := NetAddress{"localhost", 9988}
 
 	// register some handlers
-	tcps.RegisterHandler('F', func(net.Conn, []byte) error { call2 = true; return nil })
-
-	if err = tcps.RegisterRPC('B', new(Foo).Bar); err != nil {
-		t.Fatal(err)
-	}
+	tcps.Register('F', func(net.Conn, []byte) error { call2 = true; return nil })
+	tcps.Register('B', new(Foo).Bar)
 
 	// call them
-	err = addr.Call(func(conn net.Conn) error {
-		_, err := conn.Write([]byte{'F', 0, 0, 0, 0})
-		return err
-	})
+	err = addr.RPC('F', 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addr.Call(func(conn net.Conn) error {
-		_, err := conn.Write([]byte{'B', 8, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0})
-		return err
-	})
+	err = addr.RPC('B', 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
