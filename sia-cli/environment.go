@@ -95,7 +95,7 @@ func (e *environment) Close() {
 
 func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	err = e.state.AcceptBlock(b)
-	if err != nil {
+	if err != nil && err != siacore.BlockKnownErr {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
 			err2 := e.state.CatchUp(e.server.RandomPeer())

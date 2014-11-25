@@ -113,8 +113,12 @@ func (s *State) CurrentBlock() *Block {
 // input height.
 func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
 	if bn, ok := s.BlockMap[s.CurrentPath[height]]; ok {
+		if ok && bn == nil {
+			panic("block is not in block map.")
+		}
 		b = bn.Block
 	}
+
 	return
 }
 
