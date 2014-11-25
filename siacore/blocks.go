@@ -240,8 +240,8 @@ func (s *State) rewindABlock() {
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
-	s.CurrentBlockID = s.CurrentBlock().ParentBlockID
 	delete(s.CurrentPath, s.Height())
+	s.CurrentBlockID = s.CurrentBlock().ParentBlockID
 }
 
 // s.integrateBlock() will verify the block and then integrate it into the

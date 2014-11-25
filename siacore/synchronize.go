@@ -89,7 +89,12 @@ func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 	}
 
 	// Build an array of blocks.
-	for i := closestHeight; i < closestHeight+MaxCatchUpBlocks; i++ {
+	tallest := closestHeight + MaxCatchUpBlocks
+	if tallest > s.Height() {
+		tallest = s.Height()
+	}
+	for i := closestHeight; i <= tallest; i++ {
+		println(i)
 		b := s.BlockAtHeight(i)
 		if b == nil {
 			break
