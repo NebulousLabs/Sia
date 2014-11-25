@@ -51,13 +51,21 @@ func WriteObject(conn net.Conn, obj interface{}) (int, error) {
 	return WritePrefix(conn, encoding.Marshal(obj))
 }
 
+// rpcName truncates a string to 8 bytes. If len(name) < 8, the remaining
+// bytes are 0.
+func rpcName(name string) []byte {
+	b := make([]byte, 8)
+	copy(b, name)
+	return b
+}
+
 // RPC performs a Remote Procedure Call by sending the procedure name and
 // encoded argument, and decoding the response into the supplied object.
 // 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
 // nil, no response is read.
-func (na *NetAddress) RPC(t byte, arg, resp interface{}) error {
+func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 	return na.Call(func(conn net.Conn) error {
-		conn.Write([]byte{t})
+		conn.Write(rpcName(name))
 		var data []byte
 		if arg != nil {
 			data = encoding.Marshal(arg)
@@ -72,7 +80,15 @@ func (na *NetAddress) RPC(t byte, arg, resp interface{}) error {
 	})
 }
 
-func (tcps *TCPServer) Register(t byte, fn interface{}) {
+// Register registers a function as an RPC handler for a given identifier. The
+// function must be one of four possible types:
+//     func(net.Conn, []byte) error
+//     func(Type, *Type) error
+//     func(Type) error
+//     func(*Type) error
+// To call an RPC, use NetAddress.RPC, supplying the same identifier given to
+// Register. Identifiers should always use CamelCase.
+func (tcps *TCPServer) Register(name string, fn interface{}) {
 	// all handlers are function with at least one in and one error out
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
 	if typ.Kind() != reflect.Func || typ.NumIn() < 1 ||
@@ -80,30 +96,34 @@ func (tcps *TCPServer) Register(t byte, fn interface{}) {
 		panic("registered function has wrong type signature")
 	}
 
+	var handler func(net.Conn, []byte) error
 	switch {
 	// func(net.Conn, []byte) error
 	case typ.NumIn() == 2 && typ.In(0) == reflect.TypeOf((*net.Conn)(nil)).Elem() && typ.In(1) == reflect.TypeOf([]byte{}):
-		tcps.handlerMap[t] = fn.(func(net.Conn, []byte) error)
+		handler = fn.(func(net.Conn, []byte) error)
 	// func(Type, *Type) error
 	case typ.NumIn() == 2 && typ.In(0).Kind() != reflect.Ptr && typ.In(1).Kind() == reflect.Ptr:
-		tcps.registerRPC(t, val, typ)
+		handler = tcps.registerRPC(val, typ)
 	// func(Type) error
 	case typ.NumIn() == 1 && typ.In(0).Kind() != reflect.Ptr:
-		tcps.registerArg(t, val, typ)
+		handler = tcps.registerArg(val, typ)
 	// func(*Type) error
 	case typ.NumIn() == 1 && typ.In(0).Kind() == reflect.Ptr:
-		tcps.registerResp(t, val, typ)
+		handler = tcps.registerResp(val, typ)
 	default:
 		panic("registered function has wrong type signature")
 	}
+
+	ident := string(rpcName(name))
+	tcps.handlerMap[ident] = handler
 }
 
 // registerRPC is for handlers that return a value. The input is decoded and
 // passed to fn, which stores its result in a pointer argument. This argument
 // is then written back to the caller. fn must have the type signature:
 //     func(Type, *Type) error
-func (tcps *TCPServer) registerRPC(t byte, fn reflect.Value, typ reflect.Type) {
-	tcps.handlerMap[t] = func(conn net.Conn, b []byte) error {
+func (tcps *TCPServer) registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
+	return func(conn net.Conn, b []byte) error {
 		// create object to decode into
 		arg := reflect.New(typ.In(0))
 		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
@@ -121,8 +141,8 @@ func (tcps *TCPServer) registerRPC(t byte, fn reflect.Value, typ reflect.Type) {
 }
 
 // registerArg is for RPCs that do not return a value.
-func (tcps *TCPServer) registerArg(t byte, fn reflect.Value, typ reflect.Type) {
-	tcps.handlerMap[t] = func(_ net.Conn, b []byte) error {
+func (tcps *TCPServer) registerArg(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
+	return func(_ net.Conn, b []byte) error {
 		// create object to decode into
 		arg := reflect.New(typ.In(0))
 		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
@@ -137,8 +157,8 @@ func (tcps *TCPServer) registerArg(t byte, fn reflect.Value, typ reflect.Type) {
 }
 
 // registerResp is for RPCs that do not take a value.
-func (tcps *TCPServer) registerResp(t byte, fn reflect.Value, typ reflect.Type) {
-	tcps.handlerMap[t] = func(conn net.Conn, _ []byte) error {
+func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
+	return func(conn net.Conn, _ []byte) error {
 		// create object to hold response
 		resp := reflect.New(typ.In(0).Elem())
 		// call fn
