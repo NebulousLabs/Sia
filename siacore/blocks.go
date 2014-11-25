@@ -392,5 +392,27 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		}
 	}
 
+	// Do a sanity check - check that every block is listed in CurrentPath and
+	// that every block from current to genesis matches the block listed in
+	// CurrentPath.
+	currentNode := s.CurrentBlockNode()
+	for i := s.Height(); i >= 0; i-- {
+		// Check that the CurrentPath entry exists.
+		id, exists := s.CurrentPath[i]
+		if !exists {
+			println(i)
+			panic("current path is empty for a height with a known block.")
+		}
+
+		// Check that the CurrentPath entry contains the correct block id.
+		if currentNode.Block.ID() != id {
+			currentNodeID := currentNode.Block.ID()
+			println(i)
+			println(id[:])
+			println(currentNodeID[:])
+			panic("current path does not have correct id!")
+		}
+	}
+
 	return
 }
