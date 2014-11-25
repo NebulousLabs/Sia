@@ -19,12 +19,8 @@ type Wallet struct {
 	SecretKey       signatures.SecretKey
 	SpendConditions siacore.SpendConditions
 
-	OwnedOutputs         map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
-	SpentOutputs         map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
-	OpenFreezeConditions map[siacore.BlockHeight]int   // A list of all heights at which freeze conditions are being used.
-
-	// Host variables.
-	HostSettings HostAnnouncement
+	OwnedOutputs map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
+	SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -35,13 +31,6 @@ type FileContractParameters struct {
 	Transaction        siacore.Transaction
 	FileContractIndex  int
 	ClientContribution siacore.Currency
-}
-
-// Wallet.FreezeConditions
-func (w *Wallet) FreezeConditions(unlockHeight siacore.BlockHeight) (fc siacore.SpendConditions) {
-	fc = w.SpendConditions
-	fc.TimeLock = unlockHeight
-	return
 }
 
 // Creates a new wallet that can receive and spend coins.
@@ -55,7 +44,6 @@ func CreateWallet() (w *Wallet, err error) {
 
 	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
 	w.SpentOutputs = make(map[siacore.OutputID]struct{})
-	w.OpenFreezeConditions = make(map[siacore.BlockHeight]int)
 
 	return
 }
@@ -68,17 +56,6 @@ func (w *Wallet) Scan() {
 	// Check for owned outputs from the standard SpendConditions.
 	scanAddresses := make(map[siacore.CoinAddress]struct{})
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
-
-	// I'm not sure that it's the wallet's job to deal with freeze conditions.
-	/*
-		for height, _ := range w.OpenFreezeConditions {
-			if height < State.Height() {
-				freezeConditions := w.SpendConditions
-				freezeConditions.TimeLock = height
-				scanAddresses[freezeConditions.CoinAddress()] = struct{}{}
-			}
-		}
-	*/
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
 	outputs := w.State.ScanOutputs(scanAddresses)
