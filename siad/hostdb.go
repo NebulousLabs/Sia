@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -18,7 +19,7 @@ type HostDatabase struct {
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
 type HostAnnouncement struct {
-	IPAddress             []byte
+	IPAddress             network.NetAddress
 	MinFilesize           uint64
 	MaxFilesize           uint64
 	MinDuration           siacore.BlockHeight
@@ -36,7 +37,7 @@ type HostAnnouncement struct {
 // the Host struct is kept in the client package because it's what the client
 // uses to weigh hosts and pick them out when storing files.
 type HostEntry struct {
-	IPAddress   string
+	IPAddress   network.NetAddress
 	MinSize     uint64
 	MaxSize     uint64
 	Duration    siacore.BlockHeight
@@ -84,7 +85,7 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 
 		// Add the host to the host database.
 		host := HostEntry{
-			IPAddress:   string(ha.IPAddress),
+			IPAddress:   ha.IPAddress,
 			MinSize:     ha.MinFilesize,
 			MaxSize:     ha.MaxFilesize,
 			Duration:    ha.MaxDuration,

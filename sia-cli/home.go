@@ -45,11 +45,9 @@ func becomeHostWalkthrough(env *environment) (err error) {
 		return
 	}
 
-	// NEED TO GET IP ADDRESS SOMEWHERE.
-
 	// Create the host announcement structure.
 	env.wallet.HostSettings = siad.HostAnnouncement{
-		// IPAddress: "asdf",
+		IPAddress:             env.server.NetAddress(),
 		MinFilesize:           1024 * 1024, // 1mb
 		MaxFilesize:           storage * 1024 * 1024,
 		MaxDuration:           10000,

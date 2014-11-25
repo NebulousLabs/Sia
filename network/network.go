@@ -50,6 +50,10 @@ type TCPServer struct {
 	handlerMap  map[byte]func(net.Conn, []byte) error
 }
 
+func (tcps *TCPServer) NetAddress() NetAddress {
+	return tcps.myAddr
+}
+
 // NewTCPServer creates a TCPServer that listens on the specified port.
 func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	tcpServ, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
