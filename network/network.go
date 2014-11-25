@@ -144,24 +144,6 @@ func (tcps *TCPServer) Ping(addr NetAddress) bool {
 	return true
 }
 
-// Broadcast calls the specified function on each peer in the address book.
-func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
-	for addr := range tcps.addressbook {
-		addr.Call(fn)
-	}
-}
-
-// Announce sends an object to every peer in the address book.
-func (tcps *TCPServer) Announce(t byte, obj interface{}) {
-	for addr := range tcps.addressbook {
-		addr.Call(func(conn net.Conn) error {
-			conn.Write([]byte{t})
-			_, err := WriteObject(conn, obj)
-			return err
-		})
-	}
-}
-
 // listen runs in the background, accepting incoming connections and serving
 // them. listen will return after TCPServer.Close() is called, because the
 // Accept() call will fail.

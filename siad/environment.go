@@ -34,9 +34,9 @@ func (e *Environment) initializeNetwork() (err error) {
 
 	// create genesis state and register it with the server
 	e.state = siacore.CreateGenesisState()
-	e.server.Register('B', e.AcceptBlock)
-	e.server.Register('T', e.AcceptTransaction)
-	e.server.Register('R', e.state.SendBlocks)
+	e.server.Register("AcceptBlock", e.AcceptBlock)
+	e.server.Register("AcceptTransaction", e.AcceptTransaction)
+	e.server.Register("SendBlocks", e.state.SendBlocks)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
@@ -116,7 +116,7 @@ func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
 		}
 		return
 	}
-	go e.server.Announce('B', b)
+	go e.server.Broadcast("AcceptBlock", b, nil)
 
 	return
 }
@@ -128,7 +128,7 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) (err error) {
 		fmt.Println("AcceptTransaction Error:", err)
 		return
 	}
-	e.server.Announce('T', t)
+	e.server.Broadcast("AcceptTransaction", t, nil)
 
 	return
 }

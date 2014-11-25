@@ -129,7 +129,9 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 	knownBlocks[31] = s.currentPath[0]
 
 	var blocks []Block
-	peer.RPC('R', knownBlocks, &blocks)
+	if err = peer.RPC("SendBlocks", knownBlocks, &blocks); err != nil {
+		return err
+	}
 
 	for i := range blocks {
 		if err = s.AcceptBlock(blocks[i]); err != nil {
