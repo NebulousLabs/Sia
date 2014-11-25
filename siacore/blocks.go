@@ -43,27 +43,27 @@ func (b Block) CheckTarget(target Target) bool {
 // block id has been cached anywhere.
 func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	// See if the block is a known invalid block.
-	_, exists := s.BadBlocks[b.ID()]
+	_, exists := s.badBlocks[b.ID()]
 	if exists {
 		err = errors.New("block is known to be invalid")
 		return
 	}
 
 	// See if the block is a known valid block.
-	_, exists = s.BlockMap[b.ID()]
+	_, exists = s.blockMap[b.ID()]
 	if exists {
 		err = BlockKnownErr
 		return
 	}
 
 	// See if the block's parent is known.
-	parentBlockNode, exists = s.BlockMap[b.ParentBlockID]
+	parentBlockNode, exists = s.blockMap[b.ParentBlockID]
 	if !exists {
 		// See if the block is a known orphan block.
-		orphansOfParent, exists := s.OrphanMap[b.ParentBlockID]
+		orphansOfParent, exists := s.orphanMap[b.ParentBlockID]
 		if !exists {
 			// Make the map for the parent - parent has not been seen before.
-			s.OrphanMap[b.ParentBlockID] = make(map[BlockID]*Block)
+			s.orphanMap[b.ParentBlockID] = make(map[BlockID]*Block)
 		} else {
 			_, exists = orphansOfParent[b.ID()]
 			if exists {
@@ -72,7 +72,7 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 			}
 		}
 		// Add the block to the list of known orphans.
-		s.OrphanMap[b.ParentBlockID][b.ID()] = b
+		s.orphanMap[b.ParentBlockID][b.ID()] = b
 
 		err = UnknownOrphanErr
 		return
@@ -114,7 +114,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestLegalChildTimestamp() > b.Timestamp {
-		s.BadBlocks[b.ID()] = struct{}{}
+		s.badBlocks[b.ID()] = struct{}{}
 		err = errors.New("timestamp invalid for being in the past")
 		return
 	}
@@ -122,7 +122,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check that the transaction merkle root matches the transactions
 	// included into the block.
 	if b.MerkleRoot != b.ExpectedTransactionMerkleRoot() {
-		s.BadBlocks[b.ID()] = struct{}{}
+		s.badBlocks[b.ID()] = struct{}{}
 		err = errors.New("merkle root does not match transactions sent.")
 		return
 	}
@@ -135,7 +135,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
 	var timePassed, expectedTimePassed Timestamp
 	if newNode.Height < TargetWindow {
-		timePassed = newNode.Block.Timestamp - s.BlockRoot.Block.Timestamp
+		timePassed = newNode.Block.Timestamp - s.blockRoot.Block.Timestamp
 		expectedTimePassed = BlockFrequency * Timestamp(newNode.Height)
 	} else {
 		// THIS CODE ASSUMES THAT THE BLOCK AT HEIGHT
@@ -211,7 +211,7 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	newNode.Depth = s.childDepth(parentNode)
 
 	// Add the node to the block map and the list of its parents children.
-	s.BlockMap[b.ID()] = newNode
+	s.blockMap[b.ID()] = newNode
 	parentNode.Children = append(parentNode.Children, newNode)
 
 	return
@@ -232,7 +232,7 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) rewindABlock() {
 	// Remove the output for the miner subsidy.
-	delete(s.UnspentOutputs, s.CurrentBlock().SubsidyID())
+	delete(s.unspentOutputs, s.CurrentBlock().SubsidyID())
 
 	// Perform inverse contract maintenance.
 	s.inverseContractMaintenance()
@@ -244,8 +244,8 @@ func (s *State) rewindABlock() {
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
-	delete(s.CurrentPath, s.Height())
-	s.CurrentBlockID = s.CurrentBlock().ParentBlockID
+	delete(s.currentPath, s.Height())
+	s.currentBlockID = s.CurrentBlock().ParentBlockID
 }
 
 // s.integrateBlock() will verify the block and then integrate it into the
@@ -288,11 +288,11 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
-	s.UnspentOutputs[b.SubsidyID()] = minerSubsidyOutput
+	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
 
 	// Update the current block and current path variables of the longest fork.
-	s.CurrentBlockID = b.ID()
-	s.CurrentPath[s.BlockMap[b.ID()].Height] = b.ID()
+	s.currentBlockID = b.ID()
+	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
 
 	return
 }
@@ -304,8 +304,8 @@ func (s *State) invalidateNode(node *BlockNode) {
 		s.invalidateNode(node.Children[i])
 	}
 
-	delete(s.BlockMap, node.Block.ID())
-	s.BadBlocks[node.Block.ID()] = struct{}{}
+	delete(s.blockMap, node.Block.ID())
+	s.badBlocks[node.Block.ID()] = struct{}{}
 }
 
 // forkBlockchain() will go from the current block over to a block on a
@@ -317,19 +317,19 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// children of the parents so that we can re-trace as we
 	// validate the blocks.
 	currentNode := newNode
-	value := s.CurrentPath[currentNode.Height]
+	value := s.currentPath[currentNode.Height]
 	var parentHistory []BlockID
 	for value != currentNode.Block.ID() {
 		parentHistory = append(parentHistory, currentNode.Block.ID())
-		currentNode = s.BlockMap[currentNode.Block.ParentBlockID]
-		value = s.CurrentPath[currentNode.Height]
+		currentNode = s.blockMap[currentNode.Block.ParentBlockID]
+		value = s.currentPath[currentNode.Height]
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	var rewoundBlocks []BlockID
-	for s.CurrentBlockID != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.CurrentBlockID)
+	for s.currentBlockID != currentNode.Block.ID() {
+		rewoundBlocks = append(rewoundBlocks, s.currentBlockID)
 		s.rewindABlock()
 	}
 
@@ -339,11 +339,11 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// again.
 	validatedBlocks := 0
 	for i := len(parentHistory) - 1; i >= 0; i-- {
-		err = s.integrateBlock(s.BlockMap[parentHistory[i]].Block)
+		err = s.integrateBlock(s.blockMap[parentHistory[i]].Block)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
-			s.invalidateNode(s.BlockMap[parentHistory[i]])
+			s.invalidateNode(s.blockMap[parentHistory[i]])
 
 			// Rewind the validated blocks
 			for i := 0; i < validatedBlocks; i++ {
@@ -352,7 +352,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				err = s.integrateBlock(s.BlockMap[rewoundBlocks[i]].Block)
+				err = s.integrateBlock(s.blockMap[rewoundBlocks[i]].Block)
 				if err != nil {
 					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
 				}
@@ -401,7 +401,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	currentNode := s.currentBlockNode()
 	for i := s.Height(); ; i-- {
 		// Check that the CurrentPath entry exists.
-		id, exists := s.CurrentPath[i]
+		id, exists := s.currentPath[i]
 		if !exists {
 			println(i)
 			panic("current path is empty for a height with a known block.")
@@ -416,7 +416,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 			panic("current path does not have correct id!")
 		}
 
-		currentNode = s.BlockMap[currentNode.Block.ParentBlockID]
+		currentNode = s.blockMap[currentNode.Block.ParentBlockID]
 
 		// Have to do an awkward break beacuse i is unsigned.
 		if i == 0 {

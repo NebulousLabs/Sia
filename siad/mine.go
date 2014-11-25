@@ -27,7 +27,7 @@ func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddr
 	state.Lock()
 	defer state.Unlock()
 	b = &siacore.Block{
-		ParentBlockID: state.CurrentBlockID,
+		ParentBlockID: state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
 		MinerAddress:  minerAddress,
 		Transactions:  state.TransactionPoolDump(),

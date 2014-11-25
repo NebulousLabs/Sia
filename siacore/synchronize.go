@@ -20,41 +20,41 @@ var (
 func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = new(State)
-	s.BlockRoot = new(BlockNode)
-	s.BadBlocks = make(map[BlockID]struct{})
-	s.BlockMap = make(map[BlockID]*BlockNode)
-	s.OrphanMap = make(map[BlockID]map[BlockID]*Block)
-	s.CurrentPath = make(map[BlockHeight]BlockID)
-	s.OpenContracts = make(map[ContractID]*OpenContract)
-	s.UnspentOutputs = make(map[OutputID]Output)
-	s.SpentOutputs = make(map[OutputID]Output)
-	s.TransactionPool = make(map[OutputID]*Transaction)
-	s.TransactionList = make(map[OutputID]*Transaction)
+	s.blockRoot = new(BlockNode)
+	s.badBlocks = make(map[BlockID]struct{})
+	s.blockMap = make(map[BlockID]*BlockNode)
+	s.orphanMap = make(map[BlockID]map[BlockID]*Block)
+	s.currentPath = make(map[BlockHeight]BlockID)
+	s.openContracts = make(map[ContractID]*OpenContract)
+	s.unspentOutputs = make(map[OutputID]Output)
+	s.spentOutputs = make(map[OutputID]Output)
+	s.transactionPool = make(map[OutputID]*Transaction)
+	s.transactionList = make(map[OutputID]*Transaction)
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := &Block{
 		Timestamp:    GenesisTimestamp,
 		MinerAddress: GenesisAddress,
 	}
-	s.BlockRoot.Block = genesisBlock
-	s.BlockRoot.Height = 0
-	for i := range s.BlockRoot.RecentTimestamps {
-		s.BlockRoot.RecentTimestamps[i] = GenesisTimestamp
+	s.blockRoot.Block = genesisBlock
+	s.blockRoot.Height = 0
+	for i := range s.blockRoot.RecentTimestamps {
+		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
 	}
-	s.BlockRoot.Target[1] = 16 // Easy enough for a home computer to be able to mine on.
-	s.BlockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
-	s.BlockMap[genesisBlock.ID()] = s.BlockRoot
+	s.blockRoot.Target[1] = 16 // Easy enough for a home computer to be able to mine on.
+	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
+	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
 	// Fill out the consensus informaiton for the genesis block.
-	s.CurrentBlockID = genesisBlock.ID()
-	s.CurrentPath[BlockHeight(0)] = genesisBlock.ID()
+	s.currentBlockID = genesisBlock.ID()
+	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 
 	// Create the genesis subsidy output.
 	genesisSubsidyOutput := Output{
 		Value:     CalculateCoinbase(0),
 		SpendHash: GenesisAddress,
 	}
-	s.UnspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
+	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
 	return
 }
@@ -67,14 +67,14 @@ func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 	var closestHeight BlockHeight
 	for i := range knownBlocks {
 		// See if we know which block it is, get the node to know the height.
-		blockNode, exists := s.BlockMap[knownBlocks[i]]
+		blockNode, exists := s.blockMap[knownBlocks[i]]
 		if !exists {
 			continue
 		}
 
 		// See if the known block is in the current path, and if it is see if
 		// its height is greater than the closest yet known height.
-		id, exists := s.CurrentPath[blockNode.Height]
+		id, exists := s.currentPath[blockNode.Height]
 		if exists && id == knownBlocks[i] {
 			found = true
 			if closestHeight < blockNode.Height {
@@ -112,7 +112,7 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 			break
 		}
 
-		knownBlocks[i] = s.CurrentPath[s.Height()-i]
+		knownBlocks[i] = s.currentPath[s.Height()-i]
 	}
 
 	backtrace := BlockHeight(10)
@@ -123,10 +123,10 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 			break
 		}
 
-		knownBlocks[i] = s.CurrentPath[s.Height()-backtrace]
+		knownBlocks[i] = s.currentPath[s.Height()-backtrace]
 	}
 
-	knownBlocks[31] = s.CurrentPath[0]
+	knownBlocks[31] = s.currentPath[0]
 
 	var blocks []Block
 	peer.RPC('R', knownBlocks, &blocks)
