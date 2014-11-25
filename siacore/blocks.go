@@ -396,7 +396,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// that every block from current to genesis matches the block listed in
 	// CurrentPath.
 	currentNode := s.CurrentBlockNode()
-	for i := s.Height(); i == i; i-- {
+	for i := s.Height(); ; i-- {
 		// Check that the CurrentPath entry exists.
 		id, exists := s.CurrentPath[i]
 		if !exists {
