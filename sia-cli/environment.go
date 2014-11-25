@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -34,15 +33,9 @@ func (e *environment) initializeNetwork() (err error) {
 
 	// create genesis state and register it with the server
 	e.state = siacore.CreateGenesisState()
-	if err = e.server.RegisterRPC('B', e.AcceptBlock); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err = e.server.RegisterRPC('T', e.AcceptTransaction); err != nil {
-		fmt.Println(err)
-		return
-	}
-	e.server.RegisterHandler('R', e.SendBlocks)
+	e.server.Register('B', e.AcceptBlock)
+	e.server.Register('T', e.AcceptTransaction)
+	e.server.Register('R', e.state.SendBlocks)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
@@ -52,10 +45,10 @@ func (e *environment) initializeNetwork() (err error) {
 	// empty batch is sent.
 	for {
 		prevHeight := e.state.Height()
-		err2 := randomPeer.Call(e.state.CatchUp)
+		err = e.state.CatchUp(randomPeer)
 
-		if err2 != nil {
-			fmt.Println("Error during CatchUp:", err2)
+		if err != nil {
+			fmt.Println("Error during CatchUp:", err)
 			break
 		}
 
@@ -64,7 +57,7 @@ func (e *environment) initializeNetwork() (err error) {
 		}
 	}
 
-	return
+	return nil
 }
 
 // createEnvironment() creates a server, host, miner, renter and wallet and
@@ -105,8 +98,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 	if err != nil {
 		fmt.Println("AcceptBlock Error: ", err)
 		if err == siacore.UnknownOrphanErr {
-			peer := e.server.RandomPeer()
-			err2 := peer.Call(e.state.CatchUp)
+			err2 := e.state.CatchUp(e.server.RandomPeer())
 			if err2 != nil {
 				// Logging
 				// fmt.Println(err2)
@@ -114,7 +106,7 @@ func (e *environment) AcceptBlock(b siacore.Block) (err error) {
 		}
 		return
 	}
-	go e.server.Broadcast(network.SendVal('B', b))
+	go e.server.Announce('B', b)
 
 	return
 }
@@ -125,12 +117,7 @@ func (e *environment) AcceptTransaction(t siacore.Transaction) (err error) {
 		fmt.Println("AcceptTransaction Error:", err)
 		return
 	}
-	e.server.Broadcast(network.SendVal('T', t))
+	e.server.Announce('T', t)
 
-	return
-}
-
-func (e *environment) SendBlocks(conn net.Conn, data []byte) (err error) {
-	err = e.state.SendBlocks(conn, data)
 	return
 }
