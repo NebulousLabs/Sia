@@ -154,7 +154,7 @@ func (tcps *TCPServer) registerResp(t byte, fn reflect.Value, typ reflect.Type) 
 // sendHostname replies to the send with the sender's external IP.
 func sendHostname(conn net.Conn, _ []byte) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	_, err := WritePrefix(conn, []byte(host))
+	_, err := WriteObject(conn, host)
 	return err
 }
 
