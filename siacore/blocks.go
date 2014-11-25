@@ -3,6 +3,7 @@ package siacore
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -252,7 +253,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	for _, txn := range b.Transactions {
 		err = s.validTransaction(&txn)
 		if err != nil {
-			s.BadBlocks[b.ID()] = struct{}{}
 			break
 		}
 
@@ -267,7 +267,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	if err != nil {
-		// Rewind transactions added to
+		// Rewind transactions added.
 		for i := len(appliedTransactions) - 1; i >= 0; i-- {
 			s.reverseTransaction(appliedTransactions[i])
 		}
@@ -396,7 +396,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// that every block from current to genesis matches the block listed in
 	// CurrentPath.
 	currentNode := s.CurrentBlockNode()
-	for i := s.Height(); i >= 0; i-- {
+	for i := s.Height(); i == i; i-- {
 		// Check that the CurrentPath entry exists.
 		id, exists := s.CurrentPath[i]
 		if !exists {
@@ -408,9 +408,16 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		if currentNode.Block.ID() != id {
 			currentNodeID := currentNode.Block.ID()
 			println(i)
-			println(id[:])
-			println(currentNodeID[:])
+			fmt.Println(id[:])
+			fmt.Println(currentNodeID[:])
 			panic("current path does not have correct id!")
+		}
+
+		currentNode = s.BlockMap[currentNode.Block.ParentBlockID]
+
+		// Have to do an awkward break beacuse i is unsigned.
+		if i == 0 {
+			break
 		}
 	}
 
