@@ -143,7 +143,10 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		// THE CURRENT FORK. IN GENERAL THIS IS A PRETTY SAFE ASSUMPTION AS ITS
 		// LOOKING BACKWARDS BY 5000 BLOCKS. BUT WE SHOULD PROBABLY IMPLEMENT
 		// SOMETHING THATS FULLY SAFE REGARDLESS.
-		adjustmentBlock := s.BlockAtHeight(newNode.Height - TargetWindow)
+		adjustmentBlock, err := s.BlockAtHeight(newNode.Height - TargetWindow)
+		if err != nil {
+			panic(err)
+		}
 		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
 		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
 	}
@@ -395,7 +398,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// Do a sanity check - check that every block is listed in CurrentPath and
 	// that every block from current to genesis matches the block listed in
 	// CurrentPath.
-	currentNode := s.CurrentBlockNode()
+	currentNode := s.currentBlockNode()
 	for i := s.Height(); ; i-- {
 		// Check that the CurrentPath entry exists.
 		id, exists := s.CurrentPath[i]

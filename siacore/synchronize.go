@@ -94,11 +94,11 @@ func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 		tallest = s.Height()
 	}
 	for i := closestHeight; i <= tallest; i++ {
-		b := s.BlockAtHeight(i)
-		if b == nil {
-			break
+		b, err := s.BlockAtHeight(i)
+		if err != nil {
+			panic(err)
 		}
-		*blocks = append(*blocks, *b)
+		*blocks = append(*blocks, b)
 	}
 
 	return nil

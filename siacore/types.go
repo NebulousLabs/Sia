@@ -137,7 +137,7 @@ func CalculateCoinbase(height BlockHeight) Currency {
 
 // Block.ID() returns a hash of the block, which is used as the block
 // identifier. Transactions are not included in the hash.
-func (b *Block) ID() BlockID {
+func (b Block) ID() BlockID {
 	return BlockID(hash.HashBytes(encoding.MarshalAll(
 		b.ParentBlockID,
 		b.Timestamp,
@@ -148,7 +148,7 @@ func (b *Block) ID() BlockID {
 }
 
 // SubisdyID() returns the id of the output created by the block subsidy.
-func (b *Block) SubsidyID() OutputID {
+func (b Block) SubsidyID() OutputID {
 	bid := b.ID()
 	return OutputID(hash.HashBytes(append(bid[:], []byte("blockreward")...)))
 }

@@ -41,7 +41,7 @@ func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddr
 	b.MerkleRoot = b.ExpectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
-	target = state.CurrentBlockNode().Target
+	target = state.CurrentTarget()
 
 	return
 }

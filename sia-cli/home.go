@@ -92,7 +92,7 @@ func printWalletAddresses(env *environment) {
 	fmt.Println()
 
 	fmt.Println("\tCurrent Block Height:", env.state.Height())
-	fmt.Println("\tCurrent Block Target:", env.state.CurrentBlockNode().Target)
+	fmt.Println("\tCurrent Block Target:", env.state.CurrentTarget())
 	fmt.Println("\tCurrent Block Depth:", env.state.Depth())
 	fmt.Println()
 

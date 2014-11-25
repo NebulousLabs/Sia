@@ -1,6 +1,7 @@
 package siacore
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 	"sync"
@@ -95,43 +96,47 @@ func (s *State) Height() BlockHeight {
 
 // State.Depth() returns the depth of the current block of the state.
 func (s *State) Depth() Target {
-	return s.CurrentBlockNode().Depth
+	return s.currentBlockNode().Depth
 }
 
 // BlockAtHeight() returns the block from the current history at the
 // input height.
-func (s *State) BlockAtHeight(height BlockHeight) (b *Block) {
+func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	if bn, ok := s.BlockMap[s.CurrentPath[height]]; ok {
-		if ok && bn == nil {
-			panic("block is not in block map.")
-		}
-		b = bn.Block
+		b = *bn.Block
 	}
+	err = fmt.Errorf("no block at height %v found.", height)
 
 	return
 }
 
-// CurrentBlockNode returns the node of the most recent block in the
+// currentBlockNode returns the node of the most recent block in the
 // longest fork.
-func (s *State) CurrentBlockNode() *BlockNode {
+func (s *State) currentBlockNode() *BlockNode {
 	return s.BlockMap[s.CurrentBlockID]
 }
 
 // CurrentBlock returns the most recent block in the longest fork.
-func (s *State) CurrentBlock() *Block {
-	return s.BlockMap[s.CurrentBlockID].Block
+func (s *State) CurrentBlock() Block {
+	return *s.BlockMap[s.CurrentBlockID].Block
 }
 
 // CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
-	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.CurrentBlockNode().Target[:])))
+	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
 }
 
 // CurrentEarliestLegalTimestamp returns the earliest legal timestamp of the
 // next block - earlier timestamps will render the block invalid.
 func (s *State) CurrentEarliestLegalTimestamp() Timestamp {
-	return s.CurrentBlockNode().earliestLegalChildTimestamp()
+	return s.currentBlockNode().earliestLegalChildTimestamp()
+}
+
+// CurrentTarget returns the target of the next block that needs to be
+// submitted to the state.
+func (s *State) CurrentTarget() Target {
+	return s.currentBlockNode().Target
 }
 
 // StateHash returns the markle root of the current state of consensus.
@@ -152,9 +157,9 @@ func (s *State) StateHash() hash.Hash {
 	leaves = append(
 		leaves,
 		hash.HashBytes(encoding.Marshal(s.Height())),
-		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Target)),
-		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().Depth)),
-		hash.HashBytes(encoding.Marshal(s.CurrentBlockNode().earliestLegalChildTimestamp())),
+		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Target)),
+		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Depth)),
+		hash.HashBytes(encoding.Marshal(s.currentBlockNode().earliestLegalChildTimestamp())),
 		hash.Hash(s.BlockRoot.Block.ID()),
 		hash.Hash(s.CurrentBlockID),
 	)
