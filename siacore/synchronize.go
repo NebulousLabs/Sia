@@ -17,19 +17,20 @@ var (
 
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
-func CreateGenesisState() (s *State) {
+func CreateGenesisState() *State {
 	// Create a new state and initialize the maps.
-	s = new(State)
-	s.blockRoot = new(BlockNode)
-	s.badBlocks = make(map[BlockID]struct{})
-	s.blockMap = make(map[BlockID]*BlockNode)
-	s.orphanMap = make(map[BlockID]map[BlockID]*Block)
-	s.currentPath = make(map[BlockHeight]BlockID)
-	s.openContracts = make(map[ContractID]*OpenContract)
-	s.unspentOutputs = make(map[OutputID]Output)
-	s.spentOutputs = make(map[OutputID]Output)
-	s.transactionPool = make(map[OutputID]*Transaction)
-	s.transactionList = make(map[OutputID]*Transaction)
+	s := &State{
+		blockRoot:       new(BlockNode),
+		badBlocks:       make(map[BlockID]struct{}),
+		blockMap:        make(map[BlockID]*BlockNode),
+		orphanMap:       make(map[BlockID]map[BlockID]*Block),
+		currentPath:     make(map[BlockHeight]BlockID),
+		openContracts:   make(map[ContractID]*OpenContract),
+		unspentOutputs:  make(map[OutputID]Output),
+		spentOutputs:    make(map[OutputID]Output),
+		transactionPool: make(map[OutputID]*Transaction),
+		transactionList: make(map[OutputID]*Transaction),
+	}
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := &Block{
@@ -56,7 +57,7 @@ func CreateGenesisState() (s *State) {
 	}
 	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
-	return
+	return s
 }
 
 // SendBlocks sends all known blocks from the given height forward from the

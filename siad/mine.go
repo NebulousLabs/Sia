@@ -17,8 +17,8 @@ type Miner struct {
 	state *siacore.State
 
 	mining     bool
-	blockChan  chan *siacore.Block
 	killMining chan struct{}
+	blockChan  chan<- siacore.Block
 
 	subsidyAddress siacore.CoinAddress
 }
@@ -75,7 +75,7 @@ func (m *Miner) mine() {
 		default:
 			b, target := m.blockForWork()
 			if solveBlock(b, target) {
-				m.blockChan <- b
+				m.blockChan <- *b
 			}
 		}
 	}
@@ -83,11 +83,11 @@ func (m *Miner) mine() {
 
 // CreateMiner takes an address as input and returns a miner. All blocks mined
 // by the miner will have the subsidies sent to the subsidyAddress.
-func CreateMiner(s *siacore.State, subsidyAddress siacore.CoinAddress) *Miner {
+func CreateMiner(s *siacore.State, blockChan chan<- siacore.Block, subsidyAddress siacore.CoinAddress) *Miner {
 	return &Miner{
 		state:          s,
 		killMining:     make(chan struct{}),
-		blockChan:      make(chan *siacore.Block, 10),
+		blockChan:      blockChan,
 		subsidyAddress: subsidyAddress,
 	}
 }

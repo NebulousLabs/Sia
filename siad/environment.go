@@ -17,6 +17,10 @@ type Environment struct {
 	// renter *Renter
 	wallet *Wallet
 
+	// Channels for incoming blocks/transactions to be processed
+	blockChan       chan siacore.Block
+	transactionChan chan siacore.Transaction
+
 	caughtUp bool
 }
 
@@ -25,22 +29,18 @@ type Environment struct {
 // main package.
 func CreateEnvironment() (e *Environment, err error) {
 	e = new(Environment)
+	e.blockChan = make(chan siacore.Block, 100)
+	e.transactionChan = make(chan siacore.Transaction, 100)
 	err = e.initializeNetwork()
 	if err != nil {
 		return
 	}
 	e.state = siacore.CreateGenesisState()
 	e.wallet = CreateWallet(e.state)
-	e.miner = CreateMiner(e.state, e.wallet.SpendConditions.CoinAddress())
+	ROblockChan := (chan<- siacore.Block)(e.blockChan)
+	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
 	// e.host = CreateHost(e.state)
 	// e.renter = CreateRenter(e.state)
-
-	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
-	go func() {
-		for {
-			e.AcceptBlock(*<-e.miner.blockChan)
-		}
-	}()
 
 	return
 }
@@ -89,36 +89,49 @@ func (e *Environment) initializeNetwork() (err error) {
 		e.caughtUp = true
 	}()
 
+	go e.listen()
+
 	return nil
 }
 
-// TODO: Handle all accepting of things through a single channel.
-func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
-	err = e.state.AcceptBlock(b)
-	if err != nil && err != siacore.BlockKnownErr {
-		fmt.Println("AcceptBlock Error: ", err)
-		if err == siacore.UnknownOrphanErr {
-			err2 := e.state.CatchUp(e.server.RandomPeer())
-			if err2 != nil {
-				// Logging
-				// fmt.Println(err2)
-			}
-		}
-		return
-	}
-	go e.server.Broadcast("AcceptBlock", b, nil)
-
-	return
+func (e *Environment) AcceptBlock(b siacore.Block) error {
+	e.blockChan <- b
+	return nil
 }
 
-// TODO: Handle all accepting of things through a single channel.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) (err error) {
-	err = e.state.AcceptTransaction(t)
-	if err != nil {
-		fmt.Println("AcceptTransaction Error:", err)
-		return
-	}
-	e.server.Broadcast("AcceptTransaction", t, nil)
+func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
+	e.transactionChan <- t
+	return nil
+}
 
-	return
+// listen waits until a new block or transaction arrives, then attempts to
+// process and rebroadcast it.
+func (e *Environment) listen() {
+	var err error
+	for {
+		select {
+		case b := <-e.blockChan:
+			err = e.state.AcceptBlock(b)
+			if err != nil && err != siacore.BlockKnownErr {
+				fmt.Println("AcceptBlock Error: ", err)
+				if err == siacore.UnknownOrphanErr {
+					err = e.state.CatchUp(e.server.RandomPeer())
+					if err != nil {
+						// Logging
+						// fmt.Println(err2)
+					}
+				}
+				return
+			}
+			go e.server.Broadcast("AcceptBlock", b, nil)
+
+		case t := <-e.transactionChan:
+			err = e.state.AcceptTransaction(t)
+			if err != nil {
+				fmt.Println("AcceptTransaction Error:", err)
+				return
+			}
+			go e.server.Broadcast("AcceptTransaction", t, nil)
+		}
+	}
 }
