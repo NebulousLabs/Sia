@@ -112,7 +112,9 @@ func (e *Environment) listen() {
 		select {
 		case b := <-e.blockChan:
 			err = e.state.AcceptBlock(b)
-			if err != nil && err != siacore.BlockKnownErr {
+			if err == siacore.BlockKnownErr {
+				continue
+			} else if err != nil {
 				fmt.Println("AcceptBlock Error: ", err)
 				if err == siacore.UnknownOrphanErr {
 					err = e.state.CatchUp(e.server.RandomPeer())
@@ -121,7 +123,7 @@ func (e *Environment) listen() {
 						// fmt.Println(err2)
 					}
 				}
-				return
+				continue
 			}
 			go e.server.Broadcast("AcceptBlock", b, nil)
 
@@ -129,7 +131,7 @@ func (e *Environment) listen() {
 			err = e.state.AcceptTransaction(t)
 			if err != nil {
 				fmt.Println("AcceptTransaction Error:", err)
-				return
+				continue
 			}
 			go e.server.Broadcast("AcceptTransaction", t, nil)
 		}
