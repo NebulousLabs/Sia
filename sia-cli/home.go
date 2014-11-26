@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Andromeda/siad"
 )
 
+/*
 // Pulls a bunch of information and announces the host to the network.
 func becomeHostWalkthrough(e *siad.Environment) (err error) {
 	// Get a volume of days to freeze the coins.
@@ -71,7 +72,7 @@ func becomeHostWalkthrough(e *siad.Environment) (err error) {
 
 // toggleMining asks the state to switch mining on or off.
 func toggleMining(e *siad.Environment) {
-	e.ToggleMining(e.state, e.wallet.SpendConditions.CoinAddress())
+	e.ToggleMining()
 }
 
 // printWalletAddresses prints out all of the addresses that are spendable by
@@ -80,19 +81,20 @@ func printWalletAddresses(e *siad.Environment) {
 	fmt.Println("General Information:")
 
 	// Dispaly whether or not the miner is mining.
-	if e.miner.Mining() {
+	if e.Mining() {
 		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
 	} else {
 		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
 	}
 	fmt.Println()
 
-	fmt.Printf("\tWallet Address: %x\n", e.wallet.SpendConditions.CoinAddress())
+	fmt.Printf("\tWallet Address: %x\n", e.CoinAddress())
 	fmt.Println()
 
-	fmt.Println("\tCurrent Block Height:", e.state.Height())
-	fmt.Println("\tCurrent Block Target:", e.state.CurrentTarget())
-	fmt.Println("\tCurrent Block Depth:", e.state.Depth())
+	info := e.StateInfo()
+	fmt.Println("\tCurrent Block Height:", info.Height)
+	fmt.Println("\tCurrent Block Target:", info.Target)
+	fmt.Println("\tCurrent Block Depth:", info.Depth)
 	fmt.Println()
 
 	fmt.Println("\tPrinting Networked Peers:")
@@ -150,7 +152,7 @@ func displayHomeHelp() {
 		" h:\tHelp - display this message\n",
 		"q:\tQuit - quit the program\n",
 		"c:\tCatch Up - collect blocks you are missing.\n",
-		"H:\tHost - become a host and announce to the network\n",
+		// "H:\tHost - become a host and announce to the network\n",
 		"m:\tMine - turn mining on or off\n",
 		"p\tPrint - list all of the wallets, plus some stats about the program\n",
 		"s:\tSend - send coins to another wallet\n",
@@ -193,8 +195,10 @@ func pollHome(e *siad.Environment) {
 				e.caughtUp = true
 			}()
 
-		case "H", "host", "store", "advertise", "storage":
-			err = becomeHostWalkthrough(e)
+		/*
+			case "H", "host", "store", "advertise", "storage":
+				err = becomeHostWalkthrough(e)
+		*/
 
 		case "m", "mine", "toggle", "mining":
 			if !e.caughtUp {
