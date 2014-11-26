@@ -14,17 +14,13 @@ import (
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
-	State *siacore.State
+	state *siacore.State
 
 	SecretKey       signatures.SecretKey
 	SpendConditions siacore.SpendConditions
 
-	OwnedOutputs         map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
-	SpentOutputs         map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
-	OpenFreezeConditions map[siacore.BlockHeight]int   // A list of all heights at which freeze conditions are being used.
-
-	// Host variables.
-	HostSettings HostAnnouncement
+	OwnedOutputs map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
+	SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -35,13 +31,6 @@ type FileContractParameters struct {
 	Transaction        siacore.Transaction
 	FileContractIndex  int
 	ClientContribution siacore.Currency
-}
-
-// Wallet.FreezeConditions
-func (w *Wallet) FreezeConditions(unlockHeight siacore.BlockHeight) (fc siacore.SpendConditions) {
-	fc = w.SpendConditions
-	fc.TimeLock = unlockHeight
-	return
 }
 
 // Creates a new wallet that can receive and spend coins.
@@ -55,7 +44,6 @@ func CreateWallet() (w *Wallet, err error) {
 
 	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
 	w.SpentOutputs = make(map[siacore.OutputID]struct{})
-	w.OpenFreezeConditions = make(map[siacore.BlockHeight]int)
 
 	return
 }
@@ -69,19 +57,8 @@ func (w *Wallet) Scan() {
 	scanAddresses := make(map[siacore.CoinAddress]struct{})
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
-	// I'm not sure that it's the wallet's job to deal with freeze conditions.
-	/*
-		for height, _ := range w.OpenFreezeConditions {
-			if height < State.Height() {
-				freezeConditions := w.SpendConditions
-				freezeConditions.TimeLock = height
-				scanAddresses[freezeConditions.CoinAddress()] = struct{}{}
-			}
-		}
-	*/
-
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
-	outputs := w.State.ScanOutputs(scanAddresses)
+	outputs := w.state.ScanOutputs(scanAddresses)
 	for _, output := range outputs {
 		w.OwnedOutputs[output] = struct{}{}
 	}
@@ -108,7 +85,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 		// Check that the output exists.
 		var output siacore.Output
-		output, err = w.State.Output(id)
+		output, err = w.state.Output(id)
 		if err != nil {
 			continue
 		}
@@ -177,12 +154,12 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 // Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
+func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
-	w.Scan()
+	e.wallet.Scan()
 
 	// Add `amount` of free coins to the transaction.
-	err = w.FundTransaction(amount+minerFee, &t)
+	err = e.wallet.FundTransaction(amount+minerFee, &t)
 	if err != nil {
 		return
 	}
@@ -194,15 +171,22 @@ func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.C
 	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: address})
 
 	// Sign each input.
-	err = w.SignTransaction(&t)
+	err = e.wallet.SignTransaction(&t)
 	if err != nil {
 		return
 	}
 
-	err = w.State.AcceptTransaction(t)
+	// TODO: AcceptTransaction shoul be piped through a channel.
+	err = e.wallet.state.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
 
 	return
+}
+
+// Environment.CoinAddress returns the CoinAddress which foreign coins should
+// be sent to.
+func (e *Environment) CoinAddress() siacore.CoinAddress {
+	return e.wallet.SpendConditions.CoinAddress()
 }
