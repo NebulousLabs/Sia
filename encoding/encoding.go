@@ -83,8 +83,7 @@ func marshal(val reflect.Value) (b []byte) {
 		if val.IsNil() {
 			return []byte{0}
 		}
-		b = append([]byte{1}, marshal(val.Elem())...)
-		return
+		return append([]byte{1}, marshal(val.Elem())...)
 	case reflect.Bool:
 		if val.Bool() {
 			return []byte{1}
@@ -97,12 +96,25 @@ func marshal(val reflect.Value) (b []byte) {
 		return EncUint64(val.Uint())
 	case reflect.String:
 		s := val.String()
-		return append([]byte{byte(len(s))}, []byte(s)...)
-	case reflect.Slice: // TODO: add special case for []byte?
+		return append([]byte{byte(len(s))}, s...)
+	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
 		b = []byte{byte(val.Len())}
+		// special case for byte slices
+		if val.Type().Elem().Kind() == reflect.Uint8 {
+			return append(b, val.Bytes()...)
+		}
 		fallthrough
 	case reflect.Array:
+		// special case for byte arrays
+		if val.Type().Elem().Kind() == reflect.Uint8 {
+			b = make([]byte, val.Len())
+			for i := range b {
+				b[i] = byte(val.Index(i).Uint())
+			}
+			return
+		}
+		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
 			b = append(b, marshal(val.Index(i))...)
 		}
@@ -174,14 +186,27 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		n, b := int(b[0]), b[1:]
 		val.SetString(string(b[:n]))
 		return n + 1
-	case reflect.Slice: // TODO: add special case for []byte?
+	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		var sliceLen int
 		sliceLen, b, consumed = int(b[0]), b[1:], 1 // remember to count the length byte as consumed
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+		// special case for byte slices
+		if val.Type().Elem().Kind() == reflect.Uint8 {
+			val.SetBytes(b[:sliceLen])
+			return consumed + sliceLen
+		}
 		fallthrough
 	case reflect.Array:
+		// special case for byte arrays (e.g. hashes)
+		if val.Type().Elem().Kind() == reflect.Uint8 {
+			for i := 0; i < val.Len(); i++ {
+				val.Index(i).SetUint(uint64(b[i]))
+			}
+			return val.Len()
+		}
+		// normal arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
 			elem := val.Index(i)
 			n := unmarshal(b, elem)

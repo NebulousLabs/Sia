@@ -14,7 +14,9 @@ type (
 	// slice/array
 	test1 struct {
 		Is []int32
-		Ss [3]string
+		Bs []byte
+		Sa [3]string
+		Ba [3]byte
 	}
 	// nested
 	test2 struct {
@@ -46,7 +48,7 @@ func (t *test5) UnmarshalSia(b []byte) int {
 
 var testStructs = []interface{}{
 	test0{65537, "foo"},
-	test1{[]int32{1, 2, 3}, [3]string{"foo", "bar", "baz"}},
+	test1{[]int32{1, 2, 3}, []byte("foo"), [3]string{"foo", "bar", "baz"}, [3]byte{'f', 'o', 'o'}},
 	test2{test0{65537, "foo"}},
 	test3{test2{test0{65537, "foo"}}},
 	test4{&test0{65537, "foo"}},
@@ -58,10 +60,10 @@ var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{
 func TestEncoding(t *testing.T) {
 	for i := range testStructs {
 		b := Marshal(testStructs[i])
+		t.Log(i, b)
 		err := Unmarshal(b, emptyStructs[i])
 		if err != nil {
 			t.Error(err)
 		}
-		t.Log(b)
 	}
 }

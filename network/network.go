@@ -47,7 +47,7 @@ type TCPServer struct {
 	net.Listener
 	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
-	handlerMap  map[byte]func(net.Conn, []byte) error
+	handlerMap  map[string]func(net.Conn, []byte) error
 }
 
 func (tcps *TCPServer) NetAddress() NetAddress {
@@ -64,12 +64,12 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 		Listener:    tcpServ,
 		myAddr:      NetAddress{"", port},
 		addressbook: make(map[NetAddress]struct{}),
-		handlerMap:  make(map[byte]func(net.Conn, []byte) error),
+		handlerMap:  make(map[string]func(net.Conn, []byte) error),
 	}
 	// default handlers
-	tcps.Register('H', sendHostname)
-	tcps.Register('P', tcps.sharePeers)
-	tcps.Register('A', tcps.addPeer)
+	tcps.Register("SendHostname", sendHostname)
+	tcps.Register("SharePeers", tcps.sharePeers)
+	tcps.Register("AddPeer", tcps.addPeer)
 
 	// spawn listener
 	go tcps.listen()
@@ -89,7 +89,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	// learn hostname
 	for addr := range tcps.addressbook {
 		var hostname string
-		if addr.RPC('H', nil, &hostname) == nil {
+		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
 			tcps.myAddr.Host = hostname
 			break
 		}
@@ -100,7 +100,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	var peers []NetAddress
 	for addr := range tcps.addressbook {
 		var resp []NetAddress
-		addr.RPC('P', nil, &resp)
+		addr.RPC("SharePeers", nil, &resp)
 		peers = append(peers, resp...)
 	}
 	for _, addr := range peers {
@@ -110,7 +110,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	}
 
 	// announce ourselves to new peers
-	tcps.Announce('A', tcps.myAddr)
+	tcps.Broadcast("AddPeer", tcps.myAddr, nil)
 
 	return
 }
@@ -144,24 +144,6 @@ func (tcps *TCPServer) Ping(addr NetAddress) bool {
 	return true
 }
 
-// Broadcast calls the specified function on each peer in the address book.
-func (tcps *TCPServer) Broadcast(fn func(net.Conn) error) {
-	for addr := range tcps.addressbook {
-		addr.Call(fn)
-	}
-}
-
-// Announce sends an object to every peer in the address book.
-func (tcps *TCPServer) Announce(t byte, obj interface{}) {
-	for addr := range tcps.addressbook {
-		addr.Call(func(conn net.Conn) error {
-			conn.Write([]byte{t})
-			_, err := WriteObject(conn, obj)
-			return err
-		})
-	}
-}
-
 // listen runs in the background, accepting incoming connections and serving
 // them. listen will return after TCPServer.Close() is called, because the
 // Accept() call will fail.
@@ -182,8 +164,8 @@ func (tcps *TCPServer) listen() {
 // TODO: set deadlines?
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
-	msgType := make([]byte, 1)
-	if n, err := conn.Read(msgType); err != nil || n != 1 {
+	ident := make([]byte, 8)
+	if n, err := conn.Read(ident); err != nil || n != len(ident) {
 		// TODO: log error
 		return
 	}
@@ -193,7 +175,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		return
 	}
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[msgType[0]]; ok {
+	if fn, ok := tcps.handlerMap[string(ident)]; ok {
 		fn(conn, msgData)
 		// TODO: log error
 		// no wait, send the error?
