@@ -13,6 +13,8 @@ const (
 )
 
 type Miner struct {
+	State *siacore.State
+
 	mining     bool
 	BlockChan  chan *siacore.Block
 	killMining chan struct{}
@@ -27,21 +29,21 @@ func (m *Miner) blockForWork(state *siacore.State, minerAddress siacore.CoinAddr
 	state.Lock()
 	defer state.Unlock()
 	b = &siacore.Block{
-		ParentBlockID: state.CurrentBlockID,
+		ParentBlockID: state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
 		MinerAddress:  minerAddress,
 		Transactions:  state.TransactionPoolDump(),
 	}
 	// Fudge the timestamp if the block would otherwise be illegal.
-	if b.Timestamp < state.CurrentBlockNode().EarliestLegalChildTimestamp() {
-		b.Timestamp = state.CurrentBlockNode().EarliestLegalChildTimestamp()
+	if b.Timestamp < state.CurrentEarliestLegalTimestamp() {
+		b.Timestamp = state.CurrentEarliestLegalTimestamp()
 	}
 
 	// Add the transactions from the transaction pool.
 	b.MerkleRoot = b.ExpectedTransactionMerkleRoot()
 
 	// Determine the target for the block.
-	target = state.CurrentBlockNode().Target
+	target = state.CurrentTarget()
 
 	return
 }

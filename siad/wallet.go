@@ -14,12 +14,14 @@ import (
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
+	State *siacore.State
+
 	SecretKey       signatures.SecretKey
 	SpendConditions siacore.SpendConditions
 
-	OwnedOutputs         map[siacore.OutputID]siacore.Output // All outputs to CoinAddress
-	SpentOutputs         map[siacore.OutputID]siacore.Output // A list of outputs that have been assigned to transactions, though the transactions may not be in a block yet.
-	OpenFreezeConditions map[siacore.BlockHeight]int         // A list of all heights at which freeze conditions are being used.
+	OwnedOutputs         map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
+	SpentOutputs         map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
+	OpenFreezeConditions map[siacore.BlockHeight]int   // A list of all heights at which freeze conditions are being used.
 
 	// Host variables.
 	HostSettings HostAnnouncement
@@ -51,8 +53,8 @@ func CreateWallet() (w *Wallet, err error) {
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 
-	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
-	w.SpentOutputs = make(map[siacore.OutputID]siacore.Output)
+	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
+	w.SpentOutputs = make(map[siacore.OutputID]struct{})
 	w.OpenFreezeConditions = make(map[siacore.BlockHeight]int)
 
 	return
@@ -60,17 +62,29 @@ func CreateWallet() (w *Wallet, err error) {
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) Scan(state *siacore.State) {
-	w.OwnedOutputs = make(map[siacore.OutputID]siacore.Output)
+func (w *Wallet) Scan() {
+	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
 
 	// Check for owned outputs from the standard SpendConditions.
-	for id, output := range state.UnspentOutputs {
-		if output.SpendHash == w.SpendConditions.CoinAddress() {
-			w.OwnedOutputs[id] = output
-		}
-	}
+	scanAddresses := make(map[siacore.CoinAddress]struct{})
+	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
-	// Check for spendable outputs from the freeze conditions.
+	// I'm not sure that it's the wallet's job to deal with freeze conditions.
+	/*
+		for height, _ := range w.OpenFreezeConditions {
+			if height < State.Height() {
+				freezeConditions := w.SpendConditions
+				freezeConditions.TimeLock = height
+				scanAddresses[freezeConditions.CoinAddress()] = struct{}{}
+			}
+		}
+	*/
+
+	// Get the matching set of outputs and add them to the OwnedOutputs map.
+	outputs := w.State.ScanOutputs(scanAddresses)
+	for _, output := range outputs {
+		w.OwnedOutputs[output] = struct{}{}
+	}
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
@@ -85,14 +99,17 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	// Add to the list of inputs until enough funds have been allocated.
 	total := siacore.Currency(0)
 	var newInputs []siacore.Input
-	for id, output := range w.OwnedOutputs {
-		if total >= amount {
-			break
-		}
-
+	for id, _ := range w.OwnedOutputs {
 		// Check that the output has not already been assigned somewhere else.
 		_, exists := w.SpentOutputs[id]
 		if exists {
+			continue
+		}
+
+		// Check that the output exists.
+		var output siacore.Output
+		output, err = w.State.Output(id)
+		if err != nil {
 			continue
 		}
 
@@ -103,7 +120,12 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 		}
 		newInputs = append(newInputs, newInput)
 
+		// Add the value of the output to the total and see if we've hit a
+		// sufficient amount.
 		total += output.Value
+		if total >= amount {
+			break
+		}
 	}
 
 	// Check that the sum of the inputs is sufficient to complete the
@@ -115,6 +137,11 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 	// Add all of the inputs to the transaction.
 	t.Inputs = append(t.Inputs, newInputs...)
+
+	// Add all of the inputs to the spent outputs map.
+	for _, input := range newInputs {
+		w.SpentOutputs[input.OutputID] = struct{}{}
+	}
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
@@ -150,9 +177,9 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 // Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress, state *siacore.State) (t siacore.Transaction, err error) {
+func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
-	w.Scan(state)
+	w.Scan()
 
 	// Add `amount` of free coins to the transaction.
 	err = w.FundTransaction(amount+minerFee, &t)
@@ -172,7 +199,7 @@ func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.C
 		return
 	}
 
-	err = state.AcceptTransaction(t)
+	err = w.State.AcceptTransaction(t)
 	if err != nil {
 		return
 	}

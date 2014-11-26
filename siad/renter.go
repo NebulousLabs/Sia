@@ -8,6 +8,8 @@ import (
 )
 
 type Renter struct {
+	State *siacore.State
+
 	hostdb HostDatabase
 }
 
@@ -15,7 +17,7 @@ type Renter struct {
 // partial transaction containing an input for the contract, but no signatures.
 func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wallet *Wallet) (err error) {
 	// Scan the blockchain for outputs.
-	wallet.Scan(state)
+	wallet.Scan()
 
 	// Open the file, create a merkle hash.
 	file, err := os.Open(filename)

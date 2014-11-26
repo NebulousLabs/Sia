@@ -21,31 +21,31 @@ func (s *State) reverseTransaction(t Transaction) {
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
 		contractID := t.FileContractID(i)
-		delete(s.OpenContracts, contractID)
+		delete(s.openContracts, contractID)
 	}
 
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		openContract := s.OpenContracts[sp.ContractID]
+		openContract := s.openContracts[sp.ContractID]
 		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
 		if err != nil {
 			panic(err)
 		}
-		delete(s.UnspentOutputs, outputID)
+		delete(s.unspentOutputs, outputID)
 
 		// Restore the contract window to being incomplete.
-		s.OpenContracts[sp.ContractID].WindowSatisfied = false
+		s.openContracts[sp.ContractID].WindowSatisfied = false
 	}
 
 	// Delete all financial outputs created by the transaction.
 	for i := range t.Outputs {
-		delete(s.UnspentOutputs, t.OutputID(i))
+		delete(s.unspentOutputs, t.OutputID(i))
 	}
 
 	// Restore all inputs to the unspent outputs list.
 	for _, input := range t.Inputs {
-		s.UnspentOutputs[input.OutputID] = s.SpentOutputs[input.OutputID]
-		delete(s.SpentOutputs, input.OutputID)
+		s.unspentOutputs[input.OutputID] = s.spentOutputs[input.OutputID]
+		delete(s.spentOutputs, input.OutputID)
 	}
 
 	// Add the transaction to the transaction pool.
@@ -61,18 +61,18 @@ func (s *State) applyTransaction(t Transaction) {
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
 		// Sanity check.
-		_, exists := s.UnspentOutputs[input.OutputID]
+		_, exists := s.unspentOutputs[input.OutputID]
 		if !exists {
 			panic("Applying a transaction with an invalid unspent output!")
 		}
 
-		s.SpentOutputs[input.OutputID] = s.UnspentOutputs[input.OutputID]
-		delete(s.UnspentOutputs, input.OutputID)
+		s.spentOutputs[input.OutputID] = s.unspentOutputs[input.OutputID]
+		delete(s.unspentOutputs, input.OutputID)
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
-		s.UnspentOutputs[t.OutputID(i)] = output
+		s.unspentOutputs[t.OutputID(i)] = output
 	}
 
 	// Add all outputs created by storage proofs.
@@ -93,14 +93,14 @@ func (s *State) applyTransaction(t Transaction) {
 // otherwise returns an error explaining what wasn't valid.
 func (s *State) validInput(input Input) (err error) {
 	// Check the input spends an existing and valid output.
-	_, exists := s.UnspentOutputs[input.OutputID]
+	_, exists := s.unspentOutputs[input.OutputID]
 	if !exists {
 		err = errors.New("transaction spends a nonexisting output")
 		return
 	}
 
 	// Check that the spend conditions match the hash listed in the output.
-	if input.SpendConditions.CoinAddress() != s.UnspentOutputs[input.OutputID].SpendHash {
+	if input.SpendConditions.CoinAddress() != s.unspentOutputs[input.OutputID].SpendHash {
 		err = errors.New("spend conditions do not match hash")
 		return
 	}
@@ -141,7 +141,7 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 		inputSignaturesMap[input.OutputID] = newInputSignatures
 
 		// Add the input value to the coin sum.
-		inputSum += s.UnspentOutputs[input.OutputID].Value
+		inputSum += s.unspentOutputs[input.OutputID].Value
 	}
 
 	// Tally up the miner fees and output values.

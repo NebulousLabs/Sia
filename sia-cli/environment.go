@@ -84,6 +84,11 @@ func createEnvironment() (env *environment, err error) {
 		return
 	}
 
+	env.miner.State = env.state
+	env.host.State = env.state
+	env.renter.State = env.state
+	env.wallet.State = env.state
+
 	// accept mined blocks
 	// TODO: WHEN SHOULD THIS TERMINATE?
 	go func() {

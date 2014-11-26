@@ -12,12 +12,13 @@ const (
 )
 
 type Host struct {
+	State *siacore.State
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
 func (w *Wallet) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency, state *siacore.State) (t siacore.Transaction, err error) {
-	w.Scan(state)
+	w.Scan()
 
 	info := w.HostSettings
 
