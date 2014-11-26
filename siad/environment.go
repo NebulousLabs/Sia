@@ -72,12 +72,23 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
+		// Catch up the first time.
 		e.state.Lock()
 		if err := e.state.CatchUp(randomPeer); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
 		e.state.Unlock()
 		e.caughtUp = true
+
+		// Every 2 minutes call CatchUp() again on a random peer. This will
+		// help to continuously resolve synchronization issues, and will make
+		// the system more robust - even if it is a bit of a hack.
+		for {
+			time.Sleep(time.Minute * 2)
+			e.state.Lock()
+			e.state.CatchUp(e.server.RandomPeer())
+			e.state.Unlock()
+		}
 	}()
 
 	go e.listen()
