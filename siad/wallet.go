@@ -14,7 +14,7 @@ import (
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
-	State *siacore.State
+	state *siacore.State
 
 	SecretKey       signatures.SecretKey
 	SpendConditions siacore.SpendConditions
@@ -58,7 +58,7 @@ func (w *Wallet) Scan() {
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
-	outputs := w.State.ScanOutputs(scanAddresses)
+	outputs := w.state.ScanOutputs(scanAddresses)
 	for _, output := range outputs {
 		w.OwnedOutputs[output] = struct{}{}
 	}
@@ -85,7 +85,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 		// Check that the output exists.
 		var output siacore.Output
-		output, err = w.State.Output(id)
+		output, err = w.state.Output(id)
 		if err != nil {
 			continue
 		}
@@ -176,7 +176,8 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 		return
 	}
 
-	err = e.wallet.State.AcceptTransaction(t)
+	// TODO: AcceptTransaction shoul be piped through a channel.
+	err = e.wallet.state.AcceptTransaction(t)
 	if err != nil {
 		return
 	}

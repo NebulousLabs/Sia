@@ -31,6 +31,7 @@ func (m *Miner) Mining() bool {
 func (m *Miner) blockForWork() (b *siacore.Block, target siacore.Target) {
 	m.state.Lock()
 	defer m.state.Unlock()
+
 	b = &siacore.Block{
 		ParentBlockID: m.state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),

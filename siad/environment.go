@@ -84,9 +84,9 @@ func CreateEnvironment() (e *Environment, err error) {
 	// e.renter = CreateRenter()
 
 	e.miner.state = e.state
-	// e.host.State = e.state
-	// e.renter.State = e.state
-	e.wallet.State = e.state
+	// e.host.state = e.state
+	// e.renter.state = e.state
+	e.wallet.state = e.state
 
 	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
 	go func() {
