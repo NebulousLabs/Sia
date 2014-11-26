@@ -154,12 +154,12 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 // Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
+func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
-	w.Scan()
+	e.wallet.Scan()
 
 	// Add `amount` of free coins to the transaction.
-	err = w.FundTransaction(amount+minerFee, &t)
+	err = e.wallet.FundTransaction(amount+minerFee, &t)
 	if err != nil {
 		return
 	}
@@ -171,12 +171,12 @@ func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.C
 	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: address})
 
 	// Sign each input.
-	err = w.SignTransaction(&t)
+	err = e.wallet.SignTransaction(&t)
 	if err != nil {
 		return
 	}
 
-	err = w.State.AcceptTransaction(t)
+	err = e.wallet.State.AcceptTransaction(t)
 	if err != nil {
 		return
 	}

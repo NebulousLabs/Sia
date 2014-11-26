@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -137,7 +136,7 @@ func sendCoinsWalkthrough(e *siad.Environment) (err error) {
 
 	// Use the wallet api to send.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = e.wallet.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
+	_, err = e.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
 	if err != nil {
 		return
 	}
@@ -186,13 +185,10 @@ func pollHome(e *siad.Environment) {
 			// Dirty that the error just inserts itself into whatever the user
 			// is doing.
 			go func() {
-				// Need a lock here.
-				e.caughtUp = false
-				err := e.state.CatchUp(e.server.RandomPeer())
+				err := e.CatchUp(e.RandomPeer())
 				if err != nil {
 					fmt.Println("CatchUp Error:", err)
 				}
-				e.caughtUp = true
 			}()
 
 		/*
@@ -201,11 +197,7 @@ func pollHome(e *siad.Environment) {
 		*/
 
 		case "m", "mine", "toggle", "mining":
-			if !e.caughtUp {
-				err = errors.New("not caught up to peers yet. Please wait.")
-			} else {
-				toggleMining(e)
-			}
+			err = e.ToggleMining()
 
 		case "p", "print":
 			printWalletAddresses(e)

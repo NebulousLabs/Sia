@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/NebulousLabs/Andromeda/siad"
+
 	"github.com/spf13/cobra"
 )
 
 func walletStart(cmd *cobra.Command, args []string) {
-	env, err := createEnvironment()
+	env, err := siad.CreateEnvironment()
 	if err != nil {
 		fmt.Println(err)
 		return

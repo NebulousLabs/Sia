@@ -1,6 +1,7 @@
 package siad
 
 import (
+	"errors"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -95,7 +96,12 @@ func (e *Environment) Mining() bool {
 }
 
 // ToggleMining creates a channel and mines until it receives a kill signal.
-func (e *Environment) ToggleMining() {
+func (e *Environment) ToggleMining() (err error) {
+	if !e.caughtUp {
+		err = errors.New("cannot mine - still catching up")
+		return
+	}
+
 	if !e.miner.mining {
 		e.miner.mining = true
 		go e.miner.mine()
@@ -103,4 +109,6 @@ func (e *Environment) ToggleMining() {
 		e.miner.mining = false
 		e.miner.killMining <- struct{}{}
 	}
+
+	return
 }
