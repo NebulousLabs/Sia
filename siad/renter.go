@@ -9,14 +9,14 @@ import (
 )
 
 type Renter struct {
-	State *siacore.State
+	state *siacore.State
 
 	hostdb HostDatabase
 }
 
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wallet *Wallet) (err error) {
+func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err error) {
 	// Scan the blockchain for outputs.
 	wallet.Scan()
 
@@ -45,8 +45,8 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 		ContractFund:       (host.Price + host.Burn) * 5000, // 5000 blocks.
 		FileMerkleRoot:     merkle,
 		FileSize:           uint64(info.Size()),
-		Start:              state.Height() + 100,
-		End:                state.Height() + 5100,
+		Start:              r.state.Height() + 100,
+		End:                r.state.Height() + 5100,
 		ChallengeFrequency: host.Frequency,
 		Tolerance:          host.Tolerance,
 		ValidProofPayout:   host.Price,
@@ -71,7 +71,9 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 	return
 }
 
-func CreateRenter() *Renter {
-	return new(Renter)
+func CreateRenter(s *siacore.State) *Renter {
+	return &Renter{
+		state: s,
+	}
 }
 */

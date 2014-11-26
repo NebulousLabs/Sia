@@ -19,6 +19,35 @@ type Environment struct {
 	wallet *Wallet
 
 	friends map[string]siacore.CoinAddress
+
+	// Channels for incoming blocks/transactions to be processed
+	blockChan       chan siacore.Block
+	transactionChan chan siacore.Transaction
+}
+
+// createEnvironment() creates a server, host, miner, renter and wallet and
+// puts it all in a single environment struct that's used as the state for the
+// main package.
+func CreateEnvironment() (e *Environment, err error) {
+	e = new(Environment)
+	e.blockChan = make(chan siacore.Block, 100)
+	e.transactionChan = make(chan siacore.Transaction, 100)
+	err = e.initializeNetwork()
+	if err != nil {
+		return
+	}
+	e.state = siacore.CreateGenesisState()
+	e.wallet = CreateWallet(e.state)
+	ROblockChan := (chan<- siacore.Block)(e.blockChan)
+	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
+	// e.host = CreateHost(e.state)
+	// e.renter = CreateRenter(e.state)
+
+	return
+}
+
+func (e *Environment) Close() {
+	e.server.Close()
 }
 
 func (e *Environment) initializeNetwork() (err error) {
@@ -33,11 +62,9 @@ func (e *Environment) initializeNetwork() (err error) {
 		return
 	}
 
-	// create genesis state and register it with the server
-	e.state = siacore.CreateGenesisState()
-	e.server.Register('B', e.AcceptBlock)
-	e.server.Register('T', e.AcceptTransaction)
-	e.server.Register('R', e.state.SendBlocks)
+	e.server.Register("AcceptBlock", e.AcceptBlock)
+	e.server.Register("AcceptTransaction", e.AcceptTransaction)
+	e.server.Register("SendBlocks", e.state.SendBlocks)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
@@ -46,93 +73,65 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
-		for {
-			prevHeight := e.state.Height()
-			err = e.state.CatchUp(randomPeer)
-
-			if err != nil {
-				fmt.Println("Error during CatchUp:", err)
-				break
-			}
-
-			if prevHeight == e.state.Height() {
-				break
-			}
+		e.state.Lock()
+		if err := e.state.CatchUp(randomPeer); err != nil {
+			fmt.Println("Error during CatchUp:", err)
 		}
-
+		e.state.Unlock()
 		e.caughtUp = true
 	}()
+
+	go e.listen()
 
 	return nil
 }
 
-// createEnvironment() creates a server, host, miner, renter and wallet and
-// puts it all in a single environment struct that's used as the state for the
-// main package.
-func CreateEnvironment() (e *Environment, err error) {
-	e = new(Environment)
-	err = e.initializeNetwork()
-	if err != nil {
-		return
-	}
-	e.wallet, err = CreateWallet()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	e.miner = CreateMiner(e.wallet.SpendConditions.CoinAddress())
-	// e.host = CreateHost()
-	// e.renter = CreateRenter()
-
-	e.miner.state = e.state
-	// e.host.state = e.state
-	// e.renter.state = e.state
-	e.wallet.state = e.state
-
-	// Create the friends map.
-	e.friends = make(map[string]siacore.CoinAddress)
-
-	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
-	go func() {
-		for {
-			e.AcceptBlock(*<-e.miner.blockChan)
-		}
-	}()
-
-	return
+func (e *Environment) AcceptBlock(b siacore.Block) error {
+	e.blockChan <- b
+	return nil
 }
 
-func (e *Environment) Close() {
-	e.server.Close()
+func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
+	e.transactionChan <- t
+	return nil
 }
 
-// TODO: Handle all accepting of things through a single channel.
-func (e *Environment) AcceptBlock(b siacore.Block) (err error) {
-	err = e.state.AcceptBlock(b)
-	if err != nil && err != siacore.BlockKnownErr {
-		fmt.Println("AcceptBlock Error: ", err)
-		if err == siacore.UnknownOrphanErr {
-			err2 := e.state.CatchUp(e.server.RandomPeer())
-			if err2 != nil {
-				// Logging
-				// fmt.Println(err2)
+// listen waits until a new block or transaction arrives, then attempts to
+// process and rebroadcast it.
+func (e *Environment) listen() {
+	var err error
+	for {
+		select {
+		case b := <-e.blockChan:
+			e.state.Lock()
+			err = e.state.AcceptBlock(b)
+			e.state.Unlock()
+			if err == siacore.BlockKnownErr {
+				continue
+			} else if err != nil {
+				fmt.Println("AcceptBlock Error: ", err)
+				if err == siacore.UnknownOrphanErr {
+					e.state.Lock()
+					err = e.state.CatchUp(e.server.RandomPeer())
+					e.state.Unlock()
+					if err != nil {
+						// Logging
+						// fmt.Println(err2)
+					}
+				}
+				continue
 			}
+			go e.server.Broadcast("AcceptBlock", b, nil)
+
+		case t := <-e.transactionChan:
+			e.state.Lock()
+			err = e.state.AcceptTransaction(t)
+			e.state.Unlock()
+			if err != nil {
+				fmt.Println("AcceptTransaction Error:", err)
+				continue
+			}
+			go e.server.Broadcast("AcceptTransaction", t, nil)
 		}
-		return
 	}
-	go e.server.Announce('B', b)
-
-	return
-}
-
-// TODO: Handle all accepting of things through a single channel.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) (err error) {
-	err = e.state.AcceptTransaction(t)
-	if err != nil {
-		fmt.Println("AcceptTransaction Error:", err)
-		return
-	}
-	e.server.Announce('T', t)
-
-	return
 }

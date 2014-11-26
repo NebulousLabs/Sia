@@ -36,18 +36,22 @@ type FileContractParameters struct {
 }
 
 // Creates a new wallet that can receive and spend coins.
-func CreateWallet() (w *Wallet, err error) {
-	w = new(Wallet)
+func CreateWallet(s *siacore.State) *Wallet {
+	w := &Wallet{
+		state:        s,
+		OwnedOutputs: make(map[siacore.OutputID]struct{}),
+		SpentOutputs: make(map[siacore.OutputID]struct{}),
+	}
 
-	var pk signatures.PublicKey
-	w.SecretKey, pk, err = signatures.GenerateKeyPair()
+	sk, pk, err := signatures.GenerateKeyPair()
+	if err != nil {
+		panic(err)
+	}
+	w.SecretKey = sk
 	w.SpendConditions.PublicKeys = append(w.SpendConditions.PublicKeys, pk)
 	w.SpendConditions.NumSignatures = 1
 
-	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
-	w.SpentOutputs = make(map[siacore.OutputID]struct{})
-
-	return
+	return w
 }
 
 // Scans all unspent transactions and adds the ones that are spendable by this
@@ -60,8 +64,7 @@ func (w *Wallet) Scan() {
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
-	outputs := w.state.ScanOutputs(scanAddresses)
-	for _, output := range outputs {
+	for _, output := range w.state.ScanOutputs(scanAddresses) {
 		w.OwnedOutputs[output] = struct{}{}
 	}
 }
