@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/siad"
 )
 
@@ -109,46 +108,6 @@ func printEnvironmentInfo(e *siad.Environment) {
 		fmt.Printf("\t\t%v\t%x\n", name, address)
 	}
 	fmt.Println()
-}
-
-// sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
-// address that is provided through the command line.
-func sendCoinsWalkthrough(e *siad.Environment) (err error) {
-	fmt.Println("Send Coins Walkthrough:")
-
-	fmt.Print("Amount to send: ")
-	var amount int
-	_, err = fmt.Scanln(&amount)
-	if err != nil {
-		return
-	}
-
-	fmt.Print("Amount to use as Miner Fee: ")
-	var minerFee int
-	_, err = fmt.Scanln(&minerFee)
-	if err != nil {
-		return
-	}
-
-	fmt.Print("Address of Receiving Wallet: ")
-	var addressBytes []byte
-	_, err = fmt.Scanf("%x", &addressBytes)
-	if err != nil {
-		return
-	}
-
-	// Convert the address to a siacore.CoinAddress
-	var address siacore.CoinAddress
-	copy(address[:], addressBytes)
-
-	// Use the wallet api to send.
-	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = e.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
-	if err != nil {
-		return
-	}
-
-	return
 }
 
 // displayHomeHelp lists all of the options available at the home screen, with
