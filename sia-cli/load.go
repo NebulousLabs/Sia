@@ -17,7 +17,6 @@ func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println()
 
 	// Get friend name.
 	var friendName string
@@ -26,7 +25,6 @@ func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println()
 
 	// Call the environment function to handle the rest.
 	err = e.LoadCoinAddress(filename, friendName)
@@ -41,7 +39,7 @@ func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
 // saves the item chosen by the user.
 func loadWalkthrough(e *siad.Environment) (err error) {
 	fmt.Println("Load Walkthrough - What would you like to load?")
-	fmt.Println("\tc - a coin address")
+	fmt.Println("\tc - Coin Address")
 	fmt.Println()
 
 	fmt.Print("Your Choice: ")
@@ -50,7 +48,6 @@ func loadWalkthrough(e *siad.Environment) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println()
 
 	switch option {
 	default:

@@ -29,9 +29,12 @@ type Environment struct {
 // puts it all in a single environment struct that's used as the state for the
 // main package.
 func CreateEnvironment() (e *Environment, err error) {
-	e = new(Environment)
-	e.blockChan = make(chan siacore.Block, 100)
-	e.transactionChan = make(chan siacore.Transaction, 100)
+	e = &Environment{
+		friends:         make(map[string]siacore.CoinAddress),
+		blockChan:       make(chan siacore.Block, 100),
+		transactionChan: make(chan siacore.Transaction, 100),
+	}
+
 	err = e.initializeNetwork()
 	if err != nil {
 		return

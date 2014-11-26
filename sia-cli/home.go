@@ -118,8 +118,9 @@ func displayHomeHelp() {
 		"q:\tQuit - quit the program\n",
 		"c:\tCatch Up - collect blocks you are missing.\n",
 		// "H:\tHost - become a host and announce to the network\n",
+		"L:\tLoad - load a secret key or coin address.\n",
 		"m:\tMine - turn mining on or off\n",
-		"p\tPrint - list all of the wallets, plus some stats about the program\n",
+		"p\tPrint - list all of the wallets, plus some stats about the program.\n",
 		"s:\tSend - send coins to another wallet\n",
 		"S:\tSave - save your secret key or coin address\n",
 	)

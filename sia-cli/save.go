@@ -30,7 +30,7 @@ func saveCoinAddressWalkthrough(e *siad.Environment) (err error) {
 // saves the item chosen by the user.
 func saveWalkthrough(e *siad.Environment) (err error) {
 	fmt.Println("Save Walkthrough - What would you like to save?")
-	fmt.Println("\tc - CoinAddress")
+	fmt.Println("\tc - Coin Address")
 	fmt.Println()
 
 	fmt.Print("Your Choice: ")
@@ -39,7 +39,6 @@ func saveWalkthrough(e *siad.Environment) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println()
 
 	switch option {
 	default:
