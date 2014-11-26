@@ -76,7 +76,7 @@ func toggleMining(e *siad.Environment) {
 
 // printWalletAddresses prints out all of the addresses that are spendable by
 // this cli.
-func printWalletAddresses(e *siad.Environment) {
+func printEnvironmentInfo(e *siad.Environment) {
 	fmt.Println("General Information:")
 
 	// Dispaly whether or not the miner is mining.
@@ -100,6 +100,13 @@ func printWalletAddresses(e *siad.Environment) {
 	addresses := e.AddressBook()
 	for _, address := range addresses {
 		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
+	}
+	fmt.Println()
+
+	fmt.Println("\tPrinting friend list:")
+	friends := e.FriendMap()
+	for name, address := range friends {
+		fmt.Printf("\t\t%v\t%x\n", name, address)
 	}
 	fmt.Println()
 }
@@ -204,7 +211,7 @@ func pollHome(e *siad.Environment) {
 			err = e.ToggleMining()
 
 		case "p", "print":
-			printWalletAddresses(e)
+			printEnvironmentInfo(e)
 
 		/*
 			case "r", "rent":

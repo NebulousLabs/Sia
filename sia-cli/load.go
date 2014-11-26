@@ -10,6 +10,7 @@ import (
 // saveCoinAddressWalkthrough steps the user through saving their environment
 // coin address.
 func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
+	// Get filename.
 	fmt.Print("Filename for the coin address: ")
 	var filename string
 	_, err = fmt.Scanln(&filename)
@@ -18,6 +19,7 @@ func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
 	}
 	fmt.Println()
 
+	// Get friend name.
 	var friendName string
 	fmt.Print("Id/name for the coin address: ")
 	_, err = fmt.Scanln(&friendName)
@@ -26,6 +28,7 @@ func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
 	}
 	fmt.Println()
 
+	// Call the environment function to handle the rest.
 	err = e.LoadCoinAddress(filename, friendName)
 	if err != nil {
 		return
