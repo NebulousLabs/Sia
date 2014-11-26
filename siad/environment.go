@@ -20,6 +20,35 @@ type Environment struct {
 	caughtUp bool
 }
 
+// createEnvironment() creates a server, host, miner, renter and wallet and
+// puts it all in a single environment struct that's used as the state for the
+// main package.
+func CreateEnvironment() (e *Environment, err error) {
+	e = new(Environment)
+	err = e.initializeNetwork()
+	if err != nil {
+		return
+	}
+	e.state = siacore.CreateGenesisState()
+	e.wallet = siad.CreateWallet(e.state)
+	e.miner = CreateMiner(e.state, e.wallet.SpendConditions.CoinAddress())
+	// e.host = CreateHost(e.state)
+	// e.renter = CreateRenter(e.state)
+
+	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
+	go func() {
+		for {
+			e.AcceptBlock(*<-e.miner.blockChan)
+		}
+	}()
+
+	return
+}
+
+func (e *Environment) Close() {
+	e.server.Close()
+}
+
 func (e *Environment) initializeNetwork() (err error) {
 	e.server, err = network.NewTCPServer(9988)
 	if err != nil {
@@ -32,8 +61,6 @@ func (e *Environment) initializeNetwork() (err error) {
 		return
 	}
 
-	// create genesis state and register it with the server
-	e.state = siacore.CreateGenesisState()
 	e.server.Register("AcceptBlock", e.AcceptBlock)
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
 	e.server.Register("SendBlocks", e.state.SendBlocks)
@@ -63,39 +90,6 @@ func (e *Environment) initializeNetwork() (err error) {
 	}()
 
 	return nil
-}
-
-// createEnvironment() creates a server, host, miner, renter and wallet and
-// puts it all in a single environment struct that's used as the state for the
-// main package.
-func CreateEnvironment() (e *Environment, err error) {
-	e = new(Environment)
-	err = e.initializeNetwork()
-	if err != nil {
-		return
-	}
-	e.wallet = siad.CreateWallet()
-	e.miner = CreateMiner(e.wallet.SpendConditions.CoinAddress())
-	// e.host = CreateHost()
-	// e.renter = CreateRenter()
-
-	e.miner.state = e.state
-	// e.host.state = e.state
-	// e.renter.state = e.state
-	e.wallet.state = e.state
-
-	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
-	go func() {
-		for {
-			e.AcceptBlock(*<-e.miner.blockChan)
-		}
-	}()
-
-	return
-}
-
-func (e *Environment) Close() {
-	e.server.Close()
 }
 
 // TODO: Handle all accepting of things through a single channel.

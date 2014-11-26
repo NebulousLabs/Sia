@@ -9,7 +9,7 @@ import (
 )
 
 type Renter struct {
-	State *siacore.State
+	state *siacore.State
 
 	hostdb HostDatabase
 }
@@ -71,7 +71,9 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 	return
 }
 
-func CreateRenter() *Renter {
-	return new(Renter)
+func CreateRenter(s *siacore.State) *Renter {
+	return &Renter{
+		state: s,
+	}
 }
 */

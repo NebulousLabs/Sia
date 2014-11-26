@@ -14,7 +14,7 @@ const (
 
 
 type Host struct {
-	State *siacore.State
+	state *siacore.State
 
 	Settings HostAnnouncement
 }
@@ -116,7 +116,9 @@ func (h *Host) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, 
 	return
 }
 
-func CreateHost() *Host {
-	return new(Host)
+func CreateHost(s *siacore.State) *Host {
+	return &Host{
+		state: s,
+	}
 }
 */
