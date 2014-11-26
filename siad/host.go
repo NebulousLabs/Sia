@@ -50,6 +50,7 @@ func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeigh
 	announcementBytes := encoding.Marshal(info)
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
+	// TODO: send down a channel
 	err = h.state.AcceptTransaction(t)
 	if err != nil {
 		return

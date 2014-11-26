@@ -102,6 +102,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	}
 
 	// Check that the block is not too far in the future.
+	// TODO: sleep for 30 seconds at a time
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
 	if skew > FutureThreshold {
 		go func(skew Timestamp, b Block) {
