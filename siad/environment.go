@@ -10,14 +10,15 @@ import (
 type Environment struct {
 	state *siacore.State
 
-	server *network.TCPServer
+	server   *network.TCPServer
+	caughtUp bool // False while downloading blocks.
 
 	// host   *Host
 	miner *Miner
 	// renter *Renter
 	wallet *Wallet
 
-	caughtUp bool
+	friends map[string]siacore.CoinAddress
 }
 
 func (e *Environment) initializeNetwork() (err error) {
@@ -87,6 +88,9 @@ func CreateEnvironment() (e *Environment, err error) {
 	// e.host.state = e.state
 	// e.renter.state = e.state
 	e.wallet.state = e.state
+
+	// Create the friends map.
+	e.friends = make(map[string]siacore.CoinAddress)
 
 	// Accept blocks in a channel. TODO: MAKE IT A GENERAL CHANNEL.
 	go func() {

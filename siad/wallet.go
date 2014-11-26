@@ -210,3 +210,16 @@ func (e *Environment) SaveCoinAddress(filename string) (err error) {
 
 	return
 }
+
+func (e *Environment) LoadCoinAddress(filename string, friendName string) (err error) {
+	// Open the file and read the key to a friend map.
+	return
+}
+
+func (e *Environment) SaveSecretKey(filename string) (err error) {
+	return
+}
+
+func (e *Environment) LoadSecretKey(filename string) (err error) {
+	return
+}

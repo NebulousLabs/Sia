@@ -155,6 +155,7 @@ func displayHomeHelp() {
 		"m:\tMine - turn mining on or off\n",
 		"p\tPrint - list all of the wallets, plus some stats about the program\n",
 		"s:\tSend - send coins to another wallet\n",
+		"S:\tSave - save your secret key or coin address\n",
 	)
 }
 
@@ -207,10 +208,8 @@ func pollHome(e *siad.Environment) {
 				becomeClientWalkthrough(e)
 		*/
 
-		/*
-			case "S", "save":
-				saveWalletEnvironmentWalkthorugh()
-		*/
+		case "S", "save":
+			saveWalkthrough(e)
 
 		case "s", "send":
 			err = sendCoinsWalkthrough(e)
