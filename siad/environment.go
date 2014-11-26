@@ -74,11 +74,7 @@ func CreateEnvironment() (e *Environment, err error) {
 	if err != nil {
 		return
 	}
-	e.wallet, err = CreateWallet()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	e.wallet = siad.CreateWallet()
 	e.miner = CreateMiner(e.wallet.SpendConditions.CoinAddress())
 	// e.host = CreateHost()
 	// e.renter = CreateRenter()
