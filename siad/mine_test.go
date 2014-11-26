@@ -3,8 +3,6 @@ package siad
 import (
 	"testing"
 	"time"
-
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 func TestToggleMining(t *testing.T) {
@@ -12,22 +10,24 @@ func TestToggleMining(t *testing.T) {
 		t.Skip()
 	}
 
-	state := siacore.CreateGenesisState()
-	miner := CreateMiner()
-
-	if state.Height() != 0 {
-		t.Error("unexpected genesis height:", state.Height())
+	e, err := CreateEnvironment()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	miner.ToggleMining(state, siacore.CoinAddress{})
+	if e.state.Height() != 0 {
+		t.Error("unexpected genesis height:", e.state.Height())
+	}
+
+	e.ToggleMining()
 	time.Sleep(1 * time.Second)
-	miner.ToggleMining(state, siacore.CoinAddress{})
-	newHeight := state.Height()
+	e.ToggleMining()
+	newHeight := e.state.Height()
 	if newHeight == 0 {
 		t.Error("height did not increase after mining for a second")
 	}
 	time.Sleep(1 * time.Second)
-	if state.Height() != newHeight {
+	if e.state.Height() != newHeight {
 		t.Error("height still increasing after disabling mining...")
 	}
 }

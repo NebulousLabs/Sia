@@ -1,5 +1,6 @@
 package siad
 
+/*
 import (
 	"errors"
 
@@ -11,16 +12,17 @@ const (
 	HostAnnouncementPrefix = uint64(1)
 )
 
+
 type Host struct {
 	State *siacore.State
+
+	Settings HostAnnouncement
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (w *Wallet) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency, state *siacore.State) (t siacore.Transaction, err error) {
-	w.Scan()
-
-	info := w.HostSettings
+func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency) (t siacore.Transaction, err error) {
+	info := host.Settings
 
 	// Fund the transaction.
 	err = w.FundTransaction(freezeVolume+minerFee, &t)
@@ -56,7 +58,7 @@ func (w *Wallet) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHei
 	return
 }
 
-func (w *Wallet) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
+func (h *Host) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
 	// Set the new transaction equal to the old transaction. Pretty sure that
 	// go does not allow you to return the same variable that was used as
 	// input. We could use a pointer, but that might be a bad idea. This call
@@ -117,3 +119,4 @@ func (w *Wallet) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction
 func CreateHost() *Host {
 	return new(Host)
 }
+*/

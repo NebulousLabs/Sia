@@ -1,5 +1,6 @@
 package siad
 
+/*
 import (
 	"os"
 
@@ -73,3 +74,4 @@ func (r *Renter) ClientProposeContract(state *siacore.State, filename string, wa
 func CreateRenter() *Renter {
 	return new(Renter)
 }
+*/
