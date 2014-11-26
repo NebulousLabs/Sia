@@ -72,9 +72,11 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
+		e.state.Lock()
 		if err := e.state.CatchUp(randomPeer); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
+		e.state.Unlock()
 		e.caughtUp = true
 	}()
 
@@ -100,13 +102,17 @@ func (e *Environment) listen() {
 	for {
 		select {
 		case b := <-e.blockChan:
+			e.state.Lock()
 			err = e.state.AcceptBlock(b)
+			e.state.Unlock()
 			if err == siacore.BlockKnownErr {
 				continue
 			} else if err != nil {
 				fmt.Println("AcceptBlock Error: ", err)
 				if err == siacore.UnknownOrphanErr {
+					e.state.Lock()
 					err = e.state.CatchUp(e.server.RandomPeer())
+					e.state.Unlock()
 					if err != nil {
 						// Logging
 						// fmt.Println(err2)
@@ -117,7 +123,9 @@ func (e *Environment) listen() {
 			go e.server.Broadcast("AcceptBlock", b, nil)
 
 		case t := <-e.transactionChan:
+			e.state.Lock()
 			err = e.state.AcceptTransaction(t)
+			e.state.Unlock()
 			if err != nil {
 				fmt.Println("AcceptTransaction Error:", err)
 				continue

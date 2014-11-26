@@ -104,10 +104,12 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	// Check that the block is not too far in the future.
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
 	if skew > FutureThreshold {
-		go func(skew Timestamp, parent *BlockNode, b *Block) {
+		go func(skew Timestamp, b Block) {
 			time.Sleep(time.Duration(skew-FutureThreshold) * time.Second)
-			s.AcceptBlock(*b)
-		}(skew, parent, b)
+			s.Lock()
+			s.AcceptBlock(b)
+			s.Unlock()
+		}(skew, *b)
 		err = FutureBlockErr
 		return
 	}
@@ -366,13 +368,9 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	return
 }
 
-// State.AcceptBlock() is a thread-safe function that will add blocks to the
-// state, forking the blockchain if they are on a fork that is heavier than the
-// current fork. AcceptBlock() can be called concurrently.
+// State.AcceptBlock() will add blocks to the state, forking the blockchain if
+// they are on a fork that is heavier than the current fork.
 func (s *State) AcceptBlock(b Block) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(&b)
 	if err != nil {
