@@ -2,6 +2,7 @@ package siad
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -76,12 +77,24 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
+		// Catch up the first time.
 		e.state.Lock()
 		if err := e.state.CatchUp(randomPeer); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
 		e.state.Unlock()
 		e.caughtUp = true
+
+		// Every 2 minutes call CatchUp() on a random peer. This will help to
+		// resolve synchronization issues and keep everybody on the same page
+		// with regards to the longest chain. It's a bit of a hack but will
+		// make the network substantially more robust.
+		for {
+			time.Sleep(time.Minute * 2)
+			e.state.Lock()
+			e.state.CatchUp(e.server.RandomPeer())
+			e.state.Unlock()
+		}
 	}()
 
 	go e.listen()
