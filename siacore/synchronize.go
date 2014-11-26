@@ -129,6 +129,8 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 
 	knownBlocks[31] = s.currentPath[0]
 
+	prevHeight := s.Height()
+
 	var blocks []Block
 	if err = peer.RPC("SendBlocks", knownBlocks, &blocks); err != nil {
 		return err
@@ -142,6 +144,11 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 				return err
 			}
 		}
+	}
+
+	// recurse until the height stops increasing
+	if prevHeight != s.Height() {
+		return s.CatchUp(peer)
 	}
 
 	return nil

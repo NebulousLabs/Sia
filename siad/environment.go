@@ -72,20 +72,9 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
-		for {
-			prevHeight := e.state.Height()
-			err = e.state.CatchUp(randomPeer)
-
-			if err != nil {
-				fmt.Println("Error during CatchUp:", err)
-				break
-			}
-
-			if prevHeight == e.state.Height() {
-				break
-			}
+		if err := e.state.CatchUp(randomPeer); err != nil {
+			fmt.Println("Error during CatchUp:", err)
 		}
-
 		e.caughtUp = true
 	}()
 
