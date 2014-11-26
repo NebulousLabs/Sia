@@ -197,6 +197,9 @@ func pollHome(e *siad.Environment) {
 				err = becomeHostWalkthrough(e)
 		*/
 
+		case "L", "load":
+			err = loadWalkthrough(e)
+
 		case "m", "mine", "toggle", "mining":
 			err = e.ToggleMining()
 

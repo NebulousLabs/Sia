@@ -9,8 +9,8 @@ import (
 
 // saveCoinAddressWalkthrough steps the user through saving their environment
 // coin address.
-func saveCoinAddressWalkthrough(e *siad.Environment) (err error) {
-	fmt.Print("Filename for your coin address: ")
+func loadCoinAddressWalkthrough(e *siad.Environment) (err error) {
+	fmt.Print("Filename for the coin address: ")
 	var filename string
 	_, err = fmt.Scanln(&filename)
 	if err != nil {
@@ -18,7 +18,15 @@ func saveCoinAddressWalkthrough(e *siad.Environment) (err error) {
 	}
 	fmt.Println()
 
-	err = e.SaveCoinAddress(filename)
+	var friendName string
+	fmt.Print("Id/name for the coin address: ")
+	_, err = fmt.Scanln(&friendName)
+	if err != nil {
+		return
+	}
+	fmt.Println()
+
+	err = e.LoadCoinAddress(filename, friendName)
 	if err != nil {
 		return
 	}
@@ -28,9 +36,9 @@ func saveCoinAddressWalkthrough(e *siad.Environment) (err error) {
 
 // saveWalkthough present options for the various things that can be saved, and
 // saves the item chosen by the user.
-func saveWalkthrough(e *siad.Environment) (err error) {
-	fmt.Println("Save Walkthrough - What would you like to save?")
-	fmt.Println("\tc - CoinAddress")
+func loadWalkthrough(e *siad.Environment) (err error) {
+	fmt.Println("Load Walkthrough - What would you like to load?")
+	fmt.Println("\tc - a coin address")
 	fmt.Println()
 
 	fmt.Print("Your Choice: ")
@@ -47,7 +55,7 @@ func saveWalkthrough(e *siad.Environment) (err error) {
 		return
 
 	case "c", "ca", "coin address", "CoinAddress":
-		err = saveCoinAddressWalkthrough(e)
+		err = loadCoinAddressWalkthrough(e)
 		return
 	}
 }
