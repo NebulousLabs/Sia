@@ -30,7 +30,7 @@ func CreateEnvironment() (e *Environment, err error) {
 		return
 	}
 	e.state = siacore.CreateGenesisState()
-	e.wallet = siad.CreateWallet(e.state)
+	e.wallet = CreateWallet(e.state)
 	e.miner = CreateMiner(e.state, e.wallet.SpendConditions.CoinAddress())
 	// e.host = CreateHost(e.state)
 	// e.renter = CreateRenter(e.state)
