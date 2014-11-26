@@ -89,6 +89,11 @@ func CreateMiner(subsidyAddress siacore.CoinAddress) *Miner {
 	return m
 }
 
+// A getter for the mining variable of the miner.
+func (e *Environment) Mining() bool {
+	return e.miner.mining
+}
+
 // ToggleMining creates a channel and mines until it receives a kill signal.
 func (e *Environment) ToggleMining() {
 	if !e.miner.mining {

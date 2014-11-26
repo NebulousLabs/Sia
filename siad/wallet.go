@@ -183,3 +183,9 @@ func (w *Wallet) SpendCoins(amount, minerFee siacore.Currency, address siacore.C
 
 	return
 }
+
+// Environment.CoinAddress returns the CoinAddress which foreign coins should
+// be sent to.
+func (e *Environment) CoinAddress() siacore.CoinAddress {
+	return e.wallet.SpendConditions.CoinAddress()
+}

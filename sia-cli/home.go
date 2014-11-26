@@ -98,7 +98,7 @@ func printWalletAddresses(e *siad.Environment) {
 	fmt.Println()
 
 	fmt.Println("\tPrinting Networked Peers:")
-	addresses := e.server.AddressBook()
+	addresses := e.AddressBook()
 	for _, address := range addresses {
 		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
 	}
