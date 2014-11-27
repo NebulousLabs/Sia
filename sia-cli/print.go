@@ -66,7 +66,7 @@ func printDeep(e *siad.Environment) {
 			continue
 		}
 
-		fmt.Println("\t\tHash:", utxo)
+		fmt.Println("\t\tOutput ID:", utxo)
 		fmt.Println("\t\tValue:", output.Value)
 		fmt.Println("\t\tSpendHash:", output.SpendHash)
 		fmt.Printf("\t\tCoinAddress: %x\n", output.SpendHash)

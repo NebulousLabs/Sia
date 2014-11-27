@@ -282,6 +282,10 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	// Perform maintanence on all open contracts.
 	s.contractMaintenance()
 
+	// Update the current block and current path variables of the longest fork.
+	s.currentBlockID = b.ID()
+	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
+
 	// Add coin inflation to the miner subsidy.
 	minerSubsidy += CalculateCoinbase(s.Height())
 
@@ -291,10 +295,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		SpendHash: b.MinerAddress,
 	}
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
-
-	// Update the current block and current path variables of the longest fork.
-	s.currentBlockID = b.ID()
-	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
 
 	return
 }
