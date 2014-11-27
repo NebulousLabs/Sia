@@ -73,44 +73,6 @@ func toggleMining(e *siad.Environment) {
 	e.ToggleMining()
 }
 
-// printWalletAddresses prints out all of the addresses that are spendable by
-// this cli.
-func printEnvironmentInfo(e *siad.Environment) {
-	fmt.Println("General Information:")
-
-	// Dispaly whether or not the miner is mining.
-	if e.Mining() {
-		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
-	} else {
-		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
-	}
-	fmt.Println()
-
-	fmt.Printf("\tWallet Address: %x\n", e.CoinAddress())
-	fmt.Printf("\tWallet Balance: %v\n", e.WalletBalance())
-	fmt.Println()
-
-	info := e.StateInfo()
-	fmt.Println("\tCurrent Block Height:", info.Height)
-	fmt.Println("\tCurrent Block Target:", info.Target)
-	fmt.Println("\tCurrent Block Depth:", info.Depth)
-	fmt.Println()
-
-	fmt.Println("\tPrinting Networked Peers:")
-	addresses := e.AddressBook()
-	for _, address := range addresses {
-		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
-	}
-	fmt.Println()
-
-	fmt.Println("\tPrinting friend list:")
-	friends := e.FriendMap()
-	for name, address := range friends {
-		fmt.Printf("\t\t%v\t%x\n", name, address)
-	}
-	fmt.Println()
-}
-
 // displayHomeHelp lists all of the options available at the home screen, with
 // descriptions.
 func displayHomeHelp() {
@@ -173,6 +135,9 @@ func pollHome(e *siad.Environment) {
 
 		case "p", "print":
 			printEnvironmentInfo(e)
+
+		case "P":
+			printDeep(e)
 
 		/*
 			case "r", "rent":

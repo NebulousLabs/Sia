@@ -1,6 +1,7 @@
 package siad
 
 import (
+	"github.com/NebulousLabs/Andromeda/hash"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -10,15 +11,31 @@ import (
 // disrupt the environment's image of the state.
 
 type StateInfo struct {
-	Height siacore.BlockHeight
-	Target siacore.Target
-	Depth  siacore.Target
+	StateHash hash.Hash
+
+	CurrentBlock           siacore.BlockID
+	Height                 siacore.BlockHeight
+	Target                 siacore.Target
+	Depth                  siacore.Target
+	EarliestLegalTimestamp siacore.Timestamp
+
+	UtxoSet []siacore.OutputID
 }
 
 func (e *Environment) StateInfo() StateInfo {
 	return StateInfo{
-		Height: e.state.Height(),
-		Target: e.state.CurrentTarget(),
-		Depth:  e.state.Depth(),
+		StateHash: e.state.StateHash(),
+
+		CurrentBlock: e.state.CurrentBlock().ID(),
+		Height:       e.state.Height(),
+		Target:       e.state.CurrentTarget(),
+		Depth:        e.state.Depth(),
+		EarliestLegalTimestamp: e.state.CurrentEarliestLegalTimestamp(),
+
+		UtxoSet: e.state.SortedUtxoSet(),
 	}
+}
+
+func (e *Environment) Output(id siacore.OutputID) (output siacore.Output, err error) {
+	return e.state.Output(id)
 }
