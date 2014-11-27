@@ -190,6 +190,27 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 	return
 }
 
+// WalletBalance counts up the total number of coins that the wallet knows how
+// to spend, according to the State. WalletBalance will ignore all unconfirmed
+// transactions that have been created.
+func (e *Environment) WalletBalance() siacore.Currency {
+	e.wallet.Scan()
+
+	total := siacore.Currency(0)
+	for id, _ := range e.wallet.OwnedOutputs {
+		// Check that the output exists.
+		var output siacore.Output
+		output, err := e.state.Output(id)
+		if err != nil {
+			continue
+		}
+
+		total += output.Value
+	}
+
+	return total
+}
+
 // Environment.CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
 func (e *Environment) CoinAddress() siacore.CoinAddress {

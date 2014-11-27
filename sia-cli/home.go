@@ -87,6 +87,7 @@ func printEnvironmentInfo(e *siad.Environment) {
 	fmt.Println()
 
 	fmt.Printf("\tWallet Address: %x\n", e.CoinAddress())
+	fmt.Printf("\tWallet Balance: %v\n", e.WalletBalance())
 	fmt.Println()
 
 	info := e.StateInfo()
