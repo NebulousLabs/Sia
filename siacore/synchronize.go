@@ -10,11 +10,6 @@ const (
 	MaxCatchUpBlocks = 100
 )
 
-var (
-	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
-	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
-)
-
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
 func CreateGenesisState() *State {
@@ -42,7 +37,7 @@ func CreateGenesisState() *State {
 	for i := range s.blockRoot.RecentTimestamps {
 		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
 	}
-	s.blockRoot.Target[1] = 16 // Easy enough for a home computer to be able to mine on.
+	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
 	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
