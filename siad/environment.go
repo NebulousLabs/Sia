@@ -125,7 +125,6 @@ func (e *Environment) listen() {
 			if err == siacore.BlockKnownErr {
 				continue
 			} else if err != nil {
-				fmt.Println("AcceptBlock Error: ", err)
 				if err == siacore.UnknownOrphanErr {
 					e.state.Lock()
 					err = e.state.CatchUp(e.server.RandomPeer())
@@ -134,6 +133,8 @@ func (e *Environment) listen() {
 						// Logging
 						// fmt.Println(err2)
 					}
+				} else if err != siacore.KnownOrphanErr {
+					fmt.Println("AcceptBlock Error: ", err)
 				}
 				continue
 			}
