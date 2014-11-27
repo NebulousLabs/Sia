@@ -16,9 +16,6 @@ type StateInfo struct {
 }
 
 func (e *Environment) StateInfo() StateInfo {
-	e.state.Lock()
-	defer e.state.Unlock()
-
 	return StateInfo{
 		Height: e.state.Height(),
 		Target: e.state.CurrentTarget(),
