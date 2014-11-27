@@ -45,7 +45,7 @@ func printEnvironmentInfo(e *siad.Environment) {
 }
 
 // printDeep eventually intends to print out essentially everything that would
-// be hashed in StateHash.
+// be hashed in StateHash. Also displaays transaction pool data.
 func printDeep(e *siad.Environment) {
 	info := e.StateInfo()
 
@@ -71,5 +71,11 @@ func printDeep(e *siad.Environment) {
 		fmt.Println("\t\tSpendHash:", output.SpendHash)
 		fmt.Printf("\t\tCoinAddress: %x\n", output.SpendHash)
 		fmt.Println()
+	}
+
+	fmt.Println("\tTransaction Pool Set:", len(info.TransactionList))
+	for _, txn := range info.TransactionList {
+		fmt.Println("\t\tNum Inputs:", len(txn.Inputs))
+		fmt.Println("\t\tNum Outputs:", len(txn.Outputs))
 	}
 }

@@ -19,7 +19,8 @@ type StateInfo struct {
 	Depth                  siacore.Target
 	EarliestLegalTimestamp siacore.Timestamp
 
-	UtxoSet []siacore.OutputID
+	UtxoSet         []siacore.OutputID
+	TransactionList []siacore.Transaction
 }
 
 func (e *Environment) StateInfo() StateInfo {
@@ -32,7 +33,8 @@ func (e *Environment) StateInfo() StateInfo {
 		Depth:        e.state.Depth(),
 		EarliestLegalTimestamp: e.state.CurrentEarliestLegalTimestamp(),
 
-		UtxoSet: e.state.SortedUtxoSet(),
+		UtxoSet:         e.state.SortedUtxoSet(),
+		TransactionList: e.state.TransactionList(),
 	}
 }
 
