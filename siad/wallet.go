@@ -5,6 +5,7 @@ package siad
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -22,7 +23,7 @@ type Wallet struct {
 	SpendConditions siacore.SpendConditions
 
 	OwnedOutputs map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
-	SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
+	// SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -40,7 +41,7 @@ func CreateWallet(s *siacore.State) *Wallet {
 	w := &Wallet{
 		state:        s,
 		OwnedOutputs: make(map[siacore.OutputID]struct{}),
-		SpentOutputs: make(map[siacore.OutputID]struct{}),
+		// SpentOutputs: make(map[siacore.OutputID]struct{}),
 	}
 
 	sk, pk, err := signatures.GenerateKeyPair()
@@ -83,10 +84,12 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	var newInputs []siacore.Input
 	for id, _ := range w.OwnedOutputs {
 		// Check that the output has not already been assigned somewhere else.
-		_, exists := w.SpentOutputs[id]
-		if exists {
-			continue
-		}
+		/*
+			_, exists := w.SpentOutputs[id]
+			if exists {
+				continue
+			}
+		*/
 
 		// Check that the output exists.
 		var output siacore.Output
@@ -113,7 +116,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	// Check that the sum of the inputs is sufficient to complete the
 	// transaction.
 	if total < amount {
-		err = errors.New("insufficient funds")
+		err = fmt.Errorf("insufficient funds: %v, requested %v", total, amount)
 		return
 	}
 
@@ -121,9 +124,11 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	t.Inputs = append(t.Inputs, newInputs...)
 
 	// Add all of the inputs to the spent outputs map.
-	for _, input := range newInputs {
-		w.SpentOutputs[input.OutputID] = struct{}{}
-	}
+	/*
+		for _, input := range newInputs {
+			w.SpentOutputs[input.OutputID] = struct{}{}
+		}
+	*/
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
