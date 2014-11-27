@@ -104,6 +104,7 @@ func (s *State) Depth() Target {
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	if bn, ok := s.blockMap[s.currentPath[height]]; ok {
 		b = *bn.Block
+		return
 	}
 	err = fmt.Errorf("no block at height %v found.", height)
 

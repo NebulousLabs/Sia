@@ -31,6 +31,7 @@ type Environment struct {
 // main package.
 func CreateEnvironment() (e *Environment, err error) {
 	e = &Environment{
+		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
@@ -40,7 +41,6 @@ func CreateEnvironment() (e *Environment, err error) {
 	if err != nil {
 		return
 	}
-	e.state = siacore.CreateGenesisState()
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
