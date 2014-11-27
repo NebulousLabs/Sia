@@ -57,7 +57,13 @@ func (e *Environment) Close() {
 func (e *Environment) initializeNetwork() (err error) {
 	e.server, err = network.NewTCPServer(9988)
 	if err != nil {
-		return
+		// TODO: Retry a single time with a different port number. This allows 2
+		// instances to be running on the same machine, which is useful for
+		// testing. It's hacky.
+		e.server, err = network.NewTCPServer(9989)
+		if err != nil {
+			return
+		}
 	}
 
 	// establish an initial peer list
