@@ -99,6 +99,8 @@ func (e *Environment) Mining() bool {
 
 // ToggleMining creates a channel and mines until it receives a kill signal.
 func (e *Environment) ToggleMining() (err error) {
+	e.caughtUpLock.Lock()
+	defer e.caughtUpLock.Unlock()
 	if !e.caughtUp {
 		err = errors.New("cannot mine - still catching up")
 		return

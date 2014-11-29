@@ -11,6 +11,9 @@ import (
 	"github.com/NebulousLabs/Andromeda/hash"
 )
 
+// TODO: Find a better place for this. SurpassThreshold isn't really a
+// consensus rule, it can be modified. That tells me it should be in siad but
+// deciding when to fork is pretty fundamental to the AcceptBlock code.
 var SurpassThreshold = big.NewRat(5, 100)
 
 // Exported Errors

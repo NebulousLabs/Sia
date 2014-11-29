@@ -2,6 +2,7 @@ package siad
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
@@ -11,8 +12,9 @@ import (
 type Environment struct {
 	state *siacore.State
 
-	server   *network.TCPServer
-	caughtUp bool // False while downloading blocks.
+	server       *network.TCPServer
+	caughtUp     bool // False while downloading blocks.
+	caughtUpLock sync.Mutex
 
 	// host   *Host
 	miner *Miner
@@ -89,7 +91,10 @@ func (e *Environment) initializeNetwork() (err error) {
 			fmt.Println("Error during CatchUp:", err)
 		}
 		e.state.Unlock()
+
+		e.caughtUpLock.Lock()
 		e.caughtUp = true
+		e.caughtUpLock.Unlock()
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
