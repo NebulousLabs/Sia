@@ -6,10 +6,6 @@ import (
 	"github.com/NebulousLabs/Andromeda/network"
 )
 
-const (
-	MaxCatchUpBlocks = 100
-)
-
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
 func CreateGenesisState() *State {
