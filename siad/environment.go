@@ -76,7 +76,7 @@ func (e *Environment) initializeNetwork() (err error) {
 
 	e.server.Register("AcceptBlock", e.AcceptBlock)
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
-	e.server.Register("SendBlocks", e.state.SendBlocks)
+	e.server.Register("SendBlocks", e.SendBlocks)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
@@ -121,6 +121,12 @@ func (e *Environment) AcceptBlock(b siacore.Block) error {
 func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 	e.transactionChan <- t
 	return nil
+}
+
+func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) error {
+	e.state.Lock()
+	defer e.state.Unlock()
+	return e.state.SendBlocks(knownBlocks, blocks)
 }
 
 // listen waits until a new block or transaction arrives, then attempts to
