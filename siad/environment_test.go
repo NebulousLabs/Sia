@@ -3,6 +3,7 @@ package siad
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -43,6 +44,8 @@ func TestSia(t *testing.T) {
 	// Alter the constants to create a system more friendly to testing.
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
+	// TODO: Set network address peerlist to include ourselves at port 9988 and 9989, for testing.
+	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
 	siacore.RootTarget[0] = 2
 	siacore.DEBUG = true
 
