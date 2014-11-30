@@ -9,18 +9,27 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
-const (
-	BlockFrequency = 600               // In seconds.
-	TargetWindow   = BlockHeight(2016) // Number of blocks to use when calculating the target.
-
+// Though these are variables, they should never be changed during runtime.
+// They get altered during testing.
+var (
+	BlockFrequency  = Timestamp(45)          // In seconds.
+	TargetWindow    = BlockHeight(40)        // Number of blocks to use when calculating the target.
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
+	RootTarget      = Target{0, 1}
 
-	InitialCoinbase = 300000
-	MinimumCoinbase = 30000
+	MaxAdjustmentUp   = big.NewRat(103, 100)
+	MaxAdjustmentDown = big.NewRat(97, 100)
+
+	InitialCoinbase = Currency(300000)
+	MinimumCoinbase = Currency(30000)
+
+	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
+
+	MaxCatchUpBlocks = BlockHeight(100)
+
+	DEBUG = false
 )
-
-var MaxAdjustmentUp = big.NewRat(1001, 1000)
-var MaxAdjustmentDown = big.NewRat(999, 1000)
 
 type (
 	Timestamp   int64
@@ -128,7 +137,7 @@ type FileContract struct {
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
 func CalculateCoinbase(height BlockHeight) Currency {
-	if height >= InitialCoinbase-MinimumCoinbase {
+	if Currency(height) >= InitialCoinbase-MinimumCoinbase {
 		return MinimumCoinbase
 	} else {
 		return InitialCoinbase - Currency(height)

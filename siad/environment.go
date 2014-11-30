@@ -2,6 +2,8 @@ package siad
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -10,32 +12,37 @@ import (
 type Environment struct {
 	state *siacore.State
 
-	server *network.TCPServer
+	server       *network.TCPServer
+	caughtUp     bool // False while downloading blocks.
+	caughtUpLock sync.Mutex
 
 	// host   *Host
 	miner *Miner
 	// renter *Renter
 	wallet *Wallet
 
+	friends map[string]siacore.CoinAddress
+
 	// Channels for incoming blocks/transactions to be processed
 	blockChan       chan siacore.Block
 	transactionChan chan siacore.Transaction
-
-	caughtUp bool
 }
 
 // createEnvironment() creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment() (e *Environment, err error) {
-	e = new(Environment)
-	e.blockChan = make(chan siacore.Block, 100)
-	e.transactionChan = make(chan siacore.Transaction, 100)
-	err = e.initializeNetwork()
+func CreateEnvironment(port uint16) (e *Environment, err error) {
+	e = &Environment{
+		state:           siacore.CreateGenesisState(),
+		friends:         make(map[string]siacore.CoinAddress),
+		blockChan:       make(chan siacore.Block, 100),
+		transactionChan: make(chan siacore.Transaction, 100),
+	}
+
+	err = e.initializeNetwork(port)
 	if err != nil {
 		return
 	}
-	e.state = siacore.CreateGenesisState()
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
@@ -49,8 +56,8 @@ func (e *Environment) Close() {
 	e.server.Close()
 }
 
-func (e *Environment) initializeNetwork() (err error) {
-	e.server, err = network.NewTCPServer(9988)
+func (e *Environment) initializeNetwork(port uint16) (err error) {
+	e.server, err = network.NewTCPServer(port)
 	if err != nil {
 		return
 	}
@@ -63,7 +70,7 @@ func (e *Environment) initializeNetwork() (err error) {
 
 	e.server.Register("AcceptBlock", e.AcceptBlock)
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
-	e.server.Register("SendBlocks", e.state.SendBlocks)
+	e.server.Register("SendBlocks", e.SendBlocks)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
@@ -72,12 +79,27 @@ func (e *Environment) initializeNetwork() (err error) {
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
+		// Catch up the first time.
 		e.state.Lock()
 		if err := e.state.CatchUp(randomPeer); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
 		e.state.Unlock()
+
+		e.caughtUpLock.Lock()
 		e.caughtUp = true
+		e.caughtUpLock.Unlock()
+
+		// Every 2 minutes call CatchUp() on a random peer. This will help to
+		// resolve synchronization issues and keep everybody on the same page
+		// with regards to the longest chain. It's a bit of a hack but will
+		// make the network substantially more robust.
+		for {
+			time.Sleep(time.Minute * 2)
+			e.state.Lock()
+			e.state.CatchUp(e.server.RandomPeer())
+			e.state.Unlock()
+		}
 	}()
 
 	go e.listen()
@@ -95,6 +117,12 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 	return nil
 }
 
+func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) error {
+	e.state.Lock()
+	defer e.state.Unlock()
+	return e.state.SendBlocks(knownBlocks, blocks)
+}
+
 // listen waits until a new block or transaction arrives, then attempts to
 // process and rebroadcast it.
 func (e *Environment) listen() {
@@ -108,7 +136,6 @@ func (e *Environment) listen() {
 			if err == siacore.BlockKnownErr {
 				continue
 			} else if err != nil {
-				fmt.Println("AcceptBlock Error: ", err)
 				if err == siacore.UnknownOrphanErr {
 					e.state.Lock()
 					err = e.state.CatchUp(e.server.RandomPeer())
@@ -117,6 +144,8 @@ func (e *Environment) listen() {
 						// Logging
 						// fmt.Println(err2)
 					}
+				} else if err != siacore.KnownOrphanErr {
+					fmt.Println("AcceptBlock Error: ", err)
 				}
 				continue
 			}

@@ -6,15 +6,6 @@ import (
 	"github.com/NebulousLabs/Andromeda/network"
 )
 
-const (
-	MaxCatchUpBlocks = 100
-)
-
-var (
-	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
-	GenesisTimestamp = Timestamp(1415904418) // Approx. 1:47pm EST Nov. 13th, 2014
-)
-
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
 func CreateGenesisState() *State {
@@ -42,7 +33,7 @@ func CreateGenesisState() *State {
 	for i := range s.blockRoot.RecentTimestamps {
 		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
 	}
-	s.blockRoot.Target[1] = 16 // Easy enough for a home computer to be able to mine on.
+	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
 	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
@@ -94,6 +85,7 @@ func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 	if tallest > s.Height() {
 		tallest = s.Height()
 	}
+
 	for i := closestHeight; i <= tallest; i++ {
 		b, err := s.BlockAtHeight(i)
 		if err != nil {
@@ -128,11 +120,15 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 	}
 
 	knownBlocks[31] = s.currentPath[0]
-
 	prevHeight := s.Height()
 
+	// Dirty, but we can't make network calls while the state is locked - can
+	// cause deadlock.
 	var blocks []Block
-	if err = peer.RPC("SendBlocks", knownBlocks, &blocks); err != nil {
+	s.Unlock()
+	err = peer.RPC("SendBlocks", knownBlocks, &blocks)
+	s.Lock()
+	if err != nil {
 		return err
 	}
 

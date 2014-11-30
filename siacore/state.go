@@ -104,6 +104,7 @@ func (s *State) Depth() Target {
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	if bn, ok := s.blockMap[s.currentPath[height]]; ok {
 		b = *bn.Block
+		return
 	}
 	err = fmt.Errorf("no block at height %v found.", height)
 
@@ -139,15 +140,30 @@ func (s *State) CurrentTarget() Target {
 	return s.currentBlockNode().Target
 }
 
+func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
+	var unspentOutputStrings []string
+	for outputID := range s.unspentOutputs {
+		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
+	}
+	sort.Strings(unspentOutputStrings)
+
+	for _, utxoString := range unspentOutputStrings {
+		var outputID OutputID
+		copy(outputID[:], utxoString)
+		sortedOutputs = append(sortedOutputs, outputID)
+	}
+	return
+}
+
 // StateHash returns the markle root of the current state of consensus.
 func (s *State) StateHash() hash.Hash {
 	// Items of interest:
-	// 1. Current Height
-	// 2. Current Target
-	// 3. Current Depth
-	// 4. Earliest Allowed Timestamp of Next Block
-	// 5. Genesis Block
-	// 6. CurrentBlockID
+	// 1. CurrentBlockID
+	// 2. Current Height
+	// 3. Current Target
+	// 4. Current Depth
+	// 5. Earliest Allowed Timestamp of Next Block
+	// 6. Genesis Block
 	// 7. CurrentPath, ordered by height.
 	// 8. UnspentOutputs, sorted by id.
 	// 9. OpenContracts, sorted by id.
@@ -156,12 +172,12 @@ func (s *State) StateHash() hash.Hash {
 	var leaves []hash.Hash
 	leaves = append(
 		leaves,
+		hash.Hash(s.currentBlockID),
 		hash.HashBytes(encoding.Marshal(s.Height())),
 		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Target)),
 		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Depth)),
 		hash.HashBytes(encoding.Marshal(s.currentBlockNode().earliestLegalChildTimestamp())),
 		hash.Hash(s.blockRoot.Block.ID()),
-		hash.Hash(s.currentBlockID),
 	)
 
 	// Add all the blocks in the current path.
@@ -170,16 +186,10 @@ func (s *State) StateHash() hash.Hash {
 	}
 
 	// Sort the unspent outputs by the string value of their ID.
-	var unspentOutputStrings []string
-	for outputID := range s.unspentOutputs {
-		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
-	}
-	sort.Strings(unspentOutputStrings)
+	sortedUtxos := s.SortedUtxoSet()
 
 	// Add the unspent outputs in sorted order.
-	for _, stringOutputID := range unspentOutputStrings {
-		var outputID OutputID
-		copy(outputID[:], []byte(stringOutputID))
+	for _, outputID := range sortedUtxos {
 		leaves = append(leaves, hash.HashBytes(encoding.Marshal(s.unspentOutputs[outputID])))
 	}
 
@@ -188,7 +198,7 @@ func (s *State) StateHash() hash.Hash {
 	for contractID := range s.openContracts {
 		openContractStrings = append(openContractStrings, string(contractID[:]))
 	}
-	sort.Strings(unspentOutputStrings)
+	sort.Strings(openContractStrings)
 
 	// Add the open contracts in sorted order.
 	for _, stringContractID := range openContractStrings {

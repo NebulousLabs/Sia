@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/siad"
 )
 
@@ -74,76 +73,6 @@ func toggleMining(e *siad.Environment) {
 	e.ToggleMining()
 }
 
-// printWalletAddresses prints out all of the addresses that are spendable by
-// this cli.
-func printWalletAddresses(e *siad.Environment) {
-	fmt.Println("General Information:")
-
-	// Dispaly whether or not the miner is mining.
-	if e.Mining() {
-		fmt.Println("\tMining Status: ON - Wallet is mining on one thread.")
-	} else {
-		fmt.Println("\tMining Status: OFF - Wallet is not mining.")
-	}
-	fmt.Println()
-
-	fmt.Printf("\tWallet Address: %x\n", e.CoinAddress())
-	fmt.Println()
-
-	info := e.StateInfo()
-	fmt.Println("\tCurrent Block Height:", info.Height)
-	fmt.Println("\tCurrent Block Target:", info.Target)
-	fmt.Println("\tCurrent Block Depth:", info.Depth)
-	fmt.Println()
-
-	fmt.Println("\tPrinting Networked Peers:")
-	addresses := e.AddressBook()
-	for _, address := range addresses {
-		fmt.Printf("\t\t%v:%v\n", address.Host, address.Port)
-	}
-	fmt.Println()
-}
-
-// sendCoinsWalkthorugh uses the wallets in the environment to send coins to an
-// address that is provided through the command line.
-func sendCoinsWalkthrough(e *siad.Environment) (err error) {
-	fmt.Println("Send Coins Walkthrough:")
-
-	fmt.Print("Amount to send: ")
-	var amount int
-	_, err = fmt.Scanln(&amount)
-	if err != nil {
-		return
-	}
-
-	fmt.Print("Amount to use as Miner Fee: ")
-	var minerFee int
-	_, err = fmt.Scanln(&minerFee)
-	if err != nil {
-		return
-	}
-
-	fmt.Print("Address of Receiving Wallet: ")
-	var addressBytes []byte
-	_, err = fmt.Scanf("%x", &addressBytes)
-	if err != nil {
-		return
-	}
-
-	// Convert the address to a siacore.CoinAddress
-	var address siacore.CoinAddress
-	copy(address[:], addressBytes)
-
-	// Use the wallet api to send.
-	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = e.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 // displayHomeHelp lists all of the options available at the home screen, with
 // descriptions.
 func displayHomeHelp() {
@@ -152,9 +81,11 @@ func displayHomeHelp() {
 		"q:\tQuit - quit the program\n",
 		"c:\tCatch Up - collect blocks you are missing.\n",
 		// "H:\tHost - become a host and announce to the network\n",
+		"L:\tLoad - load a secret key or coin address.\n",
 		"m:\tMine - turn mining on or off\n",
-		"p\tPrint - list all of the wallets, plus some stats about the program\n",
+		"p\tPrint - list all of the wallets, plus some stats about the program.\n",
 		"s:\tSend - send coins to another wallet\n",
+		"S:\tSave - save your secret key or coin address\n",
 	)
 }
 
@@ -196,21 +127,25 @@ func pollHome(e *siad.Environment) {
 				err = becomeHostWalkthrough(e)
 		*/
 
+		case "L", "load":
+			err = loadWalkthrough(e)
+
 		case "m", "mine", "toggle", "mining":
 			err = e.ToggleMining()
 
 		case "p", "print":
-			printWalletAddresses(e)
+			printEnvironmentInfo(e)
+
+		case "P":
+			printDeep(e)
 
 		/*
 			case "r", "rent":
 				becomeClientWalkthrough(e)
 		*/
 
-		/*
-			case "S", "save":
-				saveWalletEnvironmentWalkthorugh()
-		*/
+		case "S", "save":
+			saveWalkthrough(e)
 
 		case "s", "send":
 			err = sendCoinsWalkthrough(e)

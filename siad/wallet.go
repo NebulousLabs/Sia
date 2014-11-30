@@ -5,7 +5,10 @@ package siad
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 
+	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
@@ -20,7 +23,7 @@ type Wallet struct {
 	SpendConditions siacore.SpendConditions
 
 	OwnedOutputs map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
-	SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
+	// SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -38,7 +41,7 @@ func CreateWallet(s *siacore.State) *Wallet {
 	w := &Wallet{
 		state:        s,
 		OwnedOutputs: make(map[siacore.OutputID]struct{}),
-		SpentOutputs: make(map[siacore.OutputID]struct{}),
+		// SpentOutputs: make(map[siacore.OutputID]struct{}),
 	}
 
 	sk, pk, err := signatures.GenerateKeyPair()
@@ -81,10 +84,12 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	var newInputs []siacore.Input
 	for id, _ := range w.OwnedOutputs {
 		// Check that the output has not already been assigned somewhere else.
-		_, exists := w.SpentOutputs[id]
-		if exists {
-			continue
-		}
+		/*
+			_, exists := w.SpentOutputs[id]
+			if exists {
+				continue
+			}
+		*/
 
 		// Check that the output exists.
 		var output siacore.Output
@@ -111,7 +116,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	// Check that the sum of the inputs is sufficient to complete the
 	// transaction.
 	if total < amount {
-		err = errors.New("insufficient funds")
+		err = fmt.Errorf("insufficient funds: %v, requested %v", total, amount)
 		return
 	}
 
@@ -119,9 +124,11 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	t.Inputs = append(t.Inputs, newInputs...)
 
 	// Add all of the inputs to the spent outputs map.
-	for _, input := range newInputs {
-		w.SpentOutputs[input.OutputID] = struct{}{}
-	}
+	/*
+		for _, input := range newInputs {
+			w.SpentOutputs[input.OutputID] = struct{}{}
+		}
+	*/
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
@@ -188,8 +195,50 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 	return
 }
 
+// WalletBalance counts up the total number of coins that the wallet knows how
+// to spend, according to the State. WalletBalance will ignore all unconfirmed
+// transactions that have been created.
+func (e *Environment) WalletBalance() siacore.Currency {
+	e.wallet.Scan()
+
+	total := siacore.Currency(0)
+	for id, _ := range e.wallet.OwnedOutputs {
+		// Check that the output exists.
+		var output siacore.Output
+		output, err := e.state.Output(id)
+		if err != nil {
+			continue
+		}
+
+		total += output.Value
+	}
+
+	return total
+}
+
 // Environment.CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
 func (e *Environment) CoinAddress() siacore.CoinAddress {
 	return e.wallet.SpendConditions.CoinAddress()
+}
+
+// SaveCoinAddress saves the address of the wallet used within the environment.
+func (e *Environment) SaveCoinAddress(filename string) (err error) {
+	pubKeyBytes := encoding.Marshal(e.wallet.SpendConditions.CoinAddress())
+
+	// Open the file and write the key to the filename.
+	err = ioutil.WriteFile(filename, pubKeyBytes, 0666)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (e *Environment) SaveSecretKey(filename string) (err error) {
+	return
+}
+
+func (e *Environment) LoadSecretKey(filename string) (err error) {
+	return
 }

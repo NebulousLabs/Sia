@@ -3,7 +3,6 @@ package siacore
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -12,6 +11,9 @@ import (
 	"github.com/NebulousLabs/Andromeda/hash"
 )
 
+// TODO: Find a better place for this. SurpassThreshold isn't really a
+// consensus rule, it can be modified. That tells me it should be in siad but
+// deciding when to fork is pretty fundamental to the AcceptBlock code.
 var SurpassThreshold = big.NewRat(5, 100)
 
 // Exported Errors
@@ -283,6 +285,10 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	// Perform maintanence on all open contracts.
 	s.contractMaintenance()
 
+	// Update the current block and current path variables of the longest fork.
+	s.currentBlockID = b.ID()
+	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
+
 	// Add coin inflation to the miner subsidy.
 	minerSubsidy += CalculateCoinbase(s.Height())
 
@@ -292,10 +298,6 @@ func (s *State) integrateBlock(b *Block) (err error) {
 		SpendHash: b.MinerAddress,
 	}
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
-
-	// Update the current block and current path variables of the longest fork.
-	s.currentBlockID = b.ID()
-	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
 
 	return
 }
@@ -394,33 +396,9 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		}
 	}
 
-	// Do a sanity check - check that every block is listed in CurrentPath and
-	// that every block from current to genesis matches the block listed in
-	// CurrentPath.
-	currentNode := s.currentBlockNode()
-	for i := s.Height(); ; i-- {
-		// Check that the CurrentPath entry exists.
-		id, exists := s.currentPath[i]
-		if !exists {
-			println(i)
-			panic("current path is empty for a height with a known block.")
-		}
-
-		// Check that the CurrentPath entry contains the correct block id.
-		if currentNode.Block.ID() != id {
-			currentNodeID := currentNode.Block.ID()
-			println(i)
-			fmt.Println(id[:])
-			fmt.Println(currentNodeID[:])
-			panic("current path does not have correct id!")
-		}
-
-		currentNode = s.blockMap[currentNode.Block.ParentBlockID]
-
-		// Have to do an awkward break beacuse i is unsigned.
-		if i == 0 {
-			break
-		}
+	// Perform a sanity check if debug flag is set.
+	if DEBUG {
+		CurrentPathCheck(s)
 	}
 
 	return

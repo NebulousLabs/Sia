@@ -43,9 +43,10 @@ func randomHash(t *testing.T) (h hash.Hash) {
 	return
 }
 
-// TestBlockEncoding() creates a block entirely full of random values and then
-// verifies that they are encoded correctly.
-func testBlockMarshalling(t *testing.T) {
+// TestTypeMarshalling tries to marshal and unmarshal all types, verifying that
+// the marshalling is consistent with the unmarshalling. Right now block is the
+// only type implemented, more may be added later.
+func TestTypeMarshalling(t *testing.T) {
 	// Create a block full of random values.
 	originalBlock := Block{
 		ParentBlockID: BlockID(randomHash(t)),
@@ -78,12 +79,7 @@ func testBlockMarshalling(t *testing.T) {
 	if a.MerkleRoot != b.MerkleRoot {
 		t.Error("MerkleRoot marshalling problems.")
 	}
-}
 
-// TestTypeMarshalling tries to marshal and unmarshal all types, verifying that
-// the marshalling is consistent with the unmarshalling. Right now block is the
-// only type implemented, more may be added later.
-func TestTypeMarshalling(t *testing.T) {
-	// test transactions, create a list of transactions to put in the block.
-	testBlockMarshalling(t)
+	// TODO: Add a transaction to the block, see if it can be marshalled and
+	// unmarshalled.
 }

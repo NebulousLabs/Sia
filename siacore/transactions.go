@@ -245,3 +245,10 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 
 	return
 }
+
+func (s *State) TransactionList() (txns []Transaction) {
+	for _, txn := range s.transactionList {
+		txns = append(txns, *txn)
+	}
+	return
+}
