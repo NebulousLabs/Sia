@@ -82,7 +82,12 @@ func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 
 // Broadcast calls the RPC on each peer in the address book.
 func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
+	// the RPC may alter the addressbook, so make a copy first
+	addrSlice := make([]NetAddress, 0, len(tcps.addressbook))
 	for addr := range tcps.addressbook {
+		addrSlice = append(addrSlice, addr)
+	}
+	for _, addr := range addrSlice {
 		addr.RPC(name, arg, resp)
 	}
 }
