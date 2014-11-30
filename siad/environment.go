@@ -31,7 +31,7 @@ type Environment struct {
 // createEnvironment() creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment() (e *Environment, err error) {
+func CreateEnvironment(port uint16) (e *Environment, err error) {
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
@@ -39,7 +39,7 @@ func CreateEnvironment() (e *Environment, err error) {
 		transactionChan: make(chan siacore.Transaction, 100),
 	}
 
-	err = e.initializeNetwork()
+	err = e.initializeNetwork(port)
 	if err != nil {
 		return
 	}
@@ -56,16 +56,10 @@ func (e *Environment) Close() {
 	e.server.Close()
 }
 
-func (e *Environment) initializeNetwork() (err error) {
-	e.server, err = network.NewTCPServer(9988)
+func (e *Environment) initializeNetwork(port uint16) (err error) {
+	e.server, err = network.NewTCPServer(port)
 	if err != nil {
-		// TODO: Retry a single time with a different port number. This allows 2
-		// instances to be running on the same machine, which is useful for
-		// testing. It's hacky.
-		e.server, err = network.NewTCPServer(9989)
-		if err != nil {
-			return
-		}
+		return
 	}
 
 	// establish an initial peer list
