@@ -44,16 +44,14 @@ func TestSia(t *testing.T) {
 	// Alter the constants to create a system more friendly to testing.
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
-	// TODO: Set network address peerlist to include ourselves at port 9988 and 9989, for testing.
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[0] = 2
+	siacore.RootTarget[0] = 4
 	siacore.DEBUG = true
 
 	// Create the testing environment.
 	te := establishTestingEnvironment(t)
 
 	// Perform a series of tests using the environment.
-	if !testing.Short() {
-		testToggleMining(te)
-	}
+	testToggleMining(te)
+	testDualMining(te)
 }
