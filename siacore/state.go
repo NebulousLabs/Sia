@@ -149,7 +149,7 @@ func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
 
 	for _, utxoString := range unspentOutputStrings {
 		var outputID OutputID
-		copy(outputID[:], []byte(utxoString)[:])
+		copy(outputID[:], utxoString)
 		sortedOutputs = append(sortedOutputs, outputID)
 	}
 	return

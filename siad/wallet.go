@@ -6,7 +6,7 @@ package siad
 import (
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -227,12 +227,7 @@ func (e *Environment) SaveCoinAddress(filename string) (err error) {
 	pubKeyBytes := encoding.Marshal(e.wallet.SpendConditions.CoinAddress())
 
 	// Open the file and write the key to the filename.
-	file, err := os.Create(filename)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	_, err = file.Write(pubKeyBytes)
+	err = ioutil.WriteFile(filename, pubKeyBytes, 0666)
 	if err != nil {
 		return
 	}

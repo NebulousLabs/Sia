@@ -19,7 +19,7 @@ func (e *Environment) LoadCoinAddress(filename string, friendName string) (err e
 	defer file.Close()
 
 	// Read the contents of the file into a buffer.
-	buffer := make([]byte, 256)
+	buffer := make([]byte, 32)
 	bytes, err := file.Read(buffer)
 	if err != nil {
 		return
@@ -38,6 +38,10 @@ func (e *Environment) LoadCoinAddress(filename string, friendName string) (err e
 	return
 }
 
-func (e *Environment) FriendMap() map[string]siacore.CoinAddress {
-	return e.friends
+func (e *Environment) FriendMap() (safeMap map[string]siacore.CoinAddress) {
+	safeMap = make(map[string]siacore.CoinAddress)
+	for key, value := range e.friends {
+		safeMap[key] = value
+	}
+	return
 }

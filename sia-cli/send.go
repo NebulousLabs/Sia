@@ -50,7 +50,7 @@ func sendCoinsWalkthrough(e *siad.Environment) (err error) {
 	fmt.Println()
 
 	fmt.Print("Amount to send: ")
-	var amount int
+	var amount siacore.Currency
 	_, err = fmt.Scanln(&amount)
 	if err != nil {
 		return
@@ -87,7 +87,7 @@ func sendCoinsWalkthrough(e *siad.Environment) (err error) {
 
 	// Use the wallet api to send.
 	fmt.Printf("Sending %v coins with miner fee of %v to address %x", amount, minerFee, address[:])
-	_, err = e.SpendCoins(siacore.Currency(amount), siacore.Currency(minerFee), address)
+	_, err = e.SpendCoins(amount, siacore.Currency(minerFee), address)
 	if err != nil {
 		return
 	}

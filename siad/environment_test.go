@@ -54,4 +54,7 @@ func TestSia(t *testing.T) {
 	// Perform a series of tests using the environment.
 	testToggleMining(te)
 	testDualMining(te)
+	// testTransactionSending(te)
+	// testTransactionPools(te)
+	// testLargeTransactions(te)
 }
