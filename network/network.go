@@ -50,9 +50,8 @@ type TCPServer struct {
 	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
 	handlerMap  map[string]func(net.Conn, []byte) error
-
-	peerLock    sync.Mutex
-	handlerLock sync.Mutex
+	// used to protect addressbook and handlerMap
+	sync.RWMutex
 }
 
 func (tcps *TCPServer) NetAddress() NetAddress {
@@ -121,8 +120,8 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 }
 
 func (tcps *TCPServer) AddressBook() (book []NetAddress) {
-	tcps.peerLock.Lock()
-	defer tcps.peerLock.Unlock()
+	tcps.RLock()
+	defer tcps.RUnlock()
 	for address := range tcps.addressbook {
 		book = append(book, address)
 	}
@@ -132,9 +131,9 @@ func (tcps *TCPServer) AddressBook() (book []NetAddress) {
 // AddPeer safely adds a peer to the address book. It returns an error so that
 // it can be used as an RPC.
 func (tcps *TCPServer) AddPeer(addr NetAddress) error {
-	tcps.peerLock.Lock()
+	tcps.Lock()
 	tcps.addressbook[addr] = struct{}{}
-	tcps.peerLock.Unlock()
+	tcps.Unlock()
 	return nil
 }
 
@@ -188,9 +187,9 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		return
 	}
 	// call registered handler for this message type
-	tcps.handlerLock.Lock()
+	tcps.RLock()
 	fn, ok := tcps.handlerMap[string(ident)]
-	tcps.handlerLock.Unlock()
+	tcps.RUnlock()
 	if ok {
 		fn(conn, msgData)
 		// TODO: log error

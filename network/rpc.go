@@ -122,9 +122,9 @@ func (tcps *TCPServer) Register(name string, fn interface{}) {
 	}
 
 	ident := string(rpcName(name))
-	tcps.handlerLock.Lock()
+	tcps.Lock()
 	tcps.handlerMap[ident] = handler
-	tcps.handlerLock.Unlock()
+	tcps.Unlock()
 }
 
 // registerRPC is for handlers that return a value. The input is decoded and
