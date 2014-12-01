@@ -56,13 +56,36 @@ func DecUint64(b []byte) uint64 {
 	return binary.LittleEndian.Uint64(b2)
 }
 
+// EncLen encodes a length (int) as a slice of 4 bytes.
+func EncLen(length int) (b []byte) {
+	b = make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, uint32(length))
+	return
+}
+
+// DecLen decodes a slice of 4 bytes into an int.
+// If len(b) < 8, the slice is padded with zeros.
+func DecLen(b []byte) int {
+	b2 := b
+	if len(b) < 4 {
+		b2 = make([]byte, 4)
+		copy(b2, b)
+	}
+	return int(binary.LittleEndian.Uint32(b2))
+}
+
 // Marshal encodes a value as a byte slice. The encoding rules are as follows:
+//
 // Most types are encoded as their binary representation.
+//
 // Integers are little-endian. Int and Uint are disallowed; the number of bits must be specified.
-// Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
-// (This may need to be extended to two bytes.)
+//
+// Variable-length types, such as strings and slices, are prefaced by 4 bytes containing their length.
+//
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
+//
 // Nil pointers are represented by a zero.
+//
 // Valid pointers are prefaced by a non-zero, followed by the dereferenced value.
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
@@ -96,10 +119,10 @@ func marshal(val reflect.Value) (b []byte) {
 		return EncUint64(val.Uint())
 	case reflect.String:
 		s := val.String()
-		return append([]byte{byte(len(s))}, s...)
+		return append(EncLen(len(s)), s...)
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		b = []byte{byte(val.Len())}
+		b = EncLen(val.Len())
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			return append(b, val.Bytes()...)
@@ -126,7 +149,7 @@ func marshal(val reflect.Value) (b []byte) {
 		return
 	}
 	// Marshalling should never fail. If it panics, you're doing something wrong,
-	// like trying to encode an int or a map or an unexported struct field.
+	// like trying to encode a map or an unexported struct field.
 	panic("could not marshal type " + val.Type().String())
 	return
 }
@@ -141,6 +164,7 @@ func Unmarshal(b []byte, v interface{}) (err error) {
 	}
 
 	// unmarshal may panic
+	// note that this allows us to skip any boundary checks while unmarshalling
 	var consumed int
 	defer func() {
 		if r := recover(); r != nil || consumed != len(b) {
@@ -183,14 +207,14 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		val.SetUint(DecUint64(b[:8]))
 		return 8
 	case reflect.String:
-		n, b := int(b[0]), b[1:]
-		val.SetString(string(b[:n]))
-		return n + 1
+		n := DecLen(b[:4]) + 4
+		val.SetString(string(b[4:n]))
+		return n
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		var sliceLen int
-		sliceLen, b, consumed = int(b[0]), b[1:], 1 // remember to count the length byte as consumed
+		sliceLen, b, consumed = DecLen(b[:4]), b[4:], 4
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {
@@ -206,7 +230,7 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 			}
 			return val.Len()
 		}
-		// normal arrays are unmarshalled by sequentially unmarshalling their elements
+		// arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
 			elem := val.Index(i)
 			n := unmarshal(b, elem)
