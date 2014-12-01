@@ -209,3 +209,48 @@ func (s *State) StateHash() hash.Hash {
 
 	return hash.MerkleRoot(leaves)
 }
+
+// CreateGenesisState will create the state that contains the genesis block and
+// nothing else.
+func CreateGenesisState() *State {
+	// Create a new state and initialize the maps.
+	s := &State{
+		blockRoot:       new(BlockNode),
+		badBlocks:       make(map[BlockID]struct{}),
+		blockMap:        make(map[BlockID]*BlockNode),
+		orphanMap:       make(map[BlockID]map[BlockID]*Block),
+		currentPath:     make(map[BlockHeight]BlockID),
+		openContracts:   make(map[ContractID]*OpenContract),
+		unspentOutputs:  make(map[OutputID]Output),
+		spentOutputs:    make(map[OutputID]Output),
+		transactionPool: make(map[OutputID]*Transaction),
+		transactionList: make(map[OutputID]*Transaction),
+	}
+
+	// Create the genesis block and add it as the BlockRoot.
+	genesisBlock := &Block{
+		Timestamp:    GenesisTimestamp,
+		MinerAddress: GenesisAddress,
+	}
+	s.blockRoot.Block = genesisBlock
+	s.blockRoot.Height = 0
+	for i := range s.blockRoot.RecentTimestamps {
+		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
+	}
+	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
+	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
+	s.blockMap[genesisBlock.ID()] = s.blockRoot
+
+	// Fill out the consensus informaiton for the genesis block.
+	s.currentBlockID = genesisBlock.ID()
+	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
+
+	// Create the genesis subsidy output.
+	genesisSubsidyOutput := Output{
+		Value:     CalculateCoinbase(0),
+		SpendHash: GenesisAddress,
+	}
+	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
+
+	return s
+}
