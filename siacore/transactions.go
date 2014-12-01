@@ -224,9 +224,6 @@ func (s *State) validTransaction(t *Transaction) (err error) {
 // current state, then adds the transaction to the transaction pool.
 // AcceptTransaction() is thread safe, and can be called concurrently.
 func (s *State) AcceptTransaction(t Transaction) (err error) {
-	s.Lock()
-	defer s.Unlock()
-
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	if s.transactionPoolConflict(&t) {

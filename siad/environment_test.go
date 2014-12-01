@@ -45,7 +45,7 @@ func TestSia(t *testing.T) {
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[0] = 4
+	siacore.RootTarget[0] = 8
 	siacore.DEBUG = true
 
 	// Create the testing environment.
@@ -54,7 +54,6 @@ func TestSia(t *testing.T) {
 	// Perform a series of tests using the environment.
 	testToggleMining(te)
 	testDualMining(te)
-	// testTransactionSending(te)
-	// testTransactionPools(te)
+	testTransactionSending(te)
 	// testLargeTransactions(te)
 }

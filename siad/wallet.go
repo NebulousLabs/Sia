@@ -65,9 +65,11 @@ func (w *Wallet) Scan() {
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
+	w.state.Lock()
 	for _, output := range w.state.ScanOutputs(scanAddresses) {
 		w.OwnedOutputs[output] = struct{}{}
 	}
+	w.state.Unlock()
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
@@ -161,10 +163,10 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 	return
 }
 
-// Wallet.SpendCoins creates a transaction sending 'amount' to 'address', and
+// Wallet.SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siacore.CoinAddress) (t siacore.Transaction, err error) {
+func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore.CoinAddress) (t siacore.Transaction, err error) {
 	// Scan blockchain for outputs.
 	e.wallet.Scan()
 
@@ -177,8 +179,8 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 	// Add the miner fee.
 	t.MinerFees = append(t.MinerFees, minerFee)
 
-	// Add the output to `address`.
-	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: address})
+	// Add the output to `dest`.
+	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: dest})
 
 	// Sign each input.
 	err = e.wallet.SignTransaction(&t)
@@ -187,7 +189,7 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 	}
 
 	// TODO: AcceptTransaction shoul be piped through a channel.
-	err = e.wallet.state.AcceptTransaction(t)
+	err = e.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
