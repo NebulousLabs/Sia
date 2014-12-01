@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
 const (
@@ -181,7 +183,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		// TODO: log error
 		return
 	}
-	msgData, err := ReadPrefix(conn)
+	msgData, err := encoding.ReadPrefix(conn, maxMsgLen)
 	if err != nil {
 		// TODO: log error
 		return
