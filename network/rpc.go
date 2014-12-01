@@ -13,7 +13,7 @@ func ReadPrefix(conn net.Conn) ([]byte, error) {
 	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
 		return nil, errors.New("could not read length prefix")
 	}
-	msgLen := int(encoding.DecUint64(prefix))
+	msgLen := encoding.DecLen(prefix)
 	if msgLen > maxMsgLen {
 		return nil, errors.New("message too long")
 	}
@@ -43,8 +43,7 @@ func ReadObject(conn net.Conn, obj interface{}) error {
 }
 
 func WritePrefix(conn net.Conn, data []byte) (int, error) {
-	encLen := encoding.EncUint64(uint64(len(data)))
-	return conn.Write(append(encLen[:4], data...))
+	return conn.Write(append(encoding.EncLen(len(data)), data...))
 }
 
 func WriteObject(conn net.Conn, obj interface{}) (int, error) {
