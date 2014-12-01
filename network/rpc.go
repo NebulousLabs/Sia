@@ -82,7 +82,7 @@ func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 
 // Broadcast calls the RPC on each peer in the address book.
 func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
-	for addr := range tcps.addressbook {
+	for _, addr := range tcps.AddressBook() {
 		addr.RPC(name, arg, resp)
 	}
 }
@@ -122,7 +122,9 @@ func (tcps *TCPServer) Register(name string, fn interface{}) {
 	}
 
 	ident := string(rpcName(name))
+	tcps.Lock()
 	tcps.handlerMap[ident] = handler
+	tcps.Unlock()
 }
 
 // registerRPC is for handlers that return a value. The input is decoded and
@@ -178,27 +180,18 @@ func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net
 	}
 }
 
-// sendHostname replies to the send with the sender's external IP.
+// sendHostname replies to the sender with the sender's external IP.
 func sendHostname(conn net.Conn, _ []byte) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	_, err := WriteObject(conn, host)
 	return err
 }
 
-// sharePeers transmits at most 'num' peers over the connection.
-// TODO: choose random peers?
+// sharePeers replies to the sender with 10 randomly selected peers.
+// Note: the set of peers may contain duplicates.
 func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
-	for addr := range tcps.addressbook {
-		if len(*addrs) == 10 { // arbitrary
-			break
-		}
-		*addrs = append(*addrs, addr)
+	for i := 0; i < len(tcps.AddressBook()) && i < 10; i++ {
+		*addrs = append(*addrs, tcps.RandomPeer())
 	}
-	return nil
-}
-
-// addPeer adds the connecting peer to its address book
-func (tcps *TCPServer) addPeer(peer NetAddress) error {
-	tcps.addressbook[peer] = struct{}{}
 	return nil
 }

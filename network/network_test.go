@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-var call1, call2 bool
+var chan1 = make(chan struct{})
+var chan2 = make(chan struct{})
 
 type Foo struct{}
 
-func (f Foo) Bar(int32) error { call1 = true; return nil }
+func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
 
 func TestRegister(t *testing.T) {
 	// create server
@@ -21,7 +22,7 @@ func TestRegister(t *testing.T) {
 	addr := NetAddress{"localhost", 9988}
 
 	// register some handlers
-	tcps.Register("Foo", func(net.Conn, []byte) error { call2 = true; return nil })
+	tcps.Register("Foo", func(net.Conn, []byte) error { chan2 <- struct{}{}; return nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
@@ -33,11 +34,22 @@ func TestRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// allow for message propagation
-	time.Sleep(100 * time.Millisecond)
 
-	// check that handlers were called
-	if !call1 || !call2 {
-		t.Fatal("Handler not called: call1 =", call1, "; call2 =", call2)
+	done := make(chan struct{})
+	go func() {
+		<-chan1
+		<-chan2
+		done <- struct{}{}
+	}()
+
+	// wait for messages to propagate
+	select {
+	// success
+	case <-done:
+		return
+
+	// timeout
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("One or both handlers not called")
 	}
 }

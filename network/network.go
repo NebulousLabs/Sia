@@ -1,8 +1,10 @@
 package network
 
 import (
+	"math/rand"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -48,6 +50,8 @@ type TCPServer struct {
 	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
 	handlerMap  map[string]func(net.Conn, []byte) error
+	// used to protect addressbook and handlerMap
+	sync.RWMutex
 }
 
 func (tcps *TCPServer) NetAddress() NetAddress {
@@ -69,7 +73,7 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	// default handlers
 	tcps.Register("SendHostname", sendHostname)
 	tcps.Register("SharePeers", tcps.sharePeers)
-	tcps.Register("AddPeer", tcps.addPeer)
+	tcps.Register("AddPeer", tcps.AddPeer)
 
 	// spawn listener
 	go tcps.listen()
@@ -87,7 +91,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	}
 
 	// learn hostname
-	for addr := range tcps.addressbook {
+	for _, addr := range tcps.AddressBook() {
 		var hostname string
 		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
 			tcps.myAddr.Host = hostname
@@ -98,14 +102,14 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
 	var peers []NetAddress
-	for addr := range tcps.addressbook {
+	for _, addr := range tcps.AddressBook() {
 		var resp []NetAddress
 		addr.RPC("SharePeers", nil, &resp)
 		peers = append(peers, resp...)
 	}
 	for _, addr := range peers {
 		if addr != tcps.myAddr && tcps.Ping(addr) {
-			tcps.addressbook[addr] = struct{}{}
+			tcps.AddPeer(addr)
 		}
 	}
 
@@ -116,20 +120,28 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 }
 
 func (tcps *TCPServer) AddressBook() (book []NetAddress) {
+	tcps.RLock()
+	defer tcps.RUnlock()
 	for address := range tcps.addressbook {
 		book = append(book, address)
 	}
 	return
 }
 
+// AddPeer safely adds a peer to the address book. It returns an error so that
+// it can be used as an RPC.
+func (tcps *TCPServer) AddPeer(addr NetAddress) error {
+	tcps.Lock()
+	tcps.addressbook[addr] = struct{}{}
+	tcps.Unlock()
+	return nil
+}
+
 // RandomPeer selects and returns a random peer from the address book.
 // TODO: probably not smart to depend on map iteration...
-func (tcps *TCPServer) RandomPeer() (rand NetAddress) {
-	for addr := range tcps.addressbook {
-		rand = addr
-		break
-	}
-	return
+func (tcps *TCPServer) RandomPeer() NetAddress {
+	addrs := tcps.AddressBook()
+	return addrs[rand.Intn(len(addrs))]
 }
 
 // Ping returns whether a NetAddress is reachable. It accomplishes this by
@@ -175,7 +187,10 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		return
 	}
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[string(ident)]; ok {
+	tcps.RLock()
+	fn, ok := tcps.handlerMap[string(ident)]
+	tcps.RUnlock()
+	if ok {
 		fn(conn, msgData)
 		// TODO: log error
 		// no wait, send the error?
