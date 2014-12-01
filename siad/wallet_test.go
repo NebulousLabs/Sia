@@ -4,6 +4,9 @@ import (
 	"time"
 )
 
+// testTransactionSending sends a transaction from one host to another,
+// verifying that the transaction pool is updating correctly in the process and
+// also doing some state checks.
 func testTransactionSending(te *testEnv) {
 	// Check that e0 and e1 both have mining disabled.
 	if te.e0.Mining() || te.e1.Mining() {
@@ -35,7 +38,10 @@ func testTransactionSending(te *testEnv) {
 	}
 
 	// Send coins from e0 to e1
-	te.e0.SpendCoins(250, 25, te.e1.CoinAddress())
+	_, err = te.e0.SpendCoins(250, 25, te.e1.CoinAddress())
+	if err != nil {
+		te.t.Error(err)
+	}
 
 	// Check that the 3 environments are all on the same page in terms of
 	// blockchain and transaction pool.
