@@ -74,17 +74,14 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
-	fmt.Println(randomPeer)
 
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
 		// Catch up the first time.
-		e.state.Lock()
-		if err := e.state.CatchUp(randomPeer); err != nil {
+		if err := e.CatchUp(randomPeer); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
-		e.state.Unlock()
 
 		e.caughtUpLock.Lock()
 		e.caughtUp = true
@@ -96,9 +93,7 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 		// make the network substantially more robust.
 		for {
 			time.Sleep(time.Minute * 2)
-			e.state.Lock()
-			e.state.CatchUp(e.server.RandomPeer())
-			e.state.Unlock()
+			e.CatchUp(e.server.RandomPeer())
 		}
 	}()
 
@@ -117,12 +112,6 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 	return nil
 }
 
-func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) error {
-	e.state.Lock()
-	defer e.state.Unlock()
-	return e.state.SendBlocks(knownBlocks, blocks)
-}
-
 // listen waits until a new block or transaction arrives, then attempts to
 // process and rebroadcast it.
 func (e *Environment) listen() {
@@ -137,9 +126,7 @@ func (e *Environment) listen() {
 				continue
 			} else if err != nil {
 				if err == siacore.UnknownOrphanErr {
-					e.state.Lock()
-					err = e.state.CatchUp(e.server.RandomPeer())
-					e.state.Unlock()
+					err = e.CatchUp(e.server.RandomPeer())
 					if err != nil {
 						// Logging
 						// fmt.Println(err2)
