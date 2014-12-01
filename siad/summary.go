@@ -67,3 +67,15 @@ func (e *Environment) SafeOutput(id siacore.OutputID) (output siacore.Output, er
 	defer e.state.Unlock()
 	return e.Output(id)
 }
+
+func (e *Environment) Height() siacore.BlockHeight {
+	e.state.Lock()
+	defer e.state.Unlock()
+	return e.state.Height()
+}
+
+func (e *Environment) TransactionList() []siacore.Transaction {
+	e.state.Lock()
+	defer e.state.Unlock()
+	return e.state.TransactionList()
+}

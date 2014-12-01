@@ -4,6 +4,17 @@ import (
 	"time"
 )
 
+// Takes an environment and mines until a single block is produced.
+func (e *Environment) mineSingleBlock() {
+	for {
+		b, target := e.miner.blockForWork()
+		if solveBlock(b, target) {
+			e.miner.blockChan <- *b
+			break
+		}
+	}
+}
+
 // testToggleMining tests that enabling and disabling mining works without
 // problems.
 func testToggleMining(te *testEnv) {
