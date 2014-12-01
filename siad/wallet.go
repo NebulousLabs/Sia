@@ -65,9 +65,11 @@ func (w *Wallet) Scan() {
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
+	w.state.Lock()
 	for _, output := range w.state.ScanOutputs(scanAddresses) {
 		w.OwnedOutputs[output] = struct{}{}
 	}
+	w.state.Unlock()
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
@@ -187,7 +189,7 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, address siac
 	}
 
 	// TODO: AcceptTransaction shoul be piped through a channel.
-	err = e.wallet.state.AcceptTransaction(t)
+	err = e.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
