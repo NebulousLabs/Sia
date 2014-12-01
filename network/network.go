@@ -49,8 +49,10 @@ type TCPServer struct {
 	net.Listener
 	myAddr      NetAddress
 	addressbook map[NetAddress]struct{}
-	peerLock    sync.Mutex
 	handlerMap  map[string]func(net.Conn, []byte) error
+
+	peerLock    sync.Mutex
+	handlerLock sync.Mutex
 }
 
 func (tcps *TCPServer) NetAddress() NetAddress {
@@ -186,7 +188,10 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		return
 	}
 	// call registered handler for this message type
-	if fn, ok := tcps.handlerMap[string(ident)]; ok {
+	tcps.handlerLock.Lock()
+	fn, ok := tcps.handlerMap[string(ident)]
+	tcps.handlerLock.Unlock()
+	if ok {
 		fn(conn, msgData)
 		// TODO: log error
 		// no wait, send the error?
