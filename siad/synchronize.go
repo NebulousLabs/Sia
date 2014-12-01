@@ -13,43 +13,28 @@ const (
 
 // SendBlocks sends all known blocks from the given height forward from the
 // longest known fork.
-func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
-	// Find the most recent block that is in our current path.
-	found := false
-	var closestHeight BlockHeight
+func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) error {
+	e.state.Lock()
+	defer e.state.Unlock()
+
+	// Find the most recent block that is in our current path. Since
+	// knownBlocks is ordered from newest to oldest, we can break as soon as
+	// we find a match.
+	var blockNode *siacore.BlockNode
 	for i := range knownBlocks {
-		// See if we know which block it is, get the node to know the height.
-		blockNode, exists := s.blockMap[knownBlocks[i]]
-		if !exists {
-			continue
-		}
-
-		// See if the known block is in the current path, and if it is see if
-		// its height is greater than the closest yet known height.
-		id, exists := s.currentPath[blockNode.Height]
-		if exists && id == knownBlocks[i] {
-			found = true
-			if closestHeight < blockNode.Height {
-				closestHeight = blockNode.Height
-			}
+		blockNode := e.state.NodeFromID(knownBlocks[i])
+		if blockNode != nil {
+			break
 		}
 	}
-
-	// See that a match was actually found.
-	if !found {
-		return errors.New("no matching block found during SendBlocks")
+	if blockNode == nil {
+		return errors.New("no matching block found")
 	}
 
-	// Build an array of blocks.
-	tallest := closestHeight + MaxCatchUpBlocks
-	if tallest > s.Height() {
-		tallest = s.Height()
-	}
-
-	for i := closestHeight; i <= tallest; i++ {
-		b, err := s.BlockAtHeight(i)
+	for i := blockNode.Height; i < blockNode.Height+MaxCatchUpBlocks; i++ {
+		b, err := e.state.BlockAtHeight(i)
 		if err != nil {
-			panic(err)
+			break
 		}
 		*blocks = append(*blocks, b)
 	}
@@ -57,44 +42,55 @@ func (s *State) SendBlocks(knownBlocks [32]BlockID, blocks *[]Block) error {
 	return nil
 }
 
-func (s *State) CatchUp(peer network.NetAddress) (err error) {
-	var knownBlocks [32]BlockID
-	for i := BlockHeight(0); i < 12; i++ {
-		// Prevent underflows
-		if i > s.Height() {
+// CatchUp synchronizes with a peer to acquire any missing blocks. The
+// requester sends 32 blocks, starting with the 12 most recent and then
+// progressing exponentially backwards to the genesis block. The receiver uses
+// these blocks to find the most recent block seen by both peers, and then
+// transmits blocks sequentially until the requester is fully synchronized.
+func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
+	e.state.Lock()
+	defer e.state.Unlock()
+
+	knownBlocks := make([]siacore.BlockID, 0, 32)
+	for i := siacore.BlockHeight(0); i < 12; i++ {
+		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - i)
+		if badBlockErr != nil {
 			break
 		}
-
-		knownBlocks[i] = s.currentPath[s.Height()-i]
+		knownBlocks = append(knownBlocks, block.ID())
 	}
 
-	backtrace := BlockHeight(10)
+	backtrace := siacore.BlockHeight(12)
 	for i := 12; i < 31; i++ {
-		backtrace = BlockHeight(float64(backtrace) * 1.75)
-		// Prevent underflows
-		if backtrace > s.Height() {
+		backtrace *= 2
+		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - backtrace)
+		if badBlockErr != nil {
 			break
 		}
-
-		knownBlocks[i] = s.currentPath[s.Height()-backtrace]
+		knownBlocks = append(knownBlocks, block.ID())
 	}
+	// always include the genesis block
+	genesis, _ := e.state.BlockAtHeight(0)
+	knownBlocks = append(knownBlocks, genesis.ID())
 
-	knownBlocks[31] = s.currentPath[0]
-	prevHeight := s.Height()
+	// prepare for RPC
+	var newBlocks []siacore.Block
+	var blockArray [32]siacore.BlockID
+	copy(blockArray[:], knownBlocks)
 
-	// Dirty, but we can't make network calls while the state is locked - can
-	// cause deadlock.
-	var blocks []Block
-	s.Unlock()
-	err = peer.RPC("SendBlocks", knownBlocks, &blocks)
-	s.Lock()
+	// unlock state during network I/O
+	e.state.Unlock()
+	err = peer.RPC("SendBlocks", blockArray, &newBlocks)
+	e.state.Lock()
 	if err != nil {
 		return err
 	}
 
-	for i := range blocks {
-		if err = s.AcceptBlock(blocks[i]); err != nil {
-			if err != BlockKnownErr && err != FutureBlockErr {
+	prevHeight := e.state.Height()
+
+	for i := range newBlocks {
+		if err = e.state.AcceptBlock(newBlocks[i]); err != nil {
+			if err != siacore.BlockKnownErr && err != siacore.FutureBlockErr {
 				// Return if there's an error, but don't return for benign
 				// errors: BlockKnownErr and FutureBlockErr are both benign.
 				return err
@@ -103,8 +99,8 @@ func (s *State) CatchUp(peer network.NetAddress) (err error) {
 	}
 
 	// recurse until the height stops increasing
-	if prevHeight != s.Height() {
-		return s.CatchUp(peer)
+	if prevHeight != e.state.Height() {
+		return e.CatchUp(peer)
 	}
 
 	return nil

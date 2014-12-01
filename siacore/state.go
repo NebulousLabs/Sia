@@ -107,8 +107,12 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 		return
 	}
 	err = fmt.Errorf("no block at height %v found.", height)
-
 	return
+}
+
+// NodeFromID returns the BlockNode associated with a given BlockID.
+func (s *State) NodeFromID(bid BlockID) *BlockNode {
+	return s.blockMap[bid]
 }
 
 // currentBlockNode returns the node of the most recent block in the
