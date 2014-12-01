@@ -14,11 +14,8 @@ func EncInt64(i int64) (b []byte) {
 // DecInt64 decodes a slice of 8 bytes into an int64.
 // If len(b) < 8, the slice is padded with zeros.
 func DecInt64(b []byte) int64 {
-	b2 := b
-	if len(b) < 8 {
-		b2 = make([]byte, 8)
-		copy(b2, b)
-	}
+	b2 := make([]byte, 8)
+	copy(b2, b)
 	return int64(binary.LittleEndian.Uint64(b2))
 }
 
@@ -32,11 +29,8 @@ func EncUint64(i uint64) (b []byte) {
 // DecUint64 decodes a slice of 8 bytes into a uint64.
 // If len(b) < 8, the slice is padded with zeros.
 func DecUint64(b []byte) uint64 {
-	b2 := b
-	if len(b) < 8 {
-		b2 = make([]byte, 8)
-		copy(b2, b)
-	}
+	b2 := make([]byte, 8)
+	copy(b2, b)
 	return binary.LittleEndian.Uint64(b2)
 }
 
@@ -50,10 +44,7 @@ func EncLen(length int) (b []byte) {
 // DecLen decodes a slice of 4 bytes into an int.
 // If len(b) < 8, the slice is padded with zeros.
 func DecLen(b []byte) int {
-	b2 := b
-	if len(b) < 4 {
-		b2 = make([]byte, 4)
-		copy(b2, b)
-	}
+	b2 := make([]byte, 4)
+	copy(b2, b)
 	return int(binary.LittleEndian.Uint32(b2))
 }
