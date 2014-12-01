@@ -1,8 +1,7 @@
 package siad
 
-/*
 import (
-	"errors"
+	// "errors"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -12,20 +11,19 @@ const (
 	HostAnnouncementPrefix = uint64(1)
 )
 
-
 type Host struct {
-	state *siacore.State
+	settings HostAnnouncement
 
-	Settings HostAnnouncement
+	spaceRemaining int64
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency) (t siacore.Transaction, err error) {
-	info := host.Settings
+func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency) (t siacore.Transaction, err error) {
+	info := e.host.settings
 
 	// Fund the transaction.
-	err = w.FundTransaction(freezeVolume+minerFee, &t)
+	err = e.wallet.FundTransaction(freezeVolume+minerFee, &t)
 	if err != nil {
 		return
 	}
@@ -34,14 +32,19 @@ func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeigh
 	t.MinerFees = append(t.MinerFees, minerFee)
 
 	// Add the output with the freeze volume.
-	freezeConditions := w.FreezeConditions(freezeUnlockHeight)
+	freezeConditions := e.wallet.SpendConditions
+	freezeConditions.TimeLock = freezeUnlockHeight
 	t.Outputs = append(t.Outputs, siacore.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
-	num, exists := w.OpenFreezeConditions[freezeUnlockHeight]
-	if exists {
-		w.OpenFreezeConditions[freezeUnlockHeight] = num + 1
-	} else {
-		w.OpenFreezeConditions[freezeUnlockHeight] = 1
-	}
+
+	// Frozen money can't currently be recovered.
+	/*
+		num, exists := w.OpenFreezeConditions[freezeUnlockHeight]
+		if exists {
+			w.OpenFreezeConditions[freezeUnlockHeight] = num + 1
+		} else {
+			w.OpenFreezeConditions[freezeUnlockHeight] = 1
+		}
+	*/
 	info.SpendConditions = freezeConditions
 	info.FreezeIndex = 0
 
@@ -51,7 +54,7 @@ func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeigh
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
 	// TODO: send down a channel
-	err = h.state.AcceptTransaction(t)
+	err = e.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
@@ -59,6 +62,7 @@ func (h *Host) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeigh
 	return
 }
 
+/*
 func (h *Host) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
 	// Set the new transaction equal to the old transaction. Pretty sure that
 	// go does not allow you to return the same variable that was used as
@@ -116,10 +120,8 @@ func (h *Host) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, 
 
 	return
 }
+*/
 
 func CreateHost(s *siacore.State) *Host {
-	return &Host{
-		state: s,
-	}
+	return new(Host)
 }
-*/

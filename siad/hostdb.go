@@ -136,3 +136,7 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	h = hdb.HostList[i]
 	return
 }
+
+func (e *Environment) SetHostSettings(ha HostAnnouncement) {
+	e.host.settings = ha
+}

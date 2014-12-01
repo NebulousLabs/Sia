@@ -16,7 +16,7 @@ type Environment struct {
 	caughtUp     bool // False while downloading blocks.
 	caughtUpLock sync.Mutex
 
-	// host   *Host
+	host  *Host
 	miner *Miner
 	// renter *Renter
 	wallet *Wallet
@@ -46,7 +46,7 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
-	// e.host = CreateHost(e.state)
+	e.host = CreateHost(e.state)
 	// e.renter = CreateRenter(e.state)
 
 	return
