@@ -25,6 +25,7 @@ type HostAnnouncement struct {
 	MaxFilesize           uint64
 	MinDuration           siacore.BlockHeight
 	MaxDuration           siacore.BlockHeight
+	MinChallengeFrequency siacore.BlockHeight
 	MaxChallengeFrequency siacore.BlockHeight
 	MinTolerance          uint64
 	Price                 siacore.Currency

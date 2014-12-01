@@ -73,3 +73,46 @@ func testTransactionSending(te *testEnv) {
 		return
 	}
 }
+
+// testLargeTransactions creates a transaction out of many outputs and verifies
+// that things still run smoothly.
+func testLargeTransactions(te *testEnv) {
+	// Check that no mining is happening.
+	if te.e0.Mining() || te.e1.Mining() {
+		te.t.Error("cannot do testLargeTransactions while an environment is mining!")
+		return
+	}
+
+	// Check that e0 has sufficient balance.
+	if te.e0.WalletBalance() < 2500 {
+		te.t.Error("e0 has insufficient balance to complete testLargeTransactions")
+		return
+	}
+
+	// Test has been put on hold until you can spend new outputs in the same
+	// block that they are made.
+	/*
+		// Get e1 up to having at least 50 inputs.
+		te.e1.wallet.Scan()
+		for i := len(te.e1.wallet.OwnedOutputs); i <= 5; i++ {
+			_, err = te.e0.SpendCoins(50, 0, te.e1.CoinAddress())
+			if err != nil {
+				te.t.Error(err)
+				return
+			}
+		}
+
+		// Mine a block to have the transactions accepted, and wait for the block
+		// to propagate.
+		te.e0.mineSingleBlock()
+		time.Sleep(600 * time.Millisecond)
+
+		// Check that all of the outputs have been received.
+		te.e1.wallet.Scan()
+		if len(te.e1.wallet.OwnedOutputs) < 5 {
+			te.t.Error("e1 does not have enough outputs to complete test.")
+			println(len(te.e1.wallet.OwnedOutputs))
+			return
+		}
+	*/
+}
