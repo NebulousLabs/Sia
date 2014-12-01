@@ -10,6 +10,9 @@ test: install
 	go test -short ./...
 
 test-long: install
+	go test -v ./...
+
+test-long-race: install
 	go test -v -race ./...
 
 # run twice to ensure references are updated properly

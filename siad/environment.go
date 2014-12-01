@@ -141,13 +141,11 @@ func (e *Environment) listen() {
 		case t := <-e.transactionChan:
 			e.state.Lock()
 			err = e.state.AcceptTransaction(t)
-			if err != nil {
-				// Logging
-				fmt.Println(err) // Printing errs right now becuase there are known bugs.
-			}
 			e.state.Unlock()
 			if err != nil {
-				fmt.Println("AcceptTransaction Error:", err)
+				if err != siacore.ConflictingTransactionErr {
+					fmt.Println("AcceptTransaction Error:", err)
+				}
 				continue
 			}
 			go e.server.Broadcast("AcceptTransaction", t, nil)
