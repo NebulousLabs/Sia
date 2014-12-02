@@ -58,7 +58,6 @@ func testTransactionSending(te *testEnv) {
 	// transaction, after giving a second for the information to propagate.
 	time.Sleep(300 * time.Millisecond)
 	if len(te.e0.TransactionList()) != 1 || len(te.e1.TransactionList()) != 1 || len(miningEnv.TransactionList()) != 1 {
-		panic("blub")
 		te.t.Error("transaction has not properly propagated through the transaction pool.", len(te.e0.TransactionList()), ":", len(te.e1.TransactionList()), ":", len(miningEnv.TransactionList()))
 		return
 	}
