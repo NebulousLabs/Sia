@@ -11,7 +11,3 @@ func (e *Environment) AddressBook() []network.NetAddress {
 func (e *Environment) RandomPeer() network.NetAddress {
 	return e.server.RandomPeer()
 }
-
-func (e *Environment) CatchUp(peer network.NetAddress) error {
-	return e.state.CatchUp(peer)
-}

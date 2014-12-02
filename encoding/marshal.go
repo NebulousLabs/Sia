@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"encoding/binary"
 	"errors"
 	"reflect"
 )
@@ -20,49 +19,18 @@ type SiaUnmarshaler interface {
 	UnmarshalSia([]byte) int
 }
 
-// EncInt64 encodes an int64 as a slice of 8 bytes.
-func EncInt64(i int64) (b []byte) {
-	b = make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(i))
-	return
-}
-
-// DecInt64 decodes a slice of 8 bytes into an int64.
-// If len(b) < 8, the slice is padded with zeros.
-func DecInt64(b []byte) int64 {
-	b2 := b
-	if len(b) < 8 {
-		b2 = make([]byte, 8)
-		copy(b2, b)
-	}
-	return int64(binary.LittleEndian.Uint64(b2))
-}
-
-// EncUint64 encodes a uint64 as a slice of 8 bytes.
-func EncUint64(i uint64) (b []byte) {
-	b = make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, i)
-	return
-}
-
-// DecUint64 decodes a slice of 8 bytes into a uint64.
-// If len(b) < 8, the slice is padded with zeros.
-func DecUint64(b []byte) uint64 {
-	b2 := b
-	if len(b) < 8 {
-		b2 = make([]byte, 8)
-		copy(b2, b)
-	}
-	return binary.LittleEndian.Uint64(b2)
-}
-
 // Marshal encodes a value as a byte slice. The encoding rules are as follows:
+//
 // Most types are encoded as their binary representation.
+//
 // Integers are little-endian. Int and Uint are disallowed; the number of bits must be specified.
-// Variable-length types, such as strings and slices, are prefaced by a single byte containing their length.
-// (This may need to be extended to two bytes.)
+//
+// Variable-length types, such as strings and slices, are prefaced by 4 bytes containing their length.
+//
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
+//
 // Nil pointers are represented by a zero.
+//
 // Valid pointers are prefaced by a non-zero, followed by the dereferenced value.
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
@@ -96,10 +64,10 @@ func marshal(val reflect.Value) (b []byte) {
 		return EncUint64(val.Uint())
 	case reflect.String:
 		s := val.String()
-		return append([]byte{byte(len(s))}, s...)
+		return append(EncUint64(uint64(len(s))), s...)
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		b = []byte{byte(val.Len())}
+		b = EncUint64(uint64(val.Len()))
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			return append(b, val.Bytes()...)
@@ -126,7 +94,7 @@ func marshal(val reflect.Value) (b []byte) {
 		return
 	}
 	// Marshalling should never fail. If it panics, you're doing something wrong,
-	// like trying to encode an int or a map or an unexported struct field.
+	// like trying to encode a map or an unexported struct field.
 	panic("could not marshal type " + val.Type().String())
 	return
 }
@@ -141,6 +109,7 @@ func Unmarshal(b []byte, v interface{}) (err error) {
 	}
 
 	// unmarshal may panic
+	// note that this allows us to skip any boundary checks while unmarshalling
 	var consumed int
 	defer func() {
 		if r := recover(); r != nil || consumed != len(b) {
@@ -183,14 +152,14 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		val.SetUint(DecUint64(b[:8]))
 		return 8
 	case reflect.String:
-		n, b := int(b[0]), b[1:]
-		val.SetString(string(b[:n]))
-		return n + 1
+		n := DecUint64(b[:8]) + 8
+		val.SetString(string(b[8:n]))
+		return int(n)
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		var sliceLen int
-		sliceLen, b, consumed = int(b[0]), b[1:], 1 // remember to count the length byte as consumed
+		sliceLen, b, consumed = int(DecUint64(b[:8])), b[8:], 8
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {
@@ -206,7 +175,7 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 			}
 			return val.Len()
 		}
-		// normal arrays are unmarshalled by sequentially unmarshalling their elements
+		// arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
 			elem := val.Index(i)
 			n := unmarshal(b, elem)

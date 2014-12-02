@@ -36,6 +36,7 @@ type (
 	}
 )
 
+// here we use a single length byte, unlike the standard marshalling scheme
 func (t test5) MarshalSia() []byte {
 	return append([]byte{byte(len(t.s))}, []byte(t.s)...)
 }

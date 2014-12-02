@@ -26,8 +26,6 @@ var (
 	GenesisAddress   = CoinAddress{}         // TODO: NEED TO CREATE A HARDCODED ADDRESS.
 	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
 
-	MaxCatchUpBlocks = BlockHeight(100)
-
 	DEBUG = false
 )
 

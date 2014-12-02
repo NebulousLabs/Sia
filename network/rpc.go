@@ -1,55 +1,11 @@
 package network
 
 import (
-	"errors"
 	"net"
 	"reflect"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 )
-
-func ReadPrefix(conn net.Conn) ([]byte, error) {
-	prefix := make([]byte, 4)
-	if n, err := conn.Read(prefix); err != nil || n != len(prefix) {
-		return nil, errors.New("could not read length prefix")
-	}
-	msgLen := int(encoding.DecUint64(prefix))
-	if msgLen > maxMsgLen {
-		return nil, errors.New("message too long")
-	}
-	// read msgLen bytes
-	var data []byte
-	buf := make([]byte, 1024)
-	for total := 0; total < msgLen; {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, buf[:n]...)
-		total += n
-	}
-	if len(data) != msgLen {
-		return nil, errors.New("message length mismatch")
-	}
-	return data, nil
-}
-
-func ReadObject(conn net.Conn, obj interface{}) error {
-	data, err := ReadPrefix(conn)
-	if err != nil {
-		return err
-	}
-	return encoding.Unmarshal(data, obj)
-}
-
-func WritePrefix(conn net.Conn, data []byte) (int, error) {
-	encLen := encoding.EncUint64(uint64(len(data)))
-	return conn.Write(append(encLen[:4], data...))
-}
-
-func WriteObject(conn net.Conn, obj interface{}) (int, error) {
-	return WritePrefix(conn, encoding.Marshal(obj))
-}
 
 // rpcName truncates a string to 8 bytes. If len(name) < 8, the remaining
 // bytes are 0.
@@ -70,11 +26,11 @@ func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 		if arg != nil {
 			data = encoding.Marshal(arg)
 		}
-		if _, err := WritePrefix(conn, data); err != nil {
+		if _, err := encoding.WritePrefix(conn, data); err != nil {
 			return err
 		}
 		if resp != nil {
-			return ReadObject(conn, resp)
+			return encoding.ReadObject(conn, maxMsgLen, resp)
 		}
 		return nil
 	})
@@ -144,7 +100,7 @@ func (tcps *TCPServer) registerRPC(fn reflect.Value, typ reflect.Type) func(net.
 			return err.(error)
 		}
 		// write response
-		_, err := WriteObject(conn, resp.Elem().Interface())
+		_, err := encoding.WriteObject(conn, resp.Elem().Interface())
 		return err
 	}
 }
@@ -175,7 +131,7 @@ func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net
 			return err.(error)
 		}
 		// write response
-		_, err := WriteObject(conn, resp.Elem().Interface())
+		_, err := encoding.WriteObject(conn, resp.Elem().Interface())
 		return err
 	}
 }
@@ -183,7 +139,7 @@ func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net
 // sendHostname replies to the sender with the sender's external IP.
 func sendHostname(conn net.Conn, _ []byte) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	_, err := WriteObject(conn, host)
+	_, err := encoding.WriteObject(conn, host)
 	return err
 }
 
