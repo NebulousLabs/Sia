@@ -15,11 +15,11 @@ func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
 
 func TestRegister(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(9988)
+	tcps, err := NewTCPServer(9987)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr := NetAddress{"localhost", 9988}
+	addr := NetAddress{"localhost", 9987}
 
 	// register some handlers
 	tcps.Register("Foo", func(net.Conn, []byte) error { chan2 <- struct{}{}; return nil })
