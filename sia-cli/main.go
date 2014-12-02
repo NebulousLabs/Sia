@@ -14,7 +14,7 @@ var port uint16
 func walletStart(cmd *cobra.Command, args []string) {
 	env, err := siad.CreateEnvironment(port)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Failed to initialize:", err)
 		return
 	}
 	defer env.Close()

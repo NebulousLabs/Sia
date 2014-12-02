@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"math/rand"
 	"net"
 	"strconv"
@@ -91,6 +92,9 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 			tcps.addressbook[addr] = struct{}{}
 		}
 	}
+	if len(tcps.addressbook) == 0 {
+		return errors.New("can't bootstrap: no peers responded to ping")
+	}
 
 	// learn hostname
 	for _, addr := range tcps.AddressBook() {
@@ -143,6 +147,9 @@ func (tcps *TCPServer) AddPeer(addr NetAddress) error {
 // TODO: probably not smart to depend on map iteration...
 func (tcps *TCPServer) RandomPeer() NetAddress {
 	addrs := tcps.AddressBook()
+	if len(addrs) == 0 {
+		panic("no peers!")
+	}
 	return addrs[rand.Intn(len(addrs))]
 }
 

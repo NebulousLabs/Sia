@@ -1,7 +1,7 @@
 package siad
 
 import (
-	"github.com/NebulousLabs/Andromeda/siacore"
+//"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 type Renter struct {

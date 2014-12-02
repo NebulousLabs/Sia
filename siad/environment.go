@@ -71,7 +71,6 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 
 	// establish an initial peer list
 	if err = e.server.Bootstrap(); err != nil {
-		fmt.Println(err)
 		return
 	}
 
