@@ -64,10 +64,10 @@ func marshal(val reflect.Value) (b []byte) {
 		return EncUint64(val.Uint())
 	case reflect.String:
 		s := val.String()
-		return append(EncLen(len(s)), s...)
+		return append(EncUint64(uint64(len(s))), s...)
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		b = EncLen(val.Len())
+		b = EncUint64(uint64(val.Len()))
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			return append(b, val.Bytes()...)
@@ -152,14 +152,14 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		val.SetUint(DecUint64(b[:8]))
 		return 8
 	case reflect.String:
-		n := DecLen(b[:4]) + 4
-		val.SetString(string(b[4:n]))
-		return n
+		n := DecUint64(b[:8]) + 8
+		val.SetString(string(b[8:n]))
+		return int(n)
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
 		var sliceLen int
-		sliceLen, b, consumed = DecLen(b[:4]), b[4:], 4
+		sliceLen, b, consumed = int(DecUint64(b[:8])), b[8:], 8
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
 		// special case for byte slices
 		if val.Type().Elem().Kind() == reflect.Uint8 {

@@ -33,18 +33,3 @@ func DecUint64(b []byte) uint64 {
 	copy(b2, b)
 	return binary.LittleEndian.Uint64(b2)
 }
-
-// EncLen encodes a length (int) as a slice of 4 bytes.
-func EncLen(length int) (b []byte) {
-	b = make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, uint32(length))
-	return
-}
-
-// DecLen decodes a slice of 4 bytes into an int.
-// If len(b) < 8, the slice is padded with zeros.
-func DecLen(b []byte) int {
-	b2 := make([]byte, 4)
-	copy(b2, b)
-	return int(binary.LittleEndian.Uint32(b2))
-}
