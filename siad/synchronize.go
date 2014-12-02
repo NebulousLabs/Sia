@@ -108,7 +108,10 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 
 	// recurse until the height stops increasing
 	if prevHeight != e.state.Height() {
-		return e.CatchUp(peer)
+		e.state.Unlock()
+		err = e.CatchUp(peer) // Prevents deadlock, while keeping the defer.
+		e.state.Lock()
+		return
 	}
 
 	return nil
