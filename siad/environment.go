@@ -49,8 +49,8 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
-	e.host = CreateHost(e.state)
-	e.renter = CreateRenter(e.state)
+	e.host = CreateHost()
+	e.renter = CreateRenter()
 
 	return
 }

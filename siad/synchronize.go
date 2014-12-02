@@ -16,9 +16,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siac
 	e.state.Lock()
 	defer e.state.Unlock()
 
-	// Find the most recent block that is in our current path. Since
-	// knownBlocks is ordered from newest to oldest, we can break as soon as
-	// we find a match.
+	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
 	var highest siacore.BlockHeight
 	for _, id := range knownBlocks {

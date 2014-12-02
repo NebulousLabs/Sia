@@ -3,6 +3,7 @@ package siad
 import (
 	"crypto/rand"
 	"errors"
+	"math"
 	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -53,7 +54,8 @@ type HostEntry struct {
 
 // host.Weight() determines the weight of a specific host.
 func (h *HostEntry) Weight() siacore.Currency {
-	return h.Freeze * h.Burn / h.Price
+	adjustedBurn := math.Sqrt(float64(h.Burn))
+	return siacore.Currency(float64(h.Freeze) * adjustedBurn / float64(h.Price))
 }
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any

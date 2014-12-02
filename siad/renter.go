@@ -67,6 +67,6 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 }
 */
 
-func CreateRenter(s *siacore.State) *Renter {
+func CreateRenter() *Renter {
 	return new(Renter)
 }

@@ -122,6 +122,6 @@ func (h *Host) ConsiderContract(t siacore.Transaction) (nt siacore.Transaction, 
 }
 */
 
-func CreateHost(s *siacore.State) *Host {
+func CreateHost() *Host {
 	return new(Host)
 }
