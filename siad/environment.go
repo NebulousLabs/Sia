@@ -9,6 +9,9 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
+// Environment is the struct that serves as the state for siad. It contains a
+// pointer to the state, as things like a wallet, a friend list, etc. Each
+// environment should have its own state.
 type Environment struct {
 	state *siacore.State
 
@@ -16,9 +19,9 @@ type Environment struct {
 	caughtUp     bool // False while downloading blocks.
 	caughtUpLock sync.Mutex
 
-	// host   *Host
-	miner *Miner
-	// renter *Renter
+	host   *Host
+	miner  *Miner
+	renter *Renter
 	wallet *Wallet
 
 	friends map[string]siacore.CoinAddress
@@ -28,7 +31,7 @@ type Environment struct {
 	transactionChan chan siacore.Transaction
 }
 
-// createEnvironment() creates a server, host, miner, renter and wallet and
+// createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
 func CreateEnvironment(port uint16) (e *Environment, err error) {
@@ -46,16 +49,20 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
-	// e.host = CreateHost(e.state)
-	// e.renter = CreateRenter(e.state)
+	e.host = CreateHost()
+	e.renter = CreateRenter()
 
 	return
 }
 
+// Close does any finishing maintenence before the environment can be garbage
+// collected. Right now that just means closing the server.
 func (e *Environment) Close() {
 	e.server.Close()
 }
 
+// initializeNetwork registers the rpcs and bootstraps to the network,
+// downlading all of the blocks and establishing a peer list.
 func (e *Environment) initializeNetwork(port uint16) (err error) {
 	e.server, err = network.NewTCPServer(port)
 	if err != nil {
@@ -102,55 +109,82 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 	return nil
 }
 
+// AcceptBlock sends the input block down a channel, where it will be dealt
+// with by the Environment's listener.
 func (e *Environment) AcceptBlock(b siacore.Block) error {
 	e.blockChan <- b
 	return nil
 }
 
+// AcceptTransaction sends the input transaction down a channel, where it will
+// be dealt with by the Environment's listener.
 func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 	e.transactionChan <- t
 	return nil
 }
 
+// processBlock is called by the environment's listener.
+func (e *Environment) processBlock(b siacore.Block) {
+	// Pass the block to the state.
+	e.state.Lock()
+	err := e.state.AcceptBlock(b)
+	e.state.Unlock()
+
+	// Perform error handling.
+	if err == siacore.BlockKnownErr {
+		// Nothing happens if the block is known.
+		return
+	} else if err != nil {
+		// Call CatchUp() if an unknown orphan is sent.
+		if err == siacore.UnknownOrphanErr {
+			err = e.CatchUp(e.server.RandomPeer())
+			if err != nil {
+				// Logging
+				// fmt.Println(err2)
+			}
+		} else if err != siacore.KnownOrphanErr {
+			// TODO: Change this from a print statement to a logging statement.
+			fmt.Println("AcceptBlock Error: ", err)
+		}
+		return
+	}
+
+	// Broadcast all valid blocks.
+	go e.server.Broadcast("AcceptBlock", b, nil)
+}
+
+// processTransaction is called by the environment's listener.
+func (e *Environment) processTransaction(t siacore.Transaction) {
+	// Pass the transaction to the state.
+	e.state.Lock()
+	err := e.state.AcceptTransaction(t)
+	e.state.Unlock()
+
+	// Perform error handling.
+	if err != nil {
+		if err != siacore.ConflictingTransactionErr {
+			// TODO: Change this println to a logging statement.
+			fmt.Println("AcceptTransaction Error:", err)
+		}
+		return
+	}
+
+	// Broadcast all valid transactions.
+	go e.server.Broadcast("AcceptTransaction", t, nil)
+
+	// Pass all valid transactions to the host database.
+}
+
 // listen waits until a new block or transaction arrives, then attempts to
 // process and rebroadcast it.
 func (e *Environment) listen() {
-	var err error
 	for {
 		select {
 		case b := <-e.blockChan:
-			e.state.Lock()
-			err = e.state.AcceptBlock(b)
-			e.state.Unlock()
-			if err == siacore.BlockKnownErr {
-				continue
-			} else if err != nil {
-				if err == siacore.UnknownOrphanErr {
-					err = e.CatchUp(e.server.RandomPeer())
-					if err != nil {
-						// Logging
-						// fmt.Println(err2)
-					}
-				} else if err != siacore.KnownOrphanErr {
-					fmt.Println("AcceptBlock Error: ", err)
-				}
-				continue
-			}
-			go e.server.Broadcast("AcceptBlock", b, nil)
+			e.processBlock(b)
 
 		case t := <-e.transactionChan:
-			e.state.Lock()
-			err = e.state.AcceptTransaction(t)
-			if err != nil {
-				// Logging
-				fmt.Println(err) // Printing errs right now becuase there are known bugs.
-			}
-			e.state.Unlock()
-			if err != nil {
-				fmt.Println("AcceptTransaction Error:", err)
-				continue
-			}
-			go e.server.Broadcast("AcceptTransaction", t, nil)
+			e.processTransaction(t)
 		}
 	}
 }

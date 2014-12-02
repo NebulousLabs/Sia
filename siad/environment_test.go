@@ -1,6 +1,7 @@
 package siad
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/NebulousLabs/Andromeda/network"
@@ -16,6 +17,7 @@ type testEnv struct {
 	e1 *Environment
 }
 
+// establishTestingEnvrionment sets all of the testEnv variables.
 func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 	te = new(testEnv)
 	te.t = t
@@ -32,28 +34,33 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 		te.t.Fatal(err)
 	}
 
+	// Give some funds to e0 and e1.
+	te.e0.mineSingleBlock()
+	te.e1.mineSingleBlock()
+
 	return
 }
 
-func TestSia(t *testing.T) {
-	// CreateEnvironment takes 3s for some reason.
-	if testing.Short() {
-		t.Skip()
-	}
-
+// TestSiad uses a testing environment and runs a series of tests designed to
+// probe all of the siad functions and stress test siad.
+func TestSiad(t *testing.T) {
 	// Alter the constants to create a system more friendly to testing.
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[0] = 8
+	siacore.RootTarget[0] = 255
+	siacore.MaxAdjustmentUp = big.NewRat(1001, 1000)
+	siacore.MaxAdjustmentDown = big.NewRat(999, 1000)
 	siacore.DEBUG = true
 
 	// Create the testing environment.
 	te := establishTestingEnvironment(t)
 
 	// Perform a series of tests using the environment.
-	testToggleMining(te)
-	testDualMining(te)
-	testTransactionSending(te)
-	// testLargeTransactions(te)
+	if !testing.Short() {
+		testToggleMining(te)
+		testDualMining(te)
+		testTransactionSending(te)
+		testLargeTransactions(te)
+	}
 }

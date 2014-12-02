@@ -11,3 +11,7 @@ func (e *Environment) AddressBook() []network.NetAddress {
 func (e *Environment) RandomPeer() network.NetAddress {
 	return e.server.RandomPeer()
 }
+
+func (e *Environment) NetAddress() network.NetAddress {
+	return e.server.NetAddress()
+}

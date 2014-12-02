@@ -6,6 +6,11 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
+// Exported errors
+var (
+	ConflictingTransactionErr = errors.New("conflicting transaction exists in transaction pool")
+)
+
 // Each input has a list of public keys and a required number of signatures.
 // InputSignatures keeps track of which public keys have been used and how many
 // more signatures are needed.
@@ -227,7 +232,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	if s.transactionPoolConflict(&t) {
-		err = errors.New("conflicting transaction exists in transaction pool")
+		err = ConflictingTransactionErr
 		return
 	}
 

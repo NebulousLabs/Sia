@@ -1,6 +1,7 @@
 package siacore
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -89,6 +90,51 @@ type State struct {
 	sync.Mutex
 }
 
+// CreateGenesisState will create the state that contains the genesis block and
+// nothing else.
+func CreateGenesisState() *State {
+	// Create a new state and initialize the maps.
+	s := &State{
+		blockRoot:       new(BlockNode),
+		badBlocks:       make(map[BlockID]struct{}),
+		blockMap:        make(map[BlockID]*BlockNode),
+		orphanMap:       make(map[BlockID]map[BlockID]*Block),
+		currentPath:     make(map[BlockHeight]BlockID),
+		openContracts:   make(map[ContractID]*OpenContract),
+		unspentOutputs:  make(map[OutputID]Output),
+		spentOutputs:    make(map[OutputID]Output),
+		transactionPool: make(map[OutputID]*Transaction),
+		transactionList: make(map[OutputID]*Transaction),
+	}
+
+	// Create the genesis block and add it as the BlockRoot.
+	genesisBlock := &Block{
+		Timestamp:    GenesisTimestamp,
+		MinerAddress: GenesisAddress,
+	}
+	s.blockRoot.Block = genesisBlock
+	s.blockRoot.Height = 0
+	for i := range s.blockRoot.RecentTimestamps {
+		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
+	}
+	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
+	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
+	s.blockMap[genesisBlock.ID()] = s.blockRoot
+
+	// Fill out the consensus informaiton for the genesis block.
+	s.currentBlockID = genesisBlock.ID()
+	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
+
+	// Create the genesis subsidy output.
+	genesisSubsidyOutput := Output{
+		Value:     CalculateCoinbase(0),
+		SpendHash: GenesisAddress,
+	}
+	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
+
+	return s
+}
+
 // State.Height() returns the height of the longest fork.
 func (s *State) Height() BlockHeight {
 	return s.blockMap[s.currentBlockID].Height
@@ -110,9 +156,28 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	return
 }
 
-// NodeFromID returns the BlockNode associated with a given BlockID.
-func (s *State) NodeFromID(bid BlockID) *BlockNode {
-	return s.blockMap[bid]
+// BlockFromID returns the block associated with a given id. This function
+// isn't actually used anywhere right now but it seems like it might be useful
+// so I'm keeping it around.
+func (s *State) BlockFromID(bid BlockID) (b Block, err error) {
+	node := s.blockMap[bid]
+	if node == nil {
+		err = errors.New("no block of that id found")
+		return
+	}
+	b = *node.Block
+	return
+}
+
+// HeightOfBlock returns the height of a block given the id.
+func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
+	node := s.blockMap[bid]
+	if node == nil {
+		err = errors.New("no block of that id found")
+		return
+	}
+	height = node.Height
+	return
 }
 
 // currentBlockNode returns the node of the most recent block in the
@@ -132,9 +197,9 @@ func (s *State) CurrentBlockWeight() BlockWeight {
 	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
 }
 
-// CurrentEarliestLegalTimestamp returns the earliest legal timestamp of the
-// next block - earlier timestamps will render the block invalid.
-func (s *State) CurrentEarliestLegalTimestamp() Timestamp {
+// EarliestLegalTimestamp returns the earliest legal timestamp of the next
+// block - earlier timestamps will render the block invalid.
+func (s *State) EarliestLegalTimestamp() Timestamp {
 	return s.currentBlockNode().earliestLegalChildTimestamp()
 }
 
@@ -144,6 +209,32 @@ func (s *State) CurrentTarget() Target {
 	return s.currentBlockNode().Target
 }
 
+// ScanOutputs takes a map of coin addresses as input and returns every output
+// in the set of unspent outputs that matches the list of addresses.
+func (s *State) ScanOutputs(addresses map[CoinAddress]struct{}) (outputIDs []OutputID) {
+	for id, output := range s.unspentOutputs {
+		if _, exists := addresses[output.SpendHash]; exists {
+			outputIDs = append(outputIDs, id)
+		}
+	}
+
+	return
+}
+
+// State.Output returns the Output associated with the id provided for input,
+// but only if the output is a part of the utxo set.
+func (s *State) Output(id OutputID) (output Output, err error) {
+	output, exists := s.unspentOutputs[id]
+	if exists {
+		return
+	}
+
+	err = errors.New("output not in utxo set")
+	return
+}
+
+// Sorted UtxoSet returns all of the unspent transaction outputs sorted
+// according to the numerical value of their id.
 func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
 	var unspentOutputStrings []string
 	for outputID := range s.unspentOutputs {
@@ -212,49 +303,4 @@ func (s *State) StateHash() hash.Hash {
 	}
 
 	return hash.MerkleRoot(leaves)
-}
-
-// CreateGenesisState will create the state that contains the genesis block and
-// nothing else.
-func CreateGenesisState() *State {
-	// Create a new state and initialize the maps.
-	s := &State{
-		blockRoot:       new(BlockNode),
-		badBlocks:       make(map[BlockID]struct{}),
-		blockMap:        make(map[BlockID]*BlockNode),
-		orphanMap:       make(map[BlockID]map[BlockID]*Block),
-		currentPath:     make(map[BlockHeight]BlockID),
-		openContracts:   make(map[ContractID]*OpenContract),
-		unspentOutputs:  make(map[OutputID]Output),
-		spentOutputs:    make(map[OutputID]Output),
-		transactionPool: make(map[OutputID]*Transaction),
-		transactionList: make(map[OutputID]*Transaction),
-	}
-
-	// Create the genesis block and add it as the BlockRoot.
-	genesisBlock := &Block{
-		Timestamp:    GenesisTimestamp,
-		MinerAddress: GenesisAddress,
-	}
-	s.blockRoot.Block = genesisBlock
-	s.blockRoot.Height = 0
-	for i := range s.blockRoot.RecentTimestamps {
-		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
-	}
-	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
-	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
-	s.blockMap[genesisBlock.ID()] = s.blockRoot
-
-	// Fill out the consensus informaiton for the genesis block.
-	s.currentBlockID = genesisBlock.ID()
-	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
-
-	// Create the genesis subsidy output.
-	genesisSubsidyOutput := Output{
-		Value:     CalculateCoinbase(0),
-		SpendHash: GenesisAddress,
-	}
-	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
-
-	return s
 }

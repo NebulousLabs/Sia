@@ -18,7 +18,7 @@ func (e *Environment) mineSingleBlock() {
 // testToggleMining tests that enabling and disabling mining works without
 // problems.
 func testToggleMining(te *testEnv) {
-	prevHeight := te.e0.state.Height()
+	prevHeight := te.e0.Height()
 
 	// Check that mining is not already enabled.
 	if te.e0.miner.mining {
@@ -40,14 +40,12 @@ func testToggleMining(te *testEnv) {
 
 	// Test the height, wait another second (to allow an incorrectly running
 	// miner to mine another block) and test the height again.
-	info := te.e0.SafeStateInfo()
-	newHeight := info.Height
+	newHeight := te.e0.Height()
 	if newHeight == prevHeight {
 		te.t.Error("height did not increase after mining for a second")
 	}
 	time.Sleep(300 * time.Millisecond)
-	info = te.e0.SafeStateInfo()
-	if info.Height != newHeight {
+	if te.e0.Height() != newHeight {
 		te.t.Error("height still increasing after disabling mining...")
 	}
 }
@@ -67,7 +65,7 @@ func testDualMining(te *testEnv) {
 	time.Sleep(300 * time.Millisecond)
 	te.e0.ToggleMining()
 	te.e1.ToggleMining()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Compare the state hash for equality.
 	info0 := te.e0.SafeStateInfo()

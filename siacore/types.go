@@ -1,6 +1,7 @@
 package siacore
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
 
@@ -152,6 +153,22 @@ func (b Block) ID() BlockID {
 		b.MinerAddress,
 		b.MerkleRoot,
 	)))
+}
+
+// CheckTarget() returns true if the block id is lower than the target.
+func (b Block) CheckTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
+// ExpectedTransactionMerkleRoot() returns the expected transaction
+// merkle root of the block.
+func (b Block) TransactionMerkleRoot() hash.Hash {
+	var transactionHashes []hash.Hash
+	for _, transaction := range b.Transactions {
+		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
+	}
+	return hash.MerkleRoot(transactionHashes)
 }
 
 // SubisdyID() returns the id of the output created by the block subsidy.

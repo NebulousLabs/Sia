@@ -39,12 +39,12 @@ func (m *Miner) blockForWork() (b *siacore.Block, target siacore.Target) {
 		Transactions:  m.state.TransactionPoolDump(),
 	}
 	// Fudge the timestamp if the block would otherwise be illegal.
-	if b.Timestamp < m.state.CurrentEarliestLegalTimestamp() {
-		b.Timestamp = m.state.CurrentEarliestLegalTimestamp()
+	if b.Timestamp < m.state.EarliestLegalTimestamp() {
+		b.Timestamp = m.state.EarliestLegalTimestamp()
 	}
 
 	// Add the transactions from the transaction pool.
-	b.MerkleRoot = b.ExpectedTransactionMerkleRoot()
+	b.MerkleRoot = b.TransactionMerkleRoot()
 
 	// Determine the target for the block.
 	target = m.state.CurrentTarget()

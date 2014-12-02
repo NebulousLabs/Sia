@@ -1,19 +1,14 @@
 package siad
 
-/*
 import (
-	"os"
-
-	"github.com/NebulousLabs/Andromeda/hash"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 type Renter struct {
-	state *siacore.State
-
 	hostdb HostDatabase
 }
 
+/*
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
 func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err error) {
@@ -70,10 +65,8 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 
 	return
 }
-
-func CreateRenter(s *siacore.State) *Renter {
-	return &Renter{
-		state: s,
-	}
-}
 */
+
+func CreateRenter() *Renter {
+	return new(Renter)
+}

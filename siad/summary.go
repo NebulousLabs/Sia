@@ -37,7 +37,7 @@ func (e *Environment) StateInfo() StateInfo {
 		Height:       e.state.Height(),
 		Target:       e.state.CurrentTarget(),
 		Depth:        e.state.Depth(),
-		EarliestLegalTimestamp: e.state.CurrentEarliestLegalTimestamp(),
+		EarliestLegalTimestamp: e.state.EarliestLegalTimestamp(),
 
 		UtxoSet:         e.state.SortedUtxoSet(),
 		TransactionList: e.state.TransactionList(),

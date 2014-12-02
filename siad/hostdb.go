@@ -1,9 +1,9 @@
 package siad
 
-/*
 import (
 	"crypto/rand"
 	"errors"
+	"math"
 	"math/big"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -25,6 +25,7 @@ type HostAnnouncement struct {
 	MaxFilesize           uint64
 	MinDuration           siacore.BlockHeight
 	MaxDuration           siacore.BlockHeight
+	MinChallengeFrequency siacore.BlockHeight
 	MaxChallengeFrequency siacore.BlockHeight
 	MinTolerance          uint64
 	Price                 siacore.Currency
@@ -39,9 +40,10 @@ type HostAnnouncement struct {
 // uses to weigh hosts and pick them out when storing files.
 type HostEntry struct {
 	IPAddress   network.NetAddress
-	MinSize     uint64
-	MaxSize     uint64
-	Duration    siacore.BlockHeight
+	MinFilesize uint64
+	MaxFilesize uint64
+	MinDuration siacore.BlockHeight
+	MaxDuration siacore.BlockHeight
 	Frequency   siacore.BlockHeight
 	Tolerance   uint64
 	Price       siacore.Currency
@@ -52,7 +54,8 @@ type HostEntry struct {
 
 // host.Weight() determines the weight of a specific host.
 func (h *HostEntry) Weight() siacore.Currency {
-	return h.Freeze * h.Burn / h.Price
+	adjustedBurn := math.Sqrt(float64(h.Burn))
+	return siacore.Currency(float64(h.Freeze) * adjustedBurn / float64(h.Price))
 }
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
@@ -66,7 +69,10 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 	dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
 	if dataIndicator == 1 {
 		var ha HostAnnouncement
-		encoding.Unmarshal(t.ArbitraryData[1:], ha)
+		err := encoding.Unmarshal(t.ArbitraryData[1:], ha)
+		if err != nil {
+			return
+		}
 
 		// Verify that the host has declared values that are relevant to our
 		// interests.
@@ -87,9 +93,10 @@ func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
 		// Add the host to the host database.
 		host := HostEntry{
 			IPAddress:   ha.IPAddress,
-			MinSize:     ha.MinFilesize,
-			MaxSize:     ha.MaxFilesize,
-			Duration:    ha.MaxDuration,
+			MinFilesize: ha.MinFilesize,
+			MaxFilesize: ha.MaxFilesize,
+			MinDuration: ha.MinDuration,
+			MaxDuration: ha.MaxDuration,
 			Frequency:   ha.MaxChallengeFrequency,
 			Tolerance:   ha.MinTolerance,
 			Price:       ha.Price,
@@ -131,4 +138,7 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	h = hdb.HostList[i]
 	return
 }
-*/
+
+func (e *Environment) SetHostSettings(ha HostAnnouncement) {
+	e.host.settings = ha
+}
