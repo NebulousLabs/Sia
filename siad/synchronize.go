@@ -11,27 +11,35 @@ const (
 	MaxCatchUpBlocks = 100
 )
 
-// SendBlocks sends all known blocks from the given height forward from the
-// longest known fork.
-func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) error {
+// SendBlocks takes a list of block ids as input, and sends all blocks from
+func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) (err error) {
 	e.state.Lock()
 	defer e.state.Unlock()
 
 	// Find the most recent block that is in our current path. Since
 	// knownBlocks is ordered from newest to oldest, we can break as soon as
 	// we find a match.
-	var blockNode *siacore.BlockNode
-	for i := range knownBlocks {
-		blockNode := e.state.NodeFromID(knownBlocks[i])
-		if blockNode != nil {
-			break
+	found := false
+	var highest siacore.BlockHeight
+	for _, id := range knownBlocks {
+		height, err := e.state.HeightOfBlock(id)
+		if err == nil {
+			found = true
+			if height > highest {
+				highest = height
+			}
 		}
 	}
-	if blockNode == nil {
-		return errors.New("no matching block found")
+	if !found {
+		// The genesis block should be included in knownBlocks - if no matching
+		// blocks are found the caller is probably on a different blockchain
+		// altogether.
+		err = errors.New("no matching block found")
+		return
 	}
 
-	for i := blockNode.Height; i < blockNode.Height+MaxCatchUpBlocks; i++ {
+	// Send over all blocks from the first known block.
+	for i := highest; i < highest+MaxCatchUpBlocks; i++ {
 		b, err := e.state.BlockAtHeight(i)
 		if err != nil {
 			break

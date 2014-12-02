@@ -1,14 +1,10 @@
 package siacore
 
 import (
-	"bytes"
 	"errors"
 	"math/big"
 	"sort"
 	"time"
-
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 // TODO: Find a better place for this. SurpassThreshold isn't really a
@@ -33,12 +29,6 @@ func (bn *BlockNode) earliestLegalChildTimestamp() Timestamp {
 	}
 	sort.Ints(intTimestamps)
 	return Timestamp(intTimestamps[5])
-}
-
-// CheckTarget() returns true if the block id is lower than the target.
-func (b Block) CheckTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
 // State.checkMaps() looks through the maps known to the state and sees if the
@@ -83,16 +73,6 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 	return
 }
 
-// ExpectedTransactionMerkleRoot() returns the expected transaction
-// merkle root of the block.
-func (b Block) ExpectedTransactionMerkleRoot() hash.Hash {
-	var transactionHashes []hash.Hash
-	for _, transaction := range b.Transactions {
-		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
-	}
-	return hash.MerkleRoot(transactionHashes)
-}
-
 // State.validateHaeader() returns err = nil if the header information in the
 // block (everything except the transactions) is valid, and returns an error
 // explaining why validation failed if the header is invalid.
@@ -126,7 +106,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 
 	// Check that the transaction merkle root matches the transactions
 	// included into the block.
-	if b.MerkleRoot != b.ExpectedTransactionMerkleRoot() {
+	if b.MerkleRoot != b.TransactionMerkleRoot() {
 		s.badBlocks[b.ID()] = struct{}{}
 		err = errors.New("merkle root does not match transactions sent.")
 		return
