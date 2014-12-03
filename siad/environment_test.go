@@ -25,11 +25,11 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 	// Create two environments and mine a handful of blocks in each, verifying
 	// that each got all the same blocks as the other.
 	var err error
-	te.e0, err = CreateEnvironment(9988)
+	te.e0, err = CreateEnvironment(9988, true)
 	if err != nil {
 		te.t.Fatal(err)
 	}
-	te.e1, err = CreateEnvironment(9989)
+	te.e1, err = CreateEnvironment(9989, false)
 	if err != nil {
 		te.t.Fatal(err)
 	}

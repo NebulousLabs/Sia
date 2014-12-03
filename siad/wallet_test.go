@@ -23,7 +23,7 @@ func testTransactionSending(te *testEnv) {
 	// Create a third environment to do the mining, so that we can be certain
 	// about the balances of the first two environments, and wait so CatchUp()
 	// can complete.
-	miningEnv, err := CreateEnvironment(9990)
+	miningEnv, err := CreateEnvironment(9990, false)
 	if err != nil {
 		te.t.Fatal(err)
 	}
