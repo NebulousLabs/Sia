@@ -12,7 +12,6 @@ import (
 )
 
 type HostDatabase struct {
-	State       *siacore.State
 	HostList    []HostEntry
 	TotalWeight siacore.Currency
 }
@@ -30,7 +29,7 @@ type HostAnnouncement struct {
 	MinTolerance          uint64
 	Price                 siacore.Currency
 	Burn                  siacore.Currency
-	CoinAddress           siacore.CoinAddress
+	CoinAddress           siacore.CoinAddress // Might be unneeded.
 
 	SpendConditions siacore.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
@@ -52,6 +51,11 @@ type HostEntry struct {
 	CoinAddress siacore.CoinAddress
 }
 
+func CreateHostDatabase() (hdb *HostDatabase) {
+	hdb = new(HostDatabase)
+	return
+}
+
 // host.Weight() determines the weight of a specific host.
 func (h *HostEntry) Weight() siacore.Currency {
 	adjustedBurn := math.Sqrt(float64(h.Burn))
@@ -70,7 +74,7 @@ func (e *Environment) updateHostDB(b siacore.Block) {
 		dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
 		if dataIndicator == 1 {
 			var ha HostAnnouncement
-			err := encoding.Unmarshal(t.ArbitraryData[1:], ha)
+			err := encoding.Unmarshal(t.ArbitraryData[8:], &ha)
 			if err != nil {
 				return
 			}
@@ -139,10 +143,4 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 
 	h = hdb.HostList[i]
 	return
-}
-
-// SetHostSettings changes the settings according to the input. Need a setter
-// because Environment.host is not exported.
-func (e *Environment) SetHostSettings(ha HostAnnouncement) {
-	e.host.settings = ha
 }

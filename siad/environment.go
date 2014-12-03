@@ -50,6 +50,7 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
 	e.host = CreateHost()
+	e.hostDatabase = CreateHostDatabase()
 
 	return
 }
@@ -173,8 +174,6 @@ func (e *Environment) processTransaction(t siacore.Transaction) {
 
 	// Broadcast all valid transactions.
 	go e.server.Broadcast("AcceptTransaction", t, nil)
-
-	// Pass all valid transactions to the host database.
 }
 
 // listen waits until a new block or transaction arrives, then attempts to
