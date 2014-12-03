@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/network"
@@ -14,10 +15,13 @@ import (
 type HostDatabase struct {
 	HostList    []HostEntry
 	TotalWeight siacore.Currency
+	sync.RWMutex
 }
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
+//
+// TODO: Change Min+Max ChallengeFrequency to Smallest+Largest ChallengeWindow.
 type HostAnnouncement struct {
 	IPAddress             network.NetAddress
 	MinFilesize           uint64
@@ -119,7 +123,7 @@ func (e *Environment) updateHostDB(b siacore.Block) {
 }
 
 // ChooseHost orders the hosts by weight and picks one at random.
-func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
+func (hdb *HostDatabase) ChooseHost() (h HostEntry, err error) {
 	if len(hdb.HostList) == 0 {
 		err = errors.New("no hosts found")
 		return
@@ -137,9 +141,10 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	randWeight := siacore.Currency(randInt.Int64())
 	weightPassed := siacore.Currency(0)
 	var i int
-	for i = 0; randWeight >= weightPassed; i++ {
+	for i = 0; randWeight > weightPassed; i++ {
 		weightPassed += hdb.HostList[i].Weight()
 	}
+	i -= 1
 
 	h = hdb.HostList[i]
 	return

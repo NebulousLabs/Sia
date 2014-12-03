@@ -138,7 +138,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 // Wallet.signTransaction() takes a transaction and adds a signature for every input
 // that the wallet understands how to spend.
 func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
-	for i, input := range t.Inputs {
+	for _, input := range t.Inputs {
 		// If we recognize the input as something we are able to sign, we sign
 		// the input.
 		if input.SpendConditions.CoinAddress() == w.SpendConditions.CoinAddress() {
@@ -147,8 +147,8 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
 			}
 			t.Signatures = append(t.Signatures, txnSig)
 
-			sigHash := t.SigHash(i)
-			t.Signatures[i].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
+			sigHash := t.SigHash(len(t.Signatures) - 1)
+			t.Signatures[len(t.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
 			if err != nil {
 				return
 			}

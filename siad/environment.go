@@ -150,7 +150,9 @@ func (e *Environment) processBlock(b siacore.Block) {
 
 	// TODO: once a block has been moved into the host db, it doesn't come out.
 	// But the host db should reverse when there are reorgs.
+	e.hostDatabase.Lock()
 	e.updateHostDB(b)
+	e.hostDatabase.Unlock()
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
