@@ -60,55 +60,57 @@ func (h *HostEntry) Weight() siacore.Currency {
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database.
-func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
-	// Check the arbitrary data of the transaction to fill out the host database.
-	if len(t.ArbitraryData) < 8 {
-		return
-	}
-
-	dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
-	if dataIndicator == 1 {
-		var ha HostAnnouncement
-		err := encoding.Unmarshal(t.ArbitraryData[1:], ha)
-		if err != nil {
+func (e *Environment) updateHostDB(b siacore.Block) {
+	for _, t := range b.Transactions {
+		// Check the arbitrary data of the transaction to fill out the host database.
+		if len(t.ArbitraryData) < 8 {
 			return
 		}
 
-		// Verify that the host has declared values that are relevant to our
-		// interests.
-		if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
-			return
-		}
-		if ha.MaxChallengeFrequency > 100 {
-			return
-		}
-		if ha.MinTolerance > 10 {
-			return
-		}
-		freeze := siacore.Currency(ha.SpendConditions.TimeLock-hdb.State.Height()) * t.Outputs[ha.FreezeIndex].Value
-		if freeze <= 0 {
-			return
-		}
+		dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
+		if dataIndicator == 1 {
+			var ha HostAnnouncement
+			err := encoding.Unmarshal(t.ArbitraryData[1:], ha)
+			if err != nil {
+				return
+			}
 
-		// Add the host to the host database.
-		host := HostEntry{
-			IPAddress:   ha.IPAddress,
-			MinFilesize: ha.MinFilesize,
-			MaxFilesize: ha.MaxFilesize,
-			MinDuration: ha.MinDuration,
-			MaxDuration: ha.MaxDuration,
-			Frequency:   ha.MaxChallengeFrequency,
-			Tolerance:   ha.MinTolerance,
-			Price:       ha.Price,
-			Burn:        ha.Burn,
-			Freeze:      freeze,
-			CoinAddress: ha.CoinAddress,
-		}
+			// Verify that the host has declared values that are relevant to our
+			// interests.
+			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+				return
+			}
+			if ha.MaxChallengeFrequency > 100 {
+				return
+			}
+			if ha.MinTolerance > 10 {
+				return
+			}
+			freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.Height()) * t.Outputs[ha.FreezeIndex].Value
+			if freeze <= 0 {
+				return
+			}
 
-		// Add the weight of the host to the total weight of the hosts in
-		// the host database.
-		hdb.HostList = append(hdb.HostList, host)
-		hdb.TotalWeight += host.Weight()
+			// Add the host to the host database.
+			host := HostEntry{
+				IPAddress:   ha.IPAddress,
+				MinFilesize: ha.MinFilesize,
+				MaxFilesize: ha.MaxFilesize,
+				MinDuration: ha.MinDuration,
+				MaxDuration: ha.MaxDuration,
+				Frequency:   ha.MaxChallengeFrequency,
+				Tolerance:   ha.MinTolerance,
+				Price:       ha.Price,
+				Burn:        ha.Burn,
+				Freeze:      freeze,
+				CoinAddress: ha.CoinAddress,
+			}
+
+			// Add the weight of the host to the total weight of the hosts in
+			// the host database.
+			e.hostDatabase.HostList = append(e.hostDatabase.HostList, host)
+			e.hostDatabase.TotalWeight += host.Weight()
+		}
 	}
 }
 
@@ -139,6 +141,8 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	return
 }
 
+// SetHostSettings changes the settings according to the input. Need a setter
+// because Environment.host is not exported.
 func (e *Environment) SetHostSettings(ha HostAnnouncement) {
 	e.host.settings = ha
 }
