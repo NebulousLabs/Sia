@@ -2,6 +2,10 @@ package siad
 
 import (
 	"errors"
+	"io"
+	"net"
+	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -15,6 +19,7 @@ type Host struct {
 	Settings HostAnnouncement
 
 	SpaceRemaining uint64
+	index          int
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
@@ -157,7 +162,35 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
 	e.wallet.SignTransaction(&nt)
 
+	// TODO: verify validity of transaction
+
 	return
+}
+
+// NegotiateContract returns an RPC that negotiates a file contract. If the
+// negotiation is successful, the file is downloaded and named according to
+// its hash.
+func (e *Environment) NegotiateContract(conn net.Conn, data []byte) error {
+	// read transaction
+	var t siacore.Transaction
+	if err := encoding.Unmarshal(data, &t); err != nil {
+		return err
+	}
+	// consider contract
+	if _, err := e.considerContract(t); err != nil {
+		_, err = encoding.WriteObject(conn, err.Error())
+		return err
+	} else if _, err := encoding.WriteObject(conn, AcceptContractResponse); err != nil {
+		return err
+	}
+	// read file data
+	file, err := os.Create(strconv.Itoa(e.host.index))
+	if err != nil {
+		return err
+	}
+	e.host.index++
+	_, err = io.Copy(file, conn)
+	return err
 }
 
 func CreateHost() *Host {

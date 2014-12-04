@@ -72,6 +72,7 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 	e.server.Register("AcceptBlock", e.AcceptBlock)
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
 	e.server.Register("SendBlocks", e.SendBlocks)
+	e.server.Register("NegotiateContract", e.NegotiateContract)
 
 	if nobootstrap {
 		e.caughtUpLock.Lock()
