@@ -1,13 +1,23 @@
 package siad
 
 import (
-//"github.com/NebulousLabs/Andromeda/siacore"
+	"errors"
+	"io"
+	"net"
+	"os"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-/*
-// Wallet.ClientFundFileContract() takes a template FileContract and returns a
+const (
+	AcceptContractResponse = "accept"
+)
+
+// ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err error) {
+func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (err error) {
 	// Scan the blockchain for outputs.
 	wallet.Scan()
 
@@ -26,7 +36,7 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 	}
 
 	// Find a host.
-	host, err := r.hostdb.ChooseHost(wallet)
+	host, err := e.hostDatabase.ChooseHost()
 	if err != nil {
 		return
 	}
@@ -36,8 +46,8 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 		ContractFund:       (host.Price + host.Burn) * 5000, // 5000 blocks.
 		FileMerkleRoot:     merkle,
 		FileSize:           uint64(info.Size()),
-		Start:              r.state.Height() + 100,
-		End:                r.state.Height() + 5100,
+		Start:              e.Height() + 100,
+		End:                e.Height() + 5100,
 		ChallengeFrequency: host.Frequency,
 		Tolerance:          host.Tolerance,
 		ValidProofPayout:   host.Price,
@@ -54,11 +64,25 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 		return
 	}
 
-	// Send the contract to the host.
-
-	// after getting a response, sign the reponse transaction and send the
-	// signed transaction to the host along with the file itself.
+	// Negotiate the contract to the host.
+	host.IPAddress.Call(func(conn net.Conn) error {
+		// send contract
+		if _, err := encoding.WriteObject(conn, t); err != nil {
+			return err
+		}
+		// read response
+		var response string
+		if err := encoding.ReadObject(conn, &response, 128); err != nil {
+			return err
+		}
+		if response != AcceptContractResponse {
+			return errors.New(response)
+		}
+		// host accepted, so transmit file data
+		// (no prefix needed, since FileSize is included in the metadata)
+		_, err := io.Copy(conn, file)
+		return err
+	})
 
 	return
 }
-*/
