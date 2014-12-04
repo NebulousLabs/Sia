@@ -260,7 +260,7 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 
 // Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
-func (t *Transaction) OutputID(index int) OutputID {
+func (t Transaction) OutputID(index int) OutputID {
 	return OutputID(hash.HashAll(
 		encoding.Marshal(t),
 		[]byte("coinsend"),
@@ -283,7 +283,7 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 }
 
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
-func (t *Transaction) FileContractID(index int) ContractID {
+func (t Transaction) FileContractID(index int) ContractID {
 	return ContractID(hash.HashAll(
 		encoding.Marshal(t),
 		[]byte("contract"),
