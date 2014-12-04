@@ -36,6 +36,9 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 		return err
 	}
 	defer conn.Close()
+	// set default deadline
+	// note: fn can extend this deadline as needed
+	conn.SetDeadline(time.Now().Add(timeout))
 	return fn(conn)
 }
 
@@ -174,6 +177,11 @@ func (tcps *TCPServer) listen() {
 		if err != nil {
 			return
 		}
+
+		// set default deadline
+		// note: the handler can extend this deadline as needed
+		conn.SetDeadline(time.Now().Add(timeout))
+
 		// it is the handler's responsibility to close the connection
 		go tcps.handleConn(conn)
 	}
