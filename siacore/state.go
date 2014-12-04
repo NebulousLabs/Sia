@@ -193,7 +193,7 @@ func (s *State) CurrentBlock() Block {
 // CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) CurrentBlockWeight() BlockWeight {
-	return BlockWeight(new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(s.currentBlockNode().Target[:])))
+	return s.currentBlockNode().Target.Inverse()
 }
 
 // EarliestLegalTimestamp returns the earliest legal timestamp of the next

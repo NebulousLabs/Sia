@@ -117,7 +117,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 
 // State.childTarget() calculates the proper target of a child node given the
 // parent node, and copies the target into the child node.
-func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target Target) {
+func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) Target {
 	var timePassed, expectedTimePassed Timestamp
 	if newNode.Height < TargetWindow {
 		timePassed = newNode.Block.Timestamp - s.blockRoot.Block.Timestamp
@@ -146,37 +146,16 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) (target T
 		targetAdjustment = MaxAdjustmentDown
 	}
 
-	// Take the target adjustment and apply it to the target slice,
-	// using rational numbers. Truncate the result.
-	oldTarget := new(big.Int).SetBytes(parentNode.Target[:])
-	ratOldTarget := new(big.Rat).SetInt(oldTarget)
-	ratNewTarget := ratOldTarget.Mul(targetAdjustment, ratOldTarget)
-	intNewTarget := new(big.Int).Div(ratNewTarget.Num(), ratNewTarget.Denom())
-	newTargetBytes := intNewTarget.Bytes()
-
-	// Set the new target - target cannot have more than 32 bytes.
-	offset := len(target[:]) - len(newTargetBytes)
-	if offset < 0 {
-		for i := range target {
-			target[i] = 255
-		}
-	} else {
-		copy(target[offset:], newTargetBytes)
-	}
-	return
+	newTarget := new(big.Rat).Mul(parentNode.Target.Rat(), targetAdjustment)
+	return RatToTarget(newTarget)
 }
 
 // State.childDepth() returns the cumulative weight of all the blocks leading
 // up to and including the child block.
+// childDepth := (1/parentTarget + 1/parentDepth)^-1
 func (s *State) childDepth(parentNode *BlockNode) (depth Target) {
-	blockWeight := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Target[:]))
-	ratParentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(parentNode.Depth[:]))
-	ratChildDepth := new(big.Rat).Add(ratParentDepth, blockWeight)
-	intChildDepth := new(big.Int).Div(ratChildDepth.Denom(), ratChildDepth.Num())
-	bytesChildDepth := intChildDepth.Bytes()
-	offset := len(depth[:]) - len(bytesChildDepth[:])
-	copy(depth[offset:], bytesChildDepth[:])
-	return
+	cumulativeDifficulty := new(big.Rat).Add(parentNode.Target.Inverse(), parentNode.Depth.Inverse())
+	return RatToTarget(new(big.Rat).Inv(cumulativeDifficulty))
 }
 
 // State.addBlockToTree() takes a block and a parent node, and adds a child
@@ -202,15 +181,14 @@ func (s *State) addBlockToTree(parentNode *BlockNode, b *Block) (newNode *BlockN
 	return
 }
 
-// State.heavierFork() returns ture if the input node is 5% heavier than the
-// current node of the ConesnsusState.
+// State.heavierFork() returns true if the input node is 5% heavier than the
+// current node of the ConsensusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
 	threshold := new(big.Rat).Mul(s.CurrentBlockWeight(), SurpassThreshold)
-	sdepth := s.Depth()
-	currentDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(sdepth[:]))
-	requiredDepth := new(big.Rat).Add(currentDepth, threshold)
-	newNodeDepth := new(big.Rat).SetFrac(big.NewInt(1), new(big.Int).SetBytes(newNode.Depth[:]))
-	return newNodeDepth.Cmp(requiredDepth) == 1
+	currentCumDiff := s.Depth().Inverse()
+	requiredCumDiff := new(big.Rat).Add(currentCumDiff, threshold)
+	newNodeCumDiff := newNode.Depth.Inverse()
+	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
 }
 
 // State.rewindABlock() removes the most recent block from the ConsensusState,
