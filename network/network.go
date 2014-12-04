@@ -89,7 +89,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	// populate initial peer list
 	for _, addr := range BootstrapPeers {
 		if tcps.Ping(addr) {
-			tcps.addressbook[addr] = struct{}{}
+			tcps.AddPeer(addr)
 		}
 	}
 	if len(tcps.addressbook) == 0 {

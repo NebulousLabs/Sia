@@ -325,7 +325,7 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 
 // ContractTerminationOutputID() returns the ID of a contract termination
 // output, given the id of the contract and the status of the termination.
-func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
+func ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
 	return OutputID(hash.HashAll(
 		fcID[:],
 		terminationString(successfulTermination),
