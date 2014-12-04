@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/network"
@@ -12,13 +13,15 @@ import (
 )
 
 type HostDatabase struct {
-	State       *siacore.State
 	HostList    []HostEntry
 	TotalWeight siacore.Currency
+	sync.RWMutex
 }
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
+//
+// TODO: Change Min+Max ChallengeFrequency to Smallest+Largest ChallengeWindow.
 type HostAnnouncement struct {
 	IPAddress             network.NetAddress
 	MinFilesize           uint64
@@ -30,7 +33,7 @@ type HostAnnouncement struct {
 	MinTolerance          uint64
 	Price                 siacore.Currency
 	Burn                  siacore.Currency
-	CoinAddress           siacore.CoinAddress
+	CoinAddress           siacore.CoinAddress // Might be unneeded.
 
 	SpendConditions siacore.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
@@ -52,6 +55,11 @@ type HostEntry struct {
 	CoinAddress siacore.CoinAddress
 }
 
+func CreateHostDatabase() (hdb *HostDatabase) {
+	hdb = new(HostDatabase)
+	return
+}
+
 // host.Weight() determines the weight of a specific host.
 func (h *HostEntry) Weight() siacore.Currency {
 	adjustedBurn := math.Sqrt(float64(h.Burn))
@@ -60,60 +68,62 @@ func (h *HostEntry) Weight() siacore.Currency {
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database.
-func (hdb *HostDatabase) scanAndApplyHosts(t *siacore.Transaction) {
-	// Check the arbitrary data of the transaction to fill out the host database.
-	if len(t.ArbitraryData) < 8 {
-		return
-	}
-
-	dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
-	if dataIndicator == 1 {
-		var ha HostAnnouncement
-		err := encoding.Unmarshal(t.ArbitraryData[1:], ha)
-		if err != nil {
+func (e *Environment) updateHostDB(b siacore.Block) {
+	for _, t := range b.Transactions {
+		// Check the arbitrary data of the transaction to fill out the host database.
+		if len(t.ArbitraryData) < 8 {
 			return
 		}
 
-		// Verify that the host has declared values that are relevant to our
-		// interests.
-		if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
-			return
-		}
-		if ha.MaxChallengeFrequency > 100 {
-			return
-		}
-		if ha.MinTolerance > 10 {
-			return
-		}
-		freeze := siacore.Currency(ha.SpendConditions.TimeLock-hdb.State.Height()) * t.Outputs[ha.FreezeIndex].Value
-		if freeze <= 0 {
-			return
-		}
+		dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
+		if dataIndicator == 1 {
+			var ha HostAnnouncement
+			err := encoding.Unmarshal(t.ArbitraryData[8:], &ha)
+			if err != nil {
+				return
+			}
 
-		// Add the host to the host database.
-		host := HostEntry{
-			IPAddress:   ha.IPAddress,
-			MinFilesize: ha.MinFilesize,
-			MaxFilesize: ha.MaxFilesize,
-			MinDuration: ha.MinDuration,
-			MaxDuration: ha.MaxDuration,
-			Frequency:   ha.MaxChallengeFrequency,
-			Tolerance:   ha.MinTolerance,
-			Price:       ha.Price,
-			Burn:        ha.Burn,
-			Freeze:      freeze,
-			CoinAddress: ha.CoinAddress,
-		}
+			// Verify that the host has declared values that are relevant to our
+			// interests.
+			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+				return
+			}
+			if ha.MaxChallengeFrequency > 100 {
+				return
+			}
+			if ha.MinTolerance > 10 {
+				return
+			}
+			freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.Height()) * t.Outputs[ha.FreezeIndex].Value
+			if freeze <= 0 {
+				return
+			}
 
-		// Add the weight of the host to the total weight of the hosts in
-		// the host database.
-		hdb.HostList = append(hdb.HostList, host)
-		hdb.TotalWeight += host.Weight()
+			// Add the host to the host database.
+			host := HostEntry{
+				IPAddress:   ha.IPAddress,
+				MinFilesize: ha.MinFilesize,
+				MaxFilesize: ha.MaxFilesize,
+				MinDuration: ha.MinDuration,
+				MaxDuration: ha.MaxDuration,
+				Frequency:   ha.MaxChallengeFrequency,
+				Tolerance:   ha.MinTolerance,
+				Price:       ha.Price,
+				Burn:        ha.Burn,
+				Freeze:      freeze,
+				CoinAddress: ha.CoinAddress,
+			}
+
+			// Add the weight of the host to the total weight of the hosts in
+			// the host database.
+			e.hostDatabase.HostList = append(e.hostDatabase.HostList, host)
+			e.hostDatabase.TotalWeight += host.Weight()
+		}
 	}
 }
 
 // ChooseHost orders the hosts by weight and picks one at random.
-func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
+func (hdb *HostDatabase) ChooseHost() (h HostEntry, err error) {
 	if len(hdb.HostList) == 0 {
 		err = errors.New("no hosts found")
 		return
@@ -131,14 +141,11 @@ func (hdb *HostDatabase) ChooseHost(wallet *Wallet) (h HostEntry, err error) {
 	randWeight := siacore.Currency(randInt.Int64())
 	weightPassed := siacore.Currency(0)
 	var i int
-	for i = 0; randWeight >= weightPassed; i++ {
+	for i = 0; randWeight > weightPassed; i++ {
 		weightPassed += hdb.HostList[i].Weight()
 	}
+	i -= 1
 
 	h = hdb.HostList[i]
 	return
-}
-
-func (e *Environment) SetHostSettings(ha HostAnnouncement) {
-	e.host.settings = ha
 }

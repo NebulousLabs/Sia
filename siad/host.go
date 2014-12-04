@@ -12,15 +12,21 @@ const (
 )
 
 type Host struct {
-	settings HostAnnouncement
+	Settings HostAnnouncement
 
-	spaceRemaining int64
+	SpaceRemaining int64
+}
+
+// SetHostSettings changes the settings according to the input. Need a setter
+// because Environment.host is not exported.
+func (e *Environment) SetHostSettings(ha HostAnnouncement) {
+	e.host.Settings = ha
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
 func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency) (t siacore.Transaction, err error) {
-	info := e.host.settings
+	info := e.host.Settings
 
 	// Fund the transaction.
 	err = e.wallet.FundTransaction(freezeVolume+minerFee, &t)
@@ -34,6 +40,8 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	// Add the output with the freeze volume.
 	freezeConditions := e.wallet.SpendConditions
 	freezeConditions.TimeLock = freezeUnlockHeight
+	info.FreezeIndex = uint64(len(t.Outputs))
+	info.SpendConditions = freezeConditions
 	t.Outputs = append(t.Outputs, siacore.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
 
 	// Frozen money can't currently be recovered.
@@ -45,15 +53,15 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 			w.OpenFreezeConditions[freezeUnlockHeight] = 1
 		}
 	*/
-	info.SpendConditions = freezeConditions
-	info.FreezeIndex = 0
 
 	// Add the announcement as arbitrary data.
 	prefixBytes := encoding.Marshal(HostAnnouncementPrefix)
 	announcementBytes := encoding.Marshal(info)
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
-	// TODO: send down a channel
+	// Sign the transaction.
+	e.wallet.SignTransaction(&t)
+
 	err = e.AcceptTransaction(t)
 	if err != nil {
 		return

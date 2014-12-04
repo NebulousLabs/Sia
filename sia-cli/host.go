@@ -9,10 +9,6 @@ import (
 
 // Pulls a bunch of information and announces the host to the network.
 func becomeHostWalkthrough(e *siad.Environment) (err error) {
-	// Get a volume of days to freeze the coins.
-	// Burn will be equal to price.
-	// Frequency will be 100.
-
 	// Get a volume of storage to sell.
 	fmt.Print("Amount of storage to sell (in MB): ")
 	var storage uint64
@@ -37,6 +33,7 @@ func becomeHostWalkthrough(e *siad.Environment) (err error) {
 		return
 	}
 
+	// Get a lenght of time to freeze the coins.
 	fmt.Print("How many blocks to freeze the coins (more is better): ")
 	var freezeBlocks uint64
 	_, err = fmt.Scanln(&freezeBlocks)

@@ -34,6 +34,27 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 		te.t.Fatal(err)
 	}
 
+	// Create host settings for each environment.
+	defaultSettings := HostAnnouncement{
+		MinFilesize:           1024,
+		MaxFilesize:           1024 * 1024,
+		MinDuration:           10,
+		MaxDuration:           1000,
+		MinChallengeFrequency: 1000,
+		MaxChallengeFrequency: 20,
+		MinTolerance:          5,
+		Price:                 5,
+		Burn:                  5,
+	}
+
+	// Create some host settings.
+	te.e0.host.Settings = defaultSettings
+	te.e0.host.Settings.IPAddress = network.NetAddress{"localhost", 9988}
+	te.e0.host.Settings.CoinAddress = te.e0.CoinAddress()
+	te.e1.host.Settings = defaultSettings
+	te.e1.host.Settings.IPAddress = network.NetAddress{"localhost", 9989}
+	te.e1.host.Settings.CoinAddress = te.e1.CoinAddress()
+
 	// Give some funds to e0 and e1.
 	te.e0.mineSingleBlock()
 	te.e1.mineSingleBlock()
@@ -62,5 +83,6 @@ func TestSiad(t *testing.T) {
 		testDualMining(te)
 		testTransactionSending(te)
 		testLargeTransactions(te)
+		testHostDatabase(te)
 	}
 }

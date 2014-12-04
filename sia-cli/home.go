@@ -13,7 +13,7 @@ func displayHomeHelp() {
 		" h:\tHelp - display this message\n",
 		"q:\tQuit - quit the program\n",
 		"c:\tCatch Up - collect blocks you are missing.\n",
-		// "H:\tHost - become a host and announce to the network\n",
+		"H:\tHost - become a host and announce to the network\n",
 		"L:\tLoad - load a secret key or coin address.\n",
 		"m:\tMine - turn mining on or off\n",
 		"p\tPrint - list all of the wallets, plus some stats about the program.\n",
@@ -55,10 +55,8 @@ func pollHome(e *siad.Environment) {
 				}
 			}()
 
-		/*
-			case "H", "host", "store", "advertise", "storage":
-				err = becomeHostWalkthrough(e)
-		*/
+		case "H", "host", "store", "advertise", "storage":
+			err = becomeHostWalkthrough(e)
 
 		case "L", "load":
 			err = loadWalkthrough(e)

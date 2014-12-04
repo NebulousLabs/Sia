@@ -4,10 +4,6 @@ import (
 //"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-type Renter struct {
-	hostdb HostDatabase
-}
-
 /*
 // Wallet.ClientFundFileContract() takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
@@ -66,7 +62,3 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 	return
 }
 */
-
-func CreateRenter() *Renter {
-	return new(Renter)
-}

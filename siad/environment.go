@@ -19,10 +19,10 @@ type Environment struct {
 	caughtUp     bool // False while downloading blocks.
 	caughtUpLock sync.Mutex
 
-	host   *Host
-	miner  *Miner
-	renter *Renter
-	wallet *Wallet
+	host         *Host
+	hostDatabase *HostDatabase
+	miner        *Miner
+	wallet       *Wallet
 
 	friends map[string]siacore.CoinAddress
 
@@ -50,7 +50,7 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
 	e.host = CreateHost()
-	e.renter = CreateRenter()
+	e.hostDatabase = CreateHostDatabase()
 
 	return
 }
@@ -148,6 +148,12 @@ func (e *Environment) processBlock(b siacore.Block) {
 		return
 	}
 
+	// TODO: once a block has been moved into the host db, it doesn't come out.
+	// But the host db should reverse when there are reorgs.
+	e.hostDatabase.Lock()
+	e.updateHostDB(b)
+	e.hostDatabase.Unlock()
+
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
 }
@@ -170,8 +176,6 @@ func (e *Environment) processTransaction(t siacore.Transaction) {
 
 	// Broadcast all valid transactions.
 	go e.server.Broadcast("AcceptTransaction", t, nil)
-
-	// Pass all valid transactions to the host database.
 }
 
 // listen waits until a new block or transaction arrives, then attempts to
