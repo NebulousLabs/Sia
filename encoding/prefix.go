@@ -37,7 +37,7 @@ func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 }
 
 // ReadObject reads and decodes a length-prefixed and marshalled object.
-func ReadObject(r io.Reader, maxLen uint64, obj interface{}) error {
+func ReadObject(r io.Reader, obj interface{}, maxLen uint64) error {
 	data, err := ReadPrefix(r, maxLen)
 	if err != nil {
 		return err

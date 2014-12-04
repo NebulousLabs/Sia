@@ -30,7 +30,7 @@ func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 			return err
 		}
 		if resp != nil {
-			return encoding.ReadObject(conn, maxMsgLen, resp)
+			return encoding.ReadObject(conn, resp, maxMsgLen)
 		}
 		return nil
 	})
