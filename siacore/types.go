@@ -174,7 +174,7 @@ func (b Block) TransactionMerkleRoot() hash.Hash {
 // SubisdyID() returns the id of the output created by the block subsidy.
 func (b Block) SubsidyID() OutputID {
 	bid := b.ID()
-	return OutputID(hash.HashBytes(append(bid[:], []byte("blockreward")...)))
+	return OutputID(hash.HashBytes(append(bid[:], "blockreward"...)))
 }
 
 // SigHash returns the hash of a transaction for a specific index.
@@ -223,18 +223,22 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 // Transaction.OuptutID() takes the index of the output and returns the
 // output's ID.
 func (t *Transaction) OutputID(index int) OutputID {
-	return OutputID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("coinsend"), encoding.Marshal(uint64(index))...)...)))
+	return OutputID(hash.HashAll(
+		encoding.Marshal(t),
+		[]byte("coinsend"),
+		encoding.Marshal(index),
+	))
 }
 
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
 // SpendConditions object, using the timelock, number of signatures required,
 // and each public key as leaves.
 func (sc *SpendConditions) CoinAddress() CoinAddress {
-	tlHash := hash.HashBytes(encoding.Marshal(sc.TimeLock))
-	nsHash := hash.HashBytes(encoding.Marshal(sc.NumSignatures))
+	tlHash := hash.HashObject(sc.TimeLock)
+	nsHash := hash.HashObject(sc.NumSignatures)
 	pkHashes := make([]hash.Hash, len(sc.PublicKeys))
 	for i := range sc.PublicKeys {
-		pkHashes[i] = hash.HashBytes(encoding.Marshal(sc.PublicKeys[i]))
+		pkHashes[i] = hash.HashObject(sc.PublicKeys[i])
 	}
 	leaves := append([]hash.Hash{tlHash, nsHash}, pkHashes...)
 	return CoinAddress(hash.MerkleRoot(leaves))
@@ -242,7 +246,11 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
 func (t *Transaction) FileContractID(index int) ContractID {
-	return ContractID(hash.HashBytes(append(encoding.Marshal(t), append([]byte("contract"), encoding.Marshal(uint64(index))...)...)))
+	return ContractID(hash.HashAll(
+		encoding.Marshal(t),
+		[]byte("contract"),
+		encoding.Marshal(index),
+	))
 }
 
 // WindowIndex returns the index of the challenge window that is
@@ -251,9 +259,9 @@ func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight
 	if height < fc.Start {
 		err = errors.New("height below start point")
 		return
-	}
-	if height >= fc.End {
+	} else if height >= fc.End {
 		err = errors.New("height above end point")
+		return
 	}
 
 	windowIndex = (height - fc.Start) / fc.ChallengeFrequency
@@ -269,15 +277,21 @@ func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight
 		return
 	}
 
-	outputID = OutputID(hash.HashBytes(append(fcID[:], append(proofString, encoding.Marshal(windowIndex)...)...)))
+	outputID = OutputID(hash.HashAll(
+		fcID[:],
+		proofString,
+		encoding.Marshal(windowIndex),
+	))
 	return
 }
 
 // ContractTerminationOutputID() returns the ID of a contract termination
 // output, given the id of the contract and the status of the termination.
 func (fc *FileContract) ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
-	terminationString := terminationString(successfulTermination)
-	return OutputID(hash.HashBytes(append(fcID[:], terminationString...)))
+	return OutputID(hash.HashAll(
+		fcID[:],
+		terminationString(successfulTermination),
+	))
 }
 
 // proofString() returns the string to be used when generating the output id of

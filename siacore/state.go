@@ -7,7 +7,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
 )
 
@@ -264,16 +263,14 @@ func (s *State) StateHash() hash.Hash {
 	// 9. OpenContracts, sorted by id.
 
 	// Create a slice of hashes representing all items of interest.
-	var leaves []hash.Hash
-	leaves = append(
-		leaves,
+	leaves := []hash.Hash{
 		hash.Hash(s.currentBlockID),
-		hash.HashBytes(encoding.Marshal(s.Height())),
-		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Target)),
-		hash.HashBytes(encoding.Marshal(s.currentBlockNode().Depth)),
-		hash.HashBytes(encoding.Marshal(s.currentBlockNode().earliestLegalChildTimestamp())),
+		hash.HashObject(s.Height()),
+		hash.HashObject(s.currentBlockNode().Target),
+		hash.HashObject(s.currentBlockNode().Depth),
+		hash.HashObject(s.currentBlockNode().earliestLegalChildTimestamp()),
 		hash.Hash(s.blockRoot.Block.ID()),
-	)
+	}
 
 	// Add all the blocks in the current path.
 	for i := 0; i < len(s.currentPath); i++ {
@@ -285,7 +282,7 @@ func (s *State) StateHash() hash.Hash {
 
 	// Add the unspent outputs in sorted order.
 	for _, outputID := range sortedUtxos {
-		leaves = append(leaves, hash.HashBytes(encoding.Marshal(s.unspentOutputs[outputID])))
+		leaves = append(leaves, hash.HashObject(s.unspentOutputs[outputID]))
 	}
 
 	// Sort the open contracts by the string value of their ID.
@@ -298,8 +295,8 @@ func (s *State) StateHash() hash.Hash {
 	// Add the open contracts in sorted order.
 	for _, stringContractID := range openContractStrings {
 		var contractID ContractID
-		copy(contractID[:], []byte(stringContractID))
-		leaves = append(leaves, hash.HashBytes(encoding.Marshal(s.openContracts[contractID])))
+		copy(contractID[:], stringContractID)
+		leaves = append(leaves, hash.HashObject(s.openContracts[contractID]))
 	}
 
 	return hash.MerkleRoot(leaves)
