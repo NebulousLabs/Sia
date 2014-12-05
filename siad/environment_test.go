@@ -74,11 +74,11 @@ func TestSiad(t *testing.T) {
 	siacore.MaxAdjustmentDown = big.NewRat(999, 1000)
 	siacore.DEBUG = true
 
-	// Create the testing environment.
-	te := establishTestingEnvironment(t)
-
-	// Perform a series of tests using the environment.
 	if !testing.Short() {
+		// Create the testing environment.
+		te := establishTestingEnvironment(t)
+
+		// Perform a series of tests using the environment.
 		testToggleMining(te)
 		testDualMining(te)
 		testTransactionSending(te)

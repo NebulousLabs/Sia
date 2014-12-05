@@ -38,6 +38,7 @@ func (m *Miner) blockForWork() (b *siacore.Block, target siacore.Target) {
 		MinerAddress:  m.subsidyAddress,
 		Transactions:  m.state.TransactionPoolDump(),
 	}
+
 	// Fudge the timestamp if the block would otherwise be illegal.
 	if b.Timestamp < m.state.EarliestLegalTimestamp() {
 		b.Timestamp = m.state.EarliestLegalTimestamp()
