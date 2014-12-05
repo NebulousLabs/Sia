@@ -184,10 +184,7 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore
 	}
 
 	// Send the transaction to the environment.
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
 	return
 }

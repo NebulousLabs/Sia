@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
@@ -24,6 +25,8 @@ type Host struct {
 
 	Files map[hash.Hash]string
 	index int
+
+	sync.Mutex
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
@@ -71,10 +74,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	// Sign the transaction.
 	e.wallet.SignTransaction(&t)
 
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
 	// TODO: Have a different method for setting max filesize.
 	e.host.SpaceRemaining = e.host.Settings.MaxFilesize
@@ -166,7 +166,14 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
 	e.wallet.SignTransaction(&nt)
 
-	// TODO: verify validity of transaction
+	// Check that the transaction is valid after the host signature.
+	e.state.Lock()
+	err = e.state.ValidTransaction(nt)
+	e.state.Unlock()
+	if err != nil {
+		err = errors.New("post-verified transaction not valid - most likely a client error, but could be a host error too")
+		return
+	}
 
 	return
 }
@@ -201,12 +208,9 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	e.host.index++
 
 	// Submit the transaction.
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
-	// TODO: Put the contract in a list where the host will be performing
+	//TODO: Put the contract in a list where the host will be performing
 	// proofs of storage.
 
 	return

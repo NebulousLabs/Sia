@@ -119,23 +119,21 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 
 // AcceptBlock sends the input block down a channel, where it will be dealt
 // with by the Environment's listener.
-func (e *Environment) AcceptBlock(b siacore.Block) error {
+func (e *Environment) AcceptBlock(b siacore.Block) {
 	e.blockChan <- b
-	return nil
 }
 
 // AcceptTransaction sends the input transaction down a channel, where it will
 // be dealt with by the Environment's listener.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
+func (e *Environment) AcceptTransaction(t siacore.Transaction) {
 	e.transactionChan <- t
-	return nil
 }
 
 // processBlock is called by the environment's listener.
 func (e *Environment) processBlock(b siacore.Block) {
 	// Pass the block to the state.
 	e.state.Lock()
-	err := e.state.AcceptBlock(b)
+	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 	e.state.Unlock()
 
 	// Perform error handling.
@@ -160,8 +158,12 @@ func (e *Environment) processBlock(b siacore.Block) {
 	// TODO: once a block has been moved into the host db, it doesn't come out.
 	// But the host db should reverse when there are reorgs.
 	e.hostDatabase.Lock()
-	e.updateHostDB(b)
+	e.updateHostDB(rewoundBlocks, appliedBlocks)
 	e.hostDatabase.Unlock()
+
+	e.host.Lock()
+	e.storageProofMaintenance(rewoundBlocks, appliedBlocks)
+	e.host.Unlock()
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
