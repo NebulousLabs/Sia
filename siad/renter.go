@@ -1,15 +1,33 @@
 package siad
 
 import (
-//"github.com/NebulousLabs/Andromeda/siacore"
+	"errors"
+	"io"
+	"net"
+	"os"
+
+	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-/*
-// Wallet.ClientFundFileContract() takes a template FileContract and returns a
+// FileEntry will eventually have all the information for tracking an encrypted
+// and erasure coded file across many hosts. Right now it just points to a
+// single host which has the whole file.
+type FileEntry struct {
+	Host     HostEntry            // Where to find the file.
+	Contract siacore.FileContract // The contract being enforced.
+}
+
+type Renter struct {
+	Files map[string]FileEntry
+}
+
+// ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err error) {
+func (e *Environment) ClientProposeContract(filename string) (err error) {
 	// Scan the blockchain for outputs.
-	wallet.Scan()
+	e.wallet.Scan()
 
 	// Open the file, create a merkle hash.
 	file, err := os.Open(filename)
@@ -26,7 +44,7 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 	}
 
 	// Find a host.
-	host, err := r.hostdb.ChooseHost(wallet)
+	host, err := e.hostDatabase.ChooseHost()
 	if err != nil {
 		return
 	}
@@ -36,8 +54,8 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 		ContractFund:       (host.Price + host.Burn) * 5000, // 5000 blocks.
 		FileMerkleRoot:     merkle,
 		FileSize:           uint64(info.Size()),
-		Start:              r.state.Height() + 100,
-		End:                r.state.Height() + 5100,
+		Start:              e.Height() + 100,
+		End:                e.Height() + 5100,
 		ChallengeFrequency: host.Frequency,
 		Tolerance:          host.Tolerance,
 		ValidProofPayout:   host.Price,
@@ -49,16 +67,68 @@ func (r *Renter) ClientProposeContract(filename string, wallet *Wallet) (err err
 	// Fund the client portion of the transaction.
 	var t siacore.Transaction
 	t.FileContracts = append(t.FileContracts, fileContract)
-	err = wallet.FundTransaction(host.Price*5000, &t)
+	err = e.wallet.FundTransaction(host.Price*5000, &t)
 	if err != nil {
 		return
 	}
 
-	// Send the contract to the host.
+	// Negotiate the contract to the host.
+	err = host.IPAddress.Call(func(conn net.Conn) error {
+		// send contract
+		if _, err := encoding.WriteObject(conn, t); err != nil {
+			return err
+		}
+		// read response
+		var response string
+		if err := encoding.ReadObject(conn, &response, 128); err != nil {
+			return err
+		}
+		if response != AcceptContractResponse {
+			return errors.New(response)
+		}
+		// host accepted, so transmit file data
+		// (no prefix needed, since FileSize is included in the metadata)
+		_, err := io.Copy(conn, file)
+		return err
+	})
+	if err != nil {
+		return
+	}
 
-	// after getting a response, sign the reponse transaction and send the
-	// signed transaction to the host along with the file itself.
+	// Record the file in to the renter database.
+	e.renter.Files[filename] = FileEntry{
+		Host:     host,
+		Contract: fileContract,
+	}
 
 	return
 }
-*/
+
+// Download requests a file from the host it was stored with, and downloads it
+// into the specified filename.
+func (e *Environment) Download(filename string) (err error) {
+	fe, ok := e.renter.Files[filename]
+	if !ok {
+		return errors.New("no file entry for file: " + filename)
+	}
+	return fe.Host.IPAddress.Call(func(conn net.Conn) error {
+		// send filehash
+		if _, err := encoding.WriteObject(conn, fe.Contract.FileMerkleRoot); err != nil {
+			return err
+		}
+		// TODO: read error
+		// copy response into file
+		file, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(file, conn)
+		return err
+	})
+}
+
+func CreateRenter() (r *Renter) {
+	r = new(Renter)
+	r.Files = make(map[string]FileEntry)
+	return
+}

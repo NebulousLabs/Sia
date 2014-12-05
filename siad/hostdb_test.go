@@ -10,21 +10,21 @@ func testHostDatabase(te *testEnv) {
 	e1OldEntryCount := len(te.e1.hostDatabase.HostList)
 
 	// Check that each wallet has sufficient balance.
-	if te.e0.WalletBalance() < 212 {
+	if te.e0.WalletBalance() < 112 {
 		te.t.Error("insufficient e0 balance:", te.e0.WalletBalance())
 	}
 	// Check that each wallet has sufficient balance.
-	if te.e1.WalletBalance() < 116 {
+	if te.e1.WalletBalance() < 216 {
 		te.t.Error("insufficient e1 balance:", te.e0.WalletBalance())
 	}
 
 	// Create transactions which add hosts to the hostdb.
-	_, err := te.e0.HostAnnounceSelf(200, te.e0.Height()+1200, 12)
+	_, err := te.e0.HostAnnounceSelf(100, te.e0.Height()+1200, 12)
 	if err != nil {
 		te.t.Error(err)
 		return
 	}
-	_, err = te.e1.HostAnnounceSelf(100, te.e1.Height()+1200, 16)
+	_, err = te.e1.HostAnnounceSelf(200, te.e1.Height()+1200, 16)
 	if err != nil {
 		te.t.Error(err)
 		return
@@ -69,7 +69,7 @@ func testHostDatabase(te *testEnv) {
 		}
 	}
 
-	if e0Picks <= e1Picks {
+	if e0Picks >= e1Picks {
 		te.t.Error("e0Picks is not being favored!")
 	}
 }

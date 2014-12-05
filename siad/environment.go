@@ -22,6 +22,7 @@ type Environment struct {
 	host         *Host
 	hostDatabase *HostDatabase
 	miner        *Miner
+	renter       *Renter
 	wallet       *Wallet
 
 	friends map[string]siacore.CoinAddress
@@ -51,6 +52,7 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
 	e.host = CreateHost()
 	e.hostDatabase = CreateHostDatabase()
+	e.renter = CreateRenter()
 
 	return
 }
@@ -72,6 +74,8 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 	e.server.Register("AcceptBlock", e.AcceptBlock)
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
 	e.server.Register("SendBlocks", e.SendBlocks)
+	e.server.Register("NegotiateContract", e.NegotiateContract)
+	e.server.Register("RetrieveFile", e.RetrieveFile)
 
 	if nobootstrap {
 		e.caughtUpLock.Lock()
