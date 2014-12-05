@@ -13,6 +13,7 @@ import (
 
 const (
 	HostAnnouncementPrefix = uint64(1)
+	AcceptContractResponse = "accept"
 )
 
 type Host struct {
@@ -168,28 +169,41 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 }
 
 // NegotiateContract returns an RPC that negotiates a file contract. If the
-// negotiation is successful, the file is downloaded and named according to
-// its hash.
-func (e *Environment) NegotiateContract(conn net.Conn, data []byte) error {
+// negotiation is successful, the file is downloaded and the host begins
+// submitting proofs of storage.
+func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) {
 	// read transaction
 	var t siacore.Transaction
-	if err := encoding.Unmarshal(data, &t); err != nil {
-		return err
+	if err = encoding.Unmarshal(data, &t); err != nil {
+		return
 	}
 	// consider contract
-	if _, err := e.considerContract(t); err != nil {
+	if t, err = e.considerContract(t); err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
-		return err
-	} else if _, err := encoding.WriteObject(conn, AcceptContractResponse); err != nil {
-		return err
+		return
+	} else if _, err = encoding.WriteObject(conn, AcceptContractResponse); err != nil {
+		return
 	}
 	// read file data
 	file, err := os.Create(strconv.Itoa(e.host.index))
 	if err != nil {
-		return err
+		return
 	}
 	e.host.index++
 	_, err = io.Copy(file, conn)
+	if err != nil {
+		return
+	}
+
+	// Submit the transaction.
+	err = e.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
+
+	// TODO: Put the contract in a list where the host will be performing
+	// proofs of storage.
+
 	return err
 }
 

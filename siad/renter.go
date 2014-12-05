@@ -11,9 +11,17 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-const (
-	AcceptContractResponse = "accept"
-)
+// FileEntry will eventually have all the information for tracking an encrypted
+// and erasure coded file across many hosts. Right now it just points to a
+// single host which has the whole file.
+type FileEntry struct {
+	Host     HostEntry            // Where to find the file.
+	Contract siacore.FileContract // The contract being enforced.
+}
+
+type Renter struct {
+	Files map[string]FileEntry
+}
 
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
@@ -65,7 +73,7 @@ func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (er
 	}
 
 	// Negotiate the contract to the host.
-	host.IPAddress.Call(func(conn net.Conn) error {
+	err = host.IPAddress.Call(func(conn net.Conn) error {
 		// send contract
 		if _, err := encoding.WriteObject(conn, t); err != nil {
 			return err
@@ -84,5 +92,23 @@ func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (er
 		return err
 	})
 
+	// TODO: Will sending a file always return an error, or will it be nil if
+	// everthing goes alright?
+	if err != nil {
+		return
+	}
+
+	// Record the file in to the renter database.
+	e.renter.Files[filename] = FileEntry{
+		Host:     host,
+		Contract: fileContract,
+	}
+
+	return
+}
+
+func CreateRenter() (r *Renter) {
+	r = new(Renter)
+	r.Files = make(map[string]FileEntry)
 	return
 }
