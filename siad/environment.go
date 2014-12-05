@@ -80,6 +80,7 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 	e.server.Register("AcceptTransaction", e.AcceptTransaction)
 	e.server.Register("SendBlocks", e.SendBlocks)
 	e.server.Register("NegotiateContract", e.NegotiateContract)
+	e.server.Register("RetrieveFile", e.RetrieveFile)
 
 	// Get a peer to download the blockchain from.
 	randomPeer := e.server.RandomPeer()
