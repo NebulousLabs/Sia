@@ -103,12 +103,12 @@ type TransactionSignature struct {
 type CoveredFields struct {
 	WholeTransaction bool
 	ArbitraryData    bool
-	MinerFees        []uint8 // each element indicates an index which is signed.
-	Inputs           []uint8
-	Outputs          []uint8
-	Contracts        []uint8
-	StorageProofs    []uint8
-	Signatures       []uint8
+	MinerFees        []uint64 // each element indicates an index which is signed.
+	Inputs           []uint64
+	Outputs          []uint64
+	Contracts        []uint64
+	StorageProofs    []uint64
+	Signatures       []uint64
 }
 
 // A StorageProof contains the fields needed for a host to prove that they are

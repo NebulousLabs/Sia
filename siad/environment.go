@@ -119,14 +119,16 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 
 // AcceptBlock sends the input block down a channel, where it will be dealt
 // with by the Environment's listener.
-func (e *Environment) AcceptBlock(b siacore.Block) {
+func (e *Environment) AcceptBlock(b siacore.Block) error {
 	e.blockChan <- b
+	return nil
 }
 
 // AcceptTransaction sends the input transaction down a channel, where it will
 // be dealt with by the Environment's listener.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) {
+func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 	e.transactionChan <- t
+	return nil
 }
 
 // processBlock is called by the environment's listener.
@@ -167,7 +169,6 @@ func (e *Environment) processBlock(b siacore.Block) {
 	e.updateHostDB(rewoundBlocks, appliedBlocks)
 
 	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
-	e.host.Unlock()
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)

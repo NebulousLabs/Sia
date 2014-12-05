@@ -340,8 +340,19 @@ func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, r
 
 	}
 
-	txn := siacore.Transaction{
-		StorageProofs: proofs,
+	if len(proofs) != 0 {
+		txn := siacore.Transaction{
+			MinerFees:     []siacore.Currency{10},
+			StorageProofs: proofs,
+		}
+		err := e.wallet.FundTransaction(10, &txn)
+		if err != nil {
+			panic(err) // panic is not the best move here, but some sort of urgent logging would be good.
+		}
+		err = e.wallet.SignTransaction(&txn)
+		if err != nil {
+			panic(err)
+		}
+		e.AcceptTransaction(txn)
 	}
-	e.AcceptTransaction(txn)
 }

@@ -44,6 +44,10 @@ func (s *State) addTransactionToPool(t *Transaction) {
 
 	// Safety check - there must be no conflict with any inputs that exists in
 	// the transaciton list.
+	if len(t.Inputs) == 0 {
+		panic("transaction must have an input?")
+		return
+	}
 	_, exists := s.transactionList[t.Inputs[0].OutputID]
 	if exists {
 		panic("tring to add an in-conflict transaction to the transaction list")
