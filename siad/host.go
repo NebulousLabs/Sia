@@ -26,6 +26,9 @@ type Host struct {
 	Files map[hash.Hash]string
 	index int
 
+	forwardContracts  map[siacore.BlockHeight]*siacore.FileContract
+	backwardContracts map[siacore.BlockHeight]*siacore.FileContract
+
 	sync.Mutex
 }
 
@@ -199,10 +202,32 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	_, err = io.Copy(file, conn)
 	if err != nil {
 		return
 	}
+
+	// Check that the file matches the merkle root in the contract.
+	_, err = file.Seek(0,0)
+	if err != nil {
+		return
+	}
+	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(uint64(t.FileContracts[0].FileSize)))
+	if err != nil {
+		return
+	}
+	if merkleRoot != t.FileContracts[0].FileMerkleRoot {
+		err = errors.New("uploaded file has wrong merkle root")
+		return
+	}
+
+	// Check that the file arrived in time.
+	if e.Height() >= t.FileContracts[0].Start-2 {
+		err = errors.New("file not uploaded in time, refusing to go forward with contract.")
+		return
+	}
+
 	// record filename for later retrieval
 	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.index)
 	e.host.index++
@@ -210,8 +235,9 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	// Submit the transaction.
 	e.AcceptTransaction(t)
 
-	//TODO: Put the contract in a list where the host will be performing
-	// proofs of storage.
+	// Put the contract in a list where the host will be performing proofs of
+	// storage.
+	e.host.forwardContracts[t.FileContracts[0].Start-1] = &t.FileContracts[0]
 
 	return
 }
