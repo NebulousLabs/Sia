@@ -7,24 +7,27 @@ import (
 	"github.com/NebulousLabs/Andromeda/hash"
 )
 
+func ContractProofIndex(contractID ContractID, stateHeight BlockHeight, contract FileContract, triggerBlockID BlockID) (proofIndex uint64) {
+	indexSeed := hash.HashBytes(append(triggerBlockID[:], contractID[:]...))
+	seedInt := new(big.Int).SetBytes(indexSeed[:])
+	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
+	proofIndex = modSeed.Uint64()
+	return
+}
+
 // currentProofIndex returns the index that should be used when building and
 // verifying the storage proof for a file at the given window.
-func (s *State) currentProofIndex(sp StorageProof) (proofIndex uint64) {
-	contract := s.openContracts[sp.ContractID].FileContract
+func (s *State) currentProofIndex(id ContractID) uint64 {
+	contract := s.openContracts[id].FileContract
 
 	windowIndex, err := contract.WindowIndex(s.Height())
 	if err != nil {
-		return
+		panic(err)
 	}
 	triggerBlock := windowIndex*contract.Start - 1
 	triggerBlockID := s.currentPath[triggerBlock]
 
-	indexSeed := hash.HashBytes(append(triggerBlockID[:], sp.ContractID[:]...))
-	seedInt := new(big.Int).SetBytes(indexSeed[:])
-	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
-	proofIndex = modSeed.Uint64()
-
-	return
+	return ContractProofIndex(id, s.Height(), contract, triggerBlockID)
 }
 
 // validProof returns err = nil if the storage proof provided is valid given
@@ -47,7 +50,7 @@ func (s *State) validProof(sp StorageProof) (err error) {
 		sp.Segment,
 		sp.HashSet,
 		hash.CalculateSegments(openContract.FileContract.FileSize),
-		s.currentProofIndex(sp),
+		s.currentProofIndex(sp.ContractID),
 		openContract.FileContract.FileMerkleRoot,
 	) {
 		err = errors.New("provided storage proof is invalid")
