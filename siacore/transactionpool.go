@@ -1,10 +1,27 @@
 package siacore
 
 // TransactionPoolDump() returns the list of transactions that are valid but
-// haven't yet appeared in a block.
+// haven't yet appeared in a block. It performs a safety/sanity check to verify
+// that no bad transactions have snuck in.
 func (s *State) TransactionPoolDump() (transactions []Transaction) {
+	var badTransactions []Transaction
 	for _, transaction := range s.transactionList {
+		// Check that the transaction is valid, adding it a list of bad
+		// transactions if it is not. Cannot be removed immediately, because
+		// that will change the map that we are iterating through in an
+		// undefined way.
+		err := s.ValidTransaction(transaction)
+		if err != nil {
+			// panic? This code really shouldn't ever be triggered.
+			badTransactions = append(badTransactions, *transaction)
+			continue
+		}
 		transactions = append(transactions, *transaction)
+	}
+
+	// Remove all of the now-bad transactions from the pool.
+	for _, transaction := range badTransactions {
+		s.removeTransactionFromPool(&transaction)
 	}
 	return
 }
