@@ -54,9 +54,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siac
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
 func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
-	e.state.Lock()
-	defer e.state.Unlock()
-
+	e.state.Lock() // Lock the state while building the block request.
 	knownBlocks := make([]siacore.BlockID, 0, 32)
 	for i := siacore.BlockHeight(0); i < 12; i++ {
 		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - i)
@@ -78,6 +76,7 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 	// always include the genesis block
 	genesis, _ := e.state.BlockAtHeight(0)
 	knownBlocks = append(knownBlocks, genesis.ID())
+	e.state.Unlock() // Lock is released once the set of known blocks has been built.
 
 	// prepare for RPC
 	var newBlocks []siacore.Block
@@ -85,30 +84,21 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 	copy(blockArray[:], knownBlocks)
 
 	// unlock state during network I/O
-	e.state.Unlock()
 	err = peer.RPC("SendBlocks", blockArray, &newBlocks)
-	e.state.Lock()
 	if err != nil {
 		return err
 	}
 
-	prevHeight := e.state.Height()
-
-	for i := range newBlocks {
-		if err = e.state.AcceptBlock(newBlocks[i]); err != nil {
-			if err != siacore.BlockKnownErr && err != siacore.FutureBlockErr {
-				// Return if there's an error, but don't return for benign
-				// errors: BlockKnownErr and FutureBlockErr are both benign.
-				return err
-			}
-		}
+	prevHeight := e.Height()
+	for _, block := range newBlocks {
+		e.processBlock(block) // processBlock is a blocking function.
 	}
 
-	// recurse until the height stops increasing
+	// TODO: There is probably a better approach than to call CatchUp
+	// recursively. Furthermore, if there is a reorg that's greater than 100
+	// blocks, CatchUp is going to fail outright.
 	if prevHeight != e.state.Height() {
-		e.state.Unlock()
-		err = e.CatchUp(peer) // Prevents deadlock, while keeping the defer.
-		e.state.Lock()
+		err = e.CatchUp(peer)
 		return
 	}
 

@@ -10,7 +10,7 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 		// transactions if it is not. Cannot be removed immediately, because
 		// that will change the map that we are iterating through in an
 		// undefined way.
-		err := s.ValidTransaction(transaction)
+		err := s.ValidTransaction(*transaction)
 		if err != nil {
 			// panic? This code really shouldn't ever be triggered.
 			badTransactions = append(badTransactions, *transaction)
