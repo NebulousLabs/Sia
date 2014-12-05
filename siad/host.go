@@ -330,11 +330,15 @@ func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, r
 			e.host.BackwardContracts[height-2] = append(e.host.BackwardContracts[height-2], contractEntry)
 
 			// Add this contract entry to ForwardContracts windowsize blocks into the future.
+			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency], contractEntry)
 		}
 		delete(e.host.ForwardContracts, height)
 		height++
 
 	}
-	// bundle proofs into a txn
-	// e.AcceptTransaction(t)
+
+	txn := siacore.Transaction{
+		StorageProofs: proofs,
+	}
+	e.AcceptTransaction(txn)
 }
