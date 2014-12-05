@@ -16,18 +16,9 @@ type (
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
 func GenerateKeyPair() (sk SecretKey, pk PublicKey, err error) {
-	// Get the ecdsa keys.
 	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-	// Copy the secret key into a byte array.
-	skBytes := ecdsaKey.D.Bytes()
-	copy(sk[:], skBytes)
-
-	// Copy the public key into a byte array.
-	pkBytes := ecdsaKey.PublicKey.X.Bytes()
-	pkBytes = append(pkBytes, ecdsaKey.PublicKey.Y.Bytes()...)
-	copy(pk[:], pkBytes)
-
+	copy(sk[:], ecdsaKey.D.Bytes())
+	copy(pk[:], append(ecdsaKey.PublicKey.X.Bytes(), ecdsaKey.PublicKey.Y.Bytes()...))
 	return
 }
 
@@ -45,8 +36,7 @@ func SignBytes(data []byte, sk SecretKey) (sig Signature, err error) {
 	}
 
 	// Convert the signature to a byte array.
-	sigBytes := r.Bytes()
-	sigBytes = append(sigBytes, s.Bytes()...)
+	sigBytes := append(r.Bytes(), s.Bytes()...)
 	copy(sig[:], sigBytes)
 
 	return

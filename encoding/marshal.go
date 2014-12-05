@@ -23,15 +23,27 @@ type SiaUnmarshaler interface {
 //
 // Most types are encoded as their binary representation.
 //
-// Integers are little-endian. Int and Uint are disallowed; the number of bits must be specified.
-//
-// Variable-length types, such as strings and slices, are prefaced by 4 bytes containing their length.
+// Integers are little-endian, and are always encoded as 8 bytes, i.e. their int64 or uint64 equivalent.
 //
 // Booleans are encoded as one byte, either zero (false) or non-zero (true).
 //
 // Nil pointers are represented by a zero.
 //
 // Valid pointers are prefaced by a non-zero, followed by the dereferenced value.
+//
+// Variable-length types, such as strings and slices, are prefaced by 4 bytes containing their length.
+//
+// Slices and structs are simply the concatenation of their encoded elements.
+// Byte slices are not subject to the 8-byte integer rule; they are encoded as
+// their literal representation, one byte per byte.
+// The ordering of struct fields is determined by their type definition. For example:
+//
+//   type foo struct {
+// 	 	S string
+// 		I int
+// 	 }
+//
+// 	 Marshal(foo{"bar", 3}) = append(Marshal("bar"), Marshal(3)...)
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
 }
