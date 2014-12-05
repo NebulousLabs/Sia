@@ -14,6 +14,7 @@ func displayHomeHelp() {
 		"q:\tQuit - quit the program\n",
 		"c:\tCatch Up - collect blocks you are missing.\n",
 		"H:\tHost - become a host and announce to the network\n",
+		"r:\tRent - store files on a host\n",
 		"D:\tDownload - download a file stored on a host\n",
 		"L:\tLoad - load a secret key or coin address.\n",
 		"m:\tMine - turn mining on or off\n",
@@ -59,6 +60,9 @@ func pollHome(e *siad.Environment) {
 		case "H", "host", "store", "advertise", "storage":
 			err = becomeHostWalkthrough(e)
 
+		case "r", "rent":
+			becomeRenterWalkthrough(e)
+
 		case "D", "download":
 			err = downloadWalkthrough(e)
 
@@ -73,11 +77,6 @@ func pollHome(e *siad.Environment) {
 
 		case "P":
 			printDeep(e)
-
-		/*
-			case "r", "rent":
-				becomeClientWalkthrough(e)
-		*/
 
 		case "S", "save":
 			saveWalkthrough(e)
