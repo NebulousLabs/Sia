@@ -91,9 +91,6 @@ func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (er
 		_, err := io.Copy(conn, file)
 		return err
 	})
-
-	// TODO: Will sending a file always return an error, or will it be nil if
-	// everthing goes alright?
 	if err != nil {
 		return
 	}
@@ -105,6 +102,29 @@ func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (er
 	}
 
 	return
+}
+
+// Download requests a file from the host it was stored with, and downloads it
+// into the specified filename.
+func (e *Environment) Download(filename string) (err error) {
+	fe, ok := e.renter.Files[filename]
+	if !ok {
+		return errors.New("no file entry for file: " + filename)
+	}
+	return fe.Host.IPAddress.Call(func(conn net.Conn) error {
+		// send filehash
+		if _, err := encoding.WriteObject(conn, fe.Contract.FileMerkleRoot); err != nil {
+			return err
+		}
+		// TODO: read error
+		// copy response into file
+		file, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(file, conn)
+		return err
+	})
 }
 
 func CreateRenter() (r *Renter) {

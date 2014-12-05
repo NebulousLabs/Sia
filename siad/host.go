@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Andromeda/hash"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -20,7 +21,9 @@ type Host struct {
 	Settings HostAnnouncement
 
 	SpaceRemaining uint64
-	index          int
+
+	Files map[hash.Hash]string
+	index int
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
@@ -168,7 +171,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	return
 }
 
-// NegotiateContract returns an RPC that negotiates a file contract. If the
+// NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
 func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) {
@@ -189,11 +192,13 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	if err != nil {
 		return
 	}
-	e.host.index++
 	_, err = io.Copy(file, conn)
 	if err != nil {
 		return
 	}
+	// record filename for later retrieval
+	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.index)
+	e.host.index++
 
 	// Submit the transaction.
 	err = e.AcceptTransaction(t)
@@ -204,7 +209,30 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	// TODO: Put the contract in a list where the host will be performing
 	// proofs of storage.
 
-	return err
+	return
+}
+
+// RetrieveFile is an RPC that uploads a specified file to a client.
+func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
+	var merkle hash.Hash
+	if err = encoding.Unmarshal(data, &merkle); err != nil {
+		return
+	}
+	// TODO: NEED A WAY TO LOOKUP FILENAMES
+	filename, ok := e.host.Files[merkle]
+	if !ok {
+		return errors.New("no record of that file")
+	}
+	f, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	// transmit file
+	_, err = io.Copy(conn, f)
+	if err != nil {
+		return
+	}
+	return
 }
 
 func CreateHost() *Host {
