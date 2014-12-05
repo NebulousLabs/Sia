@@ -119,9 +119,9 @@ func (s *State) validInput(input Input) (err error) {
 	return
 }
 
-// validTransaction returns err = nil if the transaction is valid, otherwise
+// ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
-func (s *State) validTransaction(t *Transaction) (err error) {
+func (s *State) ValidTransaction(t *Transaction) (err error) {
 	// Iterate through each input, summing the value, checking for
 	// correctness, and creating an InputSignatures object.
 	inputSum := Currency(0)
@@ -237,7 +237,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	}
 
 	// Check that the transaction is potentially valid.
-	err = s.validTransaction(&t)
+	err = s.ValidTransaction(&t)
 	if err != nil {
 		return
 	}

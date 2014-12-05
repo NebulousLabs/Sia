@@ -218,7 +218,6 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	if err = encoding.Unmarshal(data, &merkle); err != nil {
 		return
 	}
-	// TODO: NEED A WAY TO LOOKUP FILENAMES
 	filename, ok := e.host.Files[merkle]
 	if !ok {
 		return errors.New("no record of that file")
@@ -227,6 +226,7 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	if err != nil {
 		return
 	}
+
 	// transmit file
 	_, err = io.Copy(conn, f)
 	if err != nil {

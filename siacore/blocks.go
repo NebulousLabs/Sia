@@ -239,7 +239,7 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.validTransaction(&txn)
+		err = s.ValidTransaction(&txn)
 		if err != nil {
 			break
 		}
