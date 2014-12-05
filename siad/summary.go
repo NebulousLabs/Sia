@@ -85,3 +85,9 @@ func (e *Environment) BlockFromID(bid siacore.BlockID) (siacore.Block, error) {
 	defer e.state.Unlock()
 	return e.state.BlockFromID(bid)
 }
+
+func (e *Environment) BlockAtHeight(height siacore.BlockHeight) (siacore.Block, error) {
+	e.state.Lock()
+	defer e.state.Unlock()
+	return e.state.BlockAtHeight(height)
+}

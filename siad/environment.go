@@ -136,6 +136,7 @@ func (e *Environment) processBlock(b siacore.Block) {
 	// appliedBlocks are managed in the correct order.
 	e.state.Lock()
 	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
+	stateHeight := e.state.Height()
 	e.hostDatabase.Lock()
 	defer e.hostDatabase.Unlock()
 	e.host.Lock()
@@ -165,7 +166,7 @@ func (e *Environment) processBlock(b siacore.Block) {
 	// But the host db should reverse when there are reorgs.
 	e.updateHostDB(rewoundBlocks, appliedBlocks)
 
-	e.storageProofMaintenance(rewoundBlocks, appliedBlocks)
+	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
 	e.host.Unlock()
 
 	// Broadcast all valid blocks.

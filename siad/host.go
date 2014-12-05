@@ -18,6 +18,11 @@ const (
 	AcceptContractResponse = "accept"
 )
 
+type ContractEntry struct {
+	ID       siacore.ContractID
+	Contract *siacore.FileContract
+}
+
 type Host struct {
 	Settings HostAnnouncement
 
@@ -26,10 +31,14 @@ type Host struct {
 	Files map[hash.Hash]string
 	index int
 
-	forwardContracts  map[siacore.BlockHeight]*siacore.FileContract
-	backwardContracts map[siacore.BlockHeight]*siacore.FileContract
+	ForwardContracts  map[siacore.BlockHeight][]ContractEntry
+	BackwardContracts map[siacore.BlockHeight][]ContractEntry
 
 	sync.Mutex
+}
+
+func CreateHost() *Host {
+	return new(Host)
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
@@ -209,7 +218,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	}
 
 	// Check that the file matches the merkle root in the contract.
-	_, err = file.Seek(0,0)
+	_, err = file.Seek(0, 0)
 	if err != nil {
 		return
 	}
@@ -237,7 +246,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
-	e.host.forwardContracts[t.FileContracts[0].Start-1] = &t.FileContracts[0]
+	e.host.ForwardContracts[t.FileContracts[0].Start+1] = append(e.host.ForwardContracts[t.FileContracts[0].Start+1], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
 
 	return
 }
@@ -265,6 +274,67 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-func CreateHost() *Host {
-	return new(Host)
+func (e *Environment) CreateProof(contract siacore.FileContract, contractID siacore.ContractID, stateHeight siacore.BlockHeight) (sp siacore.StorageProof, err error) {
+	filename, ok := e.host.Files[contract.FileMerkleRoot]
+	if !ok {
+		err = errors.New("no record of that file")
+	}
+	file, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	numSegments := hash.CalculateSegments(contract.FileSize)
+	triggerBlock, err := e.BlockAtHeight(stateHeight)
+	if err != nil {
+		return
+	}
+	proofIndex := siacore.ContractProofIndex(contractID, stateHeight, contract, triggerBlock.ID())
+	base, hashSet, err := hash.BuildReaderProof(file, numSegments, proofIndex)
+	if err != nil {
+		return
+	}
+	sp = siacore.StorageProof{contractID, base, hashSet}
+	return
+}
+
+// storageProofMaintenance tracks when storage proofs need to be submitted as
+// transactions, then creates the proof and submits the transaction.
+func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
+	height := stateHeight - siacore.BlockHeight(len(appliedBlocks))
+	var proofs []siacore.StorageProof
+	for _ = range rewoundBlocks {
+		needActionContracts := e.host.BackwardContracts[height]
+		for _, contractEntry := range needActionContracts {
+			// Create a proof for this contract.
+			proof, err := e.CreateProof(*contractEntry.Contract, contractEntry.ID, height)
+			if err != nil {
+				panic(err)
+			}
+			proofs = append(proofs, proof)
+		}
+		height++
+	}
+
+	height = stateHeight - siacore.BlockHeight(len(appliedBlocks))
+	for _ = range appliedBlocks {
+		needActionContracts := e.host.ForwardContracts[height]
+		for _, contractEntry := range needActionContracts {
+			// Create a proof for this contract.
+			proof, err := e.CreateProof(*contractEntry.Contract, contractEntry.ID, height)
+			if err != nil {
+				panic(err)
+			}
+			proofs = append(proofs, proof)
+
+			// Add this contract proof to the backwards contracts list.
+			e.host.BackwardContracts[height-2] = append(e.host.BackwardContracts[height-2], contractEntry)
+
+			// Add this contract entry to ForwardContracts windowsize blocks into the future.
+		}
+		delete(e.host.ForwardContracts, height)
+		height++
+
+	}
+	// bundle proofs into a txn
+	// e.AcceptTransaction(t)
 }
