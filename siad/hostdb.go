@@ -66,58 +66,99 @@ func (h *HostEntry) Weight() siacore.Currency {
 	return siacore.Currency(float64(h.Freeze) * adjustedBurn / float64(h.Price))
 }
 
-// scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
-// hosts to the host database.
-func (e *Environment) updateHostDB(b siacore.Block) {
-	for _, t := range b.Transactions {
-		// Check the arbitrary data of the transaction to fill out the host database.
-		if len(t.ArbitraryData) < 8 {
+// pullHostEntryFromArbitraryData is one of the most cleverly named functions
+// in the Galaxy. Any attempt to ridicule such a glorious name will result in
+// immediate deprication of all clothes.
+func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he HostEntry, foundAHostEntry bool) {
+	// Check the arbitrary data of the transaction to fill out the host database.
+	if len(t.ArbitraryData) < 8 {
+		return
+	}
+
+	dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
+	if dataIndicator == 1 {
+		var ha HostAnnouncement
+		err := encoding.Unmarshal(t.ArbitraryData[8:], &ha)
+		if err != nil {
 			return
 		}
 
-		dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
-		if dataIndicator == 1 {
-			var ha HostAnnouncement
-			err := encoding.Unmarshal(t.ArbitraryData[8:], &ha)
-			if err != nil {
-				return
+		// Verify that the host has declared values that are relevant to our
+		// interests.
+		if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+			return
+		}
+		if ha.MaxChallengeFrequency > 100 {
+			return
+		}
+		if ha.MinTolerance > 10 {
+			return
+		}
+		freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.Height()) * t.Outputs[ha.FreezeIndex].Value
+		if freeze <= 0 {
+			return
+		}
+
+		// Add the host to the host database.
+		he = HostEntry{
+			IPAddress:   ha.IPAddress,
+			MinFilesize: ha.MinFilesize,
+			MaxFilesize: ha.MaxFilesize,
+			MinDuration: ha.MinDuration,
+			MaxDuration: ha.MaxDuration,
+			Frequency:   ha.MaxChallengeFrequency,
+			Tolerance:   ha.MinTolerance,
+			Price:       ha.Price,
+			Burn:        ha.Burn,
+			Freeze:      freeze,
+			CoinAddress: ha.CoinAddress,
+		}
+	}
+
+	foundAHostEntry = true
+	return
+}
+
+// scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
+// hosts to the host database.
+func (e *Environment) updateHostDB(rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
+	// Remove hosts found in blocks that were rewound. Because the hostdb is
+	// like a stack, you can just pop the hosts and be certain that they are
+	// the same hosts.
+	for _, bid := range rewoundBlocks {
+		b, err := e.BlockFromID(bid)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, t := range b.Transactions {
+			hostEntry, found := e.pullHostEntryFromTransaction(t)
+			if !found {
+				continue
 			}
 
-			// Verify that the host has declared values that are relevant to our
-			// interests.
-			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
-				return
-			}
-			if ha.MaxChallengeFrequency > 100 {
-				return
-			}
-			if ha.MinTolerance > 10 {
-				return
-			}
-			freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.Height()) * t.Outputs[ha.FreezeIndex].Value
-			if freeze <= 0 {
-				return
-			}
+			e.hostDatabase.HostList = e.hostDatabase.HostList[:len(e.hostDatabase.HostList)-1]
+			e.hostDatabase.TotalWeight -= hostEntry.Weight()
+		}
+	}
 
-			// Add the host to the host database.
-			host := HostEntry{
-				IPAddress:   ha.IPAddress,
-				MinFilesize: ha.MinFilesize,
-				MaxFilesize: ha.MaxFilesize,
-				MinDuration: ha.MinDuration,
-				MaxDuration: ha.MaxDuration,
-				Frequency:   ha.MaxChallengeFrequency,
-				Tolerance:   ha.MinTolerance,
-				Price:       ha.Price,
-				Burn:        ha.Burn,
-				Freeze:      freeze,
-				CoinAddress: ha.CoinAddress,
+	// Add hosts found in blocks that were applied.
+	for _, bid := range appliedBlocks {
+		b, err := e.BlockFromID(bid)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, t := range b.Transactions {
+			hostEntry, found := e.pullHostEntryFromTransaction(t)
+			if !found {
+				continue
 			}
 
 			// Add the weight of the host to the total weight of the hosts in
 			// the host database.
-			e.hostDatabase.HostList = append(e.hostDatabase.HostList, host)
-			e.hostDatabase.TotalWeight += host.Weight()
+			e.hostDatabase.HostList = append(e.hostDatabase.HostList, hostEntry)
+			e.hostDatabase.TotalWeight += hostEntry.Weight()
 		}
 	}
 }
