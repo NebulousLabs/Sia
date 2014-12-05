@@ -35,7 +35,7 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(port uint16) (e *Environment, err error) {
+func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
@@ -43,7 +43,7 @@ func CreateEnvironment(port uint16) (e *Environment, err error) {
 		transactionChan: make(chan siacore.Transaction, 100),
 	}
 
-	err = e.initializeNetwork(port)
+	err = e.initializeNetwork(port, nobootstrap)
 	if err != nil {
 		return
 	}
@@ -65,14 +65,9 @@ func (e *Environment) Close() {
 
 // initializeNetwork registers the rpcs and bootstraps to the network,
 // downlading all of the blocks and establishing a peer list.
-func (e *Environment) initializeNetwork(port uint16) (err error) {
+func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err error) {
 	e.server, err = network.NewTCPServer(port)
 	if err != nil {
-		return
-	}
-
-	// establish an initial peer list
-	if err = e.server.Bootstrap(); err != nil {
 		return
 	}
 
@@ -82,14 +77,24 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 	e.server.Register("NegotiateContract", e.NegotiateContract)
 	e.server.Register("RetrieveFile", e.RetrieveFile)
 
-	// Get a peer to download the blockchain from.
-	randomPeer := e.server.RandomPeer()
+	if nobootstrap {
+		e.caughtUpLock.Lock()
+		e.caughtUp = true
+		e.caughtUpLock.Unlock()
+		go e.listen()
+		return
+	}
+
+	// establish an initial peer list
+	if err = e.server.Bootstrap(); err != nil {
+		return
+	}
 
 	// Download the blockchain, getting blocks one batch at a time until an
 	// empty batch is sent.
 	go func() {
 		// Catch up the first time.
-		if err := e.CatchUp(randomPeer); err != nil {
+		if err := e.CatchUp(e.RandomPeer()); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
 
@@ -103,7 +108,7 @@ func (e *Environment) initializeNetwork(port uint16) (err error) {
 		// make the network substantially more robust.
 		for {
 			time.Sleep(time.Minute * 2)
-			e.CatchUp(e.server.RandomPeer())
+			e.CatchUp(e.RandomPeer())
 		}
 	}()
 

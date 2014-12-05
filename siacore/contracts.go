@@ -32,17 +32,15 @@ func (s *State) currentProofIndex(id ContractID) uint64 {
 
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
-func (s *State) validProof(sp StorageProof) (err error) {
+func (s *State) validProof(sp StorageProof) error {
 	openContract, exists := s.openContracts[sp.ContractID]
 	if !exists {
-		err = errors.New("unrecognized contract id in storage proof")
-		return
+		return errors.New("unrecognized contract id in storage proof")
 	}
 
 	// Check that the proof has not already been submitted.
 	if openContract.WindowSatisfied {
-		err = errors.New("storage proof has already been completed for this contract")
-		return
+		return errors.New("storage proof has already been completed for this contract")
 	}
 
 	// Check that the storage proof itself is valid.
@@ -53,11 +51,10 @@ func (s *State) validProof(sp StorageProof) (err error) {
 		s.currentProofIndex(sp.ContractID),
 		openContract.FileContract.FileMerkleRoot,
 	) {
-		err = errors.New("provided storage proof is invalid")
-		return
+		return errors.New("provided storage proof is invalid")
 	}
 
-	return
+	return nil
 }
 
 // applyStorageProof takes a storage proof and adds any outputs created by it
@@ -169,7 +166,7 @@ func (s *State) contractMaintenance() {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
 				contractStatus := openContract.Failures == openContract.FileContract.Tolerance
-				outputID := openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus)
+				outputID := ContractTerminationOutputID(openContract.ContractID, contractStatus)
 				output := Output{
 					Value: openContract.FundsRemaining,
 				}
@@ -204,7 +201,7 @@ func (s *State) inverseContractMaintenance() {
 	for _, openContract := range s.currentBlockNode().ContractTerminations {
 		s.openContracts[openContract.ContractID] = openContract
 		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
-		delete(s.unspentOutputs, openContract.FileContract.ContractTerminationOutputID(openContract.ContractID, contractStatus))
+		delete(s.unspentOutputs, ContractTerminationOutputID(openContract.ContractID, contractStatus))
 	}
 
 	// Reverse all outputs created by missed storage proofs.

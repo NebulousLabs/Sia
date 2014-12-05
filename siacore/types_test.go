@@ -14,20 +14,16 @@ import (
 func randomInt64(t *testing.T) int64 {
 	// Create a random big.Int covering the full possible range of values for
 	// an integer, starting from the value 0.
-	bigInt, err := rand.Int(rand.Reader, new(big.Int).SetUint64(^uint64(0)))
+	bigInt, err := rand.Int(rand.Reader, new(big.Int).SetUint64(math.MaxInt64))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Subtract the minimum possible int to adjust the range from [0, uintMax]
-	// to [intMin, intMax].
-	bigInt.Add(bigInt, big.NewInt(math.MinInt64))
 	return bigInt.Int64()
 }
 
 // randomUint64() returns a randomly generated uint64 from [0, uint64Max]
 func randomUint64(t *testing.T) uint64 {
-	bigInt, err := rand.Int(rand.Reader, new(big.Int).SetUint64(^uint64(0)))
+	bigInt, err := rand.Int(rand.Reader, new(big.Int).SetUint64(math.MaxUint64))
 	if err != nil {
 		t.Fatal(err)
 	}

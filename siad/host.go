@@ -91,6 +91,9 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	// TODO: Have a different method for setting max filesize.
 	e.host.SpaceRemaining = e.host.Settings.MaxFilesize
 
+	// TODO: Have a different method for setting max filesize.
+	e.host.SpaceRemaining = e.host.Settings.MaxFilesize
+
 	return
 }
 

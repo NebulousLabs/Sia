@@ -25,9 +25,9 @@ type Renter struct {
 
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (err error) {
+func (e *Environment) ClientProposeContract(filename string) (err error) {
 	// Scan the blockchain for outputs.
-	wallet.Scan()
+	e.wallet.Scan()
 
 	// Open the file, create a merkle hash.
 	file, err := os.Open(filename)
@@ -67,7 +67,7 @@ func (e *Environment) ClientProposeContract(filename string, wallet *Wallet) (er
 	// Fund the client portion of the transaction.
 	var t siacore.Transaction
 	t.FileContracts = append(t.FileContracts, fileContract)
-	err = wallet.FundTransaction(host.Price*5000, &t)
+	err = e.wallet.FundTransaction(host.Price*5000, &t)
 	if err != nil {
 		return
 	}
