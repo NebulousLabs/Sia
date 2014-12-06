@@ -35,7 +35,7 @@ func getResponse(handler string, vals *url.Values) string {
 
 func startcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	// TODO: specify port
@@ -45,7 +45,7 @@ func startcmd(cmd *cobra.Command, args []string) {
 
 func stopcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	getResponse("/stop", nil)
@@ -53,7 +53,7 @@ func stopcmd(cmd *cobra.Command, args []string) {
 
 func minecmd(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	// TODO: need start/stop
@@ -62,7 +62,7 @@ func minecmd(cmd *cobra.Command, args []string) {
 
 func sendcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 3 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/send", &url.Values{
@@ -74,7 +74,7 @@ func sendcmd(cmd *cobra.Command, args []string) {
 
 func hostcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 4 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/host", &url.Values{
@@ -87,7 +87,7 @@ func hostcmd(cmd *cobra.Command, args []string) {
 
 func rentcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/rent", &url.Values{
@@ -97,7 +97,7 @@ func rentcmd(cmd *cobra.Command, args []string) {
 
 func downloadcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/download", &url.Values{
@@ -107,7 +107,7 @@ func downloadcmd(cmd *cobra.Command, args []string) {
 
 func savecmd(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/save", &url.Values{
@@ -117,7 +117,7 @@ func savecmd(cmd *cobra.Command, args []string) {
 
 func loadcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 2 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/load", &url.Values{
@@ -128,7 +128,7 @@ func loadcmd(cmd *cobra.Command, args []string) {
 
 func statuscmd(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
-		fmt.Println(cmd.Usage())
+		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/status", nil))

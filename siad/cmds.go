@@ -76,13 +76,23 @@ func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) 
 func (e *Environment) saveHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: get type
 	filename := req.FormValue("filename")
-	e.SaveCoinAddress(filename)
+	err := e.SaveCoinAddress(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Saved coin address to "+filename)
+	}
 }
 
 func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: get type
 	filename, friendname := req.FormValue("filename"), req.FormValue("friendname")
-	e.LoadCoinAddress(filename, friendname)
+	err := e.LoadCoinAddress(filename, friendname)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Saved coin address to "+filename)
+	}
 }
 
 // TODO: this should probably just return JSON. Leave formatting to the client.
