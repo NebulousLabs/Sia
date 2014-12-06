@@ -1,4 +1,4 @@
-package siad
+package main
 
 import (
 	"crypto/rand"

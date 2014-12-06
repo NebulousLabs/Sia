@@ -1,4 +1,4 @@
-package siad
+package main
 
 // wallet.go contains things like signatures and scans the blockchain for
 // available funds that can be spent.
