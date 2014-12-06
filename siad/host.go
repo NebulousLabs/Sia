@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
@@ -17,6 +18,11 @@ const (
 	AcceptContractResponse = "accept"
 )
 
+type ContractEntry struct {
+	ID       siacore.ContractID
+	Contract *siacore.FileContract
+}
+
 type Host struct {
 	Settings HostAnnouncement
 
@@ -24,6 +30,15 @@ type Host struct {
 
 	Files map[hash.Hash]string
 	index int
+
+	ForwardContracts  map[siacore.BlockHeight][]ContractEntry
+	BackwardContracts map[siacore.BlockHeight][]ContractEntry
+
+	sync.Mutex
+}
+
+func CreateHost() *Host {
+	return new(Host)
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
@@ -69,12 +84,9 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
 	// Sign the transaction.
-	e.wallet.SignTransaction(&t)
+	e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true})
 
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
 	// TODO: Have a different method for setting max filesize.
 	e.host.SpaceRemaining = e.host.Settings.MaxFilesize
@@ -164,9 +176,16 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 
 	// Add some inputs and outputs to the transaction to fund the burn half.
 	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
-	e.wallet.SignTransaction(&nt)
+	e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true})
 
-	// TODO: verify validity of transaction
+	// Check that the transaction is valid after the host signature.
+	e.state.Lock()
+	err = e.state.ValidTransaction(nt)
+	e.state.Unlock()
+	if err != nil {
+		err = errors.New("post-verified transaction not valid - most likely a client error, but could be a host error too")
+		return
+	}
 
 	return
 }
@@ -192,22 +211,42 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	_, err = io.Copy(file, conn)
 	if err != nil {
 		return
 	}
+
+	// Check that the file matches the merkle root in the contract.
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return
+	}
+	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(t.FileContracts[0].FileSize))
+	if err != nil {
+		return
+	}
+	if merkleRoot != t.FileContracts[0].FileMerkleRoot {
+		err = errors.New("uploaded file has wrong merkle root")
+		return
+	}
+
+	// Check that the file arrived in time.
+	if e.Height() >= t.FileContracts[0].Start-2 {
+		err = errors.New("file not uploaded in time, refusing to go forward with contract.")
+		return
+	}
+
 	// record filename for later retrieval
 	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.index)
 	e.host.index++
 
 	// Submit the transaction.
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
-	// TODO: Put the contract in a list where the host will be performing
-	// proofs of storage.
+	// Put the contract in a list where the host will be performing proofs of
+	// storage.
+	e.host.ForwardContracts[t.FileContracts[0].Start+1] = append(e.host.ForwardContracts[t.FileContracts[0].Start+1], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
 
 	return
 }
@@ -218,7 +257,6 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	if err = encoding.Unmarshal(data, &merkle); err != nil {
 		return
 	}
-	// TODO: NEED A WAY TO LOOKUP FILENAMES
 	filename, ok := e.host.Files[merkle]
 	if !ok {
 		return errors.New("no record of that file")
@@ -227,6 +265,7 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	if err != nil {
 		return
 	}
+
 	// transmit file
 	_, err = io.Copy(conn, f)
 	if err != nil {
@@ -235,6 +274,82 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	return
 }
 
-func CreateHost() *Host {
-	return new(Host)
+func (e *Environment) CreateProof(contract siacore.FileContract, contractID siacore.ContractID, stateHeight siacore.BlockHeight) (sp siacore.StorageProof, err error) {
+	filename, ok := e.host.Files[contract.FileMerkleRoot]
+	if !ok {
+		err = errors.New("no record of that file")
+	}
+	file, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	numSegments := hash.CalculateSegments(contract.FileSize)
+	triggerBlock, err := e.BlockAtHeight(stateHeight)
+	if err != nil {
+		return
+	}
+	proofIndex := siacore.ContractProofIndex(contractID, stateHeight, contract, triggerBlock.ID())
+	base, hashSet, err := hash.BuildReaderProof(file, numSegments, proofIndex)
+	if err != nil {
+		return
+	}
+	sp = siacore.StorageProof{contractID, base, hashSet}
+	return
+}
+
+// storageProofMaintenance tracks when storage proofs need to be submitted as
+// transactions, then creates the proof and submits the transaction.
+func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
+	height := stateHeight - siacore.BlockHeight(len(appliedBlocks))
+	var proofs []siacore.StorageProof
+	for _ = range rewoundBlocks {
+		needActionContracts := e.host.BackwardContracts[height]
+		for _, contractEntry := range needActionContracts {
+			// Create a proof for this contract.
+			proof, err := e.CreateProof(*contractEntry.Contract, contractEntry.ID, height)
+			if err != nil {
+				panic(err)
+			}
+			proofs = append(proofs, proof)
+		}
+		height++
+	}
+
+	height = stateHeight - siacore.BlockHeight(len(appliedBlocks))
+	for _ = range appliedBlocks {
+		needActionContracts := e.host.ForwardContracts[height]
+		for _, contractEntry := range needActionContracts {
+			// Create a proof for this contract.
+			proof, err := e.CreateProof(*contractEntry.Contract, contractEntry.ID, height)
+			if err != nil {
+				panic(err)
+			}
+			proofs = append(proofs, proof)
+
+			// Add this contract proof to the backwards contracts list.
+			e.host.BackwardContracts[height-2] = append(e.host.BackwardContracts[height-2], contractEntry)
+
+			// Add this contract entry to ForwardContracts windowsize blocks into the future.
+			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency], contractEntry)
+		}
+		delete(e.host.ForwardContracts, height)
+		height++
+
+	}
+
+	if len(proofs) != 0 {
+		txn := siacore.Transaction{
+			MinerFees:     []siacore.Currency{10},
+			StorageProofs: proofs,
+		}
+		err := e.wallet.FundTransaction(10, &txn)
+		if err != nil {
+			panic(err) // panic is not the best move here, but some sort of urgent logging would be good.
+		}
+		err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true})
+		if err != nil {
+			panic(err)
+		}
+		e.AcceptTransaction(txn)
+	}
 }

@@ -137,13 +137,14 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 // Wallet.signTransaction() takes a transaction and adds a signature for every input
 // that the wallet understands how to spend.
-func (w *Wallet) SignTransaction(t *siacore.Transaction) (err error) {
+func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredFields) (err error) {
 	for _, input := range t.Inputs {
 		// If we recognize the input as something we are able to sign, we sign
 		// the input.
 		if input.SpendConditions.CoinAddress() == w.SpendConditions.CoinAddress() {
 			txnSig := siacore.TransactionSignature{
-				InputID: input.OutputID,
+				InputID:       input.OutputID,
+				CoveredFields: cf,
 			}
 			t.Signatures = append(t.Signatures, txnSig)
 
@@ -178,16 +179,13 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore
 	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: dest})
 
 	// Sign each input.
-	err = e.wallet.SignTransaction(&t)
+	err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true})
 	if err != nil {
 		return
 	}
 
 	// Send the transaction to the environment.
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
+	e.AcceptTransaction(t)
 
 	return
 }

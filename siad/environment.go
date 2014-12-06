@@ -133,9 +133,16 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 
 // processBlock is called by the environment's listener.
 func (e *Environment) processBlock(b siacore.Block) {
-	// Pass the block to the state.
+	// Pass the block to the state, grabbing a lock on hostDatabase and host
+	// before releasing the state lock, to ensure that rewoundBlocks and
+	// appliedBlocks are managed in the correct order.
 	e.state.Lock()
-	err := e.state.AcceptBlock(b)
+	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
+	stateHeight := e.state.Height()
+	e.hostDatabase.Lock()
+	defer e.hostDatabase.Unlock()
+	e.host.Lock()
+	defer e.host.Unlock()
 	e.state.Unlock()
 
 	// Perform error handling.
@@ -159,9 +166,9 @@ func (e *Environment) processBlock(b siacore.Block) {
 
 	// TODO: once a block has been moved into the host db, it doesn't come out.
 	// But the host db should reverse when there are reorgs.
-	e.hostDatabase.Lock()
-	e.updateHostDB(b)
-	e.hostDatabase.Unlock()
+	e.updateHostDB(rewoundBlocks, appliedBlocks)
+
+	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)

@@ -51,7 +51,7 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 
 	// Fill out the contract according to the whims of the host.
 	fileContract := siacore.FileContract{
-		ContractFund:       (host.Price + host.Burn) * 5000, // 5000 blocks.
+		ContractFund:       (host.Price + host.Burn) * 5000 * siacore.Currency(info.Size()), // 5000 blocks.
 		FileMerkleRoot:     merkle,
 		FileSize:           uint64(info.Size()),
 		Start:              e.Height() + 100,
@@ -66,11 +66,22 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 
 	// Fund the client portion of the transaction.
 	var t siacore.Transaction
+	t.MinerFees = append(t.MinerFees, 10)
 	t.FileContracts = append(t.FileContracts, fileContract)
-	err = e.wallet.FundTransaction(host.Price*5000, &t)
+	err = e.wallet.FundTransaction(host.Price*5010*siacore.Currency(fileContract.FileSize), &t)
 	if err != nil {
 		return
 	}
+
+	// Sign the transacion.
+	coveredFields := siacore.CoveredFields{
+		MinerFees: []uint64{0},
+		Contracts: []uint64{0},
+	}
+	for i := range t.Inputs {
+		coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
+	}
+	e.wallet.SignTransaction(&t, coveredFields)
 
 	// Negotiate the contract to the host.
 	err = host.IPAddress.Call(func(conn net.Conn) error {
