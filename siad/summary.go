@@ -31,6 +31,9 @@ type StateInfo struct {
 // If accurate data is paramount, SafeStateInfo() should be called, though this
 // can adversely affect performance.
 func (e *Environment) StateInfo() StateInfo {
+	e.state.Lock()
+	defer e.state.Unlock()
+
 	return StateInfo{
 		StateHash: e.state.StateHash(),
 
@@ -45,28 +48,13 @@ func (e *Environment) StateInfo() StateInfo {
 	}
 }
 
-// SafeStateInfo locks the state before doing any reads, ensuring that the
-// reads are accurate and not prone to race conditions. This function can
-// sometimes take a while to return, however.
-func (e *Environment) SafeStateInfo() StateInfo {
-	e.state.Lock()
-	defer e.state.Unlock()
-	return e.StateInfo()
-}
-
 // Output returns the output that corresponds with a certain OutputID. It does
 // not lock the mutex, which means it could potentially (but usually doesn't)
 // produce weird or incorrect output.
 func (e *Environment) Output(id siacore.OutputID) (output siacore.Output, err error) {
-	return e.state.Output(id)
-}
-
-// SafeOutput returns the output that corresponds with a certain OutputID,
-// using a mutex when accessing the state.
-func (e *Environment) SafeOutput(id siacore.OutputID) (output siacore.Output, err error) {
 	e.state.Lock()
 	defer e.state.Unlock()
-	return e.Output(id)
+	return e.state.Output(id)
 }
 
 func (e *Environment) Height() siacore.BlockHeight {
