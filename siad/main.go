@@ -6,7 +6,7 @@ import (
 
 func main() {
 	// create environment
-	e, err := CreateEnvironment(9989, false)
+	e, err := CreateEnvironment(9989, true)
 	if err != nil {
 		println(err.Error())
 		return
@@ -21,7 +21,7 @@ func main() {
 	http.HandleFunc("/download", e.downloadHandler)
 	http.HandleFunc("/save", e.saveHandler)
 	http.HandleFunc("/load", e.loadHandler)
-	http.HandleFunc("/stats", e.statsHandler)
+	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
 	// port should probably be an argument
 	http.ListenAndServe(":9980", nil)

@@ -85,8 +85,43 @@ func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
 	e.LoadCoinAddress(filename, friendname)
 }
 
-func (e *Environment) statsHandler(w http.ResponseWriter, req *http.Request) {
-	//w.Write("stats")
+// TODO: this should probably just return JSON. Leave formatting to the client.
+func (e *Environment) statusHandler(w http.ResponseWriter, req *http.Request) {
+	// get state info
+	info := e.StateInfo()
+	// set mining status
+	mineStatus := "OFF"
+	if e.Mining() {
+		mineStatus = "ON"
+	}
+	// create peer listing
+	peers := "\n"
+	for _, address := range e.AddressBook() {
+		peers += fmt.Sprintf("\t\t%v:%v\n", address.Host, address.Port)
+	}
+	// create friend listing
+	friends := "\n"
+	for name, address := range e.FriendMap() {
+		friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
+	}
+	// write stats to ResponseWriter
+	fmt.Fprintf(w, `General Information:
+
+	Mining Status: %s
+
+	Wallet Address: %x
+	Wallet Balance: %v
+
+	Current Block Height: %v
+	Current Block Target: %v
+	Current Block Depth: %v
+
+	Networked Peers: %s
+
+	Friends: %s`,
+		mineStatus, e.CoinAddress(), e.WalletBalance(),
+		info.Height, info.Target, info.Depth, peers, friends,
+	)
 }
 
 func (e *Environment) startServer() {
@@ -99,7 +134,7 @@ func (e *Environment) startServer() {
 	http.HandleFunc("/download", e.downloadHandler)
 	http.HandleFunc("/save", e.saveHandler)
 	http.HandleFunc("/load", e.loadHandler)
-	http.HandleFunc("/stats", e.statsHandler)
+	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
 	// port should probably be an argument
 	http.ListenAndServe(":9980", nil)

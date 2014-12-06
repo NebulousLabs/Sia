@@ -86,13 +86,13 @@ func main() {
 	}
 	root.AddCommand(load)
 
-	stats := &cobra.Command{
-		Use:   "stats",
-		Short: "Print statistics about the daemon",
-		Long:  "Query the daemon for values such as the current difficulty, target, height, transactions, etc.",
-		Run:   statscmd,
+	status := &cobra.Command{
+		Use:   "status",
+		Short: "Print the current state of the daemon",
+		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
+		Run:   statuscmd,
 	}
-	root.AddCommand(stats)
+	root.AddCommand(status)
 
 	root.Execute()
 }
