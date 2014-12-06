@@ -41,7 +41,12 @@ func startcmd(cmd *cobra.Command, args []string) {
 	}
 	// TODO: specify port
 	// TODO: don't start if already started
-	exec.Command("siad")
+	err := exec.Command("sh", "-c", "~/go/bin/siad &").Run()
+	if err != nil {
+		fmt.Println("Failed to start Sia daemon:", err)
+	} else {
+		fmt.Println("Sia daemon started")
+	}
 }
 
 func stopcmd(cmd *cobra.Command, args []string) {
@@ -50,6 +55,7 @@ func stopcmd(cmd *cobra.Command, args []string) {
 		return
 	}
 	getResponse("/stop", nil)
+	fmt.Println("Sia daemon stopped")
 }
 
 func minecmd(cmd *cobra.Command, args []string) {
