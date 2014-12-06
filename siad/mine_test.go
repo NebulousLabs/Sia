@@ -67,8 +67,8 @@ func testDualMining(te *testEnv) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Compare the state hash for equality.
-	info0 := te.e0.SafeStateInfo()
-	info1 := te.e1.SafeStateInfo()
+	info0 := te.e0.StateInfo()
+	info1 := te.e1.StateInfo()
 
 	if info0.StateHash != info1.StateHash {
 		te.t.Error("state hashes do not match after dual mining.")

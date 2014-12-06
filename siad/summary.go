@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -90,4 +91,16 @@ func (e *Environment) BlockAtHeight(height siacore.BlockHeight) (siacore.Block, 
 	e.state.Lock()
 	defer e.state.Unlock()
 	return e.state.BlockAtHeight(height)
+}
+
+func (e *Environment) AddressBook() []network.NetAddress {
+	return e.server.AddressBook()
+}
+
+func (e *Environment) RandomPeer() network.NetAddress {
+	return e.server.RandomPeer()
+}
+
+func (e *Environment) NetAddress() network.NetAddress {
+	return e.server.NetAddress()
 }
