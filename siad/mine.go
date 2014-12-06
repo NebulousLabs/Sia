@@ -1,19 +1,20 @@
 package siad
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
-	// If it takes less than 1 second to go through all of the iterations,
-	// then repeat work will be performed.
-	IterationsPerAttempt = 10 * 1000 * 1000
+	IterationsPerAttempt = 1 * 1000 * 1000
 )
 
 // Return true if currently mining, false otherwise.
 func (e *Environment) Mining() bool {
+	e.miningLock.RLock()
+	defer e.miningLock.RUnlock()
 	return e.mining
 }
 
@@ -24,7 +25,7 @@ func (e *Environment) ToggleMining() (err error) {
 
 	if !e.mining {
 		e.mining = true
-		e.miningChan <- struct{}{}
+		go e.mine()
 	} else {
 		e.mining = false
 	}
@@ -41,6 +42,7 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 	b = &siacore.Block{
 		ParentBlockID: e.state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
+		Nonce:         uint64(rand.Int()),
 		MinerAddress:  e.CoinAddress(),
 		Transactions:  e.state.TransactionPoolDump(),
 	}
@@ -57,26 +59,27 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 
 // solveBlock() tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) {
+func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
 	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			e.processBlock(*b) // Block until the block has been processed.
-			break
+			e.AcceptBlock(*b) // Block until the block has been processed.
+			return true
 		}
 	}
 
-	// Ask for more work.
-	e.miningChan <- struct{}{}
+	return false
 }
 
 // mine attempts to generate blocks, and sends any found blocks down a channel.
 func (e *Environment) mine() {
-	for _ = range e.miningChan {
+	for {
 		e.miningLock.RLock()
-		if e.mining {
-			e.miningLock.RUnlock()
+		mining := e.mining
+		e.miningLock.RUnlock()
+
+		if mining {
 			b, target := e.blockForWork()
-			go e.solveBlock(b, target)
+			e.solveBlock(b, target)
 		}
 	}
 }

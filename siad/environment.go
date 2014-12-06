@@ -48,11 +48,12 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
+	e.wallet = CreateWallet(e.state)
+
 	err = e.initializeNetwork(port, nobootstrap)
 	if err != nil {
 		return
 	}
-	e.wallet = CreateWallet(e.state)
 
 	return
 }
