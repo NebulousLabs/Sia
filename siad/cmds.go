@@ -1,0 +1,161 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/NebulousLabs/Andromeda/siacore"
+)
+
+func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: more graceful shutdown?
+	e.Close()
+	os.Exit(0)
+}
+
+func (e *Environment) syncHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: don't spawn multiple CatchUps
+	go e.CatchUp(e.RandomPeer())
+	fmt.Fprint(w, "Sync initiated")
+}
+
+func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: start/stop subcommands
+	e.ToggleMining()
+	if e.Mining() {
+		fmt.Fprint(w, "Started mining")
+	} else {
+		fmt.Fprint(w, "Stopped mining")
+	}
+}
+
+func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
+	var amount, fee siacore.Currency
+	var dest siacore.CoinAddress
+	// scan values
+	// TODO: check error
+	fmt.Sscan(req.FormValue("amount"), &amount)
+	fmt.Sscan(req.FormValue("fee"), &fee)
+	fmt.Sscan(req.FormValue("dest"), &dest)
+	_, err := e.SpendCoins(amount, fee, dest)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Sent "+req.FormValue("amount")+" coins to "+req.FormValue("dest"))
+	}
+}
+
+func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
+	var MB uint64
+	var price, freezeCoins siacore.Currency
+	var freezeBlocks siacore.BlockHeight
+	// scan values
+	// TODO: check error
+	fmt.Sscan(req.FormValue("MB"), &MB)
+	fmt.Sscan(req.FormValue("price"), &price)
+	fmt.Sscan(req.FormValue("freezeCoins"), &freezeCoins)
+	fmt.Sscan(req.FormValue("freezeBlocks"), &freezeBlocks)
+
+	e.SetHostSettings(HostAnnouncement{
+		IPAddress:             e.NetAddress(),
+		MinFilesize:           1024 * 1024, // 1 MB
+		MaxFilesize:           MB * 1024 * 1024,
+		MinDuration:           2000,
+		MaxDuration:           10000,
+		MinChallengeFrequency: 250,
+		MaxChallengeFrequency: 100,
+		MinTolerance:          10,
+		Price:                 price,
+		Burn:                  price,
+		CoinAddress:           e.CoinAddress(),
+		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
+	})
+	_, err := e.HostAnnounceSelf(freezeCoins, freezeBlocks+e.Height(), 10)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Announce successful")
+	}
+}
+
+func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
+	filename := req.FormValue("filename")
+	err := e.ClientProposeContract(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Upload complete: "+filename)
+	}
+}
+
+func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) {
+	filename := req.FormValue("filename")
+	err := e.Download(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Download complete: "+filename)
+	}
+}
+
+func (e *Environment) saveHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: get type
+	filename := req.FormValue("filename")
+	err := e.SaveCoinAddress(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Saved coin address to "+filename)
+	}
+}
+
+func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: get type
+	filename, friendname := req.FormValue("filename"), req.FormValue("friendname")
+	err := e.LoadCoinAddress(filename, friendname)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Loaded coin address to "+filename)
+	}
+}
+
+// TODO: this should probably just return JSON. Leave formatting to the client.
+func (e *Environment) statusHandler(w http.ResponseWriter, req *http.Request) {
+	// get state info
+	info := e.StateInfo()
+	// set mining status
+	mineStatus := "OFF"
+	if e.Mining() {
+		mineStatus = "ON"
+	}
+	// create peer listing
+	peers := "\n"
+	for _, address := range e.AddressBook() {
+		peers += fmt.Sprintf("\t\t%v:%v\n", address.Host, address.Port)
+	}
+	// create friend listing
+	friends := "\n"
+	for name, address := range e.FriendMap() {
+		friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
+	}
+	// write stats to ResponseWriter
+	fmt.Fprintf(w, `General Information:
+
+	Mining Status: %s
+
+	Wallet Address: %x
+	Wallet Balance: %v
+
+	Current Block Height: %v
+	Current Block Target: %v
+	Current Block Depth: %v
+
+	Networked Peers: %s
+
+	Friends: %s`,
+		mineStatus, e.CoinAddress(), e.WalletBalance(),
+		info.Height, info.Target, info.Depth, peers, friends,
+	)
+}
