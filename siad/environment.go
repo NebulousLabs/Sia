@@ -2,6 +2,7 @@ package siad
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
@@ -14,19 +15,22 @@ import (
 type Environment struct {
 	state *siacore.State
 
-	server *network.TCPServer
-
+	server       *network.TCPServer
 	host         *Host
 	hostDatabase *HostDatabase
-	miner        *Miner
 	renter       *Renter
 	wallet       *Wallet
 
 	friends map[string]siacore.CoinAddress
 
-	// Channels for incoming blocks/transactions to be processed
+	// Channels for incoming blocks and transactions to be processed
 	blockChan       chan siacore.Block
 	transactionChan chan siacore.Transaction
+
+	// Mining variables
+	mining     bool          // true when mining
+	miningLock sync.RWMutex  // prevents benign race conditions
+	miningChan chan struct{} // used to ask the miner to create more work
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
@@ -38,6 +42,7 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
+		miningChan:      make(chan struct{}),
 	}
 
 	e.hostDatabase = CreateHostDatabase()
@@ -48,8 +53,6 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		return
 	}
 	e.wallet = CreateWallet(e.state)
-	ROblockChan := (chan<- siacore.Block)(e.blockChan)
-	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
 
 	return
 }
