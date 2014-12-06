@@ -13,7 +13,7 @@ func main() {
 	}
 
 	// set up handlers
-	http.HandleFunc("/catchup", e.catchupHandler)
+	http.HandleFunc("/sync", e.syncHandler)
 	http.HandleFunc("/mine", e.mineHandler)
 	http.HandleFunc("/send", e.sendHandler)
 	http.HandleFunc("/host", e.hostHandler)

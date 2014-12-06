@@ -14,9 +14,10 @@ func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
 	os.Exit(0)
 }
 
-func (e *Environment) catchupHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: check for existing CatchUp
+func (e *Environment) syncHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: don't spawn multiple CatchUps
 	go e.CatchUp(e.RandomPeer())
+	fmt.Fprint(w, "Sync initiated")
 }
 
 func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {

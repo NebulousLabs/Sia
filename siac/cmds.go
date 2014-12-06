@@ -61,6 +61,14 @@ func minecmd(cmd *cobra.Command, args []string) {
 	fmt.Println(getResponse("/mine", nil))
 }
 
+func synccmd(cmd *cobra.Command, args []string) {
+	if len(args) != 0 {
+		cmd.Usage()
+		return
+	}
+	fmt.Println(getResponse("/sync", nil))
+}
+
 func sendcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 3 {
 		cmd.Usage()

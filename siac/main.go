@@ -43,6 +43,13 @@ func main() {
 	})
 
 	root.AddCommand(&cobra.Command{
+		Use:   "sync",
+		Short: "Synchronize with the network",
+		Long:  "Attempt to synchronize with a randomly selected peer.",
+		Run:   synccmd,
+	})
+
+	root.AddCommand(&cobra.Command{
 		Use:   "send",
 		Short: "Send coins to an address",
 		Long:  "Send coins to an address, or to a friend. The destination is first interpreted as an friend, and then as an address if the friend lookup fails.",
