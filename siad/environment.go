@@ -16,20 +16,21 @@ type Environment struct {
 	state *siacore.State
 
 	server       *network.TCPServer
-	caughtUp     bool // False while downloading blocks.
-	caughtUpLock sync.Mutex
-
 	host         *Host
 	hostDatabase *HostDatabase
-	miner        *Miner
 	renter       *Renter
 	wallet       *Wallet
 
 	friends map[string]siacore.CoinAddress
 
-	// Channels for incoming blocks/transactions to be processed
+	// Channels for incoming blocks and transactions to be processed
 	blockChan       chan siacore.Block
 	transactionChan chan siacore.Transaction
+
+	// Mining variables
+	mining        bool         // true when mining
+	miningThreads int          // number of processes mining at once
+	miningLock    sync.RWMutex // prevents benign race conditions
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
@@ -43,16 +44,15 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		transactionChan: make(chan siacore.Transaction, 100),
 	}
 
+	e.hostDatabase = CreateHostDatabase()
+	e.host = CreateHost()
+	e.renter = CreateRenter()
+	e.wallet = CreateWallet(e.state)
+
 	err = e.initializeNetwork(port, nobootstrap)
 	if err != nil {
 		return
 	}
-	e.wallet = CreateWallet(e.state)
-	ROblockChan := (chan<- siacore.Block)(e.blockChan)
-	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
-	e.host = CreateHost()
-	e.hostDatabase = CreateHostDatabase()
-	e.renter = CreateRenter()
 
 	return
 }
@@ -78,9 +78,6 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 	e.server.Register("RetrieveFile", e.RetrieveFile)
 
 	if nobootstrap {
-		e.caughtUpLock.Lock()
-		e.caughtUp = true
-		e.caughtUpLock.Unlock()
 		go e.listen()
 		return
 	}
@@ -97,10 +94,6 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 		if err := e.CatchUp(e.RandomPeer()); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
-
-		e.caughtUpLock.Lock()
-		e.caughtUp = true
-		e.caughtUpLock.Unlock()
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page

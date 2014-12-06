@@ -17,6 +17,7 @@ var (
 	TargetWindow    = BlockHeight(40)        // Number of blocks to use when calculating the target.
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 	RootTarget      = Target{0, 1}
+	RootDepth       = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
 	MaxAdjustmentUp   = big.NewRat(103, 100)
 	MaxAdjustmentDown = big.NewRat(97, 100)
@@ -164,8 +165,7 @@ func IntToTarget(i *big.Int) (t Target) {
 	// i may overflow the maximum target.
 	// In the event of overflow, return the maximum.
 	if i.BitLen() > 256 {
-		copy(t[:], bytes.Repeat([]byte{0xFF}, 32))
-		return
+		return RootDepth
 	}
 	b := i.Bytes()
 	// need to preserve big-endianness

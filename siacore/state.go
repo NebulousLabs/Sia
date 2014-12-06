@@ -116,8 +116,8 @@ func CreateGenesisState() *State {
 	for i := range s.blockRoot.RecentTimestamps {
 		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
 	}
-	s.blockRoot.Target[1] = 1  // Easy enough for a home computer to be able to mine on.
-	s.blockRoot.Depth[0] = 255 // depth of genesis block is set to 111111110000000000000000...
+	s.blockRoot.Target = RootTarget
+	s.blockRoot.Depth = RootDepth
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
 	// Fill out the consensus informaiton for the genesis block.

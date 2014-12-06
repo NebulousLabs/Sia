@@ -66,10 +66,11 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 // probe all of the siad functions and stress test siad.
 func TestSiad(t *testing.T) {
 	// Alter the constants to create a system more friendly to testing.
+	IterationsPerAttempt = 500 * 1000
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[0] = 255
+	siacore.RootTarget[1] = 8
 	siacore.MaxAdjustmentUp = big.NewRat(1001, 1000)
 	siacore.MaxAdjustmentDown = big.NewRat(999, 1000)
 	siacore.DEBUG = true

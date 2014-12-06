@@ -7,9 +7,8 @@ import (
 // Takes an environment and mines until a single block is produced.
 func (e *Environment) mineSingleBlock() {
 	for {
-		b, target := e.miner.blockForWork()
-		if solveBlock(b, target) {
-			e.miner.blockChan <- *b
+		b, target := e.blockForWork()
+		if e.solveBlock(b, target) {
 			break
 		}
 	}
@@ -18,25 +17,25 @@ func (e *Environment) mineSingleBlock() {
 // testToggleMining tests that enabling and disabling mining works without
 // problems.
 func testToggleMining(te *testEnv) {
-	prevHeight := te.e0.Height()
-
 	// Check that mining is not already enabled.
-	if te.e0.miner.mining {
+	if te.e0.mining {
 		te.t.Error("Miner is already mining! - testToggleMining prereqs not met!")
 		return
 	}
 
 	// Enable mining for a second, which should be more than enough to mine a
 	// block in the testing environment.
+	prevHeight := te.e0.Height()
 	te.e0.ToggleMining()
-	if !te.e0.miner.mining {
+	if !te.e0.mining {
 		te.t.Error("Miner is not reporting as mining after mining was enabled.")
 	}
 	time.Sleep(300 * time.Millisecond)
 	te.e0.ToggleMining()
-	if te.e0.miner.mining {
+	if te.e0.mining {
 		te.t.Error("Miner is reporting as mining after mining was disabled.")
 	}
+	time.Sleep(300 * time.Millisecond)
 
 	// Test the height, wait another second (to allow an incorrectly running
 	// miner to mine another block) and test the height again.
@@ -53,7 +52,7 @@ func testToggleMining(te *testEnv) {
 // testDualMining has both environments mine at the same time, and then
 // verifies that they maintain consistency.
 func testDualMining(te *testEnv) {
-	if te.e0.miner.mining || te.e1.miner.mining {
+	if te.e0.mining || te.e1.mining {
 		te.t.Error("one of the miners is already mining - testDualMining prereqs failed!")
 		return
 	}

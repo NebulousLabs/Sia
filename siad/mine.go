@@ -1,64 +1,71 @@
 package siad
 
 import (
-	"errors"
+	"math/rand"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-const (
-	// If it takes less than 1 second to go through all of the iterations,
-	// then repeat work will be performed.
-	IterationsPerAttempt = 10 * 1000 * 1000
+var (
+	IterationsPerAttempt uint64 = 10 * 1000 * 1000
+	MiningThreads        int    = 1
 )
 
-type Miner struct {
-	state *siacore.State
-
-	mining     bool
-	killMining chan struct{}
-	blockChan  chan<- siacore.Block
-
-	subsidyAddress siacore.CoinAddress
+// Return true if currently mining, false otherwise.
+func (e *Environment) Mining() bool {
+	e.miningLock.RLock()
+	defer e.miningLock.RUnlock()
+	return e.mining
 }
 
-func (m *Miner) Mining() bool {
-	return m.mining
+// ToggleMining creates a channel and mines until it receives a kill signal.
+func (e *Environment) ToggleMining() (err error) {
+	e.miningLock.Lock()
+	defer e.miningLock.Unlock()
+
+	if !e.mining {
+		e.mining = true
+		for i := e.miningThreads; i < MiningThreads; i++ {
+			go e.mine()
+		}
+	} else {
+		e.mining = false
+	}
+
+	return
 }
 
 // Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork() (b *siacore.Block, target siacore.Target) {
-	m.state.Lock()
-	defer m.state.Unlock()
+func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
+	e.state.Lock()
+	defer e.state.Unlock()
 
+	// Fill out the block with potentially ready values.
 	b = &siacore.Block{
-		ParentBlockID: m.state.CurrentBlock().ID(),
+		ParentBlockID: e.state.CurrentBlock().ID(),
 		Timestamp:     siacore.Timestamp(time.Now().Unix()),
-		MinerAddress:  m.subsidyAddress,
-		Transactions:  m.state.TransactionPoolDump(),
+		Nonce:         uint64(rand.Int()),
+		MinerAddress:  e.CoinAddress(),
+		Transactions:  e.state.TransactionPoolDump(),
 	}
+	b.MerkleRoot = b.TransactionMerkleRoot()
+	target = e.state.CurrentTarget()
 
 	// Fudge the timestamp if the block would otherwise be illegal.
-	if b.Timestamp < m.state.EarliestLegalTimestamp() {
-		b.Timestamp = m.state.EarliestLegalTimestamp()
+	if b.Timestamp < e.state.EarliestLegalTimestamp() {
+		b.Timestamp = e.state.EarliestLegalTimestamp()
 	}
-
-	// Add the transactions from the transaction pool.
-	b.MerkleRoot = b.TransactionMerkleRoot()
-
-	// Determine the target for the block.
-	target = m.state.CurrentTarget()
 
 	return
 }
 
 // solveBlock() tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func solveBlock(b *siacore.Block, target siacore.Target) bool {
-	maxNonce := b.Nonce + IterationsPerAttempt
-	for ; b.Nonce < maxNonce; b.Nonce++ {
+func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
+	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
+			e.processBlock(*b) // Block until the block has been processed.
 			return true
 		}
 	}
@@ -67,53 +74,34 @@ func solveBlock(b *siacore.Block, target siacore.Target) bool {
 }
 
 // mine attempts to generate blocks, and sends any found blocks down a channel.
-func (m *Miner) mine() {
-	for {
-		select {
-		case <-m.killMining:
-			return
+func (e *Environment) mine() {
+	e.miningLock.Lock()
+	e.miningThreads++
+	e.miningLock.Unlock()
 
-		default:
-			b, target := m.blockForWork()
-			if solveBlock(b, target) {
-				m.blockChan <- *b
+	// Try to solve a block repeatedly.
+	for {
+		// Get the mining status before trying to work.
+		e.miningLock.RLock()
+		mining := e.mining
+		e.miningLock.RUnlock()
+
+		// If we are still mining, do some work, otherwise disable mining and
+		// decrease the thread count for miners.
+		if mining {
+			b, target := e.blockForWork()
+			e.solveBlock(b, target)
+		} else {
+			e.miningLock.Lock()
+
+			// Need to check the mining status again, something might have
+			// changed while waiting for the lock.
+			if !e.mining {
+				e.miningThreads--
+				e.miningLock.Unlock()
+				return
 			}
+			e.miningLock.Unlock()
 		}
 	}
-}
-
-// CreateMiner takes an address as input and returns a miner. All blocks mined
-// by the miner will have the subsidies sent to the subsidyAddress.
-func CreateMiner(s *siacore.State, blockChan chan<- siacore.Block, subsidyAddress siacore.CoinAddress) *Miner {
-	return &Miner{
-		state:          s,
-		killMining:     make(chan struct{}),
-		blockChan:      blockChan,
-		subsidyAddress: subsidyAddress,
-	}
-}
-
-// A getter for the mining variable of the miner.
-func (e *Environment) Mining() bool {
-	return e.miner.mining
-}
-
-// ToggleMining creates a channel and mines until it receives a kill signal.
-func (e *Environment) ToggleMining() (err error) {
-	e.caughtUpLock.Lock()
-	defer e.caughtUpLock.Unlock()
-	if !e.caughtUp {
-		err = errors.New("cannot mine - still catching up")
-		return
-	}
-
-	if !e.miner.mining {
-		e.miner.mining = true
-		go e.miner.mine()
-	} else {
-		e.miner.mining = false
-		e.miner.killMining <- struct{}{}
-	}
-
-	return
 }
