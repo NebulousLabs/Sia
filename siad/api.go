@@ -8,6 +8,23 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
+func (e *Environment) setUpHandlers() {
+	// set up handlers
+	http.HandleFunc("/sync", e.syncHandler)
+	http.HandleFunc("/mine", e.mineHandler)
+	http.HandleFunc("/send", e.sendHandler)
+	http.HandleFunc("/host", e.hostHandler)
+	http.HandleFunc("/rent", e.rentHandler)
+	http.HandleFunc("/download", e.downloadHandler)
+	http.HandleFunc("/save", e.saveHandler)
+	http.HandleFunc("/load", e.loadHandler)
+	http.HandleFunc("/status", e.statusHandler)
+	http.HandleFunc("/stop", e.stopHandler)
+	// port should probably be an argument
+	// TODO: timeouts?
+	http.ListenAndServe(":9980", nil)
+}
+
 func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: more graceful shutdown?
 	e.Close()

@@ -27,7 +27,9 @@ type Environment struct {
 	blockChan       chan siacore.Block
 	transactionChan chan siacore.Transaction
 
-	// Mining variables
+	// Mining variables. The mining variables are protected by the miningLock.
+	// Any time that you read from or write to any of the mining variables, you
+	// need to be under a lock.
 	mining        bool         // true when mining
 	miningThreads int          // number of processes mining at once
 	miningLock    sync.RWMutex // prevents benign race conditions
