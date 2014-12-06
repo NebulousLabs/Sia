@@ -28,9 +28,8 @@ type Environment struct {
 	transactionChan chan siacore.Transaction
 
 	// Mining variables
-	mining     bool          // true when mining
-	miningLock sync.RWMutex  // prevents benign race conditions
-	miningChan chan struct{} // used to ask the miner to create more work
+	mining     bool         // true when mining
+	miningLock sync.RWMutex // prevents benign race conditions
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
@@ -42,7 +41,6 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
-		miningChan:      make(chan struct{}),
 	}
 
 	e.hostDatabase = CreateHostDatabase()

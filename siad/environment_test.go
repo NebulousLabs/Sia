@@ -69,7 +69,7 @@ func TestSiad(t *testing.T) {
 	siacore.BlockFrequency = siacore.Timestamp(1)
 	siacore.TargetWindow = siacore.BlockHeight(2000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[0] = 255
+	// siacore.RootTarget[0] = 2 // Causes test failures for some reason?
 	siacore.MaxAdjustmentUp = big.NewRat(1001, 1000)
 	siacore.MaxAdjustmentDown = big.NewRat(999, 1000)
 	siacore.DEBUG = true

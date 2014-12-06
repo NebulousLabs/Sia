@@ -7,8 +7,8 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-const (
-	IterationsPerAttempt = 1 * 1000 * 1000
+var (
+	IterationsPerAttempt uint64 = 10 * 1000 * 1000
 )
 
 // Return true if currently mining, false otherwise.
@@ -62,7 +62,7 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
 	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			e.AcceptBlock(*b) // Block until the block has been processed.
+			e.processBlock(*b) // Block until the block has been processed.
 			return true
 		}
 	}
@@ -80,6 +80,8 @@ func (e *Environment) mine() {
 		if mining {
 			b, target := e.blockForWork()
 			e.solveBlock(b, target)
+		} else {
+			return
 		}
 	}
 }
