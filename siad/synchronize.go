@@ -13,8 +13,8 @@ const (
 
 // SendBlocks takes a list of block ids as input, and sends all blocks from
 func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) (err error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
@@ -54,7 +54,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siac
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
 func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
-	e.state.Lock() // Lock the state while building the block request.
+	e.state.RLock() // Lock the state while building the block request.
 	knownBlocks := make([]siacore.BlockID, 0, 32)
 	for i := siacore.BlockHeight(0); i < 12; i++ {
 		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - i)
@@ -76,7 +76,7 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 	// always include the genesis block
 	genesis, _ := e.state.BlockAtHeight(0)
 	knownBlocks = append(knownBlocks, genesis.ID())
-	e.state.Unlock() // Lock is released once the set of known blocks has been built.
+	e.state.RUnlock() // Lock is released once the set of known blocks has been built.
 
 	// prepare for RPC
 	var newBlocks []siacore.Block

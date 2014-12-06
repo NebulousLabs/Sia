@@ -179,9 +179,9 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true})
 
 	// Check that the transaction is valid after the host signature.
-	e.state.Lock()
+	e.state.RLock()
 	err = e.state.ValidTransaction(nt)
-	e.state.Unlock()
+	e.state.RUnlock()
 	if err != nil {
 		err = errors.New("post-verified transaction not valid - most likely a client error, but could be a host error too")
 		return

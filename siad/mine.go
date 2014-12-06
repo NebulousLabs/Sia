@@ -38,8 +38,8 @@ func (e *Environment) ToggleMining() (err error) {
 
 // Creates a block that is ready for nonce grinding.
 func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 
 	// Fill out the block with potentially ready values.
 	b = &siacore.Block{

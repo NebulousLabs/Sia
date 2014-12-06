@@ -31,8 +31,8 @@ type StateInfo struct {
 // If accurate data is paramount, SafeStateInfo() should be called, though this
 // can adversely affect performance.
 func (e *Environment) StateInfo() StateInfo {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 
 	return StateInfo{
 		StateHash: e.state.StateHash(),
@@ -52,32 +52,32 @@ func (e *Environment) StateInfo() StateInfo {
 // not lock the mutex, which means it could potentially (but usually doesn't)
 // produce weird or incorrect output.
 func (e *Environment) Output(id siacore.OutputID) (output siacore.Output, err error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.Output(id)
 }
 
 func (e *Environment) Height() siacore.BlockHeight {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.Height()
 }
 
 func (e *Environment) TransactionList() []siacore.Transaction {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.TransactionList()
 }
 
 func (e *Environment) BlockFromID(bid siacore.BlockID) (siacore.Block, error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.BlockFromID(bid)
 }
 
 func (e *Environment) BlockAtHeight(height siacore.BlockHeight) (siacore.Block, error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.BlockAtHeight(height)
 }
 
