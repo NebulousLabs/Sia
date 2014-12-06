@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-func (e *Environment) setUpHandlers() {
-	// set up handlers
+// TODO: timeouts?
+func (e *Environment) setUpHandlers(apiPort uint16) {
 	http.HandleFunc("/sync", e.syncHandler)
 	http.HandleFunc("/mine", e.mineHandler)
 	http.HandleFunc("/send", e.sendHandler)
@@ -20,9 +21,9 @@ func (e *Environment) setUpHandlers() {
 	http.HandleFunc("/load", e.loadHandler)
 	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
-	// port should probably be an argument
-	// TODO: timeouts?
-	http.ListenAndServe(":9980", nil)
+
+	stringPort := string(append([]byte(":"), strconv.Itoa(int(apiPort))...)) // there's gotta be a better way to do this
+	http.ListenAndServe(stringPort, nil)
 }
 
 func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
