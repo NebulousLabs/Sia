@@ -28,9 +28,17 @@ func (na *NetAddress) String() string {
 	return net.JoinHostPort(na.Host, strconv.Itoa(int(na.Port)))
 }
 
+// handlerName truncates a string to 8 bytes. If len(name) < 8, the remaining
+// bytes are 0.
+func handlerName(name string) []byte {
+	b := make([]byte, 8)
+	copy(b, name)
+	return b
+}
+
 // Call establishes a TCP connection to the NetAddress, calls the provided
 // function on it, and closes the connection.
-func (na *NetAddress) Call(fn func(net.Conn) error) error {
+func (na *NetAddress) Call(name string, fn func(net.Conn) error) error {
 	conn, err := net.DialTimeout("tcp", na.String(), timeout)
 	if err != nil {
 		return err
@@ -39,6 +47,8 @@ func (na *NetAddress) Call(fn func(net.Conn) error) error {
 	// set default deadline
 	// note: fn can extend this deadline as needed
 	conn.SetDeadline(time.Now().Add(timeout))
+	// write header
+	conn.Write(handlerName(name))
 	return fn(conn)
 }
 
