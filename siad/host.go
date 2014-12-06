@@ -84,7 +84,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
 	// Sign the transaction.
-	e.wallet.SignTransaction(&t)
+	e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true})
 
 	e.AcceptTransaction(t)
 
@@ -176,7 +176,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 
 	// Add some inputs and outputs to the transaction to fund the burn half.
 	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
-	e.wallet.SignTransaction(&nt)
+	e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true})
 
 	// Check that the transaction is valid after the host signature.
 	e.state.Lock()
@@ -346,7 +346,7 @@ func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, r
 		if err != nil {
 			panic(err) // panic is not the best move here, but some sort of urgent logging would be good.
 		}
-		err = e.wallet.SignTransaction(&txn)
+		err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true})
 		if err != nil {
 			panic(err)
 		}

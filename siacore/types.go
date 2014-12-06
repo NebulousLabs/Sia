@@ -94,9 +94,9 @@ type SpendConditions struct {
 // transaction have been signed.
 type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
-	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
+	PublicKeyIndex uint64
 	Signature      signatures.Signature
 }
 
@@ -218,8 +218,9 @@ func (b Block) SubsidyID() OutputID {
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
 func (t *Transaction) SigHash(i int) hash.Hash {
+	var signedData []byte
 	if t.Signatures[i].CoveredFields.WholeTransaction {
-		return hash.HashBytes(encoding.MarshalAll(
+		signedData = append(signedData, encoding.MarshalAll(
 			t.ArbitraryData,
 			t.Inputs,
 			t.MinerFees,
@@ -229,28 +230,28 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
-		))
+		)...)
+	} else {
+		if t.Signatures[i].CoveredFields.ArbitraryData {
+			signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
+		}
+		for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
+		}
+		for _, input := range t.Signatures[i].CoveredFields.Inputs {
+			signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
+		}
+		for _, output := range t.Signatures[i].CoveredFields.Outputs {
+			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
+		}
+		for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
+		}
+		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
+			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
+		}
 	}
 
-	var signedData []byte
-	if t.Signatures[i].CoveredFields.ArbitraryData {
-		signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
-	}
-	for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
-		signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
-	}
-	for _, input := range t.Signatures[i].CoveredFields.Inputs {
-		signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
-	}
-	for _, output := range t.Signatures[i].CoveredFields.Outputs {
-		signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
-	}
-	for _, contract := range t.Signatures[i].CoveredFields.Contracts {
-		signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
-	}
-	for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
-		signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
-	}
 	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
 		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
 	}
