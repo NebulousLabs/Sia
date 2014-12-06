@@ -2,7 +2,6 @@ package siad
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
@@ -15,9 +14,7 @@ import (
 type Environment struct {
 	state *siacore.State
 
-	server       *network.TCPServer
-	caughtUp     bool // False while downloading blocks.
-	caughtUpLock sync.Mutex
+	server *network.TCPServer
 
 	host         *Host
 	hostDatabase *HostDatabase
@@ -43,6 +40,9 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		transactionChan: make(chan siacore.Transaction, 100),
 	}
 
+	e.hostDatabase = CreateHostDatabase()
+	e.host = CreateHost()
+	e.renter = CreateRenter()
 	err = e.initializeNetwork(port, nobootstrap)
 	if err != nil {
 		return
@@ -50,9 +50,6 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 	e.wallet = CreateWallet(e.state)
 	ROblockChan := (chan<- siacore.Block)(e.blockChan)
 	e.miner = CreateMiner(e.state, ROblockChan, e.wallet.SpendConditions.CoinAddress())
-	e.host = CreateHost()
-	e.hostDatabase = CreateHostDatabase()
-	e.renter = CreateRenter()
 
 	return
 }
@@ -78,9 +75,6 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 	e.server.Register("RetrieveFile", e.RetrieveFile)
 
 	if nobootstrap {
-		e.caughtUpLock.Lock()
-		e.caughtUp = true
-		e.caughtUpLock.Unlock()
 		go e.listen()
 		return
 	}
@@ -97,10 +91,6 @@ func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err erro
 		if err := e.CatchUp(e.RandomPeer()); err != nil {
 			fmt.Println("Error during CatchUp:", err)
 		}
-
-		e.caughtUpLock.Lock()
-		e.caughtUp = true
-		e.caughtUpLock.Unlock()
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
