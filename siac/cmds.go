@@ -20,6 +20,7 @@ func getResponse(handler string, vals *url.Values) string {
 		qs += vals.Encode()
 	}
 	// send GET request
+	// TODO: timeout?
 	resp, err := http.Get(hostname + handler + qs)
 	if err != nil {
 		return err.Error()
@@ -57,7 +58,7 @@ func minecmd(cmd *cobra.Command, args []string) {
 		return
 	}
 	// TODO: need start/stop
-	getResponse("/mine", nil)
+	fmt.Println(getResponse("/mine", nil))
 }
 
 func sendcmd(cmd *cobra.Command, args []string) {

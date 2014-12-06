@@ -24,5 +24,6 @@ func main() {
 	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
 	// port should probably be an argument
+	// TODO: timeouts?
 	http.ListenAndServe(":9980", nil)
 }

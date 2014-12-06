@@ -10,7 +10,7 @@ func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Client v0.1.0",
-		Long:  "Start the Sia daemon.",
+		Long:  "Sia Client v0.1.0",
 		Run:   startcmd,
 	}
 

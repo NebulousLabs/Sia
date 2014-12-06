@@ -20,8 +20,13 @@ func (e *Environment) catchupHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: start/stop
+	// TODO: start/stop subcommands
 	e.ToggleMining()
+	if e.Mining() {
+		fmt.Fprint(w, "Started mining")
+	} else {
+		fmt.Fprint(w, "Stopped mining")
+	}
 }
 
 func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
@@ -32,7 +37,12 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	fmt.Sscan(req.FormValue("amount"), &amount)
 	fmt.Sscan(req.FormValue("fee"), &fee)
 	fmt.Sscan(req.FormValue("dest"), &dest)
-	e.SpendCoins(amount, fee, dest)
+	_, err := e.SpendCoins(amount, fee, dest)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Sent "+req.FormValue("amount")+" coins to "+req.FormValue("dest"))
+	}
 }
 
 func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
@@ -60,17 +70,32 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		CoinAddress:           e.CoinAddress(),
 		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
 	})
-	e.HostAnnounceSelf(freezeCoins, freezeBlocks+e.Height(), 10)
+	_, err := e.HostAnnounceSelf(freezeCoins, freezeBlocks+e.Height(), 10)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Announce successful")
+	}
 }
 
 func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
 	filename := req.FormValue("filename")
-	e.ClientProposeContract(filename)
+	err := e.ClientProposeContract(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Upload complete: "+filename)
+	}
 }
 
 func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	filename := req.FormValue("filename")
-	e.Download(filename)
+	err := e.Download(filename)
+	if err != nil {
+		fmt.Fprint(w, err)
+	} else {
+		fmt.Fprint(w, "Download complete: "+filename)
+	}
 }
 
 func (e *Environment) saveHandler(w http.ResponseWriter, req *http.Request) {
@@ -91,7 +116,7 @@ func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Fprint(w, err)
 	} else {
-		fmt.Fprint(w, "Saved coin address to "+filename)
+		fmt.Fprint(w, "Loaded coin address to "+filename)
 	}
 }
 
@@ -132,20 +157,4 @@ func (e *Environment) statusHandler(w http.ResponseWriter, req *http.Request) {
 		mineStatus, e.CoinAddress(), e.WalletBalance(),
 		info.Height, info.Target, info.Depth, peers, friends,
 	)
-}
-
-func (e *Environment) startServer() {
-	// set up handlers
-	http.HandleFunc("/catchup", e.catchupHandler)
-	http.HandleFunc("/mine", e.mineHandler)
-	http.HandleFunc("/send", e.sendHandler)
-	http.HandleFunc("/host", e.hostHandler)
-	http.HandleFunc("/rent", e.rentHandler)
-	http.HandleFunc("/download", e.downloadHandler)
-	http.HandleFunc("/save", e.saveHandler)
-	http.HandleFunc("/load", e.loadHandler)
-	http.HandleFunc("/status", e.statusHandler)
-	http.HandleFunc("/stop", e.stopHandler)
-	// port should probably be an argument
-	http.ListenAndServe(":9980", nil)
 }
