@@ -165,8 +165,7 @@ func IntToTarget(i *big.Int) (t Target) {
 	// i may overflow the maximum target.
 	// In the event of overflow, return the maximum.
 	if i.BitLen() > 256 {
-		copy(t[:], bytes.Repeat([]byte{0xFF}, 32))
-		return
+		return RootDepth
 	}
 	b := i.Bytes()
 	// need to preserve big-endianness

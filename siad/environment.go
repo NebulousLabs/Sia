@@ -28,8 +28,9 @@ type Environment struct {
 	transactionChan chan siacore.Transaction
 
 	// Mining variables
-	mining     bool         // true when mining
-	miningLock sync.RWMutex // prevents benign race conditions
+	mining        bool         // true when mining
+	miningThreads int          // number of processes mining at once
+	miningLock    sync.RWMutex // prevents benign race conditions
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and

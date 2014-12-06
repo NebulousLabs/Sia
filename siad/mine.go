@@ -9,6 +9,7 @@ import (
 
 var (
 	IterationsPerAttempt uint64 = 10 * 1000 * 1000
+	MiningThreads        int    = 1
 )
 
 // Return true if currently mining, false otherwise.
@@ -25,7 +26,9 @@ func (e *Environment) ToggleMining() (err error) {
 
 	if !e.mining {
 		e.mining = true
-		go e.mine()
+		for i := e.miningThreads; i < MiningThreads; i++ {
+			go e.mine()
+		}
 	} else {
 		e.mining = false
 	}
@@ -72,16 +75,33 @@ func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
 
 // mine attempts to generate blocks, and sends any found blocks down a channel.
 func (e *Environment) mine() {
+	e.miningLock.Lock()
+	e.miningThreads++
+	e.miningLock.Unlock()
+
+	// Try to solve a block repeatedly.
 	for {
+		// Get the mining status before trying to work.
 		e.miningLock.RLock()
 		mining := e.mining
 		e.miningLock.RUnlock()
 
+		// If we are still mining, do some work, otherwise disable mining and
+		// decrease the thread count for miners.
 		if mining {
 			b, target := e.blockForWork()
 			e.solveBlock(b, target)
 		} else {
-			return
+			e.miningLock.Lock()
+
+			// Need to check the mining status again, something might have
+			// changed while waiting for the lock.
+			if !e.mining {
+				e.miningThreads--
+				e.miningLock.Unlock()
+				return
+			}
+			e.miningLock.Unlock()
 		}
 	}
 }
