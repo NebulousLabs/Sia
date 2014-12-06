@@ -7,9 +7,9 @@ import (
 	"github.com/NebulousLabs/Andromeda/encoding"
 )
 
-// rpcName truncates a string to 8 bytes. If len(name) < 8, the remaining
+// HandlerName truncates a string to 8 bytes. If len(name) < 8, the remaining
 // bytes are 0.
-func rpcName(name string) []byte {
+func HandlerName(name string) []byte {
 	b := make([]byte, 8)
 	copy(b, name)
 	return b
@@ -20,8 +20,8 @@ func rpcName(name string) []byte {
 // 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
 // nil, no response is read.
 func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
-	return na.Call(func(conn net.Conn) error {
-		conn.Write(rpcName(name))
+	return na.Call(name, func(conn net.Conn) error {
+		conn.Write(HandlerName(name))
 		var data []byte
 		if arg != nil {
 			data = encoding.Marshal(arg)
