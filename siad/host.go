@@ -222,7 +222,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	if err != nil {
 		return
 	}
-	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(uint64(t.FileContracts[0].FileSize)))
+	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(t.FileContracts[0].FileSize))
 	if err != nil {
 		return
 	}

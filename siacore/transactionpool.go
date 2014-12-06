@@ -4,7 +4,7 @@ package siacore
 // haven't yet appeared in a block. It performs a safety/sanity check to verify
 // that no bad transactions have snuck in.
 func (s *State) TransactionPoolDump() (transactions []Transaction) {
-	var badTransactions []Transaction
+	var badTransactions []*Transaction
 	for _, transaction := range s.transactionList {
 		// Check that the transaction is valid, adding it a list of bad
 		// transactions if it is not. Cannot be removed immediately, because
@@ -13,7 +13,7 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 		err := s.ValidTransaction(*transaction)
 		if err != nil {
 			// panic? This code really shouldn't ever be triggered.
-			badTransactions = append(badTransactions, *transaction)
+			badTransactions = append(badTransactions, transaction)
 			continue
 		}
 		transactions = append(transactions, *transaction)
@@ -21,7 +21,7 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 
 	// Remove all of the now-bad transactions from the pool.
 	for _, transaction := range badTransactions {
-		s.removeTransactionFromPool(&transaction)
+		s.removeTransactionFromPool(transaction)
 	}
 	return
 }
