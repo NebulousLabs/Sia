@@ -1,0 +1,13 @@
+
+    </div>
+    <!-- /#wrapper -->
+
+    <!-- jQuery -->
+    <script src="lib/js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="lib/js/bootstrap.min.js"></script>
+
+</body>
+
+</html>
