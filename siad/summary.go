@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -30,6 +31,9 @@ type StateInfo struct {
 // If accurate data is paramount, SafeStateInfo() should be called, though this
 // can adversely affect performance.
 func (e *Environment) StateInfo() StateInfo {
+	e.state.RLock()
+	defer e.state.RUnlock()
+
 	return StateInfo{
 		StateHash: e.state.StateHash(),
 
@@ -44,50 +48,47 @@ func (e *Environment) StateInfo() StateInfo {
 	}
 }
 
-// SafeStateInfo locks the state before doing any reads, ensuring that the
-// reads are accurate and not prone to race conditions. This function can
-// sometimes take a while to return, however.
-func (e *Environment) SafeStateInfo() StateInfo {
-	e.state.Lock()
-	defer e.state.Unlock()
-	return e.StateInfo()
-}
-
 // Output returns the output that corresponds with a certain OutputID. It does
 // not lock the mutex, which means it could potentially (but usually doesn't)
 // produce weird or incorrect output.
 func (e *Environment) Output(id siacore.OutputID) (output siacore.Output, err error) {
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.Output(id)
 }
 
-// SafeOutput returns the output that corresponds with a certain OutputID,
-// using a mutex when accessing the state.
-func (e *Environment) SafeOutput(id siacore.OutputID) (output siacore.Output, err error) {
-	e.state.Lock()
-	defer e.state.Unlock()
-	return e.Output(id)
-}
-
 func (e *Environment) Height() siacore.BlockHeight {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.Height()
 }
 
 func (e *Environment) TransactionList() []siacore.Transaction {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.TransactionList()
 }
 
 func (e *Environment) BlockFromID(bid siacore.BlockID) (siacore.Block, error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.BlockFromID(bid)
 }
 
 func (e *Environment) BlockAtHeight(height siacore.BlockHeight) (siacore.Block, error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+	e.state.RLock()
+	defer e.state.RUnlock()
 	return e.state.BlockAtHeight(height)
+}
+
+func (e *Environment) AddressBook() []network.NetAddress {
+	return e.server.AddressBook()
+}
+
+func (e *Environment) RandomPeer() network.NetAddress {
+	return e.server.RandomPeer()
+}
+
+func (e *Environment) NetAddress() network.NetAddress {
+	return e.server.NetAddress()
 }

@@ -14,6 +14,48 @@ type (
 	BlockWeight *big.Rat
 )
 
+// The state struct contains a list of all known blocks, sorted into a tree
+// according to the shape of the network. It also contains the
+// 'ConsensusState', which represents the state of consensus on the current
+// longest fork.
+//
+// The state has a RWMutex. Any time you read from or write to the State
+// struct, you need to either have a read lock or a write lock on the state.
+// Internally, the state has no concurrency, so the mutex is never used within
+// the siacore package.
+type State struct {
+	// The block root operates like a linked list of blocks, forming the
+	// blocktree.
+	blockRoot *BlockNode
+
+	// One map for each potential type of block.
+	badBlocks map[BlockID]struct{}           // A list of blocks that don't verify.
+	blockMap  map[BlockID]*BlockNode         // A list of all blocks in the blocktree.
+	orphanMap map[BlockID]map[BlockID]*Block // First map = ID of missing parent, second map = ID of orphan block.
+
+	// The transaction pool works by storing a list of outputs that are
+	// spent by transactions in the pool, and pointing to the transaction
+	// that spends them. That makes it really easy to look up conflicts as
+	// new transacitons arrive, and also easy to remove transactions from
+	// the pool (delete every input used in the transaction.) The
+	// transaction list contains only the first output, so that when
+	// building blocks you can more easily iterate through every
+	// transaction.
+	transactionPool map[OutputID]*Transaction
+	transactionList map[OutputID]*Transaction
+
+	// Consensus Variables - the current state of consensus according to the
+	// longest fork.
+	currentBlockID BlockID
+	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
+	unspentOutputs map[OutputID]Output
+	openContracts  map[ContractID]*OpenContract
+	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
+
+	// AcceptBlock() and AcceptTransaction() can be called concurrently.
+	sync.RWMutex
+}
+
 // An open contract contains all information necessary to properly enforce a
 // contract with no knowledge of the history of the contract.
 type OpenContract struct {
@@ -50,43 +92,6 @@ type BlockNode struct {
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof
 	SuccessfulWindows    []ContractID
-}
-
-// The state struct contains a list of all known blocks, sorted into a tree
-// according to the shape of the network. It also contains the
-// 'ConsensusState', which represents the state of consensus on the current
-// longest fork.
-type State struct {
-	// The block root operates like a linked list of blocks, forming the
-	// blocktree.
-	blockRoot *BlockNode
-
-	// One map for each potential type of block.
-	badBlocks map[BlockID]struct{}           // A list of blocks that don't verify.
-	blockMap  map[BlockID]*BlockNode         // A list of all blocks in the blocktree.
-	orphanMap map[BlockID]map[BlockID]*Block // First map = ID of missing parent, second map = ID of orphan block.
-
-	// The transaction pool works by storing a list of outputs that are
-	// spent by transactions in the pool, and pointing to the transaction
-	// that spends them. That makes it really easy to look up conflicts as
-	// new transacitons arrive, and also easy to remove transactions from
-	// the pool (delete every input used in the transaction.) The
-	// transaction list contains only the first output, so that when
-	// building blocks you can more easily iterate through every
-	// transaction.
-	transactionPool map[OutputID]*Transaction
-	transactionList map[OutputID]*Transaction
-
-	// Consensus Variables - the current state of consensus according to the
-	// longest fork.
-	currentBlockID BlockID
-	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
-	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]*OpenContract
-	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
-
-	// AcceptBlock() and AcceptTransaction() can be called concurrently.
-	sync.Mutex
 }
 
 // CreateGenesisState will create the state that contains the genesis block and

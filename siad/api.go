@@ -4,9 +4,27 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
+
+// TODO: timeouts?
+func (e *Environment) setUpHandlers(apiPort uint16) {
+	http.HandleFunc("/sync", e.syncHandler)
+	http.HandleFunc("/mine", e.mineHandler)
+	http.HandleFunc("/send", e.sendHandler)
+	http.HandleFunc("/host", e.hostHandler)
+	http.HandleFunc("/rent", e.rentHandler)
+	http.HandleFunc("/download", e.downloadHandler)
+	http.HandleFunc("/save", e.saveHandler)
+	http.HandleFunc("/load", e.loadHandler)
+	http.HandleFunc("/status", e.statusHandler)
+	http.HandleFunc("/stop", e.stopHandler)
+
+	stringPort := string(append([]byte(":"), strconv.Itoa(int(apiPort))...)) // there's gotta be a better way to do this
+	http.ListenAndServe(stringPort, nil)
+}
 
 func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: more graceful shutdown?

@@ -65,11 +65,11 @@ func (w *Wallet) Scan() {
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
-	w.state.Lock()
+	w.state.RLock()
 	for _, output := range w.state.ScanOutputs(scanAddresses) {
 		w.OwnedOutputs[output] = struct{}{}
 	}
-	w.state.Unlock()
+	w.state.RUnlock()
 }
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund

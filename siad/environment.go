@@ -27,7 +27,9 @@ type Environment struct {
 	blockChan       chan siacore.Block
 	transactionChan chan siacore.Transaction
 
-	// Mining variables
+	// Mining variables. The mining variables are protected by the miningLock.
+	// Any time that you read from or write to any of the mining variables, you
+	// need to be under a lock.
 	mining        bool         // true when mining
 	miningThreads int          // number of processes mining at once
 	miningLock    sync.RWMutex // prevents benign race conditions
@@ -36,7 +38,7 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error) {
+func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
@@ -44,15 +46,20 @@ func CreateEnvironment(port uint16, nobootstrap bool) (e *Environment, err error
 		transactionChan: make(chan siacore.Transaction, 100),
 	}
 
+	// Initialize all internal structures.
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
 	e.wallet = CreateWallet(e.state)
 
-	err = e.initializeNetwork(port, nobootstrap)
+	// Bootstrap to the network.
+	err = e.initializeNetwork(rpcPort, nobootstrap)
 	if err != nil {
 		return
 	}
+
+	// Begin listening for requests on the api.
+	e.setUpHandlers(apiPort)
 
 	return
 }
@@ -65,8 +72,8 @@ func (e *Environment) Close() {
 
 // initializeNetwork registers the rpcs and bootstraps to the network,
 // downlading all of the blocks and establishing a peer list.
-func (e *Environment) initializeNetwork(port uint16, nobootstrap bool) (err error) {
-	e.server, err = network.NewTCPServer(port)
+func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err error) {
+	e.server, err = network.NewTCPServer(rpcPort)
 	if err != nil {
 		return
 	}
@@ -199,16 +206,4 @@ func (e *Environment) listen() {
 			e.processTransaction(t)
 		}
 	}
-}
-
-func (e *Environment) AddressBook() []network.NetAddress {
-	return e.server.AddressBook()
-}
-
-func (e *Environment) RandomPeer() network.NetAddress {
-	return e.server.RandomPeer()
-}
-
-func (e *Environment) NetAddress() network.NetAddress {
-	return e.server.NetAddress()
 }
