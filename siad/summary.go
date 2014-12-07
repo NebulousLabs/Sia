@@ -13,8 +13,6 @@ import (
 
 // Contains basic information about the state, but does not go into depth.
 type StateInfo struct {
-	StateHash hash.Hash
-
 	CurrentBlock           siacore.BlockID
 	Height                 siacore.BlockHeight
 	Target                 siacore.Target
@@ -25,6 +23,8 @@ type StateInfo struct {
 // Contains in depth information about the state - potentially a lot of
 // information.
 type DeepStateInfo struct {
+	StateHash hash.Hash
+
 	UtxoSet         []siacore.OutputID
 	TransactionList []siacore.Transaction
 }
@@ -40,8 +40,6 @@ func (e *Environment) StateInfo() StateInfo {
 	defer e.state.RUnlock()
 
 	return StateInfo{
-		StateHash: e.state.StateHash(),
-
 		CurrentBlock: e.state.CurrentBlock().ID(),
 		Height:       e.state.Height(),
 		Target:       e.state.CurrentTarget(),
@@ -55,6 +53,8 @@ func (e *Environment) DeepStateInfo() DeepStateInfo {
 	defer e.state.RUnlock()
 
 	return DeepStateInfo{
+		StateHash: e.state.StateHash(),
+
 		UtxoSet:         e.state.SortedUtxoSet(),
 		TransactionList: e.state.TransactionList(),
 	}

@@ -41,7 +41,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#">Overview</a>
+                    <a href="index.html">Overview</a>
                 </li>
                 <li>
                     <a href="#">File Management</a>
@@ -50,7 +50,7 @@
                     <a href="#">Money Management</a>
                 </li>
                 <li>
-                    <a href="#">Miner Management</a>
+                    <a href="mine.html">Miner Management</a>
                 </li>
             </ul>
         </div>

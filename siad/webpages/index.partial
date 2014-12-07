@@ -6,5 +6,5 @@
 							var resp = httpGet("/json/status");
 							var status = JSON.parse(resp);
 							document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + status.Mining;
-							document.getElementById('blockInfo').innerHTML = 'Current Height: ' + status.StateInfo.Height + '<br>Current Target: ' + status.StateInfo.Target + '<br>Current Depth: ' + status.StateInfo.Depth + '<br>State Hash: ' + status.StateInfo.StateHash;
+							document.getElementById('blockInfo').innerHTML = 'Current Height: ' + status.StateInfo.Height + '<br>Current Target: ' + status.StateInfo.Target + '<br>Current Depth: ' + status.StateInfo.Depth;
 						</script>
