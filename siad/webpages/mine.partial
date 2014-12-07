@@ -1,5 +1,6 @@
                         <h2>Mining</h2>
 						<p id="miningStatus">Loading...</p>
+						<button onclick="httpGet('/mine')">Toggle Mining</button>
 
 						<script>
 							var resp = httpGet("/json/status");
