@@ -11,6 +11,7 @@ import (
 // things like state height and depth, but without giving them the ability to
 // disrupt the environment's image of the state.
 
+// Contains basic information about the state, but does not go into depth.
 type StateInfo struct {
 	StateHash hash.Hash
 
@@ -19,7 +20,11 @@ type StateInfo struct {
 	Target                 siacore.Target
 	Depth                  siacore.Target
 	EarliestLegalTimestamp siacore.Timestamp
+}
 
+// Contains in depth information about the state - potentially a lot of
+// information.
+type DeepStateInfo struct {
 	UtxoSet         []siacore.OutputID
 	TransactionList []siacore.Transaction
 }
@@ -42,7 +47,14 @@ func (e *Environment) StateInfo() StateInfo {
 		Target:       e.state.CurrentTarget(),
 		Depth:        e.state.Depth(),
 		EarliestLegalTimestamp: e.state.EarliestLegalTimestamp(),
+	}
+}
 
+func (e *Environment) DeepStateInfo() DeepStateInfo {
+	e.state.RLock()
+	defer e.state.RUnlock()
+
+	return DeepStateInfo{
 		UtxoSet:         e.state.SortedUtxoSet(),
 		TransactionList: e.state.TransactionList(),
 	}
