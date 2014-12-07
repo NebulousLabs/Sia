@@ -1,9 +1,3 @@
                         <h2>Mining</h2>
 						<p id="miningStatus">Loading...</p>
-						<button onclick="httpGet('/mine')">Toggle Mining</button>
-
-						<script>
-							var resp = httpGet("/json/status");
-							var status = JSON.parse(resp);
-							document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + status.Mining;
-						</script>
+						<button onclick="updateGet('/mine')">Toggle Mining</button>

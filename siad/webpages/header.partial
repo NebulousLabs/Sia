@@ -18,12 +18,25 @@
     <link href="lib/css/sidebar.css" rel="stylesheet">
 
 	<script type="text/javascript">
+		function updatePage() {
+			var resp = httpGet("/json/status");
+			var stats = JSON.parse(resp);
+			document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + stats.Mining;
+			document.getElementById('blockInfo').innerHTML = 'Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth;
+		}
+
 		function httpGet(url) {
 			var xmlHttp = null;
 			xmlHttp = new XMLHttpRequest();
 			xmlHttp.open("GET", url, false);
 			xmlHttp.send(null);
 			return xmlHttp.responseText;
+		}
+
+		function updateGet(url) {
+			var resp = httpGet(url)
+			updatePage()
+			return resp
 		}
 	</script>
 </head>
@@ -36,7 +49,7 @@
         <div id="sidebar-wrapper">
             <ul class="sidebar-nav">
                 <li class="sidebar-brand">
-                    <a href="#">
+                    <a href="index.html">
                         Sia Web Interface
                     </a>
                 </li>

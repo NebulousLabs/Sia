@@ -7,6 +7,11 @@
     </div>
     <!-- /#wrapper -->
 
+	<script>
+		updatePage()
+		setInterval(updatePage, 666)
+	</script>
+
     <!-- jQuery -->
     <script src="lib/js/jquery.js"></script>
 
