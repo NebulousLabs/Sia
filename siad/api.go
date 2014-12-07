@@ -27,6 +27,9 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
 
+	// JSON API
+	http.HandleFunc("/json/status", e.jsonStatusHandler)
+
 	stringPort := string(append([]byte(":"), strconv.Itoa(int(apiPort))...)) // there's gotta be a better way to do this
 	http.ListenAndServe(stringPort, nil)
 }

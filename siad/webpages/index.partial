@@ -1,0 +1,8 @@
+                        <h1>Overview</h1>
+						<p id="miningStatus">Mining Status: Determining...</p>
+
+						<script>
+							var resp = httpGet("/json/status");
+							var status = JSON.parse(resp);
+							document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + status.Mining;
+						</script>

@@ -24,7 +24,10 @@ func webComposePage(body []byte) (page []byte, err error) {
 }
 
 func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
-	indexBody := []byte("in progress")
+	indexBody, err := ioutil.ReadFile("webpages/index.partial")
+	if err != nil {
+		fmt.Println(err)
+	}
 	page, err := webComposePage(indexBody)
 	if err != nil {
 		fmt.Fprint(w, err)

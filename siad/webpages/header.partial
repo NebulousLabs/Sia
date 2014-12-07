@@ -12,11 +12,20 @@
     <title>Simple Sidebar - Start Bootstrap Template</title>
 
     <!-- Bootstrap Core CSS -->
-    <link href="/lib/css/bootstrap.css" rel="stylesheet">
+    <link href="lib/css/bootstrap.css" rel="stylesheet">
 
     <!-- Custom CSS -->
-    <link href="/lib/css/sidebar.css" rel="stylesheet">
+    <link href="lib/css/sidebar.css" rel="stylesheet">
 
+	<script type="text/javascript">
+		function httpGet(url) {
+			var xmlHttp = null;
+			xmlHttp = new XMLHttpRequest();
+			xmlHttp.open("GET", url, false);
+			xmlHttp.send(null);
+			return xmlHttp.responseText;
+		}
+	</script>
 </head>
 
 <body>
