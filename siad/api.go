@@ -11,6 +11,11 @@ import (
 
 // TODO: timeouts?
 func (e *Environment) setUpHandlers(apiPort uint16) {
+	// Web Interface
+	http.HandleFunc("/", e.webIndex)
+	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir("webpages"))))
+
+	// Plaintext API
 	http.HandleFunc("/sync", e.syncHandler)
 	http.HandleFunc("/mine", e.mineHandler)
 	http.HandleFunc("/send", e.sendHandler)
