@@ -7,6 +7,24 @@
 						<h3>Host Settings</h3>
 						<p id="hostFullStatus">Loading...</p>
 
+						<h3>Update Settings Form</h3>
+						IP Address: <input type="text" id="hostIPAddress"></input><br>
+						Total Storage: <input type="text" id="hostTotalStorage"></input><br>
+						Min Filesize: <input type="text" id="hostMinFilesize"></input><br>
+						Max Filesize: <input type="text" id="hostMaxFilesize"></input><br>
+						Min Duration: <input type="text" id="hostMinDuration"></input><br>
+						Max Duration: <input type="text" id="hostMaxDuration"></input><br>
+						Min Challenge Window: <input type="text" id="hostMinWindow"></input><br>
+						Max Challenge Window: <input type="text" id="hostMaxWindow"></input><br>
+						Minimum Downtime Tolerance: <input type="text" id="hostMinTolerance"></input><br>
+						Price: <input type="text" id="hostPrice"></input><br>
+						Penalty: <input type="text" id="hostBurn"></input><br>
+						Coin Address: <input type="text" id="hostCoinAddress"></input><br>
+						<br>
+						Number of Coins to Freeze: <input type="text" id="hostFreezeVolume"></input><br>
+						Duration of Freeze (in blocks): <input type="text" id="hostFreezeDuration"></input><br>
+						<button onclick="hostAnnounce()">Submit</button>
+
 						<br><br>
 						<p id="apiResponse"></p>
                     </div>
