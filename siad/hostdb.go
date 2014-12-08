@@ -26,6 +26,7 @@ type HostAnnouncement struct {
 	IPAddress             network.NetAddress
 	MinFilesize           uint64
 	MaxFilesize           uint64
+	TotalStorage          uint64
 	MinDuration           siacore.BlockHeight
 	MaxDuration           siacore.BlockHeight
 	MinChallengeFrequency siacore.BlockHeight

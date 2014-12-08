@@ -5,8 +5,9 @@
                     <div class="col-lg-12">
                         <h2>Overview</h2>
 						<p id="miningStatus">Loading...</p>
-						<p id="blockInfo"></p>
+						<p id="blockStatus"></p>
 						<p id="walletStatus"></p>
+						<p id="hostStatus"></p>
 						<button onclick="responseBoxGet('/sync')">Resynchronize to Network</button>
 
 						<br><br>

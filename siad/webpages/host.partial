@@ -4,7 +4,7 @@
                 <div class="row">
                     <div class="col-lg-12">
                         <h2>Host Management</h2>
-						<p id="hostStatus">Not Implemented</p>
+						<p id="hostStatus">Loading...</p>
 
 						<br><br>
 						<p id="apiResponse"></p>

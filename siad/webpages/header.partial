@@ -34,7 +34,7 @@
 
 		function updateBlockInfo(updateString) {
 			try {
-				document.getElementById('blockInfo').innerHTML = updateString;
+				document.getElementById('blockStatus').innerHTML = updateString;
 			} catch(e) {
 			}
 		}
@@ -46,13 +46,28 @@
 			}
 		}
 
+		function updateHostStatus(updateString) {
+			try {
+				document.getElementById('hostStatus').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
-			updateBlockInfo('Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth);
-			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
-			updateHostStatus();
 			updateMiningStatus('Mining Status: ' + stats.Mining);
+			updateBlockInfo(
+				'Current Height: ' + stats.StateInfo.Height +
+				'<br>Current Target: ' + stats.StateInfo.Target +
+				'<br>Current Depth: ' + stats.StateInfo.Depth
+			);
+			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+			updateHostStatus(
+				'Host Total Storage: ' + stats.HostSettings.TotalStorage +
+				'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
+				'<br>Host Number of Contracts: ' + stats.HostContractCount
+			);
 		}
 
 		function httpGet(url) {
