@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
@@ -21,6 +22,16 @@ type FileEntry struct {
 
 type Renter struct {
 	Files map[string]FileEntry
+
+	sync.RWMutex
+}
+
+// RentedFiles returns a list of files that the renter is aware of.
+func (e *Environment) RentedFiles() (files []string) {
+	for key := range e.renter.Files {
+		files = append(files, key)
+	}
+	return
 }
 
 // ClientFundFileContract takes a template FileContract and returns a
