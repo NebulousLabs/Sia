@@ -49,9 +49,10 @@
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
-			updateMiningStatus('Mining Status: ' + stats.Mining);
-			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
 			updateBlockInfo('Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth);
+			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+			updateHostStatus();
+			updateMiningStatus('Mining Status: ' + stats.Mining);
 		}
 
 		function httpGet(url) {

@@ -37,21 +37,7 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 
 // jsonStatusHandler responds to a status call with a json object of the status.
 func (e *Environment) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := EnvironmentInfo{
-		StateInfo: e.StateInfo(),
-	}
-
-	e.miningLock.RLock()
-	if e.mining {
-		status.Mining = "On"
-	} else {
-		status.Mining = "Off"
-	}
-	e.miningLock.RUnlock()
-
-	status.WalletBalance = int(e.WalletBalance())
-	status.WalletAddress = fmt.Sprintf("%x", e.CoinAddress())
-
+	status := e.EnvironmentInfo()
 	resp, err := json.Marshal(status)
 	if err != nil {
 		fmt.Println(err)
