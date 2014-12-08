@@ -5,6 +5,12 @@
                     <div class="col-lg-12">
                         <h2>Money Management</h2>
 						<p id="walletStatus">Loading...</p>
+
+						<h3>Send Money Form</h3>
+						Address: <input type="text" id="destinationAddress"></input><br>
+						Amount to Send: <input type="text" id="amountToSend"></input><br>
+						Miner Fee: <input type="text" id="minerFee" value="50"></input><br>
+						<button onclick="sendMoney()">Submit</button>
                     </div>
                 </div>
             </div>

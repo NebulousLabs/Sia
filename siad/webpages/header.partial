@@ -60,6 +60,15 @@
 			updatePage()
 			return resp
 		}
+
+		function sendMoney() {
+			var destination = document.getElementById('destinationAddress').value;
+			var amount = document.getElementById('amountToSend').value;
+			var fee = document.getElementById('minerFee').value;
+			var request = "/sendcoins?amount="+amount+"?fee="+fee+"?dest="+destination
+			alert(request)
+			updateGet(request)
+		}
 	</script>
 </head>
 
