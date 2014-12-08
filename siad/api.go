@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
+	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
@@ -91,7 +93,7 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	// Sanity check the address.
 	// TODO: Make addresses checksummed or reed-solomon encoded.
 	if len(destBytes) != len(dest) {
-		fmt.Fprint(w, "address is not sufficiently long")
+		fmt.Fprint(w, "address is not the right length")
 		return
 	}
 	copy(dest[:], destBytes)
@@ -107,36 +109,129 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
-	var MB uint64
-	var price, freezeCoins siacore.Currency
-	var freezeBlocks siacore.BlockHeight
-	// scan values
-	// TODO: check error
-	fmt.Sscan(req.FormValue("MB"), &MB)
-	fmt.Sscan(req.FormValue("price"), &price)
-	fmt.Sscan(req.FormValue("freezeCoins"), &freezeCoins)
-	fmt.Sscan(req.FormValue("freezeBlocks"), &freezeBlocks)
+	// Create all of the variables that get scanned in.
+	var ipAddress network.NetAddress
+	var totalStorage, minFilesize, maxFilesize, minTolerance uint64
+	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration siacore.BlockHeight
+	var price, burn, freezeCoins siacore.Currency
+	var coinAddressBytes []byte
+	var coinAddress siacore.CoinAddress
 
-	e.SetHostSettings(HostAnnouncement{
-		IPAddress:          e.NetAddress(),
-		MinFilesize:        1024 * 1024, // 1 MB
-		MaxFilesize:        MB * 1024 * 1024,
-		MinDuration:        2000,
-		MaxDuration:        10000,
-		MinChallengeWindow: 250,
-		MaxChallengeWindow: 100,
-		MinTolerance:       10,
-		Price:              price,
-		Burn:               price,
-		CoinAddress:        e.CoinAddress(),
-		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
-	})
-	_, err := e.HostAnnounceSelf(freezeCoins, freezeBlocks+e.Height(), 10)
+	// Get the ip addres.
+	hostAndPort := strings.Split(req.FormValue("ipaddress"), ":")
+	if len(hostAndPort) != 2 {
+		fmt.Fprint(w, "could not read ip address")
+		return
+	}
+	_, err := fmt.Sscan(hostAndPort[0], &ipAddress.Host)
 	if err != nil {
 		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, "Announce successful")
+		return
 	}
+	_, err = fmt.Sscan(hostAndPort[1], &ipAddress.Port)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	// Get the integer variables.
+	_, err = fmt.Sscan(req.FormValue("totalstorage"), &totalStorage)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("minfile"), &minFilesize)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("maxfile"), &maxFilesize)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("mintolerance"), &minTolerance)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("minduration"), &minDuration)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("maxduration"), &maxDuration)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("minwin"), &minWindow)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("maxwin"), &maxWindow)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("freezeduration"), &freezeDuration)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("price"), &burn)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("penalty"), &price)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscan(req.FormValue("freezevolume"), &freezeCoins)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	// Get the CoinAddress.
+	_, err = fmt.Sscanf(req.FormValue("coinaddress"), "%x", &coinAddressBytes)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	if len(coinAddressBytes) != len(coinAddress) {
+		fmt.Fprint(w, "coin address is not the right length.")
+		return
+	}
+	copy(coinAddressBytes[:], coinAddress[:])
+
+	// Set the host settings.
+	e.SetHostSettings(HostAnnouncement{
+		IPAddress:          ipAddress,
+		MinFilesize:        minFilesize,
+		MaxFilesize:        maxFilesize,
+		MinDuration:        minDuration,
+		MaxDuration:        maxDuration,
+		MinChallengeWindow: minWindow,
+		MaxChallengeWindow: maxWindow,
+		MinTolerance:       minTolerance,
+		Price:              price,
+		Burn:               burn,
+		CoinAddress:        coinAddress,
+		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
+	})
+
+	// Make the host announcement.
+	_, err = e.HostAnnounceSelf(freezeCoins, freezeDuration+e.Height(), 10)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	fmt.Fprint(w, "Update successful")
 }
 
 func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
