@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Simple Sidebar - Start Bootstrap Template</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="lib/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="lib/css/sidebar.css" rel="stylesheet">
+
+	<script type="text/javascript">
+		function updatePage() {
+			var resp = httpGet("/json/status");
+			var stats = JSON.parse(resp);
+			document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + stats.Mining;
+			document.getElementById('blockInfo').innerHTML = 'Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth;
+		}
+
+		function httpGet(url) {
+			var xmlHttp = null;
+			xmlHttp = new XMLHttpRequest();
+			xmlHttp.open("GET", url, false);
+			xmlHttp.send(null);
+			return xmlHttp.responseText;
+		}
+
+		function updateGet(url) {
+			var resp = httpGet(url)
+			updatePage()
+			return resp
+		}
+	</script>
+</head>
+
+<body>
+
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <ul class="sidebar-nav">
+                <li class="sidebar-brand">
+                    <a href="index.html">
+                        Sia Web Interface
+                    </a>
+                </li>
+                <li>
+                    <a href="index.html">Overview</a>
+                </li>
+                <li>
+                    <a href="#">File Management</a>
+                </li>
+                <li>
+                    <a href="#">Money Management</a>
+                </li>
+                <li>
+                    <a href="mine.html">Miner Management</a>
+                </li>
+            </ul>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-lg-12">

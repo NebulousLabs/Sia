@@ -1,0 +1,3 @@
+                        <h2>Overview</h2>
+						<p id="miningStatus">Loading...</p>
+						<p id="blockInfo"></p>

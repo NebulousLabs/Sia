@@ -11,6 +11,11 @@ import (
 
 // TODO: timeouts?
 func (e *Environment) setUpHandlers(apiPort uint16) {
+	// Web Interface
+	http.HandleFunc("/", e.webIndex)
+	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir("webpages"))))
+
+	// Plaintext API
 	http.HandleFunc("/sync", e.syncHandler)
 	http.HandleFunc("/mine", e.mineHandler)
 	http.HandleFunc("/send", e.sendHandler)
@@ -21,6 +26,9 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 	http.HandleFunc("/load", e.loadHandler)
 	http.HandleFunc("/status", e.statusHandler)
 	http.HandleFunc("/stop", e.stopHandler)
+
+	// JSON API
+	http.HandleFunc("/json/status", e.jsonStatusHandler)
 
 	stringPort := string(append([]byte(":"), strconv.Itoa(int(apiPort))...)) // there's gotta be a better way to do this
 	http.ListenAndServe(stringPort, nil)

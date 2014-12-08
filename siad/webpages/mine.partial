@@ -1,0 +1,3 @@
+                        <h2>Mining</h2>
+						<p id="miningStatus">Loading...</p>
+						<button onclick="updateGet('/mine')">Toggle Mining</button>

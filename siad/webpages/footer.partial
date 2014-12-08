@@ -1,0 +1,23 @@
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
+
+    </div>
+    <!-- /#wrapper -->
+
+	<script>
+		updatePage()
+		setInterval(updatePage, 666)
+	</script>
+
+    <!-- jQuery -->
+    <script src="lib/js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="lib/js/bootstrap.min.js"></script>
+
+</body>
+
+</html>
