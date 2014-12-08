@@ -84,7 +84,7 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 	e.wallet.SignTransaction(&t, coveredFields)
 
 	// Negotiate the contract to the host.
-	err = host.IPAddress.Call(func(conn net.Conn) error {
+	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) error {
 		// send contract
 		if _, err := encoding.WriteObject(conn, t); err != nil {
 			return err
@@ -122,7 +122,7 @@ func (e *Environment) Download(filename string) (err error) {
 	if !ok {
 		return errors.New("no file entry for file: " + filename)
 	}
-	return fe.Host.IPAddress.Call(func(conn net.Conn) error {
+	return fe.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
 		// send filehash
 		if _, err := encoding.WriteObject(conn, fe.Contract.FileMerkleRoot); err != nil {
 			return err
