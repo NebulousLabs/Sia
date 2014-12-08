@@ -53,6 +53,13 @@
 			}
 		}
 
+		function updateHostFullStatus(updateString) {
+			try {
+				document.getElementById('hostFullStatus').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
@@ -67,6 +74,20 @@
 				'Host Total Storage: ' + stats.HostSettings.TotalStorage +
 				'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 				'<br>Host Number of Contracts: ' + stats.HostContractCount
+			);
+			updateHostFullStatus(
+				'IP Address: ' + stats.HostSettings.IPAddress +
+				'<br>TotalStorage: ' + stats.HostSettings.TotalStorage +
+				'<br>Min Filesize: ' + stats.HostSettings.MinFilesize +
+				'<br>Max Filesize: ' + stats.HostSettings.MaxFilesize +
+				'<br>Min Duration: ' + stats.HostSettings.MinDuration +
+				'<br>Max Duration: ' + stats.HostSettings.MaxDuration +
+				// '<br>Min Challenge Window: ' + stats.HostSettings.MinChallengeWindow +
+				// '<br>Max Challenge Window: ' + stats.HostSettings.MaxChallengeWindow +
+				'<br>Min Tolerance: ' + stats.HostSettings.MinTolerance +
+				'<br>Price: ' + stats.HostSettings.Price +
+				'<br>Burn: ' + stats.HostSettings.Burn +
+				'<br>CoinAddress: ' + stats.HostSettings.CoinAddress
 			);
 		}
 

@@ -24,9 +24,9 @@ type HostDatabase struct {
 // TODO: Change Min+Max ChallengeFrequency to Smallest+Largest ChallengeWindow.
 type HostAnnouncement struct {
 	IPAddress             network.NetAddress
+	TotalStorage          uint64
 	MinFilesize           uint64
 	MaxFilesize           uint64
-	TotalStorage          uint64
 	MinDuration           siacore.BlockHeight
 	MaxDuration           siacore.BlockHeight
 	MinChallengeFrequency siacore.BlockHeight
