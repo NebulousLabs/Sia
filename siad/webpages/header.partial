@@ -18,51 +18,54 @@
     <link href="lib/css/sidebar.css" rel="stylesheet">
 
 	<script type="text/javascript">
+		function setHostCoinAddress(address) {
+			try {
+				document.getElementById('hostCoinAddress').defaultValue = address
+			} catch(e) {}
+		}
+		
 		function updateMiningStatus(updateString) {
 			try {
 				document.getElementById('miningStatus').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updateWalletStatus(updateString) {
 			try {
 				document.getElementById('walletStatus').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updateBlockInfo(updateString) {
 			try {
 				document.getElementById('blockStatus').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updateResponseBox(updateString) {
 			try {
 				document.getElementById('apiResponse').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updateHostStatus(updateString) {
 			try {
 				document.getElementById('hostStatus').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updateHostFullStatus(updateString) {
 			try {
 				document.getElementById('hostFullStatus').innerHTML = updateString;
-			} catch(e) {
-			}
+			} catch(e) {}
 		}
 
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
+
+			setHostCoinAddress(stats.WalletAddress);
+
 			updateMiningStatus('Mining Status: ' + stats.Mining);
 			updateBlockInfo(
 				'Current Height: ' + stats.StateInfo.Height +

@@ -180,12 +180,12 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, err)
 		return
 	}
-	_, err = fmt.Sscan(req.FormValue("price"), &burn)
+	_, err = fmt.Sscan(req.FormValue("price"), &price)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
-	_, err = fmt.Sscan(req.FormValue("penalty"), &price)
+	_, err = fmt.Sscan(req.FormValue("penalty"), &burn)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
@@ -206,7 +206,7 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, "coin address is not the right length.")
 		return
 	}
-	copy(coinAddressBytes[:], coinAddress[:])
+	copy(coinAddress[:], coinAddressBytes[:])
 
 	// Set the host settings.
 	e.SetHostSettings(HostAnnouncement{
@@ -230,6 +230,8 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, err)
 		return
 	}
+
+	fmt.Println(ipAddress, totalStorage, minFilesize, maxFilesize, minDuration, maxDuration, minWindow, maxWindow, minTolerance, price, burn, coinAddress, freezeCoins, freezeDuration)
 
 	fmt.Fprint(w, "Update successful")
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Andromeda/hash"
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
@@ -30,17 +32,19 @@ type DeepStateInfo struct {
 }
 
 // EnvironmentInfo contains lightweight information about the environment.
+// Controvertially, instead of using canonical types, EnvironmentInfo switches
+// out a few of the types to be more human readable.
 type EnvironmentInfo struct {
 	StateInfo StateInfo
 
 	WalletBalance siacore.Currency
-	WalletAddress siacore.CoinAddress
+	WalletAddress string
 
 	HostSettings       HostAnnouncement
 	HostSpaceRemaining uint64
 	HostContractCount  int
 
-	Mining bool
+	Mining string
 }
 
 // StateInfo returns a bunch of useful information about the state, doing
@@ -80,13 +84,19 @@ func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
 		StateInfo: e.StateInfo(),
 
 		WalletBalance: e.WalletBalance(),
-		WalletAddress: e.CoinAddress(),
 
 		HostSettings:       e.HostSettings(),
 		HostSpaceRemaining: e.HostSpaceRemaining(),
-
-		Mining: e.Mining(),
 	}
+
+	if e.Mining() {
+		eInfo.Mining = "On"
+	} else {
+		eInfo.Mining = "Off"
+	}
+
+	coinAddress := e.CoinAddress()
+	eInfo.WalletAddress = fmt.Sprintf("%x", coinAddress)
 
 	e.host.RLock()
 	eInfo.HostContractCount = len(e.host.Files)
