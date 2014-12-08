@@ -92,19 +92,42 @@ func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
+	// Scan the inputs.
 	var amount, fee siacore.Currency
+	var destBytes []byte
 	var dest siacore.CoinAddress
-	// scan values
-	// TODO: check error
-	fmt.Sscan(req.FormValue("amount"), &amount)
-	fmt.Sscan(req.FormValue("fee"), &fee)
-	fmt.Sscan(req.FormValue("dest"), &dest)
-	_, err := e.SpendCoins(amount, fee, dest)
+	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		fmt.Fprint(w, err)
-	} else {
-		fmt.Fprint(w, "Sent "+req.FormValue("amount")+" coins to "+req.FormValue("dest"))
+		return
 	}
+	_, err = fmt.Sscan(req.FormValue("fee"), &fee)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+	_, err = fmt.Sscanf(req.FormValue("dest"), "%x", &destBytes)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	// Sanity check the address.
+	// TODO: Make addresses checksummed or reed-solomon encoded.
+	if len(destBytes) != len(dest) {
+		fmt.Fprint(w, "address is not sufficiently long")
+		return
+	}
+	copy(dest[:], destBytes)
+
+	// Spend the coins.
+	_, err = e.SpendCoins(amount, fee, dest)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	fmt.Fprintf(w, "Sent %v coins to %x, with fee of %v", amount, dest, fee)
 }
 
 func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {

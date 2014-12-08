@@ -11,6 +11,9 @@
 						Amount to Send: <input type="text" id="amountToSend"></input><br>
 						Miner Fee: <input type="text" id="minerFee" value="50"></input><br>
 						<button onclick="sendMoney()">Submit</button>
+
+						<br><br>
+						<p id="apiResponse"></p>
                     </div>
                 </div>
             </div>

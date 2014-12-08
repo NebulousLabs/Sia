@@ -4,7 +4,7 @@
 
 	<script>
 		updatePage()
-		setInterval(updatePage, 666)
+		setInterval(updatePage, 500)
 	</script>
 
     <!-- jQuery -->

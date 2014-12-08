@@ -7,7 +7,10 @@
 						<p id="miningStatus">Loading...</p>
 						<p id="blockInfo"></p>
 						<p id="walletStatus"></p>
-						<button onclick="updateGet('/sync')">Resynchronize to Network</button>
+						<button onclick="responseBoxGet('/sync')">Resynchronize to Network</button>
+
+						<br><br>
+						<p id="apiResponse"></p>
                     </div>
                 </div>
             </div>

@@ -39,6 +39,13 @@
 			}
 		}
 
+		function updateResponseBox(updateString) {
+			try {
+				document.getElementById('apiResponse').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
@@ -56,18 +63,23 @@
 		}
 
 		function updateGet(url) {
-			var resp = httpGet(url)
-			updatePage()
-			return resp
+			var resp = httpGet(url);
+			updatePage();
+			return resp;
+		}
+
+		function responseBoxGet(url) {
+			var resp = updateGet(url);
+			updateResponseBox(resp);
+			return resp;
 		}
 
 		function sendMoney() {
 			var destination = document.getElementById('destinationAddress').value;
 			var amount = document.getElementById('amountToSend').value;
 			var fee = document.getElementById('minerFee').value;
-			var request = "/sendcoins?amount="+amount+"?fee="+fee+"?dest="+destination
-			alert(request)
-			updateGet(request)
+			var request = "/sendcoins?amount="+amount+"&fee="+fee+"&dest="+destination;
+			responseBoxGet(request);
 		}
 	</script>
 </head>
