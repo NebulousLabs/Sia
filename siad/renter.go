@@ -51,16 +51,16 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 
 	// Fill out the contract according to the whims of the host.
 	fileContract := siacore.FileContract{
-		ContractFund:       (host.Price + host.Burn) * 5000 * siacore.Currency(info.Size()), // 5000 blocks.
-		FileMerkleRoot:     merkle,
-		FileSize:           uint64(info.Size()),
-		Start:              e.Height() + 100,
-		End:                e.Height() + 5100,
-		ChallengeFrequency: host.Frequency,
-		Tolerance:          host.Tolerance,
-		ValidProofPayout:   host.Price,
-		ValidProofAddress:  host.CoinAddress,
-		MissedProofPayout:  host.Burn,
+		ContractFund:      (host.Price + host.Burn) * 5000 * siacore.Currency(info.Size()), // 5000 blocks.
+		FileMerkleRoot:    merkle,
+		FileSize:          uint64(info.Size()),
+		Start:             e.Height() + 100,
+		End:               e.Height() + 5100,
+		ChallengeWindow:   host.Window,
+		Tolerance:         host.Tolerance,
+		ValidProofPayout:  host.Price,
+		ValidProofAddress: host.CoinAddress,
+		MissedProofPayout: host.Burn,
 		// MissedProofAddress is going to be 0, funds sent to the burn address.
 	}
 

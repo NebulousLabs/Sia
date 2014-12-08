@@ -80,7 +80,7 @@ func sendcmd(cmd *cobra.Command, args []string) {
 		cmd.Usage()
 		return
 	}
-	fmt.Println(getResponse("/send", &url.Values{
+	fmt.Println(getResponse("/sendcoins", &url.Values{
 		"amount": {args[0]},
 		"fee":    {args[1]},
 		"dest":   {args[2]},

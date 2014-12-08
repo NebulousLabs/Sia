@@ -18,11 +18,82 @@
     <link href="lib/css/sidebar.css" rel="stylesheet">
 
 	<script type="text/javascript">
+		function setHostCoinAddress(address) {
+			try {
+				document.getElementById('hostCoinAddress').defaultValue = address
+			} catch(e) {}
+		}
+		
+		function updateMiningStatus(updateString) {
+			try {
+				document.getElementById('miningStatus').innerHTML = updateString;
+			} catch(e) {}
+		}
+
+		function updateWalletStatus(updateString) {
+			try {
+				document.getElementById('walletStatus').innerHTML = updateString;
+			} catch(e) {}
+		}
+
+		function updateBlockInfo(updateString) {
+			try {
+				document.getElementById('blockStatus').innerHTML = updateString;
+			} catch(e) {}
+		}
+
+		function updateResponseBox(updateString) {
+			try {
+				document.getElementById('apiResponse').innerHTML = updateString;
+			} catch(e) {}
+		}
+
+		function updateHostStatus(updateString) {
+			try {
+				document.getElementById('hostStatus').innerHTML = updateString;
+			} catch(e) {}
+		}
+
+		function updateHostFullStatus(updateString) {
+			try {
+				document.getElementById('hostFullStatus').innerHTML = updateString;
+			} catch(e) {}
+		}
+
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
-			document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + stats.Mining;
-			document.getElementById('blockInfo').innerHTML = 'Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth;
+
+			setHostCoinAddress(stats.WalletAddress);
+
+			updateMiningStatus('Mining Status: ' + stats.Mining);
+			updateBlockInfo(
+				'Current Height: ' + stats.StateInfo.Height +
+				'<br>Current Target: ' + stats.StateInfo.Target +
+				'<br>Current Depth: ' + stats.StateInfo.Depth
+			);
+			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+			updateHostStatus(
+				'Host Total Storage: ' + stats.HostSettings.TotalStorage +
+				'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
+				'<br>Host Number of Contracts: ' + stats.HostContractCount
+			);
+			updateHostFullStatus(
+				'IP Address: ' + stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port +
+				'<br>Total Storage: ' + stats.HostSettings.TotalStorage +
+				'<br>Unsold Storage: ' + stats.HostSpaceRemaining +
+				'<br>Number of Contracts: ' + stats.HostContractCount +
+				'<br>Min Filesize: ' + stats.HostSettings.MinFilesize +
+				'<br>Max Filesize: ' + stats.HostSettings.MaxFilesize +
+				'<br>Min Duration: ' + stats.HostSettings.MinDuration +
+				'<br>Max Duration: ' + stats.HostSettings.MaxDuration +
+				'<br>Min Challenge Window: ' + stats.HostSettings.MinChallengeWindow +
+				'<br>Max Challenge Window: ' + stats.HostSettings.MaxChallengeWindow +
+				'<br>Min Tolerance: ' + stats.HostSettings.MinTolerance +
+				'<br>Price: ' + stats.HostSettings.Price +
+				'<br>Burn: ' + stats.HostSettings.Burn +
+				'<br>CoinAddress: ' + stats.HostSettings.CoinAddress
+			);
 		}
 
 		function httpGet(url) {
@@ -34,9 +105,57 @@
 		}
 
 		function updateGet(url) {
-			var resp = httpGet(url)
-			updatePage()
-			return resp
+			var resp = httpGet(url);
+			updatePage();
+			return resp;
+		}
+
+		function responseBoxGet(url) {
+			var resp = updateGet(url);
+			updateResponseBox(resp);
+			return resp;
+		}
+
+		function sendMoney() {
+			var destination = document.getElementById('destinationAddress').value;
+			var amount = document.getElementById('amountToSend').value;
+			var fee = document.getElementById('minerFee').value;
+			var request = "/sendcoins?amount="+amount+"&fee="+fee+"&dest="+destination;
+			responseBoxGet(request);
+		}
+
+		function hostAnnounce() {
+			var address = document.getElementById('hostIPAddress').value;
+			var totalstorage = document.getElementById('hostTotalStorage').value;
+			var minfile = document.getElementById('hostMinFilesize').value;
+			var maxfile = document.getElementById('hostMaxFilesize').value;
+			var minduration = document.getElementById('hostMinDuration').value;
+			var maxduration = document.getElementById('hostMaxDuration').value;
+			var minwin = document.getElementById('hostMinWindow').value;
+			var maxwin = document.getElementById('hostMaxWindow').value;
+			var mintolerance = document.getElementById('hostMinTolerance').value;
+			var price = document.getElementById('hostPrice').value;
+			var penalty = document.getElementById('hostBurn').value;
+			var coinaddress = document.getElementById('hostCoinAddress').value;
+			var freezevolume = document.getElementById('hostFreezeVolume').value;
+			var freezeduration = document.getElementById('hostFreezeDuration').value;
+
+			var request = "/host?ipaddress="+address+
+				"&totalstorage="+totalstorage+
+				"&minfile="+minfile+
+				"&maxfile="+maxfile+
+				"&minduration="+minduration+
+				"&maxduration="+maxduration+
+				"&minwin="+minwin+
+				"&maxwin="+maxwin+
+				"&mintolerance="+mintolerance+
+				"&price="+price+
+				"&penalty="+penalty+
+				"&coinaddress="+coinaddress+
+				"&freezevolume="+freezevolume+
+				"&freezeduration="+freezeduration;
+
+			responseBoxGet(request);
 		}
 	</script>
 </head>
@@ -57,10 +176,13 @@
                     <a href="index.html">Overview</a>
                 </li>
                 <li>
-                    <a href="#">File Management</a>
+                    <a href="wallet.html">Money Management</a>
                 </li>
                 <li>
-                    <a href="#">Money Management</a>
+                    <a href="rent.html">File Management</a>
+                </li>
+                <li>
+                    <a href="host.html">Host Management</a>
                 </li>
                 <li>
                     <a href="mine.html">Miner Management</a>
@@ -69,8 +191,3 @@
         </div>
         <!-- /#sidebar-wrapper -->
 
-        <!-- Page Content -->
-        <div id="page-content-wrapper">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-lg-12">

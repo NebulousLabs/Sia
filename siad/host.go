@@ -29,22 +29,45 @@ type Host struct {
 	SpaceRemaining uint64
 
 	Files map[hash.Hash]string
-	index int
+	Index int
 
 	ForwardContracts  map[siacore.BlockHeight][]ContractEntry
 	BackwardContracts map[siacore.BlockHeight][]ContractEntry
 
-	sync.Mutex
+	sync.RWMutex
 }
 
-func CreateHost() *Host {
-	return new(Host)
+// CreateHost returns an initialized host.
+func CreateHost() (h *Host) {
+	h = new(Host)
+	h.Files = make(map[hash.Hash]string)
+	return
+}
+
+// HostSettings returns the host's settings.
+func (e *Environment) HostSettings() HostAnnouncement {
+	e.host.RLock()
+	defer e.host.RUnlock()
+	return e.host.Settings
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
 // because Environment.host is not exported.
 func (e *Environment) SetHostSettings(ha HostAnnouncement) {
+	e.host.Lock()
+	defer e.host.Unlock()
 	e.host.Settings = ha
+}
+
+// HostSpaceRemaining returns the amount of unsold space that the host has
+// allocated.
+//
+// TODO: Make sure that when a contract terminates, the space is returned to
+// the unsold space pool.
+func (e *Environment) HostSpaceRemaining() uint64 {
+	e.host.RLock()
+	defer e.host.RUnlock()
+	return e.host.SpaceRemaining
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
@@ -128,7 +151,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Check that challenges will not be happening too frequently or infrequently.
-	if nt.FileContracts[0].ChallengeFrequency < e.host.Settings.MaxChallengeFrequency || nt.FileContracts[0].ChallengeFrequency > e.host.Settings.MinChallengeFrequency {
+	if nt.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow || nt.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow {
 		err = errors.New("challenges frequency is too often")
 		return
 	}
@@ -153,14 +176,14 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Verify that output for failed proofs matches burn.
-	requiredBurn := e.host.Settings.Burn * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeFrequency)
+	requiredBurn := e.host.Settings.Burn * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].MissedProofPayout > requiredBurn {
 		err = errors.New("burn payout is too high for a missed proof.")
 		return
 	}
 
 	// Verify that the outputs for successful proofs are high enough.
-	requiredSize := e.host.Settings.Price * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeFrequency)
+	requiredSize := e.host.Settings.Price * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].ValidProofPayout < requiredSize {
 		err = errors.New("valid proof payout is too low")
 		return
@@ -207,7 +230,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 		return
 	}
 	// read file data
-	file, err := os.Create(strconv.Itoa(e.host.index))
+	file, err := os.Create(strconv.Itoa(e.host.Index))
 	if err != nil {
 		return
 	}
@@ -238,8 +261,8 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	}
 
 	// record filename for later retrieval
-	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.index)
-	e.host.index++
+	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.Index)
+	e.host.Index++
 
 	// Submit the transaction.
 	e.AcceptTransaction(t)
@@ -330,7 +353,7 @@ func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, r
 			e.host.BackwardContracts[height-2] = append(e.host.BackwardContracts[height-2], contractEntry)
 
 			// Add this contract entry to ForwardContracts windowsize blocks into the future.
-			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency], contractEntry)
+			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeWindow] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeWindow], contractEntry)
 		}
 		delete(e.host.ForwardContracts, height)
 		height++

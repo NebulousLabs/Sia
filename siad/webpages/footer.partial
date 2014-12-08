@@ -1,15 +1,10 @@
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- /#page-content-wrapper -->
 
     </div>
     <!-- /#wrapper -->
 
 	<script>
 		updatePage()
-		setInterval(updatePage, 666)
+		setInterval(updatePage, 500)
 	</script>
 
     <!-- jQuery -->

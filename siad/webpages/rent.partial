@@ -3,9 +3,8 @@
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-lg-12">
-                        <h2>Mining</h2>
-						<p id="miningStatus">Loading...</p>
-						<button onclick="responseBoxGet('/mine')">Toggle Mining</button>
+                        <h2>File Management</h2>
+						<p id="rentStatus">Not Implemented</p>
 
 						<br><br>
 						<p id="apiResponse"></p>
