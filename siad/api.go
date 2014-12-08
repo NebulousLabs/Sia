@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,6 +9,13 @@ import (
 
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
+
+// EnvironmentInfo contains lightweight information about the environment.
+type EnvironmentInfo struct {
+	StateInfo StateInfo
+
+	Mining string
+}
 
 // TODO: timeouts?
 func (e *Environment) setUpHandlers(apiPort uint16) {
@@ -32,6 +40,27 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 
 	stringPort := string(append([]byte(":"), strconv.Itoa(int(apiPort))...)) // there's gotta be a better way to do this
 	http.ListenAndServe(stringPort, nil)
+}
+
+// jsonStatusHandler responds to a status call with a json object of the status.
+func (e *Environment) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
+	status := EnvironmentInfo{
+		StateInfo: e.StateInfo(),
+	}
+
+	e.miningLock.RLock()
+	if e.mining {
+		status.Mining = "On"
+	} else {
+		status.Mining = "Off"
+	}
+	e.miningLock.RUnlock()
+
+	resp, err := json.Marshal(status)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Fprintf(w, "%s", resp)
 }
 
 func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {

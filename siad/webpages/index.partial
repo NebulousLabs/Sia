@@ -1,3 +1,14 @@
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-lg-12">
                         <h2>Overview</h2>
 						<p id="miningStatus">Loading...</p>
 						<p id="blockInfo"></p>
+						<button onclick="updateGet('/sync')">Resynchronize to Network</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
