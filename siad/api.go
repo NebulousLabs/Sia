@@ -118,17 +118,17 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	fmt.Sscan(req.FormValue("freezeBlocks"), &freezeBlocks)
 
 	e.SetHostSettings(HostAnnouncement{
-		IPAddress:             e.NetAddress(),
-		MinFilesize:           1024 * 1024, // 1 MB
-		MaxFilesize:           MB * 1024 * 1024,
-		MinDuration:           2000,
-		MaxDuration:           10000,
-		MinChallengeFrequency: 250,
-		MaxChallengeFrequency: 100,
-		MinTolerance:          10,
-		Price:                 price,
-		Burn:                  price,
-		CoinAddress:           e.CoinAddress(),
+		IPAddress:          e.NetAddress(),
+		MinFilesize:        1024 * 1024, // 1 MB
+		MaxFilesize:        MB * 1024 * 1024,
+		MinDuration:        2000,
+		MaxDuration:        10000,
+		MinChallengeWindow: 250,
+		MaxChallengeWindow: 100,
+		MinTolerance:       10,
+		Price:              price,
+		Burn:               price,
+		CoinAddress:        e.CoinAddress(),
 		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
 	})
 	_, err := e.HostAnnounceSelf(freezeCoins, freezeBlocks+e.Height(), 10)

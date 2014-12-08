@@ -36,15 +36,15 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 
 	// Create host settings for each environment.
 	defaultSettings := HostAnnouncement{
-		MinFilesize:           1024,
-		MaxFilesize:           1024 * 1024,
-		MinDuration:           10,
-		MaxDuration:           1000,
-		MinChallengeFrequency: 1000,
-		MaxChallengeFrequency: 20,
-		MinTolerance:          5,
-		Price:                 5,
-		Burn:                  5,
+		MinFilesize:        1024,
+		MaxFilesize:        1024 * 1024,
+		MinDuration:        10,
+		MaxDuration:        1000,
+		MinChallengeWindow: 20,
+		MaxChallengeWindow: 1000,
+		MinTolerance:       5,
+		Price:              5,
+		Burn:               5,
 	}
 
 	// Create some host settings.

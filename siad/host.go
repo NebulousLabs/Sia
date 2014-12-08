@@ -151,7 +151,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Check that challenges will not be happening too frequently or infrequently.
-	if nt.FileContracts[0].ChallengeFrequency < e.host.Settings.MaxChallengeFrequency || nt.FileContracts[0].ChallengeFrequency > e.host.Settings.MinChallengeFrequency {
+	if nt.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow || nt.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow {
 		err = errors.New("challenges frequency is too often")
 		return
 	}
@@ -176,14 +176,14 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Verify that output for failed proofs matches burn.
-	requiredBurn := e.host.Settings.Burn * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeFrequency)
+	requiredBurn := e.host.Settings.Burn * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].MissedProofPayout > requiredBurn {
 		err = errors.New("burn payout is too high for a missed proof.")
 		return
 	}
 
 	// Verify that the outputs for successful proofs are high enough.
-	requiredSize := e.host.Settings.Price * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeFrequency)
+	requiredSize := e.host.Settings.Price * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].ValidProofPayout < requiredSize {
 		err = errors.New("valid proof payout is too low")
 		return
@@ -353,7 +353,7 @@ func (e *Environment) storageProofMaintenance(stateHeight siacore.BlockHeight, r
 			e.host.BackwardContracts[height-2] = append(e.host.BackwardContracts[height-2], contractEntry)
 
 			// Add this contract entry to ForwardContracts windowsize blocks into the future.
-			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeFrequency], contractEntry)
+			e.host.ForwardContracts[height+contractEntry.Contract.ChallengeWindow] = append(e.host.ForwardContracts[height+contractEntry.Contract.ChallengeWindow], contractEntry)
 		}
 		delete(e.host.ForwardContracts, height)
 		height++

@@ -20,21 +20,19 @@ type HostDatabase struct {
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
-//
-// TODO: Change Min+Max ChallengeFrequency to Smallest+Largest ChallengeWindow.
 type HostAnnouncement struct {
-	IPAddress             network.NetAddress
-	TotalStorage          uint64
-	MinFilesize           uint64
-	MaxFilesize           uint64
-	MinDuration           siacore.BlockHeight
-	MaxDuration           siacore.BlockHeight
-	MinChallengeFrequency siacore.BlockHeight
-	MaxChallengeFrequency siacore.BlockHeight
-	MinTolerance          uint64
-	Price                 siacore.Currency
-	Burn                  siacore.Currency
-	CoinAddress           siacore.CoinAddress // Might be unneeded.
+	IPAddress          network.NetAddress
+	TotalStorage       uint64
+	MinFilesize        uint64
+	MaxFilesize        uint64
+	MinDuration        siacore.BlockHeight
+	MaxDuration        siacore.BlockHeight
+	MinChallengeWindow siacore.BlockHeight
+	MaxChallengeWindow siacore.BlockHeight
+	MinTolerance       uint64
+	Price              siacore.Currency
+	Burn               siacore.Currency
+	CoinAddress        siacore.CoinAddress // Might be unneeded.
 
 	SpendConditions siacore.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
@@ -48,7 +46,7 @@ type HostEntry struct {
 	MaxFilesize uint64
 	MinDuration siacore.BlockHeight
 	MaxDuration siacore.BlockHeight
-	Frequency   siacore.BlockHeight
+	Window      siacore.BlockHeight
 	Tolerance   uint64
 	Price       siacore.Currency
 	Burn        siacore.Currency
@@ -89,7 +87,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 		if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
 			return
 		}
-		if ha.MaxChallengeFrequency > 100 {
+		if ha.MinChallengeWindow > 100 {
 			return
 		}
 		if ha.MinTolerance > 10 {
@@ -107,7 +105,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 			MaxFilesize: ha.MaxFilesize,
 			MinDuration: ha.MinDuration,
 			MaxDuration: ha.MaxDuration,
-			Frequency:   ha.MaxChallengeFrequency,
+			Window:      ha.MaxChallengeWindow,
 			Tolerance:   ha.MinTolerance,
 			Price:       ha.Price,
 			Burn:        ha.Burn,

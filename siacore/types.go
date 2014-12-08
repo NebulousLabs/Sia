@@ -127,7 +127,7 @@ type FileContract struct {
 	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
-	ChallengeFrequency BlockHeight // size of window, one window at a time
+	ChallengeWindow    BlockHeight // size of window, one window at a time
 	Tolerance          uint64      // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  CoinAddress
@@ -303,7 +303,7 @@ func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight
 		return
 	}
 
-	windowIndex = (height - fc.Start) / fc.ChallengeFrequency
+	windowIndex = (height - fc.Start) / fc.ChallengeWindow
 	return
 }
 

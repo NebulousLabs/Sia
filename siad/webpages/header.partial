@@ -82,8 +82,8 @@
 				'<br>Max Filesize: ' + stats.HostSettings.MaxFilesize +
 				'<br>Min Duration: ' + stats.HostSettings.MinDuration +
 				'<br>Max Duration: ' + stats.HostSettings.MaxDuration +
-				// '<br>Min Challenge Window: ' + stats.HostSettings.MinChallengeWindow +
-				// '<br>Max Challenge Window: ' + stats.HostSettings.MaxChallengeWindow +
+				'<br>Min Challenge Window: ' + stats.HostSettings.MinChallengeWindow +
+				'<br>Max Challenge Window: ' + stats.HostSettings.MaxChallengeWindow +
 				'<br>Min Tolerance: ' + stats.HostSettings.MinTolerance +
 				'<br>Price: ' + stats.HostSettings.Price +
 				'<br>Burn: ' + stats.HostSettings.Burn +

@@ -207,7 +207,7 @@ func successContractTests(testEnv *testingEnvironment) {
 					ContractFund:       5,
 					Start:              testEnv.state.Height() + 1,
 					End:                testEnv.state.Height() + 2,
-					ChallengeFrequency: 1,
+					ChallengeWindow : 1,
 					Tolerance:          1,
 					ValidProofPayout:   1,
 					ValidProofAddress:  testEnv.wallets[0].SpendConditions.CoinAddress(),

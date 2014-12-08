@@ -125,7 +125,7 @@ func (s *State) contractMaintenance() {
 	var contractsToDelete []ContractID
 	for _, openContract := range s.openContracts {
 		// Check for the window switching over.
-		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeFrequency == 0 && s.Height() > openContract.FileContract.Start {
+		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeWindow == 0 && s.Height() > openContract.FileContract.Start {
 			// Check for a missed proof.
 			if openContract.WindowSatisfied == false {
 				// Determine payout of missed proof.

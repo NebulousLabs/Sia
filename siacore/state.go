@@ -71,7 +71,7 @@ type OpenContract struct {
 // proofs are passive - they happen in the absense of a transaction, not in the
 // presense of one. They must be stored in the block nodes so that a block can
 // be correctly rewound without needing to scroll through the past
-// 'ChallengeFrequency' blocks to figure out if a proof was missed or not.
+// 'ChallengeWindow' blocks to figure out if a proof was missed or not.
 type MissedStorageProof struct {
 	OutputID   OutputID
 	ContractID ContractID
