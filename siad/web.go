@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 // composePage adds the header and the footer to the given byte slice, and
@@ -23,32 +24,23 @@ func webComposePage(body []byte) (page []byte, err error) {
 	return
 }
 
+// webIndex loads a partial page according to the http request and composes it
+// into a full page by adding the header and the footer, then serves the page.
+// If there is an error, the error is reported (unsanitized). If the error is a
+// 'partial file not found', a 404 (TODO) will be served.
 func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
-	// Figure out which partial file to load.
-	var fileToLoad string
+	// Load the appropriate partial file into memory.
 	fileRequested := string(req.URL.Path)
-	if fileRequested == "/" || fileRequested == "/index.html" {
-		fileToLoad = "webpages/index.partial"
-	} else if fileRequested == "/mine.html" {
-		fileToLoad = "webpages/mine.partial"
-	} else if fileRequested == "/wallet.html" {
-		fileToLoad = "webpages/wallet.partial"
-	} else if fileRequested == "/host.html" {
-		fileToLoad = "webpages/host.partial"
-	} else if fileRequested == "/rent.html" {
-		fileToLoad = "webpages/rent.partial"
-	} else {
-		fmt.Fprint(w, "unrecognized page request")
-		return
-	}
-
-	// Load the partial file, compose the webpage, and serve the webpage.
+	fileToLoad := "webpages" + strings.TrimSuffix(fileRequested, "html") + "partial"
 	indexBody, err := ioutil.ReadFile(fileToLoad)
 	if err != nil {
+		// TODO: serve a 404 if the file is not found.
 		fmt.Fprintf(w, err.Error())
 		fmt.Println(err)
 		return
 	}
+
+	// Compose the partial into a full page and serve the page.
 	page, err := webComposePage(indexBody)
 	if err != nil {
 		fmt.Fprint(w, err)

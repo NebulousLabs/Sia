@@ -84,6 +84,9 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, err)
 		return
 	}
+
+	// TODO: While scanning the address, check if it's the id of a known
+	// friend?
 	_, err = fmt.Sscanf(req.FormValue("dest"), "%x", &destBytes)
 	if err != nil {
 		fmt.Fprint(w, err)
