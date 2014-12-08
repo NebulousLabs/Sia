@@ -31,6 +31,8 @@ func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
 		fileToLoad = "webpages/index.partial"
 	} else if fileRequested == "/mine.html" {
 		fileToLoad = "webpages/mine.partial"
+	} else if fileRequested == "/wallet.html" {
+		fileToLoad = "webpages/wallet.partial"
 	} else {
 		fmt.Fprint(w, "unrecognized page request")
 		return

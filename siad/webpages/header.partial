@@ -18,11 +18,33 @@
     <link href="lib/css/sidebar.css" rel="stylesheet">
 
 	<script type="text/javascript">
+		function updateMiningStatus(updateString) {
+			try {
+				document.getElementById('miningStatus').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
+		function updateWalletStatus(updateString) {
+			try {
+				document.getElementById('walletStatus').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
+		function updateBlockInfo(updateString) {
+			try {
+				document.getElementById('blockInfo').innerHTML = updateString;
+			} catch(e) {
+			}
+		}
+
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
-			document.getElementById('miningStatus').innerHTML = 'Mining Status: ' + stats.Mining;
-			document.getElementById('blockInfo').innerHTML = 'Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth;
+			updateMiningStatus('Mining Status: ' + stats.Mining);
+			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+			updateBlockInfo('Current Height: ' + stats.StateInfo.Height + '<br>Current Target: ' + stats.StateInfo.Target + '<br>Current Depth: ' + stats.StateInfo.Depth);
 		}
 
 		function httpGet(url) {
@@ -60,7 +82,7 @@
                     <a href="#">File Management</a>
                 </li>
                 <li>
-                    <a href="#">Money Management</a>
+                    <a href="wallet.html">Money Management</a>
                 </li>
                 <li>
                     <a href="mine.html">Miner Management</a>

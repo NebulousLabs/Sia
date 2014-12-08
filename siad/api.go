@@ -15,6 +15,9 @@ type EnvironmentInfo struct {
 	StateInfo StateInfo
 
 	Mining string
+
+	WalletBalance int
+	WalletAddress string
 }
 
 // TODO: timeouts?
@@ -26,7 +29,7 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 	// Plaintext API
 	http.HandleFunc("/sync", e.syncHandler)
 	http.HandleFunc("/mine", e.mineHandler)
-	http.HandleFunc("/send", e.sendHandler)
+	http.HandleFunc("/sendcoins", e.sendHandler)
 	http.HandleFunc("/host", e.hostHandler)
 	http.HandleFunc("/rent", e.rentHandler)
 	http.HandleFunc("/download", e.downloadHandler)
@@ -55,6 +58,9 @@ func (e *Environment) jsonStatusHandler(w http.ResponseWriter, req *http.Request
 		status.Mining = "Off"
 	}
 	e.miningLock.RUnlock()
+
+	status.WalletBalance = int(e.WalletBalance())
+	status.WalletAddress = fmt.Sprintf("%x", e.CoinAddress())
 
 	resp, err := json.Marshal(status)
 	if err != nil {
