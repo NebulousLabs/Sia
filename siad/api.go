@@ -10,16 +10,6 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
-// EnvironmentInfo contains lightweight information about the environment.
-type EnvironmentInfo struct {
-	StateInfo StateInfo
-
-	Mining string
-
-	WalletBalance int
-	WalletAddress string
-}
-
 // TODO: timeouts?
 func (e *Environment) setUpHandlers(apiPort uint16) {
 	// Web Interface

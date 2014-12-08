@@ -29,6 +29,18 @@ type DeepStateInfo struct {
 	TransactionList []siacore.Transaction
 }
 
+// EnvironmentInfo contains lightweight information about the environment.
+type EnvironmentInfo struct {
+	StateInfo StateInfo
+
+	WalletBalance int
+	WalletAddress string
+
+	HostSettings HostAnnouncement
+
+	Mining string
+}
+
 // StateInfo returns a bunch of useful information about the state, doing
 // read-only accesses. StateInfo does not lock the state mutex, which means
 // that the data could potentially be weird on account of race conditions.
