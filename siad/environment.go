@@ -57,6 +57,7 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Env
 	if err != nil {
 		return
 	}
+	e.host.Settings.IPAddress = e.server.NetAddress()
 
 	// Begin listening for requests on the api.
 	e.setUpHandlers(apiPort)

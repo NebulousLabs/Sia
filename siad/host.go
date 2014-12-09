@@ -159,7 +159,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 
 	// Check that the file size listed in the contract is in bounds.
 	if fileSize < e.host.Settings.MinFilesize || fileSize > e.host.Settings.MaxFilesize {
-		err = errors.New("file is of incorrect size")
+		err = fmt.Errorf("file is of incorrect size - filesize %v, min %v, max %v", fileSize, e.host.Settings.MinFilesize, e.host.Settings.MaxFilesize)
 		return
 	}
 	// Check that there is space for the file.

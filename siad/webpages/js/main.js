@@ -51,19 +51,20 @@ function updatePage() {
 
 	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
 	safeSetElem('hostNumContracts', stats.HostContractCount)
-	safeSetElem('hostIPAddress', stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port)
-	safeSetElem('hostTotalStorage', stats.HostSettings.TotalStorage)
-	safeSetElem('hostUnsoldStorage', stats.HostSpaceRemaining)
-	safeSetElem('hostMinFilesize', stats.HostSettings.MinFilesize)
-	safeSetElem('hostMaxFilesize', stats.HostSettings.MaxFilesize)
-	safeSetElem('hostMinDuration', stats.HostSettings.MinDuration)
-	safeSetElem('hostMaxDuration', stats.HostSettings.MaxDuration)
-	safeSetElem('hostMinWindow', stats.HostSettings.MinChallengeWindow)
-	safeSetElem('hostMaxWindow', stats.HostSettings.MaxChallengeWindow)
-	safeSetElem('hostMinTolerance', stats.HostSettings.MinTolerance)
-	safeSetElem('hostPrice', stats.HostSettings.Price)
-	safeSetElem('hostBurn', stats.HostSettings.Burn)
-	safeSetElem('hostCoinAddress', stats.HostSettings.CoinAddress)
+
+	safeSetValue('hostIPAddress', stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port)
+	// safeSetValue('hostTotalStorage', stats.HostSettings.TotalStorage)
+	// safeSetValue('hostUnsoldStorage', stats.HostSpaceRemaining)
+	// safeSetValue('hostMinFilesize', stats.HostSettings.MinFilesize)
+	// safeSetValue('hostMaxFilesize', stats.HostSettings.MaxFilesize)
+	// safeSetValue('hostMinDuration', stats.HostSettings.MinDuration)
+	// safeSetValue('hostMaxDuration', stats.HostSettings.MaxDuration)
+	// safeSetValue('hostMinWindow', stats.HostSettings.MinChallengeWindow)
+	// safeSetValue('hostMaxWindow', stats.HostSettings.MaxChallengeWindow)
+	// safeSetValue('hostMinTolerance', stats.HostSettings.MinTolerance)
+	// safeSetValue('hostPrice', stats.HostSettings.Price)
+	// safeSetValue('hostBurn', stats.HostSettings.Burn)
+	// safeSetValue('hostCoinAddress', stats.HostSettings.CoinAddress)
 }
 
 function httpGet(url) {
