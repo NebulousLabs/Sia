@@ -333,6 +333,10 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 		validatedBlocks += 1
 	}
 
+	// Update the transaction pool to remove any transactions that have
+	// invalidated on account of invalidated storage proofs.
+	s.cleanTransactionPool()
+
 	return
 }
 

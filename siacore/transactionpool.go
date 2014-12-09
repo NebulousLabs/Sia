@@ -114,6 +114,25 @@ func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
 	}
 }
 
+// cleanTransactionPool removes transactions from the pool that are no longer
+// valid. This can happen if a proof of storage window index changes before the
+// proof makes it into a block. Can also happen during reorgs.
+func (s *State) cleanTransactionPool() {
+	var []badTransactions *Transaction
+	for _, transaction := range s.transactionList {
+		err = s.ValidTransaction(*transaction)
+		if err != nil {
+			badTransactions = append(transaction)
+		}
+	}
+	for _, transaction := range badTransactions {
+		s.removeTransactionFromPool(transaction)
+	}
+
+	// Once you've switched to ValidFloatingTransaction(), need to do a
+	// cascading removal of all transactions dependant on any that got removed.
+}
+
 // transactionPoolConflict compares a transaction to the transaction pool and
 // returns true if there is already a transaction in the transaction pool that
 // is in conflict with the current transaction.

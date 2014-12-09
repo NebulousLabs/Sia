@@ -109,6 +109,7 @@ func CreateGenesisState() *State {
 		unspentOutputs:         make(map[OutputID]Output),
 		spentOutputs:           make(map[OutputID]Output),
 		transactionPoolOutputs: make(map[OutputID]*Transaction),
+		transactionPoolProofs:  make(map[ContractID]*Transaction),
 		transactionList:        make(map[OutputID]*Transaction),
 	}
 
