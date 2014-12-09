@@ -135,25 +135,30 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 	return
 }
 
-// Wallet.signTransaction() takes a transaction and adds a signature for every input
-// that the wallet understands how to spend.
-func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredFields) (err error) {
-	for _, input := range t.Inputs {
-		// If we recognize the input as something we are able to sign, we sign
-		// the input.
-		if input.SpendConditions.CoinAddress() == w.SpendConditions.CoinAddress() {
-			txnSig := siacore.TransactionSignature{
-				InputID:       input.OutputID,
-				CoveredFields: cf,
-			}
-			t.Signatures = append(t.Signatures, txnSig)
+// Wallet.signTransaction() takes a transaction and adds a signature to the
+// specified input.
+func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredFields, inputIndex int) (err error) {
+	input := t.Inputs[inputIndex]
 
-			sigHash := t.SigHash(len(t.Signatures) - 1)
-			t.Signatures[len(t.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
-			if err != nil {
-				return
-			}
-		}
+	// Check that the spend conditions match.
+	if input.SpendConditions.CoinAddress() != w.SpendConditions.CoinAddress() {
+		err = errors.New("called SignTransaction on an unknown CoinAddress")
+		return
+	}
+
+	// Create and append the signature struct.
+	txnSig := siacore.TransactionSignature{
+		InputID:       input.OutputID,
+		CoveredFields: cf,
+	}
+	t.Signatures = append(t.Signatures, txnSig)
+
+	// Hash the transaction according to the covered fields and produce
+	// the cryptographic signature.
+	sigHash := t.SigHash(len(t.Signatures) - 1)
+	t.Signatures[len(t.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], w.SecretKey)
+	if err != nil {
+		return
 	}
 
 	return
@@ -179,9 +184,11 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore
 	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: dest})
 
 	// Sign each input.
-	err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true})
-	if err != nil {
-		return
+	for i := range t.Inputs {
+		err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true}, i)
+		if err != nil {
+			return
+		}
 	}
 
 	// Send the transaction to the environment.
