@@ -1,7 +1,14 @@
-function safeUpdate(field, value) {
+function safeSetElem(field, value) {
 	var elem = document.getElementById(field)
 	if (elem != null) {
 		elem.innerHTML = value
+	}
+}
+
+function safeSetValue(field, value) {
+	var elem = document.getElementById(field)
+	if (elem != null) {
+		elem.defaultValue = value
 	}
 }
 
@@ -9,21 +16,21 @@ function updatePage() {
 	var resp = httpGet("/json/status");
 	var stats = JSON.parse(resp);
 
-	safeUpdate('hostCoinAddress', stats.WalletAddress);
+	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
-	safeUpdate('miningStatus', 'Mining Status: ' + stats.Mining);
-	safeUpdate('blockStatus',
+	safeSetElem('miningStatus', 'Mining Status: ' + stats.Mining);
+	safeSetElem('blockStatus',
 		'Current Height: ' + stats.StateInfo.Height +
 		'<br>Current Target: ' + stats.StateInfo.Target +
 		'<br>Current Depth: ' + stats.StateInfo.Depth
 	);
-	safeUpdate('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
-	safeUpdate('hostStatus',
+	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+	safeSetElem('hostStatus',
 		'Host Total Storage: ' + stats.HostSettings.TotalStorage +
 		'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
-	safeUpdate('hostFullStatus',
+	safeSetElem('hostFullStatus',
 		'IP Address: ' + stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port +
 		'<br>Total Storage: ' + stats.HostSettings.TotalStorage +
 		'<br>Unsold Storage: ' + stats.HostSpaceRemaining +
@@ -50,7 +57,7 @@ function httpGet(url) {
 }
 
 function responseBoxGet(url) {
-	safeUpdate('apiResponse', httpGet(url));
+	safeSetElem('apiResponse', httpGet(url));
 }
 
 function sendMoney() {
