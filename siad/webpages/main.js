@@ -44,22 +44,21 @@ function updatePage() {
 		'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
-	safeSetElem('hostFullStatus',
-		'IP Address: ' + stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port +
-		'<br>Total Storage: ' + stats.HostSettings.TotalStorage +
-		'<br>Unsold Storage: ' + stats.HostSpaceRemaining +
-		'<br>Number of Contracts: ' + stats.HostContractCount +
-		'<br>Min Filesize: ' + stats.HostSettings.MinFilesize +
-		'<br>Max Filesize: ' + stats.HostSettings.MaxFilesize +
-		'<br>Min Duration: ' + stats.HostSettings.MinDuration +
-		'<br>Max Duration: ' + stats.HostSettings.MaxDuration +
-		'<br>Min Challenge Window: ' + stats.HostSettings.MinChallengeWindow +
-		'<br>Max Challenge Window: ' + stats.HostSettings.MaxChallengeWindow +
-		'<br>Min Tolerance: ' + stats.HostSettings.MinTolerance +
-		'<br>Price: ' + stats.HostSettings.Price +
-		'<br>Burn: ' + stats.HostSettings.Burn +
-		'<br>CoinAddress: ' + stats.HostSettings.CoinAddress
-	);
+
+	safeSetElem('hostNumContracts', stats.HostContractCount)
+	safeSetElem('hostIPAddress', stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port)
+	safeSetElem('hostTotalStorage', stats.HostSettings.TotalStorage)
+	safeSetElem('hostUnsoldStorage', stats.HostSpaceRemaining)
+	safeSetElem('hostMinFilesize', stats.HostSettings.MinFilesize)
+	safeSetElem('hostMaxFilesize', stats.HostSettings.MaxFilesize)
+	safeSetElem('hostMinDuration', stats.HostSettings.MinDuration)
+	safeSetElem('hostMaxDuration', stats.HostSettings.MaxDuration)
+	safeSetElem('hostMinWindow', stats.HostSettings.MinChallengeWindow)
+	safeSetElem('hostMaxWindow', stats.HostSettings.MaxChallengeWindow)
+	safeSetElem('hostMinTolerance', stats.HostSettings.MinTolerance)
+	safeSetElem('hostPrice', stats.HostSettings.Price)
+	safeSetElem('hostBurn', stats.HostSettings.Burn)
+	safeSetElem('hostCoinAddress', stats.HostSettings.CoinAddress)
 }
 
 function httpGet(url) {

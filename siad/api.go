@@ -72,7 +72,6 @@ func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
 func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount, fee siacore.Currency
-	var destBytes []byte
 	var dest siacore.CoinAddress
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
@@ -85,21 +84,22 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// TODO: While scanning the address, check if it's the id of a known
-	// friend?
-	_, err = fmt.Sscanf(req.FormValue("dest"), "%x", &destBytes)
-	if err != nil {
-		fmt.Fprint(w, err)
+	// dest can be either a coin address or a friend name
+	destString := req.FormValue("dest")
+	if ca, ok := e.friends[destString]; ok {
+		dest = ca
+	} else if len(destString) != 64 {
+		fmt.Fprint(w, "malformed coin address")
 		return
+	} else {
+		var destAddressBytes []byte
+		_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
+		if err != nil {
+			fmt.Fprint(w, err)
+			return
+		}
+		copy(dest[:], destAddressBytes)
 	}
-
-	// Sanity check the address.
-	// TODO: Make addresses checksummed or reed-solomon encoded.
-	if len(destBytes) != len(dest) {
-		fmt.Fprint(w, "address is not the right length")
-		return
-	}
-	copy(dest[:], destBytes)
 
 	// Spend the coins.
 	_, err = e.SpendCoins(amount, fee, dest)
@@ -118,10 +118,9 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration siacore.BlockHeight
 	var price, burn, freezeCoins siacore.Currency
-	var coinAddressBytes []byte
 	var coinAddress siacore.CoinAddress
 
-	// Get the ip addres.
+	// Get the ip address.
 	hostAndPort := strings.Split(req.FormValue("ipaddress"), ":")
 	if len(hostAndPort) != 2 {
 		fmt.Fprint(w, "could not read ip address")
@@ -138,79 +137,45 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Get the integer variables.
-	_, err = fmt.Sscan(req.FormValue("totalstorage"), &totalStorage)
-	if err != nil {
-		fmt.Fprint(w, err)
+	// The address can be either a coin address or a friend name
+	caString := req.FormValue("coinaddress")
+	if ca, ok := e.friends[caString]; ok {
+		coinAddress = ca
+	} else if len(caString) != 64 {
+		fmt.Fprint(w, "malformed coin address")
 		return
-	}
-	_, err = fmt.Sscan(req.FormValue("minfile"), &minFilesize)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("maxfile"), &maxFilesize)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("mintolerance"), &minTolerance)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("minduration"), &minDuration)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("maxduration"), &maxDuration)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("minwin"), &minWindow)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("maxwin"), &maxWindow)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("freezeduration"), &freezeDuration)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("price"), &price)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("penalty"), &burn)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("freezevolume"), &freezeCoins)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
+	} else {
+		var coinAddressBytes []byte
+		_, err = fmt.Sscanf(caString, "%x", &coinAddressBytes)
+		if err != nil {
+			fmt.Fprint(w, err)
+			return
+		}
+		copy(coinAddress[:], coinAddressBytes)
 	}
 
-	// Get the CoinAddress.
-	_, err = fmt.Sscanf(req.FormValue("coinaddress"), "%x", &coinAddressBytes)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
+	// other vars require no special parsing
+	qsVars := map[string]interface{}{
+		"totalstorage":   &totalStorage,
+		"minfile":        &minFilesize,
+		"maxfile":        &maxFilesize,
+		"mintolerance":   &minTolerance,
+		"minduration":    &minDuration,
+		"maxduration":    &maxDuration,
+		"minwin":         &minWindow,
+		"maxwin":         &maxWindow,
+		"freezeduration": &freezeDuration,
+		"price":          &price,
+		"penalty":        &burn,
+		"freezevolume":   &freezeCoins,
 	}
-	if len(coinAddressBytes) != len(coinAddress) {
-		fmt.Fprint(w, "coin address is not the right length.")
-		return
+	for qs := range qsVars {
+		_, err = fmt.Sscan(req.FormValue(qs), qsVars[qs])
+		if err != nil {
+			fmt.Fprint(w, err)
+			return
+		}
 	}
-	copy(coinAddress[:], coinAddressBytes[:])
 
 	// Set the host settings.
 	e.SetHostSettings(HostAnnouncement{
@@ -277,7 +242,7 @@ func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		fmt.Fprint(w, err)
 	} else {
-		fmt.Fprint(w, "Loaded coin address to "+filename)
+		fmt.Fprint(w, "Loaded coin address from "+filename)
 	}
 }
 
