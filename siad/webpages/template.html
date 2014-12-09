@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Sia Web Interface</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link rel="stylesheet" href="lib/css/bootstrap.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="lib/css/sidebar.css">
+
+    <!-- JS -->
+    <script type="text/javascript" src="lib/main.js"></script>
+</head>
+
+<body>
+    <div id="wrapper">
+
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <ul class="sidebar-nav">
+                <li class="sidebar-brand">
+                    <a href="index.html">
+                        Sia Web Interface
+                    </a>
+                </li>
+                <li>
+                    <a href="index.html">Overview</a>
+                </li>
+                <li>
+                    <a href="wallet.html">Money Management</a>
+                </li>
+                <li>
+                    <a href="rent.html">File Management</a>
+                </li>
+                <li>
+                    <a href="host.html">Host Management</a>
+                </li>
+                <li>
+                    <a href="mine.html">Miner Management</a>
+                </li>
+            </ul>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+    {{.}}
+
+    </div>
+    <!-- /#wrapper -->
+
+	<script>
+		updatePage()
+		setInterval(updatePage, 500)
+	</script>
+
+    <!-- jQuery -->
+    <script src="lib/js/jquery.js"></script>
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="lib/js/bootstrap.min.js"></script>
+</body>
+</html>

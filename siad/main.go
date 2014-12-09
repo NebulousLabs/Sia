@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -21,7 +20,7 @@ func startEnvironment(cmd *cobra.Command, args []string) {
 
 // Prints version information about Sia Daemon.
 func version(cmd *cobra.Command, args []string) {
-	fmt.Println("Sia Daemon v0.1.0")
+	println("Sia Daemon v0.1.0")
 }
 
 func main() {

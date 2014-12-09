@@ -2,27 +2,13 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
-// composePage adds the header and the footer to the given byte slice, and
-// returns the result.
-func webComposePage(body []byte) (page []byte, err error) {
-	// Read the header and footer into memory.
-	header, err := ioutil.ReadFile("webpages/header.partial")
-	if err != nil {
-		return
-	}
-	footer, err := ioutil.ReadFile("webpages/footer.partial")
-	if err != nil {
-		return
-	}
-
-	page = append(append(header, body...), footer...)
-	return
-}
+var tmpl = template.Must(template.ParseFiles("webpages/template.html"))
 
 // webIndex loads a partial page according to the http request and composes it
 // into a full page by adding the header and the footer, then serves the page.
@@ -41,11 +27,5 @@ func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Compose the partial into a full page and serve the page.
-	page, err := webComposePage(indexBody)
-	if err != nil {
-		fmt.Fprint(w, err)
-		fmt.Println(err)
-		return
-	}
-	fmt.Fprintf(w, "%s", page)
+	tmpl.Execute(w, template.HTML(string(indexBody)))
 }
