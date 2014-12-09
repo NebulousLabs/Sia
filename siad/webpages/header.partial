@@ -18,67 +18,32 @@
     <link href="lib/css/sidebar.css" rel="stylesheet">
 
 	<script type="text/javascript">
-		function setHostCoinAddress(address) {
-			try {
-				document.getElementById('hostCoinAddress').defaultValue = address
-			} catch(e) {}
-		}
-		
-		function updateMiningStatus(updateString) {
-			try {
-				document.getElementById('miningStatus').innerHTML = updateString;
-			} catch(e) {}
-		}
-
-		function updateWalletStatus(updateString) {
-			try {
-				document.getElementById('walletStatus').innerHTML = updateString;
-			} catch(e) {}
-		}
-
-		function updateBlockInfo(updateString) {
-			try {
-				document.getElementById('blockStatus').innerHTML = updateString;
-			} catch(e) {}
-		}
-
-		function updateResponseBox(updateString) {
-			try {
-				document.getElementById('apiResponse').innerHTML = updateString;
-			} catch(e) {}
-		}
-
-		function updateHostStatus(updateString) {
-			try {
-				document.getElementById('hostStatus').innerHTML = updateString;
-			} catch(e) {}
-		}
-
-		function updateHostFullStatus(updateString) {
-			try {
-				document.getElementById('hostFullStatus').innerHTML = updateString;
-			} catch(e) {}
+		function safeUpdate(field, value) {
+			var elem = document.getElementById(field)
+			if (elem != null) {
+				elem.innerHTML = value
+			}
 		}
 
 		function updatePage() {
 			var resp = httpGet("/json/status");
 			var stats = JSON.parse(resp);
 
-			setHostCoinAddress(stats.WalletAddress);
+			safeUpdate('hostCoinAddress', stats.WalletAddress);
 
-			updateMiningStatus('Mining Status: ' + stats.Mining);
-			updateBlockInfo(
+			safeUpdate('miningStatus', 'Mining Status: ' + stats.Mining);
+			safeUpdate('blockStatus',
 				'Current Height: ' + stats.StateInfo.Height +
 				'<br>Current Target: ' + stats.StateInfo.Target +
 				'<br>Current Depth: ' + stats.StateInfo.Depth
 			);
-			updateWalletStatus('Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
-			updateHostStatus(
+			safeUpdate('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+			safeUpdate('hostStatus',
 				'Host Total Storage: ' + stats.HostSettings.TotalStorage +
 				'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 				'<br>Host Number of Contracts: ' + stats.HostContractCount
 			);
-			updateHostFullStatus(
+			safeUpdate('hostFullStatus',
 				'IP Address: ' + stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port +
 				'<br>Total Storage: ' + stats.HostSettings.TotalStorage +
 				'<br>Unsold Storage: ' + stats.HostSpaceRemaining +
