@@ -12,6 +12,10 @@ import (
 	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
+const (
+	HostAnnouncementPrefix = uint64(1)
+)
+
 type HostDatabase struct {
 	HostList    []HostEntry
 	TotalWeight siacore.Currency
@@ -22,7 +26,7 @@ type HostDatabase struct {
 // It is preceded by 8 bytes that decode to the integer 1.
 type HostAnnouncement struct {
 	IPAddress          network.NetAddress
-	TotalStorage       uint64
+	TotalStorage       int64 // Can go negative.
 	MinFilesize        uint64
 	MaxFilesize        uint64
 	MinDuration        siacore.BlockHeight

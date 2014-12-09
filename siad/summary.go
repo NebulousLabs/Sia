@@ -43,7 +43,7 @@ type EnvironmentInfo struct {
 	Files []string
 
 	HostSettings       HostAnnouncement
-	HostSpaceRemaining uint64
+	HostSpaceRemaining int64
 	HostContractCount  int
 
 	Mining string

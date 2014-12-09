@@ -15,9 +15,17 @@ var tmpl = template.Must(template.ParseFiles("webpages/template.html"))
 // If there is an error, the error is reported (unsanitized). If the error is a
 // 'partial file not found', a 404 (TODO) will be served.
 func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
-	// Load the appropriate partial file into memory.
+	// Parse the name of the partial file to load.
+	var fileToLoad string
 	fileRequested := string(req.URL.Path)
-	fileToLoad := "webpages" + strings.TrimSuffix(fileRequested, "html") + "partial"
+	if fileRequested == "/" {
+		// Make a special case for the index.
+		fileToLoad = "webpages/index.partial"
+	} else {
+		fileToLoad = "webpages" + strings.TrimSuffix(fileRequested, "html") + "partial"
+	}
+
+	// Load the partial file.
 	indexBody, err := ioutil.ReadFile(fileToLoad)
 	if err != nil {
 		// TODO: serve a 404 if the file is not found.

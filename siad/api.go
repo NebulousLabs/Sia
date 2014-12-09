@@ -114,7 +114,8 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Create all of the variables that get scanned in.
 	var ipAddress network.NetAddress
-	var totalStorage, minFilesize, maxFilesize, minTolerance uint64
+	var totalStorage int64
+	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration siacore.BlockHeight
 	var price, burn, freezeCoins siacore.Currency
 	var coinAddressBytes []byte
@@ -214,6 +215,7 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Set the host settings.
 	e.SetHostSettings(HostAnnouncement{
 		IPAddress:          ipAddress,
+		TotalStorage:       totalStorage,
 		MinFilesize:        minFilesize,
 		MaxFilesize:        maxFilesize,
 		MinDuration:        minDuration,
@@ -233,8 +235,6 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, err)
 		return
 	}
-
-	fmt.Println(ipAddress, totalStorage, minFilesize, maxFilesize, minDuration, maxDuration, minWindow, maxWindow, minTolerance, price, burn, coinAddress, freezeCoins, freezeDuration)
 
 	fmt.Fprint(w, "Update successful")
 }
