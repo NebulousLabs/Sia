@@ -40,7 +40,7 @@ type EnvironmentInfo struct {
 	WalletBalance siacore.Currency
 	WalletAddress string
 
-	Files []string
+	RenterFiles []string
 
 	HostSettings       HostAnnouncement
 	HostSpaceRemaining int64
@@ -101,16 +101,15 @@ func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
 	eInfo.WalletAddress = fmt.Sprintf("%x", coinAddress)
 
 	e.renter.RLock()
-	// for filename := range e.renter.Files {
-	//eInfo.Files = append(eInfo.Files, filename)
-	// }
+	for filename := range e.renter.Files {
+		eInfo.RenterFiles = append(eInfo.RenterFiles, filename)
+	}
 	e.renter.RUnlock()
 
 	e.host.RLock()
 	eInfo.HostContractCount = len(e.host.Files)
 	e.host.RUnlock()
 
-	println(len(eInfo.Files))
 	return
 }
 

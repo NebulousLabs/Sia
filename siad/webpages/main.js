@@ -18,11 +18,16 @@ function updatePage() {
 
 	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
-	var rentStatusInnerHTML
-	// alert(stats.Files)
-	// for (String s : stats.Files) {
-		// rentStatusInnerHTML = rentStatusInnerHTML + s + '<br>';
-	// }
+	var rentStatusInnerHTML = ""
+	if(stats.RenterFiles != null) {
+		for (s in stats.RenterFiles) {
+			if (s != 0) {
+				rentStatusInnerHTML += '<br>';
+			}
+			rentStatusInnerHTML += stats.RenterFiles[s];
+		}
+	}
+	safeSetElem('rentStatus', rentStatusInnerHTML);
 
 	safeSetElem('miningStatus', 'Mining Status: ' + stats.Mining);
 	safeSetElem('blockStatus',
