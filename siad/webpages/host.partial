@@ -19,7 +19,7 @@
 						Minimum Downtime Tolerance: <input type="text" id="hostMinTolerance" value="10"></input><br>
 						Price: <input type="text" id="hostPrice" value="35"></input><br>
 						Penalty: <input type="text" id="hostBurn" value="50"></input><br>
-						Coin Address: <input type="text" id="hostCoinAddress" value="walletAddress()"></input><br>
+						Coin Address: <input type="text" id="hostCoinAddress"></input><br>
 						<br>
 						Number of Coins to Freeze: <input type="text" id="hostFreezeVolume" value="115"></input><br>
 						Duration of Freeze (in blocks): <input type="text" id="hostFreezeDuration" value="315"></input><br>
