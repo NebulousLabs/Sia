@@ -369,22 +369,25 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 
 	// Build the proof using the hash library.
 	numSegments := hash.CalculateSegments(contractEntry.Contract.FileSize)
-	triggerBlock, err := e.BlockAtHeight(stateHeight)
+	windowIndex, err := contractEntry.Contract.WindowIndex(stateHeight)
 	if err != nil {
 		return
 	}
-	proofIndex := siacore.ContractProofIndex(contractEntry.ID, stateHeight, *contractEntry.Contract, triggerBlock.ID())
-	base, hashSet, err := hash.BuildReaderProof(file, numSegments, proofIndex)
+	segmentIndex, err := e.state.StorageProofSegmentIndex(contractEntry.ID, windowIndex)
 	if err != nil {
 		return
 	}
-	sp = siacore.StorageProof{contractEntry.ID, base, hashSet}
+	base, hashSet, err := hash.BuildReaderProof(file, numSegments, segmentIndex)
+	if err != nil {
+		return
+	}
+	sp = siacore.StorageProof{contractEntry.ID, windowIndex, base, hashSet}
 	return
 }
 
 // storageProofMaintenance tracks when storage proofs need to be submitted as
 // transactions, then creates the proof and submits the transaction.
-// storageProofMaintenance must be under a host lock.
+// storageProofMaintenance must be under a state and host lock.
 //
 // TODO: Make sure that when a contract terminates, the space is returned to
 // the unsold space pool, file is deleted, etc.
@@ -393,21 +396,16 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 //
 // TODO: Make sure that hosts don't need to submit a storage proof for the last
 // window.
-//
-// TODO: Remove the panicking from this function.
 func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHeight, rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
 	// Resubmit any proofs that changed as a result of the rewinding.
 	height := initialStateHeight
 	var proofs []siacore.StorageProof
 	for _ = range rewoundBlocks {
-		// Get all contracts that trigger as a result of this block being
-		// rewound.
 		needActionContracts := e.host.BackwardContracts[height]
 		for _, contractEntry := range needActionContracts {
-			// Create a proof for this contract.
-			proof, err := e.CreateProof(contractEntry, height)
+			proof, err := e.createStorageProof(contractEntry, height)
 			if err != nil {
-				panic(err)
+				fmt.Println("High Priority Error: storage proof failed:", err)
 			}
 			proofs = append(proofs, proof)
 		}
@@ -418,10 +416,9 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 	for _ = range appliedBlocks {
 		needActionContracts := e.host.ForwardContracts[height]
 		for _, contractEntry := range needActionContracts {
-			// Create a proof for this contract.
-			proof, err := e.CreateProof(contractEntry, height)
+			proof, err := e.createStorageProof(contractEntry, height)
 			if err != nil {
-				panic(err)
+				fmt.Println("High Priority Error: storage proof failed:", err)
 			}
 			proofs = append(proofs, proof)
 
@@ -450,17 +447,17 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 		}
 		err := e.wallet.FundTransaction(10, &txn)
 		if err != nil {
-			panic(err)
+			fmt.Println("High Priority Error: FundTransaction failed during storageProofMaintenance:", err)
 		}
 		for i := range txn.Inputs {
 			err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true}, i)
 			if err != nil {
-				panic(err)
+				fmt.Println("High Priority Error: SignTransaction failed during storageProofMaintenance:", err)
 			}
 		}
 		err = e.AcceptTransaction(txn)
 		if err != nil {
-			panic(err)
+			fmt.Println("High Priority Error: accept transaction failed during storageProofMaintenance:", err)
 		}
 	}
 }
