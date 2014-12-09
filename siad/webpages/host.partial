@@ -1,34 +1,39 @@
-        <!-- Page Content -->
-        <div id="page-content-wrapper">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-lg-12">
-                        <h2>Host Management</h2>
-						<h3>Host Settings</h3>
-						<p id="hostFullStatus">Loading...</p>
+		<!-- Page Content -->
+		<style>
+		label {
+			display:block;
+			width:230px;
+			float:left;
+		}
+		</style>
+		<div id="page-content-wrapper">
+			<div class="container-fluid">
+				<div class="row">
+					<div class="col-lg-12">
+						<h2>Host Management</h2>
+						You have <span id="hostNumContracts">0</span> active contracts.
 
 						<h3>Update Settings Form</h3>
-						IP Address: <input type="text" id="hostIPAddress" value="localhost:9988"></input><br>
-						Total Storage: <input type="text" id="hostTotalStorage" value="1024"></input><br>
-						Min Filesize: <input type="text" id="hostMinFilesize" value="25"></input><br>
-						Max Filesize: <input type="text" id="hostMaxFilesize" value="1000"></input><br>
-						Min Duration: <input type="text" id="hostMinDuration" value="2000"></input><br>
-						Max Duration: <input type="text" id="hostMaxDuration" value="10000"></input><br>
-						Min Challenge Window: <input type="text" id="hostMinWindow" value="100"></input><br>
-						Max Challenge Window: <input type="text" id="hostMaxWindow" value="250"></input><br>
-						Minimum Downtime Tolerance: <input type="text" id="hostMinTolerance" value="10"></input><br>
-						Price: <input type="text" id="hostPrice" value="3"></input><br>
-						Penalty: <input type="text" id="hostBurn" value="5"></input><br>
-						Coin Address: <input type="text" id="hostCoinAddress"></input><br>
-						<br>
-						Number of Coins to Freeze: <input type="text" id="hostFreezeVolume" value="115"></input><br>
-						Duration of Freeze (in blocks): <input type="text" id="hostFreezeDuration" value="315"></input><br>
+						<label>IP + Port</label><input type="text" id="hostIPAddress" value="localhost:9988"></input><br>
+						<label>Total Storage (MB)</label><input type="text" id="hostTotalStorage" value="1024"></input><br>
+						<label>Min Filesize</label><input type="text" id="hostMinFilesize" value="25"></input><br>
+						<label>Max Filesize</label><input type="text" id="hostMaxFilesize" value="1000"></input><br>
+						<label>Min Duration</label><input type="text" id="hostMinDuration" value="2000"></input><br>
+						<label>Max Duration</label><input type="text" id="hostMaxDuration" value="10000"></input><br>
+						<label>Min Challenge Window</label><input type="text" id="hostMinWindow" value="100"></input><br>
+						<label>Max Challenge Window</label><input type="text" id="hostMaxWindow" value="250"></input><br>
+						<label>Minimum Downtime Tolerance</label><input type="text" id="hostMinTolerance" value="10"></input><br>
+						<label>Price</label><input type="text" id="hostPrice" value="3"></input><br>
+						<label>Penalty</label><input type="text" id="hostBurn" value="5"></input><br>
+						<label>Coin Address</label><input type="text" id="hostCoinAddress"></input><br>
+						<label>Number of Coins to Freeze</label><input type="text" id="hostFreezeVolume" value="115"></input><br>
+						<label>Duration of Freeze (in blocks)</label><td style="padding: 2px;"><input type="text" id="hostFreezeDuration" value="315"></input></td><br>
 						<button onclick="hostAnnounce()">Submit</button>
 
 						<br><br>
 						<p id="apiResponse"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- /#page-content-wrapper -->
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- /#page-content-wrapper -->
