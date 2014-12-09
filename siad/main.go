@@ -8,10 +8,11 @@ import (
 
 var apiPort uint16
 var rpcPort uint16
+var nobootstrap bool
 
 // Calls CreateEnvironment(), which will handle everything else.
 func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := CreateEnvironment(rpcPort, apiPort, true)
+	_, err := CreateEnvironment(rpcPort, apiPort, nobootstrap)
 	if err != nil {
 		println(err.Error())
 		return
@@ -41,6 +42,7 @@ func main() {
 	// Add flags for the api port and rpc port.
 	root.Flags().Uint16VarP(&apiPort, "api-port", "a", 9980, "Which port is used to communicate with the user.")
 	root.Flags().Uint16VarP(&rpcPort, "rpc-port", "r", 9988, "Which port is used when talking to other nodes on the network.")
+	root.Flags().BoolVarP(&nobootstrap, "no-bootstrap", "n", false, "Disable bootstrapping on this run.")
 
 	// Start the party.
 	root.Execute()
