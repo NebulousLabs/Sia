@@ -145,23 +145,18 @@ func (e *Environment) processBlock(b siacore.Block) {
 	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
-	if err == siacore.BlockKnownErr {
+	if err == siacore.BlockKnownErr || siacore.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
 		if err == siacore.UnknownOrphanErr {
-			err = e.CatchUp(e.server.RandomPeer())
-			if err != nil {
-				fmt.Println("Error while calling catchup: ", err)
-			}
-		} else if err != siacore.KnownOrphanErr {
-			fmt.Println("AcceptBlock Error: ", err)
+			go e.CatchUp(e.server.RandomPeer())
 		}
 		return
 	}
 
 	e.updateHostDB(rewoundBlocks, appliedBlocks)
-	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
+	e.storageProofMaintenance(initialStateHeight, rewoundBlocks, appliedBlocks)
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
