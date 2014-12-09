@@ -45,9 +45,11 @@ type Host struct {
 
 // CreateHost returns an initialized host.
 func CreateHost() (h *Host) {
-	h = new(Host)
-	h.Files = make(map[hash.Hash]string)
-	return
+	return &Host{
+		Files:             make(map[hash.Hash]string),
+		ForwardContracts:  make(map[siacore.BlockHeight][]ContractEntry),
+		BackwardContracts: make(map[siacore.BlockHeight][]ContractEntry),
+	}
 }
 
 // HostSettings returns the host's settings.

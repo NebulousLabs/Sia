@@ -205,18 +205,18 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
-	filename := req.FormValue("sourcefile")
-	err := e.ClientProposeContract(filename)
+	filename, nickname := req.FormValue("sourcefile"), req.FormValue("nickname")
+	err := e.ClientProposeContract(filename, nickname)
 	if err != nil {
 		fmt.Fprint(w, err)
 	} else {
-		fmt.Fprint(w, "Upload complete: "+filename)
+		fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
 	}
 }
 
 func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) {
-	filename := req.FormValue("filename")
-	err := e.Download(filename)
+	nickname, filename := req.FormValue("nickname"), req.FormValue("destination")
+	err := e.Download(nickname, filename)
 	if err != nil {
 		fmt.Fprint(w, err)
 	} else {
