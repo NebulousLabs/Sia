@@ -10,7 +10,7 @@ import (
 func ContractProofIndex(contractID ContractID, stateHeight BlockHeight, contract FileContract, triggerBlockID BlockID) (proofIndex uint64) {
 	indexSeed := hash.HashBytes(append(triggerBlockID[:], contractID[:]...))
 	seedInt := new(big.Int).SetBytes(indexSeed[:])
-	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
+	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(hash.CalculateSegments(contract.FileSize))))
 	proofIndex = modSeed.Uint64()
 	return
 }
