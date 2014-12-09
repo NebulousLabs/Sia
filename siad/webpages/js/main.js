@@ -24,7 +24,7 @@ function updatePage() {
 			if (s != 0) {
 				rentStatusInnerHTML += '<br>';
 			}
-			rentStatusInnerHTML += stats.RenterFiles[s];
+			rentStatusInnerHTML += '<label>' + stats.RenterFiles[s] + '</label><button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\')">Download</button>';
 		}
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
@@ -119,4 +119,8 @@ function hostAnnounce() {
 		"&freezeduration="+freezeduration;
 
 	responseBoxGet(request);
+}
+
+function downloadFile(file) {
+	responseBoxGet("/download?filename="+file)
 }
