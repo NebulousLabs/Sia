@@ -89,29 +89,6 @@ type SpendConditions struct {
 	PublicKeys    []signatures.PublicKey
 }
 
-// A TransactionSignature signs a single input to a transaction to help fulfill
-// the unlock conditions of the transaction. It points to an input, a
-// particular public key, has a timelock, and also indicates which parts of the
-// transaction have been signed.
-type TransactionSignature struct {
-	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
-	TimeLock       BlockHeight
-	CoveredFields  CoveredFields
-	PublicKeyIndex uint64
-	Signature      signatures.Signature
-}
-
-type CoveredFields struct {
-	WholeTransaction bool
-	ArbitraryData    bool
-	MinerFees        []uint64 // each element indicates an index which is signed.
-	Inputs           []uint64
-	Outputs          []uint64
-	Contracts        []uint64
-	StorageProofs    []uint64
-	Signatures       []uint64
-}
-
 // A StorageProof contains the fields needed for a host to prove that they are
 // still storing a file.
 type StorageProof struct {
@@ -133,6 +110,29 @@ type FileContract struct {
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
+}
+
+// A TransactionSignature signs a single input to a transaction to help fulfill
+// the unlock conditions of the transaction. It points to an input, a
+// particular public key, has a timelock, and also indicates which parts of the
+// transaction have been signed.
+type TransactionSignature struct {
+	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+	TimeLock       BlockHeight
+	CoveredFields  CoveredFields
+	PublicKeyIndex uint64
+	Signature      signatures.Signature
+}
+
+type CoveredFields struct {
+	WholeTransaction bool
+	ArbitraryData    bool
+	MinerFees        []uint64 // each element indicates an index which is signed.
+	Inputs           []uint64
+	Outputs          []uint64
+	Contracts        []uint64
+	StorageProofs    []uint64
+	Signatures       []uint64
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
