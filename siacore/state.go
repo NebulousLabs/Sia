@@ -41,8 +41,9 @@ type State struct {
 	// transaction list contains only the first output, so that when
 	// building blocks you can more easily iterate through every
 	// transaction.
-	transactionPool map[OutputID]*Transaction
-	transactionList map[OutputID]*Transaction
+	transactionPoolOutputs map[OutputID]*Transaction
+	transactionPoolProofs  map[ContractID]*Transaction
+	transactionList        map[OutputID]*Transaction
 
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
@@ -99,16 +100,16 @@ type BlockNode struct {
 func CreateGenesisState() *State {
 	// Create a new state and initialize the maps.
 	s := &State{
-		blockRoot:       new(BlockNode),
-		badBlocks:       make(map[BlockID]struct{}),
-		blockMap:        make(map[BlockID]*BlockNode),
-		orphanMap:       make(map[BlockID]map[BlockID]*Block),
-		currentPath:     make(map[BlockHeight]BlockID),
-		openContracts:   make(map[ContractID]*OpenContract),
-		unspentOutputs:  make(map[OutputID]Output),
-		spentOutputs:    make(map[OutputID]Output),
-		transactionPool: make(map[OutputID]*Transaction),
-		transactionList: make(map[OutputID]*Transaction),
+		blockRoot:              new(BlockNode),
+		badBlocks:              make(map[BlockID]struct{}),
+		blockMap:               make(map[BlockID]*BlockNode),
+		orphanMap:              make(map[BlockID]map[BlockID]*Block),
+		currentPath:            make(map[BlockHeight]BlockID),
+		openContracts:          make(map[ContractID]*OpenContract),
+		unspentOutputs:         make(map[OutputID]Output),
+		spentOutputs:           make(map[OutputID]Output),
+		transactionPoolOutputs: make(map[OutputID]*Transaction),
+		transactionList:        make(map[OutputID]*Transaction),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.

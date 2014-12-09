@@ -4,10 +4,10 @@ import (
 	"fmt"
 )
 
-func CurrentPathCheck(s *State) {
-	// Do a sanity check - check that every block is listed in CurrentPath and
-	// that every block from current to genesis matches the block listed in
-	// CurrentPath.
+// CurrentPathCheck looks at every block listed in CurrentPath and verifies
+// that every block from current to genesis matches the block listed in
+// CurrentPath.
+func (s *State) CurrentPathCheck() {
 	currentNode := s.currentBlockNode()
 	for i := s.Height(); ; i-- {
 		// Check that the CurrentPath entry exists.

@@ -75,7 +75,4 @@ func TestTypeMarshalling(t *testing.T) {
 	if a.MerkleRoot != b.MerkleRoot {
 		t.Error("MerkleRoot marshalling problems.")
 	}
-
-	// TODO: Add a transaction to the block, see if it can be marshalled and
-	// unmarshalled.
 }
