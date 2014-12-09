@@ -101,22 +101,24 @@ func hostcmd(cmd *cobra.Command, args []string) {
 }
 
 func rentcmd(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
+	if len(args) != 2 {
 		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/rent", &url.Values{
 		"filename": {args[0]},
+		"nickname": {args[1]},
 	}))
 }
 
 func downloadcmd(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
+	if len(args) != 2 {
 		cmd.Usage()
 		return
 	}
 	fmt.Println(getResponse("/download", &url.Values{
-		"filename": {args[0]},
+		"nickname":    {args[0]},
+		"destination": {args[1]},
 	}))
 }
 

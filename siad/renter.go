@@ -36,7 +36,7 @@ func (e *Environment) RentedFiles() (files []string) {
 
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (e *Environment) ClientProposeContract(filename string) (err error) {
+func (e *Environment) ClientProposeContract(filename, nickname string) (err error) {
 	// Scan the blockchain for outputs.
 	e.wallet.Scan()
 
@@ -128,7 +128,7 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 	}
 
 	// Record the file in to the renter database.
-	e.renter.Files[filename] = FileEntry{
+	e.renter.Files[nickname] = FileEntry{
 		Host:     host,
 		Contract: fileContract,
 	}
@@ -138,10 +138,10 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 
 // Download requests a file from the host it was stored with, and downloads it
 // into the specified filename.
-func (e *Environment) Download(filename string) (err error) {
-	fe, ok := e.renter.Files[filename]
+func (e *Environment) Download(nickname, filename string) (err error) {
+	fe, ok := e.renter.Files[nickname]
 	if !ok {
-		return errors.New("no file entry for file: " + filename)
+		return errors.New("no file entry for file: " + nickname)
 	}
 	return fe.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
 		// send filehash

@@ -24,7 +24,10 @@ function updatePage() {
 			if (s != 0) {
 				rentStatusInnerHTML += '<br>';
 			}
-			rentStatusInnerHTML += '<label>' + stats.RenterFiles[s] + '</label><button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\')">Download</button>';
+			var formID = 'downloadForm' + s
+			rentStatusInnerHTML += '<label>' + stats.RenterFiles[s] + '</label>' +
+				'<input type="text" id="' + formID + '" placeholder="destination"></input>' +
+				'<button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\', \'' + formID + '\')">Download</button>';
 		}
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
@@ -84,7 +87,8 @@ function sendMoney() {
 
 function rentFile() {
 	var sourceFile = document.getElementById('rentSourceFile').value;
-	responseBoxGet("/rent?sourcefile=" + sourceFile)
+	var nickname = document.getElementById('rentNickname').value;
+	responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
 }
 
 function hostAnnounce() {
@@ -121,6 +125,7 @@ function hostAnnounce() {
 	responseBoxGet(request);
 }
 
-function downloadFile(file) {
-	responseBoxGet("/download?filename="+file)
+function downloadFile(nick, destFormID) {
+	var dest = document.getElementById(destFormID).value;
+	responseBoxGet("/download?nickname="+nick+"&destination="+dest)
 }
