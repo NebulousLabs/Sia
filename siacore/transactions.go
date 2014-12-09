@@ -2,6 +2,7 @@ package siacore
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
@@ -18,6 +19,7 @@ type InputSignatures struct {
 	RemainingSignatures uint64
 	PossibleKeys        []signatures.PublicKey
 	UsedKeys            map[uint64]struct{}
+	Index               int
 }
 
 // reverseTransaction removes a given transaction from the
@@ -126,7 +128,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 	// correctness, and creating an InputSignatures object.
 	inputSum := Currency(0)
 	inputSignaturesMap := make(map[OutputID]*InputSignatures)
-	for _, input := range t.Inputs {
+	for i, input := range t.Inputs {
 		// Check that the input is valid.
 		err = s.validInput(input)
 		if err != nil {
@@ -142,6 +144,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 		newInputSignatures := &InputSignatures{
 			RemainingSignatures: input.SpendConditions.NumSignatures,
 			PossibleKeys:        input.SpendConditions.PublicKeys,
+			Index:               i,
 		}
 		inputSignaturesMap[input.OutputID] = newInputSignatures
 
@@ -216,7 +219,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 	// Check that all inputs have been signed by sufficient public keys.
 	for _, inputSignatures := range inputSignaturesMap {
 		if inputSignatures.RemainingSignatures != 0 {
-			err = errors.New("an input has not been fully signed")
+			err = fmt.Errorf("an input has not been fully signed: %v", inputSignatures.Index)
 			return
 		}
 	}

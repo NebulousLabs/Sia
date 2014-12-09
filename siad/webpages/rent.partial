@@ -4,7 +4,12 @@
                 <div class="row">
                     <div class="col-lg-12">
                         <h2>File Management</h2>
-						<p id="rentStatus">Not Implemented</p>
+						<h3>Upload File</h3>
+						Filepath: <input type="text" id="rentSourceFile"></input>
+						<button onclick="rentFile()">Upload</button><br><br>
+
+						<h3>File List</h3>
+						<p id="rentStatus">Loading...</p>
 
 						<br><br>
 						<p id="apiResponse"></p>

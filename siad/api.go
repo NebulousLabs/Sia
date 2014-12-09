@@ -240,7 +240,7 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
-	filename := req.FormValue("filename")
+	filename := req.FormValue("sourcefile")
 	err := e.ClientProposeContract(filename)
 	if err != nil {
 		fmt.Fprint(w, err)

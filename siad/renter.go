@@ -69,9 +69,9 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 		End:               e.Height() + 5100,
 		ChallengeWindow:   host.Window,
 		Tolerance:         host.Tolerance,
-		ValidProofPayout:  host.Price,
+		ValidProofPayout:  host.Price * siacore.Currency(info.Size()) * siacore.Currency(host.Window),
 		ValidProofAddress: host.CoinAddress,
-		MissedProofPayout: host.Burn,
+		MissedProofPayout: host.Burn * siacore.Currency(info.Size()) * siacore.Currency(host.Window),
 		// MissedProofAddress is going to be 0, funds sent to the burn address.
 	}
 
@@ -92,7 +92,12 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 	for i := range t.Inputs {
 		coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
 	}
-	e.wallet.SignTransaction(&t, coveredFields)
+	for i := range t.Inputs {
+		err = e.wallet.SignTransaction(&t, coveredFields, i)
+		if err != nil {
+			return
+		}
+	}
 
 	// Negotiate the contract to the host.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) error {

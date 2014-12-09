@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -114,9 +115,11 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	t.ArbitraryData = append(prefixBytes, announcementBytes...)
 
 	// Sign the transaction.
-	err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true})
-	if err != nil {
-		return
+	for i := range t.Inputs {
+		err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true}, i)
+		if err != nil {
+			return
+		}
 	}
 
 	// Give the transaction to the state.
@@ -217,14 +220,26 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Add some inputs and outputs to the transaction to fund the burn half.
-	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
-	e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true})
+	existingInputs := len(nt.Inputs)
+	err = e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
+	if err != nil {
+		fmt.Println(err)
+		err = errors.New("Host is having trouble - sorry!")
+		return
+	}
+	for i := existingInputs; i < len(nt.Inputs); i++ {
+		err = e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true}, i)
+		if err != nil {
+			return
+		}
+	}
 
 	// Check that the transaction is valid after the host signature.
 	e.state.RLock()
 	err = e.state.ValidTransaction(nt)
 	e.state.RUnlock()
 	if err != nil {
+		fmt.Println(err)
 		err = errors.New("post-verified transaction not valid - most likely a client error, but could be a host error too")
 		return
 	}
@@ -435,9 +450,11 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 		if err != nil {
 			panic(err)
 		}
-		err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true})
-		if err != nil {
-			panic(err)
+		for i := range txn.Inputs {
+			err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true}, i)
+			if err != nil {
+				panic(err)
+			}
 		}
 		err = e.AcceptTransaction(txn)
 		if err != nil {
