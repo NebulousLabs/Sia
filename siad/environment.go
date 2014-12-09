@@ -99,9 +99,7 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 	// empty batch is sent.
 	go func() {
 		// Catch up the first time.
-		if err := e.CatchUp(e.RandomPeer()); err != nil {
-			fmt.Println("Error during CatchUp:", err)
-		}
+		go e.CatchUp(e.server.RandomPeer())
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
@@ -109,7 +107,7 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 		// make the network substantially more robust.
 		for {
 			time.Sleep(time.Minute * 2)
-			e.CatchUp(e.RandomPeer())
+			go e.CatchUp(e.RandomPeer())
 		}
 	}()
 
