@@ -17,8 +17,8 @@
 						Min Challenge Window: <input type="text" id="hostMinWindow" value="100"></input><br>
 						Max Challenge Window: <input type="text" id="hostMaxWindow" value="250"></input><br>
 						Minimum Downtime Tolerance: <input type="text" id="hostMinTolerance" value="10"></input><br>
-						Price: <input type="text" id="hostPrice" value="35"></input><br>
-						Penalty: <input type="text" id="hostBurn" value="50"></input><br>
+						Price: <input type="text" id="hostPrice" value="3"></input><br>
+						Penalty: <input type="text" id="hostBurn" value="5"></input><br>
 						Coin Address: <input type="text" id="hostCoinAddress"></input><br>
 						<br>
 						Number of Coins to Freeze: <input type="text" id="hostFreezeVolume" value="115"></input><br>

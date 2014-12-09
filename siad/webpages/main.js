@@ -18,6 +18,12 @@ function updatePage() {
 
 	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
+	var rentStatusInnerHTML
+	// alert(stats.Files)
+	// for (String s : stats.Files) {
+		// rentStatusInnerHTML = rentStatusInnerHTML + s + '<br>';
+	// }
+
 	safeSetElem('miningStatus', 'Mining Status: ' + stats.Mining);
 	safeSetElem('blockStatus',
 		'Current Height: ' + stats.StateInfo.Height +
@@ -25,6 +31,9 @@ function updatePage() {
 		'<br>Current Depth: ' + stats.StateInfo.Depth
 	);
 	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+	safeSetElem('hostStatus',
+		'In progess'
+	);
 	safeSetElem('hostStatus',
 		'Host Total Storage: ' + stats.HostSettings.TotalStorage +
 		'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
@@ -58,6 +67,7 @@ function httpGet(url) {
 
 function responseBoxGet(url) {
 	safeSetElem('apiResponse', httpGet(url));
+	updatePage()
 }
 
 function sendMoney() {
@@ -66,6 +76,11 @@ function sendMoney() {
 	var fee = document.getElementById('minerFee').value;
 	var request = "/sendcoins?amount="+amount+"&fee="+fee+"&dest="+destination;
 	responseBoxGet(request);
+}
+
+function rentFile() {
+	var sourceFile = document.getElementById('rentSourceFile').value;
+	responseBoxGet("/rent?sourcefile=" + sourceFile)
 }
 
 function hostAnnounce() {
