@@ -220,9 +220,14 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Add some inputs and outputs to the transaction to fund the burn half.
-	existingInputs := len(t.Inputs)
-	e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
-	for i := existingInputs; i < len(t.Inputs); i++ {
+	existingInputs := len(nt.Inputs)
+	err = e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
+	if err != nil {
+		fmt.Println(err)
+		err = errors.New("Host is having trouble - sorry!")
+		return
+	}
+	for i := existingInputs; i < len(nt.Inputs); i++ {
 		err = e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true}, i)
 		if err != nil {
 			return
