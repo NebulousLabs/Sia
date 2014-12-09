@@ -145,7 +145,7 @@ func (e *Environment) processBlock(b siacore.Block) {
 	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
-	if err == siacore.BlockKnownErr || siacore.KnownOrphanErr {
+	if err == siacore.BlockKnownErr || err == siacore.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.

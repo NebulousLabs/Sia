@@ -21,6 +21,13 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 // transaction list. A panic will trigger if there is a conflicting transaction
 // in the pool.
 func (s *State) addTransactionToPool(t *Transaction) {
+	// Safety check - there must be no conflict with any inputs that exists in
+	// the transaciton list.
+	_, exists := s.transactionList[t.Inputs[0].OutputID]
+	if exists {
+		panic("tring to add an in-conflict transaction to the transaction list")
+	}
+
 	// Add each input to the transaction pool.
 	for _, input := range t.Inputs {
 		// Safety check - there must be no conflict with any inputs that exists
@@ -33,15 +40,15 @@ func (s *State) addTransactionToPool(t *Transaction) {
 		s.transactionPoolOutputs[input.OutputID] = t
 	}
 
-	// Safety check - there must be no conflict with any inputs that exists in
-	// the transaciton list.
-	if len(t.Inputs) == 0 {
-		panic("transaction must have an input?")
-		return
-	}
-	_, exists := s.transactionList[t.Inputs[0].OutputID]
-	if exists {
-		panic("tring to add an in-conflict transaction to the transaction list")
+	// Add each proof to the transaction pool.
+	for _, proof := range t.StorageProofs {
+		// Safety check - must be no existing conflicts.
+		_, exists := s.transactionPoolProofs[proof.ContractID]
+		if exists {
+			panic("trying to add an in-conflict storage proof.")
+		}
+
+		s.transactionPoolProofs[proof.ContractID] = t
 	}
 
 	// Add the first input to the transaction list.
@@ -51,22 +58,33 @@ func (s *State) addTransactionToPool(t *Transaction) {
 // Removes a particular transaction from the transaction pool. The transaction
 // must already be in the pool or a panic will trigger.
 func (s *State) removeTransactionFromPool(t *Transaction) {
-	// Remove each input from the transaction pool.
-	for _, input := range t.Inputs {
-		// Safety check - the input must already exist.
-		_, exists := s.transactionPoolOutputs[input.OutputID]
-		if !exists {
-			panic("trying to delete a transaction from the transaction pool that already does not exist.")
-		}
-
-		delete(s.transactionPoolOutputs, input.OutputID)
-	}
-
 	// Safety check - the transaction must already exist within the transaction
 	// list.
 	_, exists := s.transactionList[t.Inputs[0].OutputID]
 	if !exists {
 		panic("trying to delete a transaction from transaction list that already does not exists.")
+	}
+
+	// Remove each input from the transaction pool.
+	for _, input := range t.Inputs {
+		// Safety check - the input must already exist.
+		_, exists := s.transactionPoolOutputs[input.OutputID]
+		if !exists {
+			panic("trying to delete a transaction input from the transaction pool that already does not exist.")
+		}
+
+		delete(s.transactionPoolOutputs, input.OutputID)
+	}
+
+	// Remove each storage proof from the transaction pool.
+	for _, proof := range t.StorageProofs {
+		// Safety check - the proof must already exist.
+		_, exists := s.transactionPoolProofs[proof.ContractID]
+		if !exists {
+			panic("trying to delete a transaction proof from the pool that already does not exist.")
+		}
+
+		delete(s.transactionPoolProofs, proof.ContractID)
 	}
 
 	// Remove the transaction from the transaction list.
@@ -85,6 +103,15 @@ func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
 			s.removeTransactionFromPool(conflict)
 		}
 	}
+
+	// For each storage proof, see if there's a conflict and remove the
+	// conflicting transaction if there is.
+	for _, proof := range t.StorageProofs {
+		conflict, exists := s.transactionPoolProofs[proof.ContractID]
+		if exists {
+			s.removeTransactionFromPool(conflict)
+		}
+	}
 }
 
 // transactionPoolConflict compares a transaction to the transaction pool and
@@ -99,7 +126,14 @@ func (s *State) transactionPoolConflict(t *Transaction) (conflict bool) {
 		}
 	}
 
-	// Check for storage proof conflicts.
+	// Check for storage proof conflicts, there can only storage proof for each
+	// contract + window index.
+	for _, proof := range t.StorageProofs {
+		_, exists := s.transactionPoolProofs[proof.ContractID]
+		if exists {
+			conflict = true
+		}
+	}
 
 	return
 }
