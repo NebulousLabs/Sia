@@ -13,8 +13,8 @@ import (
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
 var (
-	BlockFrequency  = Timestamp(45)          // In seconds.
-	TargetWindow    = BlockHeight(40)        // Number of blocks to use when calculating the target.
+	BlockFrequency  = Timestamp(10)          // In seconds.
+	TargetWindow    = BlockHeight(80)        // Number of blocks to use when calculating the target.
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 	RootTarget      = Target{0, 1}
 	RootDepth       = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
