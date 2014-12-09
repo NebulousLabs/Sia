@@ -45,12 +45,17 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
 		return
 	}
 	merkle, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(uint64(info.Size())))
 	if err != nil {
+		return
+	}
+	// reset read position
+	if _, err = file.Seek(0, 0); err != nil {
 		return
 	}
 
@@ -115,7 +120,7 @@ func (e *Environment) ClientProposeContract(filename string) (err error) {
 		}
 		// host accepted, so transmit file data
 		// (no prefix needed, since FileSize is included in the metadata)
-		_, err := io.Copy(conn, file)
+		_, err = io.Copy(conn, file)
 		return err
 	})
 	if err != nil {
