@@ -138,9 +138,9 @@ type CoveredFields struct {
 // CalculateCoinbase takes a height and from that derives the coinbase.
 func CalculateCoinbase(height BlockHeight) Currency {
 	if Currency(height) >= InitialCoinbase-MinimumCoinbase {
-		return MinimumCoinbase
+		return MinimumCoinbase * 100000
 	} else {
-		return InitialCoinbase - Currency(height)
+		return (InitialCoinbase - Currency(height)) * 100000
 	}
 }
 
