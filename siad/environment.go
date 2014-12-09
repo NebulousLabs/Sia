@@ -134,55 +134,45 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 
 // processBlock is called by the environment's listener.
 func (e *Environment) processBlock(b siacore.Block) {
-	// Pass the block to the state, grabbing a lock on hostDatabase and host
-	// before releasing the state lock, to ensure that rewoundBlocks and
-	// appliedBlocks are managed in the correct order.
 	e.state.Lock()
-	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
-	stateHeight := e.state.Height()
 	e.hostDatabase.Lock()
-	defer e.hostDatabase.Unlock()
 	e.host.Lock()
+	defer e.state.Unlock()
+	defer e.hostDatabase.Unlock()
 	defer e.host.Unlock()
-	e.state.Unlock()
+
+	initialStateHeight := e.state.Height()
+	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
 	if err == siacore.BlockKnownErr {
-		// Nothing happens if the block is known.
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
 		if err == siacore.UnknownOrphanErr {
 			err = e.CatchUp(e.server.RandomPeer())
 			if err != nil {
-				// Logging
-				// fmt.Println(err2)
+				fmt.Println("Error while calling catchup: ", err)
 			}
 		} else if err != siacore.KnownOrphanErr {
-			// TODO: Change this from a print statement to a logging statement.
 			fmt.Println("AcceptBlock Error: ", err)
 		}
 		return
 	}
 
-	// TODO: once a block has been moved into the host db, it doesn't come out.
-	// But the host db should reverse when there are reorgs.
 	e.updateHostDB(rewoundBlocks, appliedBlocks)
-
 	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
 }
 
-// processTransaction is called by the environment's listener.
+// processTransaction sends a transaction to the state.
 func (e *Environment) processTransaction(t siacore.Transaction) {
-	// Pass the transaction to the state.
 	e.state.Lock()
-	err := e.state.AcceptTransaction(t)
-	e.state.Unlock()
+	defer e.state.Unlock()
 
-	// Perform error handling.
+	err := e.state.AcceptTransaction(t)
 	if err != nil {
 		if err != siacore.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
@@ -191,7 +181,6 @@ func (e *Environment) processTransaction(t siacore.Transaction) {
 		return
 	}
 
-	// Broadcast all valid transactions.
 	go e.server.Broadcast("AcceptTransaction", t, nil)
 }
 
