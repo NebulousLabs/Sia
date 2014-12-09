@@ -353,7 +353,7 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
-func (e *Environment) CreateProof(contractEntry ContractEntry, stateHeight siacore.BlockHeight) (sp siacore.StorageProof, err error) {
+func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeight siacore.BlockHeight) (sp siacore.StorageProof, err error) {
 	// Get the file associated with the contract.
 	filename, ok := e.host.Files[contractEntry.Contract.FileMerkleRoot]
 	if !ok {
