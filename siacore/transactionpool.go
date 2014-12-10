@@ -118,11 +118,11 @@ func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
 // valid. This can happen if a proof of storage window index changes before the
 // proof makes it into a block. Can also happen during reorgs.
 func (s *State) cleanTransactionPool() {
-	var []badTransactions *Transaction
+	var badTransactions []*Transaction
 	for _, transaction := range s.transactionList {
-		err = s.ValidTransaction(*transaction)
+		err := s.ValidTransaction(*transaction)
 		if err != nil {
-			badTransactions = append(transaction)
+			badTransactions = append(badTransactions, transaction)
 		}
 	}
 	for _, transaction := range badTransactions {

@@ -84,9 +84,9 @@ func (e *Environment) CatchUp(peer network.NetAddress) {
 	copy(blockArray[:], knownBlocks)
 
 	// unlock state during network I/O
-	err = peer.RPC("SendBlocks", blockArray, &newBlocks)
+	err := peer.RPC("SendBlocks", blockArray, &newBlocks)
 	if err != nil {
-		fmt.Println(err)
+		// log error
 		return
 	}
 
