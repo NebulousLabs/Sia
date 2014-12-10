@@ -34,4 +34,8 @@ distribution:
 	tar -cJvf sia-bundle.xz config/*
 	rm -f config/siad
 
-.PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution
+cross-platform:
+	go get -u github.com/laher/goxc
+	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -pr=beta -include=config/,LICENSE*,README*
+
+.PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution cross-platform
