@@ -317,7 +317,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 			for i := 0; i < validatedBlocks; i++ {
 				s.rewindABlock()
 			}
-			appliedBlocks = nil // Reset applied blocks to nil since nothing in some was applied.
+			appliedBlocks = nil // Reset applied blocks to nil since nothing in sum was applied.
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {

@@ -137,6 +137,8 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 // as price, tolerance, etc. are all valid within the host settings. If so,
 // inputs are added to fund the burn part of the contract fund, then the
 // updated contract is signed and returned.
+//
+// TODO: Reconsider locking strategy for this function.
 func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
 	// Set the new transaction equal to the old transaction. Pretty sure that
 	// go does not allow you to return the same variable that was used as
@@ -252,6 +254,8 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 // NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
+//
+// TODO: Reconsider locking model for this function.
 func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) {
 	// Read the transaction.
 	var t siacore.Transaction

@@ -100,7 +100,7 @@ func (s *State) validContract(c FileContract) (err error) {
 		err = errors.New("contract must be funded.")
 		return
 	}
-	if c.Start < s.Height() {
+	if c.Start <= s.Height() {
 		err = errors.New("contract must start in the future.")
 		return
 	}
@@ -120,8 +120,38 @@ func (s *State) addContract(contract FileContract, id ContractID) {
 		ContractID:      id,
 		FundsRemaining:  contract.ContractFund,
 		Failures:        0,
-		WindowSatisfied: true, // The first window is free, because the start is in the future by mandate.
+		WindowSatisfied: false,
 	}
+}
+
+// recordMissedProof adds outputs to the State to manage a missed storage proof
+// on a file contract.
+func (s *State) recordMissedProof(openContract *OpenContract) {
+	contract := openContract.FileContract
+	payout := contract.MissedProofPayout
+	if openContract.FundsRemaining < contract.MissedProofPayout {
+		payout = openContract.FundsRemaining
+	}
+
+	// Create the output for the missed proof.
+	newOutputID, err := contract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
+	if err != nil {
+		panic(err)
+	}
+	output := Output{
+		Value:     payout,
+		SpendHash: contract.MissedProofAddress,
+	}
+	s.unspentOutputs[newOutputID] = output
+	msp := MissedStorageProof{
+		OutputID:   newOutputID,
+		ContractID: openContract.ContractID,
+	}
+
+	// Update the open contract to reflect the missed payment.
+	s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
+	openContract.FundsRemaining -= payout
+	openContract.Failures += 1
 }
 
 // contractMaintenance checks the contract windows and storage proofs and to
@@ -131,37 +161,12 @@ func (s *State) contractMaintenance() {
 	// Scan all open contracts and perform any required maintenance on each.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.openContracts {
-		// Check for the window switching over.
-		if (s.Height()-openContract.FileContract.Start)%openContract.FileContract.ChallengeWindow == 0 && s.Height() > openContract.FileContract.Start {
-			// Check for a missed proof.
+		// Check if the window index is changing.
+		contract := openContract.FileContract
+		contractProgress := s.Height() - contract.Start
+		if s.Height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
 			if openContract.WindowSatisfied == false {
-				// Determine payout of missed proof.
-				payout := openContract.FileContract.MissedProofPayout
-				if openContract.FundsRemaining < openContract.FileContract.MissedProofPayout {
-					payout = openContract.FundsRemaining
-				}
-
-				// Create the output for the missed proof.
-				newOutputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
-				if err != nil {
-					panic(err)
-				}
-				output := Output{
-					Value:     payout,
-					SpendHash: openContract.FileContract.MissedProofAddress,
-				}
-				s.unspentOutputs[newOutputID] = output
-				msp := MissedStorageProof{
-					OutputID:   newOutputID,
-					ContractID: openContract.ContractID,
-				}
-				s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
-
-				// Update the FundsRemaining
-				openContract.FundsRemaining -= payout
-
-				// Update the failures count.
-				openContract.Failures += 1
+				s.recordMissedProof(openContract)
 			} else {
 				s.currentBlockNode().SuccessfulWindows = append(s.currentBlockNode().SuccessfulWindows, openContract.ContractID)
 			}
@@ -169,19 +174,23 @@ func (s *State) contractMaintenance() {
 		}
 
 		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || openContract.FileContract.End == s.Height() || openContract.FileContract.Tolerance == openContract.Failures {
+		if openContract.FundsRemaining == 0 || contract.End == s.Height() || contract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
-				contractStatus := openContract.Failures == openContract.FileContract.Tolerance
-				outputID := ContractTerminationOutputID(openContract.ContractID, contractStatus)
 				output := Output{
 					Value: openContract.FundsRemaining,
 				}
-				if openContract.FileContract.Tolerance == openContract.Failures {
-					output.SpendHash = openContract.FileContract.MissedProofAddress
+
+				// Get the output address.
+				contractSuccess := openContract.Failures != openContract.FileContract.Tolerance
+				if contractSuccess {
+					output.SpendHash = contract.ValidProofAddress
 				} else {
-					output.SpendHash = openContract.FileContract.ValidProofAddress
+					output.SpendHash = contract.MissedProofAddress
 				}
+
+				// Create the output.
+				outputID := ContractTerminationOutputID(openContract.ContractID, contractSuccess)
 				s.unspentOutputs[outputID] = output
 			}
 

@@ -71,7 +71,8 @@ func (h *HostEntry) Weight() siacore.Currency {
 
 // pullHostEntryFromArbitraryData is one of the most cleverly named functions
 // in the Galaxy. Any attempt to ridicule such a glorious name will result in
-// immediate deprication of all clothes.
+// immediate deprication of all clothes. Needs to be under a hostdb and state
+// lock.
 func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he HostEntry, foundAHostEntry bool) {
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) < 8 {
@@ -97,7 +98,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 		if ha.MinTolerance > 10 {
 			return
 		}
-		freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.Height()) * t.Outputs[ha.FreezeIndex].Value
+		freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.state.Height()) * t.Outputs[ha.FreezeIndex].Value
 		if freeze <= 0 {
 			return
 		}
@@ -123,7 +124,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 }
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
-// hosts to the host database.
+// hosts to the host database. Needs to be under a hostdb and state lock.
 func (e *Environment) updateHostDB(rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
 	// Remove hosts found in blocks that were rewound. Because the hostdb is
 	// like a stack, you can just pop the hosts and be certain that they are
