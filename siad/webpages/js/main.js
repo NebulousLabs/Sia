@@ -38,13 +38,8 @@ function updatePage() {
 	var rentStatusInnerHTML = ""
 	if(stats.RenterFiles != null) {
 		for (s in stats.RenterFiles) {
-			if (s != 0) {
-				rentStatusInnerHTML += '<br>';
-			}
-			var formID = 'downloadForm' + s
 			rentStatusInnerHTML += '<label>' + stats.RenterFiles[s] + '</label>' +
-				'<input type="text" id="' + formID + '" placeholder="destination"></input>' +
-				'<button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\', \'' + formID + '\')">Download</button>';
+				'<button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\')">Download</button><br>';
 		}
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
@@ -128,7 +123,16 @@ function hostAnnounce() {
 	responseBoxGet(request);
 }
 
-function downloadFile(nick, destFormID) {
-	var dest = document.getElementById(destFormID).value;
-	responseBoxGet("/download?nickname="+nick+"&destination="+dest)
+function downloadFile(nick) {
+	var dest = "lib/downloads/" + nick;
+	// download file
+	responseBoxGet("/download?nickname="+nick+"&destination="+dest);
+	// prompt for destination
+	var downloadLink = document.createElement("a");
+	downloadLink.href = dest;
+	downloadLink.download = "";
+	downloadLink.style.display = "none";
+	document.body.appendChild(downloadLink);
+	downloadLink.click();
+	document.body.removeChild(downloadLink);
 }
