@@ -41,9 +41,10 @@ func (e *Environment) jsonStatusHandler(w http.ResponseWriter, req *http.Request
 	status := e.EnvironmentInfo()
 	resp, err := json.Marshal(status)
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, "Failed to encode status object", 500)
+		return
 	}
-	fmt.Fprintf(w, "%s", resp)
+	w.Write(resp)
 }
 
 func (e *Environment) stopHandler(w http.ResponseWriter, req *http.Request) {
@@ -75,12 +76,12 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	var dest siacore.CoinAddress
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Malformed amount", 400)
 		return
 	}
 	_, err = fmt.Sscan(req.FormValue("fee"), &fee)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Malformed fee", 400)
 		return
 	}
 
@@ -89,13 +90,13 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	if ca, ok := e.friends[destString]; ok {
 		dest = ca
 	} else if len(destString) != 64 {
-		fmt.Fprint(w, "malformed coin address")
+		http.Error(w, "Friend not found (or malformed coin address)", 400)
 		return
 	} else {
 		var destAddressBytes []byte
 		_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
 		if err != nil {
-			fmt.Fprint(w, err)
+			http.Error(w, "Malformed coin address", 400)
 			return
 		}
 		copy(dest[:], destAddressBytes)
@@ -104,7 +105,7 @@ func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	// Spend the coins.
 	_, err = e.SpendCoins(amount, fee, dest)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to create transaction: "+err.Error(), 500)
 		return
 	}
 
@@ -123,17 +124,17 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Get the ip address.
 	hostAndPort := strings.Split(req.FormValue("ipaddress"), ":")
 	if len(hostAndPort) != 2 {
-		fmt.Fprint(w, "could not read ip address")
+		http.Error(w, "Malformed IP address + port", 400)
 		return
 	}
 	_, err := fmt.Sscan(hostAndPort[0], &ipAddress.Host)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Malformed IP address", 400)
 		return
 	}
 	_, err = fmt.Sscan(hostAndPort[1], &ipAddress.Port)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Malformed port number", 400)
 		return
 	}
 
@@ -142,13 +143,13 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	if ca, ok := e.friends[caString]; ok {
 		coinAddress = ca
 	} else if len(caString) != 64 {
-		fmt.Fprint(w, "malformed coin address")
+		http.Error(w, "Friend not found (or malformed coin address)", 400)
 		return
 	} else {
 		var coinAddressBytes []byte
 		_, err = fmt.Sscanf(caString, "%x", &coinAddressBytes)
 		if err != nil {
-			fmt.Fprint(w, err)
+			http.Error(w, "Malformed coin address", 400)
 			return
 		}
 		copy(coinAddress[:], coinAddressBytes)
@@ -172,7 +173,7 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	for qs := range qsVars {
 		_, err = fmt.Sscan(req.FormValue(qs), qsVars[qs])
 		if err != nil {
-			fmt.Fprint(w, err)
+			http.Error(w, "Malformed "+qs, 400)
 			return
 		}
 	}
@@ -197,7 +198,7 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Make the host announcement.
 	_, err = e.HostAnnounceSelf(freezeCoins, freezeDuration+e.Height(), 10)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to announce host: "+err.Error(), 500)
 		return
 	}
 
@@ -208,7 +209,7 @@ func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
 	filename, nickname := req.FormValue("sourcefile"), req.FormValue("nickname")
 	err := e.ClientProposeContract(filename, nickname)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to create file contract: "+err.Error(), 500)
 	} else {
 		fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
 	}
@@ -218,7 +219,7 @@ func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) 
 	nickname, filename := req.FormValue("nickname"), req.FormValue("destination")
 	err := e.Download(nickname, filename)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to download file: "+err.Error(), 500)
 	} else {
 		fmt.Fprint(w, "Download complete: "+filename)
 	}
@@ -229,7 +230,7 @@ func (e *Environment) saveHandler(w http.ResponseWriter, req *http.Request) {
 	filename := req.FormValue("filename")
 	err := e.SaveCoinAddress(filename)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to save coin address: "+err.Error(), 500)
 	} else {
 		fmt.Fprint(w, "Saved coin address to "+filename)
 	}
@@ -240,7 +241,7 @@ func (e *Environment) loadHandler(w http.ResponseWriter, req *http.Request) {
 	filename, friendname := req.FormValue("filename"), req.FormValue("friendname")
 	err := e.LoadCoinAddress(filename, friendname)
 	if err != nil {
-		fmt.Fprint(w, err)
+		http.Error(w, "Failed to load coin address: "+err.Error(), 500)
 	} else {
 		fmt.Fprint(w, "Loaded coin address from "+filename)
 	}
