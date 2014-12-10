@@ -28,4 +28,10 @@ dependencies: race-libs
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
 
-.PHONY: all fmt install test test-long whitepaper dependencies race-libs
+distribution:
+	go install ./...
+	cp $(GOPATH)/bin/siad config/siad
+	tar -cJvf sia-bundle.xz config/*
+	rm -f config/siad
+
+.PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution
