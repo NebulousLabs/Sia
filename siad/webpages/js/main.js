@@ -84,9 +84,13 @@ function sendMoney() {
 }
 
 function rentFile() {
-	var sourceFile = document.getElementById('rentSourceFile').value;
+	var sourceFile = document.getElementById('rentSourceFile').value.replace('file://', '');
 	var nickname = document.getElementById('rentNickname').value;
-	responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
+	if (nickname.match(/^[a-zA-Z_-]+$/)) {
+		responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
+	} else {
+		safeSetElem('apiResponse', "Invalid nickname!");
+	}
 }
 
 function hostAnnounce() {
