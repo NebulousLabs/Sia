@@ -9,19 +9,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The priority order for the config file is:
-//		Lowest: The defaults set by the flags.
-//		Middle: The values loaded by the config file.
-//		Highest: Flags manually set by the user at load.
-
 var config Config
 
 type Config struct {
-	ApiPort     uint16
-	RpcPort     uint16
-	NoBootstrap bool
-
-	ConfigFilename string
+	Siad struct {
+		ApiPort        uint16
+		RpcPort        uint16
+		NoBootstrap    bool
+		ConfigFilename string
+	}
 }
 
 // confilgFilenameDefault checks multiple directories for a config file and
@@ -31,7 +27,7 @@ func configFilenameDefault() string {
 	home, err := homedir.Dir()
 	if err == nil {
 		// Check home/.config/config
-		filename := home + "/.config/config"
+		filename := home + "/.config/sia/config"
 		if _, err := os.Stat(filename); err == nil {
 			return filename
 		}
@@ -61,7 +57,7 @@ func configFilenameDefault() string {
 // startEnvironment calls createEnvironment(), which will handle everything
 // else.
 func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := CreateEnvironment(config.RpcPort, config.ApiPort, config.NoBootstrap)
+	_, err := CreateEnvironment(config.Siad.RpcPort, config.Siad.ApiPort, config.Siad.NoBootstrap)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -109,21 +105,22 @@ func main() {
 	// Add flag defaults, which have the lowest priority. Every value will be
 	// set.
 	defaultConfigFile := configFilenameDefault()
-	root.Flags().Uint16VarP(&config.ApiPort, "api-port", "a", 9980, "Which port is used to communicate with the user.")
-	root.Flags().Uint16VarP(&config.RpcPort, "rpc-port", "r", 9988, "Which port is used when talking to other nodes on the network.")
-	root.Flags().BoolVarP(&config.NoBootstrap, "no-bootstrap", "n", false, "Disable bootstrapping on this run.")
-	root.Flags().StringVarP(&config.ConfigFilename, "config-file", "c", defaultConfigFile, "Tell siad where to load the config file.")
+	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "Which port is used to communicate with the user.")
+	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "Which port is used when talking to other nodes on the network.")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "Disable bootstrapping on this run.")
+	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "Tell siad where to load the config file.")
 
 	// Load the config file, which has the middle priorty. Only values defined
 	// in the config file will be set.
-	if config.ConfigFilename != "" {
-		err := gcfg.ReadFileInto(&config, config.ConfigFilename)
+	if config.Siad.ConfigFilename != "" {
+		err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 	}
 
-	// Start the party.
+	// Execute wil over-write any flags set by the config file, but only if the
+	// user specified them manually.
 	root.Execute()
 }
