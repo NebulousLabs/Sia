@@ -24,6 +24,8 @@ race-libs:
 	go install -race std
 
 dependencies: race-libs
+	go get -u code.google.com/p/gcfg
+	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
 
 .PHONY: all fmt install test test-long whitepaper dependencies race-libs
