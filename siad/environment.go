@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -58,6 +59,12 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Env
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
+
+	// create downloads directory
+	err = os.MkdirAll("webpages/downloads", os.ModeDir|os.ModePerm)
+	if err != nil {
+		return
+	}
 
 	// Begin listening for requests on the api.
 	e.setUpHandlers(apiPort)

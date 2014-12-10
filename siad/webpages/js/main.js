@@ -38,13 +38,8 @@ function updatePage() {
 	var rentStatusInnerHTML = ""
 	if(stats.RenterFiles != null) {
 		for (s in stats.RenterFiles) {
-			if (s != 0) {
-				rentStatusInnerHTML += '<br>';
-			}
-			var formID = 'downloadForm' + s
 			rentStatusInnerHTML += '<label>' + stats.RenterFiles[s] + '</label>' +
-				'<input type="text" id="' + formID + '" placeholder="destination"></input>' +
-				'<button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\', \'' + formID + '\')">Download</button>';
+				'<button onclick="downloadFile(\'' + stats.RenterFiles[s] + '\')">Download</button><br>';
 		}
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
@@ -89,9 +84,13 @@ function sendMoney() {
 }
 
 function rentFile() {
-	var sourceFile = document.getElementById('rentSourceFile').value;
+	var sourceFile = document.getElementById('rentSourceFile').value.replace('file://', '');
 	var nickname = document.getElementById('rentNickname').value;
-	responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
+	if (nickname.match(/^[a-zA-Z_-]+$/)) {
+		responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
+	} else {
+		safeSetElem('apiResponse', "Invalid nickname!");
+	}
 }
 
 function hostAnnounce() {
@@ -128,7 +127,6 @@ function hostAnnounce() {
 	responseBoxGet(request);
 }
 
-function downloadFile(nick, destFormID) {
-	var dest = document.getElementById(destFormID).value;
-	responseBoxGet("/download?nickname="+nick+"&destination="+dest)
+function downloadFile(nick) {
+	responseBoxGet("/download?nickname="+nick);
 }
