@@ -217,11 +217,15 @@ func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
 
 func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	nickname, filename := req.FormValue("nickname"), req.FormValue("destination")
+	if filename == "" {
+		// TODO: this should be an Environment variable
+		filename = "lib/downloads/" + nickname
+	}
 	err := e.Download(nickname, filename)
 	if err != nil {
 		http.Error(w, "Failed to download file: "+err.Error(), 500)
 	} else {
-		fmt.Fprint(w, "Download complete: "+filename)
+		fmt.Fprint(w, "Download complete!")
 	}
 }
 

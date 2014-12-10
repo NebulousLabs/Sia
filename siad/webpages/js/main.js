@@ -128,15 +128,5 @@ function hostAnnounce() {
 }
 
 function downloadFile(nick) {
-	var dest = "lib/downloads/" + nick;
-	// download file
-	responseBoxGet("/download?nickname="+nick+"&destination="+dest);
-	// prompt for destination
-	var downloadLink = document.createElement("a");
-	downloadLink.href = dest;
-	downloadLink.download = "";
-	downloadLink.style.display = "none";
-	document.body.appendChild(downloadLink);
-	downloadLink.click();
-	document.body.removeChild(downloadLink);
+	responseBoxGet("/download?nickname="+nick);
 }
