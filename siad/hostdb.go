@@ -129,7 +129,7 @@ func (e *Environment) updateHostDB(rewoundBlocks []siacore.BlockID, appliedBlock
 	// like a stack, you can just pop the hosts and be certain that they are
 	// the same hosts.
 	for _, bid := range rewoundBlocks {
-		b, err := e.BlockFromID(bid)
+		b, err := e.state.BlockFromID(bid)
 		if err != nil {
 			panic(err)
 		}
@@ -147,7 +147,7 @@ func (e *Environment) updateHostDB(rewoundBlocks []siacore.BlockID, appliedBlock
 
 	// Add hosts found in blocks that were applied.
 	for _, bid := range appliedBlocks {
-		b, err := e.BlockFromID(bid)
+		b, err := e.state.BlockFromID(bid)
 		if err != nil {
 			panic(err)
 		}
