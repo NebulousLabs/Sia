@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -9,48 +10,50 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var config Config
+var (
+	home   string
+	siaDir string
+	config Config
+)
 
 type Config struct {
 	Siad struct {
-		ApiPort        uint16
-		RpcPort        uint16
-		NoBootstrap    bool
-		ConfigFilename string
+		ApiPort           uint16
+		RpcPort           uint16
+		NoBootstrap       bool
+		ConfigFilename    string
+		HostDirectory     string
+		StyleDirectory    string
+		DownloadDirectory string
 	}
+}
+
+// checkSiaDir verifies that a sia directory exists.
+func checkSiaDir() (err error) {
+	home, err := homedir.Dir()
+	if err != nil {
+		return
+	}
+
+	// Check that ~/.config/sia exists
+	dirname := home + "/.config/sia/"
+	if _, err = os.Stat(dirname); err == nil {
+		siaDir = dirname
+		return
+	}
+
+	err = errors.New("No sia directory found, please create and populate the sia directory (instructions found in README)")
+	return
 }
 
 // confilgFilenameDefault checks multiple directories for a config file and
 // loads the first one it finds. "" is returned if no config file is found.
 func configFilenameDefault() string {
-	// Try home folder.
-	home, err := homedir.Dir()
-	if err == nil {
-		// Check home/.config/config
-		filename := home + "/.config/sia/config"
-		if _, err := os.Stat(filename); err == nil {
-			return filename
-		}
-
-		// Check home/.sia/config
-		filename = home + "/.sia/config"
-		if _, err := os.Stat(filename); err == nil {
-			return filename
-		}
-
-		// Check home/.sia.conf
-		filename = home + "/.sia.conf"
-		if _, err := os.Stat(filename); err == nil {
-			return filename
-		}
-	}
-
-	// Try /etc/sia.conf
-	filename := "etc/sia.conf"
+	// Try siaDir/config
+	filename := siaDir + "config"
 	if _, err := os.Stat(filename); err == nil {
 		return filename
 	}
-
 	return ""
 }
 
@@ -81,6 +84,18 @@ func version(cmd *cobra.Command, args []string) {
 }
 
 func main() {
+	// Check that the sia directory exists and can be found.
+	err := checkSiaDir()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	home, err = homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v0.1.0",
@@ -105,10 +120,16 @@ func main() {
 	// Add flag defaults, which have the lowest priority. Every value will be
 	// set.
 	defaultConfigFile := configFilenameDefault()
-	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "Which port is used to communicate with the user.")
-	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "Which port is used when talking to other nodes on the network.")
-	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "Disable bootstrapping on this run.")
-	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "Tell siad where to load the config file.")
+	defaultHostDir := siaDir + "host/"
+	defaultStyleDir := siaDir + "style/"
+	defaultDownloadDir := home + "/Desktop/Downloads/"
+	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "which port is used to communicate with the user")
+	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
+	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "tell siad where to load the config file")
+	root.PersistentFlags().StringVarP(&config.Siad.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
+	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "where to find the files that compose the frontend")
+	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "where to download files")
 
 	// Load the config file, which has the middle priorty. Only values defined
 	// in the config file will be set.
