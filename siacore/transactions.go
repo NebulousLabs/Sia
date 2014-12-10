@@ -91,9 +91,6 @@ func (s *State) applyTransaction(t Transaction) {
 	for i, contract := range t.FileContracts {
 		s.addContract(contract, t.FileContractID(i))
 	}
-
-	// Scan the arbitrary data for items relevent to the host database.
-	// s.scanAndApplyHosts(&t)
 }
 
 // validInput returns err = nil if the input is valid within the current state,
