@@ -197,6 +197,8 @@ func (s *State) rewindABlock() {
 	// Remove the output for the miner subsidy.
 	delete(s.unspentOutputs, s.CurrentBlock().SubsidyID())
 
+	// As new transaction types get added, perform inverse maintenance here.
+
 	// Perform inverse contract maintenance.
 	s.inverseContractMaintenance()
 
@@ -242,6 +244,8 @@ func (s *State) integrateBlock(b *Block) (err error) {
 
 	// Perform maintanence on all open contracts.
 	s.contractMaintenance()
+
+	// As new transaction types get added, perform maintenance here.
 
 	// Update the current block and current path variables of the longest fork.
 	s.currentBlockID = b.ID()
@@ -329,6 +333,10 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 		validatedBlocks += 1
 	}
 
+	// Update the transaction pool to remove any transactions that have
+	// invalidated on account of invalidated storage proofs.
+	s.cleanTransactionPool()
+
 	return
 }
 
@@ -359,7 +367,7 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []BlockID, appliedBlocks []B
 
 	// Perform a sanity check if debug flag is set.
 	if DEBUG {
-		CurrentPathCheck(s)
+		s.CurrentPathCheck()
 	}
 
 	return

@@ -13,10 +13,10 @@ import (
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
 var (
-	BlockFrequency  = Timestamp(45)          // In seconds.
-	TargetWindow    = BlockHeight(40)        // Number of blocks to use when calculating the target.
+	BlockFrequency  = Timestamp(10)          // In seconds.
+	TargetWindow    = BlockHeight(80)        // Number of blocks to use when calculating the target.
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
-	RootTarget      = Target{0, 1}
+	RootTarget      = Target{0, 0, 32}
 	RootDepth       = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
 	MaxAdjustmentUp   = big.NewRat(103, 100)
@@ -90,11 +90,15 @@ type SpendConditions struct {
 }
 
 // A StorageProof contains the fields needed for a host to prove that they are
-// still storing a file.
+// still storing a file. Though WindowIndex is of type BlockHeight, it refers
+// to the index of the window, and not the height at which the window starts.
+//
+// TODO: Decide if WindowIndex should be type uint64 instead of BlockHeight
 type StorageProof struct {
-	ContractID ContractID
-	Segment    [hash.SegmentSize]byte
-	HashSet    []hash.Hash
+	ContractID  ContractID
+	WindowIndex BlockHeight
+	Segment     [hash.SegmentSize]byte
+	HashSet     []hash.Hash
 }
 
 // A FileContract contains the information necessary to enforce that a host
@@ -138,9 +142,9 @@ type CoveredFields struct {
 // CalculateCoinbase takes a height and from that derives the coinbase.
 func CalculateCoinbase(height BlockHeight) Currency {
 	if Currency(height) >= InitialCoinbase-MinimumCoinbase {
-		return MinimumCoinbase
+		return MinimumCoinbase * 100000
 	} else {
-		return InitialCoinbase - Currency(height)
+		return (InitialCoinbase - Currency(height)) * 100000
 	}
 }
 

@@ -7,27 +7,30 @@ import (
 	"github.com/NebulousLabs/Andromeda/hash"
 )
 
-func ContractProofIndex(contractID ContractID, stateHeight BlockHeight, contract FileContract, triggerBlockID BlockID) (proofIndex uint64) {
-	indexSeed := hash.HashBytes(append(triggerBlockID[:], contractID[:]...))
-	seedInt := new(big.Int).SetBytes(indexSeed[:])
-	modSeed := seedInt.Mod(seedInt, big.NewInt(int64(contract.FileSize)))
-	proofIndex = modSeed.Uint64()
-	return
-}
-
-// currentProofIndex returns the index that should be used when building and
-// verifying the storage proof for a file at the given window.
-func (s *State) currentProofIndex(id ContractID) uint64 {
-	contract := s.openContracts[id].FileContract
-
-	windowIndex, err := contract.WindowIndex(s.Height())
-	if err != nil {
-		panic(err)
+// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// the index of the segment that should be proven on when doing a proof of
+// storage.
+func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+	openContract, exists := s.openContracts[contractID]
+	if !exists {
+		err = errors.New("urecognized contractID")
+		return
 	}
-	triggerBlock := windowIndex*contract.Start - 1
-	triggerBlockID := s.currentPath[triggerBlock]
+	contract := openContract.FileContract
 
-	return ContractProofIndex(id, s.Height(), contract, triggerBlockID)
+	// Get random number seed used to pick the index.
+	triggerBlockHeight := contract.Start + contract.ChallengeWindow*windowIndex - 1
+	triggerBlock, err := s.BlockAtHeight(triggerBlockHeight)
+	if err != nil {
+		return
+	}
+	triggerBlockID := triggerBlock.ID()
+	seed := hash.HashBytes(append(triggerBlockID[:], contractID[:]...))
+
+	numSegments := int64(hash.CalculateSegments(contract.FileSize))
+	seedInt := new(big.Int).SetBytes(seed[:])
+	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
+	return
 }
 
 // validProof returns err = nil if the storage proof provided is valid given
@@ -44,11 +47,15 @@ func (s *State) validProof(sp StorageProof) error {
 	}
 
 	// Check that the storage proof itself is valid.
+	segmentIndex, err := s.StorageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
+	if err != nil {
+		return err
+	}
 	if !hash.VerifyReaderProof(
 		sp.Segment,
 		sp.HashSet,
 		hash.CalculateSegments(openContract.FileContract.FileSize),
-		s.currentProofIndex(sp.ContractID),
+		segmentIndex,
 		openContract.FileContract.FileMerkleRoot,
 	) {
 		return errors.New("provided storage proof is invalid")

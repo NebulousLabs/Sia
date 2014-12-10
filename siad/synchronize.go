@@ -53,7 +53,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siac
 // progressing exponentially backwards to the genesis block. The receiver uses
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
-func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
+func (e *Environment) CatchUp(peer network.NetAddress) {
 	e.state.RLock() // Lock the state while building the block request.
 	knownBlocks := make([]siacore.BlockID, 0, 32)
 	for i := siacore.BlockHeight(0); i < 12; i++ {
@@ -86,7 +86,8 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 	// unlock state during network I/O
 	err = peer.RPC("SendBlocks", blockArray, &newBlocks)
 	if err != nil {
-		return err
+		fmt.Println(err)
+		return
 	}
 
 	prevHeight := e.Height()
@@ -97,10 +98,7 @@ func (e *Environment) CatchUp(peer network.NetAddress) (err error) {
 	// TODO: There is probably a better approach than to call CatchUp
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
-	if prevHeight != e.state.Height() {
-		err = e.CatchUp(peer)
-		return
+	if prevHeight != e.Height() {
+		go e.CatchUp(e.RandomPeer())
 	}
-
-	return nil
 }

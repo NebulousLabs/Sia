@@ -42,6 +42,7 @@ type EnvironmentInfo struct {
 
 	RenterFiles []string
 
+	IPAddress          network.NetAddress
 	HostSettings       HostAnnouncement
 	HostSpaceRemaining int64
 	HostContractCount  int
@@ -87,6 +88,7 @@ func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
 
 		WalletBalance: e.WalletBalance(),
 
+		IPAddress:          e.server.NetAddress(),
 		HostSettings:       e.HostSettings(),
 		HostSpaceRemaining: e.HostSpaceRemaining(),
 	}

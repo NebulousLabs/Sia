@@ -39,6 +39,8 @@ func ReaderMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err erro
 
 // Calculates the number of segments in the file when building a merkle tree.
 // Should probably be renamed to CountLeaves() or something.
+//
+// TODO: Why is this in package hash?
 func CalculateSegments(fileSize uint64) (numSegments uint64) {
 	numSegments = fileSize / SegmentSize
 	if fileSize%SegmentSize != 0 {

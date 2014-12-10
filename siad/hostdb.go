@@ -109,7 +109,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 			MaxFilesize: ha.MaxFilesize,
 			MinDuration: ha.MinDuration,
 			MaxDuration: ha.MaxDuration,
-			Window:      ha.MaxChallengeWindow,
+			Window:      ha.MinChallengeWindow,
 			Tolerance:   ha.MinTolerance,
 			Price:       ha.Price,
 			Burn:        ha.Burn,

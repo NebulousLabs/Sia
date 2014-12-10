@@ -57,6 +57,7 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Env
 	if err != nil {
 		return
 	}
+	e.host.Settings.IPAddress = e.server.NetAddress()
 
 	// Begin listening for requests on the api.
 	e.setUpHandlers(apiPort)
@@ -98,9 +99,7 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 	// empty batch is sent.
 	go func() {
 		// Catch up the first time.
-		if err := e.CatchUp(e.RandomPeer()); err != nil {
-			fmt.Println("Error during CatchUp:", err)
-		}
+		go e.CatchUp(e.server.RandomPeer())
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
@@ -108,7 +107,7 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 		// make the network substantially more robust.
 		for {
 			time.Sleep(time.Minute * 2)
-			e.CatchUp(e.RandomPeer())
+			go e.CatchUp(e.RandomPeer())
 		}
 	}()
 
@@ -133,55 +132,40 @@ func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
 
 // processBlock is called by the environment's listener.
 func (e *Environment) processBlock(b siacore.Block) {
-	// Pass the block to the state, grabbing a lock on hostDatabase and host
-	// before releasing the state lock, to ensure that rewoundBlocks and
-	// appliedBlocks are managed in the correct order.
 	e.state.Lock()
-	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
-	stateHeight := e.state.Height()
 	e.hostDatabase.Lock()
-	defer e.hostDatabase.Unlock()
 	e.host.Lock()
+	defer e.state.Unlock()
+	defer e.hostDatabase.Unlock()
 	defer e.host.Unlock()
-	e.state.Unlock()
+
+	initialStateHeight := e.state.Height()
+	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
-	if err == siacore.BlockKnownErr {
-		// Nothing happens if the block is known.
+	if err == siacore.BlockKnownErr || err == siacore.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
 		if err == siacore.UnknownOrphanErr {
-			err = e.CatchUp(e.server.RandomPeer())
-			if err != nil {
-				// Logging
-				// fmt.Println(err2)
-			}
-		} else if err != siacore.KnownOrphanErr {
-			// TODO: Change this from a print statement to a logging statement.
-			fmt.Println("AcceptBlock Error: ", err)
+			go e.CatchUp(e.server.RandomPeer())
 		}
 		return
 	}
 
-	// TODO: once a block has been moved into the host db, it doesn't come out.
-	// But the host db should reverse when there are reorgs.
 	e.updateHostDB(rewoundBlocks, appliedBlocks)
-
-	e.storageProofMaintenance(stateHeight, rewoundBlocks, appliedBlocks)
+	e.storageProofMaintenance(initialStateHeight, rewoundBlocks, appliedBlocks)
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
 }
 
-// processTransaction is called by the environment's listener.
+// processTransaction sends a transaction to the state.
 func (e *Environment) processTransaction(t siacore.Transaction) {
-	// Pass the transaction to the state.
 	e.state.Lock()
-	err := e.state.AcceptTransaction(t)
-	e.state.Unlock()
+	defer e.state.Unlock()
 
-	// Perform error handling.
+	err := e.state.AcceptTransaction(t)
 	if err != nil {
 		if err != siacore.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
@@ -190,7 +174,6 @@ func (e *Environment) processTransaction(t siacore.Transaction) {
 		return
 	}
 
-	// Broadcast all valid transactions.
 	go e.server.Broadcast("AcceptTransaction", t, nil)
 }
 

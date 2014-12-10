@@ -14,7 +14,7 @@
 						You have <span id="hostNumContracts">0</span> active contracts.
 
 						<h3>Update Settings Form</h3>
-						<label>IP + Port</label><input type="text" id="hostIPAddress" value="localhost:9988"></input><br>
+						<label>IP + Port</label><input type="text" id="hostIPAddress"></input><br>
 						<label>Total Storage (MB)</label><input type="text" id="hostTotalStorage" value="1024"></input><br>
 						<label>Min Filesize</label><input type="text" id="hostMinFilesize" value="25"></input><br>
 						<label>Max Filesize</label><input type="text" id="hostMaxFilesize" value="1000"></input><br>
