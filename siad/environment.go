@@ -70,8 +70,12 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
 
-	// create downloads directory
+	// create downloads directory and host directory.
 	err = os.MkdirAll(downloadDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		return
+	}
+	err = os.MkdirAll(hostDir, os.ModeDir|os.ModePerm)
 	if err != nil {
 		return
 	}
