@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-var tmpl = template.Must(template.ParseFiles("webpages/template.html"))
-
 // webIndex loads a partial page according to the http request and composes it
 // into a full page by adding the header and the footer, then serves the page.
 // If there is an error, the error is reported (unsanitized). If the error is a
@@ -18,9 +16,9 @@ func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
 	var fileToLoad string
 	if req.URL.Path == "/" {
 		// Make a special case for the index.
-		fileToLoad = "webpages/index.partial"
+		fileToLoad = e.styleDir + "index.partial"
 	} else {
-		fileToLoad = "webpages" + strings.TrimSuffix(req.URL.Path, "html") + "partial"
+		fileToLoad = e.styleDir + strings.TrimSuffix(req.URL.Path, "html") + "partial"
 	}
 
 	// Load the partial file.
@@ -31,5 +29,5 @@ func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Compose the partial into a full page and serve the page.
-	tmpl.Execute(w, template.HTML(indexBody))
+	e.template.Execute(w, template.HTML(indexBody))
 }

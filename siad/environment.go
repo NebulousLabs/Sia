@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"os"
 	"sync"
 	"time"
@@ -34,17 +35,26 @@ type Environment struct {
 	mining        bool         // true when mining
 	miningThreads int          // number of processes mining at once
 	miningLock    sync.RWMutex // prevents benign race conditions
+
+	// Envrionment directories.
+	template    *template.Template
+	hostDir     string
+	styleDir    string
+	downloadDir string
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Environment, err error) {
+func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir string, styleDir string, downloadDir string) (e *Environment, err error) {
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
+		hostDir:         hostDir,
+		styleDir:        styleDir,
+		downloadDir:     downloadDir,
 	}
 
 	// Initialize all internal structures.
@@ -61,10 +71,13 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Env
 	e.host.Settings.IPAddress = e.server.NetAddress()
 
 	// create downloads directory
-	err = os.MkdirAll("webpages/downloads", os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(downloadDir, os.ModeDir|os.ModePerm)
 	if err != nil {
 		return
 	}
+
+	// Create the web interface template.
+	e.template = template.Must(template.ParseFiles(styleDir + "template.html"))
 
 	// Begin listening for requests on the api.
 	e.setUpHandlers(apiPort)

@@ -16,7 +16,7 @@ import (
 func (e *Environment) setUpHandlers(apiPort uint16) {
 	// Web Interface
 	http.HandleFunc("/", e.webIndex)
-	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir("webpages"))))
+	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(e.styleDir))))
 
 	// Plaintext API
 	http.HandleFunc("/sync", e.syncHandler)
@@ -218,8 +218,7 @@ func (e *Environment) rentHandler(w http.ResponseWriter, req *http.Request) {
 func (e *Environment) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	nickname, filename := req.FormValue("nickname"), req.FormValue("destination")
 	if filename == "" {
-		// TODO: this should be an Environment variable
-		filename = "lib/downloads/" + nickname
+		filename = e.downloadDir + nickname
 	}
 	err := e.Download(nickname, filename)
 	if err != nil {
