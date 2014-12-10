@@ -101,6 +101,4 @@ func (e *Environment) CatchUp(peer network.NetAddress) {
 	if prevHeight != e.Height() {
 		go e.CatchUp(e.RandomPeer())
 	}
-
-	return
 }
