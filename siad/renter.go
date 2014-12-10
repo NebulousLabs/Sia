@@ -40,6 +40,12 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 	// Scan the blockchain for outputs.
 	e.wallet.Scan()
 
+	// Find a host.
+	host, err := e.hostDatabase.ChooseHost()
+	if err != nil {
+		return
+	}
+
 	// Open the file, create a merkle hash.
 	file, err := os.Open(filename)
 	if err != nil {
@@ -56,12 +62,6 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 	}
 	// reset read position
 	if _, err = file.Seek(0, 0); err != nil {
-		return
-	}
-
-	// Find a host.
-	host, err := e.hostDatabase.ChooseHost()
-	if err != nil {
 		return
 	}
 
