@@ -70,8 +70,8 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 		ContractFund:      (host.Price + host.Burn) * 5000 * siacore.Currency(info.Size()), // 5000 blocks.
 		FileMerkleRoot:    merkle,
 		FileSize:          uint64(info.Size()),
-		Start:             e.Height() + 100,
-		End:               e.Height() + 5100,
+		Start:             e.Height() + 20,
+		End:               e.Height() + 520,
 		ChallengeWindow:   host.Window,
 		Tolerance:         host.Tolerance,
 		ValidProofPayout:  host.Price * siacore.Currency(info.Size()) * siacore.Currency(host.Window),
