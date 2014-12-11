@@ -9,6 +9,7 @@ import (
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/mitchellh/go-homedir"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a
@@ -47,17 +48,32 @@ type Environment struct {
 // puts it all in a single environment struct that's used as the state for the
 // main package.
 func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir string, styleDir string, downloadDir string) (e *Environment, err error) {
+	// Expand the input directories, replacing '~' with the home path.
+	expandedHostDir, err := homedir.Expand(hostDir)
+	if err != nil {
+		err = fmt.Errorf("problem with hostDir: %v", err)
+		return
+	}
+	expandedStyleDir, err := homedir.Expand(styleDir)
+	if err != nil {
+		err = fmt.Errorf("problem with styleDir: %v", err)
+		return
+	}
+	expandedDownloadDir, err := homedir.Expand(downloadDir)
+	if err != nil {
+		err = fmt.Errorf("problem with downloadDir: %v", err)
+		return
+	}
+
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
-		hostDir:         hostDir,
-		styleDir:        styleDir,
-		downloadDir:     downloadDir,
+		hostDir:         expandedHostDir,
+		styleDir:        expandedStyleDir,
+		downloadDir:     expandedDownloadDir,
 	}
-
-	// Initialize all internal structures.
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
@@ -69,6 +85,12 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
+
+	// Check that template.html exists.
+	if _, err := os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
+		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
+		return
+	}
 
 	// create downloads directory and host directory.
 	err = os.MkdirAll(downloadDir, os.ModeDir|os.ModePerm)

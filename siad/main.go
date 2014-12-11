@@ -42,7 +42,7 @@ func checkSiaDir() (err error) {
 		return
 	}
 
-	err = errors.New("No sia directory found, please create and populate the sia directory (instructions found in README)")
+	err = errors.New("No sia directory found, please create and populate the sia directory (instructions found in README.md)")
 	return
 }
 
@@ -60,12 +60,6 @@ func configFilenameDefault() string {
 // startEnvironment calls createEnvironment(), which will handle everything
 // else.
 func startEnvironment(cmd *cobra.Command, args []string) {
-	// Check that template.html exists.
-	if _, err := os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
-		fmt.Println("No html template found, please put the html files in the styles folder (instructions found in README)")
-		return
-	}
-
 	_, err := CreateEnvironment(config.Siad.RpcPort, config.Siad.ApiPort, config.Siad.NoBootstrap, config.Siad.HostDirectory, config.Siad.StyleDirectory, config.Siad.DownloadDirectory)
 	if err != nil {
 		fmt.Println(err)
