@@ -25,11 +25,15 @@ siad, or navigate your browser to `http://localhost:9980` to use siad's web
 interface. From here, you can send money, mine blocks, upload and download
 files, and advertise yourself as a host.
 
-A note on hosting: when you become a host, you have to put up coins ("freeze"
-them) to show that you're serious. If you're a good host, you'll eventually
-get these coins back, but if you lose files you'll lose the coins too. So when
-people make contracts with you, your balance will initially go down. Rest
-assured, once you start submitting storage proofs, you'll start making money.
+A note on hosting: when you announce yourself as a host, you have to put up
+coins ("freeze" them) to show that you're serious. This helps to mitiage Sybil
+attacks. After 'freeze duration' blocks, you will get the coins back.
+
+When someone makes a contract with you, you put up security coins. If you're a
+good host, you'll eventually get these coins back, but if you lose the file
+you'll lose the security too. So when people make contracts with you, your
+balance will initially go down. Rest assured, once you start submitting storage
+proofs, you'll start making money.
 
 Troubleshooting
 ---------------

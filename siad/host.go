@@ -432,6 +432,7 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 				// revitalize or whatever.
 				continue
 			}
+			proofs = append(proofs, proof)
 
 			// Add this contract proof to the backwards contracts list.
 			e.host.BackwardContracts[height-StorageProofReorgDepth+1] = append(e.host.BackwardContracts[height-StorageProofReorgDepth+1], contractEntry)
