@@ -66,6 +66,7 @@ func startEnvironment(cmd *cobra.Command, args []string) {
 	}
 }
 
+/*
 // install moves the given folder to the $home/.config/sia/style folder. Isn't
 // guaranteed to work correctly.
 func install(cmd *cobra.Command, args []string) {
@@ -94,6 +95,7 @@ func install(cmd *cobra.Command, args []string) {
 	}
 	fmt.Println("Moved styles folder to", configDir)
 }
+*/
 
 // Prints version information about Sia Daemon.
 func version(cmd *cobra.Command, args []string) {
@@ -120,12 +122,14 @@ func main() {
 		Run:   startEnvironment,
 	}
 
+	/*
 	root.AddCommand(&cobra.Command{
 		Use:   "install",
 		Short: "Install siad",
 		Long:  "Install siad by creating a config folder and copying in the styles folder",
 		Run:   install,
 	})
+	*/
 
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
