@@ -1,50 +1,46 @@
 Sia 0.1.0
+=========
 
 This distribution is an early beta release. It is likely to have many bugs,
 some of which may be severe. Please use with caution.
 
-This release comes with 2 binaries, siad and siac. This README only covers
-siad. Siad uses the files in the 'style/' folder to build webpages that yon can
-use to interact with siad. Siad will look for these files in your home folder,
-in '$home/.config/sia/style'. Please copy the style/ folder into
-'$home/.config/sia/style'. You can also run 'siad install $path/style/', where
-$path is the current directory.
+This release comes with 2 binaries, siad and siac. siad is a background
+service, or "daemon", that runs the Sia protocol, and siac is a client that is
+used to interact with siad. siad also exposes a web interface, which can be
+viewed in your browser at 'localhost:9980' while siad is running. This is the
+preferred way of interacting with siad.
 
-To use siad, run the executable in the command prompt (drag and drop the
-executable into the command prompt and hit enter). If you haven't put the
-style/ folder in the right spot, the program will fail and spit out an error.
-If you have, then the program will appear to do nothing. Open up a web browser
-and go to 'localhost:9980'. You should see the webpage which is the sia front
-end.
+Usage
+-----
 
-In this release, there's no way to save or load private keys. If you turn off
-your system, you'll lose all of your coins and files, and you'll lose everyone
-else's files. Don't feel bad though, beta coins are worthless anyway.
+siad and siac are run via command prompt. On Windows, you can open a command
+prompt by navigating to the sia folder and clicking File->Open Command Window.
+Then, start the siad service by entering 'siad' and pressing Enter. The command
+prompt may appear to freeze; this means siad is waiting for requests. You can
+now run 'siac' in a separate command prompt to interact with siad, or navigate
+your browser to 'localhost:9980' to use siad's web interface. From here, you
+can send money, mine blocks, and upload and download files.
 
-You can upload files to existing hosts, and you can become a host yourself. The
-host process is currently a bit unintuitive. When you become a host, you have
-to put up coins that say "I will not lose files", and if you do lose files,
-then you lose the coins. So initially, as people make contracts with you, your
-balance will actually go down. Then, as you successfully submit storage proofs,
-your balance will go back up, until you have made a profit instead of a loss.
+You can also advertise yourself as a host. This process is currently a bit
+unintuitive. When you become a host, you have to put up coins ("freeze" them)
+to show that you're serious. If you're a good host, you'll eventually get
+these coins back, but if you lose files you'll lose the coins too. So when
+people make contracts with you, your balance will initially go down. Rest
+assured, once you start submitting storage proofs, you'll start making money.
 
+Version Information
+-------------------
 
-When you announce as a host, you freeze some coins, which minimizes spam. Hosts
-which freeze few coins are going to be ignored by clients, and hosts which
-freeze many coins are going to be favored. There are 3 ways to be a favored
-host: lower your price, increase your penalty, and increase the number of coins
-you freeze. If you freeze your coins for 100 blocks, you can spend them again
-once 100 blocks have passed. Except, right now the host forgets about the
-frozen coins (like a squirrel who forgot about a nut it buried), so you can't
-actually spend your frozen coins ever again.
+v0.1.0:
 
-Thanks for being a beta user!
+- siad starts fresh every time you run it. When you close it, everything is
+  lost: your wallet, your coins, your files, the blockchain, everything. So
+  for the sake of other beta users, please leave siad running as long as
+  possible. And don't upload anything important!
 
-Upcoming features:
-	+ Save and load wallets
-	+ Remeber files you've previously uploaded
-	+ Hosts remember coins they've frozen so they can be spent again
+- Hosts don't keep track of coins they've frozen. They are lost forever. Don't
+  worry, beta coins are worthless anyway.
 
-Please tell me about any problems you run into, and any features you want! The
+Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
-on what we do in the next few months. And thanks again.
+on what we do in the next few months. Thank you!
