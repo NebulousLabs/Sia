@@ -1,36 +1,135 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
+	"code.google.com/p/gcfg"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 )
 
-var apiPort uint16
-var rpcPort uint16
-var nobootstrap bool
+var (
+	home   string
+	siaDir string
+	config Config
+)
 
-// Calls CreateEnvironment(), which will handle everything else.
-func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := CreateEnvironment(rpcPort, apiPort, nobootstrap)
-	if err != nil {
-		println(err.Error())
-		return
+type Config struct {
+	Siad struct {
+		ApiPort           uint16
+		RpcPort           uint16
+		NoBootstrap       bool
+		ConfigFilename    string
+		HostDirectory     string
+		StyleDirectory    string
+		DownloadDirectory string
 	}
 }
 
+// checkSiaDir verifies that a sia directory exists.
+func checkSiaDir() (err error) {
+	home, err := homedir.Dir()
+	if err != nil {
+		return
+	}
+
+	// Check that ~/.config/sia exists
+	dirname := home + "/.config/sia/"
+	if _, err = os.Stat(dirname); err == nil {
+		siaDir = dirname
+		return
+	}
+
+	err = errors.New("No sia directory found, please create and populate the sia directory (instructions found in README.md)")
+	return
+}
+
+// confilgFilenameDefault checks multiple directories for a config file and
+// loads the first one it finds. "" is returned if no config file is found.
+func configFilenameDefault() string {
+	// Try siaDir/config
+	filename := siaDir + "config"
+	if _, err := os.Stat(filename); err == nil {
+		return filename
+	}
+	return ""
+}
+
+// startEnvironment calls createEnvironment(), which will handle everything
+// else.
+func startEnvironment(cmd *cobra.Command, args []string) {
+	_, err := CreateEnvironment(config)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+/*
+// install moves the given folder to the $home/.config/sia/style folder. Isn't
+// guaranteed to work correctly.
+func install(cmd *cobra.Command, args []string) {
+	if len(args) != 1 {
+		fmt.Println("Incorrect use of install - must supply filepath to the styles folder.")
+		return
+	}
+
+	home, err := homedir.Dir()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	configDir := home + "/.config/sia/style"
+	err = os.MkdirAll(configDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	err = os.Rename(args[0], configDir)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Moved styles folder to", configDir)
+}
+*/
+
 // Prints version information about Sia Daemon.
 func version(cmd *cobra.Command, args []string) {
-	println("Sia Daemon v0.1.0")
+	fmt.Println("Sia Daemon v0.1.0")
 }
 
 func main() {
+	// Check that the sia directory exists and can be found.
+	err := checkSiaDir()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	home, err = homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v0.1.0",
 		Long:  "Sia Daemon v0.1.0",
 		Run:   startEnvironment,
 	}
+
+	/*
+	root.AddCommand(&cobra.Command{
+		Use:   "install",
+		Short: "Install siad",
+		Long:  "Install siad by creating a config folder and copying in the styles folder",
+		Run:   install,
+	})
+	*/
 
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
@@ -39,11 +138,31 @@ func main() {
 		Run:   version,
 	})
 
-	// Add flags for the api port and rpc port.
-	root.Flags().Uint16VarP(&apiPort, "api-port", "a", 9980, "Which port is used to communicate with the user.")
-	root.Flags().Uint16VarP(&rpcPort, "rpc-port", "r", 9988, "Which port is used when talking to other nodes on the network.")
-	root.Flags().BoolVarP(&nobootstrap, "no-bootstrap", "n", false, "Disable bootstrapping on this run.")
+	// Add flag defaults, which have the lowest priority. Every value will be
+	// set.
+	defaultConfigFile := configFilenameDefault()
+	defaultHostDir := siaDir + "host/"
+	defaultStyleDir := siaDir + "style/"
+	defaultDownloadDir := home + "/Desktop/Downloads/"
+	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "which port is used to communicate with the user")
+	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
+	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "tell siad where to load the config file")
+	root.PersistentFlags().StringVarP(&config.Siad.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
+	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "where to find the files that compose the frontend")
+	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "where to download files")
 
-	// Start the party.
+	// Load the config file, which has the middle priorty. Only values defined
+	// in the config file will be set.
+	if config.Siad.ConfigFilename != "" {
+		err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	// Execute wil over-write any flags set by the config file, but only if the
+	// user specified them manually.
 	root.Execute()
 }

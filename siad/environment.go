@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Andromeda/network"
 	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/mitchellh/go-homedir"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a
@@ -34,40 +36,78 @@ type Environment struct {
 	mining        bool         // true when mining
 	miningThreads int          // number of processes mining at once
 	miningLock    sync.RWMutex // prevents benign race conditions
+
+	// Envrionment directories.
+	template    *template.Template
+	hostDir     string
+	styleDir    string
+	downloadDir string
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool) (e *Environment, err error) {
+func CreateEnvironment(config Config) (e *Environment, err error) {
+	// Expand the input directories, replacing '~' with the home path.
+	expandedHostDir, err := homedir.Expand(config.Siad.HostDirectory)
+	if err != nil {
+		err = fmt.Errorf("problem with hostDir: %v", err)
+		return
+	}
+	expandedStyleDir, err := homedir.Expand(config.Siad.StyleDirectory)
+	if err != nil {
+		err = fmt.Errorf("problem with styleDir: %v", err)
+		return
+	}
+	expandedDownloadDir, err := homedir.Expand(config.Siad.DownloadDirectory)
+	if err != nil {
+		err = fmt.Errorf("problem with downloadDir: %v", err)
+		return
+	}
+
+	// Check that template.html exists.
+	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
+		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
+		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", config.Siad.StyleDirectory)
+		return
+	}
+
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
 		blockChan:       make(chan siacore.Block, 100),
 		transactionChan: make(chan siacore.Transaction, 100),
+		hostDir:         expandedHostDir,
+		styleDir:        expandedStyleDir,
+		downloadDir:     expandedDownloadDir,
 	}
-
-	// Initialize all internal structures.
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
 	e.wallet = CreateWallet(e.state)
 
 	// Bootstrap to the network.
-	err = e.initializeNetwork(rpcPort, nobootstrap)
+	err = e.initializeNetwork(config.Siad.RpcPort, config.Siad.NoBootstrap)
 	if err != nil {
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
 
-	// create downloads directory
-	err = os.MkdirAll("webpages/downloads", os.ModeDir|os.ModePerm)
+	// create downloads directory and host directory.
+	err = os.MkdirAll(e.downloadDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		return
+	}
+	err = os.MkdirAll(e.hostDir, os.ModeDir|os.ModePerm)
 	if err != nil {
 		return
 	}
 
+	// Create the web interface template.
+	e.template = template.Must(template.ParseFiles(e.styleDir + "template.html"))
+
 	// Begin listening for requests on the api.
-	e.setUpHandlers(apiPort)
+	e.setUpHandlers(config.Siad.ApiPort)
 
 	return
 }

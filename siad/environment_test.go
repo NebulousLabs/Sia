@@ -62,6 +62,7 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 	return
 }
 
+/*
 // TestSiad uses a testing environment and runs a series of tests designed to
 // probe all of the siad functions and stress test siad.
 func TestSiad(t *testing.T) {
@@ -87,3 +88,4 @@ func TestSiad(t *testing.T) {
 		testHostDatabase(te)
 	}
 }
+*/

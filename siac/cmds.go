@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os/exec"
 
 	"github.com/spf13/cobra"
 )
@@ -32,21 +31,6 @@ func getResponse(handler string, vals *url.Values) string {
 		return err.Error()
 	}
 	return string(data)
-}
-
-func startcmd(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
-		cmd.Usage()
-		return
-	}
-	// TODO: specify port
-	// TODO: don't start if already started
-	err := exec.Command("sh", "-c", "~/go/bin/siad &").Run()
-	if err != nil {
-		fmt.Println("Failed to start Sia daemon:", err)
-	} else {
-		fmt.Println("Sia daemon started")
-	}
 }
 
 func stopcmd(cmd *cobra.Command, args []string) {

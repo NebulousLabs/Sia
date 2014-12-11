@@ -273,7 +273,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	}
 
 	// Allocate and download the file.
-	file, err := os.Create(strconv.Itoa(e.host.Index))
+	file, err := os.Create(e.hostDir + strconv.Itoa(e.host.Index))
 	if err != nil {
 		return
 	}

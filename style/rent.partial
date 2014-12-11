@@ -1,0 +1,41 @@
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-lg-12">
+                        <h2>File Management</h2>
+
+						<div class="col-lg-6">
+							<div class="col-sm-10 col-sm-offset-2">
+							<h3>Upload File</h3>
+							</div>
+
+							<div class="row">
+								<label class="col-sm-4 control-label">File</label>
+								<div class="col-sm-8">
+								<input type="text" class="form-control" id="rentSourceFile"></input><br>
+								</div>
+							</div>
+
+							<div class="row">
+								<label class="col-sm-4 control-label">Nickname</label>
+								<div class="col-sm-8">
+								<input type="text" class="form-control" id="rentNickname"></input><br>
+								</div>
+							</div>
+
+							<div class="col-sm-8 col-sm-offset-4">
+							<button onclick="rentFile()">Submit</button>
+							</div>
+						</div>
+						<div class="col-lg-6">
+						</div>
+
+						<div class="col-lg-12">
+						<p id="apiResponse"></p>
+						</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
