@@ -65,6 +65,13 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 		return
 	}
 
+	// Check that template.html exists.
+	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
+		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
+		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", styleDir)
+		return
+	}
+
 	e = &Environment{
 		state:           siacore.CreateGenesisState(),
 		friends:         make(map[string]siacore.CoinAddress),
@@ -85,12 +92,6 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
-
-	// Check that template.html exists.
-	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
-		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
-		return
-	}
 
 	// create downloads directory and host directory.
 	err = os.MkdirAll(downloadDir, os.ModeDir|os.ModePerm)
