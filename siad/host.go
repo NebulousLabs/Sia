@@ -319,6 +319,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	// storage.
 	firstProof := t.FileContracts[0].Start + StorageProofReorgDepth
 	e.host.ForwardContracts[firstProof] = append(e.host.ForwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
+	fmt.Println("Accepted contract.")
 
 	return
 }
@@ -336,18 +337,21 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	filename, exists := e.host.Files[merkle]
 	e.host.RUnlock()
 	if !exists {
+		fmt.Println("RetrieveFile: no record of file with that hash")
 		return errors.New("no record of that file")
 	}
 
 	// Open the file.
-	file, err := os.Open(filename)
+	file, err := os.Open(e.hostDir + filename)
 	if err != nil {
+		fmt.Println("RetrieveFile:", err)
 		return
 	}
 	defer file.Close()
 
 	// Transmit the file.
-	_, err = io.Copy(conn, file)
+	n, err := io.Copy(conn, file)
+	fmt.Println("RetrieveFile: wrote", n, "bytes")
 	if err != nil {
 		return
 	}
@@ -365,7 +369,7 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 	}
 
 	// Open the file.
-	file, err := os.Open(filename)
+	file, err := os.Open(e.hostDir + filename)
 	if err != nil {
 		return
 	}
@@ -410,6 +414,7 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 			proof, err := e.createStorageProof(contractEntry, height)
 			if err != nil {
 				fmt.Println("High Priority Error: storage proof failed:", err)
+				continue
 			}
 			proofs = append(proofs, proof)
 		}
@@ -423,8 +428,10 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 			proof, err := e.createStorageProof(contractEntry, height)
 			if err != nil {
 				fmt.Println("High Priority Error: storage proof failed:", err)
+				// TODO: Do something that will have the program try again, or
+				// revitalize or whatever.
+				continue
 			}
-			proofs = append(proofs, proof)
 
 			// Add this contract proof to the backwards contracts list.
 			e.host.BackwardContracts[height-StorageProofReorgDepth+1] = append(e.host.BackwardContracts[height-StorageProofReorgDepth+1], contractEntry)

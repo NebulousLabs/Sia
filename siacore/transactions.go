@@ -178,7 +178,20 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 
 	// Check that the outputs are less than or equal to the outputs.
 	if inputSum < outputSum {
-		err = errors.New("inputs do not equal outputs for transaction.")
+		errorString := fmt.Sprintf("Inputs do not equal outputs for transaction: inputs=%v : outputs=%v", inputSum, outputSum)
+		for _, input := range t.Inputs {
+			errorString += fmt.Sprintf("\nInput: %v", s.unspentOutputs[input.OutputID].Value)
+		}
+		for _, fee := range t.MinerFees {
+			errorString += fmt.Sprintf("\nMiner Fee: %v", fee)
+		}
+		for _, output := range t.Outputs {
+			errorString += fmt.Sprintf("\nOutput: %v", output.Value)
+		}
+		for _, fc := range t.FileContracts {
+			errorString += fmt.Sprintf("\nContract Fund: %v", fc.ContractFund)
+		}
+		err = errors.New(errorString)
 		return
 	}
 
