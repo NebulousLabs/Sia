@@ -93,6 +93,7 @@ func install(cmd *cobra.Command, args []string) {
 		fmt.Println("Error:", err)
 		return
 	}
+	fmt.Println("Moved styles folder to", configDir)
 }
 
 // Prints version information about Sia Daemon.

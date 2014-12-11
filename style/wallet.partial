@@ -4,16 +4,43 @@
                 <div class="row">
                     <div class="col-lg-12">
                         <h2>Money Management</h2>
-						<p id="walletStatus">Loading...</p>
 
-						<h3>Send Money Form</h3>
-						Address: <input type="text" id="destinationAddress"></input><br>
-						Amount to Send: <input type="text" id="amountToSend"></input><br>
-						Miner Fee: <input type="text" id="minerFee" value="50"></input><br>
-						<button onclick="sendMoney()">Submit</button>
+						<div class="col-lg-6">
+							<div class="col-sm-10 col-sm-offset-2">
+							<h3>Send Money Form</h3>
+							</div>
 
-						<br><br>
+							<div class="row">
+								<label class="col-sm-4 control-label">Address</label>
+								<div class="col-sm-8">
+								<input type="text" class="form-control" id="destinationAddress"></input><br>
+								</div>
+							</div>
+
+							<div class="row">
+								<label class="col-sm-4 control-label">Amount to Send</label>
+								<div class="col-sm-8">
+								<input type="text" class="form-control" id="amountToSend"></input><br>
+								</div>
+							</div>
+
+							<div class="row">
+								<label class="col-sm-4 control-label">Miner Fee</label>
+								<div class="col-sm-8">
+								<input type="text" class="form-control" id="minerFee" value="50"></input><br>
+								</div>
+							</div>
+
+							<div class="col-sm-8 col-sm-offset-4">
+							<button onclick="sendMoney()">Submit</button>
+							</div>
+						</div>
+						<div class="col-lg-6">
+						</div>
+
+						<div class="col-lg-12">
 						<p id="apiResponse"></p>
+						</div>
                     </div>
                 </div>
             </div>
