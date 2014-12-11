@@ -12,7 +12,7 @@ test: install
 test-long: install
 	go test -v ./...
 
-test-long-race: install
+test-race: install
 	go test -v -race ./...
 
 # run twice to ensure references are updated properly
@@ -28,14 +28,12 @@ dependencies: race-libs
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
 
-distribution:
-	go install ./...
-	cp $(GOPATH)/bin/siad config/siad
-	tar -cJvf sia-bundle.xz config/*
-	rm -f config/siad
+clean:
+	rm -rf release whitepaper.aux whitepaper.log whitepaper.pdf
 
-cross-platform:
+# Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
+xc:
 	go get -u github.com/laher/goxc
-	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -pr=beta -include=config/,LICENSE*,README*
+	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -pr=beta -include=style/,config,LICENSE*,README* -tasks-=deb,deb-dev,deb-source
 
-.PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution cross-platform
+.PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution clean xc
