@@ -6,26 +6,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func versioncmd(*cobra.Command, []string) {
+	println("Sia Client v0.1.0")
+}
+
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Client v0.1.0",
 		Long:  "Sia Client v0.1.0",
-		Run:   startcmd,
+		Run:   versioncmd,
 	}
 
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information.",
-		Run:   func(*cobra.Command, []string) { println("Sia Client v0.1.0") },
-	})
-
-	root.AddCommand(&cobra.Command{
-		Use:   "start",
-		Short: "Start the Sia daemon",
-		Long:  "Start the Sia daemon.",
-		Run:   startcmd,
+		Run:   versioncmd,
 	})
 
 	root.AddCommand(&cobra.Command{
