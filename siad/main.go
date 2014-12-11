@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -11,8 +10,6 @@ import (
 )
 
 var (
-	home   string
-	siaDir string
 	config Config
 )
 
@@ -28,33 +25,35 @@ type Config struct {
 	}
 }
 
-// checkSiaDir verifies that a sia directory exists.
-func checkSiaDir() (err error) {
-	home, err := homedir.Dir()
-	if err != nil {
-		return
+// findSiaDir first checks the current directory, then checks ~/.config/sia,
+// looking for the html template file that's needed to run the web app.
+// findSiaDir will return home="" if it can't find the home dir, but it won't
+// report an error for that. It'll only report an error if it can't find
+// template.html.
+func findSiaDir() (home, siaDir string, err error) {
+	// Check the current directory for the template file.
+	var found bool
+	if _, err = os.Stat("style/template.html"); err == nil {
+		found = true
 	}
 
-	// Check that ~/.config/sia exists
-	dirname := home + "/.config/sia/"
-	if _, err = os.Stat(dirname); err == nil {
-		siaDir = dirname
-		return
+	// Check ~/.config/sia for the template file.
+	home, err = homedir.Dir()
+	if err == nil && !found {
+		dirname := home + "/.config/sia/style/template.html"
+		if _, err = os.Stat(dirname); err == nil {
+			siaDir = dirname
+			return
+		}
 	}
 
-	err = errors.New("No sia directory found, please create and populate the sia directory (instructions found in README.md)")
+	// This is the only error that can be returned.
+	if !found {
+		err = fmt.Errorf("Style folder not found, please put the 'style/' folder in the current directory")
+	} else {
+		err = nil
+	}
 	return
-}
-
-// confilgFilenameDefault checks multiple directories for a config file and
-// loads the first one it finds. "" is returned if no config file is found.
-func configFilenameDefault() string {
-	// Try siaDir/config
-	filename := siaDir + "config"
-	if _, err := os.Stat(filename); err == nil {
-		return filename
-	}
-	return ""
 }
 
 // startEnvironment calls createEnvironment(), which will handle everything
@@ -66,70 +65,18 @@ func startEnvironment(cmd *cobra.Command, args []string) {
 	}
 }
 
-/*
-// install moves the given folder to the $home/.config/sia/style folder. Isn't
-// guaranteed to work correctly.
-func install(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Println("Incorrect use of install - must supply filepath to the styles folder.")
-		return
-	}
-
-	home, err := homedir.Dir()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	configDir := home + "/.config/sia/style"
-	err = os.MkdirAll(configDir, os.ModeDir|os.ModePerm)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	err = os.Rename(args[0], configDir)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println("Moved styles folder to", configDir)
-}
-*/
-
 // Prints version information about Sia Daemon.
 func version(cmd *cobra.Command, args []string) {
 	fmt.Println("Sia Daemon v0.1.0")
 }
 
 func main() {
-	// Check that the sia directory exists and can be found.
-	err := checkSiaDir()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	home, err = homedir.Dir()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v0.1.0",
 		Long:  "Sia Daemon v0.1.0",
 		Run:   startEnvironment,
 	}
-
-	/*
-	root.AddCommand(&cobra.Command{
-		Use:   "install",
-		Short: "Install siad",
-		Long:  "Install siad by creating a config folder and copying in the styles folder",
-		Run:   install,
-	})
-	*/
 
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
@@ -138,12 +85,16 @@ func main() {
 		Run:   version,
 	})
 
-	// Add flag defaults, which have the lowest priority. Every value will be
-	// set.
-	defaultConfigFile := configFilenameDefault()
+	// Add flag defaults, which have the lowest priority.
+	home, siaDir, err := findSiaDir()
+	if err != nil {
+		// Print the error as a warning
+		fmt.Println(err)
+	}
+	defaultConfigFile := siaDir + "config"
 	defaultHostDir := siaDir + "host/"
 	defaultStyleDir := siaDir + "style/"
-	defaultDownloadDir := home + "/Desktop/Downloads/"
+	defaultDownloadDir := home + "/Downloads/"
 	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "which port is used to communicate with the user")
 	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
 	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
@@ -154,11 +105,10 @@ func main() {
 
 	// Load the config file, which has the middle priorty. Only values defined
 	// in the config file will be set.
-	if config.Siad.ConfigFilename != "" {
+	if _, err = os.Stat(config.Siad.ConfigFilename); err == nil {
 		err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename)
 		if err != nil {
-			fmt.Println(err)
-			return
+			fmt.Println("Error reading config file:", err)
 		}
 	}
 
