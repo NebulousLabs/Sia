@@ -87,7 +87,7 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 	e.host.Settings.IPAddress = e.server.NetAddress()
 
 	// Check that template.html exists.
-	if _, err := os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
+	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
 		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
 		return
 	}

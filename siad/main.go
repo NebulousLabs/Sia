@@ -69,12 +69,29 @@ func startEnvironment(cmd *cobra.Command, args []string) {
 // homeFolder displays a user's home directory to them, which is nice for
 // windows users since they might not know which directory is their home
 // directory.
-func homeFolder(cmd *cobra.Command, args []string) {
+func install(cmd *cobra.Command, args []string) {
+	if len(args) != 1 {
+		fmt.Println("Incorrect use of install - must supply filepath to the styles folder.")
+		return
+	}
+
 	home, err := homedir.Dir()
 	if err != nil {
 		fmt.Println("Error:", err)
-	} else {
-		fmt.Println(home)
+		return
+	}
+
+	configDir := home + "/.config/sia/style"
+	err = os.MkdirAll(configDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	err = os.Rename(args[0], configDir)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
 	}
 }
 
@@ -104,10 +121,10 @@ func main() {
 	}
 
 	root.AddCommand(&cobra.Command{
-		Use:   "home-folder",
-		Short: "Print home folder",
-		Long:  "Print the filepath of the home folder as seen by the binary.",
-		Run:   homeFolder,
+		Use:   "install",
+		Short: "Install siad",
+		Long:  "Install siad by creating a config folder and copying in the styles folder",
+		Run:   install,
 	})
 
 	root.AddCommand(&cobra.Command{
