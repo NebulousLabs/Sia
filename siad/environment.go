@@ -47,19 +47,19 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir string, styleDir string, downloadDir string) (e *Environment, err error) {
+func CreateEnvironment(config Config) (e *Environment, err error) {
 	// Expand the input directories, replacing '~' with the home path.
-	expandedHostDir, err := homedir.Expand(hostDir)
+	expandedHostDir, err := homedir.Expand(config.Siad.HostDirectory)
 	if err != nil {
 		err = fmt.Errorf("problem with hostDir: %v", err)
 		return
 	}
-	expandedStyleDir, err := homedir.Expand(styleDir)
+	expandedStyleDir, err := homedir.Expand(config.Siad.StyleDirectory)
 	if err != nil {
 		err = fmt.Errorf("problem with styleDir: %v", err)
 		return
 	}
-	expandedDownloadDir, err := homedir.Expand(downloadDir)
+	expandedDownloadDir, err := homedir.Expand(config.Siad.DownloadDirectory)
 	if err != nil {
 		err = fmt.Errorf("problem with downloadDir: %v", err)
 		return
@@ -68,7 +68,7 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 	// Check that template.html exists.
 	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
 		err = fmt.Errorf("No html template found, please put the html files in the styles folder (instructions found in README.md)")
-		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", styleDir)
+		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", config.Siad.StyleDirectory)
 		return
 	}
 
@@ -87,27 +87,27 @@ func CreateEnvironment(rpcPort uint16, apiPort uint16, nobootstrap bool, hostDir
 	e.wallet = CreateWallet(e.state)
 
 	// Bootstrap to the network.
-	err = e.initializeNetwork(rpcPort, nobootstrap)
+	err = e.initializeNetwork(config.Siad.RpcPort, config.Siad.NoBootstrap)
 	if err != nil {
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
 
 	// create downloads directory and host directory.
-	err = os.MkdirAll(downloadDir, os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(e.downloadDir, os.ModeDir|os.ModePerm)
 	if err != nil {
 		return
 	}
-	err = os.MkdirAll(hostDir, os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(e.hostDir, os.ModeDir|os.ModePerm)
 	if err != nil {
 		return
 	}
 
 	// Create the web interface template.
-	e.template = template.Must(template.ParseFiles(styleDir + "template.html"))
+	e.template = template.Must(template.ParseFiles(e.styleDir + "template.html"))
 
 	// Begin listening for requests on the api.
-	e.setUpHandlers(apiPort)
+	e.setUpHandlers(config.Siad.ApiPort)
 
 	return
 }

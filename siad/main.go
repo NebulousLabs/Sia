@@ -60,15 +60,14 @@ func configFilenameDefault() string {
 // startEnvironment calls createEnvironment(), which will handle everything
 // else.
 func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := CreateEnvironment(config.Siad.RpcPort, config.Siad.ApiPort, config.Siad.NoBootstrap, config.Siad.HostDirectory, config.Siad.StyleDirectory, config.Siad.DownloadDirectory)
+	_, err := CreateEnvironment(config)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-// homeFolder displays a user's home directory to them, which is nice for
-// windows users since they might not know which directory is their home
-// directory.
+// install moves the given folder to the $home/.config/sia/style folder. Isn't
+// guaranteed to work correctly.
 func install(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
 		fmt.Println("Incorrect use of install - must supply filepath to the styles folder.")
