@@ -120,7 +120,7 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 		}
 		// host accepted, so transmit file data
 		// (no prefix needed, since FileSize is included in the metadata)
-		_, err = io.Copy(conn, file)
+		_, err = io.CopyN(conn, file, info.Size())
 		return err
 	})
 	if err != nil {
@@ -154,7 +154,7 @@ func (e *Environment) Download(nickname, filename string) (err error) {
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(file, conn)
+		_, err = io.CopyN(file, conn, int64(fe.Contract.FileSize))
 		file.Close()
 		if err != nil {
 			os.Remove(filename)

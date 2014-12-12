@@ -287,7 +287,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	}()
 
 	// Download file contents
-	_, err = io.Copy(file, conn)
+	_, err = io.CopyN(file, conn, int64(t.FileContracts[0].FileSize))
 	if err != nil {
 		return
 	}
@@ -359,8 +359,7 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 	defer file.Close()
 
 	// Transmit the file.
-	n, err := io.Copy(conn, file)
-	fmt.Println("RetrieveFile: wrote", n, "bytes")
+	_, err = io.Copy(conn, file)
 	if err != nil {
 		return
 	}
