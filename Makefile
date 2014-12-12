@@ -34,6 +34,6 @@ clean:
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:
 	go get -u github.com/laher/goxc
-	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -pr=beta -include=style/,example-config,LICENSE*,README* -tasks-=deb,deb-dev,deb-source
+	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -br=developer -pr=beta -include=style/,example-config,LICENSE*,README* -tasks-=deb,deb-dev,deb-source
 
 .PHONY: all fmt install test test-long test-long-race whitepaper race-libs dependencies distribution clean xc
