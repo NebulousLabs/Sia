@@ -89,7 +89,7 @@ func main() {
 	home, siaDir, err := findSiaDir()
 	if err != nil {
 		// Print the error as a warning
-		fmt.Println(err)
+		fmt.Println("Warning:", err)
 	}
 	defaultConfigFile := siaDir + "config"
 	defaultHostDir := siaDir + "host/"
