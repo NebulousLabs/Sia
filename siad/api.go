@@ -61,12 +61,15 @@ func (e *Environment) syncHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: start/stop subcommands
-	e.ToggleMining()
-	if e.Mining() {
+	switch req.FormValue("toggle") {
+	case "on":
+		e.StartMining()
 		fmt.Fprint(w, "Started mining")
-	} else {
+	case "off":
+		e.StopMining()
 		fmt.Fprint(w, "Stopped mining")
+	default:
+		http.Error(w, "Invalid mine command", 400)
 	}
 }
 

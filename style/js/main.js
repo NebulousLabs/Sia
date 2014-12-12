@@ -75,6 +75,11 @@ function responseBoxGet(url) {
 	updatePage()
 }
 
+function toggleMining() {
+	var mining = JSON.parse(httpGet("/json/status")).Mining == "On";
+	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
+}
+
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;

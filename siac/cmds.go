@@ -43,12 +43,14 @@ func stopcmd(cmd *cobra.Command, args []string) {
 }
 
 func minecmd(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
+	if len(args) != 1 {
 		cmd.Usage()
 		return
 	}
 	// TODO: need start/stop
-	fmt.Println(getResponse("/mine", nil))
+	fmt.Println(getResponse("/mine", &url.Values{
+		"toggle": {args[0]},
+	}))
 }
 
 func synccmd(cmd *cobra.Command, args []string) {

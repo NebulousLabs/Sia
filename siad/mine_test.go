@@ -6,11 +6,7 @@ import (
 
 // Takes an environment and mines until a single block is produced.
 func (e *Environment) mineSingleBlock() {
-	for {
-		b, target := e.blockForWork()
-		if e.solveBlock(b, target) {
-			break
-		}
+	for !e.solveBlock(e.blockForWork()) {
 	}
 }
 
@@ -26,15 +22,9 @@ func testToggleMining(te *testEnv) {
 	// Enable mining for a second, which should be more than enough to mine a
 	// block in the testing environment.
 	prevHeight := te.e0.Height()
-	te.e0.ToggleMining()
-	if !te.e0.mining {
-		te.t.Error("Miner is not reporting as mining after mining was enabled.")
-	}
+	te.e0.StartMining()
 	time.Sleep(300 * time.Millisecond)
-	te.e0.ToggleMining()
-	if te.e0.mining {
-		te.t.Error("Miner is reporting as mining after mining was disabled.")
-	}
+	te.e0.StopMining()
 	time.Sleep(300 * time.Millisecond)
 
 	// Test the height, wait another second (to allow an incorrectly running
@@ -59,11 +49,11 @@ func testDualMining(te *testEnv) {
 
 	// Enable mining on each miner for long enough that each should mine
 	// multiple blocks. Then give the miners time to synchronize.
-	te.e0.ToggleMining()
-	te.e1.ToggleMining()
+	te.e0.StartMining()
+	te.e1.StartMining()
 	time.Sleep(300 * time.Millisecond)
-	te.e0.ToggleMining()
-	te.e1.ToggleMining()
+	te.e0.StopMining()
+	te.e1.StopMining()
 	time.Sleep(500 * time.Millisecond)
 
 	/*
