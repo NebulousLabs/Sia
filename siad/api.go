@@ -33,7 +33,7 @@ func (e *Environment) setUpHandlers(apiPort uint16) {
 	// JSON API
 	http.HandleFunc("/json/status", e.jsonStatusHandler)
 
-	http.ListenAndServe(":"+strconv.Itoa(int(apiPort)), nil)
+	http.ListenAndServe("localhost:"+strconv.Itoa(int(apiPort)), nil)
 }
 
 // jsonStatusHandler responds to a status call with a json object of the status.
