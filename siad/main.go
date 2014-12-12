@@ -88,7 +88,6 @@ func main() {
 	// Add flag defaults, which have the lowest priority.
 	home, siaDir, err := findSiaDir()
 	if err != nil {
-		// Print the error as a warning
 		fmt.Println("Warning:", err)
 	}
 	defaultConfigFile := siaDir + "config"

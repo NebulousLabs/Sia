@@ -1,4 +1,4 @@
-package main
+package siacore
 
 import (
 	"math/rand"

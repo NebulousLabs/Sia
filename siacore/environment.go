@@ -1,4 +1,4 @@
-package main
+package siacore
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(config Config) (e *Environment, err error) {
+func CreateEnvironment(hostDir string, downloadDir string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
 	// Expand the input directories, replacing '~' with the home path.
 	expandedHostDir, err := homedir.Expand(config.Siad.HostDirectory)
 	if err != nil {
