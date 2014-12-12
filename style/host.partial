@@ -5,7 +5,8 @@
 					<div class="col-lg-12">
 						<h2>Host Management</h2>
 						<div class="col-lg-12">
-						You have <span id="hostNumContracts">0</span> active contracts.
+						You have <span id="hostNumContracts">0</span> active contracts.<br>
+						You <span id="hostAcceptingContracts">are not</span> accepting new contracts.
 						</div>
 
 						<div class="col-lg-6">

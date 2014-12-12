@@ -46,6 +46,11 @@ function updatePage() {
 
 	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
 	safeSetElem('hostNumContracts', stats.HostContractCount)
+	if (stats.HostSettings.TotalStorage > 0) {
+		safeSetElem('hostAcceptingContracts', "are")
+	} else {
+		safeSetElem('hostAcceptingContracts', "are not")
+	}
 
 	safeSetValue('hostIPAddress', stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port)
 	// safeSetValue('hostTotalStorage', stats.HostSettings.TotalStorage)
