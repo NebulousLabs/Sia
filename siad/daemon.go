@@ -52,8 +52,6 @@ func createDaemon(config Config) (d *daemon, err error) {
 		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", expandedStyleDir)
 		return
 	}
-	// Create the web interface template.
-	d.template = template.Must(template.ParseFiles(expandedStyleDir + "template.html"))
 
 	// Create and fill out the daemon object.
 	d = &daemon{
@@ -64,6 +62,8 @@ func createDaemon(config Config) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
+	// Create the web interface template.
+	d.template = template.Must(template.ParseFiles(expandedStyleDir + "template.html"))
 
 	// Begin listening for requests on the api.
 	d.setUpHandlers(config.Siad.ApiPort)
