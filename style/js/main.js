@@ -86,10 +86,10 @@ function sendMoney() {
 function rentFile() {
 	var sourceFile = document.getElementById('rentSourceFile').value.replace('file://', '');
 	var nickname = document.getElementById('rentNickname').value;
-	if (nickname.match(/^[a-zA-Z_-]+$/)) {
+	if (nickname != "") {
 		responseBoxGet("/rent?sourcefile=" + sourceFile + "&nickname=" + nickname)
 	} else {
-		safeSetElem('apiResponse', "Invalid nickname!");
+		safeSetElem('apiResponse', "Please provide a nickname");
 	}
 }
 
