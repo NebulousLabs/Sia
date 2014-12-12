@@ -54,9 +54,7 @@ func (na *NetAddress) Call(name string, fn func(net.Conn) error) error {
 
 // TBD
 var BootstrapPeers = []NetAddress{
-// {"10.0.0.5", 9988},
-// {"10.0.0.11", 9988},
-// {"10.0.0.12", 9988},
+	{"23.239.14.98", 9988},
 }
 
 // A TCPServer sends and receives messages. It also maintains an address book

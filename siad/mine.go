@@ -20,20 +20,19 @@ func (e *Environment) Mining() bool {
 }
 
 // ToggleMining creates a channel and mines until it receives a kill signal.
-func (e *Environment) ToggleMining() (err error) {
+func (e *Environment) StartMining() {
 	e.miningLock.Lock()
 	defer e.miningLock.Unlock()
-
-	if !e.mining {
-		e.mining = true
-		for i := e.miningThreads; i < MiningThreads; i++ {
-			go e.mine()
-		}
-	} else {
-		e.mining = false
+	e.mining = true
+	for i := e.miningThreads; i < MiningThreads; i++ {
+		go e.mine()
 	}
+}
 
-	return
+func (e *Environment) StopMining() {
+	e.miningLock.Lock()
+	defer e.miningLock.Unlock()
+	e.mining = false
 }
 
 // Creates a block that is ready for nonce grinding.
@@ -53,6 +52,7 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 	target = e.state.CurrentTarget()
 
 	// Fudge the timestamp if the block would otherwise be illegal.
+	// TODO: this is unsafe
 	if b.Timestamp < e.state.EarliestLegalTimestamp() {
 		b.Timestamp = e.state.EarliestLegalTimestamp()
 	}
@@ -60,7 +60,7 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 	return
 }
 
-// solveBlock() tries to find a solution by increasing the nonce and checking
+// solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
 func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
 	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
@@ -73,27 +73,19 @@ func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
 	return false
 }
 
-// mine attempts to generate blocks, and sends any found blocks down a channel.
+// mine attempts to generate blocks.
 func (e *Environment) mine() {
 	e.miningLock.Lock()
 	e.miningThreads++
 	e.miningLock.Unlock()
-
 	// Try to solve a block repeatedly.
 	for {
-		// Get the mining status before trying to work.
-		e.miningLock.RLock()
-		mining := e.mining
-		e.miningLock.RUnlock()
-
 		// If we are still mining, do some work, otherwise disable mining and
 		// decrease the thread count for miners.
-		if mining {
-			b, target := e.blockForWork()
-			e.solveBlock(b, target)
+		if e.Mining() {
+			e.solveBlock(e.blockForWork())
 		} else {
 			e.miningLock.Lock()
-
 			// Need to check the mining status again, something might have
 			// changed while waiting for the lock.
 			if !e.mining {
