@@ -155,6 +155,10 @@ func (e *Environment) Download(nickname, filename string) (err error) {
 			return err
 		}
 		_, err = io.Copy(file, conn)
+		file.Close()
+		if err != nil {
+			os.Remove(filename)
+		}
 		return err
 	})
 }

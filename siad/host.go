@@ -272,12 +272,21 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 		return
 	}
 
-	// Allocate and download the file.
-	file, err := os.Create(e.hostDir + strconv.Itoa(e.host.Index))
+	// Create file.
+	filename := e.hostDir + strconv.Itoa(e.host.Index)
+	file, err := os.Create(filename)
 	if err != nil {
 		return
 	}
 	defer file.Close()
+	// don't keep the file around if there's an error
+	defer func() {
+		if err != nil {
+			os.Remove(filename)
+		}
+	}()
+
+	// Download file contents
 	_, err = io.Copy(file, conn)
 	if err != nil {
 		return
@@ -299,7 +308,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 
 	// Check that the file arrived in time.
 	if e.Height() >= t.FileContracts[0].Start-2 {
-		err = errors.New("file not uploaded in time, refusing to go forward with contract.")
+		err = errors.New("file not uploaded in time, refusing to go forward with contract")
 		return
 	}
 
@@ -319,7 +328,7 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 	// storage.
 	firstProof := t.FileContracts[0].Start + StorageProofReorgDepth
 	e.host.ForwardContracts[firstProof] = append(e.host.ForwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
-	fmt.Println("Accepted contract.")
+	fmt.Println("Accepted contract")
 
 	return
 }
