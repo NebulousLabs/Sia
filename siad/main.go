@@ -14,14 +14,17 @@ var (
 )
 
 type Config struct {
+	Siacore struct {
+		RpcPort       uint16
+		HostDirectory string
+		NoBootstrap   bool
+	}
+
 	Siad struct {
 		ApiPort           uint16
-		RpcPort           uint16
-		NoBootstrap       bool
 		ConfigFilename    string
-		HostDirectory     string
-		StyleDirectory    string
 		DownloadDirectory string
+		StyleDirectory    string
 	}
 }
 
@@ -59,7 +62,7 @@ func findSiaDir() (home, siaDir string, err error) {
 // startEnvironment calls createEnvironment(), which will handle everything
 // else.
 func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := CreateEnvironment(config)
+	_, err := createDaemon(config)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -95,10 +98,10 @@ func main() {
 	defaultStyleDir := siaDir + "style/"
 	defaultDownloadDir := home + "/Downloads/"
 	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "which port is used to communicate with the user")
-	root.PersistentFlags().Uint16VarP(&config.Siad.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
-	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
+	root.PersistentFlags().Uint16VarP(&config.Siacore.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
+	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
 	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "tell siad where to load the config file")
-	root.PersistentFlags().StringVarP(&config.Siad.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
+	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
 	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "where to find the files that compose the frontend")
 	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "where to download files")
 
