@@ -1,4 +1,4 @@
-package siacore
+package consensus
 
 // Genesis Hash is not correct.
 /*

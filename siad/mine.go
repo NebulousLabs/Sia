@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Andromeda/consensus"
 )
 
 var (
@@ -36,14 +36,14 @@ func (e *Environment) StopMining() {
 }
 
 // Creates a block that is ready for nonce grinding.
-func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
+func (e *Environment) blockForWork() (b *consensus.Block, target consensus.Target) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 
 	// Fill out the block with potentially ready values.
-	b = &siacore.Block{
+	b = &consensus.Block{
 		ParentBlockID: e.state.CurrentBlock().ID(),
-		Timestamp:     siacore.Timestamp(time.Now().Unix()),
+		Timestamp:     consensus.Timestamp(time.Now().Unix()),
 		Nonce:         uint64(rand.Int()),
 		MinerAddress:  e.CoinAddress(),
 		Transactions:  e.state.TransactionPoolDump(),
@@ -62,7 +62,7 @@ func (e *Environment) blockForWork() (b *siacore.Block, target siacore.Target) {
 
 // solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func (e *Environment) solveBlock(b *siacore.Block, target siacore.Target) bool {
+func (e *Environment) solveBlock(b *consensus.Block, target consensus.Target) bool {
 	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
 			e.processBlock(*b) // Block until the block has been processed.

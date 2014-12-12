@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
@@ -23,8 +23,8 @@ const (
 // id of a contract without having the transaction. Rather than keep the whole
 // transaction, we store only the id.
 type ContractEntry struct {
-	ID       siacore.ContractID
-	Contract *siacore.FileContract
+	ID       consensus.ContractID
+	Contract *consensus.FileContract
 }
 
 // Host is the persistent structure handles storage requests from clients and
@@ -37,8 +37,8 @@ type Host struct {
 	Files map[hash.Hash]string
 	Index int
 
-	ForwardContracts  map[siacore.BlockHeight][]ContractEntry
-	BackwardContracts map[siacore.BlockHeight][]ContractEntry
+	ForwardContracts  map[consensus.BlockHeight][]ContractEntry
+	BackwardContracts map[consensus.BlockHeight][]ContractEntry
 
 	sync.RWMutex
 }
@@ -47,8 +47,8 @@ type Host struct {
 func CreateHost() (h *Host) {
 	return &Host{
 		Files:             make(map[hash.Hash]string),
-		ForwardContracts:  make(map[siacore.BlockHeight][]ContractEntry),
-		BackwardContracts: make(map[siacore.BlockHeight][]ContractEntry),
+		ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
+		BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
 	}
 }
 
@@ -80,7 +80,7 @@ func (e *Environment) HostSpaceRemaining() int64 {
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlockHeight siacore.BlockHeight, minerFee siacore.Currency) (t siacore.Transaction, err error) {
+func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight, minerFee consensus.Currency) (t consensus.Transaction, err error) {
 	e.host.RLock()
 	info := e.host.Settings
 	e.host.RUnlock()
@@ -97,7 +97,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 	// Add the output with the freeze volume.
 	freezeConditions := e.wallet.SpendConditions
 	freezeConditions.TimeLock = freezeUnlockHeight
-	t.Outputs = append(t.Outputs, siacore.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
+	t.Outputs = append(t.Outputs, consensus.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
 	info.FreezeIndex = uint64(len(t.Outputs) - 1)
 	info.SpendConditions = freezeConditions
 
@@ -118,7 +118,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 
 	// Sign the transaction.
 	for i := range t.Inputs {
-		err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true}, i)
+		err = e.wallet.SignTransaction(&t, consensus.CoveredFields{WholeTransaction: true}, i)
 		if err != nil {
 			return
 		}
@@ -139,7 +139,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume siacore.Currency, freezeUnlo
 // updated contract is signed and returned.
 //
 // TODO: Reconsider locking strategy for this function.
-func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transaction, err error) {
+func (e *Environment) considerContract(t consensus.Transaction) (nt consensus.Transaction, err error) {
 	// Set the new transaction equal to the old transaction. Pretty sure that
 	// go does not allow you to return the same variable that was used as
 	// input. We could use a pointer, but that might be a bad idea. This call
@@ -195,21 +195,21 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 	}
 
 	// Outputs for successful proofs need to match the price.
-	requiredSize := e.host.Settings.Price * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
+	requiredSize := e.host.Settings.Price * consensus.Currency(fileSize) * consensus.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].ValidProofPayout < requiredSize {
 		err = errors.New("valid proof payout is too low")
 		return
 	}
 
 	// Output for failed proofs needs to be the 0 address.
-	emptyAddress := siacore.CoinAddress{}
+	emptyAddress := consensus.CoinAddress{}
 	if nt.FileContracts[0].MissedProofAddress != emptyAddress {
 		err = errors.New("burn payout needs to go to the empty address")
 		return
 	}
 
 	// Verify that output for failed proofs matches burn.
-	maxBurn := e.host.Settings.Burn * siacore.Currency(fileSize) * siacore.Currency(nt.FileContracts[0].ChallengeWindow)
+	maxBurn := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(nt.FileContracts[0].ChallengeWindow)
 	if nt.FileContracts[0].MissedProofPayout > maxBurn {
 		err = errors.New("burn payout is too high for a missed proof.")
 		return
@@ -217,7 +217,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
-	requiredFund := (e.host.Settings.Burn + e.host.Settings.Price) * siacore.Currency(fileSize) * siacore.Currency(contractDuration)
+	requiredFund := (e.host.Settings.Burn + e.host.Settings.Price) * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
 	if nt.FileContracts[0].ContractFund < requiredFund {
 		err = errors.New("ContractFund does not cover the entire duration of the contract.")
 		return
@@ -225,14 +225,14 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 
 	// Add some inputs and outputs to the transaction to fund the burn half.
 	existingInputs := len(nt.Inputs)
-	err = e.wallet.FundTransaction(e.host.Settings.Burn*siacore.Currency(fileSize)*siacore.Currency(contractDuration), &nt)
+	err = e.wallet.FundTransaction(e.host.Settings.Burn*consensus.Currency(fileSize)*consensus.Currency(contractDuration), &nt)
 	if err != nil {
 		fmt.Println(err)
 		err = errors.New("Host is having trouble - sorry!")
 		return
 	}
 	for i := existingInputs; i < len(nt.Inputs); i++ {
-		err = e.wallet.SignTransaction(&nt, siacore.CoveredFields{WholeTransaction: true}, i)
+		err = e.wallet.SignTransaction(&nt, consensus.CoveredFields{WholeTransaction: true}, i)
 		if err != nil {
 			return
 		}
@@ -258,7 +258,7 @@ func (e *Environment) considerContract(t siacore.Transaction) (nt siacore.Transa
 // TODO: Reconsider locking model for this function.
 func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) {
 	// Read the transaction.
-	var t siacore.Transaction
+	var t consensus.Transaction
 	if err = encoding.Unmarshal(data, &t); err != nil {
 		return
 	}
@@ -369,7 +369,7 @@ func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
 
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
-func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeight siacore.BlockHeight) (sp siacore.StorageProof, err error) {
+func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeight consensus.BlockHeight) (sp consensus.StorageProof, err error) {
 	// Get the file associated with the contract.
 	filename, ok := e.host.Files[contractEntry.Contract.FileMerkleRoot]
 	if !ok {
@@ -397,7 +397,7 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 	if err != nil {
 		return
 	}
-	sp = siacore.StorageProof{contractEntry.ID, windowIndex, base, hashSet}
+	sp = consensus.StorageProof{contractEntry.ID, windowIndex, base, hashSet}
 	return
 }
 
@@ -412,10 +412,10 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 //
 // TODO: Make sure that hosts don't need to submit a storage proof for the last
 // window.
-func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHeight, rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
+func (e *Environment) storageProofMaintenance(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
 	// Resubmit any proofs that changed as a result of the rewinding.
 	height := initialStateHeight
-	var proofs []siacore.StorageProof
+	var proofs []consensus.StorageProof
 	for _ = range rewoundBlocks {
 		needActionContracts := e.host.BackwardContracts[height]
 		for _, contractEntry := range needActionContracts {
@@ -461,8 +461,8 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 
 	// Create the transaction that submits the storage proof.
 	if len(proofs) != 0 {
-		txn := siacore.Transaction{
-			MinerFees:     []siacore.Currency{10},
+		txn := consensus.Transaction{
+			MinerFees:     []consensus.Currency{10},
 			StorageProofs: proofs,
 		}
 		err := e.wallet.FundTransaction(10, &txn)
@@ -470,7 +470,7 @@ func (e *Environment) storageProofMaintenance(initialStateHeight siacore.BlockHe
 			fmt.Println("High Priority Error: FundTransaction failed during storageProofMaintenance:", err)
 		}
 		for i := range txn.Inputs {
-			err = e.wallet.SignTransaction(&txn, siacore.CoveredFields{WholeTransaction: true}, i)
+			err = e.wallet.SignTransaction(&txn, consensus.CoveredFields{WholeTransaction: true}, i)
 			if err != nil {
 				fmt.Println("High Priority Error: SignTransaction failed during storageProofMaintenance:", err)
 			}

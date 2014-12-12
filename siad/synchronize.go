@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
@@ -12,13 +12,13 @@ const (
 )
 
 // SendBlocks takes a list of block ids as input, and sends all blocks from
-func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siacore.Block) (err error) {
+func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID, blocks *[]consensus.Block) (err error) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
-	var highest siacore.BlockHeight
+	var highest consensus.BlockHeight
 	for _, id := range knownBlocks {
 		height, err := e.state.HeightOfBlock(id)
 		if err == nil {
@@ -55,8 +55,8 @@ func (e *Environment) SendBlocks(knownBlocks [32]siacore.BlockID, blocks *[]siac
 // transmits blocks sequentially until the requester is fully synchronized.
 func (e *Environment) CatchUp(peer network.NetAddress) {
 	e.state.RLock() // Lock the state while building the block request.
-	knownBlocks := make([]siacore.BlockID, 0, 32)
-	for i := siacore.BlockHeight(0); i < 12; i++ {
+	knownBlocks := make([]consensus.BlockID, 0, 32)
+	for i := consensus.BlockHeight(0); i < 12; i++ {
 		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - i)
 		if badBlockErr != nil {
 			break
@@ -64,7 +64,7 @@ func (e *Environment) CatchUp(peer network.NetAddress) {
 		knownBlocks = append(knownBlocks, block.ID())
 	}
 
-	backtrace := siacore.BlockHeight(12)
+	backtrace := consensus.BlockHeight(12)
 	for i := 12; i < 31; i++ {
 		backtrace *= 2
 		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - backtrace)
@@ -79,8 +79,8 @@ func (e *Environment) CatchUp(peer network.NetAddress) {
 	e.state.RUnlock() // Lock is released once the set of known blocks has been built.
 
 	// prepare for RPC
-	var newBlocks []siacore.Block
-	var blockArray [32]siacore.BlockID
+	var newBlocks []consensus.Block
+	var blockArray [32]consensus.BlockID
 	copy(blockArray[:], knownBlocks)
 
 	// unlock state during network I/O

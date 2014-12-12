@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // TODO: timeouts?
@@ -75,8 +75,8 @@ func (e *Environment) mineHandler(w http.ResponseWriter, req *http.Request) {
 
 func (e *Environment) sendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
-	var amount, fee siacore.Currency
-	var dest siacore.CoinAddress
+	var amount, fee consensus.Currency
+	var dest consensus.CoinAddress
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		http.Error(w, "Malformed amount", 400)
@@ -120,9 +120,9 @@ func (e *Environment) hostHandler(w http.ResponseWriter, req *http.Request) {
 	var ipAddress network.NetAddress
 	var totalStorage int64
 	var minFilesize, maxFilesize, minTolerance uint64
-	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration siacore.BlockHeight
-	var price, burn, freezeCoins siacore.Currency
-	var coinAddress siacore.CoinAddress
+	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
+	var price, burn, freezeCoins consensus.Currency
+	var coinAddress consensus.CoinAddress
 
 	// Get the ip address.
 	hostAndPort := strings.Split(req.FormValue("ipaddress"), ":")

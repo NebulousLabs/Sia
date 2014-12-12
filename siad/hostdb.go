@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 
 type HostDatabase struct {
 	HostList    []HostEntry
-	TotalWeight siacore.Currency
+	TotalWeight consensus.Currency
 	sync.RWMutex
 }
 
@@ -29,16 +29,16 @@ type HostAnnouncement struct {
 	TotalStorage       int64 // Can go negative.
 	MinFilesize        uint64
 	MaxFilesize        uint64
-	MinDuration        siacore.BlockHeight
-	MaxDuration        siacore.BlockHeight
-	MinChallengeWindow siacore.BlockHeight
-	MaxChallengeWindow siacore.BlockHeight
+	MinDuration        consensus.BlockHeight
+	MaxDuration        consensus.BlockHeight
+	MinChallengeWindow consensus.BlockHeight
+	MaxChallengeWindow consensus.BlockHeight
 	MinTolerance       uint64
-	Price              siacore.Currency
-	Burn               siacore.Currency
-	CoinAddress        siacore.CoinAddress // Might be unneeded.
+	Price              consensus.Currency
+	Burn               consensus.Currency
+	CoinAddress        consensus.CoinAddress // Might be unneeded.
 
-	SpendConditions siacore.SpendConditions
+	SpendConditions consensus.SpendConditions
 	FreezeIndex     uint64 // The index of the output that froze coins.
 }
 
@@ -48,14 +48,14 @@ type HostEntry struct {
 	IPAddress   network.NetAddress
 	MinFilesize uint64
 	MaxFilesize uint64
-	MinDuration siacore.BlockHeight
-	MaxDuration siacore.BlockHeight
-	Window      siacore.BlockHeight
+	MinDuration consensus.BlockHeight
+	MaxDuration consensus.BlockHeight
+	Window      consensus.BlockHeight
 	Tolerance   uint64
-	Price       siacore.Currency
-	Burn        siacore.Currency
-	Freeze      siacore.Currency
-	CoinAddress siacore.CoinAddress
+	Price       consensus.Currency
+	Burn        consensus.Currency
+	Freeze      consensus.Currency
+	CoinAddress consensus.CoinAddress
 }
 
 func CreateHostDatabase() (hdb *HostDatabase) {
@@ -64,16 +64,16 @@ func CreateHostDatabase() (hdb *HostDatabase) {
 }
 
 // host.Weight() determines the weight of a specific host.
-func (h *HostEntry) Weight() siacore.Currency {
+func (h *HostEntry) Weight() consensus.Currency {
 	adjustedBurn := math.Sqrt(float64(h.Burn))
-	return siacore.Currency(float64(h.Freeze) * adjustedBurn / float64(h.Price))
+	return consensus.Currency(float64(h.Freeze) * adjustedBurn / float64(h.Price))
 }
 
 // pullHostEntryFromArbitraryData is one of the most cleverly named functions
 // in the Galaxy. Any attempt to ridicule such a glorious name will result in
 // immediate deprication of all clothes. Needs to be under a hostdb and state
 // lock.
-func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he HostEntry, foundAHostEntry bool) {
+func (e *Environment) pullHostEntryFromTransaction(t consensus.Transaction) (he HostEntry, foundAHostEntry bool) {
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) < 8 {
 		return
@@ -98,7 +98,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 		if ha.MinTolerance > 10 {
 			return
 		}
-		freeze := siacore.Currency(ha.SpendConditions.TimeLock-e.state.Height()) * t.Outputs[ha.FreezeIndex].Value
+		freeze := consensus.Currency(ha.SpendConditions.TimeLock-e.state.Height()) * t.Outputs[ha.FreezeIndex].Value
 		if freeze <= 0 {
 			return
 		}
@@ -125,7 +125,7 @@ func (e *Environment) pullHostEntryFromTransaction(t siacore.Transaction) (he Ho
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database. Needs to be under a hostdb and state lock.
-func (e *Environment) updateHostDB(rewoundBlocks []siacore.BlockID, appliedBlocks []siacore.BlockID) {
+func (e *Environment) updateHostDB(rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
 	// Remove hosts found in blocks that were rewound. Because the hostdb is
 	// like a stack, you can just pop the hosts and be certain that they are
 	// the same hosts.
@@ -183,8 +183,8 @@ func (hdb *HostDatabase) ChooseHost() (h HostEntry, err error) {
 	if err != nil {
 		return
 	}
-	randWeight := siacore.Currency(randInt.Int64())
-	weightPassed := siacore.Currency(0)
+	randWeight := consensus.Currency(randInt.Int64())
+	weightPassed := consensus.Currency(0)
 	var i int
 	for i = 0; randWeight > weightPassed; i++ {
 		weightPassed += hdb.HostList[i].Weight()

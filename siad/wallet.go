@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
@@ -17,13 +17,13 @@ import (
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
 type Wallet struct {
-	state *siacore.State
+	state *consensus.State
 
 	SecretKey       signatures.SecretKey
-	SpendConditions siacore.SpendConditions
+	SpendConditions consensus.SpendConditions
 
-	OwnedOutputs map[siacore.OutputID]struct{} // A list of outputs spendable by this wallet.
-	SpentOutputs map[siacore.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
+	OwnedOutputs map[consensus.OutputID]struct{} // A list of outputs spendable by this wallet.
+	SpentOutputs map[consensus.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
 // Most of the parameters are already in the file contract, but what's not
@@ -31,17 +31,17 @@ type Wallet struct {
 // much comes from the host. This specifies how much the client is to add to
 // the contract.
 type FileContractParameters struct {
-	Transaction        siacore.Transaction
+	Transaction        consensus.Transaction
 	FileContractIndex  int
-	ClientContribution siacore.Currency
+	ClientContribution consensus.Currency
 }
 
 // Creates a new wallet that can receive and spend coins.
-func CreateWallet(s *siacore.State) *Wallet {
+func CreateWallet(s *consensus.State) *Wallet {
 	w := &Wallet{
 		state:        s,
-		OwnedOutputs: make(map[siacore.OutputID]struct{}),
-		SpentOutputs: make(map[siacore.OutputID]struct{}),
+		OwnedOutputs: make(map[consensus.OutputID]struct{}),
+		SpentOutputs: make(map[consensus.OutputID]struct{}),
 	}
 
 	sk, pk, err := signatures.GenerateKeyPair()
@@ -58,10 +58,10 @@ func CreateWallet(s *siacore.State) *Wallet {
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
 func (w *Wallet) Scan() {
-	w.OwnedOutputs = make(map[siacore.OutputID]struct{})
+	w.OwnedOutputs = make(map[consensus.OutputID]struct{})
 
 	// Check for owned outputs from the standard SpendConditions.
-	scanAddresses := make(map[siacore.CoinAddress]struct{})
+	scanAddresses := make(map[consensus.CoinAddress]struct{})
 	scanAddresses[w.SpendConditions.CoinAddress()] = struct{}{}
 
 	// Get the matching set of outputs and add them to the OwnedOutputs map.
@@ -74,16 +74,16 @@ func (w *Wallet) Scan() {
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction) (err error) {
+func (w *Wallet) FundTransaction(amount consensus.Currency, t *consensus.Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
-	if amount == siacore.Currency(0) {
+	if amount == consensus.Currency(0) {
 		err = errors.New("cannot send 0 coins")
 		return
 	}
 
 	// Add to the list of inputs until enough funds have been allocated.
-	total := siacore.Currency(0)
-	var newInputs []siacore.Input
+	total := consensus.Currency(0)
+	var newInputs []consensus.Input
 	for id, _ := range w.OwnedOutputs {
 		_, exists := w.SpentOutputs[id]
 		if exists {
@@ -91,14 +91,14 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 		}
 
 		// Check that the output exists.
-		var output siacore.Output
+		var output consensus.Output
 		output, err = w.state.Output(id)
 		if err != nil {
 			continue
 		}
 
 		// Create an input to add to the transaction.
-		newInput := siacore.Input{
+		newInput := consensus.Input{
 			OutputID:        id,
 			SpendConditions: w.SpendConditions,
 		}
@@ -129,7 +129,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 	// Add a refund output to the transaction if needed.
 	if total-amount > 0 {
-		t.Outputs = append(t.Outputs, siacore.Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
+		t.Outputs = append(t.Outputs, consensus.Output{Value: total - amount, SpendHash: w.SpendConditions.CoinAddress()})
 	}
 
 	return
@@ -137,7 +137,7 @@ func (w *Wallet) FundTransaction(amount siacore.Currency, t *siacore.Transaction
 
 // Wallet.signTransaction() takes a transaction and adds a signature to the
 // specified input.
-func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredFields, inputIndex int) (err error) {
+func (w *Wallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredFields, inputIndex int) (err error) {
 	input := t.Inputs[inputIndex]
 
 	// Check that the spend conditions match.
@@ -147,7 +147,7 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredField
 	}
 
 	// Create and append the signature struct.
-	txnSig := siacore.TransactionSignature{
+	txnSig := consensus.TransactionSignature{
 		InputID:       input.OutputID,
 		CoveredFields: cf,
 	}
@@ -167,7 +167,7 @@ func (w *Wallet) SignTransaction(t *siacore.Transaction, cf siacore.CoveredField
 // Wallet.SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore.CoinAddress) (t siacore.Transaction, err error) {
+func (e *Environment) SpendCoins(amount, minerFee consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
 	// Scan blockchain for outputs.
 	e.wallet.Scan()
 
@@ -181,11 +181,11 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore
 	t.MinerFees = append(t.MinerFees, minerFee)
 
 	// Add the output to `dest`.
-	t.Outputs = append(t.Outputs, siacore.Output{Value: amount, SpendHash: dest})
+	t.Outputs = append(t.Outputs, consensus.Output{Value: amount, SpendHash: dest})
 
 	// Sign each input.
 	for i := range t.Inputs {
-		err = e.wallet.SignTransaction(&t, siacore.CoveredFields{WholeTransaction: true}, i)
+		err = e.wallet.SignTransaction(&t, consensus.CoveredFields{WholeTransaction: true}, i)
 		if err != nil {
 			return
 		}
@@ -200,13 +200,13 @@ func (e *Environment) SpendCoins(amount, minerFee siacore.Currency, dest siacore
 // WalletBalance counts up the total number of coins that the wallet knows how
 // to spend, according to the State. WalletBalance will ignore all unconfirmed
 // transactions that have been created.
-func (e *Environment) WalletBalance() siacore.Currency {
+func (e *Environment) WalletBalance() consensus.Currency {
 	e.wallet.Scan()
 
-	total := siacore.Currency(0)
+	total := consensus.Currency(0)
 	for id, _ := range e.wallet.OwnedOutputs {
 		// Check that the output exists.
-		var output siacore.Output
+		var output consensus.Output
 		output, err := e.state.Output(id)
 		if err != nil {
 			continue
@@ -220,7 +220,7 @@ func (e *Environment) WalletBalance() siacore.Currency {
 
 // Environment.CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
-func (e *Environment) CoinAddress() siacore.CoinAddress {
+func (e *Environment) CoinAddress() consensus.CoinAddress {
 	return e.wallet.SpendConditions.CoinAddress()
 }
 

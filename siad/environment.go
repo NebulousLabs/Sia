@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
 	"github.com/mitchellh/go-homedir"
 )
 
@@ -16,7 +16,7 @@ import (
 // pointer to the state, as things like a wallet, a friend list, etc. Each
 // environment should have its own state.
 type Environment struct {
-	state *siacore.State
+	state *consensus.State
 
 	server       *network.TCPServer
 	host         *Host
@@ -24,11 +24,11 @@ type Environment struct {
 	renter       *Renter
 	wallet       *Wallet
 
-	friends map[string]siacore.CoinAddress
+	friends map[string]consensus.CoinAddress
 
 	// Channels for incoming blocks and transactions to be processed
-	blockChan       chan siacore.Block
-	transactionChan chan siacore.Transaction
+	blockChan       chan consensus.Block
+	transactionChan chan consensus.Transaction
 
 	// Mining variables. The mining variables are protected by the miningLock.
 	// Any time that you read from or write to any of the mining variables, you
@@ -72,10 +72,10 @@ func CreateEnvironment(config Config) (e *Environment, err error) {
 	}
 
 	e = &Environment{
-		state:           siacore.CreateGenesisState(),
-		friends:         make(map[string]siacore.CoinAddress),
-		blockChan:       make(chan siacore.Block, 100),
-		transactionChan: make(chan siacore.Transaction, 100),
+		state:           consensus.CreateGenesisState(),
+		friends:         make(map[string]consensus.CoinAddress),
+		blockChan:       make(chan consensus.Block, 100),
+		transactionChan: make(chan consensus.Transaction, 100),
 		hostDir:         expandedHostDir,
 		styleDir:        expandedStyleDir,
 		downloadDir:     expandedDownloadDir,
@@ -164,20 +164,20 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 
 // AcceptBlock sends the input block down a channel, where it will be dealt
 // with by the Environment's listener.
-func (e *Environment) AcceptBlock(b siacore.Block) error {
+func (e *Environment) AcceptBlock(b consensus.Block) error {
 	e.blockChan <- b
 	return nil
 }
 
 // AcceptTransaction sends the input transaction down a channel, where it will
 // be dealt with by the Environment's listener.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
+func (e *Environment) AcceptTransaction(t consensus.Transaction) error {
 	e.transactionChan <- t
 	return nil
 }
 
 // processBlock is called by the environment's listener.
-func (e *Environment) processBlock(b siacore.Block) {
+func (e *Environment) processBlock(b consensus.Block) {
 	e.state.Lock()
 	e.hostDatabase.Lock()
 	e.host.Lock()
@@ -189,11 +189,11 @@ func (e *Environment) processBlock(b siacore.Block) {
 	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
-	if err == siacore.BlockKnownErr || err == siacore.KnownOrphanErr {
+	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
-		if err == siacore.UnknownOrphanErr {
+		if err == consensus.UnknownOrphanErr {
 			go e.CatchUp(e.server.RandomPeer())
 		}
 		return
@@ -207,13 +207,13 @@ func (e *Environment) processBlock(b siacore.Block) {
 }
 
 // processTransaction sends a transaction to the state.
-func (e *Environment) processTransaction(t siacore.Transaction) {
+func (e *Environment) processTransaction(t consensus.Transaction) {
 	e.state.Lock()
 	defer e.state.Unlock()
 
 	err := e.state.AcceptTransaction(t)
 	if err != nil {
-		if err != siacore.ConflictingTransactionErr {
+		if err != consensus.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
 			fmt.Println("AcceptTransaction Error:", err)
 		}
