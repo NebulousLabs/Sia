@@ -21,37 +21,37 @@
 							</div>
 
 							<div class="row">
-								<label class="col-sm-4 control-label">Total Storage (KB)</label>
+								<label class="col-sm-4 control-label">Total Storage</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostTotalStorage" value="4096"></input>
+								<input type="text" class="form-control" id="hostTotalStorage" value="4000000"></input>
 								</div>
 							</div>
 
 							<div class="row">
 								<label class="col-sm-4 control-label">Min Filesize (Bytes)</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostMinFilesize" value="1"></input>
+								<input type="text" class="form-control" id="hostMinFilesize" value="64"></input>
 								</div>
 							</div>
 
 							<div class="row">
 								<label class="col-sm-4 control-label">Max Filesize (Bytes)</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostMaxFilesize" value="4096"></input>
+								<input type="text" class="form-control" id="hostMaxFilesize" value="400000"></input>
 								</div>
 							</div>
 
 							<div class="row">
 								<label class="col-sm-4 control-label">Min Duration (Blocks)</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostMinDuration" value="100"></input>
+								<input type="text" class="form-control" id="hostMinDuration" value="25"></input>
 								</div>
 							</div>
 
 							<div class="row">
 								<label class="col-sm-4 control-label">Max Duration (Blocks)</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostMaxDuration" value="1008"></input>
+								<input type="text" class="form-control" id="hostMaxDuration" value="2000"></input>
 								</div>
 							</div>
 
@@ -77,16 +77,16 @@
 							</div>
 
 							<div class="row">
-								<label class="col-sm-4 control-label">Price</label>
+								<label class="col-sm-4 control-label">Price Per Byte Per Block</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostPrice" value="2"></input>
+								<input type="text" class="form-control" id="hostPrice" value="20"></input>
 								</div>
 							</div>
 
 							<div class="row">
-								<label class="col-sm-4 control-label">Security</label>
+								<label class="col-sm-4 control-label">Security Deposit Per Byte Per Block</label>
 								<div class="col-sm-8">
-								<input type="text" class="form-control" id="hostBurn" value="3"></input>
+								<input type="text" class="form-control" id="hostBurn" value="30"></input>
 								</div>
 							</div>
 
