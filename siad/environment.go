@@ -66,8 +66,8 @@ func CreateEnvironment(config Config) (e *Environment, err error) {
 	}
 
 	// Check that template.html exists.
-	if _, err = os.Stat(config.Siad.StyleDirectory + "template.html"); err != nil {
-		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", config.Siad.StyleDirectory)
+	if _, err = os.Stat(expandedStyleDir + "template.html"); err != nil {
+		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", expandedStyleDir)
 		return
 	}
 

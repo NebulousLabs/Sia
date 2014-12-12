@@ -42,7 +42,7 @@ func findSiaDir() (home, siaDir string, err error) {
 	if err == nil && !found {
 		dirname := home + "/.config/sia/style/template.html"
 		if _, err = os.Stat(dirname); err == nil {
-			siaDir = dirname
+			siaDir = home + "/.config/sia/"
 			return
 		}
 	}
