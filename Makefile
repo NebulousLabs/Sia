@@ -29,7 +29,7 @@ dependencies: race-libs
 	go get -u github.com/spf13/cobra
 
 clean:
-	rm -rf release whitepaper.aux whitepaper.log whitepaper.pdf
+	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:
