@@ -1,17 +1,72 @@
 package siacore
 
-// wallet.go contains things like signatures and scans the blockchain for
-// available funds that can be spent.
-
 import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"sync"
 
 	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
+
+// Wallet in an interface that helps to build and sign transactions.
+// Transactions are kept in wallet memory until they are signed, and referenced
+// using a string id.
+type WalletInterface interface {
+	// Scan takes a state and looks for all of the outputs that it knows how to
+	// spend.
+	Scan(s *consensus.State) error
+
+	// NewTransaction creates a fresh, empty transaction and returns an id that
+	// can be used to reference the transaction.
+	NewTransaction() (id string, err error)
+
+	// RegisterTransaction creates a transaction out of an existing transaction
+	// which can be modified by the wallet, returning an id that can be used to
+	// reference the transaction.
+	RegisterTransaction(*consensus.Transaction) (id string, err error)
+
+	// FundTransaction will add `amount` to a transaction's inputs.
+	FundTransaction(id string, amount consensus.Currency) error
+
+	// AddFreeze will add `amount` of coins to a transaction that unlock at
+	// block `release`.
+	AddFreeze(id string, amount consensus.Currency, release consensus.BlockHeight) error
+
+	// AddMinerFee adds a single miner fee of value `fee`.
+	AddMinerFee(id string, fee consensus.Currency) error
+
+	// AddOutput adds an output of value `amount` to address `ca`.
+	AddOutput(id string, amount consensus.Currency, dest consensus.CoinAddress) error
+
+	// AddFileContract adds a file contract to a transaction.
+	AddFileContract(id string, fc consensus.FileContract) error
+
+	// AddStorageProof adds a storage proof to a transaction.
+	AddStorageProof(id string, sp consensus.StorageProof) error
+
+	// AddArbitraryData adds a byte slice to the arbitrary data section of the
+	// transaction.
+	AddArbitraryData(id string, arb []byte) error
+
+	// Sign transaction will sign the transaction associated with the id and
+	// then return the transaction. Will not set the 'whole transaction' flag
+	// when signing.
+	SignPartialTransaction(id string) (consensus.Transaction, error)
+
+	// Sign transaction will sign the transaction associated with the id and
+	// then return the transaction. Will set the 'whole transaction' flag when
+	// signing.
+	SignWholeTransaction(id string) (consensus.Transaction, error)
+
+	// A lock should be used whenever reads or writes are being done to the
+	// wallet.
+	sync.Locker
+	// RLock()
+	// RUnlock()
+}
 
 // Contains a secret key, the spend conditions associated with that key, the
 // address associated with those spend conditions, and a list of outputs that
@@ -24,16 +79,6 @@ type Wallet struct {
 
 	OwnedOutputs map[consensus.OutputID]struct{} // A list of outputs spendable by this wallet.
 	SpentOutputs map[consensus.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
-}
-
-// Most of the parameters are already in the file contract, but what's not
-// specified is how much of the ContractFund comes from the client, and how
-// much comes from the host. This specifies how much the client is to add to
-// the contract.
-type FileContractParameters struct {
-	Transaction        consensus.Transaction
-	FileContractIndex  int
-	ClientContribution consensus.Currency
 }
 
 // Creates a new wallet that can receive and spend coins.
