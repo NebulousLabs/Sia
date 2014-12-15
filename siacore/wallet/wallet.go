@@ -1,13 +1,15 @@
 package wallet
 
 import (
+	"sync"
+
 	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
-// Wallet is the struct used in the wallet package. Though it seems like
-// stuttering, most users are going to be calling functions like `w :=
-// wallet.New()`
+// Wallet holds your coins, manages privacy, outputs, ect. The balance reported
+// by the wallet does not include coins that you have spent in transactions yet
+// haven't been revealed in a block.
 //
 // TODO: Right now, the Wallet stores all of the outputs itself, because it
 // doesn't have access to the state. There should probably be some abstracted
@@ -18,10 +20,12 @@ type Wallet struct {
 	SecretKey       signatures.SecretKey
 	SpendConditions consensus.SpendConditions
 
-	Balance      consensus.Currency
-	OwnedOutputs map[consensus.OutputID]struct{}
-	SpentOutputs map[consensus.OutputID]struct{}
-	OutputMap    map[consensus.OutputID]*consensus.Output
+	CoinsRemaining consensus.Currency
+	OwnedOutputs   map[consensus.OutputID]struct{}
+	SpentOutputs   map[consensus.OutputID]struct{}
+	OutputMap      map[consensus.OutputID]*consensus.Output
+
+	sync.RWMutex
 }
 
 // New creates an initializes a Wallet.
@@ -46,6 +50,9 @@ func New() (w *Wallet, err error) {
 
 // Update implements the core.Wallet interface.
 func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) error {
+	w.Lock()
+	defer w.Unlock()
+
 	ca := w.SpendConditions.CoinAddress()
 
 	// Remove all of the owned outputs created in the rewound blocks. Do not
@@ -61,6 +68,7 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 			// Re-add all inputs that got consumed by this block.
 			for _, input := range b.Transactions[i].Inputs {
 				if ca == input.SpendConditions.CoinAddress() {
+					w.CoinsRemaining += w.OutputMap[input.OutputID].Value
 					w.OwnedOutputs[input.OutputID] = struct{}{}
 				}
 			}
@@ -82,10 +90,33 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 					id := t.OutputID(i)
 					w.OwnedOutputs[id] = struct{}{}
 					w.OutputMap[id] = &output
+					w.CoinsRemaining += output.Value
 				}
 			}
 		}
 	}
 
 	return nil
+}
+
+// Reset implements the core.Wallet interface.
+func (w *Wallet) Reset() error {
+	w.Lock()
+	defer w.Unlock()
+
+	for id := range w.SpentOutputs {
+		// Add the spent output back into the balance if it's currently an
+		// owned output.
+		if _, exists := w.OwnedOutputs[id]; exists {
+			w.CoinsRemaining += w.OutputMap[id].Value
+		}
+		delete(w.SpentOutputs, id)
+	}
+	return nil
+}
+
+func (w *Wallet) Balance() (consensus.Currency, error) {
+	w.RLock()
+	defer w.RUnlock()
+	return w.CoinsRemaining, nil
 }

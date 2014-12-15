@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"sync"
 
 	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
@@ -24,6 +23,9 @@ type Wallet interface {
 	// accidentally made transactions that aren't spreading on the network for
 	// whatever reason (for example, 0 fee transaction, or if there are bugs in
 	// the software).
+	//
+	// TODO: Should probably have a separate call for reseting the whole wallet
+	// vs. resetting a single transaction.
 	Reset() error
 
 	// Balance returns the total number of coins accessible to the wallet.
@@ -62,14 +64,10 @@ type Wallet interface {
 	AddArbitraryData(id string, arb []byte) error
 
 	// Sign transaction will sign the transaction associated with the id and
-	// then return the transaction. Will not set the 'whole transaction' flag
-	// when signing.
-	SignPartialTransaction(id string) (consensus.Transaction, error)
-
-	// Sign transaction will sign the transaction associated with the id and
-	// then return the transaction. Will set the 'whole transaction' flag when
-	// signing.
-	SignWholeTransaction(id string) (consensus.Transaction, error)
+	// then return the transaction. If wholeTransaction is set to true, then
+	// the wholeTransaction flag will be set in CoveredFields for each
+	// signature.
+	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
 
 	// Save creates a binary file containing keys and such so the coins
 	// can be spent later.
@@ -78,12 +76,6 @@ type Wallet interface {
 	// Load is the inverse of Save, scooping up a wallet file and
 	// now being able to use the addresses within.
 	Load(filename string) (Wallet, error)
-
-	// A lock should be used whenever reads or writes are being done to the
-	// wallet.
-	sync.Locker
-	// RLock()
-	// RUnlock()
 }
 
 // Contains a secret key, the spend conditions associated with that key, the
