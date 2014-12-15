@@ -14,10 +14,13 @@ import (
 // Wallet in an interface that helps to build and sign transactions.
 // Transactions are kept in wallet memory until they are signed, and referenced
 // using a string id.
-type WalletInterface interface {
+type Wallet interface {
 	// Scan takes a state and looks for all of the outputs that it knows how to
 	// spend.
-	Scan(s *consensus.State) error
+	Scan(*consensus.State) error
+
+	// Balance returns the total number of coins accessible to the wallet.
+	Balance() (consensusCurrency, error)
 
 	// NewTransaction creates a fresh, empty transaction and returns an id that
 	// can be used to reference the transaction.
@@ -61,13 +64,13 @@ type WalletInterface interface {
 	// signing.
 	SignWholeTransaction(id string) (consensus.Transaction, error)
 
-	// SaveWallet creates a binary file containing keys and such so the coins
+	// Save creates a binary file containing keys and such so the coins
 	// can be spent later.
-	SaveWallet(filename string) error
+	Save(filename string) error
 
-	// LoadWallet is the inverse of SaveWallet, scooping up a wallet file and
+	// Load is the inverse of Save, scooping up a wallet file and
 	// now being able to use the addresses within.
-	LoadWallet(filename string) error
+	Load(filename string) error
 
 	// A lock should be used whenever reads or writes are being done to the
 	// wallet.
@@ -79,7 +82,7 @@ type WalletInterface interface {
 // Contains a secret key, the spend conditions associated with that key, the
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
-type Wallet struct {
+type CoreWallet struct {
 	state *consensus.State
 
 	SecretKey       signatures.SecretKey
@@ -90,8 +93,8 @@ type Wallet struct {
 }
 
 // Creates a new wallet that can receive and spend coins.
-func CreateWallet(s *consensus.State) *Wallet {
-	w := &Wallet{
+func CreateWallet(s *consensus.State) *CoreWallet {
+	w := &CoreWallet{
 		state:        s,
 		OwnedOutputs: make(map[consensus.OutputID]struct{}),
 		SpentOutputs: make(map[consensus.OutputID]struct{}),
@@ -110,7 +113,7 @@ func CreateWallet(s *consensus.State) *Wallet {
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) Scan() {
+func (w *CoreWallet) Scan() {
 	w.OwnedOutputs = make(map[consensus.OutputID]struct{})
 
 	// Check for owned outputs from the standard SpendConditions.
@@ -127,7 +130,7 @@ func (w *Wallet) Scan() {
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) FundTransaction(amount consensus.Currency, t *consensus.Transaction) (err error) {
+func (w *CoreWallet) FundTransaction(amount consensus.Currency, t *consensus.Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
 	if amount == consensus.Currency(0) {
 		err = errors.New("cannot send 0 coins")
@@ -188,9 +191,9 @@ func (w *Wallet) FundTransaction(amount consensus.Currency, t *consensus.Transac
 	return
 }
 
-// Wallet.signTransaction() takes a transaction and adds a signature to the
+// signTransaction() takes a transaction and adds a signature to the
 // specified input.
-func (w *Wallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredFields, inputIndex int) (err error) {
+func (w *CoreWallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredFields, inputIndex int) (err error) {
 	input := t.Inputs[inputIndex]
 
 	// Check that the spend conditions match.
@@ -217,7 +220,7 @@ func (w *Wallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredF
 	return
 }
 
-// Wallet.SpendCoins creates a transaction sending 'amount' to 'dest', and
+// SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
 func (e *Environment) SpendCoins(amount, minerFee consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {

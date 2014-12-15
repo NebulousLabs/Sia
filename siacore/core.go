@@ -19,7 +19,7 @@ type Environment struct {
 	host         *Host
 	hostDatabase *HostDatabase
 	renter       *Renter
-	wallet       *Wallet
+	wallet       *CoreWallet
 
 	friends map[string]consensus.CoinAddress
 
