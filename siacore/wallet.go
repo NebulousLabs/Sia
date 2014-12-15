@@ -20,7 +20,7 @@ type Wallet interface {
 	Scan(*consensus.State) error
 
 	// Balance returns the total number of coins accessible to the wallet.
-	Balance() (consensusCurrency, error)
+	Balance() (consensus.Currency, error)
 
 	// NewTransaction creates a fresh, empty transaction and returns an id that
 	// can be used to reference the transaction.
