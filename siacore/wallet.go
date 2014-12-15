@@ -15,9 +15,16 @@ import (
 // Transactions are kept in wallet memory until they are signed, and referenced
 // using a string id.
 type Wallet interface {
-	// Scan takes a state and looks for all of the outputs that it knows how to
-	// spend.
-	Scan(*consensus.State) error
+	// Update takes two sets of blocks. The first is the set of blocks that
+	// have been rewound since the previous call to update, and the second set
+	// is the blocks that were applied after rewinding.
+	Update(rewound []consensus.Block, applied []consensus.Block) error
+
+	// Reset will clear the list of spent transactions, which is nice if you've
+	// accidentally made transactions that aren't spreading on the network for
+	// whatever reason (for example, 0 fee transaction, or if there are bugs in
+	// the software).
+	Reset() error
 
 	// Balance returns the total number of coins accessible to the wallet.
 	Balance() (consensus.Currency, error)
