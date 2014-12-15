@@ -1,4 +1,4 @@
-package siacore
+package consensus
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ type (
 // The state has a RWMutex. Any time you read from or write to the State
 // struct, you need to either have a read lock or a write lock on the state.
 // Internally, the state has no concurrency, so the mutex is never used within
-// the siacore package.
+// the consensus package.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.

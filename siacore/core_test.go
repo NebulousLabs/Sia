@@ -1,11 +1,11 @@
-package main
+package siacore
 
 import (
 	"math/big"
 	"testing"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // A state that can be passed between functions to test the various parts of
@@ -68,13 +68,13 @@ func establishTestingEnvironment(t *testing.T) (te *testEnv) {
 func TestSiad(t *testing.T) {
 	// Alter the constants to create a system more friendly to testing.
 	IterationsPerAttempt = 500 * 1000
-	siacore.BlockFrequency = siacore.Timestamp(1)
-	siacore.TargetWindow = siacore.BlockHeight(2000)
+	consensus.BlockFrequency = consensus.Timestamp(1)
+	consensus.TargetWindow = consensus.BlockHeight(2000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	siacore.RootTarget[1] = 8
-	siacore.MaxAdjustmentUp = big.NewRat(1001, 1000)
-	siacore.MaxAdjustmentDown = big.NewRat(999, 1000)
-	siacore.DEBUG = true
+	consensus.RootTarget[1] = 8
+	consensus.MaxAdjustmentUp = big.NewRat(1001, 1000)
+	consensus.MaxAdjustmentDown = big.NewRat(999, 1000)
+	consensus.DEBUG = true
 
 	if !testing.Short() {
 		// Create the testing environment.

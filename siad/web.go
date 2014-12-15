@@ -11,14 +11,14 @@ import (
 // into a full page by adding the header and the footer, then serves the page.
 // If there is an error, the error is reported (unsanitized). If the error is a
 // 'partial file not found', a 404 (TODO) will be served.
-func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) webIndex(w http.ResponseWriter, req *http.Request) {
 	// Parse the name of the partial file to load.
 	var fileToLoad string
 	if req.URL.Path == "/" {
 		// Make a special case for the index.
-		fileToLoad = e.styleDir + "index.partial"
+		fileToLoad = d.styleDir + "index.partial"
 	} else {
-		fileToLoad = e.styleDir + strings.TrimSuffix(req.URL.Path, "html") + "partial"
+		fileToLoad = d.styleDir + strings.TrimSuffix(req.URL.Path, "html") + "partial"
 	}
 
 	// Load the partial file.
@@ -29,5 +29,5 @@ func (e *Environment) webIndex(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Compose the partial into a full page and serve the page.
-	e.template.Execute(w, template.HTML(indexBody))
+	d.template.Execute(w, template.HTML(indexBody))
 }

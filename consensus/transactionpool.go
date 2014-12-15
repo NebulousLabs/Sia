@@ -1,4 +1,4 @@
-package siacore
+package consensus
 
 // TransactionPoolDump() returns the list of transactions that are valid but
 // haven't yet appeared in a block. It performs a safety/sanity check to verify

@@ -1,22 +1,19 @@
-package main
+package siacore
 
 import (
 	"fmt"
-	"html/template"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
-	"github.com/mitchellh/go-homedir"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a
 // pointer to the state, as things like a wallet, a friend list, etc. Each
 // environment should have its own state.
 type Environment struct {
-	state *siacore.State
+	state *consensus.State
 
 	server       *network.TCPServer
 	host         *Host
@@ -24,11 +21,11 @@ type Environment struct {
 	renter       *Renter
 	wallet       *Wallet
 
-	friends map[string]siacore.CoinAddress
+	friends map[string]consensus.CoinAddress
 
 	// Channels for incoming blocks and transactions to be processed
-	blockChan       chan siacore.Block
-	transactionChan chan siacore.Transaction
+	blockChan       chan consensus.Block
+	transactionChan chan consensus.Transaction
 
 	// Mining variables. The mining variables are protected by the miningLock.
 	// Any time that you read from or write to any of the mining variables, you
@@ -38,47 +35,20 @@ type Environment struct {
 	miningLock    sync.RWMutex // prevents benign race conditions
 
 	// Envrionment directories.
-	template    *template.Template
-	hostDir     string
-	styleDir    string
-	downloadDir string
+	hostDir  string
+	styleDir string
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(config Config) (e *Environment, err error) {
-	// Expand the input directories, replacing '~' with the home path.
-	expandedHostDir, err := homedir.Expand(config.Siad.HostDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with hostDir: %v", err)
-		return
-	}
-	expandedStyleDir, err := homedir.Expand(config.Siad.StyleDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with styleDir: %v", err)
-		return
-	}
-	expandedDownloadDir, err := homedir.Expand(config.Siad.DownloadDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with downloadDir: %v", err)
-		return
-	}
-
-	// Check that template.html exists.
-	if _, err = os.Stat(expandedStyleDir + "template.html"); err != nil {
-		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", expandedStyleDir)
-		return
-	}
-
+func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
-		state:           siacore.CreateGenesisState(),
-		friends:         make(map[string]siacore.CoinAddress),
-		blockChan:       make(chan siacore.Block, 100),
-		transactionChan: make(chan siacore.Transaction, 100),
-		hostDir:         expandedHostDir,
-		styleDir:        expandedStyleDir,
-		downloadDir:     expandedDownloadDir,
+		state:           consensus.CreateGenesisState(),
+		friends:         make(map[string]consensus.CoinAddress),
+		blockChan:       make(chan consensus.Block, 100),
+		transactionChan: make(chan consensus.Transaction, 100),
+		hostDir:         hostDir,
 	}
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
@@ -86,27 +56,11 @@ func CreateEnvironment(config Config) (e *Environment, err error) {
 	e.wallet = CreateWallet(e.state)
 
 	// Bootstrap to the network.
-	err = e.initializeNetwork(config.Siad.RpcPort, config.Siad.NoBootstrap)
+	err = e.initializeNetwork(rpcPort, nobootstrap)
 	if err != nil {
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
-
-	// create downloads directory and host directory.
-	err = os.MkdirAll(e.downloadDir, os.ModeDir|os.ModePerm)
-	if err != nil {
-		return
-	}
-	err = os.MkdirAll(e.hostDir, os.ModeDir|os.ModePerm)
-	if err != nil {
-		return
-	}
-
-	// Create the web interface template.
-	e.template = template.Must(template.ParseFiles(e.styleDir + "template.html"))
-
-	// Begin listening for requests on the api.
-	e.setUpHandlers(config.Siad.ApiPort)
 
 	return
 }
@@ -164,20 +118,20 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 
 // AcceptBlock sends the input block down a channel, where it will be dealt
 // with by the Environment's listener.
-func (e *Environment) AcceptBlock(b siacore.Block) error {
+func (e *Environment) AcceptBlock(b consensus.Block) error {
 	e.blockChan <- b
 	return nil
 }
 
 // AcceptTransaction sends the input transaction down a channel, where it will
 // be dealt with by the Environment's listener.
-func (e *Environment) AcceptTransaction(t siacore.Transaction) error {
+func (e *Environment) AcceptTransaction(t consensus.Transaction) error {
 	e.transactionChan <- t
 	return nil
 }
 
 // processBlock is called by the environment's listener.
-func (e *Environment) processBlock(b siacore.Block) {
+func (e *Environment) processBlock(b consensus.Block) {
 	e.state.Lock()
 	e.hostDatabase.Lock()
 	e.host.Lock()
@@ -189,11 +143,11 @@ func (e *Environment) processBlock(b siacore.Block) {
 	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
 
 	// Perform error handling.
-	if err == siacore.BlockKnownErr || err == siacore.KnownOrphanErr {
+	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
-		if err == siacore.UnknownOrphanErr {
+		if err == consensus.UnknownOrphanErr {
 			go e.CatchUp(e.server.RandomPeer())
 		}
 		return
@@ -207,13 +161,13 @@ func (e *Environment) processBlock(b siacore.Block) {
 }
 
 // processTransaction sends a transaction to the state.
-func (e *Environment) processTransaction(t siacore.Transaction) {
+func (e *Environment) processTransaction(t consensus.Transaction) {
 	e.state.Lock()
 	defer e.state.Unlock()
 
 	err := e.state.AcceptTransaction(t)
 	if err != nil {
-		if err != siacore.ConflictingTransactionErr {
+		if err != consensus.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
 			fmt.Println("AcceptTransaction Error:", err)
 		}

@@ -1,4 +1,4 @@
-package main
+package siacore
 
 import (
 	"errors"
@@ -7,17 +7,17 @@ import (
 	"os"
 	"sync"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/hash"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // FileEntry will eventually have all the information for tracking an encrypted
 // and erasure coded file across many hosts. Right now it just points to a
 // single host which has the whole file.
 type FileEntry struct {
-	Host     HostEntry            // Where to find the file.
-	Contract siacore.FileContract // The contract being enforced.
+	Host     HostEntry              // Where to find the file.
+	Contract consensus.FileContract // The contract being enforced.
 }
 
 type Renter struct {
@@ -66,31 +66,31 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 	}
 
 	// Fill out the contract according to the whims of the host.
-	fileContract := siacore.FileContract{
-		ContractFund:      (host.Price + host.Burn) * 5000 * siacore.Currency(info.Size()), // 5000 blocks.
+	fileContract := consensus.FileContract{
+		ContractFund:      (host.Price + host.Burn) * 5000 * consensus.Currency(info.Size()), // 5000 blocks.
 		FileMerkleRoot:    merkle,
 		FileSize:          uint64(info.Size()),
 		Start:             e.Height() + 20,
 		End:               e.Height() + 520,
 		ChallengeWindow:   host.Window,
 		Tolerance:         host.Tolerance,
-		ValidProofPayout:  host.Price * siacore.Currency(info.Size()) * siacore.Currency(host.Window),
+		ValidProofPayout:  host.Price * consensus.Currency(info.Size()) * consensus.Currency(host.Window),
 		ValidProofAddress: host.CoinAddress,
-		MissedProofPayout: host.Burn * siacore.Currency(info.Size()) * siacore.Currency(host.Window),
+		MissedProofPayout: host.Burn * consensus.Currency(info.Size()) * consensus.Currency(host.Window),
 		// MissedProofAddress is going to be 0, funds sent to the burn address.
 	}
 
 	// Fund the client portion of the transaction.
-	var t siacore.Transaction
+	var t consensus.Transaction
 	t.MinerFees = append(t.MinerFees, 10)
 	t.FileContracts = append(t.FileContracts, fileContract)
-	err = e.wallet.FundTransaction(host.Price*5010*siacore.Currency(fileContract.FileSize), &t)
+	err = e.wallet.FundTransaction(host.Price*5010*consensus.Currency(fileContract.FileSize), &t)
 	if err != nil {
 		return
 	}
 
 	// Sign the transacion.
-	coveredFields := siacore.CoveredFields{
+	coveredFields := consensus.CoveredFields{
 		MinerFees: []uint64{0},
 		Contracts: []uint64{0},
 	}

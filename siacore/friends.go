@@ -1,10 +1,10 @@
-package main
+package siacore
 
 import (
 	"os"
 
+	"github.com/NebulousLabs/Andromeda/consensus"
 	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/siacore"
 )
 
 // LoadCoinAddress loads a coin address from a file and adds that address to
@@ -26,7 +26,7 @@ func (e *Environment) LoadCoinAddress(filename string, friendName string) (err e
 	}
 
 	// Decode the bytes into an address.
-	var address siacore.CoinAddress
+	var address consensus.CoinAddress
 	err = encoding.Unmarshal(buffer[:bytes], &address)
 	if err != nil {
 		return
@@ -38,8 +38,8 @@ func (e *Environment) LoadCoinAddress(filename string, friendName string) (err e
 	return
 }
 
-func (e *Environment) FriendMap() (safeMap map[string]siacore.CoinAddress) {
-	safeMap = make(map[string]siacore.CoinAddress)
+func (e *Environment) FriendMap() (safeMap map[string]consensus.CoinAddress) {
+	safeMap = make(map[string]consensus.CoinAddress)
 	for key, value := range e.friends {
 		safeMap[key] = value
 	}
