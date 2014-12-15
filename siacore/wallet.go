@@ -61,6 +61,14 @@ type WalletInterface interface {
 	// signing.
 	SignWholeTransaction(id string) (consensus.Transaction, error)
 
+	// SaveWallet creates a binary file containing keys and such so the coins
+	// can be spent later.
+	SaveWallet(filename string) error
+
+	// LoadWallet is the inverse of SaveWallet, scooping up a wallet file and
+	// now being able to use the addresses within.
+	LoadWallet(filename string) error
+
 	// A lock should be used whenever reads or writes are being done to the
 	// wallet.
 	sync.Locker
