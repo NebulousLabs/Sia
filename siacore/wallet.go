@@ -70,7 +70,7 @@ type Wallet interface {
 
 	// Load is the inverse of Save, scooping up a wallet file and
 	// now being able to use the addresses within.
-	Load(filename string) error
+	Load(filename string) (Wallet, error)
 
 	// A lock should be used whenever reads or writes are being done to the
 	// wallet.

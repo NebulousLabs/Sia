@@ -12,7 +12,28 @@ type Wallet struct {
 	SecretKey       signatures.SecretKey
 	SpendConditions consensus.SpendConditions
 
-	Balance consensus.Currency
+	Balance      consensus.Currency
 	OwnedOutputs map[consensus.OutputID]struct{}
-	SpendOutputs map[consensus.OutputID]struct{}
+	SpentOutputs map[consensus.OutputID]struct{}
+}
+
+// New creates an initializes a Wallet.
+func New() (w *Wallet, err error) {
+	sk, pk, err := signatures.GenerateKeyPair()
+	if err != nil {
+		return
+	}
+
+	w = &Wallet{
+		SecretKey: sk,
+		SpendConditions: consensus.SpendConditions{
+			NumSignatures: 1,
+			PublicKeys:    []signatures.PublicKey{pk},
+		},
+		OwnedOutputs: make(map[consensus.OutputID]struct{}),
+		SpentOutputs: make(map[consensus.OutputID]struct{}),
+	}
+	return
+}
+
 }
