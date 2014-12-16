@@ -395,7 +395,7 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
 // AddArbitraryData implements the core.Wallet interface.
 //
 // TODO: Change arbitrary data to a slice of strings.
-func (w *Wallet) AddArbitraryData(id string, arb []byte) error {
+func (w *Wallet) AddArbitraryData(id string, arb string) error {
 	w.Lock()
 	defer w.Unlock()
 

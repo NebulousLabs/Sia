@@ -37,12 +37,12 @@ type Block struct {
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
 type Transaction struct {
-	ArbitraryData []byte
 	Inputs        []Input
 	MinerFees     []Currency
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
+	ArbitraryData []string
 	Signatures    []TransactionSignature
 }
 
@@ -109,12 +109,12 @@ type TransactionSignature struct {
 
 type CoveredFields struct {
 	WholeTransaction bool
-	ArbitraryData    bool
 	MinerFees        []uint64 // each element indicates an index which is signed.
 	Inputs           []uint64
 	Outputs          []uint64
 	Contracts        []uint64
 	StorageProofs    []uint64
+	ArbitraryData    []uint64
 	Signatures       []uint64
 }
 
@@ -204,20 +204,17 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if t.Signatures[i].CoveredFields.WholeTransaction {
 		signedData = append(signedData, encoding.MarshalAll(
-			t.ArbitraryData,
 			t.Inputs,
 			t.MinerFees,
 			t.Outputs,
 			t.FileContracts,
 			t.StorageProofs,
+			t.ArbitraryData,
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
 		)...)
 	} else {
-		if t.Signatures[i].CoveredFields.ArbitraryData {
-			signedData = append(signedData, encoding.Marshal(t.ArbitraryData)...)
-		}
 		for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
@@ -232,6 +229,9 @@ func (t *Transaction) SigHash(i int) hash.Hash {
 		}
 		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
 			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
+		}
+		for _, arbData := range t.Signatures[i].CoveredFields.ArbitraryData {
+			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
 		}
 	}
 

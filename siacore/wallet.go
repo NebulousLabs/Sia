@@ -64,7 +64,7 @@ type Wallet interface {
 
 	// AddArbitraryData adds a byte slice to the arbitrary data section of the
 	// transaction.
-	AddArbitraryData(id string, arb []byte) error
+	AddArbitraryData(id string, arb string) error
 
 	// Sign transaction will sign the transaction associated with the id and
 	// then return the transaction. If wholeTransaction is set to true, then
