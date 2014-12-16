@@ -50,7 +50,7 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	sync.RWMutex
+	sync.Mutex
 }
 
 // New creates an initializes a Wallet.
@@ -148,14 +148,17 @@ func (w *Wallet) Reset() error {
 /*
 // Balance implements the core.Wallet interface.
 func (w *Wallet) Balance() (consensus.Currency, error) {
-	w.RLock()
-	defer w.RUnlock()
+	w.Lock()
+	defer w.Unlock()
 	return w.balance, nil
 }
 */
 
 // CoinAddress implements the core.Wallet interface.
 func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
+	w.Lock()
+	defer w.Unlock()
+
 	sk, pk, err := signatures.GenerateKeyPair()
 	if err != nil {
 		return
@@ -189,6 +192,9 @@ func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err e
 /*
 // FundTransaction implements the core.Wallet interface.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
+	w.Lock()
+	defer w.Unlock()
+
 	if amount == consensus.Currency(0) {
 		return errors.New("cannot fund 0 coins") // should this be an error or nil?
 	}
@@ -253,6 +259,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 // AddMinerFee implements the core.Wallet interface.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
+	w.Lock()
+	defer w.Unlock()
+
 	to, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
@@ -263,12 +272,65 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
 }
 
 // AddOutput implements the core.Wallet interface.
-func (w *Wallet) AddOutput(id string, amount consensus.Currency, dest consensus.CoinAddress) error {
+func (w *Wallet) AddOutput(id string, o consensus.Output) error {
+	w.Lock()
+	defer w.Unlock()
+
 	to, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.Outputs = append(to.transaction.Outputs, consensus.Output{Value: amount, SpendHash: dest})
+	to.transaction.Outputs = append(to.transaction.Outputs, o)
+	return nil
+}
+
+/*
+// AddTimelockedRefund implements the core.Wallet interface.
+func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (consensus.SpendConditions, error) {
+}
+*/
+
+// AddFileContract implements the core.Wallet interface.
+func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
+	w.Lock()
+	defer w.Unlock()
+
+	to, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction found for given id")
+	}
+
+	to.transaction.FileContracts = append(to.transaction.FileContracts, fc)
+	return nil
+}
+
+// AddStorageProof implements the core.Wallet interface.
+func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
+	w.Lock()
+	defer w.Unlock()
+
+	to, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction found for given id")
+	}
+
+	to.transaction.StorageProofs = append(to.transaction.StorageProofs, sp)
+	return nil
+}
+
+// AddArbitraryData implements the core.Wallet interface.
+//
+// TODO: Change arbitrary data to a slice of strings.
+func (w *Wallet) AddArbitraryData(id string, arb []byte) error {
+	w.Lock()
+	defer w.Unlock()
+
+	to, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction found for given id")
+	}
+
+	to.transaction.ArbitraryData = arb
 	return nil
 }

@@ -48,7 +48,7 @@ type Wallet interface {
 	AddMinerFee(id string, fee consensus.Currency) error
 
 	// AddOutput adds an output of value `amount` to address `ca`.
-	AddOutput(id string, amount consensus.Currency, dest consensus.CoinAddress) error
+	AddOutput(id string, o consensus.Output) error
 
 	// AddTimelockedRefund will add `amount` of coins to a transaction that
 	// unlock at block `release`. The spend conditions of the output are
