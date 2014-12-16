@@ -184,14 +184,48 @@ func (w *Wallet) Reset() error {
 	return nil
 }
 
-/*
 // Balance implements the core.Wallet interface.
-func (w *Wallet) Balance() (consensus.Currency, error) {
+func (w *Wallet) Balance() (total consensus.Currency, err error) {
 	w.Lock()
 	defer w.Unlock()
-	return w.balance, nil
+
+	// Iterate through all outputs and tally them up.
+	for _, spendableAddress := range w.spendableAddresses {
+		for _, spendableOutput := range spendableAddress.spendableOutputs {
+			if !spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter {
+				continue
+			}
+			total += spendableOutput.output.Value
+		}
+	}
+
+	return
 }
-*/
+
+// timelockedCoinAddress returns a CoinAddress with a timelock, as well as the
+// conditions needed to spend it.
+func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
+	sk, pk, err := signatures.GenerateKeyPair()
+	if err != nil {
+		return
+	}
+
+	spendConditions = consensus.SpendConditions{
+		TimeLock:      release,
+		NumSignatures: 1,
+		PublicKeys:    []signatures.PublicKey{pk},
+	}
+
+	newSpendableAddress := &spendableAddress{
+		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
+		spendConditions:  spendConditions,
+		secretKey:        sk,
+	}
+
+	coinAddress := newSpendableAddress.spendConditions.CoinAddress()
+	w.spendableAddresses[coinAddress] = newSpendableAddress
+	return
+}
 
 // CoinAddress implements the core.Wallet interface.
 func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
