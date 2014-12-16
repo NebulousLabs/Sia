@@ -393,8 +393,6 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
 }
 
 // AddArbitraryData implements the core.Wallet interface.
-//
-// TODO: Change arbitrary data to a slice of strings.
 func (w *Wallet) AddArbitraryData(id string, arb string) error {
 	w.Lock()
 	defer w.Unlock()
@@ -426,7 +424,26 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	if wholeTransaction {
 		coveredFields = consensus.CoveredFields{WholeTransaction: true}
 	} else {
-		// TODO: build a proper covered fields struct.
+		for i := range transaction.MinerFees {
+			coveredFields.MinerFees = append(coveredFields.MinerFees, uint64(i))
+		}
+		for i := range transaction.Inputs {
+			coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
+		}
+		for i := range transaction.Outputs {
+			coveredFields.Outputs = append(coveredFields.Outputs, uint64(i))
+		}
+		for i := range transaction.FileContracts {
+			coveredFields.Contracts = append(coveredFields.Contracts, uint64(i))
+		}
+		for i := range transaction.StorageProofs {
+			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
+		}
+		for i := range transaction.ArbitraryData {
+			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
+		}
+
+		// TODO: Should we also sign all of the known signatures?
 	}
 
 	// For each input in the transaction that we added, provide a signature.
