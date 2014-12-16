@@ -11,10 +11,18 @@ import (
 )
 
 // openTransaction is a type that the wallet uses to track a transaction as it
-// adds inputs, etc.
+// adds inputs and other features.
 type openTransaction struct {
 	transaction *consensus.Transaction
 	inputs      []uint64
+}
+
+// openOutput contains an output and the conditions needed to spend the output,
+// including secret keys.
+type spendableAddress struct {
+	outputs         []*consensus.Output
+	spendConditions *consensus.SpendConditions
+	secretKey       signatures.SecretKey
 }
 
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
@@ -26,16 +34,11 @@ type openTransaction struct {
 // object which can do that for the Wallet, which is shared between all of the
 // things that need to do the lookups. (and type consensus.State would
 // implement the interface fulfilling that abstraction)
-//
-// TODO: Add the inputs to a list for when it's time to sign stuff.
 type Wallet struct {
-	secretKey       signatures.SecretKey
-	spendConditions consensus.SpendConditions
-
-	balance      consensus.Currency
-	ownedOutputs map[consensus.OutputID]struct{}
-	spentOutputs map[consensus.OutputID]struct{}
-	outputs      map[consensus.OutputID]*consensus.Output
+	balance            consensus.Currency
+	ownedOutputs       map[consensus.CoinAddress]struct{}
+	spentOutputs       map[consensus.CoinAddress]struct{}
+	spendableAddresses map[consensus.CoinAddress]*spendableAddress
 
 	transactionCounter int
 	transactions       map[string]*openTransaction
@@ -44,32 +47,19 @@ type Wallet struct {
 }
 
 // New creates an initializes a Wallet.
-func New() (w *Wallet, err error) {
-	sk, pk, err := signatures.GenerateKeyPair()
-	if err != nil {
-		return
-	}
-
-	w = &Wallet{
-		secretKey: sk,
-		spendConditions: consensus.SpendConditions{
-			NumSignatures: 1,
-			PublicKeys:    []signatures.PublicKey{pk},
-		},
-		ownedOutputs: make(map[consensus.OutputID]struct{}),
-		spentOutputs: make(map[consensus.OutputID]struct{}),
-		outputs:      make(map[consensus.OutputID]*consensus.Output),
-		transactions: make(map[string]*openTransaction),
-	}
-	return
+func New() (*Wallet, error) {
+	return &Wallet{
+		ownedOutputs:       make(map[consensus.CoinAddress]struct{}),
+		spentOutputs:       make(map[consensus.CoinAddress]struct{}),
+		spendableAddresses: make(map[consensus.CoinAddress]*spendableAddress),
+		transactions:       make(map[string]*openTransaction),
+	}, nil
 }
 
 // Update implements the core.Wallet interface.
 func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) error {
 	w.Lock()
 	defer w.Unlock()
-
-	ca := w.spendConditions.CoinAddress()
 
 	// Remove all of the owned outputs created in the rewound blocks. Do not
 	// change the spent outputs map.
@@ -84,7 +74,7 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 			// Re-add all inputs that got consumed by this block.
 			for _, input := range b.Transactions[i].Inputs {
 				if ca == input.SpendConditions.CoinAddress() {
-					w.balance += w.outputs[input.OutputID].Value
+					w.balance += w.outputs[input.OutputID].output.Value
 					w.ownedOutputs[input.OutputID] = struct{}{}
 				}
 			}
@@ -105,7 +95,7 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 				if ca == output.SpendHash {
 					id := t.OutputID(i)
 					w.ownedOutputs[id] = struct{}{}
-					w.outputs[id] = &output
+					w.outputs[id].output = &output
 					w.balance += output.Value
 				}
 			}
@@ -124,7 +114,7 @@ func (w *Wallet) Reset() error {
 		// Add the spent output back into the balance if it's currently an
 		// owned output.
 		if _, exists := w.ownedOutputs[id]; exists {
-			w.balance += w.outputs[id].Value
+			w.balance += w.outputs[id].output.Value
 		}
 		delete(w.spentOutputs, id)
 	}
@@ -136,6 +126,26 @@ func (w *Wallet) Balance() (consensus.Currency, error) {
 	w.RLock()
 	defer w.RUnlock()
 	return w.balance, nil
+}
+
+// CoinAddress implements the core.Wallet interface.
+func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
+	sk, pk, err := signatures.GenerateKeyPair()
+	if err != nil {
+		return
+	}
+
+	newSpendableAddress := &spendableAddress{
+		spendConditions: consensus.SpendConditions{
+			NumSignatures: 1,
+			PublicKeys:    []signatures.PublicKey{pk},
+		},
+		secretKey: sk,
+	}
+
+	coinAddress = newAddress.spendConditions.CoinAddress()
+	w.spendableAddresses[coinAddress] = newSpendableAddress
+	return
 }
 
 // RegisterTransaction implements the core.Wallet interface.
@@ -170,11 +180,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		}
 
 		// Fetch the output
-		output, exists := w.outputs[id]
-		if !exists {
-			continue
-			// TODO: panic?
-		}
+		output := w.outputs[id].output
 
 		// Create an input for the transaction
 		newInput := consensus.Input{
@@ -213,5 +219,27 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		)
 	}
 
+	return nil
+}
+
+// AddMinerFee implements the core.Wallet interface.
+func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
+	to, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction found for given id")
+	}
+
+	to.transaction.MinerFees = append(to.transaction.MinerFees, fee)
+	return nil
+}
+
+// AddOutput implements the core.Wallet interface.
+func (w *Wallet) AddOutput(id string, amount consensus.Currency, dest consensus.CoinAddress) error {
+	to, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction found for given id")
+	}
+
+	to.transaction.Outputs = append(to.transaction.Outputs, consensus.Output{Value: amount, SpendHash: dest})
 	return nil
 }

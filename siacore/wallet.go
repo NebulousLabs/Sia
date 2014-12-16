@@ -31,6 +31,9 @@ type Wallet interface {
 	// Balance returns the total number of coins accessible to the wallet.
 	Balance() (consensus.Currency, error)
 
+	// CoinAddress return an address into which coins can be paid.
+	CoinAddress() (consensus.CoinAddress, error)
+
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to
 	// reference the transaction.
@@ -39,15 +42,17 @@ type Wallet interface {
 	// FundTransaction will add `amount` to a transaction's inputs.
 	FundTransaction(id string, amount consensus.Currency) error
 
-	// AddFreeze will add `amount` of coins to a transaction that unlock at
-	// block `release`.
-	AddFreeze(id string, amount consensus.Currency, release consensus.BlockHeight) error
-
 	// AddMinerFee adds a single miner fee of value `fee`.
 	AddMinerFee(id string, fee consensus.Currency) error
 
 	// AddOutput adds an output of value `amount` to address `ca`.
 	AddOutput(id string, amount consensus.Currency, dest consensus.CoinAddress) error
+
+	// AddTimelockedRefund will add `amount` of coins to a transaction that
+	// unlock at block `release`. The spend conditions of the output are
+	// returned so that they can be revealed to interested parties. The coins
+	// will be added back into the balance when the timelock expires.
+	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (consensus.SpendConditions, error)
 
 	// AddFileContract adds a file contract to a transaction.
 	AddFileContract(id string, fc consensus.FileContract) error
