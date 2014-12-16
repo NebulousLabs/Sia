@@ -2,7 +2,7 @@ package wallet
 
 import (
 	"errors"
-	"fmt"
+	// "fmt"
 	"strconv"
 	"sync"
 
@@ -17,27 +17,34 @@ type openTransaction struct {
 	inputs      []uint64
 }
 
+// spendableOutput keeps track of an output, it's id, and whether or not it's
+// been spent yet. Spendable indicates whether the output is available
+// according to the blockchain, true if the output is unspent in the blockchain
+// and false if the output is spent in the blockchain. The spentCounter
+// indicates whether the output has been spent or not. If it's equal to the
+// wallet's spent counter, then it has been spent since the previous reset.
+type spendableOutput struct {
+	spendable    bool
+	spentCounter int
+	id           consensus.OutputID
+	output       *consensus.Output
+}
+
 // openOutput contains an output and the conditions needed to spend the output,
 // including secret keys.
 type spendableAddress struct {
-	outputs         []*consensus.Output
-	spendConditions *consensus.SpendConditions
-	secretKey       signatures.SecretKey
+	spendableOutputs map[consensus.OutputID]*spendableOutput
+	spendConditions  consensus.SpendConditions
+	secretKey        signatures.SecretKey
 }
 
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
-// by the wallet does not include coins that you have spent in transactions yet
-// haven't been revealed in a block.
+// ignores outputs you've already spent even if they haven't made it into the
+// blockchain yet.
 //
-// TODO: Right now, the Wallet stores all of the outputs itself, because it
-// doesn't have access to the state. There should probably be some abstracted
-// object which can do that for the Wallet, which is shared between all of the
-// things that need to do the lookups. (and type consensus.State would
-// implement the interface fulfilling that abstraction)
+// TODO: Do not ignore refunds until they make it into a block (but later, leave it for now)
 type Wallet struct {
-	balance            consensus.Currency
-	ownedOutputs       map[consensus.CoinAddress]struct{}
-	spentOutputs       map[consensus.CoinAddress]struct{}
+	spentCounter       int
 	spendableAddresses map[consensus.CoinAddress]*spendableAddress
 
 	transactionCounter int
@@ -49,8 +56,6 @@ type Wallet struct {
 // New creates an initializes a Wallet.
 func New() (*Wallet, error) {
 	return &Wallet{
-		ownedOutputs:       make(map[consensus.CoinAddress]struct{}),
-		spentOutputs:       make(map[consensus.CoinAddress]struct{}),
 		spendableAddresses: make(map[consensus.CoinAddress]*spendableAddress),
 		transactions:       make(map[string]*openTransaction),
 	}, nil
@@ -61,42 +66,69 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 	w.Lock()
 	defer w.Unlock()
 
-	// Remove all of the owned outputs created in the rewound blocks. Do not
-	// change the spent outputs map.
+	// Undo add the changes from blocks that have been rewound.
 	for _, b := range rewound {
 		for i := len(b.Transactions) - 1; i >= 0; i-- {
-			// Remove all outputs that got created by this block.
-			for j, _ := range b.Transactions[i].Outputs {
-				id := b.Transactions[i].OutputID(j)
-				delete(w.ownedOutputs, id)
+			// Mark all outputs that got created (sent to an address in our
+			// control) as 'not spendable', because they no longer exist in
+			// the blockchain.
+			for j, output := range b.Transactions[i].Outputs {
+				if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
+					id := b.Transactions[i].OutputID(j)
+					if spendableOutput, exists := spendableAddress.spendableOutputs[id]; exists {
+						spendableOutput.spendable = false
+					} else {
+						panic("output should exist")
+					}
+				}
 			}
 
-			// Re-add all inputs that got consumed by this block.
+			// Mark all inputs that we control as 'spendable', because the
+			// blockchain is no longer aware that they've been spent.
 			for _, input := range b.Transactions[i].Inputs {
-				if ca == input.SpendConditions.CoinAddress() {
-					w.balance += w.outputs[input.OutputID].output.Value
-					w.ownedOutputs[input.OutputID] = struct{}{}
+				coinAddress := input.SpendConditions.CoinAddress()
+				if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
+					if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
+						spendableOutput.spendable = true
+					} else {
+						panic("output should exist")
+					}
 				}
 			}
 		}
 	}
 
-	// Add all of the owned outputs created in applied blocks, and remove all
-	// of the owned outputs that got consumed.
+	// Update spendableOutputs which got spent, and find new outputs which we
+	// know how to spend.
 	for _, b := range applied {
 		for _, t := range b.Transactions {
-			// Remove all the outputs that got consumed by this block.
+			// Mark all outputs that got consumed by the block as 'not
+			// spendable'
 			for _, input := range t.Inputs {
-				delete(w.ownedOutputs, input.OutputID)
+				coinAddress := input.SpendConditions.CoinAddress()
+				if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
+					if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
+						spendableOutput.spendable = false
+					} else {
+						panic("output should exist")
+					}
+				}
 			}
 
-			// Add all of the outputs that got created by this block.
-			for i, output := range t.Outputs {
-				if ca == output.SpendHash {
-					id := t.OutputID(i)
-					w.ownedOutputs[id] = struct{}{}
-					w.outputs[id].output = &output
-					w.balance += output.Value
+			// Mark all outputs that got created (sent to an address in our
+			// control) as 'spendable'.
+			for j, output := range t.Outputs {
+				if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
+					id := t.OutputID(j)
+					if spendOutput, exists := spendableAddress.spendableOutputs[id]; exists {
+						spendOutput.spendable = true
+					} else {
+						spendableAddress.spendableOutputs[id] = &spendableOutput{
+							spendable: true,
+							id:        id,
+							output:    &output,
+						}
+					}
 				}
 			}
 		}
@@ -109,24 +141,18 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 func (w *Wallet) Reset() error {
 	w.Lock()
 	defer w.Unlock()
-
-	for id := range w.spentOutputs {
-		// Add the spent output back into the balance if it's currently an
-		// owned output.
-		if _, exists := w.ownedOutputs[id]; exists {
-			w.balance += w.outputs[id].output.Value
-		}
-		delete(w.spentOutputs, id)
-	}
+	w.spentCounter++
 	return nil
 }
 
+/*
 // Balance implements the core.Wallet interface.
 func (w *Wallet) Balance() (consensus.Currency, error) {
 	w.RLock()
 	defer w.RUnlock()
 	return w.balance, nil
 }
+*/
 
 // CoinAddress implements the core.Wallet interface.
 func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
@@ -136,6 +162,7 @@ func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 	}
 
 	newSpendableAddress := &spendableAddress{
+		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
 		spendConditions: consensus.SpendConditions{
 			NumSignatures: 1,
 			PublicKeys:    []signatures.PublicKey{pk},
@@ -143,7 +170,7 @@ func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 		secretKey: sk,
 	}
 
-	coinAddress = newAddress.spendConditions.CoinAddress()
+	coinAddress = newSpendableAddress.spendConditions.CoinAddress()
 	w.spendableAddresses[coinAddress] = newSpendableAddress
 	return
 }
@@ -159,6 +186,7 @@ func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err e
 	return
 }
 
+/*
 // FundTransaction implements the core.Wallet interface.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	if amount == consensus.Currency(0) {
@@ -221,6 +249,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 	return nil
 }
+*/
 
 // AddMinerFee implements the core.Wallet interface.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {

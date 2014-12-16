@@ -28,8 +28,10 @@ type Wallet interface {
 	// vs. resetting a single transaction.
 	Reset() error
 
-	// Balance returns the total number of coins accessible to the wallet.
-	Balance() (consensus.Currency, error)
+	// Balance returns the total number of coins accessible to the wallet. If
+	// full == true, the number of coins returned will also include coins that
+	// have been spent in unconfirmed transactions.
+	Balance(full bool) (consensus.Currency, error)
 
 	// CoinAddress return an address into which coins can be paid.
 	CoinAddress() (consensus.CoinAddress, error)
