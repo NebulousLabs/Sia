@@ -47,23 +47,23 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	// Check that template.html exists.
-	if _, err = os.Stat(expandedStyleDir + "template.html"); err != nil {
-		err = fmt.Errorf("template.html not found! Please put the styles/ folder into '%v'", expandedStyleDir)
-		return
-	}
-
 	// Create and fill out the daemon object.
 	d = &daemon{
 		styleDir:    expandedStyleDir,
 		downloadDir: expandedDownloadDir,
 	}
+
+	// Create the web interface template.
+	d.template, err = template.ParseFiles(expandedStyleDir + "template.html")
+	if err != nil {
+		err = fmt.Errorf("template.html not found! Please move the styles folder to '%v'", expandedStyleDir)
+		return
+	}
+
 	d.core, err = siacore.CreateEnvironment(expandedHostDir, config.Siacore.RpcPort, config.Siacore.NoBootstrap)
 	if err != nil {
 		return
 	}
-	// Create the web interface template.
-	d.template = template.Must(template.ParseFiles(expandedStyleDir + "template.html"))
 
 	// Begin listening for requests on the api.
 	d.setUpHandlers(config.Siad.ApiPort)
