@@ -137,8 +137,9 @@ func sendHostname(conn net.Conn, _ []byte) error {
 // sharePeers replies to the sender with 10 randomly selected peers.
 // Note: the set of peers may contain duplicates.
 func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
-	for i := 0; i < len(tcps.AddressBook()) && i < 10; i++ {
-		*addrs = append(*addrs, tcps.RandomPeer())
+	*addrs = tcps.AddressBook()
+	if len(*addrs) > 10 {
+		*addrs = (*addrs)[:10]
 	}
 	return nil
 }
