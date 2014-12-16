@@ -222,7 +222,7 @@ func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendCond
 		secretKey:        sk,
 	}
 
-	coinAddress := newSpendableAddress.spendConditions.CoinAddress()
+	coinAddress := spendConditions.CoinAddress()
 	w.spendableAddresses[coinAddress] = newSpendableAddress
 	return
 }
@@ -336,11 +336,33 @@ func (w *Wallet) AddOutput(id string, o consensus.Output) error {
 	return nil
 }
 
-/*
 // AddTimelockedRefund implements the core.Wallet interface.
-func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (consensus.SpendConditions, error) {
+func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
+	w.Lock()
+	defer w.Unlock()
+
+	// Get the transaction
+	ot, exists := w.transactions[id]
+	if !exists {
+		err = errors.New("no transaction found for given id")
+		return
+	}
+	t := ot.transaction
+
+	// Get a frozen coin address.
+	spendConditions, err = w.timelockedCoinAddress(release)
+	if err != nil {
+		return
+	}
+
+	// Add the output to the transaction
+	output := consensus.Output{
+		Value:     amount,
+		SpendHash: spendConditions.CoinAddress(),
+	}
+	t.Outputs = append(t.Outputs, output)
+	return
 }
-*/
 
 // AddFileContract implements the core.Wallet interface.
 func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
