@@ -31,10 +31,6 @@ type Wallet interface {
 	// Balance returns the total number of coins accessible to the wallet.
 	Balance() (consensus.Currency, error)
 
-	// NewTransaction creates a fresh, empty transaction and returns an id that
-	// can be used to reference the transaction.
-	NewTransaction() (id string, err error)
-
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to
 	// reference the transaction.

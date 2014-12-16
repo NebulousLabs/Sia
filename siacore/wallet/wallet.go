@@ -138,17 +138,6 @@ func (w *Wallet) Balance() (consensus.Currency, error) {
 	return w.balance, nil
 }
 
-// NewTransaction implements the core.Wallet interface.
-func (w *Wallet) NewTransaction() (id string, err error) {
-	w.Lock()
-	defer w.Unlock()
-
-	id = strconv.Itoa(w.transactionCounter)
-	w.transactionCounter++
-	w.transactions[id].transaction = new(consensus.Transaction)
-	return
-}
-
 // RegisterTransaction implements the core.Wallet interface.
 func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err error) {
 	w.Lock()
