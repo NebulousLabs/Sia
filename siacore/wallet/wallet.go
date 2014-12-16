@@ -404,6 +404,46 @@ func (w *Wallet) AddArbitraryData(id string, arb string) error {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.ArbitraryData = arb
+	to.transaction.ArbitraryData = append(to.transaction.ArbitraryData, arb)
 	return nil
+}
+
+// SignTransaction implements the core.Wallet interface.
+func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction consensus.Transaction, err error) {
+	w.Lock()
+	defer w.Unlock()
+
+	// Fetch the transaction.
+	ot, exists := w.transactions[id]
+	if !exists {
+		err = errors.New("no transaction found for given id")
+		return
+	}
+	transaction = *ot.transaction
+
+	// Get the coveredfields struct.
+	var coveredFields consensus.CoveredFields
+	if wholeTransaction {
+		coveredFields = consensus.CoveredFields{WholeTransaction: true}
+	} else {
+		// TODO: build a proper covered fields struct.
+	}
+
+	// For each input in the transaction that we added, provide a signature.
+	for _, inputIndex := range ot.inputs {
+		input := transaction.Inputs[inputIndex]
+		sig := consensus.TransactionSignature{
+			InputID:        input.OutputID,
+			CoveredFields:  coveredFields,
+			PublicKeyIndex: 0,
+		}
+		transaction.Signatures = append(transaction.Signatures, sig)
+
+		// Hash the transaction according to the covered fields and produce the
+		// cryptographic signature.
+		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
+		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
+		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+	}
+	return
 }
