@@ -58,6 +58,11 @@ Troubleshooting
   In future versions, we will add support for UPnP, which will allow you to
   skip this step.
 
+If your issue is not addressed above, you can get in touch with us personally:
+  email: david@nebulouslabs.com
+         luke@nebulouslabs.com
+  IRC:   #siacoin on freenode
+
 Version Information
 -------------------
 
