@@ -14,7 +14,7 @@ import (
 // adds inputs and other features.
 type openTransaction struct {
 	transaction *consensus.Transaction
-	inputs      []uint64
+	inputs      []int
 }
 
 // spendableOutput keeps track of an output, it's id, and whether or not it's
@@ -228,73 +228,51 @@ func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err e
 	return
 }
 
-/*
 // FundTransaction implements the core.Wallet interface.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	w.Lock()
 	defer w.Unlock()
 
-	if amount == consensus.Currency(0) {
-		return errors.New("cannot fund 0 coins") // should this be an error or nil?
-	}
+	// Get the transaction.
 	ot, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction of given id found")
 	}
 	t := ot.transaction
 
-	total := consensus.Currency(0)
-	var newInputs []consensus.Input
-	for id, _ := range w.ownedOutputs {
-		// Check if we've already spent the output.
-		_, exists := w.spentOutputs[id]
-		if exists {
-			continue
-		}
+	// Get the set of outputs.
+	spendableOutputs, total, err := w.findOutputs(amount)
+	if err != nil {
+		return err
+	}
 
-		// Fetch the output
-		output := w.outputs[id].output
-
-		// Create an input for the transaction
+	// Create and add all of the inputs.
+	for _, spendableOutput := range spendableOutputs {
+		spendableAddress := w.spendableAddresses[spendableOutput.output.SpendHash]
 		newInput := consensus.Input{
-			OutputID:        id,
-			SpendConditions: w.spendConditions,
+			OutputID:        spendableOutput.id,
+			SpendConditions: spendableAddress.spendConditions,
 		}
-		newInputs = append(newInputs, newInput)
-
-		// See if the value of the inputs has surpassed `amount`.
-		total += output.Value
-		if total >= amount {
-			break
-		}
-	}
-
-	// Check that enough inputs were added.
-	if total < amount {
-		return fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
-	}
-
-	// Add the inputs to the transaction.
-	t.Inputs = append(t.Inputs, newInputs...)
-	for _, input := range newInputs {
-		ot.inputs = append(ot.inputs, uint64(len(t.Inputs)))
-		w.spentOutputs[input.OutputID] = struct{}{}
+		ot.inputs = append(ot.inputs, len(t.Inputs))
+		t.Inputs = append(t.Inputs, newInput)
 	}
 
 	// Add a refund output if needed.
 	if total-amount > 0 {
+		coinAddress, err := w.CoinAddress()
+		if err != nil {
+			return err
+		}
 		t.Outputs = append(
 			t.Outputs,
 			consensus.Output{
 				Value:     total - amount,
-				SpendHash: w.spendConditions.CoinAddress(),
+				SpendHash: coinAddress,
 			},
 		)
 	}
-
 	return nil
 }
-*/
 
 // AddMinerFee implements the core.Wallet interface.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
