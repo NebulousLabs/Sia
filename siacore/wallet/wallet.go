@@ -10,6 +10,13 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
+// openTransaction is a type that the wallet uses to track a transaction as it
+// adds inputs, etc.
+type openTransaction struct {
+	transaction *consensus.Transaction
+	inputs      []uint64
+}
+
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
 // by the wallet does not include coins that you have spent in transactions yet
 // haven't been revealed in a block.
@@ -19,6 +26,8 @@ import (
 // object which can do that for the Wallet, which is shared between all of the
 // things that need to do the lookups. (and type consensus.State would
 // implement the interface fulfilling that abstraction)
+//
+// TODO: Add the inputs to a list for when it's time to sign stuff.
 type Wallet struct {
 	secretKey       signatures.SecretKey
 	spendConditions consensus.SpendConditions
@@ -29,7 +38,7 @@ type Wallet struct {
 	outputs      map[consensus.OutputID]*consensus.Output
 
 	transactionCounter int
-	transactions       map[string]*consensus.Transaction
+	transactions       map[string]*openTransaction
 
 	sync.RWMutex
 }
@@ -50,7 +59,7 @@ func New() (w *Wallet, err error) {
 		ownedOutputs: make(map[consensus.OutputID]struct{}),
 		spentOutputs: make(map[consensus.OutputID]struct{}),
 		outputs:      make(map[consensus.OutputID]*consensus.Output),
-		transactions: make(map[string]*consensus.Transaction),
+		transactions: make(map[string]*openTransaction),
 	}
 	return
 }
@@ -136,7 +145,7 @@ func (w *Wallet) NewTransaction() (id string, err error) {
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
-	w.transactions[id] = new(consensus.Transaction)
+	w.transactions[id].transaction = new(consensus.Transaction)
 	return
 }
 
@@ -147,7 +156,7 @@ func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err e
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
-	w.transactions[id] = t
+	w.transactions[id].transaction = t
 	return
 }
 
@@ -156,10 +165,11 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	if amount == consensus.Currency(0) {
 		return errors.New("cannot fund 0 coins") // should this be an error or nil?
 	}
-	t, exists := w.transactions[id]
+	ot, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction of given id found")
 	}
+	t := ot.transaction
 
 	total := consensus.Currency(0)
 	var newInputs []consensus.Input
@@ -199,6 +209,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	// Add the inputs to the transaction.
 	t.Inputs = append(t.Inputs, newInputs...)
 	for _, input := range newInputs {
+		ot.inputs = append(ot.inputs, uint64(len(t.Inputs)))
 		w.spentOutputs[input.OutputID] = struct{}{}
 	}
 
