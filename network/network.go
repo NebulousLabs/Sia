@@ -80,7 +80,7 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	}
 	tcps = &TCPServer{
 		Listener:    tcpServ,
-		myAddr:      NetAddress{"", port},
+		myAddr:      NetAddress{"localhost", port},
 		addressbook: make(map[NetAddress]struct{}),
 		handlerMap:  make(map[string]func(net.Conn, []byte) error),
 	}
@@ -155,7 +155,6 @@ func (tcps *TCPServer) AddPeer(addr NetAddress) error {
 }
 
 // RandomPeer selects and returns a random peer from the address book.
-// TODO: probably not smart to depend on map iteration...
 func (tcps *TCPServer) RandomPeer() NetAddress {
 	addrs := tcps.AddressBook()
 	if len(addrs) == 0 {
