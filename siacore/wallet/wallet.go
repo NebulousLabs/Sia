@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -138,6 +140,7 @@ func (w *Wallet) NewTransaction() (id string, err error) {
 	return
 }
 
+// RegisterTransaction implements the core.Wallet interface.
 func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err error) {
 	w.Lock()
 	defer w.Unlock()
@@ -146,4 +149,69 @@ func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err e
 	w.transactionCounter++
 	w.transactions[id] = t
 	return
+}
+
+// FundTransaction implements the core.Wallet interface.
+func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
+	if amount == consensus.Currency(0) {
+		return errors.New("cannot fund 0 coins") // should this be an error or nil?
+	}
+	t, exists := w.transactions[id]
+	if !exists {
+		return errors.New("no transaction of given id found")
+	}
+
+	total := consensus.Currency(0)
+	var newInputs []consensus.Input
+	for id, _ := range w.ownedOutputs {
+		// Check if we've already spent the output.
+		_, exists := w.spentOutputs[id]
+		if exists {
+			continue
+		}
+
+		// Fetch the output
+		output, exists := w.outputs[id]
+		if !exists {
+			continue
+			// TODO: panic?
+		}
+
+		// Create an input for the transaction
+		newInput := consensus.Input{
+			OutputID:        id,
+			SpendConditions: w.spendConditions,
+		}
+		newInputs = append(newInputs, newInput)
+
+		// See if the value of the inputs has surpassed `amount`.
+		total += output.Value
+		if total >= amount {
+			break
+		}
+	}
+
+	// Check that enough inputs were added.
+	if total < amount {
+		return fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
+	}
+
+	// Add the inputs to the transaction.
+	t.Inputs = append(t.Inputs, newInputs...)
+	for _, input := range newInputs {
+		w.spentOutputs[input.OutputID] = struct{}{}
+	}
+
+	// Add a refund output if needed.
+	if total-amount > 0 {
+		t.Outputs = append(
+			t.Outputs,
+			consensus.Output{
+				Value:     total - amount,
+				SpendHash: w.spendConditions.CoinAddress(),
+			},
+		)
+	}
+
+	return nil
 }
