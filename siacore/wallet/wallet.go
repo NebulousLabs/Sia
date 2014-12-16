@@ -2,7 +2,7 @@ package wallet
 
 import (
 	"errors"
-	// "fmt"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -51,6 +51,45 @@ type Wallet struct {
 	transactions       map[string]*openTransaction
 
 	sync.Mutex
+}
+
+// findOutputs returns a set of spendable outputs that add up to at least
+// `amount` of coins, returning an error if it cannot. It also returns the
+// `total`, which is the sum of all the outputs. It does not adjust the outputs
+// in any way.
+func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spendableOutput, total consensus.Currency, err error) {
+	if amount == consensus.Currency(0) {
+		err = errors.New("cannot fund 0 coins") // should this be an error or nil?
+		return
+	}
+
+	// Iterate through all outputs until enough coins have been assembled.
+	for _, spendableAddress := range w.spendableAddresses {
+		for _, spendableOutput := range spendableAddress.spendableOutputs {
+			if !spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter {
+				continue
+			}
+			total += spendableOutput.output.Value
+			spendableOutputs = append(spendableOutputs, spendableOutput)
+
+			// Break once
+			if total >= amount {
+				break
+			}
+		}
+		// Break twice :)
+		if total >= amount {
+			break
+		}
+	}
+
+	// Check that enough inputs were added.
+	if total < amount {
+		err = fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
+		return
+	}
+
+	return
 }
 
 // New creates an initializes a Wallet.
