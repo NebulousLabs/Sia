@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/NebulousLabs/Andromeda/signatures"
+	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // Exported errors

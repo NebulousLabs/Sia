@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/network"
-	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/siacore"
 )
 
 // TODO: timeouts?

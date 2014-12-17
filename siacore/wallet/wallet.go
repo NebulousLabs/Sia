@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/signatures"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // openTransaction is a type that the wallet uses to track a transaction as it

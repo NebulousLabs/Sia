@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (

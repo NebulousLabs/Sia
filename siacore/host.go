@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 const (

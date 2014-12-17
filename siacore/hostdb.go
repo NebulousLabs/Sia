@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/network"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 const (

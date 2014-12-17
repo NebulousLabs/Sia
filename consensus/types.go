@@ -5,9 +5,9 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/hash"
-	"github.com/NebulousLabs/Andromeda/signatures"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/signatures"
 )
 
 type (

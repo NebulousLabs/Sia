@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 type (

@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
+	"github.com/NebulousLabs/Sia/consensus"
 )
 
 var (

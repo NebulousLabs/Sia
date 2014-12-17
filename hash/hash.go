@@ -3,7 +3,7 @@ package hash
 import (
 	"crypto/sha256"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (

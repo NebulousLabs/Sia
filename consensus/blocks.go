@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 // TODO: Find a better place for this. SurpassThreshold isn't really a

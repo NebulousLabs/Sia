@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"os"
 
-	"github.com/NebulousLabs/Andromeda/siacore"
+	"github.com/NebulousLabs/Sia/siacore"
 
 	"github.com/mitchellh/go-homedir"
 )

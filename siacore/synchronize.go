@@ -3,8 +3,8 @@ package siacore
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/network"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 const (

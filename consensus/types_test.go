@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
-	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 // randomInt64() returns a randomly generated int64 from [int64Min, int64Max].

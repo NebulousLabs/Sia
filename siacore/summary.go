@@ -3,9 +3,9 @@ package siacore
 import (
 	"fmt"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/hash"
-	"github.com/NebulousLabs/Andromeda/network"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // This file is here to provide access to information about the state without

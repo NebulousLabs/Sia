@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/NebulousLabs/Andromeda/hash"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 // StorageProofSegmentIndex takes a contractID and a windowIndex and calculates

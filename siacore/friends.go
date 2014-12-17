@@ -3,8 +3,8 @@ package siacore
 import (
 	"os"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // LoadCoinAddress loads a coin address from a file and adds that address to

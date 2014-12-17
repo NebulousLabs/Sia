@@ -3,7 +3,7 @@ package signatures
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // Creates and encodes a public key, and verifies that it decodes correctly,

@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/network"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a

@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/NebulousLabs/Andromeda/consensus"
-	"github.com/NebulousLabs/Andromeda/network"
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // A state that can be passed between functions to test the various parts of

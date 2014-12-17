@@ -4,7 +4,7 @@ import (
 	"net"
 	"reflect"
 
-	"github.com/NebulousLabs/Andromeda/encoding"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // RPC performs a Remote Procedure Call by sending the procedure name and

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/NebulousLabs/Andromeda/signatures"
+	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // testingEnvironment() is a struc that contains a state and a list of wallets,
