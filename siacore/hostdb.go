@@ -75,14 +75,14 @@ func (h *HostEntry) Weight() consensus.Currency {
 // lock.
 func (e *Environment) pullHostEntryFromTransaction(t consensus.Transaction) (he HostEntry, foundAHostEntry bool) {
 	// Check the arbitrary data of the transaction to fill out the host database.
-	if len(t.ArbitraryData) < 8 {
+	if len(t.ArbitraryData[0]) < 8 {
 		return
 	}
 
-	dataIndicator := encoding.DecUint64(t.ArbitraryData[0:8])
+	dataIndicator := encoding.DecUint64([]byte(t.ArbitraryData[0][0:8]))
 	if dataIndicator == 1 {
 		var ha HostAnnouncement
-		err := encoding.Unmarshal(t.ArbitraryData[8:], &ha)
+		err := encoding.Unmarshal([]byte(t.ArbitraryData[0][8:]), &ha)
 		if err != nil {
 			return
 		}

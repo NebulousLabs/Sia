@@ -1,8 +1,5 @@
 package siacore
 
-// wallet.go contains things like signatures and scans the blockchain for
-// available funds that can be spent.
-
 import (
 	"errors"
 	"fmt"
@@ -13,10 +10,76 @@ import (
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
+// Wallet in an interface that helps to build and sign transactions.
+// Transactions are kept in wallet memory until they are signed, and referenced
+// using a string id.
+//
+// TODO: Reconsider how save, load, and reset work.
+type Wallet interface {
+	// Update takes two sets of blocks. The first is the set of blocks that
+	// have been rewound since the previous call to update, and the second set
+	// is the blocks that were applied after rewinding.
+	Update(rewound []consensus.Block, applied []consensus.Block) error
+
+	// Reset will clear the list of spent transactions, which is nice if you've
+	// accidentally made transactions that aren't spreading on the network for
+	// whatever reason (for example, 0 fee transaction, or if there are bugs in
+	// the software). Conditions for reset are subject to change.
+	Reset() error
+
+	// Balance returns the total number of coins accessible to the wallet. If
+	// full == true, the number of coins returned will also include coins that
+	// have been spent in unconfirmed transactions.
+	Balance(full bool) (consensus.Currency, error)
+
+	// CoinAddress return an address into which coins can be paid.
+	CoinAddress() (consensus.CoinAddress, error)
+
+	// RegisterTransaction creates a transaction out of an existing transaction
+	// which can be modified by the wallet, returning an id that can be used to
+	// reference the transaction.
+	RegisterTransaction(*consensus.Transaction) (id string, err error)
+
+	// FundTransaction will add `amount` to a transaction's inputs.
+	FundTransaction(id string, amount consensus.Currency) error
+
+	// AddMinerFee adds a single miner fee of value `fee`.
+	AddMinerFee(id string, fee consensus.Currency) error
+
+	// AddOutput adds an output of value `amount` to address `ca`.
+	AddOutput(id string, o consensus.Output) error
+
+	// AddTimelockedRefund will add `amount` of coins to a transaction that
+	// unlock at block `release`. The spend conditions of the output are
+	// returned so that they can be revealed to interested parties. The coins
+	// will be added back into the balance when the timelock expires.
+	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (consensus.SpendConditions, error)
+
+	// AddFileContract adds a file contract to a transaction.
+	AddFileContract(id string, fc consensus.FileContract) error
+
+	// AddStorageProof adds a storage proof to a transaction.
+	AddStorageProof(id string, sp consensus.StorageProof) error
+
+	// AddArbitraryData adds a byte slice to the arbitrary data section of the
+	// transaction.
+	AddArbitraryData(id string, arb string) error
+
+	// Sign transaction will sign the transaction associated with the id and
+	// then return the transaction. If wholeTransaction is set to true, then
+	// the wholeTransaction flag will be set in CoveredFields for each
+	// signature.
+	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
+
+	// Save creates a binary file containing keys and such so the coins
+	// can be spent later.
+	Save(filename string) error
+}
+
 // Contains a secret key, the spend conditions associated with that key, the
 // address associated with those spend conditions, and a list of outputs that
 // the wallet knows how to spend.
-type Wallet struct {
+type CoreWallet struct {
 	state *consensus.State
 
 	SecretKey       signatures.SecretKey
@@ -26,19 +89,9 @@ type Wallet struct {
 	SpentOutputs map[consensus.OutputID]struct{} // A list of outputs spent by this wallet which may not yet be in the blockchain.
 }
 
-// Most of the parameters are already in the file contract, but what's not
-// specified is how much of the ContractFund comes from the client, and how
-// much comes from the host. This specifies how much the client is to add to
-// the contract.
-type FileContractParameters struct {
-	Transaction        consensus.Transaction
-	FileContractIndex  int
-	ClientContribution consensus.Currency
-}
-
 // Creates a new wallet that can receive and spend coins.
-func CreateWallet(s *consensus.State) *Wallet {
-	w := &Wallet{
+func CreateWallet(s *consensus.State) *CoreWallet {
+	w := &CoreWallet{
 		state:        s,
 		OwnedOutputs: make(map[consensus.OutputID]struct{}),
 		SpentOutputs: make(map[consensus.OutputID]struct{}),
@@ -57,7 +110,7 @@ func CreateWallet(s *consensus.State) *Wallet {
 
 // Scans all unspent transactions and adds the ones that are spendable by this
 // wallet.
-func (w *Wallet) Scan() {
+func (w *CoreWallet) Scan() {
 	w.OwnedOutputs = make(map[consensus.OutputID]struct{})
 
 	// Check for owned outputs from the standard SpendConditions.
@@ -74,7 +127,7 @@ func (w *Wallet) Scan() {
 
 // fundTransaction() adds `amount` Currency to the inputs, creating a refund
 // output for any excess.
-func (w *Wallet) FundTransaction(amount consensus.Currency, t *consensus.Transaction) (err error) {
+func (w *CoreWallet) FundTransaction(amount consensus.Currency, t *consensus.Transaction) (err error) {
 	// Check that a nonzero amount of coins is being sent.
 	if amount == consensus.Currency(0) {
 		err = errors.New("cannot send 0 coins")
@@ -135,9 +188,9 @@ func (w *Wallet) FundTransaction(amount consensus.Currency, t *consensus.Transac
 	return
 }
 
-// Wallet.signTransaction() takes a transaction and adds a signature to the
+// signTransaction() takes a transaction and adds a signature to the
 // specified input.
-func (w *Wallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredFields, inputIndex int) (err error) {
+func (w *CoreWallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredFields, inputIndex int) (err error) {
 	input := t.Inputs[inputIndex]
 
 	// Check that the spend conditions match.
@@ -164,7 +217,7 @@ func (w *Wallet) SignTransaction(t *consensus.Transaction, cf consensus.CoveredF
 	return
 }
 
-// Wallet.SpendCoins creates a transaction sending 'amount' to 'dest', and
+// SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
 func (e *Environment) SpendCoins(amount, minerFee consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {

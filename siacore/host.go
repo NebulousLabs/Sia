@@ -112,9 +112,8 @@ func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUn
 	*/
 
 	// Add the announcement as arbitrary data.
-	prefixBytes := encoding.Marshal(HostAnnouncementPrefix)
-	announcementBytes := encoding.Marshal(info)
-	t.ArbitraryData = append(prefixBytes, announcementBytes...)
+	announcement := string(encoding.MarshalAll(HostAnnouncementPrefix, info))
+	t.ArbitraryData = append(t.ArbitraryData, announcement)
 
 	// Sign the transaction.
 	for i := range t.Inputs {

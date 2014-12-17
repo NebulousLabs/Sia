@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 	"time"
+
+	"github.com/NebulousLabs/Andromeda/hash"
 )
 
 // TODO: Find a better place for this. SurpassThreshold isn't really a
@@ -292,6 +294,12 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 		value = s.currentPath[currentNode.Height]
 	}
 
+	// Get the state hash before attempting a fork.
+	var stateHash hash.Hash
+	if DEBUG {
+		stateHash = s.StateHash()
+	}
+
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
@@ -327,6 +335,13 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 				}
 			}
 			rewoundBlocks = nil // Reset rewoundBlocks to nil since nothing in sum was rewound.
+
+			// Check that the state hash is the same as before forking and then returning.
+			if DEBUG {
+				if stateHash != s.StateHash() {
+					panic("state hash does not match after an unsuccessful fork attempt")
+				}
+			}
 
 			break
 		}
