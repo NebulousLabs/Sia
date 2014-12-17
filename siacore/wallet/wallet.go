@@ -64,6 +64,7 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spe
 	}
 
 	// Iterate through all outputs until enough coins have been assembled.
+LoopBreak:
 	for _, spendableAddress := range w.spendableAddresses {
 		for _, spendableOutput := range spendableAddress.spendableOutputs {
 			if !spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter {
@@ -74,12 +75,8 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spe
 
 			// Break once
 			if total >= amount {
-				break
+				break LoopBreak
 			}
-		}
-		// Break twice :)
-		if total >= amount {
-			break
 		}
 	}
 
@@ -159,14 +156,10 @@ func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) er
 			for j, output := range t.Outputs {
 				if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
 					id := t.OutputID(j)
-					if spendOutput, exists := spendableAddress.spendableOutputs[id]; exists {
-						spendOutput.spendable = true
-					} else {
-						spendableAddress.spendableOutputs[id] = &spendableOutput{
-							spendable: true,
-							id:        id,
-							output:    &output,
-						}
+					spendableAddress.spendableOutputs[id] = &spendableOutput{
+						spendable: true,
+						id:        id,
+						output:    &output,
 					}
 				}
 			}
@@ -469,7 +462,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	return
 }
 
-// savedSpendableAddress is how we serialize and store spendable addresses on
+// AddressKey is how we serialize and store spendable addresses on
 // disk.
 type AddressKey struct {
 	SpendConditions consensus.SpendConditions
@@ -479,13 +472,15 @@ type AddressKey struct {
 // Save implements the core.Wallet interface.
 func (w *Wallet) Save(filename string) (err error) {
 	// Add every known spendable address + secret key.
-	var keys []AddressKey
+	var i int
+	keys := make([]AddressKey, len(w.spendableAddresses))
 	for _, spendableAddress := range w.spendableAddresses {
 		key := AddressKey{
 			SpendConditions: spendableAddress.spendConditions,
 			SecretKey:       spendableAddress.secretKey,
 		}
-		keys = append(keys, key)
+		keys[i] = key
+		i++
 	}
 
 	//  write the file
