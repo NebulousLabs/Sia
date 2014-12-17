@@ -90,11 +90,11 @@ LoopBreak:
 }
 
 // New creates an initializes a Wallet.
-func New() (*Wallet, error) {
+func New() *Wallet {
 	return &Wallet{
 		spendableAddresses: make(map[consensus.CoinAddress]*spendableAddress),
 		transactions:       make(map[string]*openTransaction),
-	}, nil
+	}
 }
 
 // Update implements the core.Wallet interface.
@@ -178,14 +178,14 @@ func (w *Wallet) Reset() error {
 }
 
 // Balance implements the core.Wallet interface.
-func (w *Wallet) Balance() (total consensus.Currency, err error) {
+func (w *Wallet) Balance(full bool) (total consensus.Currency, err error) {
 	w.Lock()
 	defer w.Unlock()
 
 	// Iterate through all outputs and tally them up.
 	for _, spendableAddress := range w.spendableAddresses {
 		for _, spendableOutput := range spendableAddress.spendableOutputs {
-			if !spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter {
+			if !full && (!spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter) {
 				continue
 			}
 			total += spendableOutput.output.Value
@@ -245,13 +245,13 @@ func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 }
 
 // RegisterTransaction implements the core.Wallet interface.
-func (w *Wallet) RegisterTransaction(t *consensus.Transaction) (id string, err error) {
+func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
 	w.Lock()
 	defer w.Unlock()
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
-	w.transactions[id].transaction = t
+	w.transactions[id].transaction = &t
 	return
 }
 
@@ -507,10 +507,7 @@ func Load(filename string) (w *Wallet, err error) {
 	}
 	return
 
-	w, err = New()
-	if err != nil {
-		return
-	}
+	w = New()
 	for _, key := range keys {
 		newSpendableAddress := &spendableAddress{
 			spendableOutputs: make(map[consensus.OutputID]*spendableOutput),

@@ -19,7 +19,7 @@ type Environment struct {
 	host         *Host
 	hostDatabase *HostDatabase
 	renter       *Renter
-	wallet       *CoreWallet
+	wallet       Wallet
 
 	friends map[string]consensus.CoinAddress
 
@@ -53,7 +53,7 @@ func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Env
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
-	e.wallet = CreateWallet(e.state)
+	e.wallet = wallet.New()
 
 	// Bootstrap to the network.
 	err = e.initializeNetwork(rpcPort, nobootstrap)
