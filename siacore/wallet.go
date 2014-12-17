@@ -13,6 +13,8 @@ import (
 // Wallet in an interface that helps to build and sign transactions.
 // Transactions are kept in wallet memory until they are signed, and referenced
 // using a string id.
+//
+// TODO: Reconsider how save, load, and reset work.
 type Wallet interface {
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
@@ -22,10 +24,7 @@ type Wallet interface {
 	// Reset will clear the list of spent transactions, which is nice if you've
 	// accidentally made transactions that aren't spreading on the network for
 	// whatever reason (for example, 0 fee transaction, or if there are bugs in
-	// the software).
-	//
-	// TODO: Should probably have a separate call for reseting the whole wallet
-	// vs. resetting a single transaction.
+	// the software). Conditions for reset are subject to change.
 	Reset() error
 
 	// Balance returns the total number of coins accessible to the wallet. If
@@ -75,10 +74,6 @@ type Wallet interface {
 	// Save creates a binary file containing keys and such so the coins
 	// can be spent later.
 	Save(filename string) error
-
-	// Load is the inverse of Save, scooping up a wallet file and
-	// now being able to use the addresses within.
-	Load(filename string) (Wallet, error)
 }
 
 // Contains a secret key, the spend conditions associated with that key, the

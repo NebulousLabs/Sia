@@ -3,10 +3,12 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"sync"
 
 	"github.com/NebulousLabs/Andromeda/consensus"
+	"github.com/NebulousLabs/Andromeda/encoding"
 	"github.com/NebulousLabs/Andromeda/signatures"
 )
 
@@ -41,8 +43,6 @@ type spendableAddress struct {
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
 // ignores outputs you've already spent even if they haven't made it into the
 // blockchain yet.
-//
-// TODO: Do not ignore refunds until they make it into a block (but later, leave it for now)
 type Wallet struct {
 	spentCounter       int
 	spendableAddresses map[consensus.CoinAddress]*spendableAddress
@@ -461,6 +461,68 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+	}
+
+	// Delete the open transaction.
+	delete(w.transactions, id)
+
+	return
+}
+
+// savedSpendableAddress is how we serialize and store spendable addresses on
+// disk.
+type AddressKey struct {
+	SpendConditions consensus.SpendConditions
+	SecretKey       signatures.SecretKey
+}
+
+// Save implements the core.Wallet interface.
+func (w *Wallet) Save(filename string) (err error) {
+	// Add every known spendable address + secret key.
+	var keys []AddressKey
+	for _, spendableAddress := range w.spendableAddresses {
+		key := AddressKey{
+			SpendConditions: spendableAddress.spendConditions,
+			SecretKey:       spendableAddress.secretKey,
+		}
+		keys = append(keys, key)
+	}
+
+	//  write the file
+	fileData := encoding.Marshal(keys)
+	if err != nil {
+		return
+	}
+	err = ioutil.WriteFile(filename, fileData, 0666)
+	return
+}
+
+// Load creates a new wallet and loads the contents of the file into the
+// wallet. The wallet will not contain any block information.
+func Load(filename string) (w *Wallet, err error) {
+	contents, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return
+	}
+
+	var keys []AddressKey
+	err = encoding.Unmarshal(contents, keys)
+	if err != nil {
+		return
+	}
+	return
+
+	w, err = New()
+	if err != nil {
+		return
+	}
+	for _, key := range keys {
+		newSpendableAddress := &spendableAddress{
+			spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
+			spendConditions:  key.SpendConditions,
+			secretKey:        key.SecretKey,
+		}
+		w.spendableAddresses[key.SpendConditions.CoinAddress()] = newSpendableAddress
 	}
 	return
 }
