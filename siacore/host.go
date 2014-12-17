@@ -437,25 +437,40 @@ func (e *Environment) storageProofMaintenance(initialStateHeight consensus.Block
 		height++
 	}
 
-	// Create the transaction that submits the storage proof.
-	if len(proofs) != 0 {
-		txn := consensus.Transaction{
-			MinerFees:     []consensus.Currency{10},
-			StorageProofs: proofs,
-		}
-		err := e.wallet.FundTransaction(10, &txn)
+	// Create and submit a transaction for every storage proof.
+	for _, proof := range proofs {
+		// Create the transaction.
+		minerFee := consensus.Currency(10) // TODO: ask wallet.
+		id, err := e.wallet.RegisterTransaction(consensus.Transaction{})
 		if err != nil {
-			fmt.Println("High Priority Error: FundTransaction failed during storageProofMaintenance:", err)
+			fmt.Println("High Priority Error: RegisterTransaction failed:", err)
+			continue
 		}
-		for i := range txn.Inputs {
-			err = e.wallet.SignTransaction(&txn, consensus.CoveredFields{WholeTransaction: true}, i)
-			if err != nil {
-				fmt.Println("High Priority Error: SignTransaction failed during storageProofMaintenance:", err)
-			}
-		}
-		err = e.AcceptTransaction(txn)
+		err = e.wallet.FundTransaction(id, minerFee)
 		if err != nil {
-			fmt.Println("High Priority Error: accept transaction failed during storageProofMaintenance:", err)
+			fmt.Println("High Priority Error: FundTransaction failed:", err)
+			continue
+		}
+		err = e.wallet.AddMinerFee(id , minerFee)
+		if err != nil {
+			fmt.Println("High Priority Error: AddMinerFee failed:", err)
+			continue
+		}
+		err = e.wallet.AddStorageProof(id, proof)
+		if err != nil {
+			fmt.Println("High Priority Error: AddStorageProof failed:", err)
+			continue
+		}
+		transaction, err := e.wallet.SignTransaction(id, true)
+		if err != nil {
+			fmt.Println("High Priority Error: SignTransaction failed:", err)
+			continue
+		}
+
+		// Submit the transaction.
+		err = e.AcceptTransaction(transaction)
+		if err != nil {
+			fmt.Println("High Priority Error: SignTransaction failed:", err)
 		}
 	}
 }

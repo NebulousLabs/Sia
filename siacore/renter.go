@@ -37,9 +37,6 @@ func (e *Environment) RentedFiles() (files []string) {
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
 func (e *Environment) ClientProposeContract(filename, nickname string) (err error) {
-	// Scan the blockchain for outputs.
-	e.wallet.Scan()
-
 	// Find a host.
 	host, err := e.hostDatabase.ChooseHost()
 	if err != nil {
