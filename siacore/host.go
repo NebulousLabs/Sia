@@ -81,54 +81,40 @@ func (e *Environment) HostSpaceRemaining() int64 {
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
 func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight, minerFee consensus.Currency) (t consensus.Transaction, err error) {
+	// Get the encoded announcement based on the host settings.
 	e.host.RLock()
 	info := e.host.Settings
 	e.host.RUnlock()
+	announcement := string(encoding.MarshalAll(HostAnnouncementPrefix, info))
 
-	// Fund the transaction.
-	err = e.wallet.FundTransaction(freezeVolume+minerFee, &t)
+	// Fill out the transaction.
+	id, err := e.wallet.RegisterTransaction(t)
 	if err != nil {
 		return
 	}
-
-	// Add the miner fee.
-	t.MinerFees = append(t.MinerFees, minerFee)
-
-	// Add the output with the freeze volume.
-	freezeConditions := e.wallet.SpendConditions
-	freezeConditions.TimeLock = freezeUnlockHeight
-	t.Outputs = append(t.Outputs, consensus.Output{Value: freezeVolume, SpendHash: freezeConditions.CoinAddress()})
-	info.FreezeIndex = uint64(len(t.Outputs) - 1)
-	info.SpendConditions = freezeConditions
-
-	// Frozen money can't currently be recovered.
-	/*
-		num, exists := w.OpenFreezeConditions[freezeUnlockHeight]
-		if exists {
-			w.OpenFreezeConditions[freezeUnlockHeight] = num + 1
-		} else {
-			w.OpenFreezeConditions[freezeUnlockHeight] = 1
-		}
-	*/
-
-	// Add the announcement as arbitrary data.
-	announcement := string(encoding.MarshalAll(HostAnnouncementPrefix, info))
-	t.ArbitraryData = append(t.ArbitraryData, announcement)
-
-	// Sign the transaction.
-	for i := range t.Inputs {
-		err = e.wallet.SignTransaction(&t, consensus.CoveredFields{WholeTransaction: true}, i)
-		if err != nil {
-			return
-		}
+	err = e.wallet.FundTransaction(id, freezeVolume+minerFee)
+	if err != nil {
+		return
+	}
+	err = e.wallet.AddMinerFee(id, minerFee)
+	if err != nil {
+		return
+	}
+	spendConditions, err := e.wallet.AddTimelockedRefund(id, freezeVolume, freezeUnlockHeight)
+	if err != nil {
+		return
+	}
+	err = e.wallet.AddArbitraryData(id, announcement)
+	if err != nil {
+		return
+	}
+	t, err = e.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
 	}
 
 	// Give the transaction to the state.
 	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
-
 	return
 }
 
@@ -138,22 +124,16 @@ func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUn
 // updated contract is signed and returned.
 //
 // TODO: Reconsider locking strategy for this function.
-func (e *Environment) considerContract(t consensus.Transaction) (nt consensus.Transaction, err error) {
-	// Set the new transaction equal to the old transaction. Pretty sure that
-	// go does not allow you to return the same variable that was used as
-	// input. We could use a pointer, but that might be a bad idea. This call
-	// is happening over the network anyway.
-	nt = t
-
+func (e *Environment) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
 	e.host.Lock()
 	defer e.host.Unlock()
 
-	contractDuration := nt.FileContracts[0].End - nt.FileContracts[0].Start // Duration according to the contract.
-	fullDuration := nt.FileContracts[0].End - e.Height()                    // Duration that the host will actually be storing the file.
-	fileSize := nt.FileContracts[0].FileSize
+	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
+	fullDuration := t.FileContracts[0].End - e.Height()                   // Duration that the host will actually be storing the file.
+	fileSize := t.FileContracts[0].FileSize
 
 	// Check that there is only one file contract.
-	if len(nt.FileContracts) != 1 {
+	if len(t.FileContracts) != 1 {
 		err = errors.New("transaction must have exactly one contract")
 		return
 	}
@@ -176,40 +156,40 @@ func (e *Environment) considerContract(t consensus.Transaction) (nt consensus.Tr
 	}
 
 	// Check that challenges will not be happening too frequently or infrequently.
-	if nt.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow || nt.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow {
+	if t.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow || t.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow {
 		err = errors.New("challenges frequency is too often")
 		return
 	}
 
 	// Check that tolerance is acceptible.
-	if nt.FileContracts[0].Tolerance < e.host.Settings.MinTolerance {
+	if t.FileContracts[0].Tolerance < e.host.Settings.MinTolerance {
 		err = errors.New("tolerance is too low")
 		return
 	}
 
 	// Outputs for successful proofs need to go to the correct address.
-	if nt.FileContracts[0].ValidProofAddress != e.host.Settings.CoinAddress {
+	if t.FileContracts[0].ValidProofAddress != e.host.Settings.CoinAddress {
 		err = errors.New("coins are not paying out to correct address")
 		return
 	}
 
 	// Outputs for successful proofs need to match the price.
-	requiredSize := e.host.Settings.Price * consensus.Currency(fileSize) * consensus.Currency(nt.FileContracts[0].ChallengeWindow)
-	if nt.FileContracts[0].ValidProofPayout < requiredSize {
+	requiredSize := e.host.Settings.Price * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
+	if t.FileContracts[0].ValidProofPayout < requiredSize {
 		err = errors.New("valid proof payout is too low")
 		return
 	}
 
 	// Output for failed proofs needs to be the 0 address.
 	emptyAddress := consensus.CoinAddress{}
-	if nt.FileContracts[0].MissedProofAddress != emptyAddress {
+	if t.FileContracts[0].MissedProofAddress != emptyAddress {
 		err = errors.New("burn payout needs to go to the empty address")
 		return
 	}
 
 	// Verify that output for failed proofs matches burn.
-	maxBurn := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(nt.FileContracts[0].ChallengeWindow)
-	if nt.FileContracts[0].MissedProofPayout > maxBurn {
+	maxBurn := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
+	if t.FileContracts[0].MissedProofPayout > maxBurn {
 		err = errors.New("burn payout is too high for a missed proof.")
 		return
 	}
@@ -217,33 +197,32 @@ func (e *Environment) considerContract(t consensus.Transaction) (nt consensus.Tr
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
 	requiredFund := (e.host.Settings.Burn + e.host.Settings.Price) * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
-	if nt.FileContracts[0].ContractFund < requiredFund {
+	if t.FileContracts[0].ContractFund < requiredFund {
 		err = errors.New("ContractFund does not cover the entire duration of the contract.")
 		return
 	}
 
-	// Add some inputs and outputs to the transaction to fund the burn half.
-	existingInputs := len(nt.Inputs)
-	err = e.wallet.FundTransaction(e.host.Settings.Burn*consensus.Currency(fileSize)*consensus.Currency(contractDuration), &nt)
+	// Add enough funds to the transaction to cover the penalty half of the
+	// agreement.
+	penalty := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
+	id, err := e.wallet.RegisterTransaction(t)
 	if err != nil {
-		fmt.Println(err)
-		err = errors.New("Host is having trouble - sorry!")
 		return
 	}
-	for i := existingInputs; i < len(nt.Inputs); i++ {
-		err = e.wallet.SignTransaction(&nt, consensus.CoveredFields{WholeTransaction: true}, i)
-		if err != nil {
-			return
-		}
+	err = e.wallet.FundTransaction(id, penalty)
+	if err != nil {
+		// This leaks that the host is out of money.
+		return
 	}
+	updatedTransaction, err = e.wallet.SignTransaction(id, true)
 
 	// Check that the transaction is valid after the host signature.
 	e.state.RLock()
-	err = e.state.ValidTransaction(nt)
+	err = e.state.ValidTransaction(updatedTransaction)
 	e.state.RUnlock()
 	if err != nil {
 		fmt.Println(err)
-		err = errors.New("post-verified transaction not valid - most likely a client error, but could be a host error too")
+		err = errors.New("transaction provided is not valid.")
 		return
 	}
 
