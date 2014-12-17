@@ -39,11 +39,11 @@ type SiaUnmarshaler interface {
 // The ordering of struct fields is determined by their type definition. For example:
 //
 //   type foo struct {
-// 	 	S string
-// 		I int
-// 	 }
+//   	S string
+//   	I int
+//   }
 //
-// 	 Marshal(foo{"bar", 3}) = append(Marshal("bar"), Marshal(3)...)
+//   Marshal(foo{"bar", 3}) = append(Marshal("bar"), Marshal(3)...)
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
 }
@@ -104,11 +104,11 @@ func marshal(val reflect.Value) (b []byte) {
 			b = append(b, marshal(val.Field(i))...)
 		}
 		return
+	default:
+		// Marshalling should never fail. If it panics, you're doing something wrong,
+		// like trying to encode a map or an unexported struct field.
+		panic("could not marshal type " + val.Type().String())
 	}
-	// Marshalling should never fail. If it panics, you're doing something wrong,
-	// like trying to encode a map or an unexported struct field.
-	panic("could not marshal type " + val.Type().String())
-	return
 }
 
 // Unmarshal decodes a byte slice into the provided interface. The interface must be a pointer.
@@ -201,9 +201,9 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 			consumed, b = consumed+n, b[n:]
 		}
 		return
+	default:
+		panic("unknown type")
 	}
-	panic("unknown type")
-	return
 }
 
 // MarshalAll marshals all of its inputs and returns their concatenation.
