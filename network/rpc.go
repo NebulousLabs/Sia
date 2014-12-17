@@ -143,3 +143,22 @@ func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
 	}
 	return nil
 }
+
+// addRemote adds the connecting address as a peer. The hostname can be
+// directly determined from the connection, but the port number may have been
+// obfuscated by NAT.
+func (tcps *TCPServer) addRemote(conn net.Conn, encPort []byte) (err error) {
+	var peer NetAddress
+	peer.Host, _, err = net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	if err = encoding.Unmarshal(encPort, peer.Port); err != nil {
+		return
+	}
+	// make sure the host is reachable on this port
+	if tcps.Ping(peer) {
+		tcps.AddPeer(peer)
+	}
+	return
+}

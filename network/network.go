@@ -87,7 +87,7 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	// default handlers
 	tcps.Register("SendHostname", sendHostname)
 	tcps.Register("SharePeers", tcps.sharePeers)
-	tcps.Register("AddPeer", tcps.AddPeer)
+	tcps.Register("AddMe", tcps.addRemote)
 
 	// spawn listener
 	go tcps.listen()
@@ -107,15 +107,6 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		return errors.New("can't bootstrap: no peers responded to ping")
 	}
 
-	// learn hostname
-	for _, addr := range tcps.AddressBook() {
-		var hostname string
-		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
-			tcps.myAddr.Host = hostname
-			break
-		}
-	}
-
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
 	var peers []NetAddress
@@ -130,8 +121,18 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		}
 	}
 
+	// learn hostname
+	for _, addr := range tcps.AddressBook() {
+		var hostname string
+		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
+			tcps.myAddr.Host = hostname
+			break
+		}
+	}
+	// TODO: if hostname discovery fails, ask GetMyExternalIP
+
 	// announce ourselves to new peers
-	tcps.Broadcast("AddPeer", tcps.myAddr, nil)
+	tcps.Broadcast("AddMe", tcps.myAddr.Port, nil)
 
 	return
 }
@@ -145,13 +146,18 @@ func (tcps *TCPServer) AddressBook() (book []NetAddress) {
 	return
 }
 
-// AddPeer safely adds a peer to the address book. It returns an error so that
-// it can be used as an RPC.
-func (tcps *TCPServer) AddPeer(addr NetAddress) error {
+// AddPeer safely adds a peer to the address book.
+func (tcps *TCPServer) AddPeer(addr NetAddress) {
 	tcps.Lock()
 	tcps.addressbook[addr] = struct{}{}
 	tcps.Unlock()
-	return nil
+}
+
+// Remove safely removes a peer from the address book.
+func (tcps *TCPServer) RemovePeer(addr NetAddress) {
+	tcps.Lock()
+	delete(tcps.addressbook, addr)
+	tcps.Unlock()
 }
 
 // RandomPeer selects and returns a random peer from the address book.
