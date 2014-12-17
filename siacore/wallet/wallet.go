@@ -178,7 +178,7 @@ func (w *Wallet) Reset() error {
 }
 
 // Balance implements the core.Wallet interface.
-func (w *Wallet) Balance(full bool) (total consensus.Currency, err error) {
+func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 	w.Lock()
 	defer w.Unlock()
 
@@ -191,7 +191,6 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency, err error) {
 			total += spendableOutput.output.Value
 		}
 	}
-
 	return
 }
 
@@ -330,7 +329,7 @@ func (w *Wallet) AddOutput(id string, o consensus.Output) error {
 }
 
 // AddTimelockedRefund implements the core.Wallet interface.
-func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
+func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, refundIndex uint64, err error) {
 	w.Lock()
 	defer w.Unlock()
 
@@ -353,6 +352,7 @@ func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, relea
 		Value:     amount,
 		SpendHash: spendConditions.CoinAddress(),
 	}
+	refundIndex = uint64(len(t.Outputs))
 	t.Outputs = append(t.Outputs, output)
 	return
 }

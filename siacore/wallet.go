@@ -5,8 +5,6 @@ import (
 	"io/ioutil"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // Wallet in an interface that helps to build and sign transactions.
@@ -29,7 +27,7 @@ type Wallet interface {
 	// Balance returns the total number of coins accessible to the wallet. If
 	// full == true, the number of coins returned will also include coins that
 	// have been spent in unconfirmed transactions.
-	Balance(full bool) (consensus.Currency, error)
+	Balance(full bool) consensus.Currency
 
 	// CoinAddress return an address into which coins can be paid.
 	CoinAddress() (consensus.CoinAddress, error)
@@ -52,7 +50,7 @@ type Wallet interface {
 	// unlock at block `release`. The spend conditions of the output are
 	// returned so that they can be revealed to interested parties. The coins
 	// will be added back into the balance when the timelock expires.
-	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (consensus.SpendConditions, error)
+	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (sc consensus.SpendConditions, refundIndex uint64, err error)
 
 	// AddFileContract adds a file contract to a transaction.
 	AddFileContract(id string, fc consensus.FileContract) error
@@ -78,45 +76,46 @@ type Wallet interface {
 // SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (e *Environment) SpendCoins(amount, minerFee consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
-	// Scan blockchain for outputs.
-	e.wallet.Scan()
-
-	// Add `amount` + `minerFee` coins to the transaction.
-	err = e.wallet.FundTransaction(amount+minerFee, &t)
+func (e *Environment) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
+	// Create and send the transaction.
+	minerFee := consensus.Currency(10) // TODO: wallet supplied miner fee
+	output := consensus.Output{
+		Value:     amount,
+		SpendHash: dest,
+	}
+	id, err := e.wallet.RegisterTransaction(t)
 	if err != nil {
 		return
 	}
-
-	// Add the miner fee.
-	t.MinerFees = append(t.MinerFees, minerFee)
-
-	// Add the output to `dest`.
-	t.Outputs = append(t.Outputs, consensus.Output{Value: amount, SpendHash: dest})
-
-	// Sign each input.
-	for i := range t.Inputs {
-		err = e.wallet.SignTransaction(&t, consensus.CoveredFields{WholeTransaction: true}, i)
-		if err != nil {
-			return
-		}
+	err = e.wallet.FundTransaction(id, amount+minerFee)
+	if err != nil {
+		return
 	}
-
-	// Send the transaction to the environment.
+	err = e.wallet.AddMinerFee(id, minerFee)
+	if err != nil {
+		return
+	}
+	err = e.wallet.AddOutput(id, output)
+	if err != nil {
+		return
+	}
+	t, err = e.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
 	e.AcceptTransaction(t)
-
 	return
 }
 
 // WalletBalance counts up the total number of coins that the wallet knows how
 // to spend, according to the State. WalletBalance will ignore all unconfirmed
 // transactions that have been created.
-func (e *Environment) WalletBalance() (consensus.Currency, error) {
-	return e.wallet.Balance()
+func (e *Environment) WalletBalance(full bool) consensus.Currency {
+	return e.wallet.Balance(full)
 }
 
 // Environment.CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
-func (e *Environment) CoinAddress() consensus.CoinAddress {
-	return e.wallet.SpendConditions.CoinAddress()
+func (e *Environment) CoinAddress() (consensus.CoinAddress, error) {
+	return e.wallet.CoinAddress()
 }

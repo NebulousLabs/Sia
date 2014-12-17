@@ -27,8 +27,8 @@ func (d *daemon) setUpHandlers(apiPort uint16) {
 	http.HandleFunc("/host", d.hostHandler)
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
-	http.HandleFunc("/save", d.saveHandler)
-	http.HandleFunc("/load", d.loadHandler)
+	// http.HandleFunc("/save", d.saveHandler)
+	// http.HandleFunc("/load", d.loadHandler)
 	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/stop", d.stopHandler)
 
@@ -101,16 +101,11 @@ func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) sendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
-	var amount, fee consensus.Currency
+	var amount consensus.Currency
 	var dest consensus.CoinAddress
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		http.Error(w, "Malformed amount", 400)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("fee"), &fee)
-	if err != nil {
-		http.Error(w, "Malformed fee", 400)
 		return
 	}
 
@@ -133,13 +128,13 @@ func (d *daemon) sendHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Spend the coins.
-	_, err = d.core.SpendCoins(amount, fee, dest)
+	_, err = d.core.SpendCoins(amount, dest)
 	if err != nil {
 		http.Error(w, "Failed to create transaction: "+err.Error(), 500)
 		return
 	}
 
-	fmt.Fprintf(w, "Sent %v coins to %x, with fee of %v", amount, dest, fee)
+	fmt.Fprintf(w, "Sent %v coins to %x", amount, dest)
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
@@ -255,6 +250,7 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+/*
 func (d *daemon) saveHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: get type
 	filename := req.FormValue("filename")
@@ -276,6 +272,7 @@ func (d *daemon) loadHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, "Loaded coin address from "+filename)
 	}
 }
+*/
 
 // TODO: this should probably just return JSON. Leave formatting to the client.
 func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
@@ -301,8 +298,8 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 
 	Mining Status: %s
 
-	Wallet Address: %x
 	Wallet Balance: %v
+	Full Wallet Balance: %v
 
 	Current Block Height: %v
 	Current Block Target: %v
@@ -311,7 +308,7 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 	Networked Peers: %s
 
 	Friends: %s`,
-		mineStatus, d.core.CoinAddress(), d.core.WalletBalance(),
+		mineStatus, d.core.WalletBalance(false), d.core.WalletBalance(true),
 		info.Height, info.Target, info.Depth, peers, friends,
 	)
 }

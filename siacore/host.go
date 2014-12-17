@@ -100,7 +100,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUn
 	if err != nil {
 		return
 	}
-	spendConditions, err := e.wallet.AddTimelockedRefund(id, freezeVolume, freezeUnlockHeight)
+	info.SpendConditions, info.FreezeIndex, err = e.wallet.AddTimelockedRefund(id, freezeVolume, freezeUnlockHeight)
 	if err != nil {
 		return
 	}
@@ -451,7 +451,7 @@ func (e *Environment) storageProofMaintenance(initialStateHeight consensus.Block
 			fmt.Println("High Priority Error: FundTransaction failed:", err)
 			continue
 		}
-		err = e.wallet.AddMinerFee(id , minerFee)
+		err = e.wallet.AddMinerFee(id, minerFee)
 		if err != nil {
 			fmt.Println("High Priority Error: AddMinerFee failed:", err)
 			continue
