@@ -57,7 +57,9 @@ func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Env
 
 	// Bootstrap to the network.
 	err = e.initializeNetwork(rpcPort, nobootstrap)
-	if err != nil {
+	if err == network.ErrNoPeers {
+		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+	} else if err != nil {
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
