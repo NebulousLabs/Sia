@@ -71,15 +71,15 @@ func (e *Environment) blockForWork() (b *consensus.Block, target consensus.Targe
 
 // solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func (e *Environment) solveBlock(b *consensus.Block, target consensus.Target) bool {
+func (e *Environment) solveBlock(b *consensus.Block, target consensus.Target) (bool, error) {
 	for maxNonce := b.Nonce + IterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			e.processBlock(*b) // Block until the block has been processed.
-			return true
+			err := e.processBlock(*b) // Block until the block has been processed.
+			return true, err
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // mine attempts to generate blocks.

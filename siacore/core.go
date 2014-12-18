@@ -144,7 +144,7 @@ func (e *Environment) AcceptTransaction(t consensus.Transaction) error {
 }
 
 // processBlock is called by the environment's listener.
-func (e *Environment) processBlock(b consensus.Block) {
+func (e *Environment) processBlock(b consensus.Block) (err error) {
 	e.state.Lock()
 	e.hostDatabase.Lock()
 	e.host.Lock()
@@ -171,6 +171,7 @@ func (e *Environment) processBlock(b consensus.Block) {
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
+	return
 }
 
 // processTransaction sends a transaction to the state.

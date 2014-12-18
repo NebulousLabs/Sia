@@ -1,5 +1,6 @@
 package siacore
 
+/*
 import (
 	"time"
 )
@@ -90,7 +91,6 @@ func testLargeTransactions(te *testEnv) {
 
 	// Test has been put on hold until you can spend new outputs in the same
 	// block that they are made.
-	/*
 		// Get e1 up to having at least 50 inputs.
 		te.e1.wallet.Scan()
 		for i := len(te.e1.wallet.OwnedOutputs); i <= 5; i++ {
@@ -113,5 +113,5 @@ func testLargeTransactions(te *testEnv) {
 			println(len(te.e1.wallet.OwnedOutputs))
 			return
 		}
-	*/
 }
+*/

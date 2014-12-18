@@ -1,5 +1,6 @@
 package siacore
 
+/*
 import (
 	"time"
 )
@@ -73,3 +74,4 @@ func testHostDatabase(te *testEnv) {
 		te.t.Error("e0Picks is not being favored!")
 	}
 }
+*/

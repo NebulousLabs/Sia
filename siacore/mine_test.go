@@ -1,15 +1,38 @@
 package siacore
 
 import (
-	"time"
+	"testing"
 )
 
-// Takes an environment and mines until a single block is produced.
-func (e *Environment) mineSingleBlock() {
-	for !e.solveBlock(e.blockForWork()) {
+// mineSingleBlock mines a single block and then uses the blocking function
+// processBlock to integrate the block with the state.
+func mineSingleBlock(t *testing.T, e *Environment) {
+	block, target := e.blockForWork()
+	found, err := e.solveBlock(block, target)
+	for !found {
+		found, err = e.solveBlock(block, target)
+	}
+	if err != nil {
+		t.Error(err)
 	}
 }
 
+// testEmptyBlock creates an emtpy block and submits it to the state.
+func testEmptyBlock(t *testing.T, e *Environment) {
+	// Check that the block will actually be empty.
+	if len(e.state.TransactionPoolDump()) != 0 {
+		t.Error("TransactionPoolDump is not of len 0")
+		return
+	}
+
+	height := e.Height()
+	mineSingleBlock(t, e)
+	if height+1 != e.Height() {
+		t.Errorf("height should have increased by one, went from %v to %v.", height, e.Height())
+	}
+}
+
+/*
 // testToggleMining tests that enabling and disabling mining works without
 // problems.
 func testToggleMining(te *testEnv) {
@@ -56,7 +79,6 @@ func testDualMining(te *testEnv) {
 	te.e1.StopMining()
 	time.Sleep(500 * time.Millisecond)
 
-	/*
 		// Compare the state hash for equality.
 		info0 := te.e0.StateInfo()
 		info1 := te.e1.StateInfo()
@@ -65,5 +87,5 @@ func testDualMining(te *testEnv) {
 			te.t.Error("state hashes do not match after dual mining.")
 			return
 		}
-	*/
 }
+*/
