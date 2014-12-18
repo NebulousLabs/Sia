@@ -61,6 +61,17 @@ func synccmd(cmd *cobra.Command, args []string) {
 	fmt.Println(getResponse("/sync", nil))
 }
 
+func peercmd(cmd *cobra.Command, args []string) {
+	if len(args) != 2 {
+		cmd.Usage()
+		return
+	}
+	fmt.Println(getResponse("/peer", &url.Values{
+		"action": {args[0]},
+		"addr":   {args[1]},
+	}))
+}
+
 func sendcmd(cmd *cobra.Command, args []string) {
 	if len(args) != 3 {
 		cmd.Usage()

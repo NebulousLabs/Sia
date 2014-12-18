@@ -116,6 +116,16 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 	return nil
 }
 
+// AddPeer adds a peer.
+func (e *Environment) AddPeer(addr network.NetAddress) {
+	e.server.AddPeer(addr)
+}
+
+// RemovePeer removes a peer.
+func (e *Environment) RemovePeer(addr network.NetAddress) {
+	e.server.RemovePeer(addr)
+}
+
 // AcceptBlock sends the input block down a channel, where it will be dealt
 // with by the Environment's listener.
 func (e *Environment) AcceptBlock(b consensus.Block) error {
