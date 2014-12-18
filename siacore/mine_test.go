@@ -25,11 +25,22 @@ func testEmptyBlock(t *testing.T, e *Environment) {
 		return
 	}
 
+	// Create and submit the block.
 	height := e.Height()
+	utxoSize := len(e.state.SortedUtxoSet())
 	mineSingleBlock(t, e)
 	if height+1 != e.Height() {
 		t.Errorf("height should have increased by one, went from %v to %v.", height, e.Height())
 	}
+	if utxoSize+1 != len(e.state.SortedUtxoSet()) {
+		t.Errorf("utxo set should have increased by one, went from %v to %v.", utxoSize, len(e.state.SortedUtxoSet()))
+	}
+}
+
+// testTransactionBlock creates a transaction and checks that it makes it into
+// the utxo set.
+func testTransactionBlock(t *testing.T, e *Environment) {
+
 }
 
 /*
