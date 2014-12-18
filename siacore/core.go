@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/siacore/wallet"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a

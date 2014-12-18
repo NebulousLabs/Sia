@@ -1,8 +1,6 @@
 package siacore
 
 import (
-	"fmt"
-
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/network"

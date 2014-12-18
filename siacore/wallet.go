@@ -1,9 +1,6 @@
 package siacore
 
 import (
-	"fmt"
-	"io/ioutil"
-
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
