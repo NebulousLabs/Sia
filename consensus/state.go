@@ -229,7 +229,7 @@ func (s *State) Output(id OutputID) (output Output, err error) {
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
+func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
 	var unspentOutputStrings []string
 	for outputID := range s.unspentOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
@@ -239,7 +239,11 @@ func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
 	for _, utxoString := range unspentOutputStrings {
 		var outputID OutputID
 		copy(outputID[:], utxoString)
-		sortedOutputs = append(sortedOutputs, outputID)
+		output, err := s.Output(outputID)
+		if err != nil {
+			panic(err)
+		}
+		sortedOutputs = append(sortedOutputs, output)
 	}
 	return
 }
@@ -276,8 +280,8 @@ func (s *State) StateHash() hash.Hash {
 	sortedUtxos := s.SortedUtxoSet()
 
 	// Add the unspent outputs in sorted order.
-	for _, outputID := range sortedUtxos {
-		leaves = append(leaves, hash.HashObject(s.unspentOutputs[outputID]))
+	for _, output := range sortedUtxos {
+		leaves = append(leaves, hash.HashObject(output))
 	}
 
 	// Sort the open contracts by the string value of their ID.

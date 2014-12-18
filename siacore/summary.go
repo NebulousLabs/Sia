@@ -25,7 +25,7 @@ type StateInfo struct {
 type DeepStateInfo struct {
 	StateHash hash.Hash
 
-	UtxoSet         []consensus.OutputID
+	UtxoSet         []consensus.Output
 	TransactionList []consensus.Transaction
 }
 
