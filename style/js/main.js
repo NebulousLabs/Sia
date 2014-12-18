@@ -59,7 +59,7 @@ function updatePage() {
 		safeSetElem('hostAcceptingContracts', "are not")
 	}
 
-	safeSetValue('hostIPAddress', stats.HostSettings.IPAddress.Host + ":" + stats.HostSettings.IPAddress.Port)
+	safeSetValue('hostIPAddress', stats.HostSettings.IPAddress)
 	// safeSetValue('hostTotalStorage', stats.HostSettings.TotalStorage)
 	// safeSetValue('hostUnsoldStorage', stats.HostSpaceRemaining)
 	// safeSetValue('hostMinFilesize', stats.HostSettings.MinFilesize)

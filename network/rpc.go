@@ -11,7 +11,7 @@ import (
 // encoded argument, and decoding the response into the supplied object.
 // 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
 // nil, no response is read.
-func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
+func (na Address) RPC(name string, arg, resp interface{}) error {
 	return na.Call(name, func(conn net.Conn) error {
 		var data []byte
 		if arg != nil {
@@ -44,7 +44,7 @@ func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
 //     func(Type, *Type) error
 //     func(Type) error
 //     func(*Type) error
-// To call an RPC, use NetAddress.RPC, supplying the same identifier given to
+// To call an RPC, use Address.RPC, supplying the same identifier given to
 // Register. Identifiers should always use CamelCase.
 func (tcps *TCPServer) Register(name string, fn interface{}) {
 	// all handlers are function with at least one in and one error out
@@ -140,7 +140,7 @@ func sendHostname(conn net.Conn, _ []byte) error {
 
 // sharePeers replies to the sender with 10 randomly selected peers.
 // Note: the set of peers may contain duplicates.
-func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
+func (tcps *TCPServer) sharePeers(addrs *[]Address) error {
 	*addrs = tcps.AddressBook()
 	if len(*addrs) > 10 {
 		*addrs = (*addrs)[:10]
@@ -148,21 +148,17 @@ func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
 	return nil
 }
 
-// addRemote adds the connecting address as a peer. The hostname can be
-// directly determined from the connection, but the port number may have been
-// obfuscated by NAT.
-func (tcps *TCPServer) addRemote(conn net.Conn, encPort []byte) (err error) {
-	var peer NetAddress
-	peer.Host, _, err = net.SplitHostPort(conn.RemoteAddr().String())
-	if err != nil {
-		return
-	}
-	if err = encoding.Unmarshal(encPort, peer.Port); err != nil {
+// addRemote adds the connecting address as a peer.
+func (tcps *TCPServer) addRemote(conn net.Conn, addr []byte) (err error) {
+	// check that this is the correct hostname
+	connHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	addrHost, _, _ := net.SplitHostPort(string(addr))
+	if connHost != addrHost {
 		return
 	}
 	// make sure the host is reachable on this port
-	if tcps.Ping(peer) {
-		tcps.AddPeer(peer)
+	if tcps.Ping(Address(addr)) {
+		tcps.AddPeer(Address(addr))
 	}
 	return
 }

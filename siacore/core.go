@@ -44,7 +44,7 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
+func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
 		state:           consensus.CreateGenesisState(),
 		friends:         make(map[string]consensus.CoinAddress),
@@ -62,13 +62,13 @@ func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, noboot
 	}
 
 	// Bootstrap to the network.
-	err = e.initializeNetwork(rpcPort, nobootstrap)
+	err = e.initializeNetwork(serverAddr, nobootstrap)
 	if err == network.ErrNoPeers {
 		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
 	} else if err != nil {
 		return
 	}
-	e.host.Settings.IPAddress = e.server.NetAddress()
+	e.host.Settings.IPAddress = e.server.Address()
 
 	return
 }
@@ -81,8 +81,8 @@ func (e *Environment) Close() {
 
 // initializeNetwork registers the rpcs and bootstraps to the network,
 // downlading all of the blocks and establishing a peer list.
-func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err error) {
-	e.server, err = network.NewTCPServer(rpcPort)
+func (e *Environment) initializeNetwork(addr string, nobootstrap bool) (err error) {
+	e.server, err = network.NewTCPServer(addr)
 	if err != nil {
 		return
 	}
@@ -125,12 +125,12 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 }
 
 // AddPeer adds a peer.
-func (e *Environment) AddPeer(addr network.NetAddress) {
+func (e *Environment) AddPeer(addr network.Address) {
 	e.server.AddPeer(addr)
 }
 
 // RemovePeer removes a peer.
-func (e *Environment) RemovePeer(addr network.NetAddress) {
+func (e *Environment) RemovePeer(addr network.Address) {
 	e.server.RemovePeer(addr)
 }
 

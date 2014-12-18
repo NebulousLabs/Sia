@@ -53,7 +53,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID, blocks *[]co
 // progressing exponentially backwards to the genesis block. The receiver uses
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
-func (e *Environment) CatchUp(peer network.NetAddress) {
+func (e *Environment) CatchUp(peer network.Address) {
 	e.state.RLock() // Lock the state while building the block request.
 	knownBlocks := make([]consensus.BlockID, 0, 32)
 	for i := consensus.BlockHeight(0); i < 12; i++ {

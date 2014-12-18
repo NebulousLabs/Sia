@@ -15,22 +15,21 @@ func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
 
 func TestRegister(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(9987)
+	tcps, err := NewTCPServer(":9987")
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr := NetAddress{"localhost", 9987}
 
 	// register some handlers
 	tcps.Register("Foo", func(net.Conn, []byte) error { chan2 <- struct{}{}; return nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
-	err = addr.RPC("Foo", 0, nil)
+	err = tcps.myAddr.RPC("Foo", 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addr.RPC("Bar", 0, nil)
+	err = tcps.myAddr.RPC("Bar", 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,13 +55,13 @@ func TestRegister(t *testing.T) {
 
 func TestPeerSharing(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(9981)
+	tcps, err := NewTCPServer(":9981")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// add a peer
-	peer := NetAddress{"foo", 9001}
+	peer := Address("foo:9001")
 	tcps.AddPeer(peer)
 	// tcps only has one peer, so RandomPeer() should return peer
 	if tcps.RandomPeer() != peer {
@@ -70,20 +69,20 @@ func TestPeerSharing(t *testing.T) {
 	}
 
 	// ask tcps for peers
-	var resp []NetAddress
+	var resp []Address
 	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// resp should be exactly []NetAddress{peer}
+	// resp should be exactly []Address{peer}
 	if len(resp) != 1 || resp[0] != peer {
 		t.Fatal("server gave bad peer list:", resp)
 	}
 
 	// add a couple more peers
-	tcps.AddPeer(NetAddress{"bar", 9002})
-	tcps.AddPeer(NetAddress{"baz", 9003})
-	tcps.AddPeer(NetAddress{"quux", 9004})
+	tcps.AddPeer(Address("bar:9002"))
+	tcps.AddPeer(Address("baz:9003"))
+	tcps.AddPeer(Address("quux:9004"))
 	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
 	if err != nil {
 		t.Fatal(err)
@@ -105,13 +104,13 @@ func TestPeerCulling(t *testing.T) {
 	}
 
 	// create server
-	tcps, err := NewTCPServer(9005)
+	tcps, err := NewTCPServer(":9005")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// add google as a peer
-	peer := NetAddress{"8.8.8.8", 9001}
+	peer := Address("8.8.8.8:9001")
 	tcps.AddPeer(peer)
 
 	// send a broadcast
