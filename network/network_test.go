@@ -97,3 +97,29 @@ func TestPeerSharing(t *testing.T) {
 		}
 	}
 }
+
+func TestPeerCulling(t *testing.T) {
+	// this test necessitates a timeout
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// create server
+	tcps, err := NewTCPServer(9005)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add google as a peer
+	peer := NetAddress{"8.8.8.8", 9001}
+	tcps.AddPeer(peer)
+
+	// send a broadcast
+	// doesn't need to be a real RPC
+	tcps.Broadcast("QuestionWhoseAnswerIs", 42, nil)
+
+	// peer should have been removed
+	if len(tcps.AddressBook()) != 0 {
+		t.Fatal("server did not remove dead peer:", tcps.AddressBook())
+	}
+}
