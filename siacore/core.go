@@ -36,25 +36,30 @@ type Environment struct {
 	miningLock    sync.RWMutex // prevents benign race conditions
 
 	// Envrionment directories.
-	hostDir  string
-	styleDir string
+	hostDir    string
+	styleDir   string
+	walletFile string
 }
 
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
+func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
 		state:           consensus.CreateGenesisState(),
 		friends:         make(map[string]consensus.CoinAddress),
 		blockChan:       make(chan consensus.Block, 100),
 		transactionChan: make(chan consensus.Transaction, 100),
 		hostDir:         hostDir,
+		walletFile:      walletFile,
 	}
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
-	e.wallet = wallet.New()
+	e.wallet, err = wallet.New(e.walletFile)
+	if err != nil {
+		return
+	}
 
 	// Bootstrap to the network.
 	err = e.initializeNetwork(rpcPort, nobootstrap)

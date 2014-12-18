@@ -64,10 +64,6 @@ type Wallet interface {
 	// the wholeTransaction flag will be set in CoveredFields for each
 	// signature.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
-
-	// Save creates a binary file containing keys and such so the coins
-	// can be spent later.
-	Save(filename string) error
 }
 
 // SpendCoins creates a transaction sending 'amount' to 'dest', and
