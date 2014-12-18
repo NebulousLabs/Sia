@@ -57,7 +57,9 @@ func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Env
 
 	// Bootstrap to the network.
 	err = e.initializeNetwork(rpcPort, nobootstrap)
-	if err != nil {
+	if err == network.ErrNoPeers {
+		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+	} else if err != nil {
 		return
 	}
 	e.host.Settings.IPAddress = e.server.NetAddress()
@@ -114,6 +116,16 @@ func (e *Environment) initializeNetwork(rpcPort uint16, nobootstrap bool) (err e
 	go e.listen()
 
 	return nil
+}
+
+// AddPeer adds a peer.
+func (e *Environment) AddPeer(addr network.NetAddress) {
+	e.server.AddPeer(addr)
+}
+
+// RemovePeer removes a peer.
+func (e *Environment) RemovePeer(addr network.NetAddress) {
+	e.server.RemovePeer(addr)
 }
 
 // AcceptBlock sends the input block down a channel, where it will be dealt

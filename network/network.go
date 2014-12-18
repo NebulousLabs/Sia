@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"net"
+	"net/http" // for getExternalIP()
 	"strconv"
 	"sync"
 	"time"
@@ -14,6 +15,10 @@ import (
 const (
 	timeout   = time.Second * 5
 	maxMsgLen = 1 << 24
+)
+
+var (
+	ErrNoPeers = errors.New("no peers")
 )
 
 // A NetAddress contains the information needed to contact a peer over TCP.
@@ -80,14 +85,14 @@ func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
 	}
 	tcps = &TCPServer{
 		Listener:    tcpServ,
-		myAddr:      NetAddress{"", port},
+		myAddr:      NetAddress{"localhost", port},
 		addressbook: make(map[NetAddress]struct{}),
 		handlerMap:  make(map[string]func(net.Conn, []byte) error),
 	}
 	// default handlers
 	tcps.Register("SendHostname", sendHostname)
 	tcps.Register("SharePeers", tcps.sharePeers)
-	tcps.Register("AddPeer", tcps.AddPeer)
+	tcps.Register("AddMe", tcps.addRemote)
 
 	// spawn listener
 	go tcps.listen()
@@ -104,16 +109,9 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		}
 	}
 	if len(tcps.addressbook) == 0 {
-		return errors.New("can't bootstrap: no peers responded to ping")
-	}
-
-	// learn hostname
-	for _, addr := range tcps.AddressBook() {
-		var hostname string
-		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
-			tcps.myAddr.Host = hostname
-			break
-		}
+		// fallback to centralized service to learn hostname
+		tcps.getExternalIP()
+		return ErrNoPeers
 	}
 
 	// request peers
@@ -130,8 +128,23 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		}
 	}
 
+	// learn hostname
+	var set bool
+	for _, addr := range tcps.AddressBook() {
+		var hostname string
+		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
+			tcps.myAddr.Host = hostname
+			set = true
+			break
+		}
+	}
+	// if no peers respond, fallback to centralized service
+	if !set {
+		tcps.getExternalIP()
+	}
+
 	// announce ourselves to new peers
-	tcps.Broadcast("AddPeer", tcps.myAddr, nil)
+	tcps.Broadcast("AddMe", tcps.myAddr.Port, nil)
 
 	return
 }
@@ -145,21 +158,25 @@ func (tcps *TCPServer) AddressBook() (book []NetAddress) {
 	return
 }
 
-// AddPeer safely adds a peer to the address book. It returns an error so that
-// it can be used as an RPC.
-func (tcps *TCPServer) AddPeer(addr NetAddress) error {
+// AddPeer safely adds a peer to the address book.
+func (tcps *TCPServer) AddPeer(addr NetAddress) {
 	tcps.Lock()
 	tcps.addressbook[addr] = struct{}{}
 	tcps.Unlock()
-	return nil
+}
+
+// Remove safely removes a peer from the address book.
+func (tcps *TCPServer) RemovePeer(addr NetAddress) {
+	tcps.Lock()
+	delete(tcps.addressbook, addr)
+	tcps.Unlock()
 }
 
 // RandomPeer selects and returns a random peer from the address book.
-// TODO: probably not smart to depend on map iteration...
 func (tcps *TCPServer) RandomPeer() NetAddress {
 	addrs := tcps.AddressBook()
 	if len(addrs) == 0 {
-		panic("no peers!")
+		panic(ErrNoPeers)
 	}
 	return addrs[rand.Intn(len(addrs))]
 }
@@ -220,5 +237,23 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 		// TODO: log error
 		// no wait, send the error?
 	}
+	return
+}
+
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func (tcps *TCPServer) getExternalIP() (err error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 32)
+	n, err := resp.Body.Read(buf)
+	if err != nil {
+		return
+	}
+	// TODO: validate IP?
+	tcps.myAddr.Host = string(buf[:n])
 	return
 }

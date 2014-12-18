@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -21,6 +21,7 @@ func (d *daemon) setUpHandlers(apiPort uint16) {
 
 	// Plaintext API
 	http.HandleFunc("/sync", d.syncHandler)
+	http.HandleFunc("/peer", d.peerHandler)
 	http.HandleFunc("/mine", d.mineHandler)
 	http.HandleFunc("/sendcoins", d.sendHandler)
 	http.HandleFunc("/host", d.hostHandler)
@@ -59,6 +60,30 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: return error if no peers exist
 	go d.core.CatchUp(d.core.RandomPeer())
 	fmt.Fprint(w, "Sync initiated")
+}
+
+func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
+	host, portStr, err := net.SplitHostPort(req.FormValue("addr"))
+	if err != nil {
+		http.Error(w, "Malformed address", 400)
+		return
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		http.Error(w, "Malformed IP", 400)
+		return
+	}
+	addr := network.NetAddress{host, uint16(port)}
+	switch req.FormValue("action") {
+	case "add":
+		d.core.AddPeer(addr)
+		fmt.Fprintf(w, "Added %s", req.FormValue("addr"))
+	case "remove":
+		d.core.RemovePeer(addr)
+		fmt.Fprintf(w, "Removed %s", req.FormValue("addr"))
+	default:
+		http.Error(w, "Invalid peer action", 400)
+	}
 }
 
 func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
@@ -127,21 +152,17 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	var coinAddress consensus.CoinAddress
 
 	// Get the ip address.
-	hostAndPort := strings.Split(req.FormValue("ipaddress"), ":")
-	if len(hostAndPort) != 2 {
+	host, portStr, err := net.SplitHostPort(req.FormValue("ipaddress"))
+	if err != nil {
 		http.Error(w, "Malformed IP address + port", 400)
 		return
 	}
-	_, err := fmt.Sscan(hostAndPort[0], &ipAddress.Host)
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		http.Error(w, "Malformed IP address", 400)
+		http.Error(w, "Malformed IP", 400)
 		return
 	}
-	_, err = fmt.Sscan(hostAndPort[1], &ipAddress.Port)
-	if err != nil {
-		http.Error(w, "Malformed port number", 400)
-		return
-	}
+	ipAddress = network.NetAddress{host, uint16(port)}
 
 	// The address can be either a coin address or a friend name
 	caString := req.FormValue("coinaddress")

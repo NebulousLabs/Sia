@@ -30,7 +30,11 @@ func (na *NetAddress) RPC(name string, arg, resp interface{}) error {
 // Broadcast calls the RPC on each peer in the address book.
 func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
 	for _, addr := range tcps.AddressBook() {
-		addr.RPC(name, arg, resp)
+		err := addr.RPC(name, arg, resp)
+		// remove unresponsive peers
+		if err != nil {
+			tcps.RemovePeer(addr)
+		}
 	}
 }
 
@@ -137,8 +141,28 @@ func sendHostname(conn net.Conn, _ []byte) error {
 // sharePeers replies to the sender with 10 randomly selected peers.
 // Note: the set of peers may contain duplicates.
 func (tcps *TCPServer) sharePeers(addrs *[]NetAddress) error {
-	for i := 0; i < len(tcps.AddressBook()) && i < 10; i++ {
-		*addrs = append(*addrs, tcps.RandomPeer())
+	*addrs = tcps.AddressBook()
+	if len(*addrs) > 10 {
+		*addrs = (*addrs)[:10]
 	}
 	return nil
+}
+
+// addRemote adds the connecting address as a peer. The hostname can be
+// directly determined from the connection, but the port number may have been
+// obfuscated by NAT.
+func (tcps *TCPServer) addRemote(conn net.Conn, encPort []byte) (err error) {
+	var peer NetAddress
+	peer.Host, _, err = net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	if err = encoding.Unmarshal(encPort, peer.Port); err != nil {
+		return
+	}
+	// make sure the host is reachable on this port
+	if tcps.Ping(peer) {
+		tcps.AddPeer(peer)
+	}
+	return
 }

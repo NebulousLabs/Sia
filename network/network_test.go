@@ -53,3 +53,73 @@ func TestRegister(t *testing.T) {
 		t.Fatal("One or both handlers not called")
 	}
 }
+
+func TestPeerSharing(t *testing.T) {
+	// create server
+	tcps, err := NewTCPServer(9981)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add a peer
+	peer := NetAddress{"foo", 9001}
+	tcps.AddPeer(peer)
+	// tcps only has one peer, so RandomPeer() should return peer
+	if tcps.RandomPeer() != peer {
+		t.Fatal("server has bad peer list:", tcps.AddressBook())
+	}
+
+	// ask tcps for peers
+	var resp []NetAddress
+	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// resp should be exactly []NetAddress{peer}
+	if len(resp) != 1 || resp[0] != peer {
+		t.Fatal("server gave bad peer list:", resp)
+	}
+
+	// add a couple more peers
+	tcps.AddPeer(NetAddress{"bar", 9002})
+	tcps.AddPeer(NetAddress{"baz", 9003})
+	tcps.AddPeer(NetAddress{"quux", 9004})
+	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// resp should now contain 4 distinct addresses
+	for i := 0; i < len(resp); i++ {
+		for j := i + 1; j < len(resp); j++ {
+			if resp[i] == resp[j] {
+				t.Fatal("resp contains duplicate addresses:", resp)
+			}
+		}
+	}
+}
+
+func TestPeerCulling(t *testing.T) {
+	// this test necessitates a timeout
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// create server
+	tcps, err := NewTCPServer(9005)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add google as a peer
+	peer := NetAddress{"8.8.8.8", 9001}
+	tcps.AddPeer(peer)
+
+	// send a broadcast
+	// doesn't need to be a real RPC
+	tcps.Broadcast("QuestionWhoseAnswerIs", 42, nil)
+
+	// peer should have been removed
+	if len(tcps.AddressBook()) != 0 {
+		t.Fatal("server did not remove dead peer:", tcps.AddressBook())
+	}
+}

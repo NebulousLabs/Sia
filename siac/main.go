@@ -47,6 +47,13 @@ func main() {
 	})
 
 	root.AddCommand(&cobra.Command{
+		Use:   "peer",
+		Short: "Manually add or remove a peer",
+		Long:  "Manually add or remove a peer from the server's peer list.",
+		Run:   peercmd,
+	})
+
+	root.AddCommand(&cobra.Command{
 		Use:   "send",
 		Short: "Send coins to an address",
 		Long:  "Send coins to an address, or to a friend. The destination is first interpreted as an friend, and then as an address if the friend lookup fails.",
