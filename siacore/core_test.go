@@ -10,7 +10,7 @@ import (
 
 // establishTestingEnvrionment sets all of the testEnv variables.
 func establishTestingEnvironment(t *testing.T) (e *Environment) {
-	e, err := CreateEnvironment("host", "wallet.siawallet", 9988, true)
+	e, err := CreateEnvironment("host", "test.wallet", 9988, true)
 	if err != nil {
 		t.Fatal(err)
 	}
