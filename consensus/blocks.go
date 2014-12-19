@@ -196,18 +196,10 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 // State.rewindABlock() removes the most recent block from the ConsensusState,
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) rewindABlock() (removedOutputs []Output) {
-	// Perform inverse contract maintenance.
-	removedOutputSet := s.inverseContractMaintenance()
-	removedOutputs = append(removedOutputs, removedOutputSet)
-
-	// Reverse each transaction in the block, in reverse order from how
-	// they appear in the block.
-	for i := len(s.CurrentBlock().Transactions) - 1; i >= 0; i-- {
-		removedOutputSet := s.reverseTransaction(s.CurrentBlock().Transactions[i])
-		removedOutputs = append(removedOutputs, removedOutputSet)
-	}
-
 	// Remove the output for the miner subsidy.
+	//
+	// TODO: Update this for incentive stuff - miner doesn't get subsidy until
+	// 2000 or 5000 or 10000 blocks later.
 	subsidyID := s.CurrentBlock().SubsidyID()
 	subsidy, err := s.Output(subsidyID)
 	if err != nil {
@@ -215,6 +207,17 @@ func (s *State) rewindABlock() (removedOutputs []Output) {
 	}
 	removedOutputs = append(removedOutputs, subsidy)
 	delete(s.unspentOutputs, subsidyID)
+
+	// Perform inverse contract maintenance.
+	removedOutputSet := s.inverseContractMaintenance()
+	removedOutputs = append(removedOutputs, removedOutputSet...)
+
+	// Reverse each transaction in the block, in reverse order from how
+	// they appear in the block.
+	for i := len(s.CurrentBlock().Transactions) - 1; i >= 0; i-- {
+		removedOutputSet := s.reverseTransaction(s.CurrentBlock().Transactions[i])
+		removedOutputs = append(removedOutputs, removedOutputSet...)
+	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
 	delete(s.currentPath, s.Height())
@@ -224,7 +227,7 @@ func (s *State) rewindABlock() (removedOutputs []Output) {
 
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) integrateBlock(b *Block) (err error) {
+func (s *State) integrateBlock(b *Block) (newOutputs []Output, err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -252,23 +255,26 @@ func (s *State) integrateBlock(b *Block) (err error) {
 	}
 
 	// Perform maintanence on all open contracts.
-	s.contractMaintenance()
-
-	// As new transaction types get added, perform maintenance here.
+	newOutputSet := s.contractMaintenance()
+	newOutputs = append(newOutputs, newOutputSet...)
 
 	// Update the current block and current path variables of the longest fork.
+	height := s.blockMap[b.ID()].Height
 	s.currentBlockID = b.ID()
-	s.currentPath[s.blockMap[b.ID()].Height] = b.ID()
+	s.currentPath[height] = b.ID()
 
 	// Add coin inflation to the miner subsidy.
 	minerSubsidy += CalculateCoinbase(s.Height())
 
 	// Add output contianing miner fees + block subsidy.
+	//
+	// TODO: Add this to the list of future miner subsidies
 	minerSubsidyOutput := Output{
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
+	newOutputs = append(newOutputs, minerSubsidyOutput)
 
 	return
 }
@@ -323,7 +329,6 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 		appliedBlock := s.blockMap[parentHistory[i]].Block
 		appliedBlocks = append(appliedBlocks, appliedBlock.ID())
 		newOutputSet, err := s.integrateBlock(appliedBlock)
-		newOutputs = append(newOutputs, newOutputSet...)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
@@ -333,16 +338,18 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 			for i := 0; i < validatedBlocks; i++ {
 				s.rewindABlock()
 			}
-			appliedBlocks = nil // Reset applied blocks to nil since nothing in sum was applied.
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				err = s.integrateBlock(s.blockMap[rewoundBlocks[i]].Block)
+				_, err = s.integrateBlock(s.blockMap[rewoundBlocks[i]].Block)
 				if err != nil {
 					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
 				}
 			}
-			// Reset removed blocks and ouptuts to nil, since nothing in sum happened.
+
+			// Reset diffs to nil since nothing in sum was changed.
+			appliedBlocks = nil
+			newOutputs = nil
 			rewoundBlocks = nil
 			removedOutputs = nil
 
@@ -356,6 +363,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 			break
 		}
 		validatedBlocks += 1
+		newOutputs = append(newOutputs, newOutputSet...)
 	}
 
 	// Update the transaction pool to remove any transactions that have

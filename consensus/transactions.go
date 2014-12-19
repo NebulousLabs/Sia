@@ -24,7 +24,7 @@ type InputSignatures struct {
 
 // reverseTransaction removes a given transaction from the
 // ConsensusState, making it as though the transaction had never happened.
-func (s *State) reverseTransaction(t Transaction) {
+func (s *State) reverseTransaction(t Transaction) (removedOutputs []Output) {
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
 		contractID := t.FileContractID(i)
@@ -38,6 +38,11 @@ func (s *State) reverseTransaction(t Transaction) {
 		if err != nil {
 			panic(err)
 		}
+		output, err := s.Output(outputID)
+		if err != nil {
+			panic(err)
+		}
+		removedOutputs = append(removedOutputs, output)
 		delete(s.unspentOutputs, outputID)
 
 		// Restore the contract window to being incomplete.
@@ -46,6 +51,11 @@ func (s *State) reverseTransaction(t Transaction) {
 
 	// Delete all financial outputs created by the transaction.
 	for i := range t.Outputs {
+		output, err := s.Output(t.OutputID(i))
+		if err != nil {
+			panic(err)
+		}
+		removedOutputs = append(removedOutputs, output)
 		delete(s.unspentOutputs, t.OutputID(i))
 	}
 
@@ -57,6 +67,7 @@ func (s *State) reverseTransaction(t Transaction) {
 
 	// Add the transaction to the transaction pool.
 	s.addTransactionToPool(&t)
+	return
 }
 
 // applyTransaction() takes a transaction and adds it to the
