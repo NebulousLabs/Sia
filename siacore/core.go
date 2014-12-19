@@ -182,11 +182,11 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 }
 
 // processTransaction sends a transaction to the state.
-func (e *Environment) processTransaction(t consensus.Transaction) {
+func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
 	e.state.Lock()
 	defer e.state.Unlock()
 
-	err := e.state.AcceptTransaction(t)
+	err = e.state.AcceptTransaction(t)
 	if err != nil {
 		if err != consensus.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
@@ -196,6 +196,7 @@ func (e *Environment) processTransaction(t consensus.Transaction) {
 	}
 
 	go e.server.Broadcast("AcceptTransaction", t, nil)
+	return
 }
 
 // listen waits until a new block or transaction arrives, then attempts to

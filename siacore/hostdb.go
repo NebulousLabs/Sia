@@ -75,6 +75,9 @@ func (h *HostEntry) Weight() consensus.Currency {
 // lock.
 func (e *Environment) pullHostEntryFromTransaction(t consensus.Transaction) (he HostEntry, foundAHostEntry bool) {
 	// Check the arbitrary data of the transaction to fill out the host database.
+	if len(t.ArbitraryData) == 0 {
+		return
+	}
 	if len(t.ArbitraryData[0]) < 8 {
 		return
 	}

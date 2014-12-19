@@ -36,23 +36,39 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 
 	// Send all coins to the `1` address.
 	dest := consensus.CoinAddress{1}
-	_, err := e.SpendCoins(e.wallet.Balance(false)-10, dest)
+	txn, err := e.SpendCoins(e.wallet.Balance(false)-10, dest)
 	if err != nil {
 		t.Error(err)
+		return
+	}
+	err = e.processTransaction(txn)
+
+	// Check that the transaction made it into the transaction pool.
+	if len(e.state.TransactionPoolDump()) != 1 {
+		t.Error("transaction pool not len 1", len(e.state.TransactionPoolDump()))
 		return
 	}
 
 	// Mine the block and see if the outputs moved.
 	mineSingleBlock(t, e)
 	sortedSet := e.state.SortedUtxoSet()
-	if len(sortedSet) != 2 {
-		t.Error("expecting sortedSet to be len 2, got", len(sortedSet))
+	if len(sortedSet) != 3 {
+		t.Error("expecting sortedSet to be len 3, got", len(sortedSet))
 		return
 	}
 
 	// At least one of the outputs should belong to address `1`.
-	if sortedSet[0].SpendHash != dest && sortedSet[1].SpendHash != dest {
-		t.Error("neither of the outputs is the correct output.")
-		return
+	if sortedSet[0].SpendHash != dest &&
+		sortedSet[1].SpendHash != dest &&
+		sortedSet[2].SpendHash != dest {
+		t.Error("no outputs belong to the transaction destination")
+		t.Error(sortedSet[0].SpendHash, "\n", sortedSet[1].SpendHash, "\n", sortedSet[2].SpendHash)
+	}
+	// At least one of the outputs should belong to empty (the genesis).
+	genesisAddress := consensus.CoinAddress{}
+	if sortedSet[0].SpendHash != genesisAddress &&
+		sortedSet[1].SpendHash != genesisAddress &&
+		sortedSet[2].SpendHash != genesisAddress {
+		t.Error("no outputs belong to genesis address")
 	}
 }

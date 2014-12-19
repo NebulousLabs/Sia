@@ -96,7 +96,7 @@ func (e *Environment) SpendCoins(amount consensus.Currency, dest consensus.CoinA
 	if err != nil {
 		return
 	}
-	e.AcceptTransaction(t)
+	err = e.AcceptTransaction(t)
 	return
 }
 
