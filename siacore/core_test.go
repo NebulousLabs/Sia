@@ -10,11 +10,6 @@ import (
 
 // establishTestingEnvrionment sets all of the testEnv variables.
 func establishTestingEnvironment(t *testing.T) (e *Environment) {
-	e, err := CreateEnvironment("host", "test.wallet", 9988, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Alter the constants to create a system more friendly to testing.
 	//
 	// TODO: Perhaps also have these constants as a build flag, then they don't
@@ -23,9 +18,14 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 	consensus.BlockFrequency = consensus.Timestamp(1)
 	consensus.TargetWindow = consensus.BlockHeight(1000)
 	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
-	consensus.RootTarget[1] = 32
+	consensus.RootTarget[0] = 255
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
+
+	e, err := CreateEnvironment("host", "test.wallet", 9988, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	/*
 		// Create host settings for each environment.
@@ -45,13 +45,6 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 		te.e0.host.Settings = defaultSettings
 		te.e0.host.Settings.IPAddress = network.NetAddress{"localhost", 9988}
 		te.e0.host.Settings.CoinAddress = te.e0.CoinAddress()
-		te.e1.host.Settings = defaultSettings
-		te.e1.host.Settings.IPAddress = network.NetAddress{"localhost", 9989}
-		te.e1.host.Settings.CoinAddress = te.e1.CoinAddress()
-
-		// Give some funds to e0 and e1.
-		te.e0.mineSingleBlock()
-		te.e1.mineSingleBlock()
 	*/
 
 	return
@@ -62,4 +55,5 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 func TestEverything(t *testing.T) {
 	e := establishTestingEnvironment(t)
 	testEmptyBlock(t, e)
+	testTransactionBlock(t, e)
 }

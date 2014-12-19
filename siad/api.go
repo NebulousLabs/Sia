@@ -40,7 +40,7 @@ func (d *daemon) setUpHandlers(apiPort uint16) {
 
 // jsonStatusHandler responds to a status call with a json object of the status.
 func (d *daemon) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := d.core.EnvironmentInfo()
+	status := d.core.Info()
 	resp, err := json.Marshal(status)
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
@@ -276,23 +276,26 @@ func (d *daemon) loadHandler(w http.ResponseWriter, req *http.Request) {
 
 // TODO: this should probably just return JSON. Leave formatting to the client.
 func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
-	// get state info
 	info := d.core.StateInfo()
+
 	// set mining status
 	mineStatus := "OFF"
 	if d.core.Mining() {
 		mineStatus = "ON"
 	}
+
 	// create peer listing
 	peers := "\n"
 	for _, address := range d.core.AddressBook() {
 		peers += fmt.Sprintf("\t\t%v:%v\n", address.Host, address.Port)
 	}
+
 	// create friend listing
 	friends := "\n"
 	for name, address := range d.core.FriendMap() {
 		friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
 	}
+
 	// write stats to ResponseWriter
 	fmt.Fprintf(w, `General Information:
 

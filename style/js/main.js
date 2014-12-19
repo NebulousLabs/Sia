@@ -44,7 +44,7 @@ function updatePage() {
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
 
-	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
+	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance);
 	safeSetElem('hostNumContracts', stats.HostContractCount)
 	if (stats.HostSettings.TotalStorage > 0) {
 		safeSetElem('hostAcceptingContracts', "are")

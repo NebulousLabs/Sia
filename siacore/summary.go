@@ -80,7 +80,7 @@ func (e *Environment) DeepStateInfo() DeepStateInfo {
 }
 
 // EnvrionmentInfo returns a bunch of simple information about the environment.
-func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
+func (e *Environment) Info() (eInfo EnvironmentInfo) {
 	eInfo = EnvironmentInfo{
 		StateInfo: e.StateInfo(),
 

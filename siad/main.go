@@ -98,7 +98,7 @@ func main() {
 	defaultHostDir := siaDir + "host/"
 	defaultStyleDir := siaDir + "style/"
 	defaultDownloadDir := home + "/Downloads/"
-	defaultWalletFile := siaDir + "wallet.siawallet"
+	defaultWalletFile := siaDir + "sia.wallet"
 	root.PersistentFlags().Uint16VarP(&config.Siad.ApiPort, "api-port", "a", 9980, "which port is used to communicate with the user")
 	root.PersistentFlags().Uint16VarP(&config.Siacore.RpcPort, "rpc-port", "r", 9988, "which port is used when talking to other nodes on the network")
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
@@ -106,7 +106,7 @@ func main() {
 	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
 	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "where to find the files that compose the frontend")
 	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "where to download files")
-	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "wallet-file", "w", defaultWalletFile, "where to keep the wallet")
+	root.PersistentFlags().StringVarP(&config.Siad.WalletFile, "wallet-file", "w", defaultWalletFile, "where to keep the wallet")
 
 	// Load the config file, which has the middle priorty. Only values defined
 	// in the config file will be set.

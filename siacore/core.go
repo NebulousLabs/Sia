@@ -158,9 +158,7 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 	defer e.host.Unlock()
 
 	initialStateHeight := e.state.Height()
-	rewoundBlocks, appliedBlocks, err := e.state.AcceptBlock(b)
-
-	// Perform error handling.
+	rewoundBlockIDs, appliedBlockIDs, err := e.state.AcceptBlock(b)
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
@@ -171,8 +169,29 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 		return
 	}
 
-	e.updateHostDB(rewoundBlocks, appliedBlocks)
-	e.storageProofMaintenance(initialStateHeight, rewoundBlocks, appliedBlocks)
+	// Get a list of blocks from the rewound and applied blocks.
+	var rewoundBlocks []consensus.Block
+	var appliedBlocks []consensus.Block
+	for _, id := range rewoundBlockIDs {
+		var block consensus.Block
+		block, err = e.state.BlockFromID(id)
+		if err != nil {
+			return
+		}
+		rewoundBlocks = append(rewoundBlocks, block)
+	}
+	for _, id := range appliedBlockIDs {
+		var block consensus.Block
+		block, err = e.state.BlockFromID(id)
+		if err != nil {
+			return
+		}
+		appliedBlocks = append(appliedBlocks, block)
+	}
+
+	e.wallet.Update(rewoundBlocks, appliedBlocks)
+	e.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
+	e.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
 	// Broadcast all valid blocks.
 	go e.server.Broadcast("AcceptBlock", b, nil)
