@@ -129,73 +129,79 @@ func New(filename string) (w *Wallet, err error) {
 }
 
 // Update implements the core.Wallet interface.
-func (w *Wallet) Update(rewound []consensus.Block, applied []consensus.Block) error {
+func (w *Wallet) Update(diffs []consensus.OutputDiff) error {
 	w.Lock()
 	defer w.Unlock()
 
-	// Undo add the changes from blocks that have been rewound.
-	for _, b := range rewound {
-		for i := len(b.Transactions) - 1; i >= 0; i-- {
-			// Mark all outputs that got created (sent to an address in our
-			// control) as 'not spendable', because they no longer exist in
-			// the blockchain.
-			for j, output := range b.Transactions[i].Outputs {
-				if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
-					id := b.Transactions[i].OutputID(j)
-					if spendableOutput, exists := spendableAddress.spendableOutputs[id]; exists {
-						spendableOutput.spendable = false
-					} else {
-						panic("output should exist")
+	/*
+		// Remove all of the outputs in `removed`.
+		for _, diff := range diffs {
+		}
+
+		// Undo add the changes from blocks that have been rewound.
+		for _, b := range rewound {
+			for i := len(b.Transactions) - 1; i >= 0; i-- {
+				// Mark all outputs that got created (sent to an address in our
+				// control) as 'not spendable', because they no longer exist in
+				// the blockchain.
+				for j, output := range b.Transactions[i].Outputs {
+					if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
+						id := b.Transactions[i].OutputID(j)
+						if spendableOutput, exists := spendableAddress.spendableOutputs[id]; exists {
+							spendableOutput.spendable = false
+						} else {
+							panic("output should exist")
+						}
 					}
 				}
-			}
 
-			// Mark all inputs that we control as 'spendable', because the
-			// blockchain is no longer aware that they've been spent.
-			for _, input := range b.Transactions[i].Inputs {
-				coinAddress := input.SpendConditions.CoinAddress()
-				if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
-					if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
-						spendableOutput.spendable = true
-					} else {
-						panic("output should exist")
+				// Mark all inputs that we control as 'spendable', because the
+				// blockchain is no longer aware that they've been spent.
+				for _, input := range b.Transactions[i].Inputs {
+					coinAddress := input.SpendConditions.CoinAddress()
+					if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
+						if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
+							spendableOutput.spendable = true
+						} else {
+							panic("output should exist")
+						}
 					}
 				}
 			}
 		}
-	}
 
-	// Update spendableOutputs which got spent, and find new outputs which we
-	// know how to spend.
-	for _, b := range applied {
-		for _, t := range b.Transactions {
-			// Mark all outputs that got consumed by the block as 'not
-			// spendable'
-			for _, input := range t.Inputs {
-				coinAddress := input.SpendConditions.CoinAddress()
-				if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
-					if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
-						spendableOutput.spendable = false
-					} else {
-						panic("output should exist")
+		// Update spendableOutputs which got spent, and find new outputs which we
+		// know how to spend.
+		for _, b := range applied {
+			for _, t := range b.Transactions {
+				// Mark all outputs that got consumed by the block as 'not
+				// spendable'
+				for _, input := range t.Inputs {
+					coinAddress := input.SpendConditions.CoinAddress()
+					if spendableAddress, exists := w.spendableAddresses[coinAddress]; exists {
+						if spendableOutput, exists := spendableAddress.spendableOutputs[input.OutputID]; exists {
+							spendableOutput.spendable = false
+						} else {
+							panic("output should exist")
+						}
 					}
 				}
-			}
 
-			// Mark all outputs that got created (sent to an address in our
-			// control) as 'spendable'.
-			for j, output := range t.Outputs {
-				if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
-					id := t.OutputID(j)
-					spendableAddress.spendableOutputs[id] = &spendableOutput{
-						spendable: true,
-						id:        id,
-						output:    &output,
+				// Mark all outputs that got created (sent to an address in our
+				// control) as 'spendable'.
+				for j, output := range t.Outputs {
+					if spendableAddress, exists := w.spendableAddresses[output.SpendHash]; exists {
+						id := t.OutputID(j)
+						spendableAddress.spendableOutputs[id] = &spendableOutput{
+							spendable: true,
+							id:        id,
+							output:    &output,
+						}
 					}
 				}
 			}
 		}
-	}
+	*/
 
 	return nil
 }

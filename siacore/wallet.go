@@ -13,7 +13,7 @@ type Wallet interface {
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
 	// is the blocks that were applied after rewinding.
-	Update(rewound []consensus.Block, applied []consensus.Block) error
+	Update([]consensus.OutputDiff) error
 
 	// Reset will clear the list of spent transactions, which is nice if you've
 	// accidentally made transactions that aren't spreading on the network for

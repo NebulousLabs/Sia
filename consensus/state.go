@@ -95,6 +95,13 @@ type BlockNode struct {
 	SuccessfulWindows    []ContractID
 }
 
+// An OutputDiff indicates an output that has either been added or removed.
+type OutputDiff struct {
+	New    bool
+	ID     OutputID
+	Output Output
+}
+
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
 func CreateGenesisState() *State {

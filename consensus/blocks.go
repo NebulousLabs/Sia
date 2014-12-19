@@ -195,7 +195,7 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 
 // State.rewindABlock() removes the most recent block from the ConsensusState,
 // making the ConsensusState as though the block had never been integrated.
-func (s *State) rewindABlock() (removedOutputs []Output) {
+func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 	// Remove the output for the miner subsidy.
 	//
 	// TODO: Update this for incentive stuff - miner doesn't get subsidy until
@@ -205,18 +205,19 @@ func (s *State) rewindABlock() (removedOutputs []Output) {
 	if err != nil {
 		panic(err)
 	}
-	removedOutputs = append(removedOutputs, subsidy)
+	diff := OutputDiff{New: false, ID: subsidyID, Output: subsidy}
+	diffs = append(diffs, diff)
 	delete(s.unspentOutputs, subsidyID)
 
 	// Perform inverse contract maintenance.
-	removedOutputSet := s.inverseContractMaintenance()
-	removedOutputs = append(removedOutputs, removedOutputSet...)
+	diffSet := s.invertContractMaintenance()
+	diffs = append(diffs, diffSet...)
 
 	// Reverse each transaction in the block, in reverse order from how
 	// they appear in the block.
 	for i := len(s.CurrentBlock().Transactions) - 1; i >= 0; i-- {
-		removedOutputSet := s.reverseTransaction(s.CurrentBlock().Transactions[i])
-		removedOutputs = append(removedOutputs, removedOutputSet...)
+		diffSet := s.invertTransaction(s.CurrentBlock().Transactions[i])
+		diffs = append(diffs, diffSet...)
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
@@ -227,7 +228,7 @@ func (s *State) rewindABlock() (removedOutputs []Output) {
 
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) integrateBlock(b *Block) (newOutputs []Output, err error) {
+func (s *State) integrateBlock(b *Block) (diffs []OutputDiff, err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -237,8 +238,9 @@ func (s *State) integrateBlock(b *Block) (newOutputs []Output, err error) {
 		}
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		s.applyTransaction(txn)
+		diffSet := s.applyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
+		diffs = append(diffs, diffSet...)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
@@ -249,14 +251,14 @@ func (s *State) integrateBlock(b *Block) (newOutputs []Output, err error) {
 	if err != nil {
 		// Rewind transactions added.
 		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.reverseTransaction(appliedTransactions[i])
+			s.invertTransaction(appliedTransactions[i])
 		}
 		return
 	}
 
 	// Perform maintanence on all open contracts.
-	newOutputSet := s.contractMaintenance()
-	newOutputs = append(newOutputs, newOutputSet...)
+	diffSet := s.applyContractMaintenance()
+	diffs = append(diffs, diffSet...)
 
 	// Update the current block and current path variables of the longest fork.
 	height := s.blockMap[b.ID()].Height
@@ -274,7 +276,8 @@ func (s *State) integrateBlock(b *Block) (newOutputs []Output, err error) {
 		SpendHash: b.MinerAddress,
 	}
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
-	newOutputs = append(newOutputs, minerSubsidyOutput)
+	diff := OutputDiff{New: true, ID: b.SubsidyID(), Output: minerSubsidyOutput}
+	diffs = append(diffs, diff)
 
 	return
 }
@@ -293,7 +296,7 @@ func (s *State) invalidateNode(node *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, appliedBlocks []BlockID, removedOutputs []Output, newOutputs []Output, err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, appliedBlocks []BlockID, outputDiffs []OutputDiff, err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
 	// children of the parents so that we can re-trace as we
@@ -317,7 +320,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
 		rewoundBlocks = append(rewoundBlocks, s.currentBlockID)
-		removedOutputs = append(removedOutputs, s.rewindABlock()...)
+		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
 	}
 
 	// Validate each block in the parent history in order, updating
@@ -328,7 +331,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 	for i := len(parentHistory) - 1; i >= 0; i-- {
 		appliedBlock := s.blockMap[parentHistory[i]].Block
 		appliedBlocks = append(appliedBlocks, appliedBlock.ID())
-		newOutputSet, err := s.integrateBlock(appliedBlock)
+		diffSet, err := s.integrateBlock(appliedBlock)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
@@ -336,7 +339,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 
 			// Rewind the validated blocks
 			for i := 0; i < validatedBlocks; i++ {
-				s.rewindABlock()
+				s.invertRecentBlock()
 			}
 
 			// Integrate the rewound blocks
@@ -349,9 +352,8 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 
 			// Reset diffs to nil since nothing in sum was changed.
 			appliedBlocks = nil
-			newOutputs = nil
 			rewoundBlocks = nil
-			removedOutputs = nil
+			outputDiffs = nil
 
 			// Check that the state hash is the same as before forking and then returning.
 			if DEBUG {
@@ -363,7 +365,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 			break
 		}
 		validatedBlocks += 1
-		newOutputs = append(newOutputs, newOutputSet...)
+		outputDiffs = append(outputDiffs, diffSet...)
 	}
 
 	// Update the transaction pool to remove any transactions that have
@@ -375,7 +377,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b Block) (rewoundBlocks []BlockID, appliedBlocks []BlockID, removedOutputs []Output, newOutputs []Output, err error) {
+func (s *State) AcceptBlock(b Block) (rewoundBlocks []BlockID, appliedBlocks []BlockID, outputDiffs []OutputDiff, err error) {
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(&b)
 	if err != nil {
@@ -392,7 +394,7 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []BlockID, appliedBlocks []B
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		rewoundBlocks, appliedBlocks, removedOutputs, newOutputs, err = s.forkBlockchain(newBlockNode)
+		rewoundBlocks, appliedBlocks, outputDiffs, err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}
