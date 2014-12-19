@@ -101,12 +101,11 @@ func New(filename string) (w *Wallet, err error) {
 		transactions:       make(map[string]*openTransaction),
 	}
 
-	// Check if the file exists.
+	// Check if the file exists, then read it into memory.
 	if _, err = os.Stat(filename); os.IsNotExist(err) {
 		err = nil
 		return
 	}
-
 	contents, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return
