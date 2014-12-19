@@ -1,5 +1,18 @@
 This file is meant to document the flow of information in the codebase.
 
+Within the consensus package, it is convention to use the term 'apply' any time
+that a function is changing the state as the result of information being
+introduced to the blockchain. For example 'ApplyBlock' and 'ApplyStorageProof'.
+
+Within the consensus package, it is convention to use the term 'invert' any
+time that a function is changing the state as the result of information being
+removed from the blockchain. For example 'invertBlock'.
+
+Within the consensus package, it is convention to use the term 'valid' any time
+that the validity of something is being checked. It is convention not to change
+the state in any capacity when inside of a validation function. For example
+'validInput' and 'validContract'.
+
 Verifying and Applying a Block:
 
 1. Check lists of blocks to see if the block is already known to the program.
