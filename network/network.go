@@ -7,8 +7,6 @@ import (
 	"net/http" // for getExternalIP()
 	"sync"
 	"time"
-
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -60,7 +58,7 @@ type TCPServer struct {
 	net.Listener
 	myAddr      Address
 	addressbook map[Address]struct{}
-	handlerMap  map[string]func(net.Conn, []byte) error
+	handlerMap  map[string]func(net.Conn) error
 	// used to protect addressbook and handlerMap
 	sync.RWMutex
 }
@@ -79,7 +77,7 @@ func NewTCPServer(addr string) (tcps *TCPServer, err error) {
 		Listener:    tcpServ,
 		myAddr:      Address(addr),
 		addressbook: make(map[Address]struct{}),
-		handlerMap:  make(map[string]func(net.Conn, []byte) error),
+		handlerMap:  make(map[string]func(net.Conn) error),
 	}
 	// default handlers
 	tcps.Register("SendHostname", sendHostname)
@@ -210,19 +208,12 @@ func (tcps *TCPServer) listen() {
 	}
 }
 
-// handleConn reads header data from a connection, unmarshals the data
-// structures it contains, and routes the data to other functions for
-// processing.
-// TODO: set deadlines?
+// handleConn reads header data from a connection, then routes it to the
+// appropriate handler for further processing.
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	ident := make([]byte, 8)
 	if n, err := conn.Read(ident); err != nil || n != len(ident) {
-		// TODO: log error
-		return
-	}
-	msgData, err := encoding.ReadPrefix(conn, maxMsgLen)
-	if err != nil {
 		// TODO: log error
 		return
 	}
@@ -231,7 +222,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	fn, ok := tcps.handlerMap[string(ident)]
 	tcps.RUnlock()
 	if ok {
-		fn(conn, msgData)
+		fn(conn)
 		// TODO: log error
 		// no wait, send the error?
 	}

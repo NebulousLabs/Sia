@@ -11,14 +11,13 @@ import (
 // encoded argument, and decoding the response into the supplied object.
 // 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
 // nil, no response is read.
-func (na Address) RPC(name string, arg, resp interface{}) error {
+func (na *Address) RPC(name string, arg, resp interface{}) error {
 	return na.Call(name, func(conn net.Conn) error {
-		var data []byte
 		if arg != nil {
-			data = encoding.Marshal(arg)
-		}
-		if _, err := encoding.WritePrefix(conn, data); err != nil {
-			return err
+			_, err := encoding.WriteObject(conn, arg)
+			if err != nil {
+				return err
+			}
 		}
 		if resp != nil {
 			return encoding.ReadObject(conn, resp, maxMsgLen)
@@ -54,11 +53,11 @@ func (tcps *TCPServer) Register(name string, fn interface{}) {
 		panic("registered function has wrong type signature")
 	}
 
-	var handler func(net.Conn, []byte) error
+	var handler func(net.Conn) error
 	switch {
-	// func(net.Conn, []byte) error
-	case typ.NumIn() == 2 && typ.In(0) == reflect.TypeOf((*net.Conn)(nil)).Elem() && typ.In(1) == reflect.TypeOf([]byte{}):
-		handler = fn.(func(net.Conn, []byte) error)
+	// func(net.Conn) error
+	case typ.NumIn() == 1 && typ.In(0) == reflect.TypeOf((*net.Conn)(nil)).Elem():
+		handler = fn.(func(net.Conn) error)
 	// func(Type, *Type) error
 	case typ.NumIn() == 2 && typ.In(0).Kind() != reflect.Ptr && typ.In(1).Kind() == reflect.Ptr:
 		handler = tcps.registerRPC(val, typ)
@@ -82,11 +81,11 @@ func (tcps *TCPServer) Register(name string, fn interface{}) {
 // passed to fn, which stores its result in a pointer argument. This argument
 // is then written back to the caller. fn must have the type signature:
 //     func(Type, *Type) error
-func (tcps *TCPServer) registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
-	return func(conn net.Conn, b []byte) error {
+func (tcps *TCPServer) registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
+	return func(conn net.Conn) error {
 		// create object to decode into
 		arg := reflect.New(typ.In(0))
-		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
+		if err := encoding.ReadObject(conn, arg.Interface(), maxMsgLen); err != nil {
 			return err
 		}
 		// call fn on object
@@ -101,11 +100,11 @@ func (tcps *TCPServer) registerRPC(fn reflect.Value, typ reflect.Type) func(net.
 }
 
 // registerArg is for RPCs that do not return a value.
-func (tcps *TCPServer) registerArg(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
-	return func(_ net.Conn, b []byte) error {
+func (tcps *TCPServer) registerArg(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
+	return func(conn net.Conn) error {
 		// create object to decode into
 		arg := reflect.New(typ.In(0))
-		if err := encoding.Unmarshal(b, arg.Interface()); err != nil {
+		if err := encoding.ReadObject(conn, arg.Interface(), maxMsgLen); err != nil {
 			return err
 		}
 		// call fn on object
@@ -117,8 +116,8 @@ func (tcps *TCPServer) registerArg(fn reflect.Value, typ reflect.Type) func(net.
 }
 
 // registerResp is for RPCs that do not take a value.
-func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn, []byte) error {
-	return func(conn net.Conn, _ []byte) error {
+func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
+	return func(conn net.Conn) error {
 		// create object to hold response
 		resp := reflect.New(typ.In(0).Elem())
 		// call fn
@@ -132,7 +131,7 @@ func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net
 }
 
 // sendHostname replies to the sender with the sender's external IP.
-func sendHostname(conn net.Conn, _ []byte) error {
+func sendHostname(conn net.Conn) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	_, err := encoding.WriteObject(conn, host)
 	return err
@@ -149,7 +148,11 @@ func (tcps *TCPServer) sharePeers(addrs *[]Address) error {
 }
 
 // addRemote adds the connecting address as a peer.
-func (tcps *TCPServer) addRemote(conn net.Conn, addr []byte) (err error) {
+func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
+	addr, err := encoding.ReadPrefix(conn, maxMsgLen)
+	if err != nil {
+		return err
+	}
 	// check that this is the correct hostname
 	connHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	addrHost, _, _ := net.SplitHostPort(string(addr))

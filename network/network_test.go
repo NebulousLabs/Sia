@@ -21,11 +21,11 @@ func TestRegister(t *testing.T) {
 	}
 
 	// register some handlers
-	tcps.Register("Foo", func(net.Conn, []byte) error { chan2 <- struct{}{}; return nil })
+	tcps.Register("Foo", func(net.Conn) error { chan2 <- struct{}{}; return nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
-	err = tcps.myAddr.RPC("Foo", 0, nil)
+	err = tcps.myAddr.RPC("Foo", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

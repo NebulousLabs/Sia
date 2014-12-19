@@ -17,6 +17,7 @@ import (
 const (
 	AcceptContractResponse = "accept"
 	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
+	maxContractLen         = 1 << 24
 )
 
 // ContractEntry houses a single contract with its id - you cannot derive the
@@ -234,10 +235,10 @@ func (e *Environment) considerContract(t consensus.Transaction) (updatedTransact
 // submitting proofs of storage.
 //
 // TODO: Reconsider locking model for this function.
-func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) {
+func (e *Environment) NegotiateContract(conn net.Conn) (err error) {
 	// Read the transaction.
 	var t consensus.Transaction
-	if err = encoding.Unmarshal(data, &t); err != nil {
+	if err = encoding.ReadObject(conn, &t, maxContractLen); err != nil {
 		return
 	}
 
@@ -312,10 +313,10 @@ func (e *Environment) NegotiateContract(conn net.Conn, data []byte) (err error) 
 }
 
 // RetrieveFile is an RPC that uploads a specified file to a client.
-func (e *Environment) RetrieveFile(conn net.Conn, data []byte) (err error) {
+func (e *Environment) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
 	var merkle hash.Hash
-	if err = encoding.Unmarshal(data, &merkle); err != nil {
+	if err = encoding.ReadObject(conn, &merkle, hash.HashSize); err != nil {
 		return
 	}
 
