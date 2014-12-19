@@ -169,7 +169,10 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 		return
 	}
 
-	e.wallet.Update(outputDiffs)
+	err = e.wallet.Update(outputDiffs)
+	if err != nil {
+		return
+	}
 	e.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
 	e.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
