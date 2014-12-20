@@ -56,7 +56,6 @@ LoopBreak:
 			total += spendableOutput.output.Value
 			spendableOutputs = append(spendableOutputs, spendableOutput)
 
-			// Break once
 			if total >= amount {
 				break LoopBreak
 			}

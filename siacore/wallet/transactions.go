@@ -51,7 +51,11 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 	// Add a refund output if needed.
 	if total-amount > 0 {
+		// This is dirty and should probably happen some other way.
+		w.Unlock()
 		coinAddress, err := w.CoinAddress()
+		w.Lock()
+
 		if err != nil {
 			return err
 		}
@@ -220,6 +224,11 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+
+		// Mark the input as spent. Maps :)
+		//
+		// TODO: Sometimes causes panic?
+		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter
 	}
 
 	// Delete the open transaction.
