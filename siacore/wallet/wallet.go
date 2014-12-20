@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -9,6 +10,13 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/signatures"
 )
+
+// AddressKey is how we serialize and store spendable addresses on
+// disk.
+type AddressKey struct {
+	SpendConditions consensus.SpendConditions
+	SecretKey       signatures.SecretKey
+}
 
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
 // ignores outputs you've already spent even if they haven't made it into the
@@ -23,6 +31,12 @@ type Wallet struct {
 	transactions       map[string]*openTransaction
 
 	sync.Mutex
+}
+
+type Status struct {
+	Balance      consensus.Currency
+	FullBalance  consensus.Currency
+	NumAddresses uint64
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -70,13 +84,6 @@ func (w *Wallet) Reset() error {
 	return nil
 }
 
-// AddressKey is how we serialize and store spendable addresses on
-// disk.
-type AddressKey struct {
-	SpendConditions consensus.SpendConditions
-	SecretKey       signatures.SecretKey
-}
-
 // Save implements the core.Wallet interface.
 func (w *Wallet) Save() (err error) {
 	// Add every known spendable address + secret key.
@@ -98,4 +105,14 @@ func (w *Wallet) Save() (err error) {
 	}
 	err = ioutil.WriteFile(w.saveFilename, fileData, 0666)
 	return
+}
+
+// Info implements the core.Wallet interface.
+func (w *Wallet) Info() ([]byte, error) {
+	status := Status{
+		Balance:     w.Balance(false),
+		FullBalance: w.Balance(true),
+	}
+
+	return json.Marshal(status)
 }

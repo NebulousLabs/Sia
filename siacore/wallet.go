@@ -17,7 +17,7 @@ type Wallet interface {
 	//
 	// TODO: Decide if Info supplants balance. I don't think that it does
 	// though.
-	// Info() ([]byte, err)
+	Info() ([]byte, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
@@ -116,8 +116,13 @@ func (e *Environment) WalletBalance(full bool) consensus.Currency {
 	return e.wallet.Balance(full)
 }
 
-// Environment.CoinAddress returns the CoinAddress which foreign coins should
+// CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
 func (e *Environment) CoinAddress() (consensus.CoinAddress, error) {
 	return e.wallet.CoinAddress()
+}
+
+// Returns a []byte that's supposed to be json of some struct.
+func (e *Environment) WalletInfo() ([]byte, error) {
+	return e.wallet.Info()
 }
