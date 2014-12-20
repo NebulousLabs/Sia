@@ -27,6 +27,7 @@ function continuousUpdate() {
 		'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
+	safeSetElem('walletStatus', 'Unconfirmed Balance: ' + stats.WalletBalance + '<br>Full Balance: ' + stats.FullWalletBalance);
 
 	return stats
 }
@@ -44,7 +45,6 @@ function updatePage() {
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
 
-	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance);
 	safeSetElem('hostNumContracts', stats.HostContractCount)
 	if (stats.HostSettings.TotalStorage > 0) {
 		safeSetElem('hostAcceptingContracts', "are")

@@ -6,8 +6,18 @@
                         <h2>Money Management</h2>
 
 						<div class="col-lg-6">
-							<div class="col-sm-10 col-sm-offset-2">
+							<div class="col-sm-12">
+							<h3>Address Management</h3>
+							<br>
+							<p id="walletStatus"></p>
+							<br>
+							<button type="button" class="btn btn-default" onclick="reqAddress()">Generate Address</button>
+							<br><br>
+							</div>
+
+							<div class="col-sm-12">
 							<h3>Send Money Form</h3>
+							<br>
 							</div>
 
 							<div class="row">
@@ -31,14 +41,15 @@
 								</div>
 							</div>
 
-							<div class="col-sm-8 col-sm-offset-4">
-							<button onclick="sendMoney()">Submit</button>
+							<div class="col-sm-2 col-sm-offset-10">
+							<button type="button" class="btn btn-default" onclick="sendMoney()">Submit</button>
 							</div>
 						</div>
 						<div class="col-lg-6">
 						</div>
 
 						<div class="col-lg-12">
+						<br>
 						<p id="apiResponse"></p>
 						</div>
                     </div>
