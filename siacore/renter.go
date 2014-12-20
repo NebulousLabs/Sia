@@ -22,14 +22,13 @@ type FileEntry struct {
 
 type Renter struct {
 	Files map[string]FileEntry
-
 	sync.RWMutex
 }
 
 // RentedFiles returns a list of files that the renter is aware of.
 func (e *Environment) RentedFiles() (files []string) {
-	for key := range e.renter.Files {
-		files = append(files, key)
+	for filename := range e.renter.Files {
+		files = append(files, filename)
 	}
 	return
 }
@@ -37,9 +36,6 @@ func (e *Environment) RentedFiles() (files []string) {
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
 func (e *Environment) ClientProposeContract(filename, nickname string) (err error) {
-	// Scan the blockchain for outputs.
-	e.wallet.Scan()
-
 	// Find a host.
 	host, err := e.hostDatabase.ChooseHost()
 	if err != nil {
@@ -66,12 +62,14 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 	}
 
 	// Fill out the contract according to the whims of the host.
+	duration := consensus.BlockHeight(500)
+	delay := consensus.BlockHeight(20)
 	fileContract := consensus.FileContract{
-		ContractFund:      (host.Price + host.Burn) * 5000 * consensus.Currency(info.Size()), // 5000 blocks.
+		ContractFund:      (host.Price + host.Burn) * consensus.Currency(duration) * consensus.Currency(info.Size()),
 		FileMerkleRoot:    merkle,
 		FileSize:          uint64(info.Size()),
-		Start:             e.Height() + 20,
-		End:               e.Height() + 520,
+		Start:             e.Height() + delay,
+		End:               e.Height() + duration + delay,
 		ChallengeWindow:   host.Window,
 		Tolerance:         host.Tolerance,
 		ValidProofPayout:  host.Price * consensus.Currency(info.Size()) * consensus.Currency(host.Window),
@@ -81,33 +79,33 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 	}
 
 	// Fund the client portion of the transaction.
-	var t consensus.Transaction
-	t.MinerFees = append(t.MinerFees, 10)
-	t.FileContracts = append(t.FileContracts, fileContract)
-	err = e.wallet.FundTransaction(host.Price*5010*consensus.Currency(fileContract.FileSize), &t)
+	minerFee := consensus.Currency(10) // TODO: ask wallet.
+	renterPortion := host.Price * consensus.Currency(duration) * consensus.Currency(fileContract.FileSize)
+	id, err := e.wallet.RegisterTransaction(consensus.Transaction{})
 	if err != nil {
 		return
 	}
-
-	// Sign the transacion.
-	coveredFields := consensus.CoveredFields{
-		MinerFees: []uint64{0},
-		Contracts: []uint64{0},
+	err = e.wallet.FundTransaction(id, renterPortion+minerFee)
+	if err != nil {
+		return
 	}
-	for i := range t.Inputs {
-		coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
+	err = e.wallet.AddMinerFee(id, minerFee)
+	if err != nil {
+		return
 	}
-	for i := range t.Inputs {
-		err = e.wallet.SignTransaction(&t, coveredFields, i)
-		if err != nil {
-			return
-		}
+	err = e.wallet.AddFileContract(id, fileContract)
+	if err != nil {
+		return
+	}
+	transaction, err := e.wallet.SignTransaction(id, false)
+	if err != nil {
+		return
 	}
 
 	// Negotiate the contract to the host.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) error {
 		// send contract
-		if _, err := encoding.WriteObject(conn, t); err != nil {
+		if _, err := encoding.WriteObject(conn, transaction); err != nil {
 			return err
 		}
 		// read response

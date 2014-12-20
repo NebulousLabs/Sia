@@ -1,8 +1,6 @@
 package siacore
 
 import (
-	"fmt"
-
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/network"
@@ -37,8 +35,8 @@ type DeepStateInfo struct {
 type EnvironmentInfo struct {
 	StateInfo StateInfo
 
-	WalletBalance consensus.Currency
-	WalletAddress string
+	WalletBalance     consensus.Currency
+	FullWalletBalance consensus.Currency
 
 	RenterFiles []string
 
@@ -86,7 +84,8 @@ func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
 	eInfo = EnvironmentInfo{
 		StateInfo: e.StateInfo(),
 
-		WalletBalance: e.WalletBalance(),
+		WalletBalance:     e.WalletBalance(false),
+		FullWalletBalance: e.WalletBalance(true),
 
 		IPAddress:          e.server.NetAddress(),
 		HostSettings:       e.HostSettings(),
@@ -98,9 +97,6 @@ func (e *Environment) EnvironmentInfo() (eInfo EnvironmentInfo) {
 	} else {
 		eInfo.Mining = "Off"
 	}
-
-	coinAddress := e.CoinAddress()
-	eInfo.WalletAddress = fmt.Sprintf("%x", coinAddress)
 
 	e.renter.RLock()
 	for filename := range e.renter.Files {

@@ -1,5 +1,8 @@
 package siacore
 
+// TODO: Miner is probably creating wayyyyy toooo many addresses when it calls
+// blockForWork() - most of these addresses will never get outputs.
+
 import (
 	"math/rand"
 	"time"
@@ -45,8 +48,14 @@ func (e *Environment) blockForWork() (b *consensus.Block, target consensus.Targe
 		ParentBlockID: e.state.CurrentBlock().ID(),
 		Timestamp:     consensus.Timestamp(time.Now().Unix()),
 		Nonce:         uint64(rand.Int()),
-		MinerAddress:  e.CoinAddress(),
 		Transactions:  e.state.TransactionPoolDump(),
+	}
+
+	// Get the address for the miner.
+	var err error
+	b.MinerAddress, err = e.CoinAddress()
+	if err != nil {
+		panic(err) // TODO: something about this panic.
 	}
 	b.MerkleRoot = b.TransactionMerkleRoot()
 	target = e.state.CurrentTarget()

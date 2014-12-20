@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/siacore/wallet"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a
@@ -19,7 +20,7 @@ type Environment struct {
 	host         *Host
 	hostDatabase *HostDatabase
 	renter       *Renter
-	wallet       *CoreWallet
+	wallet       Wallet
 
 	friends map[string]consensus.CoinAddress
 
@@ -53,7 +54,7 @@ func CreateEnvironment(hostDir string, rpcPort uint16, nobootstrap bool) (e *Env
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
 	e.renter = CreateRenter()
-	e.wallet = CreateWallet(e.state)
+	e.wallet = wallet.New()
 
 	// Bootstrap to the network.
 	err = e.initializeNetwork(rpcPort, nobootstrap)
