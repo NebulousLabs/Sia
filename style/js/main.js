@@ -85,6 +85,10 @@ function toggleMining() {
 	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
 }
 
+function reqAddress() {
+	// var request =
+}
+
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;

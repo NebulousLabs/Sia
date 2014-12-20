@@ -36,7 +36,7 @@ type Wallet struct {
 type Status struct {
 	Balance      consensus.Currency
 	FullBalance  consensus.Currency
-	NumAddresses uint64
+	NumAddresses int
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -109,9 +109,13 @@ func (w *Wallet) Save() (err error) {
 
 // Info implements the core.Wallet interface.
 func (w *Wallet) Info() ([]byte, error) {
+	w.Lock()
+	defer w.Unlock()
+
 	status := Status{
-		Balance:     w.Balance(false),
-		FullBalance: w.Balance(true),
+		Balance:      w.Balance(false),
+		FullBalance:  w.Balance(true),
+		NumAddresses: len(w.spendableAddresses),
 	}
 
 	return json.Marshal(status)

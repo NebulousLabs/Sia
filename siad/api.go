@@ -23,14 +23,16 @@ func (d *daemon) setUpHandlers(apiPort uint16) {
 	http.HandleFunc("/sync", d.syncHandler)
 	http.HandleFunc("/peer", d.peerHandler)
 	http.HandleFunc("/mine", d.mineHandler)
-	http.HandleFunc("/sendcoins", d.sendHandler)
 	http.HandleFunc("/host", d.hostHandler)
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
-	// http.HandleFunc("/save", d.saveHandler)
-	// http.HandleFunc("/load", d.loadHandler)
 	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/stop", d.stopHandler)
+
+	// Wallet API Calls
+	http.HandleFunc("/wallet/send", d.walletSendHandler)
+	http.HandleFunc("/wallet/status", d.walletStatusHandler)
+	http.HandleFunc("/wallet/address", d.walletAddressHandler)
 
 	// JSON API
 	http.HandleFunc("/json/status", d.jsonStatusHandler)
@@ -97,44 +99,6 @@ func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
 	default:
 		http.Error(w, "Invalid mine command", 400)
 	}
-}
-
-func (d *daemon) sendHandler(w http.ResponseWriter, req *http.Request) {
-	// Scan the inputs.
-	var amount consensus.Currency
-	var dest consensus.CoinAddress
-	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
-	if err != nil {
-		http.Error(w, "Malformed amount", 400)
-		return
-	}
-
-	// dest can be either a coin address or a friend name
-	destString := req.FormValue("dest")
-	// if ca, ok := e.friends[destString]; ok {
-	//	dest = ca
-	//} else
-	if len(destString) != 64 {
-		http.Error(w, "Friend not found (or malformed coin address)", 400)
-		return
-	} else {
-		var destAddressBytes []byte
-		_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
-		if err != nil {
-			http.Error(w, "Malformed coin address", 400)
-			return
-		}
-		copy(dest[:], destAddressBytes)
-	}
-
-	// Spend the coins.
-	_, err = d.core.SpendCoins(amount, dest)
-	if err != nil {
-		http.Error(w, "Failed to create transaction: "+err.Error(), 500)
-		return
-	}
-
-	fmt.Fprintf(w, "Sent %v coins to %x", amount, dest)
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
@@ -249,30 +213,6 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprint(w, "Download complete!")
 	}
 }
-
-/*
-func (d *daemon) saveHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: get type
-	filename := req.FormValue("filename")
-	err := d.core.SaveCoinAddress(filename)
-	if err != nil {
-		http.Error(w, "Failed to save coin address: "+err.Error(), 500)
-	} else {
-		fmt.Fprint(w, "Saved coin address to "+filename)
-	}
-}
-
-func (d *daemon) loadHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: get type
-	filename, friendname := req.FormValue("filename"), req.FormValue("friendname")
-	err := d.core.LoadCoinAddress(filename, friendname)
-	if err != nil {
-		http.Error(w, "Failed to load coin address: "+err.Error(), 500)
-	} else {
-		fmt.Fprint(w, "Loaded coin address from "+filename)
-	}
-}
-*/
 
 // TODO: this should probably just return JSON. Leave formatting to the client.
 func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
