@@ -7,42 +7,40 @@
 
 						<div class="col-lg-6">
 							<div class="col-sm-12">
-							<h3>Address Management</h3>
-							<br>
-							<p id="walletStatus"></p>
-							<br>
-							<button type="button" class="btn btn-default" onclick="reqAddress()">Generate Address</button>
-							<br><br>
+								<h3>Address Management</h3>
+								<br>
+								<p id="walletStatus"></p>
+								<br>
+								<button type="button" class="btn btn-default" onclick="reqAddress()">Generate Address</button>
+								<br><br>
 							</div>
 
 							<div class="col-sm-12">
-							<h3>Send Money Form</h3>
-							<br>
-							</div>
-
-							<div class="row">
-								<label class="col-sm-4 control-label">Address</label>
-								<div class="col-sm-8">
-								<input type="text" class="form-control" id="destinationAddress"></input><br>
+								<h3>Send Money Form</h3>
+								<br>
+	
+								<div class="row">
+									<label class="col-sm-4 control-label">Address</label>
+									<div class="col-sm-8">
+									<input type="text" class="form-control" id="destinationAddress"></input><br>
+									</div>
 								</div>
-							</div>
-
-							<div class="row">
-								<label class="col-sm-4 control-label">Amount to Send</label>
-								<div class="col-sm-8">
-								<input type="text" class="form-control" id="amountToSend"></input><br>
+	
+								<div class="row">
+									<label class="col-sm-4 control-label">Amount to Send</label>
+									<div class="col-sm-8">
+									<input type="text" class="form-control" id="amountToSend"></input><br>
+									</div>
 								</div>
-							</div>
-
-							<div class="row">
-								<label class="col-sm-4 control-label">Miner Fee</label>
-								<div class="col-sm-8">
-								<input type="text" class="form-control" id="minerFee" value="50"></input><br>
+	
+								<div class="row">
+									<label class="col-sm-4 control-label">Miner Fee</label>
+									<div class="col-sm-8">
+									<input type="text" class="form-control" id="minerFee" value="50"></input><br>
+									</div>
 								</div>
-							</div>
-
-							<div class="col-sm-2 col-sm-offset-10">
-							<button type="button" class="btn btn-default" onclick="sendMoney()">Submit</button>
+	
+								<button type="button" class="btn btn-default pull-right" onclick="sendMoney()">Submit</button>
 							</div>
 						</div>
 						<div class="col-lg-6">

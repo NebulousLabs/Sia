@@ -27,7 +27,14 @@ function continuousUpdate() {
 		'<br>Host Unsold Storage: ' + stats.HostSpaceRemaining +
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
-	safeSetElem('walletStatus', 'Unconfirmed Balance: ' + stats.WalletBalance + '<br>Full Balance: ' + stats.FullWalletBalance);
+
+	var walletResp = httpGet("/wallet/status")
+	var walletStats = JSON.parse(walletResp)
+	safeSetElem('walletStatus', 
+		'Unconfirmed Balance: ' + walletStats.Balance +
+		'<br>Full Balance: ' + walletStats.FullBalance +
+		'<br>Number of Addresses: ' + walletStats.NumAddresses
+	);
 
 	return stats
 }
@@ -86,14 +93,14 @@ function toggleMining() {
 }
 
 function reqAddress() {
-	// var request =
+	responseBoxGet("/wallet/address")
 }
 
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;
 	var fee = document.getElementById('minerFee').value;
-	var request = "/sendcoins?amount="+amount+"&fee="+fee+"&dest="+destination;
+	var request = "/wallet/send?amount="+amount+"&fee="+fee+"&dest="+destination;
 	responseBoxGet(request);
 }
 
