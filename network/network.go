@@ -144,7 +144,7 @@ func (tcps *TCPServer) getExternalIP() (err error) {
 func (tcps *TCPServer) Bootstrap() (err error) {
 	// populate initial peer list
 	for _, addr := range BootstrapPeers {
-		if tcps.Ping(addr) {
+		if Ping(addr) {
 			tcps.AddPeer(addr)
 		}
 	}
@@ -164,7 +164,7 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		peers = append(peers, resp...)
 	}
 	for _, addr := range peers {
-		if addr != tcps.myAddr && tcps.Ping(addr) {
+		if addr != tcps.myAddr && Ping(addr) {
 			tcps.AddPeer(addr)
 		}
 	}
@@ -203,6 +203,7 @@ func NewTCPServer(addr string) (tcps *TCPServer, err error) {
 		handlerMap:  make(map[string]func(net.Conn) error),
 	}
 	// default handlers (defined in handlers.go)
+	tcps.Register("Ping", pong)
 	tcps.Register("SendHostname", sendHostname)
 	tcps.Register("SharePeers", tcps.sharePeers)
 	tcps.Register("AddMe", tcps.addRemote)

@@ -8,10 +8,15 @@ import (
 
 // Ping returns whether an Address is reachable and responds correctly to the
 // ping request -- in other words, whether it is a potential peer.
-func (tcps *TCPServer) Ping(addr Address) bool {
+func Ping(addr Address) bool {
 	var pong string
 	err := addr.RPC("Ping", nil, &pong)
 	return err == nil && pong == "pong"
+}
+
+func pong(pong *string) error {
+	*pong = "pong"
+	return nil
 }
 
 // sendHostname replies to the sender with the sender's external IP.
@@ -44,7 +49,7 @@ func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
 		return
 	}
 	// make sure the host is reachable on this port
-	if tcps.Ping(Address(addr)) {
+	if Ping(Address(addr)) {
 		tcps.AddPeer(Address(addr))
 	}
 	return

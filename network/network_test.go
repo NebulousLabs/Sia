@@ -15,7 +15,7 @@ func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
 
 func TestRegister(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(":9987")
+	tcps, err := NewTCPServer(":9000")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,9 +53,20 @@ func TestRegister(t *testing.T) {
 	}
 }
 
+func TestTableTennis(t *testing.T) {
+	// create server
+	tcps, err := NewTCPServer(":9001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Ping(tcps.myAddr) {
+		t.Fatal("server did not respond to ping")
+	}
+}
+
 func TestPeerSharing(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(":9981")
+	tcps, err := NewTCPServer(":9002")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +115,7 @@ func TestPeerCulling(t *testing.T) {
 	}
 
 	// create server
-	tcps, err := NewTCPServer(":9005")
+	tcps, err := NewTCPServer(":9003")
 	if err != nil {
 		t.Fatal(err)
 	}
