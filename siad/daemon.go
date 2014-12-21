@@ -36,6 +36,11 @@ func createDaemon(config Config) (d *daemon, err error) {
 		err = fmt.Errorf("problem with downloadDir: %v", err)
 		return
 	}
+	expandedWalletFile, err := homedir.Expand(config.Siad.WalletFile)
+	if err != nil {
+		err = fmt.Errorf("problem with walletFile: %v", err)
+		return
+	}
 
 	// Create downloads directory and host directory.
 	err = os.MkdirAll(expandedDownloadDir, os.ModeDir|os.ModePerm)
@@ -60,7 +65,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	d.core, err = siacore.CreateEnvironment(expandedHostDir, config.Siacore.RpcPort, config.Siacore.NoBootstrap)
+	d.core, err = siacore.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RpcPort, config.Siacore.NoBootstrap)
 	if err != nil {
 		return
 	}

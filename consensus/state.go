@@ -95,6 +95,13 @@ type BlockNode struct {
 	SuccessfulWindows    []ContractID
 }
 
+// An OutputDiff indicates an output that has either been added or removed.
+type OutputDiff struct {
+	New    bool
+	ID     OutputID
+	Output Output
+}
+
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
 func CreateGenesisState() *State {
@@ -215,18 +222,6 @@ func (s *State) CurrentTarget() Target {
 	return s.currentBlockNode().Target
 }
 
-// ScanOutputs takes a map of coin addresses as input and returns every output
-// in the set of unspent outputs that matches the list of addresses.
-func (s *State) ScanOutputs(addresses map[CoinAddress]struct{}) (outputIDs []OutputID) {
-	for id, output := range s.unspentOutputs {
-		if _, exists := addresses[output.SpendHash]; exists {
-			outputIDs = append(outputIDs, id)
-		}
-	}
-
-	return
-}
-
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
 func (s *State) Output(id OutputID) (output Output, err error) {
@@ -241,7 +236,7 @@ func (s *State) Output(id OutputID) (output Output, err error) {
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
+func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
 	var unspentOutputStrings []string
 	for outputID := range s.unspentOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
@@ -251,7 +246,11 @@ func (s *State) SortedUtxoSet() (sortedOutputs []OutputID) {
 	for _, utxoString := range unspentOutputStrings {
 		var outputID OutputID
 		copy(outputID[:], utxoString)
-		sortedOutputs = append(sortedOutputs, outputID)
+		output, err := s.Output(outputID)
+		if err != nil {
+			panic(err)
+		}
+		sortedOutputs = append(sortedOutputs, output)
 	}
 	return
 }
@@ -288,8 +287,8 @@ func (s *State) StateHash() hash.Hash {
 	sortedUtxos := s.SortedUtxoSet()
 
 	// Add the unspent outputs in sorted order.
-	for _, outputID := range sortedUtxos {
-		leaves = append(leaves, hash.HashObject(s.unspentOutputs[outputID]))
+	for _, output := range sortedUtxos {
+		leaves = append(leaves, hash.HashObject(output))
 	}
 
 	// Sort the open contracts by the string value of their ID.

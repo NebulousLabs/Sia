@@ -24,7 +24,7 @@ type InputSignatures struct {
 
 // reverseTransaction removes a given transaction from the
 // ConsensusState, making it as though the transaction had never happened.
-func (s *State) reverseTransaction(t Transaction) {
+func (s *State) invertTransaction(t Transaction) (diffs []OutputDiff) {
 	// Delete all the open contracts created by new contracts.
 	for i := range t.FileContracts {
 		contractID := t.FileContractID(i)
@@ -33,64 +33,74 @@ func (s *State) reverseTransaction(t Transaction) {
 
 	// Delete all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		openContract := s.openContracts[sp.ContractID]
-		outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
-		if err != nil {
-			panic(err)
-		}
-		delete(s.unspentOutputs, outputID)
-
-		// Restore the contract window to being incomplete.
-		s.openContracts[sp.ContractID].WindowSatisfied = false
+		diffs = append(diffs, s.invertStorageProof(sp))
 	}
 
 	// Delete all financial outputs created by the transaction.
 	for i := range t.Outputs {
+		output, err := s.Output(t.OutputID(i))
+		if err != nil {
+			panic(err)
+		}
+		diff := OutputDiff{New: false, ID: t.OutputID(i), Output: output}
 		delete(s.unspentOutputs, t.OutputID(i))
+		diffs = append(diffs, diff)
 	}
 
 	// Restore all inputs to the unspent outputs list.
 	for _, input := range t.Inputs {
+		diff := OutputDiff{New: true, ID: input.OutputID, Output: s.spentOutputs[input.OutputID]}
 		s.unspentOutputs[input.OutputID] = s.spentOutputs[input.OutputID]
+		diffs = append(diffs, diff)
 		delete(s.spentOutputs, input.OutputID)
 	}
 
 	// Add the transaction to the transaction pool.
 	s.addTransactionToPool(&t)
+	return
 }
 
 // applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
-func (s *State) applyTransaction(t Transaction) {
+func (s *State) applyTransaction(t Transaction) (diffs []OutputDiff) {
 	// Update the transaction pool to resolve any conflicts.
 	s.removeTransactionConflictsFromPool(&t)
 
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
 		// Sanity check.
-		_, exists := s.unspentOutputs[input.OutputID]
-		if !exists {
-			panic("Applying a transaction with an invalid unspent output!")
+		if DEBUG {
+			_, exists := s.unspentOutputs[input.OutputID]
+			if !exists {
+				panic("Applying a transaction with an invalid unspent output!")
+			}
 		}
 
 		s.spentOutputs[input.OutputID] = s.unspentOutputs[input.OutputID]
+		diff := OutputDiff{New: false, ID: input.OutputID, Output: s.unspentOutputs[input.OutputID]}
 		delete(s.unspentOutputs, input.OutputID)
+		diffs = append(diffs, diff)
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
+		diff := OutputDiff{New: true, ID: t.OutputID(i), Output: output}
 		s.unspentOutputs[t.OutputID(i)] = output
+		diffs = append(diffs, diff)
 	}
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		s.applyStorageProof(sp)
+		diffs = append(diffs, s.applyStorageProof(sp))
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		s.addContract(contract, t.FileContractID(i))
+		// Diff not needed here, because applying a contract doesn't change the
+		// outputs set.
+		s.applyContract(contract, t.FileContractID(i))
 	}
+	return
 }
 
 // validInput returns err = nil if the input is valid within the current state,

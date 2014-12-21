@@ -28,6 +28,14 @@ function continuousUpdate() {
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
 
+	var walletResp = httpGet("/wallet/status")
+	var walletStats = JSON.parse(walletResp)
+	safeSetElem('walletStatus', 
+		'Unconfirmed Balance: ' + walletStats.Balance +
+		'<br>Full Balance: ' + walletStats.FullBalance +
+		'<br>Number of Addresses: ' + walletStats.NumAddresses
+	);
+
 	return stats
 }
 
@@ -44,7 +52,6 @@ function updatePage() {
 	}
 	safeSetElem('rentStatus', rentStatusInnerHTML);
 
-	safeSetElem('walletStatus', 'Wallet Balance: ' + stats.WalletBalance + '<br>Wallet Address: ' + stats.WalletAddress);
 	safeSetElem('hostNumContracts', stats.HostContractCount)
 	if (stats.HostSettings.TotalStorage > 0) {
 		safeSetElem('hostAcceptingContracts', "are")
@@ -85,11 +92,15 @@ function toggleMining() {
 	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
 }
 
+function reqAddress() {
+	responseBoxGet("/wallet/address")
+}
+
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;
 	var fee = document.getElementById('minerFee').value;
-	var request = "/sendcoins?amount="+amount+"&fee="+fee+"&dest="+destination;
+	var request = "/wallet/send?amount="+amount+"&fee="+fee+"&dest="+destination;
 	responseBoxGet(request);
 }
 

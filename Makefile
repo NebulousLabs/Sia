@@ -24,11 +24,11 @@ dependencies:
 	go get -u github.com/spf13/cobra
 
 clean:
-	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf
+	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf siacore/test.wallet
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:
 	go get -u github.com/laher/goxc
-	goxc -arch="386 amd64" -bc="linux,!arm windows darwin" -d=release -pv=0.1.0 -br=developer -pr=beta -include=style/,example-config,LICENSE*,README* -tasks-=deb,deb-dev,deb-source -build-tags=release
+	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.1.0 -br=developer -pr=beta -include=style/,example-config,LICENSE*,README* -tasks-=deb,deb-dev,deb-source -build-tags=release
 
 .PHONY: all fmt install test test-long test-long-race whitepaper dependencies distribution clean xc

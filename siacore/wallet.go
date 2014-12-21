@@ -10,10 +10,19 @@ import (
 //
 // TODO: Reconsider how save, load, and reset work.
 type Wallet interface {
+	// Info takes zero arguments and returns an arbitrary set of information
+	// about the wallet in the form of json. The frontend will have to know how
+	// to parse it, but Core and Daemon don't need to understand what's in the
+	// json.
+	//
+	// TODO: Decide if Info supplants balance. I don't think that it does
+	// though.
+	Info() ([]byte, error)
+
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
 	// is the blocks that were applied after rewinding.
-	Update(rewound []consensus.Block, applied []consensus.Block) error
+	Update([]consensus.OutputDiff) error
 
 	// Reset will clear the list of spent transactions, which is nice if you've
 	// accidentally made transactions that aren't spreading on the network for
@@ -64,10 +73,6 @@ type Wallet interface {
 	// the wholeTransaction flag will be set in CoveredFields for each
 	// signature.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
-
-	// Save creates a binary file containing keys and such so the coins
-	// can be spent later.
-	Save(filename string) error
 }
 
 // SpendCoins creates a transaction sending 'amount' to 'dest', and
@@ -100,7 +105,7 @@ func (e *Environment) SpendCoins(amount consensus.Currency, dest consensus.CoinA
 	if err != nil {
 		return
 	}
-	e.AcceptTransaction(t)
+	err = e.AcceptTransaction(t)
 	return
 }
 
@@ -111,8 +116,13 @@ func (e *Environment) WalletBalance(full bool) consensus.Currency {
 	return e.wallet.Balance(full)
 }
 
-// Environment.CoinAddress returns the CoinAddress which foreign coins should
+// CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
 func (e *Environment) CoinAddress() (consensus.CoinAddress, error) {
 	return e.wallet.CoinAddress()
+}
+
+// Returns a []byte that's supposed to be json of some struct.
+func (e *Environment) WalletInfo() ([]byte, error) {
+	return e.wallet.Info()
 }
