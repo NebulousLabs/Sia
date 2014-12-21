@@ -47,7 +47,6 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spe
 	}
 
 	// Iterate through all outputs until enough coins have been assembled.
-LoopBreak:
 	for _, spendableAddress := range w.spendableAddresses {
 		for _, spendableOutput := range spendableAddress.spendableOutputs {
 			if !spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter {
@@ -57,17 +56,14 @@ LoopBreak:
 			spendableOutputs = append(spendableOutputs, spendableOutput)
 
 			if total >= amount {
-				break LoopBreak
+				return
 			}
 		}
 	}
 
-	// Check that enough inputs were added.
-	if total < amount {
-		err = fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
-		return
-	}
-
+	// This code will only be reached if total < amount, meaning insufficient
+	// funds.
+	err = fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
 	return
 }
 

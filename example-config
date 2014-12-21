@@ -11,3 +11,4 @@ RpcPort = 9988
 ; HostDirectory = ~/.config/sia/host/
 ; StyleDirectory = ~/.config/sia/style/
 ; DownloadDirectory = ~/Desktop/Downloads/
+; WalletFile = "~/.config/sia/myName.wallet
