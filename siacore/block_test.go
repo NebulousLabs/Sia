@@ -6,7 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// testEmptyBlock creates an emtpy block and submits it to the state.
+// testEmptyBlock creates an emtpy block and submits it to the state, checking that a utxo is created for the miner subisdy.
 func testEmptyBlock(t *testing.T, e *Environment) {
 	// Check that the block will actually be empty.
 	if len(e.state.TransactionPoolDump()) != 0 {
@@ -29,6 +29,8 @@ func testEmptyBlock(t *testing.T, e *Environment) {
 // testTransactionBlock creates a transaction and checks that it makes it into
 // the utxo set.
 func testTransactionBlock(t *testing.T, e *Environment) {
+	// As a prereq the balance of the wallet needs to be non-zero.
+	// Alternatively we could probably mine a block.
 	if e.wallet.Balance(false) == 0 {
 		t.Error("e.wallet is empty.")
 		return
@@ -46,7 +48,11 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 	// Check that the transaction made it into the transaction pool.
 	if len(e.state.TransactionPoolDump()) != 1 {
 		t.Error("transaction pool not len 1", len(e.state.TransactionPoolDump()))
-		return
+	}
+
+	// Check that the balance of e.wallet.Balance(false) has dropped to 0.
+	if e.wallet.Balance(false) != 0 {
+		t.Error("wallet.Balance(false) should be 0, but instead is", e.wallet.Balance(false))
 	}
 
 	// Mine the block and see if the outputs moved.
@@ -54,7 +60,6 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 	sortedSet := e.state.SortedUtxoSet()
 	if len(sortedSet) != 3 {
 		t.Error("expecting sortedSet to be len 3, got", len(sortedSet))
-		return
 	}
 
 	// At least one of the outputs should belong to address `1`.
@@ -70,5 +75,14 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 		sortedSet[1].SpendHash != genesisAddress &&
 		sortedSet[2].SpendHash != genesisAddress {
 		t.Error("no outputs belong to genesis address")
+	}
+
+	// Check that the full wallet balance is reporting to only have the miner
+	// subsidy.
+	minerSubsidy := consensus.CalculateCoinbase(e.Height())
+	minerSubsidy += 10 // TODO: Wallet figures out miner fee.
+	if e.wallet.Balance(true) != minerSubsidy {
+		t.Errorf("full balance not reporting correctly, should be %v but instead is %v", minerSubsidy, e.wallet.Balance(true))
+		return
 	}
 }

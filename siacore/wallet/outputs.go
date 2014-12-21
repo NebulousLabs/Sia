@@ -75,7 +75,10 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 	// Iterate through all outputs and tally them up.
 	for _, spendableAddress := range w.spendableAddresses {
 		for _, spendableOutput := range spendableAddress.spendableOutputs {
-			if !full && (!spendableOutput.spendable || spendableOutput.spentCounter == w.spentCounter) {
+			if !spendableOutput.spendable {
+				continue
+			}
+			if !full && spendableOutput.spentCounter == w.spentCounter {
 				continue
 			}
 			total += spendableOutput.output.Value
@@ -101,7 +104,7 @@ func (w *Wallet) Update(diffs []consensus.OutputDiff) error {
 		} else {
 			if spendableAddress, exists := w.spendableAddresses[diff.Output.SpendHash]; exists {
 				if spendableOutput, exists := spendableAddress.spendableOutputs[diff.ID]; exists {
-					spendableOutput.spendable = true
+					spendableOutput.spendable = false
 				} else {
 					panic("output should exist!")
 				}
