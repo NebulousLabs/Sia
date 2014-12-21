@@ -3,9 +3,37 @@ package network
 import (
 	"net"
 	"reflect"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 )
+
+// handlerName truncates a string to 8 bytes. If len(name) < 8, the remaining
+// bytes are 0. A handlerName is specified at the beginning of each network
+// call, indicating which function should handle the connection.
+func handlerName(name string) []byte {
+	b := make([]byte, 8)
+	copy(b, name)
+	return b
+}
+
+// Call establishes a TCP connection to the Address, calls the provided
+// function on it, and closes the connection.
+func (na Address) Call(name string, fn func(net.Conn) error) error {
+	conn, err := net.DialTimeout("tcp", string(na), timeout)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	// set default deadline
+	// note: fn can extend this deadline as needed
+	conn.SetDeadline(time.Now().Add(timeout))
+	// write header
+	if _, err := conn.Write(handlerName(name)); err != nil {
+		return err
+	}
+	return fn(conn)
+}
 
 // RPC performs a Remote Procedure Call by sending the procedure name and
 // encoded argument, and decoding the response into the supplied object.
@@ -128,40 +156,4 @@ func (tcps *TCPServer) registerResp(fn reflect.Value, typ reflect.Type) func(net
 		_, err := encoding.WriteObject(conn, resp.Elem().Interface())
 		return err
 	}
-}
-
-// sendHostname replies to the sender with the sender's external IP.
-func sendHostname(conn net.Conn) error {
-	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	_, err := encoding.WriteObject(conn, host)
-	return err
-}
-
-// sharePeers replies to the sender with 10 randomly selected peers.
-// Note: the set of peers may contain duplicates.
-func (tcps *TCPServer) sharePeers(addrs *[]Address) error {
-	*addrs = tcps.AddressBook()
-	if len(*addrs) > 10 {
-		*addrs = (*addrs)[:10]
-	}
-	return nil
-}
-
-// addRemote adds the connecting address as a peer.
-func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
-	addr, err := encoding.ReadPrefix(conn, maxMsgLen)
-	if err != nil {
-		return err
-	}
-	// check that this is the correct hostname
-	connHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	addrHost, _, _ := net.SplitHostPort(string(addr))
-	if connHost != addrHost {
-		return
-	}
-	// make sure the host is reachable on this port
-	if tcps.Ping(Address(addr)) {
-		tcps.AddPeer(Address(addr))
-	}
-	return
 }
