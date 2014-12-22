@@ -2,11 +2,11 @@ package siacore
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/siacore/miner"
 	"github.com/NebulousLabs/Sia/siacore/wallet"
 )
 
@@ -19,6 +19,7 @@ type Environment struct {
 	server       *network.TCPServer
 	host         *Host
 	hostDatabase *HostDatabase
+	miner        Miner
 	renter       *Renter
 	wallet       Wallet
 
@@ -27,13 +28,6 @@ type Environment struct {
 	// Channels for incoming blocks and transactions to be processed
 	blockChan       chan consensus.Block
 	transactionChan chan consensus.Transaction
-
-	// Mining variables. The mining variables are protected by the miningLock.
-	// Any time that you read from or write to any of the mining variables, you
-	// need to be under a lock.
-	mining        bool         // true when mining
-	miningThreads int          // number of processes mining at once
-	miningLock    sync.RWMutex // prevents benign race conditions
 
 	// Envrionment directories.
 	hostDir    string
@@ -55,6 +49,7 @@ func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, noboot
 	}
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
+	e.miner = miner.New(1024 * 1024)
 	e.renter = CreateRenter()
 	e.wallet, err = wallet.New(e.walletFile)
 	if err != nil {

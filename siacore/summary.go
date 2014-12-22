@@ -92,12 +92,6 @@ func (e *Environment) Info() (eInfo EnvironmentInfo) {
 		HostSpaceRemaining: e.HostSpaceRemaining(),
 	}
 
-	if e.Mining() {
-		eInfo.Mining = "On"
-	} else {
-		eInfo.Mining = "Off"
-	}
-
 	e.renter.RLock()
 	for filename := range e.renter.Files {
 		eInfo.RenterFiles = append(eInfo.RenterFiles, filename)

@@ -8,7 +8,7 @@ import (
 // Transactions are kept in wallet memory until they are signed, and referenced
 // using a string id.
 //
-// TODO: Reconsider how save, load, and reset work.
+// TODO: Reconsider how reset works.
 type Wallet interface {
 	// Info takes zero arguments and returns an arbitrary set of information
 	// about the wallet in the form of json. The frontend will have to know how

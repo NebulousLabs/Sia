@@ -91,7 +91,7 @@ func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.FormValue("toggle") {
 	case "on":
-		d.core.StartMining()
+		d.core.StartMining(1)
 		fmt.Fprint(w, "Started mining")
 	case "off":
 		d.core.StopMining()
@@ -220,9 +220,6 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 
 	// set mining status
 	mineStatus := "OFF"
-	if d.core.Mining() {
-		mineStatus = "ON"
-	}
 
 	// create peer listing
 	peers := "\n"
