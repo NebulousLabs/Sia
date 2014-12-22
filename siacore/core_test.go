@@ -56,4 +56,5 @@ func TestEverything(t *testing.T) {
 	e := establishTestingEnvironment(t)
 	testEmptyBlock(t, e)
 	testTransactionBlock(t, e)
+	testSendToSelf(t, e)
 }

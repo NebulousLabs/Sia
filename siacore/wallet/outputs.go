@@ -25,7 +25,7 @@ type spendableOutput struct {
 	spendable    bool
 	spentCounter int
 	id           consensus.OutputID
-	output       *consensus.Output
+	output       consensus.Output
 }
 
 // openOutput contains an output and the conditions needed to spend the output,
@@ -98,7 +98,7 @@ func (w *Wallet) Update(diffs []consensus.OutputDiff) error {
 				spendableAddress.spendableOutputs[diff.ID] = &spendableOutput{
 					spendable: true,
 					id:        diff.ID,
-					output:    &diff.Output,
+					output:    diff.Output,
 				}
 			}
 		} else {

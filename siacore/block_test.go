@@ -44,6 +44,9 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 		return
 	}
 	err = e.processTransaction(txn)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Check that the transaction made it into the transaction pool.
 	if len(e.state.TransactionPoolDump()) != 1 {
