@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -36,21 +37,23 @@ func (tcps *TCPServer) sharePeers(addrs *[]Address) error {
 	return nil
 }
 
-// addRemote adds the connecting address as a peer.
+// addRemote adds the connecting address as a peer, using the supplied port
+// number. The port number must be sent manually because it may differ from
+// the conn's port number; this is due to NAT.
 func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
-	addr, err := encoding.ReadPrefix(conn, maxMsgLen)
-	if err != nil {
-		return err
+	var addr Address
+	if err = encoding.ReadObject(conn, &addr, maxMsgLen); err != nil {
+		return
 	}
 	// check that this is the correct hostname
 	connHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	addrHost, _, _ := net.SplitHostPort(string(addr))
 	if connHost != addrHost {
-		return
+		return errors.New("supplied hostname does not match connection's hostname")
 	}
-	// make sure the host is reachable on this port
-	if Ping(Address(addr)) {
-		tcps.AddPeer(Address(addr))
+	// check that the host is reachable on this port
+	if Ping(addr) {
+		tcps.AddPeer(addr)
 	}
 	return
 }
