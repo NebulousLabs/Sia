@@ -12,7 +12,7 @@ const (
 )
 
 // SendBlocks takes a list of block ids as input, and sends all blocks from
-func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID, blocks *[]consensus.Block) (err error) {
+func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 
@@ -42,10 +42,10 @@ func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID, blocks *[]co
 		if err != nil {
 			break
 		}
-		*blocks = append(*blocks, b)
+		blocks = append(blocks, b)
 	}
 
-	return nil
+	return
 }
 
 // CatchUp synchronizes with a peer to acquire any missing blocks. The

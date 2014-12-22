@@ -15,9 +15,8 @@ func Ping(addr Address) bool {
 	return err == nil && pong == "pong"
 }
 
-func pong(pong *string) error {
-	*pong = "pong"
-	return nil
+func pong() (string, error) {
+	return "pong", nil
 }
 
 // sendHostname replies to the sender with the sender's external IP.
@@ -29,12 +28,12 @@ func sendHostname(conn net.Conn) error {
 
 // sharePeers replies to the sender with 10 randomly selected peers.
 // Note: the set of peers may contain duplicates.
-func (tcps *TCPServer) sharePeers(addrs *[]Address) error {
-	*addrs = tcps.AddressBook()
-	if len(*addrs) > 10 {
-		*addrs = (*addrs)[:10]
+func (tcps *TCPServer) sharePeers() (addrs []Address, err error) {
+	addrs = tcps.AddressBook()
+	if len(addrs) > 10 {
+		addrs = addrs[:10]
 	}
-	return nil
+	return
 }
 
 // addRemote adds the connecting address as a peer, using the supplied port

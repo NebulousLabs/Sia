@@ -6,11 +6,11 @@ import (
 
 type Foo struct{}
 
-func (f Foo) Bar(i uint32, s *string) error {
+func (f Foo) Bar(i uint32) (s string, err error) {
 	if i == 0xdeadbeef {
-		*s = "bar"
+		s = "bar"
 	}
-	return nil
+	return
 }
 
 func TestRegister(t *testing.T) {
@@ -21,7 +21,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	// register some handlers
-	tcps.Register("Foo", func(s *string) error { *s = "foo"; return nil })
+	tcps.Register("Foo", func() (string, error) { return "foo", nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
