@@ -1,17 +1,17 @@
 package network
 
 import (
-	"net"
 	"testing"
-	"time"
 )
-
-var chan1 = make(chan struct{})
-var chan2 = make(chan struct{})
 
 type Foo struct{}
 
-func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
+func (f Foo) Bar(i uint32, s *string) error {
+	if i == 0xdeadbeef {
+		*s = "bar"
+	}
+	return nil
+}
 
 func TestRegister(t *testing.T) {
 	// create server
@@ -21,35 +21,26 @@ func TestRegister(t *testing.T) {
 	}
 
 	// register some handlers
-	tcps.Register("Foo", func(net.Conn) error { chan2 <- struct{}{}; return nil })
+	tcps.Register("Foo", func(s *string) error { *s = "foo"; return nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
-	err = tcps.myAddr.RPC("Foo", nil, nil)
+	var foo string
+	err = tcps.myAddr.RPC("Foo", nil, &foo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = tcps.myAddr.RPC("Bar", 0, nil)
+	if foo != "foo" {
+		t.Fatalf("Foo was not called")
+	}
+
+	var bar string
+	err = tcps.myAddr.RPC("Bar", 0xdeadbeef, &bar)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	done := make(chan struct{})
-	go func() {
-		<-chan1
-		<-chan2
-		done <- struct{}{}
-	}()
-
-	// wait for messages to propagate
-	select {
-	// success
-	case <-done:
-		return
-
-	// timeout
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("One or both handlers not called")
+	if bar != "bar" {
+		t.Fatalf("Bar was not called")
 	}
 }
 
