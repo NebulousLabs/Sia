@@ -35,3 +35,30 @@ func (e *Environment) StopMining() error {
 func (e *Environment) MinerInfo() ([]byte, error) {
 	return e.miner.Info()
 }
+
+func (e *Environment) updateMiner() (err error) {
+	e.state.RLock()
+	defer e.state.RUnlock()
+
+	recentBlock, err := e.state.BlockAtHeight(0)
+	if err != nil {
+		return
+	}
+	transactionSet := e.state.TransactionPoolDump()
+	target := e.state.CurrentTarget()
+	earliestTimestamp := e.state.EarliestLegalTimestamp()
+
+	// Get a new address if the recent block belongs to us, otherwise use the
+	// current address.
+	address := e.miner.SubsidyAddress()
+	if address == recentBlock.MinerAddress {
+		address, err = e.wallet.CoinAddress()
+		if err != nil {
+			return
+		}
+	}
+
+	// Call update on the miner.
+	e.miner.Update(recentBlock.ID(), transactionSet, target, address, earliestTimestamp)
+	return
+}

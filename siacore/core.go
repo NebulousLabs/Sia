@@ -40,18 +40,29 @@ type Environment struct {
 // main package.
 func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
-		state:           consensus.CreateGenesisState(),
 		friends:         make(map[string]consensus.CoinAddress),
 		blockChan:       make(chan consensus.Block, 100),
 		transactionChan: make(chan consensus.Transaction, 100),
 		hostDir:         hostDir,
 		walletFile:      walletFile,
 	}
+	var genesisOutputDiffs []consensus.OutputDiff
+	e.state, genesisOutputDiffs = consensus.CreateGenesisState()
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
-	e.miner = miner.New(1024 * 1024)
+	e.miner = miner.New()
 	e.renter = CreateRenter()
 	e.wallet, err = wallet.New(e.walletFile)
+	if err != nil {
+		return
+	}
+
+	// Update componenets to see genesis block.
+	err = e.updateMiner()
+	if err != nil {
+		return
+	}
+	err = e.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}

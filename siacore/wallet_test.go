@@ -11,7 +11,7 @@ import (
 // the coins are still sendable.
 func testSendToSelf(t *testing.T, e *Environment) {
 	if e.wallet.Balance(false) == 0 {
-		t.Error("e.wallet. is empty.")
+		t.Error("e.wallet is empty.")
 		return
 	}
 	originalBalance := e.wallet.Balance(false)

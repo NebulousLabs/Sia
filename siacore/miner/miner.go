@@ -23,9 +23,9 @@ type Miner struct {
 }
 
 // Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork() (b *consensus.Block) {
+func (m *Miner) blockForWork() (b consensus.Block) {
 	// Fill out the block with potentially ready values.
-	b = &consensus.Block{
+	b = consensus.Block{
 		ParentBlockID: m.parent,
 		Timestamp:     consensus.Timestamp(time.Now().Unix()),
 		Nonce:         uint64(rand.Int()),
@@ -104,7 +104,7 @@ func (m *Miner) StopMining() error {
 	m.Lock()
 	defer m.Unlock()
 
-	// Set maxThreads to 0. The miners will shut down automatically.
+	// Set desiredThreads to 0. The miners will shut down automatically.
 	m.desiredThreads = 0
 	return nil
 }
