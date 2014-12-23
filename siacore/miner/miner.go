@@ -19,6 +19,8 @@ type Miner struct {
 	desiredThreads       int // 0 if not mining.
 	runningThreads       int
 	iterationsPerAttempt uint64
+
+	blockChan chan consensus.Block
 	sync.RWMutex
 }
 
@@ -55,10 +57,7 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 	m.RUnlock()
 	for maxNonce := b.Nonce + m.iterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(m.target) {
-			// Need to throw a block down a channel.
-			/*
-				err := m.processBlock(*b) // Block until the block has been processed.
-			*/
+			m.blockChan <- b
 			solved = true
 			return
 		}
@@ -67,9 +66,10 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 	return
 }
 
-func New() (m *Miner) {
+func New(blockChan chan consensus.Block) (m *Miner) {
 	return &Miner{
 		iterationsPerAttempt: 256 * 1024,
+		blockChan:            blockChan,
 	}
 }
 
@@ -79,6 +79,9 @@ func (m *Miner) Info() ([]byte, error) {
 }
 
 func (m *Miner) SubsidyAddress() consensus.CoinAddress {
+	m.Lock()
+	defer m.Unlock()
+
 	return m.address
 }
 

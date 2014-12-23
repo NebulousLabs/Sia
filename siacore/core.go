@@ -50,7 +50,7 @@ func CreateEnvironment(hostDir string, walletFile string, rpcPort uint16, noboot
 	e.state, genesisOutputDiffs = consensus.CreateGenesisState()
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
-	e.miner = miner.New()
+	e.miner = miner.New(e.blockChan)
 	e.renter = CreateRenter()
 	e.wallet, err = wallet.New(e.walletFile)
 	if err != nil {
@@ -179,6 +179,10 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
+	err = e.updateMiner()
+	if err != nil {
+		return
+	}
 	e.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
 	e.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
@@ -200,6 +204,8 @@ func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
 		}
 		return
 	}
+
+	e.updateMiner()
 
 	go e.server.Broadcast("AcceptTransaction", t, nil)
 	return

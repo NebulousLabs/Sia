@@ -44,14 +44,9 @@ func (e *Environment) MinerInfo() ([]byte, error) {
 	return e.miner.Info()
 }
 
+// updateMiner needs to be called with the state read-locked.
 func (e *Environment) updateMiner() (err error) {
-	e.state.RLock()
-	defer e.state.RUnlock()
-
-	recentBlock, err := e.state.BlockAtHeight(0)
-	if err != nil {
-		return
-	}
+	recentBlock := e.state.CurrentBlock()
 	transactionSet := e.state.TransactionPoolDump()
 	target := e.state.CurrentTarget()
 	earliestTimestamp := e.state.EarliestLegalTimestamp()
