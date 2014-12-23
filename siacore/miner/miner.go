@@ -49,29 +49,37 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 
 // solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func (m *Miner) solveBlock(b *consensus.Block) (bool, error) {
+func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
+	m.RLock()
+	b = m.blockForWork()
+	m.RUnlock()
 	for maxNonce := b.Nonce + m.iterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(m.target) {
 			// Need to throw a block down a channel.
 			/*
 				err := m.processBlock(*b) // Block until the block has been processed.
 			*/
-			return true, nil
+			solved = true
+			return
 		}
 	}
 
-	return false, nil
+	return
 }
 
-func New(iterationsPerAttempt uint64) (m *Miner) {
+func New() (m *Miner) {
 	return &Miner{
-		iterationsPerAttempt: iterationsPerAttempt,
+		iterationsPerAttempt: 256 * 1024,
 	}
 }
 
 // TODO: Return useful info...
 func (m *Miner) Info() ([]byte, error) {
 	return nil, nil
+}
+
+func (m *Miner) SubsidyAddress() consensus.CoinAddress {
+	return m.address
 }
 
 func (m *Miner) Update(parent consensus.BlockID, transactions []consensus.Transaction, target consensus.Target, address consensus.CoinAddress, earliestTimestamp consensus.Timestamp) error {
@@ -127,7 +135,7 @@ func (m *Miner) mine() {
 
 		// If we are allowed to be running, mine a block, otherwise shut down.
 		if desiredThreads >= myThread {
-			m.solveBlock(m.blockForWork())
+			m.SolveBlock()
 		} else {
 			m.Lock()
 			// Need to check the mining status again, something might have
