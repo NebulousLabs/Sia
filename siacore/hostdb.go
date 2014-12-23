@@ -25,7 +25,7 @@ type HostDatabase struct {
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
 type HostAnnouncement struct {
-	IPAddress          network.NetAddress
+	IPAddress          network.Address
 	TotalStorage       int64 // Can go negative.
 	MinFilesize        uint64
 	MaxFilesize        uint64
@@ -45,7 +45,7 @@ type HostAnnouncement struct {
 // the Host struct is kept in the client package because it's what the client
 // uses to weigh hosts and pick them out when storing files.
 type HostEntry struct {
-	IPAddress   network.NetAddress
+	IPAddress   network.Address
 	MinFilesize uint64
 	MaxFilesize uint64
 	MinDuration consensus.BlockHeight

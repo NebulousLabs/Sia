@@ -1,68 +1,69 @@
 package network
 
 import (
-	"net"
 	"testing"
-	"time"
 )
-
-var chan1 = make(chan struct{})
-var chan2 = make(chan struct{})
 
 type Foo struct{}
 
-func (f Foo) Bar(int32) error { chan1 <- struct{}{}; return nil }
+func (f Foo) Bar(i uint32) (s string, err error) {
+	if i == 0xdeadbeef {
+		s = "bar"
+	}
+	return
+}
 
 func TestRegister(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(9987)
+	tcps, err := NewTCPServer(":9000")
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr := NetAddress{"localhost", 9987}
 
 	// register some handlers
-	tcps.Register("Foo", func(net.Conn, []byte) error { chan2 <- struct{}{}; return nil })
+	tcps.Register("Foo", func() (string, error) { return "foo", nil })
 	tcps.Register("Bar", new(Foo).Bar)
 
 	// call them
-	err = addr.RPC("Foo", 0, nil)
+	var foo string
+	err = tcps.myAddr.RPC("Foo", nil, &foo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addr.RPC("Bar", 0, nil)
+	if foo != "foo" {
+		t.Fatalf("Foo was not called")
+	}
+
+	var bar string
+	err = tcps.myAddr.RPC("Bar", 0xdeadbeef, &bar)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if bar != "bar" {
+		t.Fatalf("Bar was not called")
+	}
+}
 
-	done := make(chan struct{})
-	go func() {
-		<-chan1
-		<-chan2
-		done <- struct{}{}
-	}()
-
-	// wait for messages to propagate
-	select {
-	// success
-	case <-done:
-		return
-
-	// timeout
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("One or both handlers not called")
+func TestTableTennis(t *testing.T) {
+	// create server
+	tcps, err := NewTCPServer(":9001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Ping(tcps.myAddr) {
+		t.Fatal("server did not respond to ping")
 	}
 }
 
 func TestPeerSharing(t *testing.T) {
 	// create server
-	tcps, err := NewTCPServer(9981)
+	tcps, err := NewTCPServer(":9002")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// add a peer
-	peer := NetAddress{"foo", 9001}
+	peer := Address("foo:9001")
 	tcps.AddPeer(peer)
 	// tcps only has one peer, so RandomPeer() should return peer
 	if tcps.RandomPeer() != peer {
@@ -70,20 +71,20 @@ func TestPeerSharing(t *testing.T) {
 	}
 
 	// ask tcps for peers
-	var resp []NetAddress
+	var resp []Address
 	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// resp should be exactly []NetAddress{peer}
+	// resp should be exactly []Address{peer}
 	if len(resp) != 1 || resp[0] != peer {
 		t.Fatal("server gave bad peer list:", resp)
 	}
 
 	// add a couple more peers
-	tcps.AddPeer(NetAddress{"bar", 9002})
-	tcps.AddPeer(NetAddress{"baz", 9003})
-	tcps.AddPeer(NetAddress{"quux", 9004})
+	tcps.AddPeer(Address("bar:9002"))
+	tcps.AddPeer(Address("baz:9003"))
+	tcps.AddPeer(Address("quux:9004"))
 	err = tcps.myAddr.RPC("SharePeers", nil, &resp)
 	if err != nil {
 		t.Fatal(err)
@@ -105,13 +106,13 @@ func TestPeerCulling(t *testing.T) {
 	}
 
 	// create server
-	tcps, err := NewTCPServer(9005)
+	tcps, err := NewTCPServer(":9003")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// add google as a peer
-	peer := NetAddress{"8.8.8.8", 9001}
+	peer := Address("8.8.8.8:9001")
 	tcps.AddPeer(peer)
 
 	// send a broadcast

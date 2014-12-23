@@ -40,7 +40,7 @@ type EnvironmentInfo struct {
 
 	RenterFiles []string
 
-	IPAddress          network.NetAddress
+	IPAddress          network.Address
 	HostSettings       HostAnnouncement
 	HostSpaceRemaining int64
 	HostContractCount  int
@@ -87,7 +87,7 @@ func (e *Environment) Info() (eInfo EnvironmentInfo) {
 		WalletBalance:     e.WalletBalance(false),
 		FullWalletBalance: e.WalletBalance(true),
 
-		IPAddress:          e.server.NetAddress(),
+		IPAddress:          e.server.Address(),
 		HostSettings:       e.HostSettings(),
 		HostSpaceRemaining: e.HostSpaceRemaining(),
 	}
@@ -138,14 +138,14 @@ func (e *Environment) BlockAtHeight(height consensus.BlockHeight) (consensus.Blo
 	return e.state.BlockAtHeight(height)
 }
 
-func (e *Environment) AddressBook() []network.NetAddress {
+func (e *Environment) AddressBook() []network.Address {
 	return e.server.AddressBook()
 }
 
-func (e *Environment) RandomPeer() network.NetAddress {
+func (e *Environment) RandomPeer() network.Address {
 	return e.server.RandomPeer()
 }
 
-func (e *Environment) NetAddress() network.NetAddress {
-	return e.server.NetAddress()
+func (e *Environment) Address() network.Address {
+	return e.server.Address()
 }

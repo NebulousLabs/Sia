@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -14,7 +12,7 @@ import (
 )
 
 // TODO: timeouts?
-func (d *daemon) setUpHandlers(apiPort uint16) {
+func (d *daemon) setUpHandlers(addr string) {
 	// Web Interface
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
@@ -37,7 +35,7 @@ func (d *daemon) setUpHandlers(apiPort uint16) {
 	// JSON API
 	http.HandleFunc("/json/status", d.jsonStatusHandler)
 
-	http.ListenAndServe("localhost:"+strconv.Itoa(int(apiPort)), nil)
+	http.ListenAndServe(addr, nil)
 }
 
 // jsonStatusHandler responds to a status call with a json object of the status.
@@ -65,17 +63,7 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
-	host, portStr, err := net.SplitHostPort(req.FormValue("addr"))
-	if err != nil {
-		http.Error(w, "Malformed address", 400)
-		return
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		http.Error(w, "Malformed IP", 400)
-		return
-	}
-	addr := network.NetAddress{host, uint16(port)}
+	addr := network.Address(req.FormValue("addr"))
 	switch req.FormValue("action") {
 	case "add":
 		d.core.AddPeer(addr)
@@ -103,7 +91,7 @@ func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Create all of the variables that get scanned in.
-	var ipAddress network.NetAddress
+	var ipAddress network.Address
 	var totalStorage int64
 	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
@@ -111,17 +99,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	var coinAddress consensus.CoinAddress
 
 	// Get the ip address.
-	host, portStr, err := net.SplitHostPort(req.FormValue("ipaddress"))
-	if err != nil {
-		http.Error(w, "Malformed IP address + port", 400)
-		return
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		http.Error(w, "Malformed IP", 400)
-		return
-	}
-	ipAddress = network.NetAddress{host, uint16(port)}
+	ipAddress = network.Address(req.FormValue("ipaddress"))
 
 	// The address can be either a coin address or a friend name
 	caString := req.FormValue("coinaddress")
@@ -133,7 +111,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	} else {
 		var coinAddressBytes []byte
-		_, err = fmt.Sscanf(caString, "%x", &coinAddressBytes)
+		_, err := fmt.Sscanf(caString, "%x", &coinAddressBytes)
 		if err != nil {
 			http.Error(w, "Malformed coin address", 400)
 			return
@@ -157,7 +135,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 		"freezevolume":   &freezeCoins,
 	}
 	for qs := range qsVars {
-		_, err = fmt.Sscan(req.FormValue(qs), qsVars[qs])
+		_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 		if err != nil {
 			http.Error(w, "Malformed "+qs, 400)
 			return
@@ -182,7 +160,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	})
 
 	// Make the host announcement.
-	_, err = d.core.HostAnnounceSelf(freezeCoins, freezeDuration+d.core.Height(), 10)
+	_, err := d.core.HostAnnounceSelf(freezeCoins, freezeDuration+d.core.Height(), 10)
 	if err != nil {
 		http.Error(w, "Failed to announce host: "+err.Error(), 500)
 		return
@@ -223,8 +201,8 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 
 	// create peer listing
 	peers := "\n"
-	for _, address := range d.core.AddressBook() {
-		peers += fmt.Sprintf("\t\t%v:%v\n", address.Host, address.Port)
+	for _, addr := range d.core.AddressBook() {
+		peers += fmt.Sprintf("\t\t%s\n", addr)
 	}
 
 	// create friend listing

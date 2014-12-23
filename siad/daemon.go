@@ -65,13 +65,13 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	d.core, err = siacore.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RpcPort, config.Siacore.NoBootstrap)
+	d.core, err = siacore.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
 	if err != nil {
 		return
 	}
 
 	// Begin listening for requests on the api.
-	d.setUpHandlers(config.Siad.ApiPort)
+	d.setUpHandlers(config.Siad.APIaddr)
 
 	return
 }

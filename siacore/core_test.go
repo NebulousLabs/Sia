@@ -16,12 +16,12 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 	// need to be variables.
 	consensus.BlockFrequency = consensus.Timestamp(1)
 	consensus.TargetWindow = consensus.BlockHeight(1000)
-	network.BootstrapPeers = []network.NetAddress{{"localhost", 9988}, {"localhost", 9989}}
+	network.BootstrapPeers = []network.Address{"localhost:9988", "localhost:9989"}
 	consensus.RootTarget[0] = 255
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
-	e, err := CreateEnvironment("host", "test.wallet", 9988, true)
+	e, err := CreateEnvironment("host", "test.wallet", ":9988", true)
 	if err != nil {
 		t.Fatal(err)
 	}

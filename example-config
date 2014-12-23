@@ -5,8 +5,8 @@
 ; Run 'siad -h' for more information.
 
 [Siad] # All variables go under siad.
-ApiPort = 9980
-RpcPort = 9988
+APIaddr = localhost:9980
+RPCaddr = :9988
 ; NoBootstrap # Setting this means you will run your own network instead of connecting to the existing network.
 ; HostDirectory = ~/.config/sia/host/
 ; StyleDirectory = ~/.config/sia/style/

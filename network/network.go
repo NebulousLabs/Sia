@@ -5,11 +5,8 @@ import (
 	"math/rand"
 	"net"
 	"net/http" // for getExternalIP()
-	"strconv"
 	"sync"
 	"time"
-
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 const (
@@ -19,137 +16,34 @@ const (
 
 var (
 	ErrNoPeers = errors.New("no peers")
+
+	// hard-coded addresses used when bootstrapping
+	BootstrapPeers = []Address{
+		"23.239.14.98:9988",
+	}
 )
 
-// A NetAddress contains the information needed to contact a peer over TCP.
-type NetAddress struct {
-	Host string
-	Port uint16
-}
-
-// String returns the NetAddress as a string, concatentating the hostname and
-// port number.
-func (na *NetAddress) String() string {
-	return net.JoinHostPort(na.Host, strconv.Itoa(int(na.Port)))
-}
-
-// handlerName truncates a string to 8 bytes. If len(name) < 8, the remaining
-// bytes are 0.
-func handlerName(name string) []byte {
-	b := make([]byte, 8)
-	copy(b, name)
-	return b
-}
-
-// Call establishes a TCP connection to the NetAddress, calls the provided
-// function on it, and closes the connection.
-func (na *NetAddress) Call(name string, fn func(net.Conn) error) error {
-	conn, err := net.DialTimeout("tcp", na.String(), timeout)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	// set default deadline
-	// note: fn can extend this deadline as needed
-	conn.SetDeadline(time.Now().Add(timeout))
-	// write header
-	conn.Write(handlerName(name))
-	return fn(conn)
-}
-
-// TBD
-var BootstrapPeers = []NetAddress{
-	{"23.239.14.98", 9988},
-}
+// An Address contains the information needed to contact a peer over TCP.
+type Address string
 
 // A TCPServer sends and receives messages. It also maintains an address book
 // of peers to broadcast to and make requests of.
 type TCPServer struct {
 	net.Listener
-	myAddr      NetAddress
-	addressbook map[NetAddress]struct{}
-	handlerMap  map[string]func(net.Conn, []byte) error
+	myAddr      Address
+	addressbook map[Address]struct{}
+	handlerMap  map[string]func(net.Conn) error
 	// used to protect addressbook and handlerMap
 	sync.RWMutex
 }
 
-func (tcps *TCPServer) NetAddress() NetAddress {
+// Address returns the Address of the server.
+func (tcps *TCPServer) Address() Address {
 	return tcps.myAddr
 }
 
-// NewTCPServer creates a TCPServer that listens on the specified port.
-func NewTCPServer(port uint16) (tcps *TCPServer, err error) {
-	tcpServ, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
-	if err != nil {
-		return
-	}
-	tcps = &TCPServer{
-		Listener:    tcpServ,
-		myAddr:      NetAddress{"localhost", port},
-		addressbook: make(map[NetAddress]struct{}),
-		handlerMap:  make(map[string]func(net.Conn, []byte) error),
-	}
-	// default handlers
-	tcps.Register("SendHostname", sendHostname)
-	tcps.Register("SharePeers", tcps.sharePeers)
-	tcps.Register("AddMe", tcps.addRemote)
-
-	// spawn listener
-	go tcps.listen()
-	return
-}
-
-// Bootstrap discovers the external IP of the TCPServer, requests peers from
-// the initial peer list, and announces itself to those peers.
-func (tcps *TCPServer) Bootstrap() (err error) {
-	// populate initial peer list
-	for _, addr := range BootstrapPeers {
-		if tcps.Ping(addr) {
-			tcps.AddPeer(addr)
-		}
-	}
-	if len(tcps.addressbook) == 0 {
-		// fallback to centralized service to learn hostname
-		tcps.getExternalIP()
-		return ErrNoPeers
-	}
-
-	// request peers
-	// TODO: maybe iterate until we have enough new peers?
-	var peers []NetAddress
-	for _, addr := range tcps.AddressBook() {
-		var resp []NetAddress
-		addr.RPC("SharePeers", nil, &resp)
-		peers = append(peers, resp...)
-	}
-	for _, addr := range peers {
-		if addr != tcps.myAddr && tcps.Ping(addr) {
-			tcps.AddPeer(addr)
-		}
-	}
-
-	// learn hostname
-	var set bool
-	for _, addr := range tcps.AddressBook() {
-		var hostname string
-		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
-			tcps.myAddr.Host = hostname
-			set = true
-			break
-		}
-	}
-	// if no peers respond, fallback to centralized service
-	if !set {
-		tcps.getExternalIP()
-	}
-
-	// announce ourselves to new peers
-	tcps.Broadcast("AddMe", tcps.myAddr.Port, nil)
-
-	return
-}
-
-func (tcps *TCPServer) AddressBook() (book []NetAddress) {
+// AddressBook returns the server's address book as a slice.
+func (tcps *TCPServer) AddressBook() (book []Address) {
 	tcps.RLock()
 	defer tcps.RUnlock()
 	for address := range tcps.addressbook {
@@ -158,39 +52,33 @@ func (tcps *TCPServer) AddressBook() (book []NetAddress) {
 	return
 }
 
+// setHostname sets the hostname of the server. The port is unchanged.
+func (tcps *TCPServer) setHostname(host string) {
+	_, port, _ := net.SplitHostPort(string(tcps.myAddr))
+	tcps.myAddr = Address(net.JoinHostPort(host, port))
+}
+
 // AddPeer safely adds a peer to the address book.
-func (tcps *TCPServer) AddPeer(addr NetAddress) {
+func (tcps *TCPServer) AddPeer(addr Address) {
 	tcps.Lock()
 	tcps.addressbook[addr] = struct{}{}
 	tcps.Unlock()
 }
 
 // Remove safely removes a peer from the address book.
-func (tcps *TCPServer) RemovePeer(addr NetAddress) {
+func (tcps *TCPServer) RemovePeer(addr Address) {
 	tcps.Lock()
 	delete(tcps.addressbook, addr)
 	tcps.Unlock()
 }
 
 // RandomPeer selects and returns a random peer from the address book.
-func (tcps *TCPServer) RandomPeer() NetAddress {
+func (tcps *TCPServer) RandomPeer() Address {
 	addrs := tcps.AddressBook()
 	if len(addrs) == 0 {
 		panic(ErrNoPeers)
 	}
 	return addrs[rand.Intn(len(addrs))]
-}
-
-// Ping returns whether a NetAddress is reachable. It accomplishes this by
-// initiating a TCP connection and immediately closes it. This is pretty
-// unsophisticated. I'll add a Pong later.
-func (tcps *TCPServer) Ping(addr NetAddress) bool {
-	conn, err := net.DialTimeout("tcp", addr.String(), timeout)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
 }
 
 // listen runs in the background, accepting incoming connections and serving
@@ -212,19 +100,12 @@ func (tcps *TCPServer) listen() {
 	}
 }
 
-// handleConn reads header data from a connection, unmarshals the data
-// structures it contains, and routes the data to other functions for
-// processing.
-// TODO: set deadlines?
+// handleConn reads header data from a connection, then routes it to the
+// appropriate handler for further processing.
 func (tcps *TCPServer) handleConn(conn net.Conn) {
 	defer conn.Close()
 	ident := make([]byte, 8)
 	if n, err := conn.Read(ident); err != nil || n != len(ident) {
-		// TODO: log error
-		return
-	}
-	msgData, err := encoding.ReadPrefix(conn, maxMsgLen)
-	if err != nil {
 		// TODO: log error
 		return
 	}
@@ -233,7 +114,7 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	fn, ok := tcps.handlerMap[string(ident)]
 	tcps.RUnlock()
 	if ok {
-		fn(conn, msgData)
+		fn(conn)
 		// TODO: log error
 		// no wait, send the error?
 	}
@@ -254,6 +135,80 @@ func (tcps *TCPServer) getExternalIP() (err error) {
 		return
 	}
 	// TODO: validate IP?
-	tcps.myAddr.Host = string(buf[:n])
+	tcps.setHostname(string(buf[:n]))
+	return
+}
+
+// Bootstrap discovers the external IP of the TCPServer, requests peers from
+// the initial peer list, and announces itself to those peers.
+func (tcps *TCPServer) Bootstrap() (err error) {
+	// populate initial peer list
+	for _, addr := range BootstrapPeers {
+		if Ping(addr) {
+			tcps.AddPeer(addr)
+		}
+	}
+	if len(tcps.addressbook) == 0 {
+		// no bootstrap nodes were reachable, so fallback to centralized
+		// service to learn hostname
+		tcps.getExternalIP()
+		return ErrNoPeers
+	}
+
+	// request peers
+	// TODO: maybe iterate until we have enough new peers?
+	var peers []Address
+	for _, addr := range tcps.AddressBook() {
+		var resp []Address
+		addr.RPC("SharePeers", nil, &resp)
+		peers = append(peers, resp...)
+	}
+	for _, addr := range peers {
+		if addr != tcps.myAddr && Ping(addr) {
+			tcps.AddPeer(addr)
+		}
+	}
+
+	// learn hostname
+	var set bool
+	for _, addr := range tcps.AddressBook() {
+		var hostname string
+		if err := addr.RPC("SendHostname", nil, &hostname); err == nil {
+			tcps.setHostname(hostname)
+			set = true
+			break
+		}
+	}
+	// if no peers respond, fallback to centralized service
+	if !set {
+		tcps.getExternalIP()
+	}
+
+	// announce ourselves to new peers
+	tcps.Broadcast("AddMe", tcps.myAddr, nil)
+
+	return
+}
+
+// NewTCPServer creates a TCPServer that listens on the specified address.
+func NewTCPServer(addr string) (tcps *TCPServer, err error) {
+	tcpServ, err := net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+	tcps = &TCPServer{
+		Listener:    tcpServ,
+		myAddr:      Address(addr),
+		addressbook: make(map[Address]struct{}),
+		handlerMap:  make(map[string]func(net.Conn) error),
+	}
+	// default handlers (defined in handlers.go)
+	tcps.Register("Ping", pong)
+	tcps.Register("SendHostname", sendHostname)
+	tcps.Register("SharePeers", tcps.sharePeers)
+	tcps.Register("AddMe", tcps.addRemote)
+
+	// spawn listener
+	go tcps.listen()
 	return
 }
