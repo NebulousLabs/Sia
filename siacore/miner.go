@@ -21,7 +21,7 @@ type Miner interface {
 
 	// StartMining takes as input a number of threads to use for mining. 0 will return
 	// an error.
-	StartMining(threads int) error
+	StartMining() error
 
 	// StopMining will take all of the threads down to 0. If mining is already
 	// stopped, an error will be returned.
