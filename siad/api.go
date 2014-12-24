@@ -20,7 +20,6 @@ func (d *daemon) setUpHandlers(addr string) {
 	// Plaintext API
 	http.HandleFunc("/sync", d.syncHandler)
 	http.HandleFunc("/peer", d.peerHandler)
-	http.HandleFunc("/mine", d.mineHandler)
 	http.HandleFunc("/host", d.hostHandler)
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
@@ -28,9 +27,14 @@ func (d *daemon) setUpHandlers(addr string) {
 	http.HandleFunc("/stop", d.stopHandler)
 
 	// Wallet API Calls
+	http.HandleFunc("/wallet/address", d.walletAddressHandler)
 	http.HandleFunc("/wallet/send", d.walletSendHandler)
 	http.HandleFunc("/wallet/status", d.walletStatusHandler)
-	http.HandleFunc("/wallet/address", d.walletAddressHandler)
+
+	// Miner API Calls
+	http.HandleFunc("/miner/start", d.minerStartHandler)
+	http.HandleFunc("/miner/status", d.minerStatusHandler)
+	http.HandleFunc("/miner/stop", d.minerStopHandler)
 
 	// JSON API
 	http.HandleFunc("/json/status", d.jsonStatusHandler)
@@ -73,19 +77,6 @@ func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(w, "Removed %s", req.FormValue("addr"))
 	default:
 		http.Error(w, "Invalid peer action", 400)
-	}
-}
-
-func (d *daemon) mineHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.FormValue("toggle") {
-	case "on":
-		d.core.StartMining(1)
-		fmt.Fprint(w, "Started mining")
-	case "off":
-		d.core.StopMining()
-		fmt.Fprint(w, "Stopped mining")
-	default:
-		http.Error(w, "Invalid mine command", 400)
 	}
 }
 
