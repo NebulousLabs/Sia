@@ -7,7 +7,7 @@ import (
 // TestApplyTransaction provides testing coverage for State.applyTransaction()
 func TestApplyTransaction(t *testing.T) {
 	// Create a state to which transactions can be applied.
-	s := CreateGenesisState()
+	s, _ := CreateGenesisState()
 
 	// Create a transaction with one input and one output.
 	transaction := Transaction{

@@ -2,11 +2,11 @@ package siacore
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/siacore/miner"
 	"github.com/NebulousLabs/Sia/siacore/wallet"
 )
 
@@ -19,6 +19,7 @@ type Environment struct {
 	server       *network.TCPServer
 	host         *Host
 	hostDatabase *HostDatabase
+	miner        Miner
 	renter       *Renter
 	wallet       Wallet
 
@@ -27,13 +28,6 @@ type Environment struct {
 	// Channels for incoming blocks and transactions to be processed
 	blockChan       chan consensus.Block
 	transactionChan chan consensus.Transaction
-
-	// Mining variables. The mining variables are protected by the miningLock.
-	// Any time that you read from or write to any of the mining variables, you
-	// need to be under a lock.
-	mining        bool         // true when mining
-	miningThreads int          // number of processes mining at once
-	miningLock    sync.RWMutex // prevents benign race conditions
 
 	// Envrionment directories.
 	hostDir    string
@@ -46,17 +40,29 @@ type Environment struct {
 // main package.
 func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
-		state:           consensus.CreateGenesisState(),
 		friends:         make(map[string]consensus.CoinAddress),
 		blockChan:       make(chan consensus.Block, 100),
 		transactionChan: make(chan consensus.Transaction, 100),
 		hostDir:         hostDir,
 		walletFile:      walletFile,
 	}
+	var genesisOutputDiffs []consensus.OutputDiff
+	e.state, genesisOutputDiffs = consensus.CreateGenesisState()
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
+	e.miner = miner.New(e.blockChan)
 	e.renter = CreateRenter()
 	e.wallet, err = wallet.New(e.walletFile)
+	if err != nil {
+		return
+	}
+
+	// Update componenets to see genesis block.
+	err = e.updateMiner()
+	if err != nil {
+		return
+	}
+	err = e.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}
@@ -173,6 +179,10 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
+	err = e.updateMiner()
+	if err != nil {
+		return
+	}
 	e.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
 	e.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
@@ -194,6 +204,8 @@ func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
 		}
 		return
 	}
+
+	e.updateMiner()
 
 	go e.server.Broadcast("AcceptTransaction", t, nil)
 	return

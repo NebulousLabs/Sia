@@ -95,7 +95,8 @@ type BlockNode struct {
 	SuccessfulWindows    []ContractID
 }
 
-// An OutputDiff indicates an output that has either been added or removed.
+// An OutputDiff indicates an output that has either been added to or removed
+// from the unspent outputs set. This is used by the wallet.
 type OutputDiff struct {
 	New    bool
 	ID     OutputID
@@ -104,9 +105,9 @@ type OutputDiff struct {
 
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
-func CreateGenesisState() *State {
+func CreateGenesisState() (s *State, diffs []OutputDiff) {
 	// Create a new state and initialize the maps.
-	s := &State{
+	s = &State{
 		blockRoot:              new(BlockNode),
 		badBlocks:              make(map[BlockID]struct{}),
 		blockMap:               make(map[BlockID]*BlockNode),
@@ -145,7 +146,15 @@ func CreateGenesisState() *State {
 	}
 	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
-	return s
+	// Create the output diff for genesis subsidy.
+	diff := OutputDiff{
+		New:    true,
+		ID:     genesisBlock.SubsidyID(),
+		Output: genesisSubsidyOutput,
+	}
+	diffs = append(diffs, diff)
+
+	return
 }
 
 // State.Height() returns the height of the longest fork.

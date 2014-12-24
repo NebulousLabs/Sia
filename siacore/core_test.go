@@ -14,7 +14,6 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 	//
 	// TODO: Perhaps also have these constants as a build flag, then they don't
 	// need to be variables.
-	IterationsPerAttempt = 500 * 1000
 	consensus.BlockFrequency = consensus.Timestamp(1)
 	consensus.TargetWindow = consensus.BlockHeight(1000)
 	network.BootstrapPeers = []network.Address{"localhost:9988", "localhost:9989"}
@@ -56,4 +55,5 @@ func TestEverything(t *testing.T) {
 	e := establishTestingEnvironment(t)
 	testEmptyBlock(t, e)
 	testTransactionBlock(t, e)
+	testSendToSelf(t, e)
 }

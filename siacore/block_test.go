@@ -44,6 +44,9 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 		return
 	}
 	err = e.processTransaction(txn)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Check that the transaction made it into the transaction pool.
 	if len(e.state.TransactionPoolDump()) != 1 {
@@ -59,7 +62,8 @@ func testTransactionBlock(t *testing.T, e *Environment) {
 	mineSingleBlock(t, e)
 	sortedSet := e.state.SortedUtxoSet()
 	if len(sortedSet) != 3 {
-		t.Error("expecting sortedSet to be len 3, got", len(sortedSet))
+		t.Error(sortedSet)
+		t.Fatal("expecting sortedSet to be len 3, got", len(sortedSet))
 	}
 
 	// At least one of the outputs should belong to address `1`.
