@@ -25,6 +25,7 @@ type Miner struct {
 }
 
 type Status struct {
+	State          string
 	Threads        int
 	RunningThreads int
 	Address        consensus.CoinAddress
@@ -51,6 +52,22 @@ func (m *Miner) Info() ([]byte, error) {
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
 	}
+
+	// Set the running status based on desiredThreads vs. runningThreads.
+	if m.desiredThreads == 0 && m.runningThreads == 0 {
+		status.State = "Off"
+	} else if m.desiredThreads == 0 && m.runningThreads > 0 {
+		status.State = "Turning Off"
+	} else if m.desiredThreads == m.runningThreads {
+		status.State = "On"
+	} else if m.desiredThreads < m.runningThreads {
+		status.State = "Turning On"
+	} else if m.desiredThreads > m.runningThreads {
+		status.State = "Decreasing number of threads."
+	} else {
+		status.State = "Miner is in an ERROR state!"
+	}
+
 	return json.Marshal(status)
 }
 

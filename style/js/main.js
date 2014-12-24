@@ -16,7 +16,13 @@ function continuousUpdate() {
 	var resp = httpGet("/json/status");
 	var stats = JSON.parse(resp);
 
-	safeSetElem('miningStatus', 'Mining Status: ' + stats.Mining);
+	var miningResp = httpGet("/miner/status")
+	var miningStats = JSON.parse(miningResp)
+	safeSetElem('miningStatus',
+		'Mining Status: ' + stats.State +
+		'<br>Threads: ' + stats.RunningThreads
+	);
+
 	safeSetElem('blockStatus',
 		'Current Height: ' + stats.StateInfo.Height +
 		'<br>Current Target: ' + stats.StateInfo.Target +
