@@ -109,14 +109,14 @@ func (w *Wallet) Save() (err error) {
 
 // Info implements the core.Wallet interface.
 func (w *Wallet) Info() ([]byte, error) {
+	w.Lock()
+	defer w.Unlock()
+
 	status := Status{
 		Balance:     w.Balance(false),
 		FullBalance: w.Balance(true),
 	}
-
-	w.Lock()
 	status.NumAddresses = len(w.spendableAddresses)
-	w.Unlock()
 
 	return json.Marshal(status)
 }

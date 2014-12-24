@@ -1,6 +1,7 @@
 package miner
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -23,6 +24,12 @@ type Miner struct {
 	sync.RWMutex
 }
 
+type Status struct {
+	Threads        int
+	RunningThreads int
+	Address        consensus.CoinAddress
+}
+
 // New takes a block channel down which it drops blocks that it mines. It also
 // takes a thread count, which it uses to spin up miners on separate threads.
 func New(blockChan chan consensus.Block, threads int) (m *Miner) {
@@ -36,7 +43,15 @@ func New(blockChan chan consensus.Block, threads int) (m *Miner) {
 // Info() returns a JSON struct which can be parsed by frontends for displaying
 // information to the user.
 func (m *Miner) Info() ([]byte, error) {
-	return nil, nil
+	m.RLock()
+	defer m.RUnlock()
+
+	status := Status{
+		Threads:        m.threads,
+		RunningThreads: m.runningThreads,
+		Address:        m.address,
+	}
+	return json.Marshal(status)
 }
 
 // SubsidyAddress returns the address that is currently being used by the miner
