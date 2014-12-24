@@ -1,7 +1,7 @@
 package miner
 
 import (
-	"crypto/rand"
+	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"

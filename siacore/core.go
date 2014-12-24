@@ -38,6 +38,9 @@ type Environment struct {
 // createEnvironment creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
+//
+// TODO: swap out the way that CreateEnvironment is called so that the wallet,
+// host, etc. can all be used as input - or not supplied at all.
 func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (e *Environment, err error) {
 	e = &Environment{
 		friends:         make(map[string]consensus.CoinAddress),
@@ -50,7 +53,7 @@ func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nob
 	e.state, genesisOutputDiffs = consensus.CreateGenesisState()
 	e.hostDatabase = CreateHostDatabase()
 	e.host = CreateHost()
-	e.miner = miner.New(e.blockChan)
+	e.miner = miner.New(e.blockChan, 1)
 	e.renter = CreateRenter()
 	e.wallet, err = wallet.New(e.walletFile)
 	if err != nil {
@@ -58,7 +61,7 @@ func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nob
 	}
 
 	// Update componenets to see genesis block.
-	err = e.updateMiner()
+	err = e.updateMiner(e.miner)
 	if err != nil {
 		return
 	}
@@ -179,7 +182,7 @@ func (e *Environment) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	err = e.updateMiner()
+	err = e.updateMiner(e.miner)
 	if err != nil {
 		return
 	}
@@ -205,7 +208,7 @@ func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
 		return
 	}
 
-	e.updateMiner()
+	e.updateMiner(e.miner)
 
 	go e.server.Broadcast("AcceptTransaction", t, nil)
 	return

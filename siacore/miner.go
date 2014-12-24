@@ -32,20 +32,26 @@ type Miner interface {
 	SolveBlock() (block consensus.Block, solved bool, err error)
 }
 
-func (e *Environment) StartMining(threads int) error {
-	return e.miner.StartMining(threads)
+// StartMining calls StartMining on the miner.
+func (e *Environment) StartMining() error {
+	return e.miner.StartMining()
 }
 
+// StopMining calls StopMining on the miner.
 func (e *Environment) StopMining() error {
 	return e.miner.StopMining()
 }
 
+// MinerInfo calls Info on the miner.
 func (e *Environment) MinerInfo() ([]byte, error) {
 	return e.miner.Info()
 }
 
-// updateMiner needs to be called with the state read-locked.
-func (e *Environment) updateMiner() (err error) {
+// updateMiner needs to be called with the state read-locked. updateMiner takes
+// a miner as input and calls `miner.Update()` with all of the recent values
+// from the state. Usually, but not always, the call will be
+// e.updateMiner(e.miner).
+func (e *Environment) updateMiner(miner Miner) (err error) {
 	recentBlock := e.state.CurrentBlock()
 	transactionSet := e.state.TransactionPoolDump()
 	target := e.state.CurrentTarget()
@@ -62,6 +68,19 @@ func (e *Environment) updateMiner() (err error) {
 	}
 
 	// Call update on the miner.
-	e.miner.Update(recentBlock.ID(), transactionSet, target, address, earliestTimestamp)
+	miner.Update(recentBlock.ID(), transactionSet, target, address, earliestTimestamp)
 	return
+}
+
+// ReplaceMiner terminates the existing miner and replaces it with the new
+// miner. ReplaceMiner will not call `StartMining()` on the new miner.
+func (e *Environment) ReplaceMiner(miner Miner) {
+	// Fill out the new miner with the most recent block information.
+	e.state.RLock()
+	e.updateMiner(miner)
+	e.state.RUnlock()
+
+	// Kill and replace the existing miner.
+	e.miner.StopMining()
+	e.miner = miner
 }
