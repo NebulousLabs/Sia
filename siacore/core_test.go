@@ -56,4 +56,5 @@ func TestEverything(t *testing.T) {
 	testEmptyBlock(t, e)
 	testTransactionBlock(t, e)
 	testSendToSelf(t, e)
+	testWalletInfo(t, e)
 }

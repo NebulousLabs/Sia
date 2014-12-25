@@ -19,8 +19,8 @@ function continuousUpdate() {
 	var miningResp = httpGet("/miner/status")
 	var miningStats = JSON.parse(miningResp)
 	safeSetElem('miningStatus',
-		'Mining Status: ' + stats.State +
-		'<br>Threads: ' + stats.RunningThreads
+		'Mining Status: ' + miningStats.State +
+		'<br>Threads: ' + miningStats.RunningThreads
 	);
 
 	safeSetElem('blockStatus',
@@ -49,6 +49,7 @@ function updatePage() {
 	var stats = continuousUpdate()
 	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
+	/*
 	var rentStatusInnerHTML = ""
 	if(stats.RenterFiles != null) {
 		for (s in stats.RenterFiles) {
@@ -78,6 +79,7 @@ function updatePage() {
 	// safeSetValue('hostPrice', stats.HostSettings.Price)
 	// safeSetValue('hostBurn', stats.HostSettings.Burn)
 	// safeSetValue('hostCoinAddress', stats.HostSettings.CoinAddress)
+	*/
 }
 
 function httpGet(url) {
@@ -93,6 +95,7 @@ function responseBoxGet(url) {
 	updatePage()
 }
 
+/*
 function toggleMining() {
 	var mining = JSON.parse(httpGet("/json/status")).Mining == "On";
 	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
@@ -101,15 +104,16 @@ function toggleMining() {
 function reqAddress() {
 	responseBoxGet("/wallet/address")
 }
+*/
 
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;
-	var fee = document.getElementById('minerFee').value;
-	var request = "/wallet/send?amount="+amount+"&fee="+fee+"&dest="+destination;
+	var request = "/wallet/send?amount="+amount+"&dest="+destination;
 	responseBoxGet(request);
 }
 
+/*
 function rentFile() {
 	var sourceFile = document.getElementById('rentSourceFile').value.replace('file://', '');
 	var nickname = document.getElementById('rentNickname').value;
@@ -157,3 +161,4 @@ function hostAnnounce() {
 function downloadFile(nick) {
 	responseBoxGet("/download?nickname="+nick);
 }
+*/

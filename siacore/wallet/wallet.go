@@ -30,7 +30,7 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	sync.Mutex
+	sync.RWMutex
 }
 
 type Status struct {
@@ -109,8 +109,8 @@ func (w *Wallet) Save() (err error) {
 
 // Info implements the core.Wallet interface.
 func (w *Wallet) Info() ([]byte, error) {
-	w.Lock()
-	defer w.Unlock()
+	w.RLock()
+	defer w.RUnlock()
 
 	status := Status{
 		Balance:     w.Balance(false),

@@ -47,3 +47,12 @@ func testSendToSelf(t *testing.T, e *Environment) {
 		t.Errorf("Expecting balance and full balance to be equal, but instead they are false: %v, full: %v", e.wallet.Balance(false), e.wallet.Balance(true))
 	}
 }
+
+// testWalletInfo calles wallet.Info to see if an error is thrown. Also make sure
+// there is no deadlock.
+func testWalletInfo(t *testing.T, e *Environment) {
+	_, err := e.WalletInfo()
+	if err != nil {
+		t.Error(err)
+	}
+}
