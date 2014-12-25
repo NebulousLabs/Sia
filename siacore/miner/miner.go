@@ -2,6 +2,7 @@ package miner
 
 import (
 	"encoding/json"
+	"runtime"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -34,6 +35,7 @@ type Status struct {
 // New takes a block channel down which it drops blocks that it mines. It also
 // takes a thread count, which it uses to spin up miners on separate threads.
 func New(blockChan chan consensus.Block, threads int) (m *Miner) {
+	runtime.GOMAXPROCS(threads)
 	return &Miner{
 		threads:              threads,
 		iterationsPerAttempt: 256 * 1024,
