@@ -3,12 +3,34 @@
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-lg-12">
-                        <h2>Mining</h2>
-						<p id="miningStatus">Loading...</p>
-						<button onclick="toggleMining()">Toggle Mining</button>
+                        <h2>Miner Management</h2>
+						<br>
 
-						<br><br>
+						<div class="col-lg-4">
+							<div class="col-sm-12">
+								<p id="miningStatus"></p>
+								<br>
+							</div>
+
+							<div class="col-sm-12">
+								<div class="row">
+									<label class="col-sm-3 control-label">Threads</label>
+									<div class="col-sm-9">
+									<input type="text" class="form-control" id="minerThreads"></input><br>
+									</div>
+								</div>
+	
+								<button type="button" class="btn btn-default pull-right" onclick="turnOnMiner()">Turn on Miner</button>
+								<button type="button" class="btn btn-default pull-left" onclick="turnOffMiner()">Turn off Miner</button>
+								<br><br><br>
+							</div>
+						</div>
+						<div class="col-lg-8">
+						</div>
+
+						<div class="col-lg-12">
 						<p id="apiResponse"></p>
+						</div>
                     </div>
                 </div>
             </div>

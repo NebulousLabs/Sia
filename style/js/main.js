@@ -95,16 +95,19 @@ function responseBoxGet(url) {
 	updatePage()
 }
 
-/*
-function toggleMining() {
-	var mining = JSON.parse(httpGet("/json/status")).Mining == "On";
-	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
+function turnOnMiner() {
+	var threads = document.getElementById('minerThreads').value;
+	var request = "/miner/start?threads="+threads;
+	responseBoxGet(request);
+}
+
+function turnOffMiner() {
+	responseBoxGet("/miner/stop");
 }
 
 function reqAddress() {
 	responseBoxGet("/wallet/address")
 }
-*/
 
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
