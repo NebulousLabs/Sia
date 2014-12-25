@@ -8,7 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/siacore"
+	"github.com/NebulousLabs/Sia/sia"
 )
 
 // TODO: timeouts?
@@ -134,7 +134,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Set the host settings.
-	d.core.SetHostSettings(siacore.HostAnnouncement{
+	d.core.SetHostSettings(sia.HostAnnouncement{
 		IPAddress:          ipAddress,
 		TotalStorage:       totalStorage,
 		MinFilesize:        minFilesize,

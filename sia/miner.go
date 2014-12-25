@@ -1,4 +1,4 @@
-package siacore
+package sia
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"

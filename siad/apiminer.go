@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/siacore/miner"
+	"github.com/NebulousLabs/Sia/sia/miner"
 )
 
 // Takes a number of threads and then begins mining on that many threads.

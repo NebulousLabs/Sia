@@ -5,13 +5,13 @@ import (
 	"html/template"
 	"os"
 
-	"github.com/NebulousLabs/Sia/siacore"
+	"github.com/NebulousLabs/Sia/sia"
 
 	"github.com/mitchellh/go-homedir"
 )
 
 type daemon struct {
-	core *siacore.Environment
+	core *sia.Environment
 
 	styleDir    string
 	downloadDir string
@@ -65,7 +65,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	d.core, err = siacore.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
+	d.core, err = sia.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
 	if err != nil {
 		return
 	}

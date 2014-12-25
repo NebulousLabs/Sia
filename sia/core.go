@@ -1,10 +1,10 @@
-package siacore
+package sia
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/siacore/miner"
-	"github.com/NebulousLabs/Sia/siacore/wallet"
+	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
 // Environment is the struct that serves as the state for siad. It contains a
