@@ -37,10 +37,10 @@ type CoreInfo struct {
 
 	RenterFiles []string
 
-	IPAddress          network.Address
-	HostSettings       HostAnnouncement
-	HostSpaceRemaining int64
-	HostContractCount  int
+	IPAddress network.Address
+	// HostSettings       HostAnnouncement
+	// HostSpaceRemaining int64
+	// HostContractCount  int
 }
 
 // StateInfo returns a bunch of useful information about the state, doing
@@ -79,20 +79,22 @@ func (e *Core) Info() (eInfo CoreInfo) {
 	eInfo = CoreInfo{
 		StateInfo: e.StateInfo(),
 
-		IPAddress:          e.server.Address(),
-		HostSettings:       e.HostSettings(),
-		HostSpaceRemaining: e.HostSpaceRemaining(),
+		IPAddress: e.server.Address(),
+		// HostSettings:       e.HostSettings(),
+		// HostSpaceRemaining: e.HostSpaceRemaining(),
 	}
 
-	e.renter.RLock()
-	for filename := range e.renter.Files {
-		eInfo.RenterFiles = append(eInfo.RenterFiles, filename)
-	}
-	e.renter.RUnlock()
+	/*
+		e.renter.RLock()
+		for filename := range e.renter.Files {
+			eInfo.RenterFiles = append(eInfo.RenterFiles, filename)
+		}
+		e.renter.RUnlock()
 
-	e.host.RLock()
-	eInfo.HostContractCount = len(e.host.Files)
-	e.host.RUnlock()
+		e.host.RLock()
+		eInfo.HostContractCount = len(e.host.Files)
+		e.host.RUnlock()
+	*/
 
 	return
 }

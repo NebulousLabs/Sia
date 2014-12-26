@@ -1,5 +1,6 @@
 package sia
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -31,7 +32,7 @@ type ContractEntry struct {
 // Host is the persistent structure handles storage requests from clients and
 // manages the submission of storage proofs.
 type Host struct {
-	Settings HostAnnouncement
+	// Settings HostAnnouncement
 
 	SpaceRemaining int64
 
@@ -475,3 +476,4 @@ func (e *Core) storageProofMaintenance(initialStateHeight consensus.BlockHeight,
 		}
 	}
 }
+*/

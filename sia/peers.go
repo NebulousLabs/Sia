@@ -22,8 +22,8 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 	c.server.Register("AcceptBlock", c.AcceptBlock)
 	c.server.Register("AcceptTransaction", c.AcceptTransaction)
 	c.server.Register("SendBlocks", c.SendBlocks)
-	c.server.Register("NegotiateContract", c.NegotiateContract)
-	c.server.Register("RetrieveFile", c.RetrieveFile)
+	// c.server.Register("NegotiateContract", c.NegotiateContract)
+	// c.server.Register("RetrieveFile", c.RetrieveFile)
 
 	if nobootstrap {
 		go c.listen()

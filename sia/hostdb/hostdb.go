@@ -1,5 +1,6 @@
-package sia
+package hostdb
 
+/*
 import (
 	"crypto/rand"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia"
 )
 
 const (
@@ -197,3 +199,4 @@ func (hdb *HostDatabase) ChooseHost() (h HostEntry, err error) {
 	h = hdb.HostList[i]
 	return
 }
+*/
