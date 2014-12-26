@@ -7,71 +7,71 @@ import (
 )
 
 // BlockChan returns a channel down which blocks can be thrown.
-func (e *Environment) BlockChan() chan consensus.Block {
-	return e.blockChan
+func (c *Core) BlockChan() chan consensus.Block {
+	return c.blockChan
 }
 
-func (e *Environment) TransactionChan() chan consensus.Transaction {
-	return e.transactionChan
+func (c *Core) TransactionChan() chan consensus.Transaction {
+	return c.transactionChan
 }
 
 // AcceptBlock sends the input block down a channel, where it will be dealt
-// with by the Environment's listener.
-func (e *Environment) AcceptBlock(b consensus.Block) error {
-	e.blockChan <- b
+// with by the Core's listener.
+func (c *Core) AcceptBlock(b consensus.Block) error {
+	c.blockChan <- b
 	return nil
 }
 
 // AcceptTransaction sends the input transaction down a channel, where it will
-// be dealt with by the Environment's listener.
-func (e *Environment) AcceptTransaction(t consensus.Transaction) error {
-	e.transactionChan <- t
+// be dealt with by the Core's listener.
+func (c *Core) AcceptTransaction(t consensus.Transaction) error {
+	c.transactionChan <- t
 	return nil
 }
 
 // processBlock is called by the environment's listener.
-func (e *Environment) processBlock(b consensus.Block) (err error) {
-	e.state.Lock()
-	e.hostDatabase.Lock()
-	e.host.Lock()
-	defer e.state.Unlock()
-	defer e.hostDatabase.Unlock()
-	defer e.host.Unlock()
+func (c *Core) processBlock(b consensus.Block) (err error) {
+	c.state.Lock()
+	c.hostDatabase.Lock()
+	c.host.Lock()
+	defer c.state.Unlock()
+	defer c.hostDatabase.Unlock()
+	defer c.host.Unlock()
 
-	initialStateHeight := e.state.Height()
-	rewoundBlockIDs, appliedBlockIDs, outputDiffs, err := e.state.AcceptBlock(b)
+	initialStateHeight := c.state.Height()
+	rewoundBlockIDs, appliedBlockIDs, outputDiffs, err := c.state.AcceptBlock(b)
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
 		// Call CatchUp() if an unknown orphan is sent.
 		if err == consensus.UnknownOrphanErr {
-			go e.CatchUp(e.server.RandomPeer())
+			go c.CatchUp(c.server.RandomPeer())
 		}
 		return
 	}
 
-	err = e.wallet.Update(outputDiffs)
+	err = c.wallet.Update(outputDiffs)
 	if err != nil {
 		return
 	}
-	err = e.updateMiner(e.miner)
+	err = c.updateMiner(c.miner)
 	if err != nil {
 		return
 	}
-	e.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
-	e.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
+	c.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
+	c.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
 	// Broadcast all valid blocks.
-	go e.server.Broadcast("AcceptBlock", b, nil)
+	go c.server.Broadcast("AcceptBlock", b, nil)
 	return
 }
 
 // processTransaction sends a transaction to the state.
-func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
-	e.state.Lock()
-	defer e.state.Unlock()
+func (c *Core) processTransaction(t consensus.Transaction) (err error) {
+	c.state.Lock()
+	defer c.state.Unlock()
 
-	err = e.state.AcceptTransaction(t)
+	err = c.state.AcceptTransaction(t)
 	if err != nil {
 		if err != consensus.ConflictingTransactionErr {
 			// TODO: Change this println to a logging statement.
@@ -80,22 +80,22 @@ func (e *Environment) processTransaction(t consensus.Transaction) (err error) {
 		return
 	}
 
-	e.updateMiner(e.miner)
+	c.updateMiner(c.miner)
 
-	go e.server.Broadcast("AcceptTransaction", t, nil)
+	go c.server.Broadcast("AcceptTransaction", t, nil)
 	return
 }
 
 // listen waits until a new block or transaction arrives, then attempts to
 // process and rebroadcast it.
-func (e *Environment) listen() {
+func (c *Core) listen() {
 	for {
 		select {
-		case b := <-e.blockChan:
-			e.processBlock(b)
+		case b := <-c.blockChan:
+			c.processBlock(b)
 
-		case t := <-e.transactionChan:
-			e.processTransaction(t)
+		case t := <-c.transactionChan:
+			c.processTransaction(t)
 		}
 	}
 }

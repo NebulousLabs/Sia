@@ -26,7 +26,7 @@ type Renter struct {
 }
 
 // RentedFiles returns a list of files that the renter is aware of.
-func (e *Environment) RentedFiles() (files []string) {
+func (e *Core) RentedFiles() (files []string) {
 	for filename := range e.renter.Files {
 		files = append(files, filename)
 	}
@@ -35,7 +35,7 @@ func (e *Environment) RentedFiles() (files []string) {
 
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (e *Environment) ClientProposeContract(filename, nickname string) (err error) {
+func (e *Core) ClientProposeContract(filename, nickname string) (err error) {
 	// Find a host.
 	host, err := e.hostDatabase.ChooseHost()
 	if err != nil {
@@ -136,7 +136,7 @@ func (e *Environment) ClientProposeContract(filename, nickname string) (err erro
 
 // Download requests a file from the host it was stored with, and downloads it
 // into the specified filename.
-func (e *Environment) Download(nickname, filename string) (err error) {
+func (e *Core) Download(nickname, filename string) (err error) {
 	fe, ok := e.renter.Files[nickname]
 	if !ok {
 		return errors.New("no file entry for file: " + nickname)

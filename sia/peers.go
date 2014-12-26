@@ -7,31 +7,31 @@ import (
 )
 
 // AddPeer adds a peer.
-func (e *Environment) AddPeer(addr network.Address) {
-	e.server.AddPeer(addr)
+func (c *Core) AddPeer(addr network.Address) {
+	c.server.AddPeer(addr)
 }
 
 // initializeNetwork registers the rpcs and bootstraps to the network,
 // downlading all of the blocks and establishing a peer list.
-func (e *Environment) initializeNetwork(addr string, nobootstrap bool) (err error) {
-	e.server, err = network.NewTCPServer(addr)
+func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
+	c.server, err = network.NewTCPServer(addr)
 	if err != nil {
 		return
 	}
 
-	e.server.Register("AcceptBlock", e.AcceptBlock)
-	e.server.Register("AcceptTransaction", e.AcceptTransaction)
-	e.server.Register("SendBlocks", e.SendBlocks)
-	e.server.Register("NegotiateContract", e.NegotiateContract)
-	e.server.Register("RetrieveFile", e.RetrieveFile)
+	c.server.Register("AcceptBlock", c.AcceptBlock)
+	c.server.Register("AcceptTransaction", c.AcceptTransaction)
+	c.server.Register("SendBlocks", c.SendBlocks)
+	c.server.Register("NegotiateContract", c.NegotiateContract)
+	c.server.Register("RetrieveFile", c.RetrieveFile)
 
 	if nobootstrap {
-		go e.listen()
+		go c.listen()
 		return
 	}
 
 	// establish an initial peer list
-	if err = e.server.Bootstrap(); err != nil {
+	if err = c.server.Bootstrap(); err != nil {
 		return
 	}
 
@@ -39,7 +39,7 @@ func (e *Environment) initializeNetwork(addr string, nobootstrap bool) (err erro
 	// empty batch is sent.
 	go func() {
 		// Catch up the first time.
-		go e.CatchUp(e.server.RandomPeer())
+		go c.CatchUp(c.server.RandomPeer())
 
 		// Every 2 minutes call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
@@ -47,16 +47,16 @@ func (e *Environment) initializeNetwork(addr string, nobootstrap bool) (err erro
 		// make the network substantially more robust.
 		for {
 			time.Sleep(time.Minute * 2)
-			go e.CatchUp(e.RandomPeer())
+			go c.CatchUp(c.RandomPeer())
 		}
 	}()
 
-	go e.listen()
+	go c.listen()
 
 	return nil
 }
 
 // RemovePeer removes a peer.
-func (e *Environment) RemovePeer(addr network.Address) {
-	e.server.RemovePeer(addr)
+func (c *Core) RemovePeer(addr network.Address) {
+	c.server.RemovePeer(addr)
 }

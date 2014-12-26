@@ -33,35 +33,35 @@ type Miner interface {
 }
 
 // StartMining calls StartMining on the miner.
-func (e *Environment) StartMining() error {
-	return e.miner.StartMining()
+func (c *Core) StartMining() error {
+	return c.miner.StartMining()
 }
 
 // StopMining calls StopMining on the miner.
-func (e *Environment) StopMining() error {
-	return e.miner.StopMining()
+func (c *Core) StopMining() error {
+	return c.miner.StopMining()
 }
 
 // MinerInfo calls Info on the miner.
-func (e *Environment) MinerInfo() ([]byte, error) {
-	return e.miner.Info()
+func (c *Core) MinerInfo() ([]byte, error) {
+	return c.miner.Info()
 }
 
 // updateMiner needs to be called with the state read-locked. updateMiner takes
 // a miner as input and calls `miner.Update()` with all of the recent values
 // from the state. Usually, but not always, the call will be
-// e.updateMiner(e.miner).
-func (e *Environment) updateMiner(miner Miner) (err error) {
-	recentBlock := e.state.CurrentBlock()
-	transactionSet := e.state.TransactionPoolDump()
-	target := e.state.CurrentTarget()
-	earliestTimestamp := e.state.EarliestLegalTimestamp()
+// c.updateMiner(c.miner).
+func (c *Core) updateMiner(miner Miner) (err error) {
+	recentBlock := c.state.CurrentBlock()
+	transactionSet := c.state.TransactionPoolDump()
+	target := c.state.CurrentTarget()
+	earliestTimestamp := c.state.EarliestLegalTimestamp()
 
 	// Get a new address if the recent block belongs to us, otherwise use the
 	// current address.
-	address := e.miner.SubsidyAddress()
+	address := c.miner.SubsidyAddress()
 	if address == recentBlock.MinerAddress {
-		address, err = e.wallet.CoinAddress()
+		address, err = c.wallet.CoinAddress()
 		if err != nil {
 			return
 		}
@@ -74,13 +74,13 @@ func (e *Environment) updateMiner(miner Miner) (err error) {
 
 // ReplaceMiner terminates the existing miner and replaces it with the new
 // miner. ReplaceMiner will not call `StartMining()` on the new miner.
-func (e *Environment) ReplaceMiner(miner Miner) {
+func (c *Core) ReplaceMiner(miner Miner) {
 	// Fill out the new miner with the most recent block information.
-	e.state.RLock()
-	e.updateMiner(miner)
-	e.state.RUnlock()
+	c.state.RLock()
+	c.updateMiner(miner)
+	c.state.RUnlock()
 
 	// Kill and replace the existing miner.
-	e.miner.StopMining()
-	e.miner = miner
+	c.miner.StopMining()
+	c.miner = miner
 }

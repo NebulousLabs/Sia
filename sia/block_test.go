@@ -7,7 +7,7 @@ import (
 )
 
 // testEmptyBlock creates an emtpy block and submits it to the state, checking that a utxo is created for the miner subisdy.
-func testEmptyBlock(t *testing.T, e *Environment) {
+func testEmptyBlock(t *testing.T, e *Core) {
 	// Check that the block will actually be empty.
 	if len(e.state.TransactionPoolDump()) != 0 {
 		t.Error("TransactionPoolDump is not of len 0")
@@ -28,7 +28,7 @@ func testEmptyBlock(t *testing.T, e *Environment) {
 
 // testTransactionBlock creates a transaction and checks that it makes it into
 // the utxo set.
-func testTransactionBlock(t *testing.T, e *Environment) {
+func testTransactionBlock(t *testing.T, e *Core) {
 	// As a prereq the balance of the wallet needs to be non-zero.
 	// Alternatively we could probably mine a block.
 	if e.wallet.Balance(false) == 0 {

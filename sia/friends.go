@@ -10,7 +10,7 @@ import (
 // LoadCoinAddress loads a coin address from a file and adds that address to
 // the friend list using the input name. An error is returned if the name is
 // already in the friend list.
-func (e *Environment) LoadCoinAddress(filename string, friendName string) (err error) {
+func (c *Core) LoadCoinAddress(filename string, friendName string) (err error) {
 	// Open the file and read the key to a friend map.
 	file, err := os.Open(filename)
 	if err != nil {
@@ -33,14 +33,14 @@ func (e *Environment) LoadCoinAddress(filename string, friendName string) (err e
 	}
 
 	// Add the address to the friends list.
-	e.friends[friendName] = address
+	c.friends[friendName] = address
 
 	return
 }
 
-func (e *Environment) FriendMap() (safeMap map[string]consensus.CoinAddress) {
+func (c *Core) FriendMap() (safeMap map[string]consensus.CoinAddress) {
 	safeMap = make(map[string]consensus.CoinAddress)
-	for key, value := range e.friends {
+	for key, value := range c.friends {
 		safeMap[key] = value
 	}
 	return

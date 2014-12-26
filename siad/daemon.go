@@ -11,7 +11,7 @@ import (
 )
 
 type daemon struct {
-	core *sia.Environment
+	core *sia.Core
 
 	styleDir    string
 	downloadDir string
@@ -65,7 +65,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	d.core, err = sia.CreateEnvironment(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
+	d.core, err = sia.CreateCore(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
 	if err != nil {
 		return
 	}

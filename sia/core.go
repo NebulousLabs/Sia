@@ -7,10 +7,10 @@ import (
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
-// Environment is the struct that serves as the state for siad. It contains a
+// Core is the struct that serves as the state for siad. It contains a
 // pointer to the state, as things like a wallet, a friend list, etc. Each
 // environment should have its own state.
-type Environment struct {
+type Core struct {
 	state *consensus.State
 
 	server       *network.TCPServer
@@ -32,14 +32,14 @@ type Environment struct {
 	walletFile string
 }
 
-// createEnvironment creates a server, host, miner, renter and wallet and
+// createCore creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
 //
-// TODO: swap out the way that CreateEnvironment is called so that the wallet,
+// TODO: swap out the way that CreateCore is called so that the wallet,
 // host, etc. can all be used as input - or not supplied at all.
-func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (e *Environment, err error) {
-	e = &Environment{
+func CreateCore(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (c *Core, err error) {
+	c = &Core{
 		friends:         make(map[string]consensus.CoinAddress),
 		blockChan:       make(chan consensus.Block, 100),
 		transactionChan: make(chan consensus.Transaction, 100),
@@ -47,40 +47,40 @@ func CreateEnvironment(hostDir string, walletFile string, serverAddr string, nob
 		walletFile:      walletFile,
 	}
 	var genesisOutputDiffs []consensus.OutputDiff
-	e.state, genesisOutputDiffs = consensus.CreateGenesisState()
-	e.hostDatabase = CreateHostDatabase()
-	e.host = CreateHost()
-	e.miner = miner.New(e.blockChan, 1)
-	e.renter = CreateRenter()
-	e.wallet, err = wallet.New(e.walletFile)
+	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
+	c.hostDatabase = CreateHostDatabase()
+	c.host = CreateHost()
+	c.miner = miner.New(c.blockChan, 1)
+	c.renter = CreateRenter()
+	c.wallet, err = wallet.New(c.walletFile)
 	if err != nil {
 		return
 	}
 
 	// Update componenets to see genesis block.
-	err = e.updateMiner(e.miner)
+	err = c.updateMiner(c.miner)
 	if err != nil {
 		return
 	}
-	err = e.wallet.Update(genesisOutputDiffs)
+	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}
 
 	// Bootstrap to the network.
-	err = e.initializeNetwork(serverAddr, nobootstrap)
+	err = c.initializeNetwork(serverAddr, nobootstrap)
 	if err == network.ErrNoPeers {
 		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
 	} else if err != nil {
 		return
 	}
-	e.host.Settings.IPAddress = e.server.Address()
+	c.host.Settings.IPAddress = c.server.Address()
 
 	return
 }
 
 // Close does any finishing maintenence before the environment can be garbage
 // collected. Right now that just means closing the server.
-func (e *Environment) Close() {
-	e.server.Close()
+func (c *Core) Close() {
+	c.server.Close()
 }

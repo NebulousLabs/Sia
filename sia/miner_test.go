@@ -6,15 +6,15 @@ import (
 
 // mineSingleBlock mines a single block and then uses the blocking function
 // processBlock to integrate the block with the state.
-func mineSingleBlock(t *testing.T, e *Environment) {
-	b, found, err := e.miner.SolveBlock()
+func mineSingleBlock(t *testing.T, c *Core) {
+	b, found, err := c.miner.SolveBlock()
 	for !found && err == nil {
-		b, found, err = e.miner.SolveBlock()
+		b, found, err = c.miner.SolveBlock()
 	}
 	if err != nil {
 		t.Error(err)
 	}
-	err = e.processBlock(b)
+	err = c.processBlock(b)
 	if err != nil {
 		t.Error(err)
 	}

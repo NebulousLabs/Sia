@@ -54,15 +54,15 @@ func CreateHost() (h *Host) {
 }
 
 // HostSettings returns the host's settings.
-func (e *Environment) HostSettings() HostAnnouncement {
+func (e *Core) HostSettings() HostAnnouncement {
 	e.host.RLock()
 	defer e.host.RUnlock()
 	return e.host.Settings
 }
 
 // SetHostSettings changes the settings according to the input. Need a setter
-// because Environment.host is not exported.
-func (e *Environment) SetHostSettings(ha HostAnnouncement) {
+// because Core.host is not exported.
+func (e *Core) SetHostSettings(ha HostAnnouncement) {
 	e.host.Lock()
 	defer e.host.Unlock()
 
@@ -73,7 +73,7 @@ func (e *Environment) SetHostSettings(ha HostAnnouncement) {
 
 // HostSpaceRemaining returns the amount of unsold space that the host has
 // allocated.
-func (e *Environment) HostSpaceRemaining() int64 {
+func (e *Core) HostSpaceRemaining() int64 {
 	e.host.RLock()
 	defer e.host.RUnlock()
 	return e.host.SpaceRemaining
@@ -81,7 +81,7 @@ func (e *Environment) HostSpaceRemaining() int64 {
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
-func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight, minerFee consensus.Currency) (t consensus.Transaction, err error) {
+func (e *Core) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight, minerFee consensus.Currency) (t consensus.Transaction, err error) {
 	// Get the encoded announcement based on the host settings.
 	e.host.RLock()
 	info := e.host.Settings
@@ -125,7 +125,7 @@ func (e *Environment) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUn
 // updated contract is signed and returned.
 //
 // TODO: Reconsider locking strategy for this function.
-func (e *Environment) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
+func (e *Core) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
 	e.host.Lock()
 	defer e.host.Unlock()
 
@@ -235,7 +235,7 @@ func (e *Environment) considerContract(t consensus.Transaction) (updatedTransact
 // submitting proofs of storage.
 //
 // TODO: Reconsider locking model for this function.
-func (e *Environment) NegotiateContract(conn net.Conn) (err error) {
+func (e *Core) NegotiateContract(conn net.Conn) (err error) {
 	// Read the transaction.
 	var t consensus.Transaction
 	if err = encoding.ReadObject(conn, &t, maxContractLen); err != nil {
@@ -313,7 +313,7 @@ func (e *Environment) NegotiateContract(conn net.Conn) (err error) {
 }
 
 // RetrieveFile is an RPC that uploads a specified file to a client.
-func (e *Environment) RetrieveFile(conn net.Conn) (err error) {
+func (e *Core) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
 	var merkle hash.Hash
 	if err = encoding.ReadObject(conn, &merkle, hash.HashSize); err != nil {
@@ -348,7 +348,7 @@ func (e *Environment) RetrieveFile(conn net.Conn) (err error) {
 
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
-func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeight consensus.BlockHeight) (sp consensus.StorageProof, err error) {
+func (e *Core) createStorageProof(contractEntry ContractEntry, stateHeight consensus.BlockHeight) (sp consensus.StorageProof, err error) {
 	// Get the file associated with the contract.
 	filename, ok := e.host.Files[contractEntry.Contract.FileMerkleRoot]
 	if !ok {
@@ -391,7 +391,7 @@ func (e *Environment) createStorageProof(contractEntry ContractEntry, stateHeigh
 //
 // TODO: Make sure that hosts don't need to submit a storage proof for the last
 // window.
-func (e *Environment) storageProofMaintenance(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
+func (e *Core) storageProofMaintenance(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
 	// Resubmit any proofs that changed as a result of the rewinding.
 	height := initialStateHeight
 	var proofs []consensus.StorageProof

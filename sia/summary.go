@@ -29,14 +29,11 @@ type DeepStateInfo struct {
 	TransactionList []consensus.Transaction
 }
 
-// EnvironmentInfo contains lightweight information about the environment.
-// Controvertially, instead of using canonical types, EnvironmentInfo switches
+// CoreInfo contains lightweight information about the environment.
+// Controvertially, instead of using canonical types, CoreInfo switches
 // out a few of the types to be more human readable.
-type EnvironmentInfo struct {
+type CoreInfo struct {
 	StateInfo StateInfo
-
-	WalletBalance     consensus.Currency
-	FullWalletBalance consensus.Currency
 
 	RenterFiles []string
 
@@ -44,8 +41,6 @@ type EnvironmentInfo struct {
 	HostSettings       HostAnnouncement
 	HostSpaceRemaining int64
 	HostContractCount  int
-
-	Mining string
 }
 
 // StateInfo returns a bunch of useful information about the state, doing
@@ -54,7 +49,7 @@ type EnvironmentInfo struct {
 // Because it's just a read-only call, it will not adversely affect the state.
 // If accurate data is paramount, SafeStateInfo() should be called, though this
 // can adversely affect performance.
-func (e *Environment) StateInfo() StateInfo {
+func (e *Core) StateInfo() StateInfo {
 	e.state.RLock()
 	defer e.state.RUnlock()
 
@@ -67,7 +62,7 @@ func (e *Environment) StateInfo() StateInfo {
 	}
 }
 
-func (e *Environment) DeepStateInfo() DeepStateInfo {
+func (e *Core) DeepStateInfo() DeepStateInfo {
 	e.state.RLock()
 	defer e.state.RUnlock()
 
@@ -80,12 +75,9 @@ func (e *Environment) DeepStateInfo() DeepStateInfo {
 }
 
 // EnvrionmentInfo returns a bunch of simple information about the environment.
-func (e *Environment) Info() (eInfo EnvironmentInfo) {
-	eInfo = EnvironmentInfo{
+func (e *Core) Info() (eInfo CoreInfo) {
+	eInfo = CoreInfo{
 		StateInfo: e.StateInfo(),
-
-		WalletBalance:     e.WalletBalance(false),
-		FullWalletBalance: e.WalletBalance(true),
 
 		IPAddress:          e.server.Address(),
 		HostSettings:       e.HostSettings(),
@@ -108,44 +100,44 @@ func (e *Environment) Info() (eInfo EnvironmentInfo) {
 // Output returns the output that corresponds with a certain OutputID. It does
 // not lock the mutex, which means it could potentially (but usually doesn't)
 // produce weird or incorrect output.
-func (e *Environment) Output(id consensus.OutputID) (output consensus.Output, err error) {
+func (e *Core) Output(id consensus.OutputID) (output consensus.Output, err error) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 	return e.state.Output(id)
 }
 
-func (e *Environment) Height() consensus.BlockHeight {
+func (e *Core) Height() consensus.BlockHeight {
 	e.state.RLock()
 	defer e.state.RUnlock()
 	return e.state.Height()
 }
 
-func (e *Environment) TransactionList() []consensus.Transaction {
+func (e *Core) TransactionList() []consensus.Transaction {
 	e.state.RLock()
 	defer e.state.RUnlock()
 	return e.state.TransactionList()
 }
 
-func (e *Environment) BlockFromID(bid consensus.BlockID) (consensus.Block, error) {
+func (e *Core) BlockFromID(bid consensus.BlockID) (consensus.Block, error) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 	return e.state.BlockFromID(bid)
 }
 
-func (e *Environment) BlockAtHeight(height consensus.BlockHeight) (consensus.Block, error) {
+func (e *Core) BlockAtHeight(height consensus.BlockHeight) (consensus.Block, error) {
 	e.state.RLock()
 	defer e.state.RUnlock()
 	return e.state.BlockAtHeight(height)
 }
 
-func (e *Environment) AddressBook() []network.Address {
+func (e *Core) AddressBook() []network.Address {
 	return e.server.AddressBook()
 }
 
-func (e *Environment) RandomPeer() network.Address {
+func (e *Core) RandomPeer() network.Address {
 	return e.server.RandomPeer()
 }
 
-func (e *Environment) Address() network.Address {
+func (e *Core) Address() network.Address {
 	return e.server.Address()
 }

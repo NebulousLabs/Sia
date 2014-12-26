@@ -9,7 +9,7 @@ import (
 // testSendToSelf does a send from the wallet to itself, and checks that all of
 // the balance reporting at each step makes sense, and then checks that all of
 // the coins are still sendable.
-func testSendToSelf(t *testing.T, e *Environment) {
+func testSendToSelf(t *testing.T, e *Core) {
 	if e.wallet.Balance(false) == 0 {
 		t.Error("e.wallet is empty.")
 		return
@@ -50,8 +50,8 @@ func testSendToSelf(t *testing.T, e *Environment) {
 
 // testWalletInfo calles wallet.Info to see if an error is thrown. Also make sure
 // there is no deadlock.
-func testWalletInfo(t *testing.T, e *Environment) {
-	_, err := e.WalletInfo()
+func testWalletInfo(t *testing.T, c *Core) {
+	_, err := c.WalletInfo()
 	if err != nil {
 		t.Error(err)
 	}
