@@ -6,10 +6,13 @@ fmt:
 install: fmt
 	go install ./...
 
-test: install
+clean:
+	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf siacore/test.wallet
+
+test: clean install
 	go test -short ./...
 
-test-long: install
+test-long: clean install
 	go test -v -race -tags=debug ./...
 
 # run twice to ensure references are updated properly
@@ -22,9 +25,6 @@ dependencies:
 	go get -u code.google.com/p/gcfg
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
-
-clean:
-	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf siacore/test.wallet
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:

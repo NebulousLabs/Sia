@@ -52,9 +52,9 @@ func establishTestingEnvironment(t *testing.T) (e *Core) {
 // I'm not sure how to test asynchronous code, so at this point I don't try, I
 // only test the synchronous parts.
 func TestEverything(t *testing.T) {
-	e := establishTestingEnvironment(t)
-	testEmptyBlock(t, e)
-	testTransactionBlock(t, e)
-	testSendToSelf(t, e)
-	testWalletInfo(t, e)
+	c := establishTestingEnvironment(t)
+	testEmptyBlock(t, c)
+	testTransactionBlock(t, c)
+	testSendToSelf(t, c)
+	testWalletInfo(t, c)
 }
