@@ -1,4 +1,4 @@
-package siacore
+package sia
 
 import (
 	"errors"
@@ -12,15 +12,15 @@ const (
 )
 
 // SendBlocks takes a list of block ids as input, and sends all blocks from
-func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
-	e.state.RLock()
-	defer e.state.RUnlock()
+func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
+	c.state.RLock()
+	defer c.state.RUnlock()
 
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
 	var highest consensus.BlockHeight
 	for _, id := range knownBlocks {
-		height, err := e.state.HeightOfBlock(id)
+		height, err := c.state.HeightOfBlock(id)
 		if err == nil {
 			found = true
 			if height > highest {
@@ -38,7 +38,7 @@ func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []co
 
 	// Send over all blocks from the first known block.
 	for i := highest; i < highest+MaxCatchUpBlocks; i++ {
-		b, err := e.state.BlockAtHeight(i)
+		b, err := c.state.BlockAtHeight(i)
 		if err != nil {
 			break
 		}
@@ -53,11 +53,11 @@ func (e *Environment) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []co
 // progressing exponentially backwards to the genesis block. The receiver uses
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
-func (e *Environment) CatchUp(peer network.Address) {
-	e.state.RLock() // Lock the state while building the block request.
+func (c *Core) CatchUp(peer network.Address) {
+	c.state.RLock() // Lock the state while building the block request.
 	knownBlocks := make([]consensus.BlockID, 0, 32)
 	for i := consensus.BlockHeight(0); i < 12; i++ {
-		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - i)
+		block, badBlockErr := c.state.BlockAtHeight(c.state.Height() - i)
 		if badBlockErr != nil {
 			break
 		}
@@ -67,16 +67,16 @@ func (e *Environment) CatchUp(peer network.Address) {
 	backtrace := consensus.BlockHeight(12)
 	for i := 12; i < 31; i++ {
 		backtrace *= 2
-		block, badBlockErr := e.state.BlockAtHeight(e.state.Height() - backtrace)
+		block, badBlockErr := c.state.BlockAtHeight(c.state.Height() - backtrace)
 		if badBlockErr != nil {
 			break
 		}
 		knownBlocks = append(knownBlocks, block.ID())
 	}
 	// always include the genesis block
-	genesis, _ := e.state.BlockAtHeight(0)
+	genesis, _ := c.state.BlockAtHeight(0)
 	knownBlocks = append(knownBlocks, genesis.ID())
-	e.state.RUnlock() // Lock is released once the set of known blocks has been built.
+	c.state.RUnlock() // Lock is released once the set of known blocks has been built.
 
 	// prepare for RPC
 	var newBlocks []consensus.Block
@@ -90,15 +90,15 @@ func (e *Environment) CatchUp(peer network.Address) {
 		return
 	}
 
-	prevHeight := e.Height()
+	prevHeight := c.Height()
 	for _, block := range newBlocks {
-		e.processBlock(block) // processBlock is a blocking function.
+		c.processBlock(block) // processBlock is a blocking function.
 	}
 
 	// TODO: There is probably a better approach than to call CatchUp
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
-	if prevHeight != e.Height() {
-		go e.CatchUp(e.RandomPeer())
+	if prevHeight != c.Height() {
+		go c.CatchUp(c.RandomPeer())
 	}
 }

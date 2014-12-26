@@ -1,4 +1,4 @@
-package siacore
+package sia
 
 import (
 	"crypto/rand"
@@ -73,7 +73,7 @@ func (h *HostEntry) Weight() consensus.Currency {
 // in the Galaxy. Any attempt to ridicule such a glorious name will result in
 // immediate deprication of all clothes. Needs to be under a hostdb and state
 // lock.
-func (e *Environment) pullHostEntryFromTransaction(t consensus.Transaction) (he HostEntry, foundAHostEntry bool) {
+func (e *Core) pullHostEntryFromTransaction(t consensus.Transaction) (he HostEntry, foundAHostEntry bool) {
 	// Check the arbitrary data of the transaction to fill out the host database.
 	if len(t.ArbitraryData) == 0 {
 		return
@@ -128,7 +128,7 @@ func (e *Environment) pullHostEntryFromTransaction(t consensus.Transaction) (he 
 
 // scanAndApplyHosts looks at the arbitrary data of a transaction and adds any
 // hosts to the host database. Needs to be under a hostdb and state lock.
-func (e *Environment) updateHostDB(rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
+func (e *Core) updateHostDB(rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
 	// Remove hosts found in blocks that were rewound. Because the hostdb is
 	// like a stack, you can just pop the hosts and be certain that they are
 	// the same hosts.

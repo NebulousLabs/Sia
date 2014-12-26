@@ -1,4 +1,4 @@
-package siacore
+package sia
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
@@ -78,51 +78,51 @@ type Wallet interface {
 // SpendCoins creates a transaction sending 'amount' to 'dest', and
 // allocateding 'minerFee' as a miner fee. The transaction is submitted to the
 // miner pool, but is also returned.
-func (e *Environment) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
+func (c *Core) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
 	minerFee := consensus.Currency(10) // TODO: wallet supplied miner fee
 	output := consensus.Output{
 		Value:     amount,
 		SpendHash: dest,
 	}
-	id, err := e.wallet.RegisterTransaction(t)
+	id, err := c.wallet.RegisterTransaction(t)
 	if err != nil {
 		return
 	}
-	err = e.wallet.FundTransaction(id, amount+minerFee)
+	err = c.wallet.FundTransaction(id, amount+minerFee)
 	if err != nil {
 		return
 	}
-	err = e.wallet.AddMinerFee(id, minerFee)
+	err = c.wallet.AddMinerFee(id, minerFee)
 	if err != nil {
 		return
 	}
-	err = e.wallet.AddOutput(id, output)
+	err = c.wallet.AddOutput(id, output)
 	if err != nil {
 		return
 	}
-	t, err = e.wallet.SignTransaction(id, true)
+	t, err = c.wallet.SignTransaction(id, true)
 	if err != nil {
 		return
 	}
-	err = e.AcceptTransaction(t)
+	err = c.AcceptTransaction(t)
 	return
 }
 
 // WalletBalance counts up the total number of coins that the wallet knows how
 // to spend, according to the State. WalletBalance will ignore all unconfirmed
 // transactions that have been created.
-func (e *Environment) WalletBalance(full bool) consensus.Currency {
-	return e.wallet.Balance(full)
+func (c *Core) WalletBalance(full bool) consensus.Currency {
+	return c.wallet.Balance(full)
 }
 
 // CoinAddress returns the CoinAddress which foreign coins should
 // be sent to.
-func (e *Environment) CoinAddress() (consensus.CoinAddress, error) {
-	return e.wallet.CoinAddress()
+func (c *Core) CoinAddress() (consensus.CoinAddress, error) {
+	return c.wallet.CoinAddress()
 }
 
 // Returns a []byte that's supposed to be json of some struct.
-func (e *Environment) WalletInfo() ([]byte, error) {
-	return e.wallet.Info()
+func (c *Core) WalletInfo() ([]byte, error) {
+	return c.wallet.Info()
 }

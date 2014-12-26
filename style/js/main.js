@@ -16,7 +16,13 @@ function continuousUpdate() {
 	var resp = httpGet("/json/status");
 	var stats = JSON.parse(resp);
 
-	safeSetElem('miningStatus', 'Mining Status: ' + stats.Mining);
+	var miningResp = httpGet("/miner/status")
+	var miningStats = JSON.parse(miningResp)
+	safeSetElem('miningStatus',
+		'Mining Status: ' + miningStats.State +
+		'<br>Threads: ' + miningStats.RunningThreads
+	);
+
 	safeSetElem('blockStatus',
 		'Current Height: ' + stats.StateInfo.Height +
 		'<br>Current Target: ' + stats.StateInfo.Target +
@@ -43,6 +49,7 @@ function updatePage() {
 	var stats = continuousUpdate()
 	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
+	/*
 	var rentStatusInnerHTML = ""
 	if(stats.RenterFiles != null) {
 		for (s in stats.RenterFiles) {
@@ -72,6 +79,7 @@ function updatePage() {
 	// safeSetValue('hostPrice', stats.HostSettings.Price)
 	// safeSetValue('hostBurn', stats.HostSettings.Burn)
 	// safeSetValue('hostCoinAddress', stats.HostSettings.CoinAddress)
+	*/
 }
 
 function httpGet(url) {
@@ -87,9 +95,14 @@ function responseBoxGet(url) {
 	updatePage()
 }
 
-function toggleMining() {
-	var mining = JSON.parse(httpGet("/json/status")).Mining == "On";
-	responseBoxGet("/mine?toggle=" + (mining ? "off" : "on"));
+function turnOnMiner() {
+	var threads = document.getElementById('minerThreads').value;
+	var request = "/miner/start?threads="+threads;
+	responseBoxGet(request);
+}
+
+function turnOffMiner() {
+	responseBoxGet("/miner/stop");
 }
 
 function reqAddress() {
@@ -99,11 +112,11 @@ function reqAddress() {
 function sendMoney() {
 	var destination = document.getElementById('destinationAddress').value;
 	var amount = document.getElementById('amountToSend').value;
-	var fee = document.getElementById('minerFee').value;
-	var request = "/wallet/send?amount="+amount+"&fee="+fee+"&dest="+destination;
+	var request = "/wallet/send?amount="+amount+"&dest="+destination;
 	responseBoxGet(request);
 }
 
+/*
 function rentFile() {
 	var sourceFile = document.getElementById('rentSourceFile').value.replace('file://', '');
 	var nickname = document.getElementById('rentNickname').value;
@@ -151,3 +164,4 @@ function hostAnnounce() {
 function downloadFile(nick) {
 	responseBoxGet("/download?nickname="+nick);
 }
+*/

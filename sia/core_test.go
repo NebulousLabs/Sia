@@ -1,4 +1,4 @@
-package siacore
+package sia
 
 import (
 	"math/big"
@@ -9,7 +9,7 @@ import (
 )
 
 // establishTestingEnvrionment sets all of the testEnv variables.
-func establishTestingEnvironment(t *testing.T) (e *Environment) {
+func establishTestingEnvironment(t *testing.T) (e *Core) {
 	// Alter the constants to create a system more friendly to testing.
 	//
 	// TODO: Perhaps also have these constants as a build flag, then they don't
@@ -21,7 +21,7 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
-	e, err := CreateEnvironment("host", "test.wallet", ":9988", true)
+	e, err := CreateCore("host", "test.wallet", ":9988", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +52,9 @@ func establishTestingEnvironment(t *testing.T) (e *Environment) {
 // I'm not sure how to test asynchronous code, so at this point I don't try, I
 // only test the synchronous parts.
 func TestEverything(t *testing.T) {
-	e := establishTestingEnvironment(t)
-	testEmptyBlock(t, e)
-	testTransactionBlock(t, e)
-	testSendToSelf(t, e)
+	c := establishTestingEnvironment(t)
+	testEmptyBlock(t, c)
+	testTransactionBlock(t, c)
+	testSendToSelf(t, c)
+	testWalletInfo(t, c)
 }
