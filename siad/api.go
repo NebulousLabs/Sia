@@ -44,7 +44,7 @@ func (d *daemon) setUpHandlers(addr string) {
 
 // jsonStatusHandler responds to a status call with a json object of the status.
 func (d *daemon) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := d.core.Info()
+	status := d.core.StateInfo()
 	resp, err := json.Marshal(status)
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
