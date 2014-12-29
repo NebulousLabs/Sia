@@ -26,7 +26,7 @@ func (hn *hostNode) createNode(entry *HostEntry) *hostNode {
 	}
 }
 
-// insert inserts a host entry into the node.
+// insert inserts a host entry into the node. insert is recursive.
 func (hn *hostNode) insert(entry *HostEntry) {
 	if hn.left == nil {
 		hn.left = hn.createNode(entry)
@@ -42,4 +42,25 @@ func (hn *hostNode) insert(entry *HostEntry) {
 
 	hn.count++
 	hn.weight += entry.Weight()
+}
+
+// remove takes a node and removes it from the tree by climbing through the
+// list of parents.
+func (hn *hostNode) remove() {
+	prev := hn
+	current := hn.parent
+	for current != nil {
+		if current.left == prev {
+			current.left = nil
+		} else if current.right == prev {
+			current.right = nil
+		} else {
+			panic("malformed tree!")
+		}
+
+		current.count--
+		current.weight -= hn.hostEntry.Weight()
+		prev = current
+		current = current.parent
+	}
 }
