@@ -57,12 +57,10 @@ type HostEntry struct {
 	CoinAddress consensus.CoinAddress
 }
 
-/*
-func CreateHostDatabase() (hdb *HostDatabase) {
+func New() (hdb *HostDatabase) {
 	hdb = new(HostDatabase)
 	return
 }
-*/
 
 // host.Weight() determines the weight of a specific host, which is:
 //

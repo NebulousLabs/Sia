@@ -5,7 +5,10 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// hostNode is the node of an unsorted, balanced, weighted binary tree.
+// hostNode is the node of an unsorted, balanced, weighted binary tree. When
+// inserting elements, elements are inserted on the side of the tree with the
+// fewest elements. When removing, the node is just made empty but the tree is
+// not reorganized.
 type hostNode struct {
 	parent *hostNode
 	weight consensus.Currency // cumulative weight of this node and all children.
@@ -27,41 +30,43 @@ func (hn *hostNode) createNode(entry *HostEntry) *hostNode {
 	}
 }
 
-// insert inserts a host entry into the node. insert is recursive.
-func (hn *hostNode) insert(entry *HostEntry) {
+// insert inserts a host entry into the node. insert is recursive. The value
+// returned is the number of nodes added to the tree, always 1 or 0.
+func (hn *hostNode) insert(entry *HostEntry) int {
+	hn.weight += entry.Weight()
+
+	// If the current node is empty, add the entry but don't increase the
+	// count.
+	if hn.hostEntry == nil {
+		hn.hostEntry = entry
+		return 0
+	}
+
+	// Insert the element into the lightest side.
+	var nodesAdded int
 	if hn.left == nil {
 		hn.left = hn.createNode(entry)
+		nodesAdded = 1
 	} else if hn.right == nil {
 		hn.right = hn.createNode(entry)
-	}
-
-	if hn.left.weight < hn.right.weight {
-		hn.left.insert(entry)
+		nodesAdded = 1
+	} else if hn.left.weight < hn.right.weight {
+		nodesAdded = hn.left.insert(entry)
 	} else {
-		hn.right.insert(entry)
+		nodesAdded = hn.right.insert(entry)
 	}
 
-	hn.count++
-	hn.weight += entry.Weight()
+	hn.count += nodesAdded
+	return nodesAdded
 }
 
 // remove takes a node and removes it from the tree by climbing through the
-// list of parents.
+// list of parents. Remove does not delete nodes.
 func (hn *hostNode) remove() {
-	prev := hn
+	hn.weight -= hn.hostEntry.Weight()
 	current := hn.parent
 	for current != nil {
-		if current.left == prev {
-			current.left = nil
-		} else if current.right == prev {
-			current.right = nil
-		} else {
-			panic("malformed tree!")
-		}
-
-		current.count--
 		current.weight -= hn.hostEntry.Weight()
-		prev = current
 		current = current.parent
 	}
 }
@@ -86,6 +91,11 @@ func (hn *hostNode) elementAtWeight(weight consensus.Currency) (entry HostEntry,
 	}
 	if hn.right != nil {
 		return hn.right.elementAtWeight(weight)
+	}
+
+	// Sanity check
+	if hn.hostEntry == nil {
+		panic("should not be returning a nil entry")
 	}
 
 	// Return the root entry.
