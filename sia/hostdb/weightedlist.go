@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"errors"
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
@@ -63,4 +64,31 @@ func (hn *hostNode) remove() {
 		prev = current
 		current = current.parent
 	}
+}
+
+// elementAtWeight grabs an element in the tree that appears at the given
+// weight. Though the tree has an arbitrary sorting, a sufficiently random
+// weight will pull a random element. The tree is searched through in a
+// post-ordered way.
+func (hn *hostNode) elementAtWeight(weight consensus.Currency) (entry HostEntry, err error) {
+	// Check for an errored weight call.
+	if weight > hn.weight {
+		err = errors.New("tree is not that heavy")
+		return
+	}
+
+	// Check if the left or right child should be returned.
+	if hn.left != nil {
+		if hn.left.weight > weight {
+			return hn.left.elementAtWeight(weight)
+		}
+		weight -= hn.left.weight
+	}
+	if hn.right != nil {
+		return hn.right.elementAtWeight(weight)
+	}
+
+	// Return the root entry.
+	entry = *hn.hostEntry
+	return
 }

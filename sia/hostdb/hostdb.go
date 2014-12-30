@@ -5,7 +5,7 @@ import (
 	// "errors"
 	"math"
 	// "math/big"
-	// "sync"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	// "github.com/NebulousLabs/Sia/encoding"
@@ -13,15 +13,13 @@ import (
 	// "github.com/NebulousLabs/Sia/sia"
 )
 
-/*
 // Need to be easily able to swap hosts in and out of an active and inactive
 // list.
 type HostDatabase struct {
-	HostList    []HostEntry
-	TotalWeight consensus.Currency
+	activeHosts   *hostNode
+	inactiveHosts map[string]*hostNode
 	sync.RWMutex
 }
-*/
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
