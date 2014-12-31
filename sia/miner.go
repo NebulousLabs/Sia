@@ -14,17 +14,17 @@ type Miner interface {
 	// miner while looking for a block.
 	SubsidyAddress() consensus.CoinAddress
 
-	// Update takes a block and a set of transactions. The miner will use the
-	// given block as the parent, and will use the transactions as the set of
-	// transactions in the block.
+	// Update tells the miner what blocks should be getting mined.
+	//
+	// Consider: should Update also provide a block chan?
 	Update(parentID consensus.BlockID, transactionSet []consensus.Transaction, nextTarget consensus.Target, subsidyAddress consensus.CoinAddress, earliestTimestamp consensus.Timestamp) error
 
-	// StartMining takes as input a number of threads to use for mining. 0 will return
-	// an error.
+	// StartMining will turn on the miner and begin consuming computational
+	// cycles.
 	StartMining() error
 
-	// StopMining will take all of the threads down to 0. If mining is already
-	// stopped, an error will be returned.
+	// StopMining will turn of the miner and stop consuming computational
+	// cycles.
 	StopMining() error
 
 	// SolveBlock will attempt to solve a block, returning the most recent
