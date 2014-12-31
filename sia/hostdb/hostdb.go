@@ -48,6 +48,15 @@ func New() (hdb *HostDatabase) {
 	return
 }
 
+// TODO: Implement this.
+func (hdb *HostDatabase) Info() ([]byte, error) {
+	return nil, nil
+}
+
+func (hdb *HostDatabase) Update(rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error {
+	return nil
+}
+
 /*
 // pullHostEntryFromArbitraryData is one of the most cleverly named functions
 // in the Galaxy. Any attempt to ridicule such a glorious name will result in

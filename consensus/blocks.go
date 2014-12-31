@@ -228,7 +228,7 @@ func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) integrateBlock(b *Block) (diffs []OutputDiff, err error) {
+func (s *State) integrateBlock(b Block) (diffs []OutputDiff, err error) {
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -296,7 +296,7 @@ func (s *State) invalidateNode(node *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, appliedBlocks []BlockID, outputDiffs []OutputDiff, err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
 	// children of the parents so that we can re-trace as we
@@ -319,7 +319,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.currentBlockID)
+		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock())
 		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
 	}
 
@@ -329,8 +329,8 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 	// again.
 	validatedBlocks := 0
 	for i := len(parentHistory) - 1; i >= 0; i-- {
-		appliedBlock := s.blockMap[parentHistory[i]].Block
-		appliedBlocks = append(appliedBlocks, appliedBlock.ID())
+		appliedBlock := *s.blockMap[parentHistory[i]].Block
+		appliedBlocks = append(appliedBlocks, appliedBlock)
 		diffSet, err := s.integrateBlock(appliedBlock)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
@@ -344,7 +344,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				_, err = s.integrateBlock(s.blockMap[rewoundBlocks[i]].Block)
+				_, err = s.integrateBlock(rewoundBlocks[i])
 				if err != nil {
 					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
 				}
@@ -377,7 +377,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []BlockID, app
 
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b Block) (rewoundBlocks []BlockID, appliedBlocks []BlockID, outputDiffs []OutputDiff, err error) {
+func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
 	// Check the maps in the state to see if the block is already known.
 	parentBlockNode, err := s.checkMaps(&b)
 	if err != nil {

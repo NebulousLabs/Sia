@@ -39,7 +39,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	// defer c.host.Unlock()
 
 	// initialStateHeight := c.state.Height()
-	_, _, outputDiffs, err := c.state.AcceptBlock(b)
+	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
@@ -50,6 +50,10 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 		return
 	}
 
+	err = c.hostDB.Update(rewoundBlocks, appliedBlocks)
+	if err != nil {
+		return
+	}
 	err = c.wallet.Update(outputDiffs)
 	if err != nil {
 		return
