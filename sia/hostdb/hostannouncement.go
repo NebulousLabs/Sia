@@ -8,8 +8,6 @@ import (
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
 type HostAnnouncement struct {
-	ID string
-
 	IPAddress          network.Address
 	TotalStorage       int64 // Can go negative.
 	MinFilesize        uint64
