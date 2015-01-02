@@ -12,5 +12,5 @@ type HostDB interface {
 
 	// Update gives the hostdb a set of blocks that have been applied and
 	// reversed.
-	Update(rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error
+	Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error
 }

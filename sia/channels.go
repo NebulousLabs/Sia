@@ -38,7 +38,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	// defer c.hostDatabase.Unlock()
 	// defer c.host.Unlock()
 
-	// initialStateHeight := c.state.Height()
+	initialStateHeight := c.state.Height()
 	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
@@ -50,7 +50,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 		return
 	}
 
-	err = c.hostDB.Update(rewoundBlocks, appliedBlocks)
+	err = c.hostDB.Update(initialStateHeight, rewoundBlocks, appliedBlocks)
 	if err != nil {
 		return
 	}
@@ -62,7 +62,6 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	// c.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
 	// c.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
 	// Broadcast all valid blocks.
