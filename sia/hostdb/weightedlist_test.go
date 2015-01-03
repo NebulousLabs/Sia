@@ -98,4 +98,17 @@ func TestWeightedList(t *testing.T) {
 		removedMap[randInt] = struct{}{}
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals, t)
+
+	// Do some more insertions.
+	secondInsertions := 64
+	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
+		entry := HostEntry{
+			ID:     strconv.Itoa(i),
+			Burn:   10,
+			Freeze: 10,
+			Price:  10,
+		}
+		hdb.Insert(entry)
+	}
+	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)
 }

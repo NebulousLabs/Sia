@@ -11,6 +11,9 @@ import (
 // but I think it makes enough sense to define them in the same package that
 // also provides an example (and the primary) implementation of the hostdb
 // interface.
+//
+// Maybe though we can make the HostAnnouncement and the HostEntry their own
+// interfaces.
 
 type HostDB interface {
 	// Info returns an arbitrary byte slice presumably with information about
