@@ -12,8 +12,8 @@ import (
 // Need to be easily able to swap hosts in and out of an active and inactive
 // list.
 type HostDatabase struct {
-	hostTree *hostNode
-	activeHosts map[string]*hostNode
+	hostTree      *hostNode
+	activeHosts   map[string]*hostNode
 	inactiveHosts map[string]*HostEntry
 	sync.RWMutex
 }
@@ -21,8 +21,8 @@ type HostDatabase struct {
 // New returns an empty HostDatabase.
 func New() (hdb *HostDatabase) {
 	hdb = &HostDatabase{
-		activeHosts: make(map[string]*hostNode),
-		inactiveHosts: make(map[string]*hostEntry),
+		activeHosts:   make(map[string]*hostNode),
+		inactiveHosts: make(map[string]*HostEntry),
 	}
 	return
 }
@@ -31,25 +31,31 @@ func (hdb *HostDatabase) Info() ([]byte, error) {
 	return nil, nil
 }
 
-func (hdb *HostDatabase) Insert(entry *HostEntry) error {
-	_, hostNode := hdb.hostTree.insert(entry)
+func (hdb *HostDatabase) Insert(entry HostEntry) error {
+	_, exists := hdb.activeHosts[entry.ID]
+	if exists {
+		return errors.New("entry of given id already exists in host db")
+	}
+
+	_, hostNode := hdb.hostTree.insert(&entry)
 	hdb.activeHosts[entry.ID] = hostNode
+	return nil
 }
 
 func (hdb *HostDatabase) Remove(id string) error {
-	node, exists := activeHosts[id]
+	node, exists := hdb.activeHosts[id]
 	if !exists {
-		_, exists := inactiveHosts[id]
+		_, exists := hdb.inactiveHosts[id]
 		if exists {
-			delete(inactiveHosts, id)
-			return
+			delete(hdb.inactiveHosts, id)
+			return nil
 		} else {
 			return errors.New("id not found in host database")
 		}
 	}
-	delete(activeHosts, id)
+	delete(hdb.activeHosts, id)
 	node.remove()
-	return
+	return nil
 }
 
 func (hdb *HostDatabase) Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) (err error) {
@@ -64,7 +70,7 @@ func (hdb *HostDatabase) Update(initialStateHeight consensus.BlockHeight, rewoun
 		}
 
 		for _, entry := range entries {
-			err = hdb.Remove(entry)
+			err = hdb.Remove(entry.ID)
 			if err != nil {
 				return
 			}
