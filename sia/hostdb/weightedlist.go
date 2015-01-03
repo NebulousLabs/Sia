@@ -1,7 +1,7 @@
 package hostdb
 
 import (
-	"errors"
+	"fmt"
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
@@ -21,9 +21,9 @@ type hostNode struct {
 }
 
 // createNode makes a new node the fill a host entry.
-func (hn *hostNode) createNode(entry *HostEntry) *hostNode {
+func createNode(parent *hostNode, entry *HostEntry) *hostNode {
 	return &hostNode{
-		parent:    hn,
+		parent:    parent,
 		weight:    entry.Weight(),
 		count:     1,
 		hostEntry: entry,
@@ -45,11 +45,11 @@ func (hn *hostNode) insert(entry *HostEntry) (nodesAdded int, newNode *hostNode)
 
 	// Insert the element into the lightest side.
 	if hn.left == nil {
-		hn.left = hn.createNode(entry)
+		hn.left = createNode(hn, entry)
 		nodesAdded = 1
 		newNode = hn.left
 	} else if hn.right == nil {
-		hn.right = hn.createNode(entry)
+		hn.right = createNode(hn, entry)
 		nodesAdded = 1
 		newNode = hn.right
 	} else if hn.left.weight < hn.right.weight {
@@ -80,18 +80,18 @@ func (hn *hostNode) remove() {
 func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry HostEntry, err error) {
 	// Check for an errored weight call.
 	if weight > hn.weight {
-		err = errors.New("tree is not that heavy")
+		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)
 		return
 	}
 
 	// Check if the left or right child should be returned.
 	if hn.left != nil {
-		if hn.left.weight > weight {
+		if weight < hn.left.weight {
 			return hn.left.entryAtWeight(weight)
 		}
-		weight -= hn.left.weight
+		weight -= hn.left.weight // Search from 0th index of right side.
 	}
-	if hn.right != nil {
+	if hn.right != nil && weight < hn.right.weight {
 		return hn.right.entryAtWeight(weight)
 	}
 

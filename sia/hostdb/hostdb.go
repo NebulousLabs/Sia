@@ -38,8 +38,13 @@ func (hdb *HostDatabase) Insert(entry HostEntry) error {
 		return errors.New("entry of given id already exists in host db")
 	}
 
-	_, hostNode := hdb.hostTree.insert(&entry)
-	hdb.activeHosts[entry.ID] = hostNode
+	if hdb.hostTree == nil {
+		hdb.hostTree = createNode(nil, &entry)
+		hdb.activeHosts[entry.ID] = hdb.hostTree
+	} else {
+		_, hostNode := hdb.hostTree.insert(&entry)
+		hdb.activeHosts[entry.ID] = hostNode
+	}
 	return nil
 }
 

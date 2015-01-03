@@ -39,7 +39,6 @@ type HostEntry struct {
 // price. This is also a bit simplistic however, because we're not sure what
 // the host might be charging for bandwidth.
 func (h *HostEntry) Weight() consensus.Currency {
-	// adjustedBurn := math.Sqrt(float64(h.Burn))
 	adjustedBurn := float64(h.Burn)
 	adjustedFreeze := float64(h.Freeze)
 	adjustedPrice := math.Sqrt(float64(h.Price))
