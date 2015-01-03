@@ -41,4 +41,34 @@ func TestWeightedList(t *testing.T) {
 	if hdb.hostTree.weight != expectedWeight {
 		t.Error("Expected weight is incorrect")
 	}
+
+	// Select many random hosts and do naive statistical analysis on the
+	// results.
+	if !testing.Short() {
+		// Pull a bunch of random hosts and count how many times we pull each
+		// host.
+		selectionSlice := make([]int, firstInsertions)
+		expected := 50
+		for i := 0; i < expected*firstInsertions; i++ {
+			entry, err := hdb.RandomHost()
+			if err != nil {
+				t.Fatal(err)
+			}
+			idInt, err := strconv.Atoi(entry.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selectionSlice[idInt]++
+		}
+
+		// See if each host was selected enough times.
+		errorBound := 21
+		for i, count := range selectionSlice {
+			if count < expected-errorBound || count > expected+errorBound {
+				t.Error(i, count)
+			}
+		}
+	}
+
+	// Remove a few hosts and check that the tree is still in order.
 }
