@@ -73,11 +73,11 @@ func (hn *hostNode) remove() {
 	}
 }
 
-// elementAtWeight grabs an element in the tree that appears at the given
+// entryAtWeight grabs an element in the tree that appears at the given
 // weight. Though the tree has an arbitrary sorting, a sufficiently random
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
-func (hn *hostNode) elementAtWeight(weight consensus.Currency) (entry HostEntry, err error) {
+func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry HostEntry, err error) {
 	// Check for an errored weight call.
 	if weight > hn.weight {
 		err = errors.New("tree is not that heavy")
@@ -87,12 +87,12 @@ func (hn *hostNode) elementAtWeight(weight consensus.Currency) (entry HostEntry,
 	// Check if the left or right child should be returned.
 	if hn.left != nil {
 		if hn.left.weight > weight {
-			return hn.left.elementAtWeight(weight)
+			return hn.left.entryAtWeight(weight)
 		}
 		weight -= hn.left.weight
 	}
 	if hn.right != nil {
-		return hn.right.elementAtWeight(weight)
+		return hn.right.entryAtWeight(weight)
 	}
 
 	// Sanity check

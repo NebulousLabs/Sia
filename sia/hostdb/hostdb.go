@@ -1,8 +1,9 @@
 package hostdb
 
 import (
-	// "crypto/rand"
+	"crypto/rand"
 	"errors"
+	"math/big"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -152,32 +153,18 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 	return
 }
 
-/*
-// ChooseHost orders the hosts by weight and picks one at random.
-func (hdb *HostDatabase) ChooseHost() (h HostEntry, err error) {
-	if len(hdb.HostList) == 0 {
+func (hdb *HostDatabase) RandomHost() (h HostEntry, err error) {
+	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
 		return
-	}
-	if hdb.TotalWeight == 0 {
-		panic("state has 0 total weight but not 0 length host list?")
 	}
 
 	// Get a random number between 0 and state.TotalWeight and then scroll
 	// through state.HostList until at least that much weight has been passed.
-	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(hdb.TotalWeight)))
+	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(hdb.hostTree.weight)))
 	if err != nil {
 		return
 	}
 	randWeight := consensus.Currency(randInt.Int64())
-	weightPassed := consensus.Currency(0)
-	var i int
-	for i = 0; randWeight > weightPassed; i++ {
-		weightPassed += hdb.HostList[i].Weight()
-	}
-	i -= 1
-
-	h = hdb.HostList[i]
-	return
+	return hdb.hostTree.entryAtWeight(randWeight)
 }
-*/

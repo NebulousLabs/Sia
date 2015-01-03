@@ -30,4 +30,5 @@ type HostDB interface {
 
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
+	RandomHost() (hostdb.HostEntry, error)
 }
