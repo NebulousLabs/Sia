@@ -1,11 +1,58 @@
 package hostdb
 
 import (
+	"crypto/rand"
+	"math/big"
 	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
 )
+
+// uniformTreeVerification checks that everything makes sense in the tree given
+// the number of entries that the tree is supposed to have and also given that
+// every entropy has the same weight.
+func uniformTreeVerification(hdb *HostDatabase, numEntries int, t *testing.T) {
+	// Check that the weight of the hostTree is what is expected.
+	randomHost, err := hdb.RandomHost()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedWeight := consensus.Currency(numEntries) * randomHost.Weight()
+	if hdb.hostTree.weight != expectedWeight {
+		t.Error("Expected weight is incorrect")
+	}
+
+	// Check that the length of activeHosts and the count of hostTree are
+	// consistent.
+	if len(hdb.activeHosts) != numEntries {
+		t.Error("activeHosts should equal ", numEntries, "equals", len(hdb.activeHosts))
+	}
+
+	// Select many random hosts and do naive statistical analysis on the
+	// results.
+	if !testing.Short() {
+		// Pull a bunch of random hosts and count how many times we pull each
+		// host.
+		selectionMap := make(map[string]int)
+		expected := 50
+		for i := 0; i < expected*numEntries; i++ {
+			entry, err := hdb.RandomHost()
+			if err != nil {
+				t.Fatal(err)
+			}
+			selectionMap[entry.ID] = selectionMap[entry.ID] + 1
+		}
+
+		// See if each host was selected enough times.
+		errorBound := 30 // Pretty large, but will still detect if something is seriously wrong.
+		for i, count := range selectionMap {
+			if count < expected-errorBound || count > expected+errorBound {
+				t.Error(i, count)
+			}
+		}
+	}
+}
 
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
@@ -22,53 +69,33 @@ func TestWeightedList(t *testing.T) {
 		}
 		hdb.Insert(entry)
 	}
-
-	// Check that the length of activeHosts and the count of hostTree are
-	// consistent.
-	if len(hdb.activeHosts) != firstInsertions {
-		t.Error("activeHosts should equal ", firstInsertions, "equals", len(hdb.activeHosts))
-	}
-	if hdb.hostTree.count != firstInsertions {
-		t.Error("hostTree count is off")
-	}
-
-	// Check that the weight of the hostTree is what is expected.
-	randomHost, err := hdb.RandomHost()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedWeight := consensus.Currency(firstInsertions) * randomHost.Weight()
-	if hdb.hostTree.weight != expectedWeight {
-		t.Error("Expected weight is incorrect")
-	}
-
-	// Select many random hosts and do naive statistical analysis on the
-	// results.
-	if !testing.Short() {
-		// Pull a bunch of random hosts and count how many times we pull each
-		// host.
-		selectionSlice := make([]int, firstInsertions)
-		expected := 50
-		for i := 0; i < expected*firstInsertions; i++ {
-			entry, err := hdb.RandomHost()
-			if err != nil {
-				t.Fatal(err)
-			}
-			idInt, err := strconv.Atoi(entry.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			selectionSlice[idInt]++
-		}
-
-		// See if each host was selected enough times.
-		errorBound := 21
-		for i, count := range selectionSlice {
-			if count < expected-errorBound || count > expected+errorBound {
-				t.Error(i, count)
-			}
-		}
-	}
+	uniformTreeVerification(hdb, firstInsertions, t)
 
 	// Remove a few hosts and check that the tree is still in order.
+	removals := 12
+	// Keep a map of what we've removed so far.
+	removedMap := make(map[int]struct{})
+	for i := 0; i < removals; i++ {
+		// Try numbers until we roll a number that's not been removed yet.
+		var randInt int
+		for {
+			randBig, err := rand.Int(rand.Reader, big.NewInt(int64(firstInsertions)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			randInt = int(randBig.Int64())
+			_, exists := removedMap[randInt]
+			if !exists {
+				break
+			}
+		}
+
+		// Remove the entry and add it to the list of removed entries
+		err := hdb.Remove(strconv.Itoa(randInt))
+		if err != nil {
+			t.Fatal(err)
+		}
+		removedMap[randInt] = struct{}{}
+	}
+	uniformTreeVerification(hdb, firstInsertions-removals, t)
 }
