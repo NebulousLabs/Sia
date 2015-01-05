@@ -1,14 +1,14 @@
 function safeSetElem(field, value) {
-	var elem = document.getElementById(field)
+	var elem = document.getElementById(field);
 	if (elem != null) {
-		elem.innerHTML = value
+		elem.innerHTML = value;
 	}
 }
 
 function safeSetValue(field, value) {
-	var elem = document.getElementById(field)
+	var elem = document.getElementById(field);
 	if (elem != null) {
-		elem.defaultValue = value
+		elem.defaultValue = value;
 	}
 }
 
@@ -16,8 +16,8 @@ function continuousUpdate() {
 	var resp = httpGet("/json/status");
 	var stats = JSON.parse(resp);
 
-	var miningResp = httpGet("/miner/status")
-	var miningStats = JSON.parse(miningResp)
+	var miningResp = httpGet("/miner/status");
+	var miningStats = JSON.parse(miningResp);
 	safeSetElem('miningStatus',
 		'Mining Status: ' + miningStats.State +
 		'<br>Threads: ' + miningStats.RunningThreads
@@ -34,19 +34,19 @@ function continuousUpdate() {
 		'<br>Host Number of Contracts: ' + stats.HostContractCount
 	);
 
-	var walletResp = httpGet("/wallet/status")
-	var walletStats = JSON.parse(walletResp)
-	safeSetElem('walletStatus', 
+	var walletResp = httpGet("/wallet/status");
+	var walletStats = JSON.parse(walletResp);
+	safeSetElem('walletStatus',
 		'Unconfirmed Balance: ' + walletStats.Balance +
 		'<br>Full Balance: ' + walletStats.FullBalance +
 		'<br>Number of Addresses: ' + walletStats.NumAddresses
 	);
 
-	return stats
+	return stats;
 }
 
 function updatePage() {
-	var stats = continuousUpdate()
+	var stats = continuousUpdate();
 	safeSetValue('hostCoinAddress', stats.WalletAddress);
 
 	/*
@@ -92,7 +92,7 @@ function httpGet(url) {
 
 function responseBoxGet(url) {
 	safeSetElem('apiResponse', httpGet(url));
-	updatePage()
+	updatePage();
 }
 
 function turnOnMiner() {
@@ -106,7 +106,7 @@ function turnOffMiner() {
 }
 
 function reqAddress() {
-	responseBoxGet("/wallet/address")
+	responseBoxGet("/wallet/address");
 }
 
 function sendMoney() {
