@@ -1,5 +1,8 @@
 package sia
 
+type Host interface {
+}
+
 /*
 import (
 	"errors"
