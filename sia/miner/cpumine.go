@@ -8,7 +8,7 @@ import (
 )
 
 // Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork() (b consensus.Block) {
+func (m *CPUMiner) blockForWork() (b consensus.Block) {
 	// Fill out the block with potentially ready values.
 	b = consensus.Block{
 		ParentBlockID: m.parent,
@@ -37,7 +37,7 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 // function.
 //
 // The threading is fragile. Edit with caution!
-func (m *Miner) mine() {
+func (m *CPUMiner) mine() {
 	// Increment the number of threads running, because this thread is spinning
 	// up. Also grab a number that will tell us when to shut down.
 	m.Lock()
@@ -71,7 +71,7 @@ func (m *Miner) mine() {
 
 // solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
-func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
+func (m *CPUMiner) SolveBlock() (b consensus.Block, solved bool, err error) {
 	m.RLock()
 	b = m.blockForWork()
 	m.RUnlock()
@@ -88,7 +88,7 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 
 // StartMining spawns a bunch of mining threads which will mine until stop is
 // called.
-func (m *Miner) StartMining() error {
+func (m *CPUMiner) StartMining() error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -103,7 +103,7 @@ func (m *Miner) StartMining() error {
 
 // StopMining sets desiredThreads to 0, a value which is polled by mining
 // threads. When set to 0, the mining threads will all cease mining.
-func (m *Miner) StopMining() error {
+func (m *CPUMiner) StopMining() error {
 	m.Lock()
 	defer m.Unlock()
 

@@ -1,65 +1,49 @@
 package miner
 
 import (
-	"runtime"
-	"sync"
-
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia"
 )
 
-// Might want to switch to having a settings variable.
-type Miner struct {
-	// Block variables - helps the miner construct the next block.
-	parent            consensus.BlockID
-	transactions      []consensus.Transaction
-	address           consensus.CoinAddress
-	target            consensus.Target
-	earliestTimestamp consensus.Timestamp
+// MinerUpdate condenses the set of inputs to the Update() function into a
+// single struct.
+type MinerUpdate struct {
+	Parent            consensus.BlockID
+	Transactions      []consensus.Transaction
+	Target            consensus.Target
+	Address           consensus.CoinAddress
+	EarliestTimestamp consensus.Timestamp
 
-	threads              int // how many threads the miner usually uses.
-	desiredThreads       int // 0 if not mining.
-	runningThreads       int
-	iterationsPerAttempt uint64
-
-	blockChan chan consensus.Block
-	sync.RWMutex
+	BlockChan chan consensus.Block
+	Threads   int
 }
 
-// New takes a block channel down which it drops blocks that it mines. It also
-// takes a thread count, which it uses to spin up miners on separate threads.
-func New() (m *Miner) {
-	return &Miner{
-		iterationsPerAttempt: 256 * 1024,
-	}
-}
+// The miner is used by the Core to facilitate the mining of blocks.
+type Miner interface {
+	// Info returns an arbitrary byte slice presumably with information about
+	// the status of the miner. Info is not relevant to the sia package, but
+	// instead to the front end.
+	Info() ([]byte, error)
 
-// SubsidyAddress returns the address that is currently being used by the miner
-// while searching for blocks.
-func (m *Miner) SubsidyAddress() consensus.CoinAddress {
-	m.Lock()
-	defer m.Unlock()
+	// SubsidyAddress returns the address that is currently being used by the
+	// miner while looking for a block.
+	SubsidyAddress() consensus.CoinAddress
 
-	return m.address
-}
+	// Update allows the state to change the block channel, the number of
+	// threads, and the block mining information.
+	//
+	// If MinerUpdate.Threads == 0, the number of threads is kept the same.
+	// There should be a cleaner way of doing this.
+	Update(MinerUpdate) error
 
-// Update changes what block the miner is mining on. Changes include address
-// and target.
-func (m *Miner) Update(mu sia.MinerUpdate) error {
-	m.Lock()
-	defer m.Unlock()
+	// StartMining will turn on the miner and begin consuming computational
+	// cycles.
+	StartMining() error
 
-	m.parent = mu.Parent
-	m.transactions = mu.Transactions
-	m.target = mu.Target
-	m.address = mu.Address
-	m.earliestTimestamp = mu.EarliestTimestamp
+	// StopMining will turn of the miner and stop consuming computational
+	// cycles.
+	StopMining() error
 
-	if mu.Threads != 0 {
-		m.threads = mu.Threads
-		runtime.GOMAXPROCS(mu.Threads)
-	}
-	m.blockChan = mu.BlockChan
-
-	return nil
+	// SolveBlock will attempt to solve a block, returning the most recent
+	// attempt and indicating whether the solve was successful or not.
+	SolveBlock() (block consensus.Block, solved bool, err error)
 }

@@ -7,7 +7,7 @@ import (
 
 // timelockedCoinAddress returns a CoinAddress with a timelock, as well as the
 // conditions needed to spend it.
-func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
+func (w *BasicWallet) timelockedCoinAddress(release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
 	sk, pk, err := signatures.GenerateKeyPair()
 	if err != nil {
 		return
@@ -30,8 +30,8 @@ func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendCond
 	return
 }
 
-// CoinAddress implements the core.Wallet interface.
-func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
+// CoinAddress implements the core.BasicWallet interface.
+func (w *BasicWallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 	w.Lock()
 	defer w.Unlock()
 

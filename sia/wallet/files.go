@@ -1,5 +1,14 @@
 package wallet
 
+import (
+	"io/ioutil"
+	"os"
+
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/signatures"
+)
+
 // AddressKey is how we serialize and store spendable addresses on
 // disk.
 type AddressKey struct {
@@ -7,8 +16,8 @@ type AddressKey struct {
 	SecretKey       signatures.SecretKey
 }
 
-// Save implements the core.Wallet interface.
-func (w *Wallet) Save() (err error) {
+// Save implements the core.BasicWallet interface.
+func (w *BasicWallet) Save() (err error) {
 	// Add every known spendable address + secret key.
 	var i int
 	keys := make([]AddressKey, len(w.spendableAddresses))
@@ -30,8 +39,8 @@ func (w *Wallet) Save() (err error) {
 	return
 }
 
-// Load implements the core.Wallet interface.
-func (w *Wallet) Load(filename string) (err error) {
+// Load implements the core.BasicWallet interface.
+func (w *BasicWallet) Load(filename string) (err error) {
 	// Check if the file exists, then read it into memory.
 	if _, err = os.Stat(filename); os.IsNotExist(err) {
 		err = nil
@@ -56,4 +65,5 @@ func (w *Wallet) Load(filename string) (err error) {
 		}
 		w.spendableAddresses[key.SpendConditions.CoinAddress()] = newSpendableAddress
 	}
+	return
 }

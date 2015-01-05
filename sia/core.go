@@ -1,8 +1,12 @@
 package sia
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
 // CoreInput is just to prevent the inputs to CreateCore() from being
@@ -18,8 +22,8 @@ type Config struct {
 	// Interface implementations.
 	Host   Host
 	HostDB HostDB
-	Miner  Miner
-	Wallet Wallet
+	Miner  miner.Miner
+	Wallet wallet.Wallet
 }
 
 // Core is the struct that serves as the state for siad. It contains a
@@ -31,8 +35,8 @@ type Core struct {
 	server *network.TCPServer
 	host   Host
 	hostDB HostDB
-	miner  Miner
-	wallet Wallet
+	miner  miner.Miner
+	wallet wallet.Wallet
 
 	// friends map[string]consensus.CoinAddress
 
@@ -49,10 +53,24 @@ type Core struct {
 // createCore creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-//
-// TODO: swap out the way that CreateCore is called so that the wallet,
-// host, etc. can all be used as input - or not supplied at all.
 func CreateCore(config Config) (c *Core, err error) {
+	if config.Host == nil {
+		err = errors.New("cannot have nil host")
+		return
+	}
+	if config.HostDB == nil {
+		err = errors.New("cannot have nil hostdb")
+		return
+	}
+	if config.Miner == nil {
+		err = errors.New("cannot have nil miner")
+		return
+	}
+	if config.Wallet == nil {
+		err = errors.New("cannot have nil wallet")
+		return
+	}
+
 	// Fill out the basic information.
 	c = &Core{
 		host:   config.Host,

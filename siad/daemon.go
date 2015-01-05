@@ -69,6 +69,10 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
+	wallet, err := wallet.New(expandedWalletFile)
+	if err != nil {
+		return
+	}
 	siaconfig := sia.Config{
 		HostDir:     expandedHostDir,
 		WalletFile:  expandedWalletFile,
@@ -78,7 +82,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 		Host:   host.New(),
 		HostDB: hostdb.New(),
 		Miner:  miner.New(),
-		Wallet: wallet.New(),
+		Wallet: wallet,
 	}
 
 	d.core, err = sia.CreateCore(siaconfig)

@@ -9,7 +9,7 @@ import (
 )
 
 // establishTestingEnvrionment sets all of the testEnv variables.
-func establishTestingEnvironment(t *testing.T) (e *Core) {
+func establishTestingEnvironment(t *testing.T) (c *Core) {
 	// Alter the constants to create a system more friendly to testing.
 	//
 	// TODO: Perhaps also have these constants as a build flag, then they don't
@@ -21,30 +21,17 @@ func establishTestingEnvironment(t *testing.T) (e *Core) {
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
-	e, err := CreateCore("host", "test.wallet", ":9988", true)
+	coreConfig := Config{
+		HostDir:     "hostdir",
+		WalletFile:  "test.wallet",
+		ServerAddr:  ":9988",
+		Nobootstrap: true,
+	}
+
+	c, err := CreateCore(coreConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	/*
-		// Create host settings for each environment.
-		defaultSettings := HostAnnouncement{
-			MinFilesize:        1024,
-			MaxFilesize:        1024 * 1024,
-			MinDuration:        10,
-			MaxDuration:        1000,
-			MinChallengeWindow: 20,
-			MaxChallengeWindow: 1000,
-			MinTolerance:       5,
-			Price:              5,
-			Burn:               5,
-		}
-
-		// Create some host settings.
-		te.e0.host.Settings = defaultSettings
-		te.e0.host.Settings.IPAddress = network.NetAddress{"localhost", 9988}
-		te.e0.host.Settings.CoinAddress = te.e0.CoinAddress()
-	*/
 
 	return
 }
