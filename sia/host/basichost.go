@@ -1,20 +1,59 @@
-package sia
+package host
 
-/*
 import (
-	"errors"
-	"fmt"
-	"io"
-	"net"
-	"os"
-	"strconv"
+	// "errors"
+	// "fmt"
+	// "io"
+	// "net"
+	// "os"
+	// "strconv"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
+	// "github.com/NebulousLabs/Sia/consensus"
+	// "github.com/NebulousLabs/Sia/encoding"
+	// "github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/sia/hostdb"
 )
 
+type BasicHost struct {
+	Settings       hostdb.HostAnnouncement
+	SpaceRemaining int64
+
+	/*
+		Files map[hash.Hash]string
+		Index int
+
+		ForwardContracts  map[consensus.BlockHeight][]ContractEntry
+		BackwardContracts map[consensus.BlockHeight][]ContractEntry
+	*/
+
+	sync.RWMutex
+}
+
+// New returns an initialized BasicHost.
+func New() (bh *BasicHost) {
+	return &BasicHost{
+	// Files:             make(map[hash.Hash]string),
+	// ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
+	// BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
+	}
+}
+
+// UpdateSettings changes the settings of the host to the input settings.
+// SpaceRemaining will be changed accordingly, and will not return an error if
+// space remaining goes negative.
+func (bh *BasicHost) UpdateSettings(newSettings hostdb.HostAnnouncement) error {
+	bh.Lock()
+	defer bh.Unlock()
+
+	storageDiff := newSettings.TotalStorage - bh.Settings.TotalStorage
+	bh.SpaceRemaining += storageDiff
+
+	bh.Settings = newSettings
+	return nil
+}
+
+/*
 const (
 	AcceptContractResponse = "accept"
 	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
@@ -27,57 +66,6 @@ const (
 type ContractEntry struct {
 	ID       consensus.ContractID
 	Contract *consensus.FileContract
-}
-
-// Host is the persistent structure handles storage requests from clients and
-// manages the submission of storage proofs.
-type Host struct {
-	// Settings HostAnnouncement
-
-	SpaceRemaining int64
-
-	Files map[hash.Hash]string
-	Index int
-
-	ForwardContracts  map[consensus.BlockHeight][]ContractEntry
-	BackwardContracts map[consensus.BlockHeight][]ContractEntry
-
-	sync.RWMutex
-}
-
-// CreateHost returns an initialized host.
-func CreateHost() (h *Host) {
-	return &Host{
-		Files:             make(map[hash.Hash]string),
-		ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
-		BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
-	}
-}
-
-// HostSettings returns the host's settings.
-func (e *Core) HostSettings() HostAnnouncement {
-	e.host.RLock()
-	defer e.host.RUnlock()
-	return e.host.Settings
-}
-
-// SetHostSettings changes the settings according to the input. Need a setter
-// because Core.host is not exported.
-func (e *Core) SetHostSettings(ha HostAnnouncement) {
-	e.host.Lock()
-	defer e.host.Unlock()
-
-	e.host.SpaceRemaining += (ha.TotalStorage - e.host.Settings.TotalStorage)
-
-	e.host.Settings = ha
-}
-
-// HostSpaceRemaining returns the amount of unsold space that the host has
-// allocated.
-func (e *Core) HostSpaceRemaining() int64 {
-	e.host.RLock()
-	defer e.host.RUnlock()
-	return e.host.SpaceRemaining
 }
 
 // Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
@@ -139,7 +127,6 @@ func (e *Core) considerContract(t consensus.Transaction) (updatedTransaction con
 		err = errors.New("transaction must have exactly one contract")
 		return
 	}
-
 	// Check that the file size listed in the contract is in bounds.
 	if fileSize < e.host.Settings.MinFilesize || fileSize > e.host.Settings.MaxFilesize {
 		err = fmt.Errorf("file is of incorrect size - filesize %v, min %v, max %v", fileSize, e.host.Settings.MinFilesize, e.host.Settings.MaxFilesize)
@@ -150,52 +137,44 @@ func (e *Core) considerContract(t consensus.Transaction) (updatedTransaction con
 		err = errors.New("host is at capacity and can not take more files.")
 		return
 	}
-
 	// Check that the duration of the contract is in bounds.
 	if fullDuration < e.host.Settings.MinDuration || fullDuration > e.host.Settings.MaxDuration {
 		err = errors.New("contract duration is out of bounds")
 		return
 	}
-
 	// Check that challenges will not be happening too frequently or infrequently.
 	if t.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow || t.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow {
 		err = errors.New("challenges frequency is too often")
 		return
 	}
-
 	// Check that tolerance is acceptible.
 	if t.FileContracts[0].Tolerance < e.host.Settings.MinTolerance {
 		err = errors.New("tolerance is too low")
 		return
 	}
-
 	// Outputs for successful proofs need to go to the correct address.
 	if t.FileContracts[0].ValidProofAddress != e.host.Settings.CoinAddress {
 		err = errors.New("coins are not paying out to correct address")
 		return
 	}
-
 	// Outputs for successful proofs need to match the price.
 	requiredSize := e.host.Settings.Price * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
 	if t.FileContracts[0].ValidProofPayout < requiredSize {
 		err = errors.New("valid proof payout is too low")
 		return
 	}
-
 	// Output for failed proofs needs to be the 0 address.
 	emptyAddress := consensus.CoinAddress{}
 	if t.FileContracts[0].MissedProofAddress != emptyAddress {
 		err = errors.New("burn payout needs to go to the empty address")
 		return
 	}
-
 	// Verify that output for failed proofs matches burn.
 	maxBurn := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
 	if t.FileContracts[0].MissedProofPayout > maxBurn {
 		err = errors.New("burn payout is too high for a missed proof.")
 		return
 	}
-
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
 	requiredFund := (e.host.Settings.Burn + e.host.Settings.Price) * consensus.Currency(fileSize) * consensus.Currency(contractDuration)

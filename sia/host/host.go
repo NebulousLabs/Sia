@@ -1,11 +1,10 @@
 package host
 
+import (
+	"github.com/NebulousLabs/Sia/sia/hostdb"
+)
+
 type Host interface {
-}
-
-type BasicHost struct {
-}
-
-func New() BasicHost {
-	return BasicHost{}
+	// UpdateSettings changes the settings used by the host.
+	UpdateSettings(hostdb.HostAnnouncement) error
 }
