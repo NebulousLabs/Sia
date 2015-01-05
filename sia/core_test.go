@@ -6,6 +6,10 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia/host"
+	"github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
 // establishTestingEnvrionment sets all of the testEnv variables.
@@ -21,14 +25,24 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
+	walletFilename := "test.wallet"
+	wallet, err := wallet.New(walletFilename)
+	if err != nil {
+		return
+	}
 	coreConfig := Config{
 		HostDir:     "hostdir",
-		WalletFile:  "test.wallet",
+		WalletFile:  walletFilename,
 		ServerAddr:  ":9988",
 		Nobootstrap: true,
+
+		Host:   host.New(),
+		HostDB: hostdb.New(),
+		Miner:  miner.New(),
+		Wallet: wallet,
 	}
 
-	c, err := CreateCore(coreConfig)
+	c, err = CreateCore(coreConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

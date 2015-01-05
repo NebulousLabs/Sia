@@ -1,8 +1,11 @@
 package host
 
-type Host struct {
+type Host interface {
 }
 
-func New() Host {
-	return Host{}
+type BasicHost struct {
+}
+
+func New() BasicHost {
+	return BasicHost{}
 }

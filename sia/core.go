@@ -5,6 +5,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia/host"
+	"github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
@@ -20,8 +22,8 @@ type Config struct {
 	Nobootstrap bool
 
 	// Interface implementations.
-	Host   Host
-	HostDB HostDB
+	Host   host.Host
+	HostDB hostdb.HostDB
 	Miner  miner.Miner
 	Wallet wallet.Wallet
 }
@@ -33,8 +35,8 @@ type Core struct {
 	state *consensus.State
 
 	server *network.TCPServer
-	host   Host
-	hostDB HostDB
+	host   host.Host
+	hostDB hostdb.HostDB
 	miner  miner.Miner
 	wallet wallet.Wallet
 
