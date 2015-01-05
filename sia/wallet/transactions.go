@@ -8,6 +8,17 @@ import (
 	"github.com/NebulousLabs/Sia/signatures"
 )
 
+// Reset implements the core.Wallet interface.
+func (w *Wallet) Reset() error {
+	w.Lock()
+	defer w.Unlock()
+
+	w.spentCounter++
+	w.transactions = make(map[string]*openTransaction)
+
+	return nil
+}
+
 // RegisterTransaction implements the core.Wallet interface.
 func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
 	w.Lock()
