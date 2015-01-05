@@ -74,7 +74,7 @@ func CreateCore(config Config) (c *Core, err error) {
 	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
 
 	// Update componenets to see genesis block.
-	err = c.updateMiner(c.miner)
+	err = c.UpdateMiner(0)
 	if err != nil {
 		return
 	}

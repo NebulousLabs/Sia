@@ -6,11 +6,12 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// BlockChan returns a channel down which blocks can be thrown.
+// BlockChan provides a channel to inform the core of new blocks.
 func (c *Core) BlockChan() chan consensus.Block {
 	return c.blockChan
 }
 
+// TransactionChan provides a channel to inform the core of new transactions.
 func (c *Core) TransactionChan() chan consensus.Transaction {
 	return c.transactionChan
 }
@@ -29,14 +30,11 @@ func (c *Core) AcceptTransaction(t consensus.Transaction) error {
 	return nil
 }
 
-// processBlock is called by the environment's listener.
+// processBlock locks the state and then attempts to integrate the block.
+// Invalid blocks will result in an error.
 func (c *Core) processBlock(b consensus.Block) (err error) {
 	c.state.Lock()
-	// c.hostDatabase.Lock()
-	// c.host.Lock()
 	defer c.state.Unlock()
-	// defer c.hostDatabase.Unlock()
-	// defer c.host.Unlock()
 
 	initialStateHeight := c.state.Height()
 	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
@@ -58,7 +56,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	err = c.updateMiner(c.miner)
+	err = c.UpdateMiner(0)
 	if err != nil {
 		return
 	}
@@ -69,7 +67,9 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	return
 }
 
-// processTransaction sends a transaction to the state.
+// processTransaction locks the state and then attempts to integrate the
+// transaction into the state. An error will be returned for invalid or
+// duplicate transactions.
 func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 	c.state.Lock()
 	defer c.state.Unlock()
@@ -83,7 +83,7 @@ func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 		return
 	}
 
-	c.updateMiner(c.miner)
+	c.UpdateMiner(0)
 
 	go c.server.Broadcast("AcceptTransaction", t, nil)
 	return

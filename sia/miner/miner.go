@@ -6,8 +6,10 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia"
 )
 
+// Might want to switch to having a settings variable.
 type Miner struct {
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -34,12 +36,9 @@ type Status struct {
 
 // New takes a block channel down which it drops blocks that it mines. It also
 // takes a thread count, which it uses to spin up miners on separate threads.
-func New(blockChan chan consensus.Block, threads int) (m *Miner) {
-	runtime.GOMAXPROCS(threads)
+func New() (m *Miner) {
 	return &Miner{
-		threads:              threads,
 		iterationsPerAttempt: 256 * 1024,
-		blockChan:            blockChan,
 	}
 }
 
@@ -84,14 +83,21 @@ func (m *Miner) SubsidyAddress() consensus.CoinAddress {
 
 // Update changes what block the miner is mining on. Changes include address
 // and target.
-func (m *Miner) Update(parent consensus.BlockID, transactions []consensus.Transaction, target consensus.Target, address consensus.CoinAddress, earliestTimestamp consensus.Timestamp) error {
+func (m *Miner) Update(mu sia.MinerUpdate) error {
 	m.Lock()
 	defer m.Unlock()
 
-	m.parent = parent
-	m.transactions = transactions
-	m.target = target
-	m.address = address
-	m.earliestTimestamp = earliestTimestamp
+	m.parent = mu.Parent
+	m.transactions = mu.Transactions
+	m.target = mu.Target
+	m.address = mu.Address
+	m.earliestTimestamp = mu.EarliestTimestamp
+
+	if mu.Threads != 0 {
+		m.threads = mu.Threads
+		runtime.GOMAXPROCS(mu.Threads)
+	}
+	m.blockChan = mu.BlockChan
+
 	return nil
 }

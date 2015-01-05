@@ -4,19 +4,14 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// Wallet in an interface that helps to build and sign transactions.
-// Transactions are kept in wallet memory until they are signed, and referenced
-// using a string id.
-//
-// TODO: Reconsider how reset works.
+// Wallet in an interface that helps to build and sign transactions. The user
+// can make a new transaction-in-progress by calling Register(), and then can
+// add outputs, fees, etc.
 type Wallet interface {
 	// Info takes zero arguments and returns an arbitrary set of information
 	// about the wallet in the form of json. The frontend will have to know how
 	// to parse it, but Core and Daemon don't need to understand what's in the
 	// json.
-	//
-	// TODO: Decide if Info supplants balance. I don't think that it does
-	// though.
 	Info() ([]byte, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
@@ -27,7 +22,7 @@ type Wallet interface {
 	// Reset will clear the list of spent transactions, which is nice if you've
 	// accidentally made transactions that aren't spreading on the network for
 	// whatever reason (for example, 0 fee transaction, or if there are bugs in
-	// the software). Conditions for reset are subject to change.
+	// the software). Reset will also destroy all in-progress transactions.
 	Reset() error
 
 	// Balance returns the total number of coins accessible to the wallet. If
@@ -52,11 +47,10 @@ type Wallet interface {
 	// AddOutput adds an output of value `amount` to address `ca`.
 	AddOutput(id string, o consensus.Output) error
 
-	// AddTimelockedRefund will add `amount` of coins to a transaction that
-	// unlock at block `release`. The spend conditions of the output are
-	// returned so that they can be revealed to interested parties. The coins
-	// will be added back into the balance when the timelock expires.
-	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (sc consensus.SpendConditions, refundIndex uint64, err error)
+	// AddTimelockedOutput will create an output with coins that are locked
+	// until block `release`. The spend conditions are returned so that they
+	// can be shown as proof that coins have been timelocked.
+	AddTimelockedOutput(id string, amount consensus.Currency, dest consensus.CoinAddress, release consensus.BlockHeight) (sc consensus.SpendConditions, refundIndex uint64, err error)
 
 	// AddFileContract adds a file contract to a transaction.
 	AddFileContract(id string, fc consensus.FileContract) error
@@ -72,6 +66,9 @@ type Wallet interface {
 	// then return the transaction. If wholeTransaction is set to true, then
 	// the wholeTransaction flag will be set in CoveredFields for each
 	// signature.
+	//
+	// Upon being signed and returned, the transaction-in-progress is deleted
+	// from the wallet.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
 }
 

@@ -21,6 +21,18 @@ type AddressKey struct {
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
 // ignores outputs you've already spent even if they haven't made it into the
 // blockchain yet.
+//
+// The spentCounter is used to indicate which transactions have been spent but
+// have not appeared in the blockchain. It's used as an int for an easy reset.
+// Each transaction also has a spent counter. If the transaction's spent
+// counter is equal to the wallet's spent counter, then the transaction has
+// been spent since the last reset. Upon reset, the wallet's spent counter is
+// incremented, which means all transactions will no longer register as having
+// been spent since the last reset.
+//
+// Wallet.transactions is a list of transactions that are currently being built
+// within the wallet. The transactionCounter ensures that each
+// transaction-in-progress gets a unique ID.
 type Wallet struct {
 	saveFilename string
 
