@@ -35,6 +35,8 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 // mine attempts to generate blocks, and will run until desiredThreads is
 // changd to be lower than `myThread`, which is set at the beginning of the
 // function.
+//
+// The threading is fragile. Edit with caution!
 func (m *Miner) mine() {
 	// Increment the number of threads running, because this thread is spinning
 	// up. Also grab a number that will tell us when to shut down.
