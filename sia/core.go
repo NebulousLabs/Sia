@@ -89,8 +89,20 @@ func CreateCore(config Config) (c *Core, err error) {
 	// Create a state.
 	var genesisOutputDiffs []consensus.OutputDiff
 	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
+	genesisBlock, err := c.state.BlockAtHeight(0)
+	if err != nil {
+		return
+	}
 
 	// Update componenets to see genesis block.
+	err = c.UpdateHost(components.HostAnnouncement{})
+	if err != nil {
+		return
+	}
+	err = c.hostDB.Update(0, nil, []consensus.Block{genesisBlock})
+	if err != nil {
+		return
+	}
 	err = c.UpdateMiner(0)
 	if err != nil {
 		return
@@ -99,18 +111,6 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-
-	/*
-		// c.host = CreateHost()
-		c.hostDB = hostdb.New()
-		c.miner = miner.New(c.blockChan, 1)
-		// c.renter = CreateRenter()
-		c.wallet, err = wallet.New(c.walletFile)
-		if err != nil {
-			return
-		}
-
-	*/
 
 	// Bootstrap to the network.
 	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)

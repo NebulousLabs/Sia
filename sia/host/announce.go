@@ -11,7 +11,7 @@ import (
 func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (t consensus.Transaction, err error) {
 	// Get the encoded announcement based on the host settings.
 	h.RLock()
-	info := h.Settings
+	info := h.Announcement
 	h.RUnlock()
 	announcement := string(encoding.MarshalAll(components.HostAnnouncementPrefix, info))
 
@@ -37,6 +37,8 @@ func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight 
 	if err != nil {
 		return
 	}
+
+	h.transactionChan <- t
 
 	return
 }

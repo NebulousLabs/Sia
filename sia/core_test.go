@@ -25,6 +25,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
+	// Pull together the configuration for the Core.
 	walletFilename := "test.wallet"
 	wallet, err := wallet.New(walletFilename)
 	if err != nil {
@@ -42,6 +43,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 		Wallet: wallet,
 	}
 
+	// Create the core.
 	c, err = CreateCore(coreConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -50,12 +52,13 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	return
 }
 
-// I'm not sure how to test asynchronous code, so at this point I don't try, I
-// only test the synchronous parts.
 func TestEverything(t *testing.T) {
 	c := establishTestingEnvironment(t)
 	testEmptyBlock(t, c)
 	testTransactionBlock(t, c)
 	testSendToSelf(t, c)
 	testWalletInfo(t, c)
+	testHostAnnouncement(t, c)
+
+	// TODO: add some tests which probe the miner implementation more.
 }

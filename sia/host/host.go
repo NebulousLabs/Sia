@@ -9,7 +9,7 @@ import (
 	// "strconv"
 	"sync"
 
-	// "github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/consensus"
 	// "github.com/NebulousLabs/Sia/encoding"
 	// "github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/sia/components"
@@ -24,7 +24,7 @@ const (
 type Host struct {
 	Wallet components.Wallet
 
-	Settings       components.HostAnnouncement
+	Announcement   components.HostAnnouncement
 	SpaceRemaining int64
 
 	/*
@@ -34,6 +34,8 @@ type Host struct {
 		ForwardContracts  map[consensus.BlockHeight][]ContractEntry
 		BackwardContracts map[consensus.BlockHeight][]ContractEntry
 	*/
+
+	transactionChan chan consensus.Transaction
 
 	sync.RWMutex
 }
@@ -50,14 +52,16 @@ func New() (h *Host) {
 // UpdateSettings changes the settings of the host to the input settings.
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
-func (h *Host) UpdateHostSettings(newSettings components.HostAnnouncement) error {
+func (h *Host) UpdateHostSettings(newSettings components.HostSettings) error {
 	h.Lock()
 	defer h.Unlock()
 
-	storageDiff := newSettings.TotalStorage - h.Settings.TotalStorage
+	storageDiff := newSettings.Announcement.TotalStorage - h.Announcement.TotalStorage
 	h.SpaceRemaining += storageDiff
 
-	h.Settings = newSettings
+	h.Announcement = newSettings.Announcement
+	h.Wallet = newSettings.Wallet
+	h.transactionChan = newSettings.TransactionChan
 	return nil
 }
 
