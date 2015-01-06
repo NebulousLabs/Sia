@@ -38,10 +38,10 @@ func (hdb *HostDB) Insert(entry components.HostEntry) error {
 	}
 
 	if hdb.hostTree == nil {
-		hdb.hostTree = createNode(nil, &entry)
+		hdb.hostTree = createNode(nil, entry)
 		hdb.activeHosts[entry.ID] = hdb.hostTree
 	} else {
-		_, hostNode := hdb.hostTree.insert(&entry)
+		_, hostNode := hdb.hostTree.insert(entry)
 		hdb.activeHosts[entry.ID] = hostNode
 	}
 	return nil

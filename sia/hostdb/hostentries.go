@@ -21,7 +21,7 @@ import (
 // We take the square of the price to heavily emphasize hosts that have a low
 // price. This is also a bit simplistic however, because we're not sure what
 // the host might be charging for bandwidth.
-func entryWeight(entry *components.HostEntry) consensus.Currency {
+func entryWeight(entry components.HostEntry) consensus.Currency {
 	adjustedBurn := float64(entry.Burn)
 	adjustedFreeze := float64(entry.Freeze)
 	adjustedPrice := math.Sqrt(float64(entry.Price))

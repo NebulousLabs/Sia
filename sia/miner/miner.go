@@ -5,10 +5,11 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // Might want to switch to having a settings variable.
-type CPUMiner struct {
+type Miner struct {
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
 	transactions      []consensus.Transaction
@@ -27,15 +28,15 @@ type CPUMiner struct {
 
 // New takes a block channel down which it drops blocks that it mines. It also
 // takes a thread count, which it uses to spin up miners on separate threads.
-func New() (m *CPUMiner) {
-	return &CPUMiner{
+func New() (m *Miner) {
+	return &Miner{
 		iterationsPerAttempt: 256 * 1024,
 	}
 }
 
 // SubsidyAddress returns the address that is currently being used by the miner
 // while searching for blocks.
-func (m *CPUMiner) SubsidyAddress() consensus.CoinAddress {
+func (m *Miner) SubsidyAddress() consensus.CoinAddress {
 	m.Lock()
 	defer m.Unlock()
 
@@ -44,7 +45,7 @@ func (m *CPUMiner) SubsidyAddress() consensus.CoinAddress {
 
 // Update changes what block the miner is mining on. Changes include address
 // and target.
-func (m *CPUMiner) Update(mu MinerUpdate) error {
+func (m *Miner) Update(mu components.MinerUpdate) error {
 	m.Lock()
 	defer m.Unlock()
 

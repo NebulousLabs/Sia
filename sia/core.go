@@ -5,10 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/sia/host"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
-	"github.com/NebulousLabs/Sia/sia/miner"
-	"github.com/NebulousLabs/Sia/sia/wallet"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // CoreInput is just to prevent the inputs to CreateCore() from being
@@ -22,10 +19,10 @@ type Config struct {
 	Nobootstrap bool
 
 	// Interface implementations.
-	Host   host.Host
-	HostDB hostdb.HostDB
-	Miner  miner.Miner
-	Wallet wallet.Wallet
+	Host   components.Host
+	HostDB components.HostDB
+	Miner  components.Miner
+	Wallet components.Wallet
 }
 
 // Core is the struct that serves as the state for siad. It contains a
@@ -35,10 +32,10 @@ type Core struct {
 	state *consensus.State
 
 	server *network.TCPServer
-	host   host.Host
-	hostDB hostdb.HostDB
-	miner  miner.Miner
-	wallet wallet.Wallet
+	host   components.Host
+	hostDB components.HostDB
+	miner  components.Miner
+	wallet components.Wallet
 
 	// friends map[string]consensus.CoinAddress
 

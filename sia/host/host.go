@@ -12,8 +12,7 @@ import (
 	// "github.com/NebulousLabs/Sia/consensus"
 	// "github.com/NebulousLabs/Sia/encoding"
 	// "github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
-	"github.com/NebulousLabs/Sia/sia/wallet"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 const (
@@ -23,9 +22,9 @@ const (
 )
 
 type Host struct {
-	Wallet wallet.Wallet
+	Wallet components.Wallet
 
-	Settings       hostdb.HostAnnouncement
+	Settings       components.HostAnnouncement
 	SpaceRemaining int64
 
 	/*
@@ -51,7 +50,7 @@ func New() (h *Host) {
 // UpdateSettings changes the settings of the host to the input settings.
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
-func (h *Host) UpdateSettings(newSettings hostdb.HostAnnouncement) error {
+func (h *Host) UpdateHostSettings(newSettings components.HostAnnouncement) error {
 	h.Lock()
 	defer h.Unlock()
 
@@ -63,7 +62,7 @@ func (h *Host) UpdateSettings(newSettings hostdb.HostAnnouncement) error {
 }
 
 // UpdateWallet replaces the host's internal wallet with a new wallet.
-func (h *Host) UpdateWallet(w wallet.Wallet) error {
+func (h *Host) UpdateWallet(w components.Wallet) error {
 	h.Lock()
 	defer h.Unlock()
 	h.Wallet = w

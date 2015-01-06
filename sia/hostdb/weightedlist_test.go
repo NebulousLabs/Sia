@@ -7,18 +7,19 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // uniformTreeVerification checks that everything makes sense in the tree given
 // the number of entries that the tree is supposed to have and also given that
 // every entropy has the same weight.
-func uniformTreeVerification(hdb *HostDatabase, numEntries int, t *testing.T) {
+func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	// Check that the weight of the hostTree is what is expected.
 	randomHost, err := hdb.RandomHost()
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedWeight := consensus.Currency(numEntries) * randomHost.Weight()
+	expectedWeight := consensus.Currency(numEntries) * entryWeight(randomHost)
 	if hdb.hostTree.weight != expectedWeight {
 		t.Error("Expected weight is incorrect")
 	}
@@ -61,7 +62,7 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		entry := HostEntry{
+		entry := components.HostEntry{
 			ID:     strconv.Itoa(i),
 			Burn:   10,
 			Freeze: 10,
@@ -102,7 +103,7 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := HostEntry{
+		entry := components.HostEntry{
 			ID:     strconv.Itoa(i),
 			Burn:   10,
 			Freeze: 10,

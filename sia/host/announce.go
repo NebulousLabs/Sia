@@ -3,7 +3,7 @@ package host
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // HostAnnounceSelf creates a host announcement transaction, adding
@@ -13,7 +13,7 @@ func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight 
 	h.RLock()
 	info := h.Settings
 	h.RUnlock()
-	announcement := string(encoding.MarshalAll(hostdb.HostAnnouncementPrefix, info))
+	announcement := string(encoding.MarshalAll(components.HostAnnouncementPrefix, info))
 
 	// Fill out the transaction.
 	id, err := h.Wallet.RegisterTransaction(t)

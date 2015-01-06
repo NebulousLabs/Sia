@@ -15,7 +15,7 @@ type Status struct {
 
 // Info() returns a JSON struct which can be parsed by frontends for displaying
 // information to the user.
-func (m *CPUMiner) Info() ([]byte, error) {
+func (m *Miner) Info() ([]byte, error) {
 	m.RLock()
 	defer m.RUnlock()
 

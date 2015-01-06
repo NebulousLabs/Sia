@@ -1,7 +1,7 @@
 package sia
 
 import (
-	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // StartMining calls StartMining on the miner.
@@ -35,7 +35,7 @@ func (c *Core) UpdateMiner(threads int) (err error) {
 	}
 
 	// Create the update struct for the miner.
-	update := miner.MinerUpdate{
+	update := components.MinerUpdate{
 		Parent:            recentBlock.ID(),
 		Transactions:      c.state.TransactionPoolDump(),
 		Target:            c.state.CurrentTarget(),
