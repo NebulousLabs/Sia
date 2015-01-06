@@ -6,6 +6,10 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
+const (
+	HostAnnouncementPrefix = "HostAnnouncement"
+)
+
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
 // It is preceded by 8 bytes that decode to the integer 1.
 type HostAnnouncement struct {

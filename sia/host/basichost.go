@@ -13,9 +13,18 @@ import (
 	// "github.com/NebulousLabs/Sia/encoding"
 	// "github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/sia/wallet"
+)
+
+const (
+	AcceptContractResponse = "accept"
+	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
+	maxContractLen         = 1 << 24
 )
 
 type BasicHost struct {
+	Wallet wallet.Wallet
+
 	Settings       hostdb.HostAnnouncement
 	SpaceRemaining int64
 
@@ -53,59 +62,21 @@ func (bh *BasicHost) UpdateSettings(newSettings hostdb.HostAnnouncement) error {
 	return nil
 }
 
-/*
-const (
-	AcceptContractResponse = "accept"
-	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
-	maxContractLen         = 1 << 24
-)
+// UpdateWallet replaces the host's internal wallet with a new wallet.
+func (bh *BasicHost) UpdateWallet(w wallet.Wallet) error {
+	bh.Lock()
+	defer bh.Unlock()
+	bh.Wallet = w
+	return nil
+}
 
+/*
 // ContractEntry houses a single contract with its id - you cannot derive the
 // id of a contract without having the transaction. Rather than keep the whole
 // transaction, we store only the id.
 type ContractEntry struct {
 	ID       consensus.ContractID
 	Contract *consensus.FileContract
-}
-
-// Wallet.HostAnnounceSelf() creates a host announcement transaction, adding
-// information to the arbitrary data and then signing the transaction.
-func (e *Core) HostAnnounceSelf(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight, minerFee consensus.Currency) (t consensus.Transaction, err error) {
-	// Get the encoded announcement based on the host settings.
-	e.host.RLock()
-	info := e.host.Settings
-	e.host.RUnlock()
-	announcement := string(encoding.MarshalAll(HostAnnouncementPrefix, info))
-
-	// Fill out the transaction.
-	id, err := e.wallet.RegisterTransaction(t)
-	if err != nil {
-		return
-	}
-	err = e.wallet.FundTransaction(id, freezeVolume+minerFee)
-	if err != nil {
-		return
-	}
-	err = e.wallet.AddMinerFee(id, minerFee)
-	if err != nil {
-		return
-	}
-	info.SpendConditions, info.FreezeIndex, err = e.wallet.AddTimelockedRefund(id, freezeVolume, freezeUnlockHeight)
-	if err != nil {
-		return
-	}
-	err = e.wallet.AddArbitraryData(id, announcement)
-	if err != nil {
-		return
-	}
-	t, err = e.wallet.SignTransaction(id, true)
-	if err != nil {
-		return
-	}
-
-	// Give the transaction to the state.
-	err = e.AcceptTransaction(t)
-	return
 }
 
 // considerContract takes a contract and verifies that the negotiations, such
