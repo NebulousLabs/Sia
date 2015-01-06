@@ -1,4 +1,4 @@
-package wallet
+package components
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"

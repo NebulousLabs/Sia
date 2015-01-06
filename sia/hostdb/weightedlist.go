@@ -3,6 +3,7 @@ package hostdb
 import (
 	"fmt"
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
@@ -17,7 +18,7 @@ type hostNode struct {
 	left  *hostNode
 	right *hostNode
 
-	hostEntry *HostEntry
+	hostEntry *components.HostEntry
 }
 
 // createNode makes a new node the fill a host entry.
@@ -62,7 +63,7 @@ func (hn *hostNode) insert(entry *HostEntry) (nodesAdded int, newNode *hostNode)
 	return
 }
 
-// remove takes a node and removes it from the tree by climbing through the
+// REMOVE takes a node and removes it from the tree by climbing through the
 // list of parents. Remove does not delete nodes.
 func (hn *hostNode) remove() {
 	hn.weight -= hn.hostEntry.Weight()

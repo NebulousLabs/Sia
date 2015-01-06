@@ -1,4 +1,4 @@
-package miner
+package components
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
