@@ -22,6 +22,7 @@ type Config struct {
 	Host   components.Host
 	HostDB components.HostDB
 	Miner  components.Miner
+	Renter components.Renter
 	Wallet components.Wallet
 }
 
@@ -35,6 +36,7 @@ type Core struct {
 	host   components.Host
 	hostDB components.HostDB
 	miner  components.Miner
+	renter components.Renter
 	wallet components.Wallet
 
 	// friends map[string]consensus.CoinAddress
@@ -65,6 +67,10 @@ func CreateCore(config Config) (c *Core, err error) {
 		err = errors.New("cannot have nil miner")
 		return
 	}
+	if config.Renter == nil {
+		err = errors.New("cannot have nil renter")
+		return
+	}
 	if config.Wallet == nil {
 		err = errors.New("cannot have nil wallet")
 		return
@@ -75,6 +81,7 @@ func CreateCore(config Config) (c *Core, err error) {
 		host:   config.Host,
 		hostDB: config.HostDB,
 		miner:  config.Miner,
+		renter: config.Renter,
 		wallet: config.Wallet,
 
 		// friends:         make(map[string]consensus.CoinAddress),
@@ -104,6 +111,10 @@ func CreateCore(config Config) (c *Core, err error) {
 		return
 	}
 	err = c.UpdateMiner(0)
+	if err != nil {
+		return
+	}
+	err = c.UpdateRenter()
 	if err != nil {
 		return
 	}

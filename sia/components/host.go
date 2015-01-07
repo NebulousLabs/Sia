@@ -6,8 +6,9 @@ import (
 
 type HostSettings struct {
 	Announcement    HostAnnouncement
-	Wallet          Wallet
+	Height          consensus.BlockHeight
 	TransactionChan chan consensus.Transaction
+	Wallet          Wallet
 }
 
 type Host interface {

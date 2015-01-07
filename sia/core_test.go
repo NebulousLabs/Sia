@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/sia/host"
 	"github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
@@ -40,6 +41,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 		Host:   host.New(),
 		HostDB: hostdb.New(),
 		Miner:  miner.New(),
+		Renter: renter.New(),
 		Wallet: wallet,
 	}
 
