@@ -40,31 +40,31 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 func (m *Miner) mine() {
 	// Increment the number of threads running, because this thread is spinning
 	// up. Also grab a number that will tell us when to shut down.
-	m.Lock()
+	m.lock()
 	m.runningThreads++
 	myThread := m.runningThreads
-	m.Unlock()
+	m.unlock()
 
 	// Try to solve a block repeatedly.
 	for {
 		// Grab the number of threads that are supposed to be running.
-		m.RLock()
+		m.rLock()
 		desiredThreads := m.desiredThreads
-		m.RUnlock()
+		m.rUnlock()
 
 		// If we are allowed to be running, mine a block, otherwise shut down.
 		if desiredThreads >= myThread {
 			m.SolveBlock()
 		} else {
-			m.Lock()
+			m.lock()
 			// Need to check the mining status again, something might have
 			// changed while waiting for the lock.
 			if desiredThreads < myThread {
 				m.runningThreads--
-				m.Unlock()
+				m.unlock()
 				return
 			}
-			m.Unlock()
+			m.unlock()
 		}
 	}
 }
@@ -72,9 +72,9 @@ func (m *Miner) mine() {
 // solveBlock tries to find a solution by increasing the nonce and checking
 // the hash repeatedly. Can fail.
 func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
-	m.RLock()
+	m.rLock()
 	b = m.blockForWork()
-	m.RUnlock()
+	m.rUnlock()
 	for maxNonce := b.Nonce + m.iterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(m.target) {
 			m.blockChan <- b
@@ -89,8 +89,8 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 // StartMining spawns a bunch of mining threads which will mine until stop is
 // called.
 func (m *Miner) StartMining() error {
-	m.Lock()
-	defer m.Unlock()
+	m.lock()
+	defer m.unlock()
 
 	// Increase the number of threads to m.desiredThreads.
 	m.desiredThreads = m.threads
@@ -104,8 +104,8 @@ func (m *Miner) StartMining() error {
 // StopMining sets desiredThreads to 0, a value which is polled by mining
 // threads. When set to 0, the mining threads will all cease mining.
 func (m *Miner) StopMining() error {
-	m.Lock()
-	defer m.Unlock()
+	m.lock()
+	defer m.unlock()
 
 	// Set desiredThreads to 0. The miners will shut down automatically.
 	m.desiredThreads = 0

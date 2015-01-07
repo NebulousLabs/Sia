@@ -23,7 +23,7 @@ type Miner struct {
 	iterationsPerAttempt uint64
 
 	blockChan chan consensus.Block
-	sync.RWMutex
+	rwLock    sync.RWMutex
 }
 
 // New takes a block channel down which it drops blocks that it mines. It also
@@ -37,8 +37,8 @@ func New() (m *Miner) {
 // SubsidyAddress returns the address that is currently being used by the miner
 // while searching for blocks.
 func (m *Miner) SubsidyAddress() consensus.CoinAddress {
-	m.Lock()
-	defer m.Unlock()
+	m.lock()
+	defer m.unlock()
 
 	return m.address
 }
@@ -46,8 +46,8 @@ func (m *Miner) SubsidyAddress() consensus.CoinAddress {
 // Update changes what block the miner is mining on. Changes include address
 // and target.
 func (m *Miner) Update(mu components.MinerUpdate) error {
-	m.Lock()
-	defer m.Unlock()
+	m.lock()
+	defer m.unlock()
 
 	m.parent = mu.Parent
 	m.transactions = mu.Transactions
