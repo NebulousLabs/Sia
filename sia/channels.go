@@ -77,7 +77,6 @@ func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 	err = c.state.AcceptTransaction(t)
 	if err != nil {
 		if err != consensus.ConflictingTransactionErr {
-			// TODO: Change this println to a logging statement.
 			fmt.Println("AcceptTransaction Error:", err)
 		}
 		return
@@ -98,7 +97,6 @@ func (c *Core) listen() {
 			c.processBlock(b)
 
 		case t := <-c.transactionChan:
-			println("processing transaction")
 			c.processTransaction(t)
 		}
 	}

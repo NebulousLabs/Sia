@@ -13,7 +13,6 @@ func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight 
 	h.RLock()
 	info := h.Announcement
 	h.RUnlock()
-	announcement := string(encoding.MarshalAll(components.HostAnnouncementPrefix, info))
 
 	// Fill out the transaction.
 	id, err := h.Wallet.RegisterTransaction(t)
@@ -28,6 +27,7 @@ func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight 
 	if err != nil {
 		return
 	}
+	announcement := string(encoding.MarshalAll(components.HostAnnouncementPrefix, info))
 	err = h.Wallet.AddArbitraryData(id, announcement)
 	if err != nil {
 		return

@@ -107,7 +107,9 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 		}
 
 		for _, entry := range entries {
+			hdb.unlock()
 			err = hdb.Insert(entry)
+			hdb.lock()
 			if err != nil {
 				return
 			}

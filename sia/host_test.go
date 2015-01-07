@@ -34,7 +34,6 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	c.UpdateHost(hostAnnouncement)
 
 	// Submit a host announcement.
-	println("making host announcement")
 	transaction, err := c.host.AnnounceHost(1500, 120)
 	if err != nil {
 		t.Fatal(err)
