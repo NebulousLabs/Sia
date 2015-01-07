@@ -1,22 +1,14 @@
 package host
 
 import (
-	// "errors"
-	// "fmt"
-	// "io"
-	// "net"
-	// "os"
-	// "strconv"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	// "github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 const (
-	AcceptContractResponse = "accept"
 	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
 	maxContractLen         = 1 << 24
 )
@@ -29,11 +21,12 @@ type Host struct {
 	height          consensus.BlockHeight      // Current height of the state.
 	transactionChan chan consensus.Transaction // Can send channels to the state.
 
-	FileCounter int
-	Files       map[hash.Hash]string
+	hostDir     string
+	fileCounter int
+	files       map[hash.Hash]string
 
-	ForwardContracts  map[consensus.BlockHeight][]ContractEntry
-	BackwardContracts map[consensus.BlockHeight][]ContractEntry
+	forwardContracts  map[consensus.BlockHeight][]ContractEntry
+	backwardContracts map[consensus.BlockHeight][]ContractEntry
 
 	rwLock sync.RWMutex
 }
@@ -41,9 +34,9 @@ type Host struct {
 // New returns an initialized Host.
 func New() (h *Host) {
 	return &Host{
-		Files:             make(map[hash.Hash]string),
-		ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
-		BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
+		files:             make(map[hash.Hash]string),
+		forwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
+		backwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
 	}
 }
 
@@ -59,6 +52,7 @@ func (h *Host) UpdateHostSettings(newSettings components.HostSettings) error {
 
 	h.announcement = newSettings.Announcement
 	h.height = newSettings.Height
+	h.hostDir = newSettings.HostDir
 	h.transactionChan = newSettings.TransactionChan
 	h.wallet = newSettings.Wallet
 	return nil

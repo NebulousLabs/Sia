@@ -3,8 +3,15 @@ package host
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // ContractEntry houses a single contract with its id - you cannot derive the
@@ -13,6 +20,11 @@ import (
 type ContractEntry struct {
 	ID       consensus.ContractID
 	Contract consensus.FileContract
+}
+
+func (h *Host) getFilename() string {
+	h.fileCounter++
+	return strconv.Itoa(h.fileCounter)
 }
 
 // considerContract takes a contract and verifies that the terms such as price
@@ -112,37 +124,41 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 // submitting proofs of storage.
 //
 // TODO: Reconsider locking model for this function.
-func (e *Core) NegotiateContract(conn net.Conn) (err error) {
-	// Read the transaction.
+func (h *Host) NegotiateContract(conn net.Conn) (err error) {
+	// Read the transaction from the connection.
 	var t consensus.Transaction
 	if err = encoding.ReadObject(conn, &t, maxContractLen); err != nil {
 		return
 	}
 
 	// Check that the contained FileContract fits host criteria for taking
-	// files.
-	if t, err = e.considerContract(t); err != nil {
+	// files, replying with the error if there's a problem.
+	t, err = h.considerContract(t)
+	if err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
 		return
-	} else if _, err = encoding.WriteObject(conn, AcceptContractResponse); err != nil {
+	}
+	_, err = encoding.WriteObject(conn, components.AcceptContractResponse)
+	if err != nil {
 		return
 	}
 
 	// Create file.
-	filename := e.hostDir + strconv.Itoa(e.host.Index)
+	filename := h.hostDir + h.getFilename()
 	file, err := os.Create(filename)
 	if err != nil {
 		return
 	}
 	defer file.Close()
-	// don't keep the file around if there's an error
+
+	// If there's an error upon return, delete the file that's been created.
 	defer func() {
 		if err != nil {
 			os.Remove(filename)
 		}
 	}()
 
-	// Download file contents
+	// Download file contents.
 	_, err = io.CopyN(file, conn, int64(t.FileContracts[0].FileSize))
 	if err != nil {
 		return
@@ -163,19 +179,18 @@ func (e *Core) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// Check that the file arrived in time.
-	if e.Height() >= t.FileContracts[0].Start-2 {
+	if h.height >= t.FileContracts[0].Start-2 {
 		err = errors.New("file not uploaded in time, refusing to go forward with contract")
 		return
 	}
 
 	// record filename for later retrieval
-	e.host.Lock()
-	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.Index)
-	e.host.Index++
-	e.host.Unlock()
+	h.lock()
+	h.files[t.FileContracts[0].FileMerkleRoot] = filename
+	h.unlock()
 
 	// Submit the transaction.
-	err = e.AcceptTransaction(t)
+	h.transactionChan <- t
 	if err != nil {
 		return
 	}
@@ -183,7 +198,7 @@ func (e *Core) NegotiateContract(conn net.Conn) (err error) {
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
 	firstProof := t.FileContracts[0].Start + StorageProofReorgDepth
-	e.host.ForwardContracts[firstProof] = append(e.host.ForwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
+	h.forwardContracts[firstProof] = append(h.forwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: t.FileContracts[0]})
 	fmt.Println("Accepted contract")
 
 	return

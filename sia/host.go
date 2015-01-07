@@ -8,6 +8,7 @@ func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 	settings := components.HostSettings{
 		Announcement:    announcement,
 		Height:          c.Height(),
+		HostDir:         c.hostDir,
 		TransactionChan: c.transactionChan,
 		Wallet:          c.wallet,
 	}
