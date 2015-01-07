@@ -22,10 +22,10 @@ const (
 )
 
 type Host struct {
-	Wallet components.Wallet
+	wallet components.Wallet
 
-	Announcement   components.HostAnnouncement
-	SpaceRemaining int64
+	announcement   components.HostAnnouncement
+	spaceRemaining int64
 
 	/*
 		Files map[hash.Hash]string
@@ -37,7 +37,7 @@ type Host struct {
 
 	transactionChan chan consensus.Transaction
 
-	sync.RWMutex
+	rwLock sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -53,23 +53,23 @@ func New() (h *Host) {
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
 func (h *Host) UpdateHostSettings(newSettings components.HostSettings) error {
-	h.Lock()
-	defer h.Unlock()
+	h.lock()
+	defer h.unlock()
 
-	storageDiff := newSettings.Announcement.TotalStorage - h.Announcement.TotalStorage
-	h.SpaceRemaining += storageDiff
+	storageDiff := newSettings.Announcement.TotalStorage - h.announcement.TotalStorage
+	h.spaceRemaining += storageDiff
 
-	h.Announcement = newSettings.Announcement
-	h.Wallet = newSettings.Wallet
+	h.announcement = newSettings.Announcement
+	h.wallet = newSettings.Wallet
 	h.transactionChan = newSettings.TransactionChan
 	return nil
 }
 
 // UpdateWallet replaces the host's internal wallet with a new wallet.
 func (h *Host) UpdateWallet(w components.Wallet) error {
-	h.Lock()
-	defer h.Unlock()
-	h.Wallet = w
+	h.lock()
+	defer h.unlock()
+	h.wallet = w
 	return nil
 }
 

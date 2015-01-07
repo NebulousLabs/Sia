@@ -15,7 +15,7 @@ type HostDB struct {
 	activeHosts   map[string]*hostNode
 	inactiveHosts map[string]*components.HostEntry
 
-	dbLock sync.RWMutex
+	rwLock sync.RWMutex
 }
 
 // New returns an empty HostDatabase.

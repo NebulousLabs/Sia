@@ -1,21 +1,17 @@
 package hostdb
 
-// lock.go is in place merely as a convenience. Instead of needing to write
-// hdb.lock.Lock(), you just write hdb.lock(), and we don't need to export the
-// functions.
-
 func (hdb *HostDB) lock() {
-	hdb.dbLock.Lock()
+	hdb.rwLock.Lock()
 }
 
 func (hdb *HostDB) unlock() {
-	hdb.dbLock.Unlock()
+	hdb.rwLock.Unlock()
 }
 
 func (hdb *HostDB) rLock() {
-	hdb.dbLock.RLock()
+	hdb.rwLock.RLock()
 }
 
 func (hdb *HostDB) rUnlock() {
-	hdb.dbLock.RUnlock()
+	hdb.rwLock.RUnlock()
 }
