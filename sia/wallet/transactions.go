@@ -8,10 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/signatures"
 )
 
-// Reset implements the core.BasicWallet interface.
-func (w *BasicWallet) Reset() error {
-	w.Lock()
-	defer w.Unlock()
+// Reset implements the core.Wallet interface.
+func (w *Wallet) Reset() error {
+	w.lock()
+	defer w.unlock()
 
 	w.spentCounter++
 	w.transactions = make(map[string]*openTransaction)
@@ -19,10 +19,10 @@ func (w *BasicWallet) Reset() error {
 	return nil
 }
 
-// RegisterTransaction implements the core.BasicWallet interface.
-func (w *BasicWallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
-	w.Lock()
-	defer w.Unlock()
+// RegisterTransaction implements the core.Wallet interface.
+func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
+	w.lock()
+	defer w.unlock()
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
@@ -31,10 +31,10 @@ func (w *BasicWallet) RegisterTransaction(t consensus.Transaction) (id string, e
 	return
 }
 
-// FundTransaction implements the core.BasicWallet interface.
-func (w *BasicWallet) FundTransaction(id string, amount consensus.Currency) error {
-	w.Lock()
-	defer w.Unlock()
+// FundTransaction implements the core.Wallet interface.
+func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
+	w.lock()
+	defer w.unlock()
 
 	// Get the transaction.
 	ot, exists := w.transactions[id]
@@ -63,9 +63,9 @@ func (w *BasicWallet) FundTransaction(id string, amount consensus.Currency) erro
 	// Add a refund output if needed.
 	if total-amount > 0 {
 		// This is dirty and should probably happen some other way.
-		w.Unlock()
+		w.unlock()
 		coinAddress, err := w.CoinAddress()
-		w.Lock()
+		w.lock()
 
 		if err != nil {
 			return err
@@ -81,10 +81,10 @@ func (w *BasicWallet) FundTransaction(id string, amount consensus.Currency) erro
 	return nil
 }
 
-// AddMinerFee implements the core.BasicWallet interface.
-func (w *BasicWallet) AddMinerFee(id string, fee consensus.Currency) error {
-	w.Lock()
-	defer w.Unlock()
+// AddMinerFee implements the core.Wallet interface.
+func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -95,10 +95,10 @@ func (w *BasicWallet) AddMinerFee(id string, fee consensus.Currency) error {
 	return nil
 }
 
-// AddOutput implements the core.BasicWallet interface.
-func (w *BasicWallet) AddOutput(id string, o consensus.Output) error {
-	w.Lock()
-	defer w.Unlock()
+// AddOutput implements the core.Wallet interface.
+func (w *Wallet) AddOutput(id string, o consensus.Output) error {
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -109,10 +109,10 @@ func (w *BasicWallet) AddOutput(id string, o consensus.Output) error {
 	return nil
 }
 
-// AddTimelockedRefund implements the core.BasicWallet interface.
-func (w *BasicWallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, refundIndex uint64, err error) {
-	w.Lock()
-	defer w.Unlock()
+// AddTimelockedRefund implements the core.Wallet interface.
+func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, refundIndex uint64, err error) {
+	w.lock()
+	defer w.unlock()
 
 	// Get the transaction
 	ot, exists := w.transactions[id]
@@ -138,10 +138,10 @@ func (w *BasicWallet) AddTimelockedRefund(id string, amount consensus.Currency, 
 	return
 }
 
-// AddFileContract implements the core.BasicWallet interface.
-func (w *BasicWallet) AddFileContract(id string, fc consensus.FileContract) error {
-	w.Lock()
-	defer w.Unlock()
+// AddFileContract implements the core.Wallet interface.
+func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -152,10 +152,10 @@ func (w *BasicWallet) AddFileContract(id string, fc consensus.FileContract) erro
 	return nil
 }
 
-// AddStorageProof implements the core.BasicWallet interface.
-func (w *BasicWallet) AddStorageProof(id string, sp consensus.StorageProof) error {
-	w.Lock()
-	defer w.Unlock()
+// AddStorageProof implements the core.Wallet interface.
+func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -166,10 +166,10 @@ func (w *BasicWallet) AddStorageProof(id string, sp consensus.StorageProof) erro
 	return nil
 }
 
-// AddArbitraryData implements the core.BasicWallet interface.
-func (w *BasicWallet) AddArbitraryData(id string, arb string) error {
-	w.Lock()
-	defer w.Unlock()
+// AddArbitraryData implements the core.Wallet interface.
+func (w *Wallet) AddArbitraryData(id string, arb string) error {
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -180,10 +180,10 @@ func (w *BasicWallet) AddArbitraryData(id string, arb string) error {
 	return nil
 }
 
-// SignTransaction implements the core.BasicWallet interface.
-func (w *BasicWallet) SignTransaction(id string, wholeTransaction bool) (transaction consensus.Transaction, err error) {
-	w.Lock()
-	defer w.Unlock()
+// SignTransaction implements the core.Wallet interface.
+func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction consensus.Transaction, err error) {
+	w.lock()
+	defer w.unlock()
 
 	// Fetch the transaction.
 	ot, exists := w.transactions[id]

@@ -40,7 +40,7 @@ type spendableAddress struct {
 // `amount` of coins, returning an error if it cannot. It also returns the
 // `total`, which is the sum of all the outputs. It does not adjust the outputs
 // in any way.
-func (w *BasicWallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spendableOutput, total consensus.Currency, err error) {
+func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spendableOutput, total consensus.Currency, err error) {
 	if amount == consensus.Currency(0) {
 		err = errors.New("cannot fund 0 coins") // should this be an error or nil?
 		return
@@ -67,10 +67,10 @@ func (w *BasicWallet) findOutputs(amount consensus.Currency) (spendableOutputs [
 	return
 }
 
-// Balance implements the core.BasicWallet interface.
-func (w *BasicWallet) Balance(full bool) (total consensus.Currency) {
-	w.RLock()
-	defer w.RUnlock()
+// Balance implements the core.Wallet interface.
+func (w *Wallet) Balance(full bool) (total consensus.Currency) {
+	w.rLock()
+	defer w.rUnlock()
 
 	// Iterate through all outputs and tally them up.
 	for _, spendableAddress := range w.spendableAddresses {
@@ -87,10 +87,10 @@ func (w *BasicWallet) Balance(full bool) (total consensus.Currency) {
 	return
 }
 
-// Update implements the core.BasicWallet interface.
-func (w *BasicWallet) Update(diffs []consensus.OutputDiff) error {
-	w.Lock()
-	defer w.Unlock()
+// Update implements the core.Wallet interface.
+func (w *Wallet) Update(diffs []consensus.OutputDiff) error {
+	w.lock()
+	defer w.unlock()
 
 	for _, diff := range diffs {
 		if diff.New {

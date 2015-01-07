@@ -16,8 +16,9 @@ type AddressKey struct {
 	SecretKey       signatures.SecretKey
 }
 
-// Save implements the core.BasicWallet interface.
-func (w *BasicWallet) Save() (err error) {
+// Save implements the core.Wallet interface.
+func (w *Wallet) Save() (err error) {
+	w.rLock()
 	// Add every known spendable address + secret key.
 	var i int
 	keys := make([]AddressKey, len(w.spendableAddresses))
@@ -29,6 +30,7 @@ func (w *BasicWallet) Save() (err error) {
 		keys[i] = key
 		i++
 	}
+	w.rUnlock()
 
 	//  write the file
 	fileData := encoding.Marshal(keys)
@@ -39,8 +41,8 @@ func (w *BasicWallet) Save() (err error) {
 	return
 }
 
-// Load implements the core.BasicWallet interface.
-func (w *BasicWallet) Load(filename string) (err error) {
+// Load implements the core.Wallet interface.
+func (w *Wallet) Load(filename string) (err error) {
 	// Check if the file exists, then read it into memory.
 	if _, err = os.Stat(filename); os.IsNotExist(err) {
 		err = nil
@@ -52,6 +54,8 @@ func (w *BasicWallet) Load(filename string) (err error) {
 	}
 
 	// Unmarshal the spendable addresses and put them into the wallet.
+	w.lock()
+	defer w.unlock()
 	var keys []AddressKey
 	err = encoding.Unmarshal(contents, &keys)
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// BasicWallet holds your coins, manages privacy, outputs, ect. The balance reported
+// Wallet holds your coins, manages privacy, outputs, ect. The balance reported
 // ignores outputs you've already spent even if they haven't made it into the
 // blockchain yet.
 //
@@ -19,10 +19,10 @@ import (
 // incremented, which means all transactions will no longer register as having
 // been spent since the last reset.
 //
-// BasicWallet.transactions is a list of transactions that are currently being built
+// Wallet.transactions is a list of transactions that are currently being built
 // within the wallet. The transactionCounter ensures that each
 // transaction-in-progress gets a unique ID.
-type BasicWallet struct {
+type Wallet struct {
 	saveFilename string
 
 	spentCounter       int
@@ -31,7 +31,7 @@ type BasicWallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	sync.RWMutex
+	rwLock sync.RWMutex
 }
 
 type Status struct {
@@ -42,8 +42,8 @@ type Status struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(filename string) (w *BasicWallet, err error) {
-	w = &BasicWallet{
+func New(filename string) (w *Wallet, err error) {
+	w = &Wallet{
 		spentCounter:       1,
 		saveFilename:       filename,
 		spendableAddresses: make(map[consensus.CoinAddress]*spendableAddress),
@@ -58,10 +58,10 @@ func New(filename string) (w *BasicWallet, err error) {
 	return
 }
 
-// Info implements the core.BasicWallet interface.
-func (w *BasicWallet) Info() ([]byte, error) {
-	w.RLock()
-	defer w.RUnlock()
+// Info implements the core.Wallet interface.
+func (w *Wallet) Info() ([]byte, error) {
+	w.rLock()
+	defer w.rUnlock()
 
 	status := Status{
 		Balance:     w.Balance(false),
