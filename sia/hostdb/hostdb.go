@@ -52,8 +52,11 @@ func (hdb *HostDB) Remove(id string) error {
 	hdb.lock()
 	defer hdb.unlock()
 
+	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[id]
 	if !exists {
+		// If the node is in the set of inactive hosts, delete from that set,
+		// otherwise return a not found error.
 		_, exists := hdb.inactiveHosts[id]
 		if exists {
 			delete(hdb.inactiveHosts, id)
@@ -62,6 +65,8 @@ func (hdb *HostDB) Remove(id string) error {
 			return errors.New("id not found in host database")
 		}
 	}
+
+	// Delete the node from the active hosts, and remove it from the tree.
 	delete(hdb.activeHosts, id)
 	node.remove()
 

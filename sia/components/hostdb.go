@@ -25,6 +25,9 @@ type HostDB interface {
 	// instead toa frontend.
 	Info() ([]byte, error)
 
+	// Size returns the number of active hosts in the hostdb.
+	Size() int
+
 	// Update gives the hostdb a set of blocks that have been applied and
 	// reversed.
 	Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error

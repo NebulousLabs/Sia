@@ -98,6 +98,7 @@ func (c *Core) listen() {
 			c.processBlock(b)
 
 		case t := <-c.transactionChan:
+			println("processing transaction")
 			c.processTransaction(t)
 		}
 	}

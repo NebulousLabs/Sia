@@ -11,6 +11,7 @@ import (
 // the announcements.
 func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (entries []components.HostEntry, err error) {
 	for _, t := range b.Transactions {
+		println("scanning transaction for announcement")
 		// Check the arbitrary data of the transaction to fill out the host database.
 		if len(t.ArbitraryData) == 0 {
 			continue
@@ -18,9 +19,11 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 		if len(t.ArbitraryData[0]) < 8 {
 			continue
 		}
+		println("found transaction with enough bytes to maybe be an announcement")
 
 		dataIndicator := encoding.DecUint64([]byte(t.ArbitraryData[0][0:8]))
 		if dataIndicator == 1 {
+			println("super... duper...")
 			var ha components.HostAnnouncement
 			err = encoding.Unmarshal([]byte(t.ArbitraryData[0][8:]), &ha)
 			if err != nil {
