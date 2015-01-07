@@ -7,8 +7,9 @@ import (
 func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 	settings := components.HostSettings{
 		Announcement:    announcement,
-		Wallet:          c.wallet,
+		Height:          c.Height(),
 		TransactionChan: c.transactionChan,
+		Wallet:          c.wallet,
 	}
 
 	return c.host.UpdateHostSettings(settings)

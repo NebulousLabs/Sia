@@ -11,7 +11,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	// "github.com/NebulousLabs/Sia/encoding"
-	// "github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
@@ -22,20 +22,18 @@ const (
 )
 
 type Host struct {
-	wallet components.Wallet
-
 	announcement   components.HostAnnouncement
 	spaceRemaining int64
+	wallet         components.Wallet
 
-	/*
-		Files map[hash.Hash]string
-		Index int
+	height          consensus.BlockHeight      // Current height of the state.
+	transactionChan chan consensus.Transaction // Can send channels to the state.
 
-		ForwardContracts  map[consensus.BlockHeight][]ContractEntry
-		BackwardContracts map[consensus.BlockHeight][]ContractEntry
-	*/
+	FileCounter int
+	Files       map[hash.Hash]string
 
-	transactionChan chan consensus.Transaction
+	ForwardContracts  map[consensus.BlockHeight][]ContractEntry
+	BackwardContracts map[consensus.BlockHeight][]ContractEntry
 
 	rwLock sync.RWMutex
 }
@@ -43,9 +41,9 @@ type Host struct {
 // New returns an initialized Host.
 func New() (h *Host) {
 	return &Host{
-	// Files:             make(map[hash.Hash]string),
-	// ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
-	// BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
+		Files:             make(map[hash.Hash]string),
+		ForwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
+		BackwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
 	}
 }
 
@@ -60,212 +58,13 @@ func (h *Host) UpdateHostSettings(newSettings components.HostSettings) error {
 	h.spaceRemaining += storageDiff
 
 	h.announcement = newSettings.Announcement
-	h.wallet = newSettings.Wallet
+	h.height = newSettings.Height
 	h.transactionChan = newSettings.TransactionChan
-	return nil
-}
-
-// UpdateWallet replaces the host's internal wallet with a new wallet.
-func (h *Host) UpdateWallet(w components.Wallet) error {
-	h.lock()
-	defer h.unlock()
-	h.wallet = w
+	h.wallet = newSettings.Wallet
 	return nil
 }
 
 /*
-// ContractEntry houses a single contract with its id - you cannot derive the
-// id of a contract without having the transaction. Rather than keep the whole
-// transaction, we store only the id.
-type ContractEntry struct {
-	ID       consensus.ContractID
-	Contract *consensus.FileContract
-}
-
-// considerContract takes a contract and verifies that the negotiations, such
-// as price, tolerance, etc. are all valid within the host settings. If so,
-// inputs are added to fund the burn part of the contract fund, then the
-// updated contract is signed and returned.
-//
-// TODO: Reconsider locking strategy for this function.
-func (e *Core) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
-	e.host.Lock()
-	defer e.host.Unlock()
-
-	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
-	fullDuration := t.FileContracts[0].End - e.Height()                   // Duration that the host will actually be storing the file.
-	fileSize := t.FileContracts[0].FileSize
-
-	// Check that there is only one file contract.
-	if len(t.FileContracts) != 1 {
-		err = errors.New("transaction must have exactly one contract")
-		return
-	}
-	// Check that the file size listed in the contract is in bounds.
-	if fileSize < e.host.Settings.MinFilesize || fileSize > e.host.Settings.MaxFilesize {
-		err = fmt.Errorf("file is of incorrect size - filesize %v, min %v, max %v", fileSize, e.host.Settings.MinFilesize, e.host.Settings.MaxFilesize)
-		return
-	}
-	// Check that there is space for the file.
-	if fileSize > uint64(e.host.SpaceRemaining) {
-		err = errors.New("host is at capacity and can not take more files.")
-		return
-	}
-	// Check that the duration of the contract is in bounds.
-	if fullDuration < e.host.Settings.MinDuration || fullDuration > e.host.Settings.MaxDuration {
-		err = errors.New("contract duration is out of bounds")
-		return
-	}
-	// Check that challenges will not be happening too frequently or infrequently.
-	if t.FileContracts[0].ChallengeWindow < e.host.Settings.MinChallengeWindow || t.FileContracts[0].ChallengeWindow > e.host.Settings.MaxChallengeWindow {
-		err = errors.New("challenges frequency is too often")
-		return
-	}
-	// Check that tolerance is acceptible.
-	if t.FileContracts[0].Tolerance < e.host.Settings.MinTolerance {
-		err = errors.New("tolerance is too low")
-		return
-	}
-	// Outputs for successful proofs need to go to the correct address.
-	if t.FileContracts[0].ValidProofAddress != e.host.Settings.CoinAddress {
-		err = errors.New("coins are not paying out to correct address")
-		return
-	}
-	// Outputs for successful proofs need to match the price.
-	requiredSize := e.host.Settings.Price * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
-	if t.FileContracts[0].ValidProofPayout < requiredSize {
-		err = errors.New("valid proof payout is too low")
-		return
-	}
-	// Output for failed proofs needs to be the 0 address.
-	emptyAddress := consensus.CoinAddress{}
-	if t.FileContracts[0].MissedProofAddress != emptyAddress {
-		err = errors.New("burn payout needs to go to the empty address")
-		return
-	}
-	// Verify that output for failed proofs matches burn.
-	maxBurn := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
-	if t.FileContracts[0].MissedProofPayout > maxBurn {
-		err = errors.New("burn payout is too high for a missed proof.")
-		return
-	}
-	// Verify that the contract fund covers the payout and burn for the whole
-	// duration.
-	requiredFund := (e.host.Settings.Burn + e.host.Settings.Price) * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
-	if t.FileContracts[0].ContractFund < requiredFund {
-		err = errors.New("ContractFund does not cover the entire duration of the contract.")
-		return
-	}
-
-	// Add enough funds to the transaction to cover the penalty half of the
-	// agreement.
-	penalty := e.host.Settings.Burn * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
-	id, err := e.wallet.RegisterTransaction(t)
-	if err != nil {
-		return
-	}
-	err = e.wallet.FundTransaction(id, penalty)
-	if err != nil {
-		// This leaks that the host is out of money.
-		return
-	}
-	updatedTransaction, err = e.wallet.SignTransaction(id, true)
-
-	// Check that the transaction is valid after the host signature.
-	e.state.RLock()
-	err = e.state.ValidTransaction(updatedTransaction)
-	e.state.RUnlock()
-	if err != nil {
-		fmt.Println(err)
-		err = errors.New("transaction provided is not valid.")
-		return
-	}
-
-	return
-}
-
-// NegotiateContract is an RPC that negotiates a file contract. If the
-// negotiation is successful, the file is downloaded and the host begins
-// submitting proofs of storage.
-//
-// TODO: Reconsider locking model for this function.
-func (e *Core) NegotiateContract(conn net.Conn) (err error) {
-	// Read the transaction.
-	var t consensus.Transaction
-	if err = encoding.ReadObject(conn, &t, maxContractLen); err != nil {
-		return
-	}
-
-	// Check that the contained FileContract fits host criteria for taking
-	// files.
-	if t, err = e.considerContract(t); err != nil {
-		_, err = encoding.WriteObject(conn, err.Error())
-		return
-	} else if _, err = encoding.WriteObject(conn, AcceptContractResponse); err != nil {
-		return
-	}
-
-	// Create file.
-	filename := e.hostDir + strconv.Itoa(e.host.Index)
-	file, err := os.Create(filename)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	// don't keep the file around if there's an error
-	defer func() {
-		if err != nil {
-			os.Remove(filename)
-		}
-	}()
-
-	// Download file contents
-	_, err = io.CopyN(file, conn, int64(t.FileContracts[0].FileSize))
-	if err != nil {
-		return
-	}
-
-	// Check that the file matches the merkle root in the contract.
-	_, err = file.Seek(0, 0)
-	if err != nil {
-		return
-	}
-	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(t.FileContracts[0].FileSize))
-	if err != nil {
-		return
-	}
-	if merkleRoot != t.FileContracts[0].FileMerkleRoot {
-		err = errors.New("uploaded file has wrong merkle root")
-		return
-	}
-
-	// Check that the file arrived in time.
-	if e.Height() >= t.FileContracts[0].Start-2 {
-		err = errors.New("file not uploaded in time, refusing to go forward with contract")
-		return
-	}
-
-	// record filename for later retrieval
-	e.host.Lock()
-	e.host.Files[t.FileContracts[0].FileMerkleRoot] = strconv.Itoa(e.host.Index)
-	e.host.Index++
-	e.host.Unlock()
-
-	// Submit the transaction.
-	err = e.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
-
-	// Put the contract in a list where the host will be performing proofs of
-	// storage.
-	firstProof := t.FileContracts[0].Start + StorageProofReorgDepth
-	e.host.ForwardContracts[firstProof] = append(e.host.ForwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: &t.FileContracts[0]})
-	fmt.Println("Accepted contract")
-
-	return
-}
-
 // RetrieveFile is an RPC that uploads a specified file to a client.
 func (e *Core) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
