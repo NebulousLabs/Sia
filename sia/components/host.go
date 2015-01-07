@@ -14,6 +14,7 @@ type HostSettings struct {
 	Announcement    HostAnnouncement
 	Height          consensus.BlockHeight
 	HostDir         string
+	State           ReadOnlyState
 	TransactionChan chan consensus.Transaction
 	Wallet          Wallet
 }
@@ -27,6 +28,10 @@ type Host interface {
 	// documentataion. For now, see the host package for a reference
 	// implementation.
 	NegotiateContract(conn net.Conn) error
+
+	// RetrieveFile is a strict function that enables a client to download a
+	// file from a host.
+	RetrieveFile(conn net.Conn) error
 
 	// UpdateHostSettings changes the settings used by the host.
 	UpdateHostSettings(HostSettings) error

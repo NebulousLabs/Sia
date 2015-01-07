@@ -56,7 +56,20 @@ func (c *Core) AddPeer(addr network.Address) {
 	c.server.AddPeer(addr)
 }
 
+// RandomPeer provides a random peer from the peer list.
+func (c *Core) RandomPeer() network.Address {
+	return c.server.RandomPeer()
+}
+
 // RemovePeer removes a peer.
 func (c *Core) RemovePeer(addr network.Address) {
 	c.server.RemovePeer(addr)
+}
+
+func (c *Core) AddressBook() []network.Address {
+	return c.server.AddressBook()
+}
+
+func (c *Core) Address() network.Address {
+	return c.server.Address()
 }

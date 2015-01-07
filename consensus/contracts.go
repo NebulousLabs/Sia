@@ -13,7 +13,7 @@ import (
 func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
 	openContract, exists := s.openContracts[contractID]
 	if !exists {
-		err = errors.New("urecognized contractID")
+		err = errors.New("unrecognized contractID")
 		return
 	}
 	contract := openContract.FileContract
