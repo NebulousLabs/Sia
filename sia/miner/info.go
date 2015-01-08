@@ -6,7 +6,8 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-type Status struct {
+// TODO: write docstring.
+type MinerStatus struct {
 	State          string
 	Threads        int
 	RunningThreads int
@@ -19,7 +20,7 @@ func (m *Miner) Info() ([]byte, error) {
 	m.rLock()
 	defer m.rUnlock()
 
-	status := Status{
+	status := MinerStatus{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
@@ -41,4 +42,19 @@ func (m *Miner) Info() ([]byte, error) {
 	}
 
 	return json.Marshal(status)
+}
+
+// Threads returns the number of threads being used by the miner.
+func (m *Miner) Threads() int {
+	m.rLock()
+	defer m.rUnlock()
+	return m.threads
+}
+
+// SubsidyAddress returns the address that is currently being used by the miner
+// while searching for blocks.
+func (m *Miner) SubsidyAddress() consensus.CoinAddress {
+	m.lock()
+	defer m.unlock()
+	return m.address
 }

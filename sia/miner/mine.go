@@ -69,14 +69,23 @@ func (m *Miner) mine() {
 	}
 }
 
-// solveBlock tries to find a solution by increasing the nonce and checking
-// the hash repeatedly. Can fail.
+// SolveBlock grabs a block from the miner and grinds on the block, trying to
+// find a winning solution.
+//
+// SolveBlock locks the miner for long enough to grab a block, and then unlocks
+// the miner for the remaining work, which does not interact with the miner.
 func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
+	// Lock the miner and grab the information necessary for grinding hashes.
 	m.rLock()
 	b = m.blockForWork()
+	target := m.target
+	iterations := m.iterationsPerAttempt
 	m.rUnlock()
-	for maxNonce := b.Nonce + m.iterationsPerAttempt; b.Nonce != maxNonce; b.Nonce++ {
-		if b.CheckTarget(m.target) {
+
+	// Iterate through a bunch of nonces (from a random starting point) and try
+	// to find a winnning solution.
+	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
+		if b.CheckTarget(target) {
 			m.blockChan <- b
 			solved = true
 			return

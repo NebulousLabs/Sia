@@ -24,6 +24,9 @@ type Miner interface {
 	// instead to the front end.
 	Info() ([]byte, error)
 
+	// Threads returns the number of threads being used by the miner.
+	Threads() int
+
 	// SubsidyAddress returns the address that is currently being used by the
 	// miner while looking for a block.
 	SubsidyAddress() consensus.CoinAddress
@@ -33,7 +36,7 @@ type Miner interface {
 	//
 	// If MinerUpdate.Threads == 0, the number of threads is kept the same.
 	// There should be a cleaner way of doing this.
-	Update(MinerUpdate) error
+	UpdateMiner(MinerUpdate) error
 
 	// StartMining will turn on the miner and begin consuming computational
 	// cycles.

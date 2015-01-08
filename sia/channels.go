@@ -56,7 +56,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateMiner(0)
+	err = c.UpdateMiner(c.miner.Threads())
 	if err != nil {
 		return
 	}
@@ -82,7 +82,7 @@ func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 		return
 	}
 
-	c.UpdateMiner(0)
+	c.UpdateMiner(c.miner.Threads())
 
 	go c.server.Broadcast("AcceptTransaction", t, nil)
 	return

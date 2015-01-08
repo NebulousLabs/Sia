@@ -32,7 +32,7 @@ type Config struct {
 type Core struct {
 	state *consensus.State
 
-	server *network.TCPServer
+	server *network.TCPServer // one of these things is not like the others :)
 	host   components.Host
 	hostDB components.HostDB
 	miner  components.Miner
@@ -110,7 +110,7 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateMiner(0)
+	err = c.UpdateMiner(c.miner.Threads())
 	if err != nil {
 		return
 	}

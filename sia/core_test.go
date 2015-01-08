@@ -40,7 +40,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 
 		Host:   host.New(),
 		HostDB: hostdb.New(),
-		Miner:  miner.New(),
+		Miner:  miner.New(1),
 		Renter: renter.New(),
 		Wallet: wallet,
 	}

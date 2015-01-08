@@ -47,6 +47,6 @@ func (c *Core) UpdateMiner(threads int) (err error) {
 	}
 
 	// Call update on the miner.
-	c.miner.Update(update)
+	err = c.miner.UpdateMiner(update)
 	return
 }
