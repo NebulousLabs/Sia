@@ -1,17 +1,52 @@
-This file is meant to document the flow of information in the codebase.
+This file is meant to help a developer navagate the codebase and develop clean,
+maintainable code.
 
-Within the consensus package, it is convention to use the term 'apply' any time
-that a function is changing the state as the result of information being
-introduced to the blockchain. For example 'ApplyBlock' and 'ApplyStorageProof'.
+///////////////////////////
+// Consensus Conventions //
+///////////////////////////
 
-Within the consensus package, it is convention to use the term 'invert' any
-time that a function is changing the state as the result of information being
-removed from the blockchain. For example 'invertBlock'.
+It is convention to use the term 'apply' any time that a function is changing
+the state as the result of information being introduced to the state. For
+example 'ApplyBlock' and 'applyStorageProof'.
 
-Within the consensus package, it is convention to use the term 'valid' any time
-that the validity of something is being checked. It is convention not to change
-the state in any capacity when inside of a validation function. For example
-'validInput' and 'validContract'.
+It is convention to use the term 'invert' any time that a function is changing
+the state as the result of information being removed from the blockchain. For
+example 'invertBlock'.
+
+It is convention to use the term 'valid' any time that the validity of
+something is being checked. It is convention not to change the state in any
+capacity when inside of a validation function. For example 'validInput' and
+'validContract'.
+
+//////////////////////
+// Mutex Convetions //
+//////////////////////
+
+WARNING, TODO: These conventions are not currently followed closely in the
+codebase. This is a bug, and needs to be fixed.
+
+It is convention that any exported function will lock any state object that is
+being manipulated. This means that exported functions can be called
+concurrently without the caller needing to worry about locking or unlocking the
+state object. Where possible, the mutex will be handled entirely at the top of
+the function, via `Lock; defer Unlock;`. If the function does not handle
+mutexes following this convention, it must be documented in the function
+explanation.
+
+It is convention that non-exported functions will not lock any state object,
+and that their caller will manage the locks for them. This is because
+non-exported are typically only called by exported functions, who will manage
+the locks already in all-encompassing `lock; defer unlock` calls. If there is a
+non exported function that breaks this convention (for example, a listen()
+function), it must be documented in the function explanation.
+
+////////////////////
+// Consensus Flow //
+////////////////////
+
+WARNING: This is both no longer fully correct and also not the flow that's
+going to be upheld in the future. Better strategies have been learned and will
+be implemented in a later iteration, after the Jan. 16th release.
 
 Verifying and Applying a Block:
 
