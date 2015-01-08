@@ -11,6 +11,8 @@ const (
 	MaxCatchUpBlocks = 100
 )
 
+var moreBlocksErr = errors.New("more blocks are available")
+
 // SendBlocks takes a list of block ids as input, and sends all blocks from
 func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
 	c.state.RLock()
@@ -43,6 +45,11 @@ func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus
 			break
 		}
 		blocks = append(blocks, b)
+	}
+
+	// If more blocks are available, send a benign error
+	if _, maxErr := c.state.BlockAtHeight(highest + MaxCatchUpBlocks); maxErr == nil {
+		err = moreBlocksErr
 	}
 
 	return
@@ -85,20 +92,20 @@ func (c *Core) CatchUp(peer network.Address) {
 
 	// unlock state during network I/O
 	err := peer.RPC("SendBlocks", blockArray, &newBlocks)
-	if err != nil {
+	if err != nil && err != moreBlocksErr {
 		// log error
+		// TODO: try a different peer?
 		return
 	}
 
-	prevHeight := c.Height()
 	for _, block := range newBlocks {
-		c.processBlock(block) // processBlock is a blocking function.
+		c.AcceptBlock(block)
 	}
 
 	// TODO: There is probably a better approach than to call CatchUp
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
-	if prevHeight != c.Height() {
-		go c.CatchUp(c.RandomPeer())
+	if err == moreBlocksErr {
+		go c.CatchUp(peer)
 	}
 }

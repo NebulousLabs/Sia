@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"net"
 	"reflect"
 	"time"
@@ -47,14 +48,24 @@ func (na Address) Call(name string, fn func(net.Conn) error) error {
 // nil, no response is read.
 func (na *Address) RPC(name string, arg, resp interface{}) error {
 	return na.Call(name, func(conn net.Conn) error {
+		// write arg
 		if arg != nil {
-			_, err := encoding.WriteObject(conn, arg)
-			if err != nil {
+			if _, err := encoding.WriteObject(conn, arg); err != nil {
 				return err
 			}
 		}
+		// read resp
 		if resp != nil {
-			return encoding.ReadObject(conn, resp, maxMsgLen)
+			if err := encoding.ReadObject(conn, resp, maxMsgLen); err != nil {
+				return err
+			}
+		}
+		// read err
+		var errStr string
+		if err := encoding.ReadObject(conn, &errStr, maxMsgLen); err != nil {
+			return err
+		} else if errStr != "" {
+			return errors.New(errStr)
 		}
 		return nil
 	})
@@ -119,7 +130,7 @@ func (tcps *TCPServer) Register(name string, fn interface{}) {
 //   func(Type, *Type) error
 func registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 	return func(conn net.Conn) error {
-		// create object to decode into
+		// read arg
 		arg := reflect.New(typ.In(0))
 		if err := encoding.ReadObject(conn, arg.Interface(), maxMsgLen); err != nil {
 			return err
@@ -127,11 +138,16 @@ func registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		// call fn
 		retvals := fn.Call([]reflect.Value{arg.Elem()})
 		resp, errInter := retvals[0].Interface(), retvals[1].Interface()
-		if errInter != nil {
-			return errInter.(error)
+		// write resp
+		if _, err := encoding.WriteObject(conn, resp); err != nil {
+			return err
 		}
-		// write response
-		_, err := encoding.WriteObject(conn, resp)
+		// write err
+		var errStr string
+		if errInter != nil {
+			errStr = errInter.(error).Error()
+		}
+		_, err := encoding.WriteObject(conn, errStr)
 		return err
 	}
 }
@@ -139,16 +155,20 @@ func registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 // registerArg is for RPCs that do not return a value.
 func registerArg(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 	return func(conn net.Conn) error {
-		// create object to decode into
+		// read arg
 		arg := reflect.New(typ.In(0))
 		if err := encoding.ReadObject(conn, arg.Interface(), maxMsgLen); err != nil {
 			return err
 		}
 		// call fn on object
-		if err := fn.Call([]reflect.Value{arg.Elem()})[0].Interface(); err != nil {
-			return err.(error)
+		errInter := fn.Call([]reflect.Value{arg.Elem()})[0].Interface()
+		// write err
+		var errStr string
+		if errInter != nil {
+			errStr = errInter.(error).Error()
 		}
-		return nil
+		_, err := encoding.WriteObject(conn, errStr)
+		return err
 	}
 }
 
@@ -158,11 +178,16 @@ func registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		// call fn
 		retvals := fn.Call(nil)
 		resp, errInter := retvals[0].Interface(), retvals[1].Interface()
-		if errInter != nil {
-			return errInter.(error)
+		// write resp
+		if _, err := encoding.WriteObject(conn, resp); err != nil {
+			return err
 		}
-		// write response
-		_, err := encoding.WriteObject(conn, resp)
+		// write err
+		var errStr string
+		if errInter != nil {
+			errStr = errInter.(error).Error()
+		}
+		_, err := encoding.WriteObject(conn, errStr)
 		return err
 	}
 }
