@@ -35,6 +35,8 @@ func New() (r *Renter) {
 }
 
 func (r *Renter) UpdateRenter(update components.RenterUpdate) error {
+	r.lock()
+	defer r.unlock()
 	r.hostDB = update.HostDB
 	return nil
 }

@@ -36,8 +36,7 @@ func New() (hdb *HostDB) {
 	return
 }
 
-// insert needs to be locked before being called, and will add a host entry to
-// the state.
+// insert will add a host entry to the state.
 func (hdb *HostDB) insert(entry components.HostEntry) error {
 	_, exists := hdb.activeHosts[entry.ID]
 	if exists {
