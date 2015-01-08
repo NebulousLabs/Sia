@@ -22,9 +22,9 @@ type ContractEntry struct {
 	Contract consensus.FileContract
 }
 
-func (h *Host) getFilename() string {
+func (h *Host) nextFilename() string {
 	h.fileCounter++
-	return strconv.Itoa(h.fileCounter)
+	return h.hostDir + strconv.Itoa(h.fileCounter)
 }
 
 // considerContract takes a contract and verifies that the terms such as price
@@ -149,7 +149,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Create file.
 	h.lock()
-	filename := h.hostDir + h.getFilename()
+	filename := h.nextFilename()
 	h.unlock()
 	file, err := os.Create(filename)
 	if err != nil {
@@ -200,9 +200,6 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Submit the transaction.
 	h.transactionChan <- t
-	if err != nil {
-		return
-	}
 
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.

@@ -9,9 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
-// CoreInput is just to prevent the inputs to CreateCore() from being
-// excessively long. Potentially it could be used as a struct within Core
-// instead of manually copying over all of the inputs.
+// The config struct is used when calling CreateCore(), and prevents the input
+// line from being excessively long.
 type Config struct {
 	// Settings available through flags.
 	HostDir     string
