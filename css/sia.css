@@ -1,0 +1,59 @@
+html,
+body {
+	height: 100%;
+	background-color: #fff;
+	max-width: 1024px;
+	margin: 0 auto;
+}
+
+.body-text {
+	font-size: 16px;
+}
+
+.fill {
+	min-height: 100%;
+}
+
+.light {
+	background-color: rgba(235,235,235,.5);
+}
+
+.nav-style > li > a {
+	color: rgba(0,0,0,.5);
+	font-size: 20px;
+}
+
+.nav-style > li > a:hover,
+.nav-style > li > a:focus {
+	color: rgba(0,0,0,.85);
+	text-decoration:underline;
+	background-color: transparent;
+}
+
+.pad-top {
+	padding-top: 30px;
+}
+
+.pad-bottom {
+	padding-bottom: 30px;
+}
+
+.shadow {
+	box-shadow: inset 0 0 40px rgba(0,0,0,.3);
+}
+
+#logo {
+	background-image: url('../img/sia.png');
+	width: 438px;
+	height: 180px;
+	background-size: 438px 180px;
+}
+
+@media only screen and (-webkit-min-device-pixel-ratio: 1.5),
+	   only screen and (-o-min-device-pixel-ratio: 3/2),
+	   only screen and (min--moz-device-pixel-ratio: 1.5),
+	   only screen and (min-device-pixel-ratio: 1.5) {
+	   #logo {
+		   background-image: url('../img/sia.svg');
+	   }
+}
