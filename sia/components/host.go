@@ -10,13 +10,17 @@ const (
 	AcceptContractResponse = "accept"
 )
 
-type HostSettings struct {
+type HostUpdate struct {
 	Announcement    HostAnnouncement
 	Height          consensus.BlockHeight
 	HostDir         string
 	State           ReadOnlyState
 	TransactionChan chan consensus.Transaction
 	Wallet          Wallet
+
+	InitialStateHeight consensus.BlockHeight
+	RewoundBlocks      []consensus.Block
+	AppliedBlocks      []consensus.Block
 }
 
 type Host interface {
@@ -24,15 +28,16 @@ type Host interface {
 	AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (consensus.Transaction, error)
 
 	// NegotiateContract is a strict function that enables a client to
-	// communicate with the host to propose a contract. TODO: enhance this
-	// documentataion. For now, see the host package for a reference
-	// implementation.
+	// communicate with the host to propose a contract.
+	//
+	// TODO: enhance this documentataion. For now, see the host package for a
+	// reference implementation.
 	NegotiateContract(conn net.Conn) error
 
 	// RetrieveFile is a strict function that enables a client to download a
 	// file from a host.
 	RetrieveFile(conn net.Conn) error
 
-	// UpdateHostSettings changes the settings used by the host.
-	UpdateHostSettings(HostSettings) error
+	// UpdateHost changes the settings used by the host.
+	UpdateHost(HostUpdate) error
 }

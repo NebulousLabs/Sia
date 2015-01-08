@@ -46,22 +46,22 @@ func New() (h *Host) {
 	}
 }
 
-// UpdateSettings changes the settings of the host to the input settings.
+// UpdateHost changes the settings of the host to the input settings.
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
-func (h *Host) UpdateHostSettings(newSettings components.HostSettings) error {
+func (h *Host) UpdateHost(update components.HostUpdate) error {
 	h.lock()
 	defer h.unlock()
 
-	storageDiff := newSettings.Announcement.TotalStorage - h.announcement.TotalStorage
+	storageDiff := update.Announcement.TotalStorage - h.announcement.TotalStorage
 	h.spaceRemaining += storageDiff
 
-	h.announcement = newSettings.Announcement
-	h.height = newSettings.Height
-	h.hostDir = newSettings.HostDir
-	h.state = newSettings.State
-	h.transactionChan = newSettings.TransactionChan
-	h.wallet = newSettings.Wallet
+	h.announcement = update.Announcement
+	h.height = update.Height
+	h.hostDir = update.HostDir
+	h.state = update.State
+	h.transactionChan = update.TransactionChan
+	h.wallet = update.Wallet
 	return nil
 }
 

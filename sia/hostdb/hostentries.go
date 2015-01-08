@@ -7,6 +7,10 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: Add a bunch of different ways to arrive at weight, which can each be
+// chosen according to the need at hand. This might also require having a bunch
+// of different weights at each node in the tree.
+
 // host.Weight() determines the weight of a specific host, which is:
 //
 //		Freeze * Burn / square(Price).

@@ -6,6 +6,11 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: add multiple different weight metrics to each node, so that things
+// like latency or throughput or expected bandwidth price can be favored.
+// Functions also need to be added that allow us to change the weight of a
+// specific node.
+
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
 // inserting elements, elements are inserted on the side of the tree with the
 // fewest elements. When removing, the node is just made empty but the tree is

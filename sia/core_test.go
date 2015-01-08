@@ -21,7 +21,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	// need to be variables.
 	consensus.BlockFrequency = consensus.Timestamp(1)
 	consensus.TargetWindow = consensus.BlockHeight(1000)
-	network.BootstrapPeers = []network.Address{"localhost:9988", "localhost:9989"}
+	network.BootstrapPeers = []network.Address{"localhost:9988"}
 	consensus.RootTarget[0] = 255
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)

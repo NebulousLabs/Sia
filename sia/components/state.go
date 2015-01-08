@@ -7,6 +7,8 @@ import (
 // A ReadOnlyState is a state that can only be read, and is missing any write
 // functions such as AcceptBlock and AcceptTransaction. This allows interfaces
 // such as host to view the state without being able to modify anything.
+//
+// It is expected that the ReadOnlyState will handle it's own thread safety.
 type ReadOnlyState interface {
 	// Height returns the number of blocks in the state.
 	Height() consensus.BlockHeight

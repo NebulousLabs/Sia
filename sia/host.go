@@ -5,7 +5,7 @@ import (
 )
 
 func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
-	settings := components.HostSettings{
+	update := components.HostUpdate{
 		Announcement:    announcement,
 		Height:          c.Height(),
 		HostDir:         c.hostDir,
@@ -14,5 +14,5 @@ func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 		Wallet:          c.wallet,
 	}
 
-	return c.host.UpdateHostSettings(settings)
+	return c.host.UpdateHost(update)
 }

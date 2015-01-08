@@ -10,6 +10,15 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: Add a whole set of features to the host database that allow hosts to
+// be pulled according to a variety of different weights. A 'natural
+// preference' will allow users to manually favor certain hosts, but even still
+// things that matter are price, burn, perhaps some sort of reliability metric,
+// a latency metric, and a throughput metric, as well as perhaps a cooperation
+// metric. Some of these need to be added to the HostEntry object, but some of
+// them can be polled regularly and managed entirely from within the hostdb.
+
+// The HostDB is a set of hosts that get weighted and inserted into a tree
 type HostDB struct {
 	hostTree      *hostNode
 	activeHosts   map[string]*hostNode
@@ -27,11 +36,9 @@ func New() (hdb *HostDB) {
 	return
 }
 
-// Insert adds an entry to the hostdb.
-func (hdb *HostDB) Insert(entry components.HostEntry) error {
-	hdb.lock()
-	defer hdb.unlock()
-
+// insert needs to be locked before being called, and will add a host entry to
+// the state.
+func (hdb *HostDB) insert(entry components.HostEntry) error {
 	_, exists := hdb.activeHosts[entry.ID]
 	if exists {
 		return errors.New("entry of given id already exists in host db")
@@ -45,6 +52,16 @@ func (hdb *HostDB) Insert(entry components.HostEntry) error {
 		hdb.activeHosts[entry.ID] = hostNode
 	}
 	return nil
+}
+
+// Insert adds an entry to the hostdb, wrapping the standard insert call with a
+// lock. When called externally, the lock needs to be in place, however
+// sometimes insert needs to be called internally when there is already a lock
+// in place.
+func (hdb *HostDB) Insert(entry components.HostEntry) error {
+	hdb.lock()
+	defer hdb.unlock()
+	return hdb.insert(entry)
 }
 
 // Remove deletes an entry from the hostdb.
@@ -74,8 +91,6 @@ func (hdb *HostDB) Remove(id string) error {
 }
 
 // Update throws a bunch of blocks at the hostdb to be integrated.
-//
-// TODO: Check for repeat host announcements when parsing blocks.
 func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) (err error) {
 	hdb.lock()
 	defer hdb.unlock()

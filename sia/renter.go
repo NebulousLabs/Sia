@@ -5,8 +5,8 @@ import (
 )
 
 func (c *Core) UpdateRenter() error {
-	settings := components.RenterSettings{
+	update := components.RenterUpdate{
 		HostDB: c.hostDB,
 	}
-	return c.renter.UpdateRenterSettings(settings)
+	return c.renter.UpdateRenter(update)
 }

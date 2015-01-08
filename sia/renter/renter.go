@@ -34,8 +34,8 @@ func New() (r *Renter) {
 	return
 }
 
-func (r *Renter) UpdateRenterSettings(rs components.RenterSettings) error {
-	r.hostDB = rs.HostDB
+func (r *Renter) UpdateRenter(update components.RenterUpdate) error {
+	r.hostDB = update.HostDB
 	return nil
 }
 

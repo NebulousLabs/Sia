@@ -1,6 +1,7 @@
 package miner
 
 import (
+	"errors"
 	"runtime"
 	"sync"
 
@@ -17,7 +18,7 @@ type Miner struct {
 	target            consensus.Target
 	earliestTimestamp consensus.Timestamp
 
-	threads              int // how many threads the miner usually uses.
+	threads              int // how many threads the miner uses.
 	desiredThreads       int // 0 if not mining.
 	runningThreads       int
 	iterationsPerAttempt uint64
@@ -39,7 +40,6 @@ func New() (m *Miner) {
 func (m *Miner) SubsidyAddress() consensus.CoinAddress {
 	m.lock()
 	defer m.unlock()
-
 	return m.address
 }
 
@@ -49,17 +49,19 @@ func (m *Miner) Update(mu components.MinerUpdate) error {
 	m.lock()
 	defer m.unlock()
 
+	if mu.Threads == 0 {
+		return errors.New("cannot have a miner with 0 threads.")
+	}
+
 	m.parent = mu.Parent
 	m.transactions = mu.Transactions
 	m.target = mu.Target
 	m.address = mu.Address
 	m.earliestTimestamp = mu.EarliestTimestamp
-
-	if mu.Threads != 0 {
-		m.threads = mu.Threads
-		runtime.GOMAXPROCS(mu.Threads)
-	}
+	m.threads = mu.Threads
 	m.blockChan = mu.BlockChan
+
+	runtime.GOMAXPROCS(mu.Threads)
 
 	return nil
 }

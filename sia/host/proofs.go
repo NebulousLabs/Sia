@@ -54,7 +54,7 @@ func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.
 //
 // TODO: Make sure that hosts don't need to submit a storage proof for the last
 // window.
-func (h *Host) storageProofMaintenance(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.BlockID, appliedBlocks []consensus.BlockID) {
+func (h *Host) storageProofMaintenance(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) {
 	// Resubmit any proofs that changed as a result of the rewinding.
 	height := initialStateHeight
 	var proofs []consensus.StorageProof
