@@ -237,8 +237,6 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
 
 		// Mark the input as spent. Maps :)
-		//
-		// TODO: Sometimes causes panic?
 		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter
 	}
 

@@ -33,6 +33,7 @@ func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendCond
 // CoinAddress implements the core.Wallet interface.
 func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 	w.lock()
+	defer w.unlock()
 
 	sk, pk, err := signatures.GenerateKeyPair()
 	if err != nil {
@@ -51,8 +52,7 @@ func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 	coinAddress = newSpendableAddress.spendConditions.CoinAddress()
 	w.spendableAddresses[coinAddress] = newSpendableAddress
 
-	w.unlock() // Unlock before saving.
-	err = w.Save()
+	err = w.save()
 	if err != nil {
 		return
 	}
