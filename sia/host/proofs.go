@@ -9,6 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
+// TODO: Re-write this entire file, it doesn't work properly.
+
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
 func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.BlockHeight) (sp consensus.StorageProof, err error) {

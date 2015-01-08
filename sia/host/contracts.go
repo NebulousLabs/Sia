@@ -31,12 +31,8 @@ func (h *Host) getFilename() string {
 // are all valid within the host settings. If so, inputs are added to fund the
 // burn part of the contract fund, then the updated contract is signed and
 // returned.
-//
-// TODO: Reconsider locking strategy for this function.
 func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
-	h.lock()
-	defer h.unlock()
-
+	// These variables are here for convenience.
 	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
 	fullDuration := t.FileContracts[0].End - h.height                     // Duration that the host will actually be storing the file.
 	fileSize := t.FileContracts[0].FileSize
@@ -123,7 +119,13 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
 //
-// TODO: Reconsider locking model for this function.
+// Care is taken not to have any locks in place when network communication is
+// happening, nor while any intensive file operations are happening. For this
+// reason, all of the locking in this function is done manually. Edit with
+// caution, review with caution.
+//
+// TODO: Split some of this logic into helper functions, which in particular
+// will make mutex management easier.
 func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read the transaction from the connection.
 	var t consensus.Transaction
@@ -133,7 +135,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Check that the contained FileContract fits host criteria for taking
 	// files, replying with the error if there's a problem.
+	h.lock()
 	t, err = h.considerContract(t)
+	h.unlock()
 	if err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
 		return
@@ -144,7 +148,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// Create file.
+	h.lock()
 	filename := h.hostDir + h.getFilename()
+	h.unlock()
 	file, err := os.Create(filename)
 	if err != nil {
 		return
@@ -178,6 +184,11 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		return
 	}
 
+	// Network communication is finished, and disk intense operations are
+	// finished. We can lock the host for the remainder of the function.
+	h.lock()
+	defer h.unlock()
+
 	// Check that the file arrived in time.
 	if h.height >= t.FileContracts[0].Start-2 {
 		err = errors.New("file not uploaded in time, refusing to go forward with contract")
@@ -185,9 +196,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// record filename for later retrieval
-	h.lock()
 	h.files[t.FileContracts[0].FileMerkleRoot] = filename
-	h.unlock()
 
 	// Submit the transaction.
 	h.transactionChan <- t

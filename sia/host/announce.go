@@ -9,10 +9,11 @@ import (
 // HostAnnounceSelf creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
 func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (t consensus.Transaction, err error) {
+	h.lock()
+	defer h.unlock()
+
 	// Get the encoded announcement based on the host settings.
-	h.rLock()
 	info := h.announcement
-	h.rUnlock()
 
 	// Fill out the transaction.
 	id, err := h.wallet.RegisterTransaction(t)

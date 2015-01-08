@@ -66,6 +66,11 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 }
 
 // RetrieveFile is an RPC that uploads a specified file to a client.
+//
+// Mutexes are applied carefully to avoid any disk intensive or network
+// intensive operations. All necessary interaction with the host involves
+// looking up the filepath of the file being requested. This is done all at
+// once.
 func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
 	var merkle hash.Hash
@@ -74,16 +79,17 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 		return
 	}
 
-	// Verify the file exists.
+	// Verify the file exists, using a mutex while reading the host.
 	h.rLock()
 	filename, exists := h.files[merkle]
+	fullname := h.hostDir + filename
 	h.rUnlock()
 	if !exists {
 		return errors.New("no record of that file")
 	}
 
 	// Open the file.
-	file, err := os.Open(h.hostDir + filename)
+	file, err := os.Open(fullname)
 	if err != nil {
 		return
 	}
