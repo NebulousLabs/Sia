@@ -32,14 +32,14 @@ func (c *Core) AcceptTransaction(t consensus.Transaction) error {
 // processBlock is called by the environment's listener.
 func (c *Core) processBlock(b consensus.Block) (err error) {
 	c.state.Lock()
-	c.hostDatabase.Lock()
-	c.host.Lock()
+	// c.hostDatabase.Lock()
+	// c.host.Lock()
 	defer c.state.Unlock()
-	defer c.hostDatabase.Unlock()
-	defer c.host.Unlock()
+	// defer c.hostDatabase.Unlock()
+	// defer c.host.Unlock()
 
 	initialStateHeight := c.state.Height()
-	rewoundBlockIDs, appliedBlockIDs, outputDiffs, err := c.state.AcceptBlock(b)
+	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
@@ -50,6 +50,10 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 		return
 	}
 
+	err = c.hostDB.Update(initialStateHeight, rewoundBlocks, appliedBlocks)
+	if err != nil {
+		return
+	}
 	err = c.wallet.Update(outputDiffs)
 	if err != nil {
 		return
@@ -58,8 +62,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	c.updateHostDB(rewoundBlockIDs, appliedBlockIDs)
-	c.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
+	// c.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
 	// Broadcast all valid blocks.
 	go c.server.Broadcast("AcceptBlock", b, nil)

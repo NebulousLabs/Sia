@@ -1,5 +1,6 @@
 package sia
 
+/*
 import (
 	"errors"
 	"io"
@@ -166,3 +167,4 @@ func CreateRenter() (r *Renter) {
 	r.Files = make(map[string]FileEntry)
 	return
 }
+*/

@@ -8,7 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/sia"
+	// "github.com/NebulousLabs/Sia/sia"
 )
 
 // TODO: timeouts?
@@ -44,7 +44,7 @@ func (d *daemon) setUpHandlers(addr string) {
 
 // jsonStatusHandler responds to a status call with a json object of the status.
 func (d *daemon) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := d.core.Info()
+	status := d.core.StateInfo()
 	resp, err := json.Marshal(status)
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
@@ -82,7 +82,7 @@ func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Create all of the variables that get scanned in.
-	var ipAddress network.Address
+	// var ipAddress network.Address
 	var totalStorage int64
 	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
@@ -90,7 +90,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	var coinAddress consensus.CoinAddress
 
 	// Get the ip address.
-	ipAddress = network.Address(req.FormValue("ipaddress"))
+	// ipAddress = network.Address(req.FormValue("ipaddress"))
 
 	// The address can be either a coin address or a friend name
 	caString := req.FormValue("coinaddress")
@@ -134,40 +134,46 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Set the host settings.
-	d.core.SetHostSettings(sia.HostAnnouncement{
-		IPAddress:          ipAddress,
-		TotalStorage:       totalStorage,
-		MinFilesize:        minFilesize,
-		MaxFilesize:        maxFilesize,
-		MinDuration:        minDuration,
-		MaxDuration:        maxDuration,
-		MinChallengeWindow: minWindow,
-		MaxChallengeWindow: maxWindow,
-		MinTolerance:       minTolerance,
-		Price:              price,
-		Burn:               burn,
-		CoinAddress:        coinAddress,
-		// SpendConditions and FreezeIndex handled by HostAnnounceSelf
-	})
+	/*
+		d.core.SetHostSettings(sia.HostAnnouncement{
+			IPAddress:          ipAddress,
+			TotalStorage:       totalStorage,
+			MinFilesize:        minFilesize,
+			MaxFilesize:        maxFilesize,
+			MinDuration:        minDuration,
+			MaxDuration:        maxDuration,
+			MinChallengeWindow: minWindow,
+			MaxChallengeWindow: maxWindow,
+			MinTolerance:       minTolerance,
+			Price:              price,
+			Burn:               burn,
+			CoinAddress:        coinAddress,
+			// SpendConditions and FreezeIndex handled by HostAnnounceSelf
+		})
+	*/
 
-	// Make the host announcement.
-	_, err := d.core.HostAnnounceSelf(freezeCoins, freezeDuration+d.core.Height(), 10)
-	if err != nil {
-		http.Error(w, "Failed to announce host: "+err.Error(), 500)
-		return
-	}
+	/*
+		// Make the host announcement.
+		 _, err := d.core.HostAnnounceSelf(freezeCoins, freezeDuration+d.core.Height(), 10)
+		if err != nil {
+			http.Error(w, "Failed to announce host: "+err.Error(), 500)
+			return
+		}
+	*/
 
 	fmt.Fprint(w, "Update successful")
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
-	filename, nickname := req.FormValue("sourcefile"), req.FormValue("nickname")
-	err := d.core.ClientProposeContract(filename, nickname)
-	if err != nil {
-		http.Error(w, "Failed to create file contract: "+err.Error(), 500)
-	} else {
-		fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
-	}
+	// filename, nickname := req.FormValue("sourcefile"), req.FormValue("nickname")
+	// err := d.core.ClientProposeContract(filename, nickname)
+	/*
+		if err != nil {
+			http.Error(w, "Failed to create file contract: "+err.Error(), 500)
+		} else {
+			fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
+		}
+	*/
 }
 
 func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
@@ -175,12 +181,14 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	if filename == "" {
 		filename = d.downloadDir + nickname
 	}
-	err := d.core.Download(nickname, filename)
-	if err != nil {
-		http.Error(w, "Failed to download file: "+err.Error(), 500)
-	} else {
-		fmt.Fprint(w, "Download complete!")
-	}
+	/*
+		 err := d.core.Download(nickname, filename)
+		if err != nil {
+			http.Error(w, "Failed to download file: "+err.Error(), 500)
+		} else {
+			fmt.Fprint(w, "Download complete!")
+		}
+	*/
 }
 
 // TODO: this should probably just return JSON. Leave formatting to the client.

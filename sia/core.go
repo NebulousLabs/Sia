@@ -3,6 +3,7 @@ package sia
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
@@ -13,12 +14,12 @@ import (
 type Core struct {
 	state *consensus.State
 
-	server       *network.TCPServer
-	host         *Host
-	hostDatabase *HostDatabase
-	miner        Miner
-	renter       *Renter
-	wallet       Wallet
+	server *network.TCPServer
+	// host         *Host
+	hostDB HostDB
+	miner  Miner
+	// renter       *Renter
+	wallet Wallet
 
 	friends map[string]consensus.CoinAddress
 
@@ -48,10 +49,11 @@ func CreateCore(hostDir string, walletFile string, serverAddr string, nobootstra
 	}
 	var genesisOutputDiffs []consensus.OutputDiff
 	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
-	c.hostDatabase = CreateHostDatabase()
-	c.host = CreateHost()
+	// c.hostDatabase = CreateHostDatabase()
+	// c.host = CreateHost()
+	c.hostDB = hostdb.New()
 	c.miner = miner.New(c.blockChan, 1)
-	c.renter = CreateRenter()
+	// c.renter = CreateRenter()
 	c.wallet, err = wallet.New(c.walletFile)
 	if err != nil {
 		return
@@ -74,7 +76,7 @@ func CreateCore(hostDir string, walletFile string, serverAddr string, nobootstra
 	} else if err != nil {
 		return
 	}
-	c.host.Settings.IPAddress = c.server.Address()
+	// c.host.Settings.IPAddress = c.server.Address()
 
 	return
 }
