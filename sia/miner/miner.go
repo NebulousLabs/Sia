@@ -26,7 +26,12 @@ type Miner struct {
 	rwLock    sync.RWMutex
 }
 
-// TODO: write docstring.
+// New creates a miner that will mine on the given number of threads. This
+// number can be changed later.
+//
+// TODO: Reconsider how miner's New() works, as well as how all component's
+// New() functions should work by convention. Perhaps it would be better to
+// call New() with a MinerUpdate struct as input.
 func New(threads int) (m *Miner) {
 	return &Miner{
 		threads:              threads,
@@ -34,8 +39,11 @@ func New(threads int) (m *Miner) {
 	}
 }
 
-// UpdateMiner changes what block the miner is mining on. Changes include address
-// and target.
+// TODO: write docstring.
+//
+// TODO: contemplate giving the miner access to a read only state that it
+// queries for block information, instead of needing to pass all of that
+// information through the update struct.
 func (m *Miner) UpdateMiner(mu components.MinerUpdate) error {
 	m.lock()
 	defer m.unlock()

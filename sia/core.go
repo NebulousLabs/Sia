@@ -2,6 +2,7 @@ package sia
 
 import (
 	"errors"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -75,6 +76,9 @@ func CreateCore(config Config) (c *Core, err error) {
 		err = errors.New("cannot have nil wallet")
 		return
 	}
+
+	// Set the number of procs equal to the number of cpus.
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Fill out the basic information.
 	c = &Core{
