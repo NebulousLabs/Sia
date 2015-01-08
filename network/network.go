@@ -116,7 +116,6 @@ func (tcps *TCPServer) handleConn(conn net.Conn) {
 	if ok {
 		fn(conn)
 		// TODO: log error
-		// no wait, send the error?
 	}
 	return
 }

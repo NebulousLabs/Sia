@@ -279,16 +279,17 @@ func (e *Core) NegotiateContract(conn net.Conn) (err error) {
 	}
 	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(t.FileContracts[0].FileSize))
 	if err != nil {
+		encoding.WriteObject(conn, "internal error")
 		return
 	}
 	if merkleRoot != t.FileContracts[0].FileMerkleRoot {
-		err = errors.New("uploaded file has wrong merkle root")
+		encoding.WriteObject(conn, "uploaded file has wrong merkle root")
 		return
 	}
 
 	// Check that the file arrived in time.
 	if e.Height() >= t.FileContracts[0].Start-2 {
-		err = errors.New("file not uploaded in time, refusing to go forward with contract")
+		encoding.WriteObject(conn, "file not uploaded in time, refusing to go forward with contract")
 		return
 	}
 
@@ -326,14 +327,14 @@ func (e *Core) RetrieveFile(conn net.Conn) (err error) {
 	filename, exists := e.host.Files[merkle]
 	e.host.RUnlock()
 	if !exists {
-		fmt.Println("RetrieveFile: no record of file with that hash")
-		return errors.New("no record of that file")
+		encoding.WriteObject(conn, "no record of that file")
+		return
 	}
 
 	// Open the file.
 	file, err := os.Open(e.hostDir + filename)
 	if err != nil {
-		fmt.Println("RetrieveFile:", err)
+		encoding.WriteObject(conn, "internal error")
 		return
 	}
 	defer file.Close()
@@ -341,6 +342,7 @@ func (e *Core) RetrieveFile(conn net.Conn) (err error) {
 	// Transmit the file.
 	_, err = io.Copy(conn, file)
 	if err != nil {
+		encoding.WriteObject(conn, "internal error")
 		return
 	}
 
