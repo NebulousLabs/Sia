@@ -3,7 +3,13 @@ package hostdb
 import (
 	"fmt"
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
+
+// TODO: add multiple different weight metrics to each node, so that things
+// like latency or throughput or expected bandwidth price can be favored.
+// Functions also need to be added that allow us to change the weight of a
+// specific node.
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
 // inserting elements, elements are inserted on the side of the tree with the
@@ -17,27 +23,31 @@ type hostNode struct {
 	left  *hostNode
 	right *hostNode
 
-	hostEntry *HostEntry
+	taken     bool // Used because components.HostEntry can't be compared to nil.
+	hostEntry components.HostEntry
 }
 
 // createNode makes a new node the fill a host entry.
-func createNode(parent *hostNode, entry *HostEntry) *hostNode {
+func createNode(parent *hostNode, entry components.HostEntry) *hostNode {
 	return &hostNode{
-		parent:    parent,
-		weight:    entry.Weight(),
-		count:     1,
+		parent: parent,
+		weight: entryWeight(entry),
+		count:  1,
+
+		taken:     true,
 		hostEntry: entry,
 	}
 }
 
 // insert inserts a host entry into the node. insert is recursive. The value
 // returned is the number of nodes added to the tree, always 1 or 0.
-func (hn *hostNode) insert(entry *HostEntry) (nodesAdded int, newNode *hostNode) {
-	hn.weight += entry.Weight()
+func (hn *hostNode) insert(entry components.HostEntry) (nodesAdded int, newNode *hostNode) {
+	hn.weight += entryWeight(entry)
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
-	if hn.hostEntry == nil {
+	if !hn.taken {
+		hn.taken = true
 		hn.hostEntry = entry
 		newNode = hn
 		return
@@ -65,10 +75,11 @@ func (hn *hostNode) insert(entry *HostEntry) (nodesAdded int, newNode *hostNode)
 // remove takes a node and removes it from the tree by climbing through the
 // list of parents. Remove does not delete nodes.
 func (hn *hostNode) remove() {
-	hn.weight -= hn.hostEntry.Weight()
+	hn.weight -= entryWeight(hn.hostEntry)
+	hn.taken = false
 	current := hn.parent
 	for current != nil {
-		current.weight -= hn.hostEntry.Weight()
+		current.weight -= entryWeight(hn.hostEntry)
 		current = current.parent
 	}
 }
@@ -77,7 +88,7 @@ func (hn *hostNode) remove() {
 // weight. Though the tree has an arbitrary sorting, a sufficiently random
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
-func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry HostEntry, err error) {
+func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry components.HostEntry, err error) {
 	// Check for an errored weight call.
 	if weight > hn.weight {
 		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)
@@ -96,11 +107,11 @@ func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry HostEntry, e
 	}
 
 	// Sanity check
-	if hn.hostEntry == nil {
+	if !hn.taken {
 		panic("should not be returning a nil entry")
 	}
 
 	// Return the root entry.
-	entry = *hn.hostEntry
+	entry = hn.hostEntry
 	return
 }

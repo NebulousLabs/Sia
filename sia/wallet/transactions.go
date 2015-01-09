@@ -8,10 +8,21 @@ import (
 	"github.com/NebulousLabs/Sia/signatures"
 )
 
+// Reset implements the core.Wallet interface.
+func (w *Wallet) Reset() error {
+	w.lock()
+	defer w.unlock()
+
+	w.spentCounter++
+	w.transactions = make(map[string]*openTransaction)
+
+	return nil
+}
+
 // RegisterTransaction implements the core.Wallet interface.
 func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
@@ -22,8 +33,8 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 
 // FundTransaction implements the core.Wallet interface.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	// Get the transaction.
 	ot, exists := w.transactions[id]
@@ -52,9 +63,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	// Add a refund output if needed.
 	if total-amount > 0 {
 		// This is dirty and should probably happen some other way.
-		w.Unlock()
+		w.unlock()
 		coinAddress, err := w.CoinAddress()
-		w.Lock()
+		w.lock()
 
 		if err != nil {
 			return err
@@ -72,8 +83,8 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 // AddMinerFee implements the core.Wallet interface.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -86,8 +97,8 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
 
 // AddOutput implements the core.Wallet interface.
 func (w *Wallet) AddOutput(id string, o consensus.Output) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -100,8 +111,8 @@ func (w *Wallet) AddOutput(id string, o consensus.Output) error {
 
 // AddTimelockedRefund implements the core.Wallet interface.
 func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, refundIndex uint64, err error) {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	// Get the transaction
 	ot, exists := w.transactions[id]
@@ -129,8 +140,8 @@ func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, relea
 
 // AddFileContract implements the core.Wallet interface.
 func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -143,8 +154,8 @@ func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
 
 // AddStorageProof implements the core.Wallet interface.
 func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -157,8 +168,8 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
 
 // AddArbitraryData implements the core.Wallet interface.
 func (w *Wallet) AddArbitraryData(id string, arb string) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	to, exists := w.transactions[id]
 	if !exists {
@@ -171,8 +182,8 @@ func (w *Wallet) AddArbitraryData(id string, arb string) error {
 
 // SignTransaction implements the core.Wallet interface.
 func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction consensus.Transaction, err error) {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	// Fetch the transaction.
 	ot, exists := w.transactions[id]
@@ -226,8 +237,6 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
 
 		// Mark the input as spent. Maps :)
-		//
-		// TODO: Sometimes causes panic?
 		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter
 	}
 

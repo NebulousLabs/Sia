@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/NebulousLabs/Sia/sia/miner"
 )
 
 // Takes a number of threads and then begins mining on that many threads.
@@ -17,9 +15,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	miner := miner.New(d.core.BlockChan(), threads)
-	d.core.ReplaceMiner(miner)
-	d.core.StartMining()
+	d.core.UpdateMiner(threads)
 	fmt.Fprintf(w, "Now mining on %v threads.", threads)
 }
 

@@ -205,10 +205,12 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// create friend listing
-	friends := "\n"
-	for name, address := range d.core.FriendMap() {
-		friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
-	}
+	/*
+		friends := "\n"
+		for name, address := range d.core.FriendMap() {
+			friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
+		}
+	*/
 
 	// write stats to ResponseWriter
 	fmt.Fprintf(w, `General Information:
@@ -222,10 +224,8 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 	Current Block Target: %v
 	Current Block Depth: %v
 
-	Networked Peers: %s
-
-	Friends: %s`,
+	Networked Peers: %s`,
 		mineStatus, d.core.WalletBalance(false), d.core.WalletBalance(true),
-		info.Height, info.Target, info.Depth, peers, friends,
+		info.Height, info.Target, info.Depth, peers,
 	)
 }

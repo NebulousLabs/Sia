@@ -69,8 +69,8 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spe
 
 // Balance implements the core.Wallet interface.
 func (w *Wallet) Balance(full bool) (total consensus.Currency) {
-	w.RLock()
-	defer w.RUnlock()
+	w.rLock()
+	defer w.rUnlock()
 
 	// Iterate through all outputs and tally them up.
 	for _, spendableAddress := range w.spendableAddresses {
@@ -89,8 +89,8 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 
 // Update implements the core.Wallet interface.
 func (w *Wallet) Update(diffs []consensus.OutputDiff) error {
-	w.Lock()
-	defer w.Unlock()
+	w.lock()
+	defer w.unlock()
 
 	for _, diff := range diffs {
 		if diff.New {

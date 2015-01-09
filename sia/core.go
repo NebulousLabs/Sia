@@ -1,12 +1,30 @@
 package sia
 
 import (
+	"errors"
+	"runtime"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
-	"github.com/NebulousLabs/Sia/sia/miner"
-	"github.com/NebulousLabs/Sia/sia/wallet"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
+
+// The config struct is used when calling CreateCore(), and prevents the input
+// line from being excessively long.
+type Config struct {
+	// Settings available through flags.
+	HostDir     string
+	WalletFile  string
+	ServerAddr  string
+	Nobootstrap bool
+
+	// Interface implementations.
+	Host   components.Host
+	HostDB components.HostDB
+	Miner  components.Miner
+	Renter components.Renter
+	Wallet components.Wallet
+}
 
 // Core is the struct that serves as the state for siad. It contains a
 // pointer to the state, as things like a wallet, a friend list, etc. Each
@@ -14,14 +32,14 @@ import (
 type Core struct {
 	state *consensus.State
 
-	server *network.TCPServer
-	// host         *Host
-	hostDB HostDB
-	miner  Miner
-	// renter       *Renter
-	wallet Wallet
+	server *network.TCPServer // one of these things is not like the others :)
+	host   components.Host
+	hostDB components.HostDB
+	miner  components.Miner
+	renter components.Renter
+	wallet components.Wallet
 
-	friends map[string]consensus.CoinAddress
+	// friends map[string]consensus.CoinAddress
 
 	// Channels for incoming blocks and transactions to be processed
 	blockChan       chan consensus.Block
@@ -36,31 +54,70 @@ type Core struct {
 // createCore creates a server, host, miner, renter and wallet and
 // puts it all in a single environment struct that's used as the state for the
 // main package.
-//
-// TODO: swap out the way that CreateCore is called so that the wallet,
-// host, etc. can all be used as input - or not supplied at all.
-func CreateCore(hostDir string, walletFile string, serverAddr string, nobootstrap bool) (c *Core, err error) {
+func CreateCore(config Config) (c *Core, err error) {
+	if config.Host == nil {
+		err = errors.New("cannot have nil host")
+		return
+	}
+	if config.HostDB == nil {
+		err = errors.New("cannot have nil hostdb")
+		return
+	}
+	if config.Miner == nil {
+		err = errors.New("cannot have nil miner")
+		return
+	}
+	if config.Renter == nil {
+		err = errors.New("cannot have nil renter")
+		return
+	}
+	if config.Wallet == nil {
+		err = errors.New("cannot have nil wallet")
+		return
+	}
+
+	// Set the number of procs equal to the number of cpus.
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	// Fill out the basic information.
 	c = &Core{
-		friends:         make(map[string]consensus.CoinAddress),
+		host:   config.Host,
+		hostDB: config.HostDB,
+		miner:  config.Miner,
+		renter: config.Renter,
+		wallet: config.Wallet,
+
+		// friends:         make(map[string]consensus.CoinAddress),
+
 		blockChan:       make(chan consensus.Block, 100),
 		transactionChan: make(chan consensus.Transaction, 100),
-		hostDir:         hostDir,
-		walletFile:      walletFile,
+
+		hostDir:    config.HostDir,
+		walletFile: config.WalletFile,
 	}
+
+	// Create a state.
 	var genesisOutputDiffs []consensus.OutputDiff
 	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
-	// c.hostDatabase = CreateHostDatabase()
-	// c.host = CreateHost()
-	c.hostDB = hostdb.New()
-	c.miner = miner.New(c.blockChan, 1)
-	// c.renter = CreateRenter()
-	c.wallet, err = wallet.New(c.walletFile)
+	genesisBlock, err := c.state.BlockAtHeight(0)
 	if err != nil {
 		return
 	}
 
 	// Update componenets to see genesis block.
-	err = c.updateMiner(c.miner)
+	err = c.UpdateHost(components.HostAnnouncement{})
+	if err != nil {
+		return
+	}
+	err = c.hostDB.Update(0, nil, []consensus.Block{genesisBlock})
+	if err != nil {
+		return
+	}
+	err = c.UpdateMiner(c.miner.Threads())
+	if err != nil {
+		return
+	}
+	err = c.UpdateRenter()
 	if err != nil {
 		return
 	}
@@ -70,7 +127,7 @@ func CreateCore(hostDir string, walletFile string, serverAddr string, nobootstra
 	}
 
 	// Bootstrap to the network.
-	err = c.initializeNetwork(serverAddr, nobootstrap)
+	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
 	if err == network.ErrNoPeers {
 		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
 	} else if err != nil {

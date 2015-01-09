@@ -1,13 +1,14 @@
 package miner
 
 import (
-	"encoding/json"
-	"runtime"
+	"errors"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: integrate the miner as a state listener.
 type Miner struct {
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -16,82 +17,45 @@ type Miner struct {
 	target            consensus.Target
 	earliestTimestamp consensus.Timestamp
 
-	threads              int // how many threads the miner usually uses.
+	threads              int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads       int // 0 if not mining.
 	runningThreads       int
 	iterationsPerAttempt uint64
 
 	blockChan chan consensus.Block
-	sync.RWMutex
+	rwLock    sync.RWMutex
 }
 
-type Status struct {
-	State          string
-	Threads        int
-	RunningThreads int
-	Address        consensus.CoinAddress
-}
-
-// New takes a block channel down which it drops blocks that it mines. It also
-// takes a thread count, which it uses to spin up miners on separate threads.
-func New(blockChan chan consensus.Block, threads int) (m *Miner) {
-	runtime.GOMAXPROCS(threads)
+// New returns a miner that needs to be updated/initialized.
+//
+// TODO: Formalize components so that
+func New() (m *Miner) {
 	return &Miner{
-		threads:              threads,
+		threads:              1,
 		iterationsPerAttempt: 256 * 1024,
-		blockChan:            blockChan,
 	}
 }
 
-// Info() returns a JSON struct which can be parsed by frontends for displaying
-// information to the user.
-func (m *Miner) Info() ([]byte, error) {
-	m.RLock()
-	defer m.RUnlock()
+// TODO: write docstring.
+//
+// TODO: contemplate giving the miner access to a read only state that it
+// queries for block information, instead of needing to pass all of that
+// information through the update struct.
+func (m *Miner) UpdateMiner(mu components.MinerUpdate) error {
+	m.lock()
+	defer m.unlock()
 
-	status := Status{
-		Threads:        m.threads,
-		RunningThreads: m.runningThreads,
-		Address:        m.address,
+	if mu.Threads == 0 {
+		return errors.New("cannot have a miner with 0 threads.")
 	}
 
-	// Set the running status based on desiredThreads vs. runningThreads.
-	if m.desiredThreads == 0 && m.runningThreads == 0 {
-		status.State = "Off"
-	} else if m.desiredThreads == 0 && m.runningThreads > 0 {
-		status.State = "Turning Off"
-	} else if m.desiredThreads == m.runningThreads {
-		status.State = "On"
-	} else if m.desiredThreads < m.runningThreads {
-		status.State = "Turning On"
-	} else if m.desiredThreads > m.runningThreads {
-		status.State = "Decreasing number of threads."
-	} else {
-		status.State = "Miner is in an ERROR state!"
-	}
+	m.parent = mu.Parent
+	m.transactions = mu.Transactions
+	m.target = mu.Target
+	m.address = mu.Address
+	m.earliestTimestamp = mu.EarliestTimestamp
+	m.threads = mu.Threads
+	m.blockChan = mu.BlockChan
 
-	return json.Marshal(status)
-}
-
-// SubsidyAddress returns the address that is currently being used by the miner
-// while searching for blocks.
-func (m *Miner) SubsidyAddress() consensus.CoinAddress {
-	m.Lock()
-	defer m.Unlock()
-
-	return m.address
-}
-
-// Update changes what block the miner is mining on. Changes include address
-// and target.
-func (m *Miner) Update(parent consensus.BlockID, transactions []consensus.Transaction, target consensus.Target, address consensus.CoinAddress, earliestTimestamp consensus.Timestamp) error {
-	m.Lock()
-	defer m.Unlock()
-
-	m.parent = parent
-	m.transactions = transactions
-	m.target = target
-	m.address = address
-	m.earliestTimestamp = earliestTimestamp
 	return nil
 }

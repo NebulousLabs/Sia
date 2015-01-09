@@ -3,7 +3,6 @@ package sia
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // This file is here to provide access to information about the state without
@@ -93,21 +92,8 @@ func (c *Core) BlockAtHeight(height consensus.BlockHeight) (consensus.Block, err
 	return c.state.BlockAtHeight(height)
 }
 
-////////////////////////
-// OBSOLETE FUNCITONS //
-////////////////////////
-
-// Some of these functions just need to be moved to other files, some will be
-// deleted entirely.
-
-func (c *Core) AddressBook() []network.Address {
-	return c.server.AddressBook()
-}
-
-func (c *Core) RandomPeer() network.Address {
-	return c.server.RandomPeer()
-}
-
-func (c *Core) Address() network.Address {
-	return c.server.Address()
+func (c *Core) StorageProofSegmentIndex(contractID consensus.ContractID, windowIndex consensus.BlockHeight) (index uint64, err error) {
+	c.state.RLock()
+	defer c.state.RUnlock()
+	return c.state.StorageProofSegmentIndex(contractID, windowIndex)
 }

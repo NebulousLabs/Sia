@@ -1,36 +1,8 @@
 package sia
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
-
-type Miner interface {
-	// Info returns an arbitrary byte slice presumably with information about
-	// the status of the miner. Info is not relevant to the sia package, but
-	// instead to the front end.
-	Info() ([]byte, error)
-
-	// SubsidyAddress returns the address that is currently being used by the
-	// miner while looking for a block.
-	SubsidyAddress() consensus.CoinAddress
-
-	// Update tells the miner what blocks should be getting mined.
-	//
-	// Consider: should Update also provide a block chan?
-	Update(parentID consensus.BlockID, transactionSet []consensus.Transaction, nextTarget consensus.Target, subsidyAddress consensus.CoinAddress, earliestTimestamp consensus.Timestamp) error
-
-	// StartMining will turn on the miner and begin consuming computational
-	// cycles.
-	StartMining() error
-
-	// StopMining will turn of the miner and stop consuming computational
-	// cycles.
-	StopMining() error
-
-	// SolveBlock will attempt to solve a block, returning the most recent
-	// attempt and indicating whether the solve was successful or not.
-	SolveBlock() (block consensus.Block, solved bool, err error)
-}
 
 // StartMining calls StartMining on the miner.
 func (c *Core) StartMining() error {
@@ -47,18 +19,13 @@ func (c *Core) MinerInfo() ([]byte, error) {
 	return c.miner.Info()
 }
 
-// updateMiner needs to be called with the state read-locked. updateMiner takes
+// UpdateMiner needs to be called with the state read-locked. UpdateMiner takes
 // a miner as input and calls `miner.Update()` with all of the recent values
-// from the state. Usually, but not always, the call will be
-// c.updateMiner(c.miner).
-func (c *Core) updateMiner(miner Miner) (err error) {
-	recentBlock := c.state.CurrentBlock()
-	transactionSet := c.state.TransactionPoolDump()
-	target := c.state.CurrentTarget()
-	earliestTimestamp := c.state.EarliestLegalTimestamp()
-
+// from the state.
+func (c *Core) UpdateMiner(threads int) (err error) {
 	// Get a new address if the recent block belongs to us, otherwise use the
 	// current address.
+	recentBlock := c.state.CurrentBlock()
 	address := c.miner.SubsidyAddress()
 	if address == recentBlock.MinerAddress {
 		address, err = c.wallet.CoinAddress()
@@ -67,20 +34,19 @@ func (c *Core) updateMiner(miner Miner) (err error) {
 		}
 	}
 
+	// Create the update struct for the miner.
+	update := components.MinerUpdate{
+		Parent:            recentBlock.ID(),
+		Transactions:      c.state.TransactionPoolDump(),
+		Target:            c.state.CurrentTarget(),
+		Address:           address,
+		EarliestTimestamp: c.state.EarliestLegalTimestamp(),
+
+		BlockChan: c.BlockChan(),
+		Threads:   threads,
+	}
+
 	// Call update on the miner.
-	miner.Update(recentBlock.ID(), transactionSet, target, address, earliestTimestamp)
+	err = c.miner.UpdateMiner(update)
 	return
-}
-
-// ReplaceMiner terminates the existing miner and replaces it with the new
-// miner. ReplaceMiner will not call `StartMining()` on the new miner.
-func (c *Core) ReplaceMiner(miner Miner) {
-	// Fill out the new miner with the most recent block information.
-	c.state.RLock()
-	c.updateMiner(miner)
-	c.state.RUnlock()
-
-	// Kill and replace the existing miner.
-	c.miner.StopMining()
-	c.miner = miner
 }
