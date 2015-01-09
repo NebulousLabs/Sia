@@ -81,7 +81,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 
 		Host:   host.New(),
 		HostDB: hostdb.New(),
-		Miner:  miner.New(1),
+		Miner:  miner.New(),
 		Wallet: wallet,
 	}
 

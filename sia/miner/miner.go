@@ -8,7 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
-// TODO: write docstring.
+// TODO: integrate the miner as a state listener.
 type Miner struct {
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -26,15 +26,12 @@ type Miner struct {
 	rwLock    sync.RWMutex
 }
 
-// New creates a miner that will mine on the given number of threads. This
-// number can be changed later.
+// New returns a miner that needs to be updated/initialized.
 //
-// TODO: Reconsider how miner's New() works, as well as how all component's
-// New() functions should work by convention. Perhaps it would be better to
-// call New() with a MinerUpdate struct as input.
-func New(threads int) (m *Miner) {
+// TODO: Formalize components so that
+func New() (m *Miner) {
 	return &Miner{
-		threads:              threads,
+		threads:              1,
 		iterationsPerAttempt: 256 * 1024,
 	}
 }
