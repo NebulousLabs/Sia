@@ -16,10 +16,10 @@ type (
 	Currency    uint64
 
 	BlockID       hash.Hash
-	OutputID      hash.Hash // An output id points to a specific output.
+	OutputID      hash.Hash
 	ContractID    hash.Hash
 	TransactionID hash.Hash
-	CoinAddress   hash.Hash // An address is the hash of the spend conditions that unlock the output.
+	CoinAddress   hash.Hash // The hash of the spend conditions of an output.
 	Target        hash.Hash
 )
 
@@ -71,8 +71,6 @@ type SpendConditions struct {
 // A StorageProof contains the fields needed for a host to prove that they are
 // still storing a file. Though WindowIndex is of type BlockHeight, it refers
 // to the index of the window, and not the height at which the window starts.
-//
-// TODO: Decide if WindowIndex should be type uint64 instead of BlockHeight
 type StorageProof struct {
 	ContractID  ContractID
 	WindowIndex BlockHeight

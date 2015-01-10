@@ -400,6 +400,10 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 		}
 	}
 
+	// Notify subscribers of the consensus change.
+	var cc ConsensusChange
+	s.notifySubscribers(cc)
+
 	// Perform a sanity check if debug flag is set.
 	if DEBUG {
 		s.CurrentPathCheck()

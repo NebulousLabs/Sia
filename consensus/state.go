@@ -53,7 +53,7 @@ type State struct {
 	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	unspentOutputs map[OutputID]Output
 	openContracts  map[ContractID]*OpenContract
-	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
+	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
 
 	// consensusSubscriptions is a list of channels that receive notifications
 	// each time the state of consensus changes. Consensus changes only happen
@@ -100,14 +100,6 @@ type BlockNode struct {
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof
 	SuccessfulWindows    []ContractID
-}
-
-// An OutputDiff indicates an output that has either been added to or removed
-// from the unspent outputs set. This is used by the wallet.
-type OutputDiff struct {
-	New    bool
-	ID     OutputID
-	Output Output
 }
 
 // CreateGenesisState will create the state that contains the genesis block and
