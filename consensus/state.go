@@ -23,6 +23,8 @@ type (
 // struct, you need to either have a read lock or a write lock on the state.
 // Internally, the state has no concurrency, so the mutex is never used within
 // the consensus package.
+//
+// TODO: The mutexing in the consensus package breaks convention.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -53,7 +55,12 @@ type State struct {
 	openContracts  map[ContractID]*OpenContract
 	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
 
-	// AcceptBlock() and AcceptTransaction() can be called concurrently.
+	// consensusSubscriptions is a list of channels that receive notifications
+	// each time the state of consensus changes. Consensus changes only happen
+	// through the application and inversion of blocks. See notifications.go
+	// for more information.
+	consensusSubscriptions []chan ConsensusChange
+
 	sync.RWMutex
 }
 

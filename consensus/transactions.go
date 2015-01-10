@@ -97,7 +97,7 @@ func (s *State) applyTransaction(t Transaction) (diffs []OutputDiff) {
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
 		// Diff not needed here, because applying a contract doesn't change the
-		// outputs set.
+		// outputs set, a contract is merely being created.
 		s.applyContract(contract, t.FileContractID(i))
 	}
 	return
