@@ -66,10 +66,20 @@ func (s *State) validProof(sp StorageProof) error {
 
 // applyStorageProof takes a storage proof and adds any outputs created by it
 // to the consensus state.
-func (s *State) applyStorageProof(sp StorageProof) (diff OutputDiff) {
+//
+// TODO: Though the contract terminates here, code later on handles that. That
+// should be changed.
+func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
+	openContract := s.openContracts[sp.ContractID]
+	contractDiff := ContractDiff{
+		Contract:             openContract.FileContract,
+		ContractID:           sp.ContractID,
+		New:                  false,
+		PreviousOpenContract: *openContract,
+	}
+
 	// Set the payout of the output - payout cannot be greater than the
 	// amount of funds remaining.
-	openContract := s.openContracts[sp.ContractID]
 	payout := openContract.FileContract.ValidProofPayout
 	if openContract.FundsRemaining < openContract.FileContract.ValidProofPayout {
 		payout = openContract.FundsRemaining
@@ -85,12 +95,13 @@ func (s *State) applyStorageProof(sp StorageProof) (diff OutputDiff) {
 		panic(err)
 	}
 	s.unspentOutputs[outputID] = output
-	diff = OutputDiff{New: true, ID: outputID, Output: output}
+	td.OutputDiffs = append(td.OutputDiffs, OutputDiff{New: true, ID: outputID, Output: output})
 
 	// Mark the proof as complete for this window, and subtract from the
 	// FundsRemaining.
 	s.openContracts[sp.ContractID].WindowSatisfied = true
 	s.openContracts[sp.ContractID].FundsRemaining -= payout
+	contractDiff.NewOpenContract = *s.openContracts[sp.ContractID]
 	return
 }
 
@@ -134,7 +145,7 @@ func (s *State) validContract(c FileContract) (err error) {
 
 // addContract takes a FileContract and its corresponding ContractID and adds
 // it to the state.
-func (s *State) applyContract(contract FileContract, id ContractID) {
+func (s *State) applyContract(contract FileContract, id ContractID, td *TransactionDiff) {
 	s.openContracts[id] = &OpenContract{
 		FileContract:    contract,
 		ContractID:      id,
@@ -142,6 +153,15 @@ func (s *State) applyContract(contract FileContract, id ContractID) {
 		Failures:        0,
 		WindowSatisfied: false,
 	}
+
+	cd := ContractDiff{
+		Contract:        contract,
+		ContractID:      id,
+		New:             true,
+		Terminated:      false,
+		NewOpenContract: *s.openContracts[id],
+	}
+	td.ContractDiffs = append(td.ContractDiffs, cd)
 }
 
 // applyMissedProof adds outputs to the State to manage a missed storage proof
@@ -179,7 +199,9 @@ func (s *State) applyMissedProof(openContract *OpenContract) (diff OutputDiff) {
 // contractMaintenance checks the contract windows and storage proofs and to
 // create outputs for missed proofs and contract terminations, and to advance
 // any storage proof windows.
-func (s *State) applyContractMaintenance() (diffs []OutputDiff) {
+//
+// TODO: Contracts should terminate immediately...
+func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDiff) {
 	// Scan all open contracts and perform any required maintenance on each.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.openContracts {
@@ -188,6 +210,13 @@ func (s *State) applyContractMaintenance() (diffs []OutputDiff) {
 		contractProgress := s.Height() - contract.Start
 		if s.Height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
 			// If the proof was missed for this window, add an output.
+			cd := &ContractDiff{
+				Contract:             openContract.FileContract,
+				ContractID:           openContract.ContractID,
+				New:                  false,
+				Terminated:           false,
+				PreviousOpenContract: *openContract,
+			}
 			if openContract.WindowSatisfied == false {
 				diff := s.applyMissedProof(openContract)
 				diffs = append(diffs, diff)
@@ -195,6 +224,7 @@ func (s *State) applyContractMaintenance() (diffs []OutputDiff) {
 				s.currentBlockNode().SuccessfulWindows = append(s.currentBlockNode().SuccessfulWindows, openContract.ContractID)
 			}
 			openContract.WindowSatisfied = false
+			cd.NewOpenContract = *openContract
 		}
 
 		// Check for a terminated contract.
