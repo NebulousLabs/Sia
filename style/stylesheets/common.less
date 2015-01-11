@@ -1,0 +1,110 @@
+.i{
+    display:inline-block;
+}
+.title-text{
+    font-size:32px;
+    color:@g500;
+    padding:20px;
+}
+
+// BUTTON
+
+.button{
+    display:inline-block;
+    color:@g500;
+    padding:10px;
+    padding-left:15px;
+    padding-right:15px;
+    font-size:18px;
+}
+.button i{
+    margin-right:5px;
+}
+.button:hover{
+    cursor:pointer;
+    color:@g600;
+    background-color:@g50;
+}
+
+// DROPDOWN
+
+.dropdown-button{
+    .i;
+    float:right;
+    padding:1px;
+    padding-left:4px;
+    padding-right:4px;
+    margin:7px;
+    background-color:@g400;
+    border-radius:4px;
+    color:#fff;
+    font-size:12px;
+}
+.dropdown-button:hover{
+    cursor:pointer;
+    background-color:@g300;
+}
+
+// CAPSULE
+
+.capsule{
+    .i;
+    border:1px solid @g300;
+    border-radius:4px;
+}
+.capsule .pod{
+    .i;
+    padding:10px;
+    padding-left:16px;
+    padding-right:16px;
+    border-right:1px solid @g300;
+    color:@g600;
+}
+.capsule .pod:last-child{
+    border:none;
+    padding-right:20px;
+}
+.capsule .pod.enabled{
+}
+.capsule .pod.disabled{
+    background-color:@g200;
+    margin-left:-4px;
+}
+.capsule .pod.button{
+
+}
+.capsule .pod.button:hover{
+    cursor:pointer;
+    background-color:@g50;
+}
+
+// HEADER
+
+#content .header{
+    padding:20px;
+    border-bottom:1px solid @g300;
+}
+#content .header .title{
+    .i;
+    font-size:32px;
+    color:@g500;
+}
+#content .header .capsule{
+    float:right;
+}
+
+// SEARCH BAR
+
+.search{
+    display:block;
+    margin-top:4px;
+    margin-right:20px;
+    border:1px solid @g400;
+    font-size:18px;
+    border-radius:4px;
+    padding:4px;
+}
+.search i{
+    float:right;
+    margin:2px;
+}

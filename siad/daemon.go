@@ -58,13 +58,6 @@ func createDaemon(config Config) (d *daemon, err error) {
 		downloadDir: expandedDownloadDir,
 	}
 
-	// Create the web interface template.
-	d.template, err = template.ParseFiles(expandedStyleDir + "template.html")
-	if err != nil {
-		err = fmt.Errorf("template.html not found! Please move the styles folder to '%v'", expandedStyleDir)
-		return
-	}
-
 	d.core, err = sia.CreateCore(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
 	if err != nil {
 		return

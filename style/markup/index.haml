@@ -1,0 +1,36 @@
+<!doctype html>
+%html
+    %head
+        %title {{TITLE}}
+
+        %link{:rel => "stylesheet",
+             :href => "lib/libraries/bootstrap.min.css"}
+        %link{:rel => "stylesheet",
+             :href => "lib/libraries/bootstrap-theme.min.css"}
+        %link{:rel => "stylesheet",
+              :href => "lib/libraries/font-awesome-4.2.0/css/font-awesome.min.css"}
+        %link{:rel => "stylesheet",
+             :href => "lib/stylesheets/style.css"}
+
+        %script{:type => "text/javascript",
+                :src  => "lib/libraries/jquery-1.11.0.min.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/libraries/bootstrap.min.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/main.js"}
+
+    %body
+        = Haml::Engine.new(File.read('markup/header.haml')).render
+        .container
+            #sidebar-and-content.row
+                = Haml::Engine.new(File.read('markup/sidebar.haml')).render
+                #content.col-md-9
+                    #loader
+                        %i.fa.fa-circle-o-notch.fa-spin
+                    = Haml::Engine.new(File.read('markup/pages/overview.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/mining.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/manage-account.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/money.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/files.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/hosting.haml')).render
+            = Haml::Engine.new(File.read('markup/footer.haml')).render
