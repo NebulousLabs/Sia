@@ -62,7 +62,7 @@ func (s *State) invertTransaction(t Transaction) (diffs []OutputDiff) {
 
 // applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
-func (s *State) applyTransaction(t Transaction) (diffs []OutputDiff) {
+func (s *State) applyTransaction(t Transaction) (diffs TransactionDiff) {
 	// Update the transaction pool to resolve any conflicts.
 	s.removeTransactionConflictsFromPool(&t)
 
@@ -79,26 +79,26 @@ func (s *State) applyTransaction(t Transaction) (diffs []OutputDiff) {
 		s.spentOutputs[input.OutputID] = s.unspentOutputs[input.OutputID]
 		diff := OutputDiff{New: false, ID: input.OutputID, Output: s.unspentOutputs[input.OutputID]}
 		delete(s.unspentOutputs, input.OutputID)
-		diffs = append(diffs, diff)
+		diffs.OutputDiffs = append(diffs.OutputDiffs, diff)
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
 		diff := OutputDiff{New: true, ID: t.OutputID(i), Output: output}
 		s.unspentOutputs[t.OutputID(i)] = output
-		diffs = append(diffs, diff)
+		diffs.OutputDiffs = append(diffs.OutputDiffs, diff)
 	}
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		diffs = append(diffs, s.applyStorageProof(sp))
+		s.applyStorageProof(sp, &diffs)
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
 		// Diff not needed here, because applying a contract doesn't change the
 		// outputs set, a contract is merely being created.
-		s.applyContract(contract, t.FileContractID(i))
+		s.applyContract(contract, t.FileContractID(i), &diffs)
 	}
 	return
 }

@@ -25,6 +25,11 @@ type (
 // the consensus package.
 //
 // TODO: The mutexing in the consensus package breaks convention.
+//
+// TODO: When applying blocks and transactions, make the state changes in real
+// time (?) and then if DEBUG, remove and reapply the diffs and make sure that
+// the resulting state is identical to the one that was created when applying
+// in real time.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -52,8 +57,8 @@ type State struct {
 	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]*OpenContract
-	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
+	openContracts  map[ContractID]*OpenContract // TODO: This probably shouldn't be a pointer.
+	spentOutputs   map[OutputID]Output          // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
 
 	// consensusSubscriptions is a list of channels that receive notifications
 	// each time the state of consensus changes. Consensus changes only happen

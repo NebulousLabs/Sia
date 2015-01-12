@@ -45,6 +45,7 @@ type TransactionDiff struct {
 type BlockDiff struct {
 	CatalystBlock    BlockID // Which block was used to derive the diffs.
 	TransactionDiffs []TransactionDiff
+	BlockChanges     TransactionDiff // Changes specific to the block being in place - subsidies and contract maintenance.
 }
 
 // A ConsensusChange is a list of block diffs that have been applied to the
