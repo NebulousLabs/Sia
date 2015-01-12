@@ -21,6 +21,11 @@ const (
 	maxContractLen         = 1 << 24
 )
 
+type contractObligation struct {
+	inConsensus bool   // Whether the contract is recognized by the network.
+	filename    string // Where on disk the file is stored.
+}
+
 type Host struct {
 	state *consensus.State
 
@@ -32,7 +37,7 @@ type Host struct {
 
 	hostDir     string
 	fileCounter int
-	contracts   map[consensus.ContractID]string // The string is filepath of the file being stored.
+	contracts   map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
 
 	rwLock sync.RWMutex
 }
@@ -41,7 +46,7 @@ type Host struct {
 func New(s *consensus.State) (h *Host) {
 	h = &Host{
 		state:     s,
-		contracts: make(map[consensus.ContractID]string),
+		contracts: make(map[consensus.ContractID]contractObligation),
 	}
 
 	// Subscribe to the state and begin listening for updates.
@@ -64,9 +69,7 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 	h.spaceRemaining += storageDiff
 
 	h.announcement = update.Announcement
-	h.height = update.Height
 	h.hostDir = update.HostDir
-	h.state = update.State
 	h.transactionChan = update.TransactionChan
 	h.wallet = update.Wallet
 	return nil
@@ -78,22 +81,25 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 // intensive operations. All necessary interaction with the host involves
 // looking up the filepath of the file being requested. This is done all at
 // once.
+//
+// TODO: Move this function to a different file in the package?
 func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
-	var merkle hash.Hash
-	err = encoding.ReadObject(conn, &merkle, hash.HashSize)
+	var contractID consensus.ContractID
+	err = encoding.ReadObject(conn, &contractID, hash.HashSize)
 	if err != nil {
 		return
 	}
 
 	// Verify the file exists, using a mutex while reading the host.
 	h.rLock()
-	filename, exists := h.files[merkle]
-	fullname := h.hostDir + filename
-	h.rUnlock()
+	contractObligation, exists := h.contracts[contractID]
 	if !exists {
+		h.rUnlock()
 		return errors.New("no record of that file")
 	}
+	fullname := h.hostDir + contractObligation.filename
+	h.rUnlock()
 
 	// Open the file.
 	file, err := os.Open(fullname)

@@ -34,7 +34,7 @@ func (h *Host) nextFilename() string {
 func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
 	// These variables are here for convenience.
 	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
-	fullDuration := t.FileContracts[0].End - h.height                     // Duration that the host will actually be storing the file.
+	fullDuration := t.FileContracts[0].End - h.state.Height()             // Duration that the host will actually be storing the file.
 	fileSize := t.FileContracts[0].FileSize
 
 	// Check that there is only one file contract.
@@ -190,21 +190,21 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	defer h.unlock()
 
 	// Check that the file arrived in time.
-	if h.height >= t.FileContracts[0].Start-2 {
+	if h.state.Height() >= t.FileContracts[0].Start-2 {
 		err = errors.New("file not uploaded in time, refusing to go forward with contract")
 		return
 	}
-
-	// record filename for later retrieval
-	h.files[t.FileContracts[0].FileMerkleRoot] = filename
 
 	// Submit the transaction.
 	h.transactionChan <- t
 
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
-	firstProof := t.FileContracts[0].Start + StorageProofReorgDepth
-	h.forwardContracts[firstProof] = append(h.forwardContracts[firstProof], ContractEntry{ID: t.FileContractID(0), Contract: t.FileContracts[0]})
+	co := contractObligation{
+		inConsensus: false,
+		filename:    filename,
+	}
+	h.contracts[t.FileContractID(0)] = co
 	fmt.Println("Accepted contract")
 
 	return

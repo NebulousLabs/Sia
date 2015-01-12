@@ -1,6 +1,5 @@
 package host
 
-/*
 import (
 	"errors"
 	"fmt"
@@ -10,19 +9,28 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// TODO: Re-write this entire file, it doesn't work properly.
+func (h *Host) consensusListen(updateChan chan consensus.ConsensusChange) {
+	for consensusChange := range updateChan {
+		fmt.Println(consensusChange)
+		// For every contract that we recognize that gets destroyed, mark that contract as inactive
+
+		// For every contract that we recognize that gets created, mark that contract as active.
+	}
+}
 
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
 func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.BlockHeight) (sp consensus.StorageProof, err error) {
 	// Get the file associated with the contract.
-	filename, exists := h.files[entry.Contract.FileMerkleRoot]
+	contractObligation, exists := h.contracts[entry.ID]
 	if !exists {
 		err = errors.New("no record of that file")
+		return
 	}
+	fullname := h.hostDir + contractObligation.filename
 
 	// Open the file.
-	file, err := os.Open(h.hostDir + filename)
+	file, err := os.Open(fullname)
 	if err != nil {
 		return
 	}
@@ -46,6 +54,7 @@ func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.
 	return
 }
 
+/*
 // storageProofMaintenance tracks when storage proofs need to be submitted as
 // transactions, then creates the proof and submits the transaction.
 // storageProofMaintenance must be under a state and host lock.

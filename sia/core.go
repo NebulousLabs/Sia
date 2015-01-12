@@ -12,12 +12,6 @@ import (
 // The config struct is used when calling CreateCore(), and prevents the input
 // line from being excessively long.
 type Config struct {
-	// Settings available through flags.
-	HostDir     string
-	WalletFile  string
-	ServerAddr  string
-	Nobootstrap bool
-
 	// The State, which is separate from a componenent as it is not an
 	// interface. There is a single implementation which is considered
 	// acceptible.
@@ -29,6 +23,12 @@ type Config struct {
 	Miner  components.Miner
 	Renter components.Renter
 	Wallet components.Wallet
+
+	// Settings available through flags.
+	HostDir     string
+	WalletFile  string
+	ServerAddr  string
+	Nobootstrap bool
 }
 
 // Core is the struct that serves as the state for siad. It contains a
@@ -90,6 +90,8 @@ func CreateCore(config Config) (c *Core, err error) {
 
 	// Fill out the basic information.
 	c = &Core{
+		state: config.State,
+
 		host:   config.Host,
 		hostDB: config.HostDB,
 		miner:  config.Miner,
