@@ -327,8 +327,8 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
 		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock())
+		cc.InvertedBlocks = append(cc.InvertedBlocks, s.currentBlockNode().BlockDiff)
 		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
-		// cc.InvertedBlocks = append(cc.InvertedBlocks, )
 	}
 
 	// Validate each block in the parent history in order, updating
@@ -375,6 +375,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 			break
 		}
 		cc.AppliedBlocks = append(cc.AppliedBlocks, bd)
+		s.blockMap[parentHistory[i]].BlockDiff = bd
 		// TODO: Add the block diff to the block node, for retrieval during inversion.
 		validatedBlocks += 1
 		outputDiffs = append(outputDiffs, diffSet...)

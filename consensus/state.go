@@ -102,6 +102,7 @@ type BlockNode struct {
 	Target           Target        // Target for next block.
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 
+	BlockDiff            BlockDiff       // Soon to replace the other 3 entirely
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof
 	SuccessfulWindows    []ContractID
