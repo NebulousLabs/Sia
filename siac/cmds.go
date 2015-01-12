@@ -42,6 +42,16 @@ func stopcmd(cmd *cobra.Command, args []string) {
 	fmt.Println("Sia daemon stopped")
 }
 
+func updatecmd(cmd *cobra.Command, args []string) {
+	if len(args) != 0 {
+		cmd.Usage()
+		return
+	}
+	fmt.Println(getResponse("/update", &url.Values{
+		"action": {args[0]},
+	}))
+}
+
 func minecmd(cmd *cobra.Command, args []string) {
 	if len(args) != 1 {
 		cmd.Usage()

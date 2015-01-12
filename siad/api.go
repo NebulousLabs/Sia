@@ -24,6 +24,7 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
 	http.HandleFunc("/status", d.statusHandler)
+	http.HandleFunc("/update", d.updateHandler)
 	http.HandleFunc("/stop", d.stopHandler)
 
 	// Wallet API Calls
@@ -189,6 +190,27 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Download complete!")
 		}
 	*/
+}
+
+func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
+	var resp []byte
+	var err error
+
+	switch req.FormValue("action") {
+	case "check":
+		resp, err = json.Marshal(d.checkForUpdate())
+	case "apply":
+		resp, err = json.Marshal(d.applyUpdate())
+	default:
+		http.Error(w, "Unrecognized action", 400)
+		return
+	}
+
+	if err != nil {
+		http.Error(w, "Failed to encode response", 500)
+	} else {
+		w.Write(resp)
+	}
 }
 
 // TODO: this should probably just return JSON. Leave formatting to the client.

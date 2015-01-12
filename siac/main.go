@@ -33,7 +33,7 @@ func main() {
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "mine",
+		Use:   "mine [on|off]",
 		Short: "Start or stop mining",
 		Long:  "Start or stop mining blocks.",
 		Run:   minecmd,
@@ -47,35 +47,35 @@ func main() {
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "peer",
+		Use:   "peer [add|remove] [address]",
 		Short: "Manually add or remove a peer",
 		Long:  "Manually add or remove a peer from the server's peer list.",
 		Run:   peercmd,
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "send",
+		Use:   "send [amount] [fee] [dest]",
 		Short: "Send coins to an address",
 		Long:  "Send coins to an address, or to a friend. The destination is first interpreted as an friend, and then as an address if the friend lookup fails.",
 		Run:   sendcmd,
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "host",
+		Use:   "host [MB] [price] [freezecoins] [freezeblocks]",
 		Short: "Become a host",
 		Long:  "Submit a host announcement to the network, including the amount of storage offered and the price of renting storage.",
 		Run:   hostcmd,
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "rent",
+		Use:   "rent [filename] [nickname]",
 		Short: "Store a file on a host",
 		Long:  "Negotiate a file contract with a host, and upload the file to them if negotiation is successful.",
 		Run:   rentcmd,
 	})
 
 	root.AddCommand(&cobra.Command{
-		Use:   "download",
+		Use:   "download [nickname] [destination]",
 		Short: "Download a file from a host",
 		Long:  "Download a file previously stored with a host",
 		Run:   downloadcmd,
@@ -98,12 +98,23 @@ func main() {
 	root.AddCommand(load)
 
 	status := &cobra.Command{
-		Use:   "status",
+		Use:   "status [check|apply]",
 		Short: "Print the current state of the daemon",
 		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
 		Run:   statuscmd,
 	}
 	root.AddCommand(status)
+
+	update := &cobra.Command{
+		Use:   "update",
+		Short: "Print the current state of the daemon",
+		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
+		Run:   updatecmd,
+	}
+	root.AddCommand(update)
+
+	// check for updates
+	updatecmd(update, []string{"check"})
 
 	root.Execute()
 }
