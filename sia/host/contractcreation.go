@@ -31,6 +31,10 @@ func (h *Host) nextFilename() string {
 // are all valid within the host settings. If so, inputs are added to fund the
 // burn part of the contract fund, then the updated contract is signed and
 // returned.
+//
+// TODO: Need to save the space before the file is uploaded, not register it as
+// used after the file is uploaded, otherwise there could be a race condition
+// that uses more than the available space.
 func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
 	// These variables are here for convenience.
 	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
@@ -92,7 +96,7 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 	}
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
-	requiredFund := (h.announcement.Burn + h.announcement.Price) * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
+	requiredFund := (h.announcement.Burn + h.announcement.Price) * consensus.Currency(fileSize) * consensus.Currency(fullDuration)
 	if t.FileContracts[0].ContractFund < requiredFund {
 		err = errors.New("ContractFund does not cover the entire duration of the contract.")
 		return

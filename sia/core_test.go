@@ -29,10 +29,11 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	// Pull together the configuration for the Core.
 	state, _ := consensus.CreateGenesisState() // The missing piece is not an error. TODO: That missing piece is deprecated.
 	walletFilename := "test.wallet"
-	wallet, err := wallet.New(walletFilename)
+	w, err := wallet.New(walletFilename)
 	if err != nil {
 		return
 	}
+	hdb := hostdb.New()
 	coreConfig := Config{
 		HostDir:     "hostdir",
 		WalletFile:  walletFilename,
@@ -44,8 +45,8 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 		Host:   host.New(state),
 		HostDB: hostdb.New(),
 		Miner:  miner.New(),
-		Renter: renter.New(),
-		Wallet: wallet,
+		Renter: renter.New(state, hdb, w),
+		Wallet: w,
 	}
 
 	// Create the core.
