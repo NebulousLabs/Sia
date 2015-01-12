@@ -13,37 +13,44 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: Changing the host path should automatically move all of the files
+// over.
+
 const (
 	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
 	maxContractLen         = 1 << 24
 )
 
 type Host struct {
+	state *consensus.State
+
 	announcement   components.HostAnnouncement
 	spaceRemaining int64
 	wallet         components.Wallet
-	state          components.ReadOnlyState
 
-	height          consensus.BlockHeight      // Current height of the state.
-	transactionChan chan consensus.Transaction // Can send channels to the state.
+	transactionChan chan consensus.Transaction // TODO: Deprecated, subscription model should be implemented.
 
 	hostDir     string
 	fileCounter int
-	files       map[hash.Hash]string
-
-	forwardContracts  map[consensus.BlockHeight][]ContractEntry
-	backwardContracts map[consensus.BlockHeight][]ContractEntry
+	contracts   map[consensus.ContractID]string // The string is filepath of the file being stored.
 
 	rwLock sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New() (h *Host) {
-	return &Host{
-		files:             make(map[hash.Hash]string),
-		forwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
-		backwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
+func New(s *consensus.State) (h *Host) {
+	h = &Host{
+		state:     s,
+		contracts: make(map[consensus.ContractID]string),
 	}
+
+	// Subscribe to the state and begin listening for updates.
+	// TODO: Get all changes/diffs from the genesis to current block in a way
+	// that doesn't cause a race condition with the subscription.
+	updateChan := s.ConsensusSubscribe()
+	go h.consensusListen(updateChan)
+
+	return
 }
 
 // UpdateHost changes the settings of the host to the input settings.

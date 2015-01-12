@@ -14,7 +14,6 @@ type HostUpdate struct {
 	Announcement    HostAnnouncement
 	Height          consensus.BlockHeight
 	HostDir         string
-	State           ReadOnlyState
 	TransactionChan chan consensus.Transaction
 	Wallet          Wallet
 

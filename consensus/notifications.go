@@ -60,6 +60,7 @@ type ConsensusChange struct {
 // notification each time that the consensus changes (from incoming blocks or
 // invalidated blocks, etc.).
 func (s *State) ConsensusSubscribe() (alert chan ConsensusChange) {
+	// TODO: Put some locks in place.
 	alert = make(chan ConsensusChange)
 	s.consensusSubscriptions = append(s.consensusSubscriptions, alert)
 	return

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"os"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia"
 	"github.com/NebulousLabs/Sia/sia/host"
 	"github.com/NebulousLabs/Sia/sia/hostdb"
@@ -69,6 +70,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
+	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
 	wallet, err := wallet.New(expandedWalletFile)
 	if err != nil {
 		return
@@ -79,7 +81,9 @@ func createDaemon(config Config) (d *daemon, err error) {
 		ServerAddr:  config.Siacore.RPCaddr,
 		Nobootstrap: config.Siacore.NoBootstrap,
 
-		Host:   host.New(),
+		State: state,
+
+		Host:   host.New(state),
 		HostDB: hostdb.New(),
 		Miner:  miner.New(),
 		Wallet: wallet,

@@ -1,5 +1,6 @@
 package host
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -137,3 +138,4 @@ func (h *Host) storageProofMaintenance(initialStateHeight consensus.BlockHeight,
 		h.transactionChan <- transaction
 	}
 }
+*/
