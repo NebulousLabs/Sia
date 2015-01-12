@@ -23,32 +23,29 @@ type FileEntry struct {
 }
 
 type Renter struct {
-	state  *consensus.State
-	files  map[string]FileEntry
-	hostDB components.HostDB
-	wallet components.Wallet
-	rwLock sync.RWMutex
+	state       *consensus.State
+	files       map[string]FileEntry
+	hostDB      components.HostDB
+	wallet      components.Wallet
+	rwLock      sync.RWMutex
 }
 
 func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter) {
-	r = new(Renter)
-	r.state = state
-	r.hostDB = hdb
-	r.wallet = wallet
-	r.files = make(map[string]FileEntry)
+	r = &Renter{
+		state:  state,
+		hostDB: hdb,
+		wallet: wallet,
+		files:  make(map[string]FileEntry),
+	}
 	return
-}
-
-func (r *Renter) UpdateRenter(update components.RenterUpdate) error {
-	r.lock()
-	defer r.unlock()
-	r.hostDB = update.HostDB
-	return nil
 }
 
 // ClientFundFileContract takes a template FileContract and returns a
 // partial transaction containing an input for the contract, but no signatures.
-func (r *Renter) proposeContract(filename, nickname string, duration consensus.BlockHeight) (fp FilePiece, err error) {
+//
+// TODO: We need to get the id of the contract before we can start doing
+// re-uploading.
+func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight) (fp FilePiece, err error) {
 	// Open the file, create a merkle hash.
 	file, err := os.Open(filename)
 	if err != nil {
@@ -146,6 +143,32 @@ func (r *Renter) proposeContract(filename, nickname string, duration consensus.B
 	}
 
 	return
+}
+
+// TODO: Do the uploading in parallel.
+func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces, optimalRepairPieces int) (err error) {
+	r.lock()
+	defer r.unlock()
+
+	_, exists := r.files[nickname]
+	if exists {
+		return errors.New("file of that nickname already exists")
+	}
+
+	// Make an entry for this file.
+	var pieces []FilePiece
+	for i := 0; i < totalPieces; i++ {
+		var piece FilePiece
+		piece, err = r.proposeContract(filename, 2000 + 1000*i)
+		if err != nil {
+			i--
+			fmt.Println(err)
+			// TODO: Something more in the error case. Maybe let the hostdb know that this host is having problems?
+		}
+		pieces = append(pieces, piece)
+	}
+
+	r.files[nickname] = pieces
 }
 
 /*
