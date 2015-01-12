@@ -12,7 +12,7 @@ import (
 )
 
 // TODO: timeouts?
-func (d *daemon) setUpHandlers(addr string) {
+func (d *daemon) handle(addr string) {
 	// Web Interface
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
