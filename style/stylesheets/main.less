@@ -135,7 +135,6 @@ body{
     position:absolute;
     display:inline-block;
     color:@g500;
-    opacity:0;
     font-size:32px;
 }
 
@@ -163,6 +162,12 @@ body{
 #footer .link-list .item:hover{
     cursor:pointer;
     color:@g500;
+}
+
+@media (min-width:992px){
+    #footer .link-list{
+        text-align:right;
+    }
 }
 
 // ---------------------

@@ -3,6 +3,9 @@
 .i {
   display: inline-block;
 }
+.blueprint {
+  display: none;
+}
 .title-text {
   font-size: 32px;
   color: #9e9e9e;
@@ -44,6 +47,7 @@
   display: inline-block;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
+  overflow: hidden;
 }
 .capsule .pod {
   display: inline-block;
@@ -263,6 +267,11 @@
 }
 #manage-account .transactions .item .date {
   display: inline-block;
+}
+#manage-account .transactions .item .icon {
+  display: inline-block;
+  float: right;
+  margin-right: 8px;
 }
 #manage-account .transactions .item .amt {
   display: inline-block;
@@ -577,7 +586,6 @@ body {
   position: absolute;
   display: inline-block;
   color: #9e9e9e;
-  opacity: 0;
   font-size: 32px;
 }
 #footer {
@@ -598,6 +606,11 @@ body {
 #footer .link-list .item:hover {
   cursor: pointer;
   color: #9e9e9e;
+}
+@media (min-width: 992px) {
+  #footer .link-list {
+    text-align: right;
+  }
 }
 ::-webkit-scrollbar {
   width: 8px;

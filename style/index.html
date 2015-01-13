@@ -1,1 +1,647 @@
-<!doctype html> <html> <head> <title>{{TITLE}}</title> <link href='lib/libraries/bootstrap.min.css' rel='stylesheet'> <link href='lib/libraries/bootstrap-theme.min.css' rel='stylesheet'> <link href='lib/libraries/font-awesome-4.2.0/css/font-awesome.min.css' rel='stylesheet'> <link href='lib/stylesheets/style.css' rel='stylesheet'> <script src='lib/libraries/jquery-1.11.0.min.js' type='text/javascript'></script> <script src='lib/libraries/bootstrap.min.js' type='text/javascript'></script> <script src='lib/scripts/main.js' type='text/javascript'></script> </head> <body> <div id='header'> <div class='container'> <div class='row'> <div class='col-xs-6' id='logo-container'> Sia Web Interface </div> <div class='col-xs-6' id='button-container'> <div class='header-button' id='balance-button'>$4.60010</div> <div class='header-button' id='balance-button'>+&micro;10.15</div> <div class='header-button'> <i class='fa fa-question'></i> </div> </div> </div> </div> </div> <div class='container'> <div class='row' id='sidebar-and-content'> <div class='col-md-3' id='sidebar'> <div class='large-sidebar hidden-xs hidden-sm'> <div class='item overview-button current' onclick="switchView('overview');"> <i class='fa fa-bars fa-fw'></i> <div class='text'>Overview</div> </div> <div class='item money-button' onclick="switchView('money');"> <i class='fa fa-dollar fa-fw'></i> <div class='text'>Money</div> </div> <div class='item files-button' onclick="switchView('files');"> <i class='fa fa-file fa-fw'></i> <div class='text'>Files</div> </div> <div class='item mining-button' onclick="switchView('mining');setTimeout(drawMiningGraph,450);"> <i class='fa fa-area-chart fa-fw'></i> <div class='text'>Mining</div> </div> <div class='item hosting-button' onclick="switchView('hosting');"> <i class='fa fa-folder-o fa-fw'></i> <div class='text'>Hosting</div> </div> <div class='item about-button'> <i class='fa fa-info fa-fw'></i> <div class='text'>About</div> </div> </div> <div class='small-sidebar visible-xs visible-sm'> <div class='item overview-button current' onclick="switchView('overview');"> <i class='fa fa-bars fa-fw'></i> <div class='text'>Overview</div> </div> <div class='item money-button' onclick="switchView('money');"> <i class='fa fa-dollar fa-fw'></i> <div class='text'>Money</div> </div> <div class='item files-button' onclick="switchView('files');"> <i class='fa fa-file fa-fw'></i> <div class='text'>Files</div> </div> <div class='item mining-button' onclick="switchView('mining');setTimeout(drawMiningGraph,450);"> <i class='fa fa-area-chart fa-fw'></i> <div class='text'>Mining</div> </div> <div class='item hosting-button' onclick="switchView('hosting');"> <i class='fa fa-folder-o fa-fw'></i> <div class='text'>Hosting</div> </div> </div> </div> <div class='col-md-9' id='content'> <div id='loader'> <i class='fa fa-circle-o-notch fa-spin'></i> </div> <div id='overview'> <div class='header'> <div class='title'>Dashboard</div> <div class='capsule'> <div class='pod button enabled'>Mining On</div> <div class='pod button disabled'>Hosting Off</div> </div> </div> <div class='header'> <div class='sumdisplay'> Balance <div class='amt'>4.60010 SC</div> <div class='amtusd'>&asymp; 9.60 USD</div> <div class='fund-buttons'> <div class='button'> <i class='fa fa-sign-in fa-fw'></i> Add Funds </div> <div class='button'> <i class='fa fa-sign-out fa-fw'></i> Withdraw </div> </div> </div> </div> </div> <div id='mining'> <div class='header'> <div class='title'>Mining</div> <div class='capsule'> <div class='pod button'>Mining</div> <div class='pod'>0.122 SC/h</div> <div class='pod'>3 Active Miners</div> </div> </div> <div class='graph-controls'> <div class='button'>Past Hour</div> <div class='button'>Today</div> <div class='button'>Past Week</div> <div class='button'>Past Month</div> <div class='button'>Past Year</div> </div> <div class='graph-container'> <canvas></canvas> </div> <div class='miner-control'> <div class='display'> <div class='number'>3</div> <div class='text'>Active Miner Threads</div> </div> <div class='button'> <i class='fa fa-plus fa-fw'></i> Add Miner </div> <div class='button'> <i class='fa fa-minus fa-fw'></i> Remove Miner </div> <div class='button'> <i class='fa fa-remove fa-fw'></i> Stop Mining </div> </div> </div> <div id='manage-account'> <div class='row header'> <div class='button' id='back-to-money'> <i class='fa fa-chevron-left'></i> </div> <div class='text'>Manage Account</div> <div class='account-name'>Grocery Store Account</div> </div> <div class='sumdisplay'> Balance <div class='amt'>4.60010 SC</div> <div class='amtusd'>&asymp; 9.60 USD</div> <div class='fund-buttons'> <div class='button'> <i class='fa fa-sign-in fa-fw'></i> Add Funds </div> <div class='button'> <i class='fa fa-sign-out fa-fw'></i> Withdraw </div> </div> </div> <div class='row'> <div class='col-xs-7'> <div class='addresses'> <div class='title'> Addresses <div class='dropdown-button'> <i class='fa fa-chevron-down'></i> </div> </div> <div class='items'> <div class='item'> <div class='address'>3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy</div> <div class='amt'>$0.301</div> </div> <div class='item'> <div class='address'>3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy</div> <div class='amt'>$1.01</div> </div> <div class='item'> <div class='address'>3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy</div> <div class='amt'>$0.002</div> </div> <div class='item'> <div class='address'>3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy</div> <div class='amt'>$0.019</div> </div> </div> </div> </div> <div class='col-xs-5'> <div class='transactions'> <div class='title'> Transactions <div class='dropdown-button'> <i class='fa fa-chevron-down'></i> </div> </div> <div class='items'> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-right'></i> $2.67 </div> </div> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-left'></i> $0.501 </div> </div> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-left'></i> $0.23 </div> </div> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-right'></i> $0.17 </div> </div> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-left'></i> $0.05 </div> </div> <div class='item'> <div class='date'>01/02/2015</div> <div class='amt'> <i class='fa fa-arrow-right'></i> $1.02 </div> </div> </div> </div> </div> </div> <div class='row account-control-buttons'> <div class='button'> <i class='fa fa-plus fa-fw'></i> Create Address </div> <div class='button'> <i class='fa fa-send fa-fw'></i> Send Money </div> <div class='button'> <i class='fa fa-exchange fa-fw'></i> Transfer Funds </div> <div class='button'> <i class='fa fa-remove fa-fw'></i> Delete Account </div> </div> </div> <div id='money'> <div class='sumdisplay header'> Balance <div class='amt'>4.60010 SC</div> <div class='amtusd'>&asymp; 9.60 USD</div> <div class='fund-buttons'> <div class='button'> <i class='fa fa-sign-in fa-fw'></i> Add Funds </div> <div class='button'> <i class='fa fa-sign-out fa-fw'></i> Withdraw </div> </div> </div> <div class='row'> <div class='col-xs-12'> <div class='row subhead'> <div class='col-xs-6'> <div class='text'>Accounts</div> </div> <div class='col-xs-6'> <div class='search'> &nbsp; <i class='fa fa-search'></i> </div> </div> </div> <div class='accounts'> <div class='item'> <div class='name'>Grocery Store Account</div> <div class='money'>$4.05</div> </div> <div class='item'> <div class='name'>Checking Account</div> <div class='money'>$5.06</div> </div> <div class='item'> <div class='name'>Savings Account</div> <div class='money'>$102.05</div> </div> <div class='item'> <div class='name'>Other Random Account</div> <div class='money'>$0.32</div> </div> <div class='item'> <div class='name'>Other Random Account</div> <div class='money'>$0.68</div> </div> <div class='item'> <div class='name'>Other Random Account</div> <div class='money'>$0.18</div> </div> <div class='item'> <div class='name'>Other Random Account</div> <div class='money'>$0.19</div> </div> </div> <div class='address-control'> <div class='button'> <i class='fa fa-plus fa-fw'></i> Add Account </div> <div class='button'> <i class='fa fa-send fa-fw'></i> Send Money </div> <div class='button'> <i class='fa fa-exchange fa-fw'></i> Transfer Funds </div> <div class='button'> <i class='fa fa-remove fa-fw'></i> Delete Account </div> </div> </div> </div> </div> <div id='files'> <div class='header'> <div class='title'>File Manager</div> <div class='info'> <div class='space'>12.2 GB</div> <div class='cost'>0.122 &micro;SC/h</div> <div class='costusd'>&asymp; 0.001 &micro;USD/h</div> </div> </div> <div class='cloud-control'> <div class='row'> <div class='col-xs-6'> <div class='button upload-public'> <i class='fa fa-upload'></i> Upload File </div> </div> <div class='col-xs-6'> <div class='search'> &nbsp; <i class='fa fa-search'></i> </div> </div> </div> </div> <div class='upload-pane'> <div class='path'> <div class='stop'> <i class='fa fa-close'></i> </div> <div class='text'> <i class='fa fa-edit'></i> filename.txt </div> <div class='meta'> 1.2 MB - 0.0122 SC/h </div> </div> <div class='upload button'> <i class='fa fa-upload'></i> Upload </div> <div class='public button'> <i class='fa fa-check-square'></i> Public </div> <div class='account button'> <i class='fa fa-sign-out'></i> Grocery Store Account </div> </div> <div class='info-pane'> <div class='name'>filename.txt</div> <div class='visibility'>Public</div> <div class='size'>1.2 MB</div> <div class='cost'>0.0122 SC/h</div> <div class='button delete'> <i class='fa fa-close'></i> Delete </div> <div class='button update'> <i class='fa fa-refresh'></i> Update </div> <div class='button download'> <i class='fa fa-download'></i> Download </div> </div> <div class='file-browser'> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> <div class='file'> <div class='graphic'> <i class='fa fa-file'></i> </div> <div class='name'>filename.txt</div> </div> </div> </div> <div id='hosting'> <div class='header'> <div class='title'>Host Management</div> <div class='capsule'> <div class='pod'> 34 / 64 GB </div> <div class='pod'> 4.3 SC/h </div> <div class='pod'> 2 Contracts </div> <div class='pod'> Hosting </div> </div> </div> <div class='host-config'> <div class='title'>Configure Hosting</div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value' contentEditable='true'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='property'> <div class='row'> <div class='col-xs-4'> <div class='name'>Property Name</div> </div> <div class='col-xs-8'> <div class='value'>0</div> </div> </div> </div> <div class='control'> <div class='button'> <i class='fa fa-refresh'></i> Reset </div> <div class='button'> <i class='fa fa-save'></i> Save </div> </div> </div> </div> </div> </div> <div class='row'> <div class='col-xs-12'> <div id='footer'> <div class='row'> <div class='col-md-2 col-md-offset-1'> <img height='50' src='lib/assets/sia.svg' style='opacity:.5;'> </div> <div class='col-md-8'> <div class='link-list'> <div class='item'>Overview</div> <div class='item'>Money</div> <div class='item'>Files</div> <div class='item'>Mining</div> <div class='item'>Hosting</div> <div class='item'>About</div> <div class='item'>Help</div> </div> </div> </div> </div> </div> </div> </div> </body> </html>
+<!doctype html>
+<html>
+  <head>
+    <title>Sia Web Interface</title>
+    <link href='lib/libraries/bootstrap.min.css' rel='stylesheet'>
+    <link href='lib/libraries/bootstrap-theme.min.css' rel='stylesheet'>
+    <link href='lib/libraries/font-awesome-4.2.0/css/font-awesome.min.css' rel='stylesheet'>
+    <link href='lib/stylesheets/style.css' rel='stylesheet'>
+    <script src='lib/libraries/jquery.js' type='text/javascript'></script>
+    <script src='lib/libraries/bootstrap.min.js' type='text/javascript'></script>
+    <script src='lib/scripts/util.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/overview.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/hosting.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/mining.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/manage-account.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/money.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/files.js' type='text/javascript'></script>
+    <script>
+      $(window).ready(function(){
+          ui.init();
+          ui.update({
+              "miner":{
+                  "State":"Off",
+                  "Threads":1,
+                  "RunningThreads":0,
+                  "Address":[126,66,"...",173,53]
+              },
+              "wallet":{
+                  "Balance":0,
+                  "USDBalance": 0,
+                  "FullBalance":0,
+                  "NumAddresses":2392,
+                  "DefaultAccount": "Personal",
+                  "Accounts":[
+                      {
+                          "Name": "Personal",
+                          "Balance": 1.00,
+                          "USDBalance": 2.00,
+                          "FullBalance": 0,
+                          "NumAddresses": 231,
+                          "Addresses": [{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Balance": 2.13
+                          },{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Balance": 0.001
+                          },{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Balance": 1.32
+                          }],
+                          "Transactions": [
+                              {
+                                  "Date": "01/02/2015",
+                                  "Amount": "2.67",
+                                  "USDAmount": "3.90",
+                                  "Deposit": true
+                              },
+                              {
+                                  "Date": "01/02/2015",
+                                  "Amount": "3.14",
+                                  "USDAmount": "3.90",
+                                  "Deposit": false
+                              },
+                          ]
+                      },
+                      {
+                          "Name": "Work",
+                          "Balance": 0,
+                          "USDBalance": 0,
+                          "FullBalance": 0,
+                          "NumAddresses": 101,
+                          "Addresses": [{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Amount": 2.13
+                          },{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Amount": 0.001
+                          },{
+                              "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                              "Amount": 1.32
+                          }],
+                          "Transactions": [
+                              {
+                                  "Date": "01/02/2015",
+                                  "Amount": "2.67",
+                                  "USDAmount": "3.90",
+                                  "Deposit": true
+                              },
+                              {
+                                  "Date": "01/02/2015",
+                                  "Amount": "2.67",
+                                  "USDAmount": "3.90",
+                                  "Deposit": true
+                              },
+                          ]
+                      }
+                  ]
+              },
+              "status": {
+                  "StateInfo": {
+                      "CurrentBlock": [231, 83, "...", 114, 111, 159],
+                      "Height": 0,
+                      "Target": [0 ,0 , "...", 0 ,0],
+                      "Depth": [255, 255, "...", 255, 255],
+                      "EarliestLegalTimestamp": 1417070299
+                  },
+                  "RenterFiles": null,
+                  "IPAddress": ":9988",
+                  "HostSettings": {
+                      "IPAddress": ":9988",
+                      "TotalStorage": 0,
+                      "MinFilesize": 0,
+                      "MaxFilesize": 0,
+                      "MinDuration": 0,
+                      "MaxDuration": 0,
+                      "MinChallengeWindow": 0,
+                      "MaxChallengeWindow": 0,
+                      "MinTolerance": 0,
+                      "Price": 0,
+                      "Burn": 0,
+                      "CoinAddress": [0 ,0 ,"..." ,0 ,0],
+                      "SpendConditions": {
+                          "TimeLock": 0,
+                          "NumSignatures": 0,
+                          "PublicKeys": null
+                      },
+                      "FreezeIndex": 0
+                  },
+                  "HostSpaceRemaining": 0,
+                  "HostContractCount": 0
+              }
+          })
+      });
+    </script>
+  </head>
+  <body>
+    <div id='header'>
+      <div class='container'>
+        <div class='row'>
+          <div class='col-xs-6' id='logo-container'>
+            Sia Web Interface
+          </div>
+          <div class='col-xs-6' id='button-container'>
+            <div class='header-button' id='balance-button'>$4.60010</div>
+            <div class='header-button' id='balance-button'>+&micro;10.15</div>
+            <div class='header-button'>
+              <i class='fa fa-question'></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class='container'>
+      <div class='row' id='sidebar-and-content'>
+        <div class='col-md-3' id='sidebar'>
+          <div class='large-sidebar hidden-xs hidden-sm'>
+            <div class='item overview-button current'>
+              <i class='fa fa-bars fa-fw'></i>
+              <div class='text'>Overview</div>
+            </div>
+            <div class='item money-button'>
+              <i class='fa fa-dollar fa-fw'></i>
+              <div class='text'>Money</div>
+            </div>
+            <div class='item files-button'>
+              <i class='fa fa-file fa-fw'></i>
+              <div class='text'>Files</div>
+            </div>
+            <div class='item mining-button'>
+              <i class='fa fa-area-chart fa-fw'></i>
+              <div class='text'>Mining</div>
+            </div>
+            <div class='item hosting-button'>
+              <i class='fa fa-folder-o fa-fw'></i>
+              <div class='text'>Hosting</div>
+            </div>
+            <div class='item about-button'>
+              <i class='fa fa-info fa-fw'></i>
+              <div class='text'>About</div>
+            </div>
+          </div>
+          <div class='small-sidebar visible-xs visible-sm'>
+            <div class='item overview-button current'>
+              <i class='fa fa-bars fa-fw'></i>
+              <div class='text'>Overview</div>
+            </div>
+            <div class='item money-button'>
+              <i class='fa fa-dollar fa-fw'></i>
+              <div class='text'>Money</div>
+            </div>
+            <div class='item files-button'>
+              <i class='fa fa-file fa-fw'></i>
+              <div class='text'>Files</div>
+            </div>
+            <div class='item mining-button'>
+              <i class='fa fa-area-chart fa-fw'></i>
+              <div class='text'>Mining</div>
+            </div>
+            <div class='item hosting-button'>
+              <i class='fa fa-folder-o fa-fw'></i>
+              <div class='text'>Hosting</div>
+            </div>
+          </div>
+        </div>
+        <div class='col-md-9' id='content'>
+          <div id='loader'>
+            <i class='fa fa-circle-o-notch fa-spin'></i>
+          </div>
+          <div id='overview'>
+            <div class='header'>
+              <div class='title'>Dashboard</div>
+              <div class='capsule'>
+                <div class='mining-status pod button enabled'>Mining On</div>
+                <div class='hosting-status pod button disabled'>Hosting Off</div>
+              </div>
+            </div>
+            <div class='header'>
+              <div class='sumdisplay'>
+                Balance
+                <div class='amt'>4.60010 SC</div>
+                <div class='amtusd'>&asymp; 9.60 USD</div>
+                <div class='fund-buttons'>
+                  <div class='add-funds button'>
+                    <i class='fa fa-sign-in fa-fw'></i>
+                    Add Funds
+                  </div>
+                  <div class='withdraw-funds button'>
+                    <i class='fa fa-sign-out fa-fw'></i>
+                    Withdraw
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id='mining'>
+            <div class='header'>
+              <div class='title'>Mining</div>
+              <div class='capsule'>
+                <div class='pod button'>Mining</div>
+                <div class='pod'>0.122 SC/h</div>
+                <div class='pod'>3 Active Miners</div>
+              </div>
+            </div>
+            <div class='graph-controls'>
+              <div class='button'>Past Hour</div>
+              <div class='button'>Today</div>
+              <div class='button'>Past Week</div>
+              <div class='button'>Past Month</div>
+              <div class='button'>Past Year</div>
+            </div>
+            <div class='graph-container'>
+              <canvas></canvas>
+            </div>
+            <div class='miner-control'>
+              <div class='display'>
+                <div class='number'>3</div>
+                <div class='text'>Active Miner Threads</div>
+              </div>
+              <div class='button'>
+                <i class='fa fa-plus fa-fw'></i>
+                Add Miner
+              </div>
+              <div class='button'>
+                <i class='fa fa-minus fa-fw'></i>
+                Remove Miner
+              </div>
+              <div class='button'>
+                <i class='fa fa-remove fa-fw'></i>
+                Stop Mining
+              </div>
+            </div>
+          </div>
+          <div id='manage-account'>
+            <div class='row header'>
+              <div class='button' id='back-to-money'>
+                <i class='fa fa-chevron-left'></i>
+              </div>
+              <div class='text'>Manage Account</div>
+              <div class='account-name'>Grocery Store Account</div>
+            </div>
+            <div class='sumdisplay'>
+              Balance
+              <div class='amt'>4.60010 SC</div>
+              <div class='amtusd'>&asymp; 9.60 USD</div>
+              <div class='fund-buttons'>
+                <div class='button'>
+                  <i class='fa fa-sign-in fa-fw'></i>
+                  Add Funds
+                </div>
+                <div class='button'>
+                  <i class='fa fa-sign-out fa-fw'></i>
+                  Withdraw
+                </div>
+              </div>
+            </div>
+            <div class='row'>
+              <div class='col-xs-7'>
+                <div class='addresses'>
+                  <div class='title'>
+                    Addresses
+                    <div class='dropdown-button'>
+                      <i class='fa fa-chevron-down'></i>
+                    </div>
+                  </div>
+                  <div class='items'>
+                    <div class='item blueprint'>
+                      <div class='address'>3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy</div>
+                      <div class='amt'>$0.301</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class='col-xs-5'>
+                <div class='transactions'>
+                  <div class='title'>
+                    Transactions
+                    <div class='dropdown-button'>
+                      <i class='fa fa-chevron-down'></i>
+                    </div>
+                  </div>
+                  <div class='items'>
+                    <div class='item blueprint'>
+                      <div class='date'>01/02/2015</div>
+                      <div class='amt'>
+                        $2.67
+                      </div>
+                      <div class='icon'>
+                        <i class='fa fa-arrow-right'></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class='row account-control-buttons'>
+              <div class='button'>
+                <i class='fa fa-plus fa-fw'></i>
+                Create Address
+              </div>
+              <div class='button'>
+                <i class='fa fa-send fa-fw'></i>
+                Send Money
+              </div>
+              <div class='button'>
+                <i class='fa fa-exchange fa-fw'></i>
+                Transfer Funds
+              </div>
+              <div class='button'>
+                <i class='fa fa-remove fa-fw'></i>
+                Delete Account
+              </div>
+            </div>
+          </div>
+          <div id='money'>
+            <div class='sumdisplay header'>
+              Balance
+              <div class='amt'>4.60010 SC</div>
+              <div class='amtusd'>&asymp; 9.60 USD</div>
+              <div class='fund-buttons'>
+                <div class='button'>
+                  <i class='fa fa-sign-in fa-fw add-funds'></i>
+                  Add Funds
+                </div>
+                <div class='button'>
+                  <i class='fa fa-sign-out fa-fw withdraw-funds'></i>
+                  Withdraw
+                </div>
+              </div>
+            </div>
+            <div class='row'>
+              <div class='col-xs-12'>
+                <div class='row subhead'>
+                  <div class='col-xs-6'>
+                    <div class='text'>Accounts</div>
+                  </div>
+                  <div class='col-xs-6'>
+                    <div class='search'>
+                      &nbsp;
+                      <i class='fa fa-search'></i>
+                    </div>
+                  </div>
+                </div>
+                <div class='accounts'>
+                  <div class='item blueprint'>
+                    <div class='name'>Grocery Store Account</div>
+                    <div class='money'>$4.05</div>
+                  </div>
+                </div>
+                <div class='address-control'>
+                  <div class='button'>
+                    <i class='fa fa-plus fa-fw'></i>
+                    Add Account
+                  </div>
+                  <div class='button'>
+                    <i class='fa fa-send fa-fw'></i>
+                    Send Money
+                  </div>
+                  <div class='button'>
+                    <i class='fa fa-exchange fa-fw'></i>
+                    Transfer Funds
+                  </div>
+                  <div class='button'>
+                    <i class='fa fa-remove fa-fw'></i>
+                    Delete Account
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id='files'>
+            <div class='header'>
+              <div class='title'>File Manager</div>
+              <div class='info'>
+                <div class='space'>12.2 GB</div>
+                <div class='cost'>0.122 &micro;SC/h</div>
+                <div class='costusd'>&asymp; 0.001 &micro;USD/h</div>
+              </div>
+            </div>
+            <div class='cloud-control'>
+              <div class='row'>
+                <div class='col-xs-6'>
+                  <div class='button upload-public'>
+                    <i class='fa fa-upload'></i>
+                    Upload File
+                  </div>
+                </div>
+                <div class='col-xs-6'>
+                  <div class='search'>
+                    &nbsp;
+                    <i class='fa fa-search'></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class='upload-pane'>
+              <div class='path'>
+                <div class='stop'>
+                  <i class='fa fa-close'></i>
+                </div>
+                <div class='text'>
+                  <i class='fa fa-edit'></i>
+                  filename.txt
+                </div>
+                <div class='meta'>
+                  1.2 MB - 0.0122 SC/h
+                </div>
+              </div>
+              <div class='upload button'>
+                <i class='fa fa-upload'></i>
+                Upload
+              </div>
+              <div class='public button'>
+                <i class='fa fa-check-square'></i>
+                Public
+              </div>
+              <div class='account button'>
+                <i class='fa fa-sign-out'></i>
+                Grocery Store Account
+              </div>
+            </div>
+            <div class='info-pane'>
+              <div class='name'>filename.txt</div>
+              <div class='visibility'>Public</div>
+              <div class='size'>1.2 MB</div>
+              <div class='cost'>0.0122 SC/h</div>
+              <div class='button delete'>
+                <i class='fa fa-close'></i>
+                Delete
+              </div>
+              <div class='button update'>
+                <i class='fa fa-refresh'></i>
+                Update
+              </div>
+              <div class='button download'>
+                <i class='fa fa-download'></i>
+                Download
+              </div>
+            </div>
+            <div class='file-browser'>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+              <div class='file'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>filename.txt</div>
+              </div>
+            </div>
+          </div>
+          <div id='hosting'>
+            <div class='header'>
+              <div class='title'>Host Management</div>
+              <div class='capsule'>
+                <div class='pod'>
+                  34 / 64 GB
+                </div>
+                <div class='pod'>
+                  4.3 SC/h
+                </div>
+                <div class='pod'>
+                  2 Contracts
+                </div>
+                <div class='pod'>
+                  Hosting
+                </div>
+              </div>
+            </div>
+            <div class='host-config'>
+              <div class='title'>Configure Hosting</div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value' contentEditable='true'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='property'>
+                <div class='row'>
+                  <div class='col-xs-4'>
+                    <div class='name'>Property Name</div>
+                  </div>
+                  <div class='col-xs-8'>
+                    <div class='value'>0</div>
+                  </div>
+                </div>
+              </div>
+              <div class='control'>
+                <div class='button'>
+                  <i class='fa fa-refresh'></i>
+                  Reset
+                </div>
+                <div class='button'>
+                  <i class='fa fa-save'></i>
+                  Save
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class='row'>
+        <div class='col-xs-12'>
+          <div id='footer'>
+            <div class='row'>
+              <div class='col-md-2 col-md-offset-1'>
+                <img height='50' src='lib/assets/sia.svg' style='opacity:.5;'>
+              </div>
+              <div class='col-md-8'>
+                <div class='link-list'>
+                  <div class='item'>Overview</div>
+                  <div class='item'>Money</div>
+                  <div class='item'>Files</div>
+                  <div class='item'>Mining</div>
+                  <div class='item'>Hosting</div>
+                  <div class='item'>About</div>
+                  <div class='item'>Help</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

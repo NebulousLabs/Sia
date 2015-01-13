@@ -1,7 +1,7 @@
 <!doctype html>
 %html
     %head
-        %title {{TITLE}}
+        %title Sia Web Interface
 
         %link{:rel => "stylesheet",
              :href => "lib/libraries/bootstrap.min.css"}
@@ -13,11 +13,141 @@
              :href => "lib/stylesheets/style.css"}
 
         %script{:type => "text/javascript",
-                :src  => "lib/libraries/jquery-1.11.0.min.js"}
+                :src  => "lib/libraries/jquery.js"}
         %script{:type => "text/javascript",
                 :src  => "lib/libraries/bootstrap.min.js"}
         %script{:type => "text/javascript",
-                :src  => "lib/scripts/main.js"}
+                :src  => "lib/scripts/util.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/ui.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/overview.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/hosting.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/mining.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/manage-account.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/money.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/files.js"}
+        :javascript
+            $(window).ready(function(){
+                ui.init();
+                ui.update({
+                    "miner":{
+                        "State":"Off",
+                        "Threads":1,
+                        "RunningThreads":0,
+                        "Address":[126,66,"...",173,53]
+                    },
+                    "wallet":{
+                        "Balance":0,
+                        "USDBalance": 0,
+                        "FullBalance":0,
+                        "NumAddresses":2392,
+                        "DefaultAccount": "Personal",
+                        "Accounts":[
+                            {
+                                "Name": "Personal",
+                                "Balance": 1.00,
+                                "USDBalance": 2.00,
+                                "FullBalance": 0,
+                                "NumAddresses": 231,
+                                "Addresses": [{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Balance": 2.13
+                                },{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Balance": 0.001
+                                },{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Balance": 1.32
+                                }],
+                                "Transactions": [
+                                    {
+                                        "Date": "01/02/2015",
+                                        "Amount": "2.67",
+                                        "USDAmount": "3.90",
+                                        "Deposit": true
+                                    },
+                                    {
+                                        "Date": "01/02/2015",
+                                        "Amount": "3.14",
+                                        "USDAmount": "3.90",
+                                        "Deposit": false
+                                    },
+                                ]
+                            },
+                            {
+                                "Name": "Work",
+                                "Balance": 0,
+                                "USDBalance": 0,
+                                "FullBalance": 0,
+                                "NumAddresses": 101,
+                                "Addresses": [{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Amount": 2.13
+                                },{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Amount": 0.001
+                                },{
+                                    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+                                    "Amount": 1.32
+                                }],
+                                "Transactions": [
+                                    {
+                                        "Date": "01/02/2015",
+                                        "Amount": "2.67",
+                                        "USDAmount": "3.90",
+                                        "Deposit": true
+                                    },
+                                    {
+                                        "Date": "01/02/2015",
+                                        "Amount": "2.67",
+                                        "USDAmount": "3.90",
+                                        "Deposit": true
+                                    },
+                                ]
+                            }
+                        ]
+                    },
+                    "status": {
+                        "StateInfo": {
+                            "CurrentBlock": [231, 83, "...", 114, 111, 159],
+                            "Height": 0,
+                            "Target": [0 ,0 , "...", 0 ,0],
+                            "Depth": [255, 255, "...", 255, 255],
+                            "EarliestLegalTimestamp": 1417070299
+                        },
+                        "RenterFiles": null,
+                        "IPAddress": ":9988",
+                        "HostSettings": {
+                            "IPAddress": ":9988",
+                            "TotalStorage": 0,
+                            "MinFilesize": 0,
+                            "MaxFilesize": 0,
+                            "MinDuration": 0,
+                            "MaxDuration": 0,
+                            "MinChallengeWindow": 0,
+                            "MaxChallengeWindow": 0,
+                            "MinTolerance": 0,
+                            "Price": 0,
+                            "Burn": 0,
+                            "CoinAddress": [0 ,0 ,"..." ,0 ,0],
+                            "SpendConditions": {
+                                "TimeLock": 0,
+                                "NumSignatures": 0,
+                                "PublicKeys": null
+                            },
+                            "FreezeIndex": 0
+                        },
+                        "HostSpaceRemaining": 0,
+                        "HostContractCount": 0
+                    }
+                })
+            });
 
     %body
         = Haml::Engine.new(File.read('markup/header.haml')).render
