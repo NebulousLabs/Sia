@@ -131,10 +131,6 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateRenter()
-	if err != nil {
-		return
-	}
 	/* wallet will ne to be switched to subscription before it starts seeing genesis diffs.
 	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {

@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -23,11 +24,11 @@ type FileEntry struct {
 }
 
 type Renter struct {
-	state       *consensus.State
-	files       map[string]FileEntry
-	hostDB      components.HostDB
-	wallet      components.Wallet
-	rwLock      sync.RWMutex
+	state  *consensus.State
+	files  map[string]FileEntry
+	hostDB components.HostDB
+	wallet components.Wallet
+	rwLock sync.RWMutex
 }
 
 func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter) {
@@ -159,7 +160,7 @@ func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces
 	var pieces []FilePiece
 	for i := 0; i < totalPieces; i++ {
 		var piece FilePiece
-		piece, err = r.proposeContract(filename, 2000 + 1000*i)
+		piece, err = r.proposeContract(filename, consensus.BlockHeight(2000+1000*i))
 		if err != nil {
 			i--
 			fmt.Println(err)
@@ -168,34 +169,50 @@ func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces
 		pieces = append(pieces, piece)
 	}
 
-	r.files[nickname] = pieces
+	r.files[nickname] = FileEntry{Pieces: pieces}
+	return
 }
 
-/*
-// Download requests a file from the host it was stored with, and downloads it
-// into the specified filename.
-func (e *Core) Download(nickname, filename string) (err error) {
-	fe, ok := e.renter.files[nickname]
-	if !ok {
-		return errors.New("no file entry for file: " + nickname)
-	}
-	return fe.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
+func (r *Renter) downloadPiece(piece FilePiece, destination string) (err error) {
+	return piece.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
 		// send filehash
-		if _, err := encoding.WriteObject(conn, fe.Contract.FileMerkleRoot); err != nil {
+		if _, err := encoding.WriteObject(conn, piece.Contract.FileMerkleRoot); err != nil {
 			return err
 		}
 		// TODO: read error
 		// copy response into file
-		file, err := os.Create(filename)
+		file, err := os.Create(destination)
 		if err != nil {
 			return err
 		}
-		_, err = io.CopyN(file, conn, int64(fe.Contract.FileSize))
+		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
 		file.Close()
 		if err != nil {
-			os.Remove(filename)
+			os.Remove(destination)
 		}
 		return err
 	})
 }
-*/
+
+// Download requests a file from the host it was stored with, and downloads it
+// into the specified filename.
+func (r *Renter) Download(nickname, filename string) (err error) {
+	entry, exists := r.files[nickname]
+	if !exists {
+		return errors.New("no file entry for file: " + nickname)
+	}
+
+	// We just need to get one piece, we'll keep contacting hosts until one
+	// doesn't return an error.
+	for _, piece := range entry.Pieces {
+		err = r.downloadPiece(piece, filename)
+		if err != nil {
+			return
+		} else {
+			fmt.Println(err)
+			r.hostDB.FlagHost(piece.Host.ID)
+		}
+	}
+
+	return
+}

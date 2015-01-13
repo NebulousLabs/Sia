@@ -63,6 +63,15 @@ func (hdb *HostDB) Insert(entry components.HostEntry) error {
 	return hdb.insert(entry)
 }
 
+func (hdb *HostDB) FlagHost(id string) error {
+	// Check that we're online at all.
+
+	// Remove the flagged host.
+	//
+	// TODO: Smarter flagging code, perhaps cut the weight for example.
+	return hdb.Remove(id)
+}
+
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) Remove(id string) error {
 	hdb.lock()
