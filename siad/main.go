@@ -65,7 +65,7 @@ func findSiaDir() (home, siaDir string, err error) {
 func startEnvironment(cmd *cobra.Command, args []string) {
 	_, err := createDaemon(config)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error starting client:", err)
 	}
 }
 
