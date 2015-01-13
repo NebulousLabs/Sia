@@ -193,23 +193,26 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
-	var resp []byte
-	var err error
+	enc := json.NewEncoder(w)
 
 	switch req.FormValue("action") {
 	case "check":
-		resp, err = json.Marshal(d.checkForUpdate())
+		available, err := d.checkForUpdate()
+		enc.Encode(struct {
+			Available bool
+			Error     string
+		}{available, err.Error()})
+
 	case "apply":
-		resp, err = json.Marshal(d.applyUpdate())
+		applied, err := d.applyUpdate()
+		enc.Encode(struct {
+			Applied bool
+			Error   string
+		}{applied, err.Error()})
+
 	default:
 		http.Error(w, "Unrecognized action", 400)
 		return
-	}
-
-	if err != nil {
-		http.Error(w, "Failed to encode response", 500)
-	} else {
-		w.Write(resp)
 	}
 }
 

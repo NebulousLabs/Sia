@@ -43,7 +43,7 @@ func stopcmd(cmd *cobra.Command, args []string) {
 }
 
 func updatecmd(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
+	if len(args) != 1 {
 		cmd.Usage()
 		return
 	}

@@ -113,7 +113,7 @@ func main() {
 	}
 	root.AddCommand(update)
 
-	// check for updates
+	// check for updates on startup
 	updatecmd(update, []string{"check"})
 
 	root.Execute()

@@ -84,14 +84,14 @@ func startEnvironment(*cobra.Command, []string) {
 }
 
 func version(*cobra.Command, []string) {
-	fmt.Println("Sia Daemon v0.1.0")
+	fmt.Println("Sia Daemon v" + VERSION)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Daemon v0.1.0",
-		Long:  "Sia Daemon v0.1.0",
+		Short: "Sia Daemon v" + VERSION,
+		Long:  "Sia Daemon v" + VERSION,
 		Run:   startEnvironment,
 	}
 
