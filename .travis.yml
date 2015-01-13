@@ -1,0 +1,10 @@
+language: go
+
+go:
+  - 1.3
+
+install:
+  - make dependencies
+  - make
+
+script: make test-long
