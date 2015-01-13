@@ -68,6 +68,7 @@ var ui = (function(){
         "manage-account->money": "slideright"
     };
     var lastData;
+    var eTooltip;
 
     function switchView(newView){
         // Check that parameter is specified
@@ -203,6 +204,8 @@ var ui = (function(){
             })
         });
 
+        eTooltip = $("#tooltip");
+
         initViews();
     }
 
@@ -224,9 +227,46 @@ var ui = (function(){
         alert(event);
     }
 
+    // Shows tooltip with content on given element
+    var tooltipTimeout,tooltipVisible;
+    function _tooltip(element, content){
+        element = $(element);
+        var middleX = element.offset().left + element.width()/2;
+        var topY = element.offset().top - element.height();
+        eTooltip.show();
+        eTooltip.offset({
+            top: topY - $("#tooltip").height(),
+            left: middleX
+        });
+        eTooltip.text(content);
+        if (!tooltipVisible){
+            eTooltip.stop();
+            eTooltip.css({"opacity":0});
+            tooltipVisible = true;
+            eTooltip.animate({
+                "opacity":1
+            },400);
+        }else{
+            eTooltip.stop();
+            eTooltip.show();
+            eTooltip.css({"opacity":1});
+        }
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = setTimeout(function(){
+            // eTooltip.hide();
+            eTooltip.animate({
+                "opacity":"0"
+            },400,function(){
+                tooltipVisible = false;
+                eTooltip.hide();
+            });
+        },1400);
+    }
+
     return {
         "switchView": switchView,
         "update": update,
+        "_tooltip": _tooltip,
         "_trigger": _trigger,
         "help": help,
         "init": init
