@@ -19,21 +19,9 @@ func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 		return nil, fmt.Errorf("length %d exceeds maxLen of %d", dataLen, maxLen)
 	}
 	// read dataLen bytes
-	var data []byte
-	buf := make([]byte, 1024)
-	var total uint64
-	for total = 0; total < dataLen; {
-		n, err := r.Read(buf)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, buf[:n]...)
-		total += uint64(n)
-	}
-	if total != dataLen {
-		return nil, errors.New("length mismatch")
-	}
-	return data, nil
+	data := make([]byte, dataLen)
+	_, err := io.ReadFull(r, data)
+	return data, err
 }
 
 // ReadObject reads and decodes a length-prefixed and marshalled object.

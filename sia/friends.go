@@ -1,5 +1,6 @@
 package sia
 
+/*
 import (
 	"os"
 
@@ -45,3 +46,4 @@ func (c *Core) FriendMap() (safeMap map[string]consensus.CoinAddress) {
 	}
 	return
 }
+*/

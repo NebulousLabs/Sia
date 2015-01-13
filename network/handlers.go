@@ -1,7 +1,6 @@
 package network
 
 import (
-	"errors"
 	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -48,11 +47,14 @@ func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
 	connHost, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	addrHost, _, _ := net.SplitHostPort(string(addr))
 	if connHost != addrHost {
-		return errors.New("supplied hostname does not match connection's hostname")
+		_, err = encoding.WriteObject(conn, "supplied hostname does not match connection's hostname")
+		return
 	}
 	// check that the host is reachable on this port
-	if Ping(addr) {
-		tcps.AddPeer(addr)
+	if !Ping(addr) {
+		_, err = encoding.WriteObject(conn, "supplied hostname did not respond to ping")
+		return
 	}
+	tcps.AddPeer(addr)
 	return
 }

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -9,6 +10,8 @@ type Foo struct{}
 func (f Foo) Bar(i uint32) (s string, err error) {
 	if i == 0xdeadbeef {
 		s = "bar"
+	} else {
+		err = errors.New("wrong number")
 	}
 	return
 }
@@ -31,7 +34,7 @@ func TestRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	if foo != "foo" {
-		t.Fatalf("Foo was not called")
+		t.Fatal("Foo was not called")
 	}
 
 	var bar string
@@ -40,7 +43,13 @@ func TestRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	if bar != "bar" {
-		t.Fatalf("Bar was not called")
+		t.Fatal("Bar was not called")
+	}
+
+	// wrong number should produce an error
+	err = tcps.myAddr.RPC("Bar", 0xbadbeef, &bar)
+	if err == nil || err.Error() != "wrong number" {
+		t.Fatal("Bar returned nil or incorrect error:", err)
 	}
 }
 

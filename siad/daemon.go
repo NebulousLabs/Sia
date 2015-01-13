@@ -6,6 +6,10 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Sia/sia"
+	"github.com/NebulousLabs/Sia/sia/host"
+	"github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/wallet"
 
 	"github.com/mitchellh/go-homedir"
 )
@@ -58,7 +62,23 @@ func createDaemon(config Config) (d *daemon, err error) {
 		downloadDir: expandedDownloadDir,
 	}
 
-	d.core, err = sia.CreateCore(expandedHostDir, expandedWalletFile, config.Siacore.RPCaddr, config.Siacore.NoBootstrap)
+	wallet, err := wallet.New(expandedWalletFile)
+	if err != nil {
+		return
+	}
+	siaconfig := sia.Config{
+		HostDir:     expandedHostDir,
+		WalletFile:  expandedWalletFile,
+		ServerAddr:  config.Siacore.RPCaddr,
+		Nobootstrap: config.Siacore.NoBootstrap,
+
+		Host:   host.New(),
+		HostDB: hostdb.New(),
+		Miner:  miner.New(),
+		Wallet: wallet,
+	}
+
+	d.core, err = sia.CreateCore(siaconfig)
 	if err != nil {
 		return
 	}

@@ -7,7 +7,7 @@ install: fmt
 	go install ./...
 
 clean:
-	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf siacore/test.wallet
+	rm -rf host release whitepaper.aux whitepaper.log whitepaper.pdf sia/test.wallet
 
 test: clean install
 	go test -short ./...
