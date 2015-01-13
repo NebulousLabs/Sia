@@ -146,6 +146,23 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 	return
 }
 
+func (r *Renter) RenameFile(currentName, newName string) error {
+	// Check that the currentName exists and the newName doesn't.
+	entry, exists := r.files[currentName]
+	if !exists {
+		return errors.New("no file found by that name")
+	}
+	_, exists = r.files[newName]
+	if exists {
+		return errors.New("file of new name already exists")
+	}
+
+	// Do the renaming.
+	delete(r.files, currentName)
+	r.files[newName] = entry
+	return nil
+}
+
 // TODO: Do the uploading in parallel.
 func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces, optimalRepairPieces int) (err error) {
 	r.lock()
