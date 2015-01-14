@@ -16,6 +16,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	d.core.UpdateMiner(threads)
+	d.core.StartMining()
 	fmt.Fprintf(w, "Now mining on %v threads.", threads)
 }
 
