@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"html/template"
 	"os"
 
@@ -12,8 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/sia/miner"
 	"github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/sia/wallet"
-
-	"github.com/mitchellh/go-homedir"
 )
 
 type daemon struct {
@@ -25,55 +23,29 @@ type daemon struct {
 	template *template.Template
 }
 
-func createDaemon(config Config) (d *daemon, err error) {
-	// Expand any '~' characters in the config directories.
-	expandedHostDir, err := homedir.Expand(config.Siacore.HostDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with hostDir: %v", err)
-		return
+func startDaemon(config Config) (err error) {
+	// Create download directory and host directory.
+	if err = os.MkdirAll(config.Siad.DownloadDirectory, os.ModeDir|os.ModePerm); err != nil {
+		return errors.New("failed to create download directory: " + err.Error())
 	}
-	expandedStyleDir, err := homedir.Expand(config.Siad.StyleDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with styleDir: %v", err)
-		return
-	}
-	expandedDownloadDir, err := homedir.Expand(config.Siad.DownloadDirectory)
-	if err != nil {
-		err = fmt.Errorf("problem with downloadDir: %v", err)
-		return
-	}
-	expandedWalletFile, err := homedir.Expand(config.Siad.WalletFile)
-	if err != nil {
-		err = fmt.Errorf("problem with walletFile: %v", err)
-		return
-	}
-
-	// Create downloads directory and host directory.
-	err = os.MkdirAll(expandedDownloadDir, os.ModeDir|os.ModePerm)
-	if err != nil {
-		return
-	}
-	err = os.MkdirAll(expandedHostDir, os.ModeDir|os.ModePerm)
-	if err != nil {
-		return
+	if err = os.MkdirAll(config.Siacore.HostDirectory, os.ModeDir|os.ModePerm); err != nil {
+		return errors.New("failed to create host directory: " + err.Error())
 	}
 
 	// Create and fill out the daemon object.
-	d = &daemon{
-		styleDir:    expandedStyleDir,
-		downloadDir: expandedDownloadDir,
+	d := &daemon{
+		styleDir:    config.Siad.StyleDirectory,
+		downloadDir: config.Siad.DownloadDirectory,
 	}
 
-	// mr is used to resolve conflicts between packages and variable names
-
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
-	Wallet, err := wallet.New(expandedWalletFile)
+	Wallet, err := wallet.New(config.Siad.WalletFile)
 	if err != nil {
 		return
 	}
 	hostDB, err := hostdb.New()
 	if err != nil {
-		return
+		return errors.New("could not load wallet file: " + err.Error())
 	}
 	Host, err := host.New(state, Wallet)
 	if err != nil {
@@ -85,8 +57,8 @@ func createDaemon(config Config) (d *daemon, err error) {
 	}
 
 	siaconfig := sia.Config{
-		HostDir:     expandedHostDir,
-		WalletFile:  expandedWalletFile,
+		HostDir:     config.Siacore.HostDirectory,
+		WalletFile:  config.Siad.WalletFile,
 		ServerAddr:  config.Siacore.RPCaddr,
 		Nobootstrap: config.Siacore.NoBootstrap,
 
@@ -104,8 +76,8 @@ func createDaemon(config Config) (d *daemon, err error) {
 		return
 	}
 
-	// Begin listening for requests on the api.
-	d.setUpHandlers(config.Siad.APIaddr)
+	// Begin listening for requests on the API.
+	d.handle(config.Siad.APIaddr)
 
 	return
 }

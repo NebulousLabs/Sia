@@ -30,15 +30,15 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 		return
 	}
 
-	// Establish an initial peer list
-	if err = c.server.Bootstrap(); err != nil {
-		return
-	}
-
-	// Download the blockchain, getting blocks one batch at a time until an
-	// empty batch is sent.
+	// Bootstrapping may take a while.
 	go func() {
-		// Every 2 minutes call CatchUp() on a random peer. This will help to
+		// Establish an initial peer list.
+		if err = c.server.Bootstrap(); err != nil {
+			// log error
+			return
+		}
+
+		// Every 2 minutes, call CatchUp() on a random peer. This will help to
 		// resolve synchronization issues and keep everybody on the same page
 		// with regards to the longest chain. It's a bit of a hack but will
 		// make the network substantially more robust.

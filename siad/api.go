@@ -12,7 +12,7 @@ import (
 )
 
 // TODO: timeouts?
-func (d *daemon) setUpHandlers(addr string) {
+func (d *daemon) handle(addr string) {
 	// Web Interface
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
@@ -24,6 +24,7 @@ func (d *daemon) setUpHandlers(addr string) {
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
 	http.HandleFunc("/status", d.statusHandler)
+	http.HandleFunc("/update", d.updateHandler)
 	http.HandleFunc("/stop", d.stopHandler)
 
 	// Wallet API Calls
@@ -189,6 +190,30 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Download complete!")
 		}
 	*/
+}
+
+func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
+	enc := json.NewEncoder(w)
+
+	switch req.FormValue("action") {
+	case "check":
+		available, err := d.checkForUpdate()
+		enc.Encode(struct {
+			Available bool
+			Error     string
+		}{available, err.Error()})
+
+	case "apply":
+		applied, err := d.applyUpdate()
+		enc.Encode(struct {
+			Applied bool
+			Error   string
+		}{applied, err.Error()})
+
+	default:
+		http.Error(w, "Unrecognized action", 400)
+		return
+	}
 }
 
 // TODO: this should probably just return JSON. Leave formatting to the client.
