@@ -4,9 +4,54 @@ var controller = (function(){
 
     function init(){
         update();
+        addListeners();
         setInterval(function(){
             update();
         },250);
+    }
+
+    function addListeners(){
+        ui.addListener("add-miner", function(){
+            console.log("Getting miner",data.miner.Threads);
+            $.get("/miner/start",{
+                "threads": data.miner.Threads + 1
+            }, function(e){
+                // TODO: handle error
+                console.log(e);
+            });
+        });
+        ui.addListener("remove-miner", function(){
+            console.log("Getting miner",data.miner.Threads);
+            $.get("/miner/start",{
+                "threads": data.miner.Threads - 1 < 0 ? 0 : data.miner.Threads - 1
+            }, function(e){
+                // TODO: handle error
+                console.log(e);
+            });
+        });
+        ui.addListener("toggle-mining", function(){
+            console.log("Toggling miner",data.miner.Threads);
+            if (data.miner.State == "Off"){
+                $.get("/miner/start",{
+                    "threads": data.miner.Threads
+                }, function(e){
+                    // TODO: handle error
+                    console.log(e);
+                });
+            }else{
+                $.get("/miner/stop", function(e){
+                    // TODO: handle error
+                    console.log(e);
+                });
+            }
+        });
+        ui.addListener("stop-mining", function(){
+            console.log("Getting miner",data.miner.Threads);
+            $.get("/miner/stop", function(e){
+                // TODO: handle error
+                console.log(e);
+            });
+        });
     }
 
     function update(){

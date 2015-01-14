@@ -76,7 +76,8 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         }
 
         if (!account){
-            console.error("Invalid Account");
+            // TODO: throw this error again when the polling issue is fixed
+            // console.error("Invalid Account");
             return;
         }
 
