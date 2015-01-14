@@ -46,9 +46,11 @@ type Host struct {
 func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) {
 	if wallet == nil {
 		err = errors.New("host.New: cannot have nil wallet")
+		return
 	}
 	if state == nil {
 		err = errors.New("host.New: cannot have nil state")
+		return
 	}
 
 	h = &Host{
