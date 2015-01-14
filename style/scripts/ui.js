@@ -163,6 +163,11 @@ var ui = (function(){
         newElement.animate({animationProgress:1},{
             duration:400,
             step: function(v){
+                // Prevent tooltips from being spawned
+                eTooltip.stop().hide();
+                clearTimeout(tooltipTimeout);
+
+                // Translate views
                 if (directionString == "right"){
                     setTranslate(newElement, slideDistance * (v- 1),heightDifference);
                     setTranslate(oldElement, slideDistance * v, 0);
