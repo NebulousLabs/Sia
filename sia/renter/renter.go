@@ -31,7 +31,20 @@ type Renter struct {
 	rwLock sync.RWMutex
 }
 
-func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter) {
+func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter, err error) {
+	if state == nil {
+		err = errors.New("renter.New: cannot have nil state")
+		return
+	}
+	if hdb == nil {
+		err = errors.New("renter.New: cannot have nil hostDB")
+		return
+	}
+	if wallet == nil {
+		err = errors.New("renter.New: cannot have nil wallet")
+		return
+	}
+
 	r = &Renter{
 		state:  state,
 		hostDB: hdb,
