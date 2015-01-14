@@ -145,6 +145,7 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 func (hdb *HostDB) RandomHost() (h components.HostEntry, err error) {
 	hdb.rLock()
 	defer hdb.rUnlock()
+
 	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
 		return

@@ -23,7 +23,7 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 		MinFilesize:        64,
 		MaxFilesize:        2 * 1000,
 		MinDuration:        20,
-		MaxDuration:        200,
+		MaxDuration:        52 * 1008,
 		MinChallengeWindow: 50,
 		MaxChallengeWindow: 200,
 		MinTolerance:       5,

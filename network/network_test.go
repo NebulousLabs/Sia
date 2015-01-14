@@ -16,7 +16,7 @@ func (f Foo) Bar(i uint32) (s string, err error) {
 	return
 }
 
-func TestRegister(t *testing.T) {
+func TestRegisterRPC(t *testing.T) {
 	// create server
 	tcps, err := NewTCPServer(":9000")
 	if err != nil {
@@ -24,8 +24,14 @@ func TestRegister(t *testing.T) {
 	}
 
 	// register some handlers
-	tcps.Register("Foo", func() (string, error) { return "foo", nil })
-	tcps.Register("Bar", new(Foo).Bar)
+	err = tcps.RegisterRPC("Foo", func() (string, error) { return "foo", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tcps.RegisterRPC("Bar", new(Foo).Bar)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// call them
 	var foo string

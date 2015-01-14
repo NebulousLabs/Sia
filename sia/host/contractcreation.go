@@ -96,7 +96,7 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 	}
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
-	requiredFund := (h.announcement.Burn + h.announcement.Price) * consensus.Currency(fileSize) * consensus.Currency(fullDuration)
+	requiredFund := (h.announcement.Price*consensus.Currency(fullDuration) + h.announcement.Burn*consensus.Currency(contractDuration)) * consensus.Currency(fileSize)
 	if t.FileContracts[0].ContractFund < requiredFund {
 		err = errors.New("ContractFund does not cover the entire duration of the contract.")
 		return

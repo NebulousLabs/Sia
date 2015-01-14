@@ -54,8 +54,19 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 	}
 
 	h = &Host{
-		state:     state,
-		wallet:    wallet,
+		state:  state,
+		wallet: wallet,
+
+		announcement: components.HostAnnouncement{
+			TotalStorage:       16 * 1024 * 1024,
+			MaxFilesize:        1024 * 1024,
+			MaxDuration:        52 * 1008, // one year
+			MinChallengeWindow: 3,
+			MinTolerance:       1,
+			Price:              1,
+			Burn:               1,
+		},
+
 		contracts: make(map[consensus.ContractID]contractObligation),
 	}
 
@@ -125,4 +136,9 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	}
 
 	return
+}
+
+// TODO: Deprecate this function.
+func (h *Host) NumContracts() int {
+	return len(h.contracts)
 }

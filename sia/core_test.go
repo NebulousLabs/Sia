@@ -76,6 +76,7 @@ func TestEverything(t *testing.T) {
 	testSendToSelf(t, c)
 	testWalletInfo(t, c)
 	testHostAnnouncement(t, c)
+	testUploadFile(t, c)
 
 	// TODO: add some tests which probe the miner implementation more.
 }

@@ -9,16 +9,6 @@ const (
 	HostAnnouncementPrefix = 1
 )
 
-// The HostDB interface actually uses a struct from the hostdb subpackage,
-// which is a bit of a bad practice. The alternative would be to create a
-// different package to manage things like host entries and host announcements,
-// but I think it makes enough sense to define them in the same package that
-// also provides an example (and the primary) implementation of the hostdb
-// interface.
-//
-// Maybe though we can make the HostAnnouncement and the HostEntry their own
-// interfaces.
-
 type HostDB interface {
 	// FlagHost alerts the HostDB that a host is not behaving as expected. The
 	// HostDB may decide to remove the host, or just reduce the weight, or it

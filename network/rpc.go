@@ -90,7 +90,7 @@ func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
 //     func() (Type, error)
 // To call an RPC, use Address.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
-func (tcps *TCPServer) RegisterRPC(name string, fn interface{}) {
+func (tcps *TCPServer) RegisterRPC(name string, fn interface{}) error {
 	// all handlers are functions with 0 or 1 ins and 1 or 2 outs, the last of
 	// which must be an error.
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
@@ -122,6 +122,8 @@ func (tcps *TCPServer) RegisterRPC(name string, fn interface{}) {
 	tcps.Lock()
 	tcps.handlerMap[ident] = handler
 	tcps.Unlock()
+
+	return nil
 }
 
 // registerRPC is for handlers that take an argument return a value. The input
