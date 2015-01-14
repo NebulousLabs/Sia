@@ -1,7 +1,7 @@
 ui._mining = (function(){
 
     var view, eMiningStatus, eIncomeRate, eActiveMiners, eActiveMinerCount, eAddMiner,
-        eRemoveMiner, eStopMining;
+        eRemoveMiner, eStopMining, eAccountName, eBalance, eUSDBalance;
 
     function init(){
         view = $("#mining");
@@ -12,6 +12,9 @@ ui._mining = (function(){
         eAddMiner = view.find(".add-miner");
         eRemoveMiner = view.find(".remove-miner");
         eStopMining = view.find(".stop-mining");
+        eAccountName = view.find(".account-name");
+        eBalance = view.find(".account-info .amt");
+        eUSDBalance = view.find(".account-info .amtusd");
 
         addEvents();
     }
@@ -55,6 +58,11 @@ ui._mining = (function(){
 
         eActiveMinerCount.text(data.miner.RunningThreads);
         eIncomeRate.text(data.miner.IncomeRate);
+
+        eBalance.text(data.miner.Balance);
+        if (data.miner.USDBalance !== undefined){
+            eUSDBalance.html("&asymp; " + data.wallet.USDBalance + " USD");
+        }
     }
 
     return {

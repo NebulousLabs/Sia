@@ -2,7 +2,7 @@ ui._manageAccount = ui["_manage-account"] = (function(){
 
     var view,eBackToMoney, eBalance, eUSDBalance, eAccountName, eAddFunds, eWithdraw,
         eAddressBlueprint,eAddresses,eTransactionBlueprint, eTransactions, eCreateAddress,
-        eSendMoney, eTransferFunds, eDeleteAccount;
+        eSendMoney, eTransferFunds, eDeleteAccount, eAddressDropdown, eTransactionDropdown;
 
     var accountName;
 
@@ -21,6 +21,8 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         eAddressBlueprint = view.find(".addresses .item.blueprint");
         eAddFunds = view.find(".add-funds");
         eWithdraw = view.find(".withdraw");
+        eAddressDropdown = view.find(".dropdown-button");
+        eTransactionDropdown = view.find(".transaction-button");
         eAddresses = $();
         eTransactionBlueprint = view.find(".transactions .item.blueprint");
         eTransactions = $();
@@ -48,6 +50,12 @@ ui._manageAccount = ui["_manage-account"] = (function(){
             ui._tooltip(this, "Not Implemented");
         });
         eDeleteAccount.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eAddressDropdown.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eTransactionDropdown.click(function(){
             ui._tooltip(this, "Not Implemented");
         });
     }
