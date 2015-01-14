@@ -28,7 +28,7 @@ type HostDB struct {
 }
 
 // New returns an empty HostDatabase.
-func New() (hdb *HostDB) {
+func New() (hdb *HostDB, err error) {
 	hdb = &HostDB{
 		activeHosts:   make(map[string]*hostNode),
 		inactiveHosts: make(map[string]*components.HostEntry),
