@@ -26,8 +26,6 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
-	// mr is used to resolve conflicts between packages and variable names
-
 	// Pull together the configuration for the Core.
 	state, _ := consensus.CreateGenesisState() // The missing piece is not an error. TODO: That missing piece is deprecated.
 	walletFilename := "test.wallet"
@@ -39,11 +37,11 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mrHost, err := host.New(state, w)
+	Host, err := host.New(state, w)
 	if err != nil {
 		return
 	}
-	mrRenter, err := renter.New(state, hdb, w)
+	Renter, err := renter.New(state, hdb, w)
 	if err != nil {
 		return
 	}
@@ -55,10 +53,10 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 
 		State: state,
 
-		Host:   mrHost,
+		Host:   Host,
 		HostDB: hdb,
 		Miner:  miner.New(),
-		Renter: mrRenter,
+		Renter: Renter,
 		Wallet: w,
 	}
 

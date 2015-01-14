@@ -67,7 +67,7 @@ func createDaemon(config Config) (d *daemon, err error) {
 	// mr is used to resolve conflicts between packages and variable names
 
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
-	mrWallet, err := wallet.New(expandedWalletFile)
+	Wallet, err := wallet.New(expandedWalletFile)
 	if err != nil {
 		return
 	}
@@ -75,11 +75,11 @@ func createDaemon(config Config) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	mrHost, err := host.New(state, mrWallet)
+	Host, err := host.New(state, Wallet)
 	if err != nil {
 		return
 	}
-	mrRenter, err := renter.New(state, hostDB, mrWallet)
+	Renter, err := renter.New(state, hostDB, Wallet)
 	if err != nil {
 		return
 	}
@@ -92,11 +92,11 @@ func createDaemon(config Config) (d *daemon, err error) {
 
 		State: state,
 
-		Host:   mrHost,
+		Host:   Host,
 		HostDB: hostDB,
 		Miner:  miner.New(),
-		Renter: mrRenter,
-		Wallet: mrWallet,
+		Renter: Renter,
+		Wallet: Wallet,
 	}
 
 	d.core, err = sia.CreateCore(siaconfig)
