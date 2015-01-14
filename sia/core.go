@@ -139,15 +139,13 @@ func CreateCore(config Config) (c *Core, err error) {
 	*/
 
 	// Bootstrap to the network (may take a few seconds).
-	go func() {
-		err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
-		if err == network.ErrNoPeers {
-			// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
-		} else if err != nil {
-			return
-		}
-		// c.host.Settings.IPAddress = c.server.Address()
-	}()
+	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
+	if err == network.ErrNoPeers {
+		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+	} else if err != nil {
+		return
+	}
+	// c.host.Settings.IPAddress = c.server.Address()
 
 	return
 }
