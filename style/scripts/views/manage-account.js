@@ -82,9 +82,9 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         }
 
         // TODO this balance should represent the account's balance
-        eBalance.text(account.Balance);
+        eBalance.html(util.engNotation(account.Balance));
         if (account.USDBalance !== undefined){
-            eUSDBalance.html("&asymp; " + account.USDBalance + " USD");
+            eUSDBalance.html("&asymp; " + util.engNotation(account.USDBalance) + "USD");
         }
 
         // Populate addresses
