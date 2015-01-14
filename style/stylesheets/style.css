@@ -443,11 +443,11 @@
 .file-browser .file {
   display: inline-block;
   background-color: #fff;
-  width: 140px;
-  height: 140px;
+  width: 100px;
+  height: 100px;
   border: 1px solid #e0e0e0;
   padding: 4px;
-  margin: 20px;
+  margin: 10px;
   border-radius: 4px;
   position: relative;
   color: #757575;
@@ -457,11 +457,12 @@
   background-color: #fafafa;
 }
 .file .graphic {
-  font-size: 72px;
+  font-size: 48px;
   text-align: center;
 }
 .file .name {
   text-align: center;
+  font-size: 14px;
 }
 #hosting {
   background-color: #fafafa;
