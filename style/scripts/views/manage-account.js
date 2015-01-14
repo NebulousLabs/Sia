@@ -41,7 +41,8 @@ ui._manageAccount = ui["_manage-account"] = (function(){
             ui._tooltip(this, "Not Implemented");
         });
         eCreateAddress.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._tooltip(this, "Creating Address");
+            ui._trigger("create-address", accountName);
         });
         eSendMoney.click(function(){
             ui._tooltip(this, "Not Implemented");
