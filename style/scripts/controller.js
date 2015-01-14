@@ -12,7 +12,6 @@ var controller = (function(){
 
     function addListeners(){
         ui.addListener("add-miner", function(){
-            console.log("Getting miner",data.miner.Threads);
             $.get("/miner/start",{
                 "threads": data.miner.Threads + 1
             }, function(e){
@@ -21,7 +20,6 @@ var controller = (function(){
             });
         });
         ui.addListener("remove-miner", function(){
-            console.log("Getting miner",data.miner.Threads);
             $.get("/miner/start",{
                 "threads": data.miner.Threads - 1 < 0 ? 0 : data.miner.Threads - 1
             }, function(e){
@@ -30,7 +28,6 @@ var controller = (function(){
             });
         });
         ui.addListener("toggle-mining", function(){
-            console.log("Toggling miner",data.miner.Threads);
             if (data.miner.State == "Off"){
                 $.get("/miner/start",{
                     "threads": data.miner.Threads
@@ -46,7 +43,6 @@ var controller = (function(){
             }
         });
         ui.addListener("stop-mining", function(){
-            console.log("Getting miner",data.miner.Threads);
             $.get("/miner/stop", function(e){
                 // TODO: handle error
                 console.log(e);
