@@ -164,20 +164,20 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 }
 
 // TODO: Do the uploading in parallel.
-func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces, optimalRepairPieces int) (err error) {
+func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
 	r.lock()
 	defer r.unlock()
 
-	_, exists := r.files[nickname]
+	_, exists := r.files[rfp.Nickname]
 	if exists {
 		return errors.New("file of that nickname already exists")
 	}
 
 	// Make an entry for this file.
 	var pieces []FilePiece
-	for i := 0; i < totalPieces; i++ {
+	for i := 0; i < rfp.TotalPieces; i++ {
 		var piece FilePiece
-		piece, err = r.proposeContract(filename, consensus.BlockHeight(2000+1000*i))
+		piece, err = r.proposeContract(rfp.Filepath, consensus.BlockHeight(2000+1000*i))
 		if err != nil {
 			i--
 			fmt.Println(err)
@@ -186,7 +186,7 @@ func (r *Renter) RentFile(filename, nickname string, totalPieces, requiredPieces
 		pieces = append(pieces, piece)
 	}
 
-	r.files[nickname] = FileEntry{Pieces: pieces}
+	r.files[rfp.Nickname] = FileEntry{Pieces: pieces}
 	return
 }
 

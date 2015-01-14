@@ -64,10 +64,10 @@ func (w *Wallet) Info() ([]byte, error) {
 	defer w.rUnlock()
 
 	status := Status{
-		Balance:     w.Balance(false),
-		FullBalance: w.Balance(true),
+		Balance:      w.Balance(false),
+		FullBalance:  w.Balance(true),
+		NumAddresses: len(w.spendableAddresses),
 	}
-	status.NumAddresses = len(w.spendableAddresses)
 
 	return json.Marshal(status)
 }

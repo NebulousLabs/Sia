@@ -1,6 +1,14 @@
 package components
 
+type RentFileParameters struct {
+	Filepath       string
+	Nickname       string
+	TotalPieces    int
+	RequiredPieces int
+	OptimalPieces  int
+}
+
 type Renter interface {
 	RenameFile(currentName, newName string) error
-	RentFile(filename, nickname string, totalPieces, requiredPieces, optimalRecoveryPieces int) error
+	RentFile(RentFileParameters) error
 }
