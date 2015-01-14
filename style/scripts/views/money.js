@@ -55,9 +55,9 @@ ui._money = (function(){
     }
 
     function update(data){
-        eBalance.text(util.engNotation(data.wallet.Balance));
+        eBalance.html(util.engNotation(data.wallet.Balance) + "SC");
         if (data.wallet.USDBalance !== undefined){
-            eUSDBalance.html("&asymp; " + util.engNotation(data.wallet.USDBalance) + " USD");
+            eUSDBalance.html("&asymp; " + util.engNotation(data.wallet.USDBalance) + "USD");
         }
 
         eItems.remove();
@@ -70,9 +70,9 @@ ui._money = (function(){
             var item = blueprint.clone().removeClass("blueprint");
             blueprint.parent().append(item);
             item.find(".name").text(account.Name);
-            item.find(".money").text(account.Balance + " SC");
+            item.find(".money").text(util.engNotation(account.Balance,10) + "SC");
             item.find(".money").hover(function(){
-                ui._tooltip(this, account.USDBalance + " USD");
+                ui._tooltip(this, util.engNotation(account.USDBalance) + "USD");
             });
             accountElements.push(item[0]);
         });
