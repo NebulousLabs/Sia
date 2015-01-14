@@ -54,6 +54,7 @@ ui._mining = (function(){
         }
 
         eActiveMinerCount.text(data.miner.RunningThreads);
+        eIncomeRate.text(data.miner.IncomeRate);
     }
 
     return {
