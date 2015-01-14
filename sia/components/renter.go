@@ -1,14 +1,14 @@
 package components
 
-import (
-// "github.com/NebulousLabs/Sia/consensus"
-)
-
-type RenterUpdate struct {
-	HostDB HostDB
+type RentFileParameters struct {
+	Filepath       string
+	Nickname       string
+	TotalPieces    int
+	RequiredPieces int
+	OptimalPieces  int
 }
 
 type Renter interface {
-	// UpdateRenter changes the settings used by the host.
-	UpdateRenter(RenterUpdate) error
+	RenameFile(currentName, newName string) error
+	RentFile(RentFileParameters) error
 }

@@ -20,17 +20,16 @@ const (
 // interfaces.
 
 type HostDB interface {
+	// FlagHost alerts the HostDB that a host is not behaving as expected. The
+	// HostDB may decide to remove the host, or just reduce the weight, or it
+	// may decide to ignore the flagging. If the flagging is ignored, an error
+	// will be returned explaining why.
+	FlagHost(id string) error
+
 	// Info returns an arbitrary byte slice presumably with information about
 	// the status of the hostdb. Info is not relevant to the sia package, but
 	// instead toa frontend.
 	Info() ([]byte, error)
-
-	// Size returns the number of active hosts in the hostdb.
-	Size() int
-
-	// Update gives the hostdb a set of blocks that have been applied and
-	// reversed.
-	Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error
 
 	// Insert puts a host entry into the host database.
 	Insert(HostEntry) error
@@ -41,6 +40,13 @@ type HostDB interface {
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
 	RandomHost() (HostEntry, error)
+
+	// Size returns the number of active hosts in the hostdb.
+	Size() int
+
+	// Update gives the hostdb a set of blocks that have been applied and
+	// reversed.
+	Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) error
 }
 
 // A HostAnnouncement is a struct that can appear in the arbitrary data field.
