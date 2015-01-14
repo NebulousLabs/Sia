@@ -4,7 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-type WalletStatus struct {
+type WalletInfo struct {
 	Balance      consensus.Currency
 	FullBalance  consensus.Currency
 	NumAddresses int
@@ -21,7 +21,7 @@ type Wallet interface {
 	// about the wallet in the form of json. The frontend will have to know how
 	// to parse it, but Core and Daemon don't need to understand what's in the
 	// json.
-	Info() (WalletStatus, error)
+	Info() (WalletInfo, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set

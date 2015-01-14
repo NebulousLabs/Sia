@@ -53,11 +53,11 @@ func New(filename string) (w *Wallet, err error) {
 }
 
 // Info implements the core.Wallet interface.
-func (w *Wallet) Info() (status components.WalletStatus, err error) {
+func (w *Wallet) Info() (status components.WalletInfo, err error) {
 	w.rLock()
 	defer w.rUnlock()
 
-	status = components.WalletStatus{
+	status = components.WalletInfo{
 		Balance:      w.Balance(false),
 		FullBalance:  w.Balance(true),
 		NumAddresses: len(w.spendableAddresses),
