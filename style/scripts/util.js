@@ -15,7 +15,12 @@ var util = (function(){
         return numberString.slice(0,precision + 1) + " " + si;
     }
 
+    function USDConvert(balance){
+        return balance * 0.00172;
+    }
+
     return {
-        "engNotation": engNotation
+        "engNotation": engNotation,
+        "USDConvert": USDConvert
     };
 })();

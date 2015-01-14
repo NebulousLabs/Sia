@@ -21,6 +21,8 @@
         %script{:type => "text/javascript",
                 :src  => "lib/scripts/ui.js"}
         %script{:type => "text/javascript",
+                :src  => "lib/scripts/controller.js"}
+        %script{:type => "text/javascript",
                 :src  => "lib/scripts/views/overview.js"}
         %script{:type => "text/javascript",
                 :src  => "lib/scripts/views/hosting.js"}
@@ -35,6 +37,7 @@
         :javascript
             $(window).ready(function(){
                 ui.init();
+                controller.init();
                 ui.update({
                     "miner":{
                         "State":"On",
