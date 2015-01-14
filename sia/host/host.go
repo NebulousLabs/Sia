@@ -39,7 +39,7 @@ type Host struct {
 	fileCounter int
 	contracts   map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
 
-	rwLock sync.RWMutex
+	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -72,8 +72,8 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
 func (h *Host) UpdateHost(update components.HostUpdate) error {
-	h.lock()
-	defer h.unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	storageDiff := update.Announcement.TotalStorage - h.announcement.TotalStorage
 	h.spaceRemaining += storageDiff
@@ -102,14 +102,14 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	}
 
 	// Verify the file exists, using a mutex while reading the host.
-	h.rLock()
+	h.mu.RLock()
 	contractObligation, exists := h.contracts[contractID]
 	if !exists {
-		h.rUnlock()
+		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
 	fullname := h.hostDir + contractObligation.filename
-	h.rUnlock()
+	h.mu.RUnlock()
 
 	// Open the file.
 	file, err := os.Open(fullname)

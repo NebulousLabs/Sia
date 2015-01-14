@@ -23,7 +23,7 @@ type Miner struct {
 	iterationsPerAttempt uint64
 
 	blockChan chan consensus.Block
-	rwLock    sync.RWMutex
+	mu        sync.RWMutex
 }
 
 // New returns a miner that needs to be updated/initialized.
@@ -42,8 +42,8 @@ func New() (m *Miner) {
 // queries for block information, instead of needing to pass all of that
 // information through the update struct.
 func (m *Miner) UpdateMiner(mu components.MinerUpdate) error {
-	m.lock()
-	defer m.unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if mu.Threads == 0 {
 		return errors.New("cannot have a miner with 0 threads.")
