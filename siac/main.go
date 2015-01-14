@@ -107,14 +107,11 @@ func main() {
 
 	update := &cobra.Command{
 		Use:   "update",
-		Short: "Print the current state of the daemon",
-		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
+		Short: "Update Sia",
+		Long:  "Check for (and/or download) available updates for Sia.",
 		Run:   updatecmd,
 	}
 	root.AddCommand(update)
-
-	// check for updates on startup
-	updatecmd(update, []string{"check"})
 
 	root.Execute()
 }
