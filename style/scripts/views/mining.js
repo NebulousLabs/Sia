@@ -1,7 +1,7 @@
 ui._mining = (function(){
 
     var view, eMiningStatus, eIncomeRate, eActiveMiners, eActiveMinerCount, eAddMiner,
-        eRemoveMiner, eStopMining, eAccountName, eBalance, eUSDBalance;
+        eRemoveMiner, eToggleMining, eAccountName, eBalance, eUSDBalance;
 
     function init(){
         view = $("#mining");
@@ -11,7 +11,7 @@ ui._mining = (function(){
         eActiveMinerCount = view.find(".miner-control .display .number");
         eAddMiner = view.find(".add-miner");
         eRemoveMiner = view.find(".remove-miner");
-        eStopMining = view.find(".stop-mining");
+        eToggleMining = view.find(".toggle-mining");
         eAccountName = view.find(".account-name");
         eBalance = view.find(".account-info .amt");
         eUSDBalance = view.find(".account-info .amtusd");
@@ -32,9 +32,13 @@ ui._mining = (function(){
             ui._tooltip(this, "Removing Miner");
             ui._trigger("remove-miner");
         });
-        eStopMining.click(function(){
-            ui._tooltip(this, "Stopping Miners");
-            ui._trigger("stop-mining");
+        eToggleMining.click(function(){
+            if (eToggleMining.find(".text").text() == "Stop Mining"){
+                ui._tooltip(this, "Stopping Miners");
+            }else{
+                ui._tooltip(this, "Starting Miners");
+            }
+            ui._trigger("toggle-mining");
         });
     }
 
@@ -49,22 +53,29 @@ ui._mining = (function(){
             eMiningStatus.removeClass("enabled");
             eMiningStatus.addClass("disabled");
             eActiveMiners.text("No Active Threads");
+            eToggleMining.find(".fa-remove").hide();
+            eToggleMining.find(".fa-legal").show();
+            eToggleMining.find(".text").text("Start Mining");
         }else{
             eMiningStatus.text("Mining On");
             eMiningStatus.removeClass("disabled");
             eMiningStatus.addClass("enabled");
             eActiveMiners.text(data.miner.RunningThreads + " Active Threads");
+            eToggleMining.find(".fa-remove").show();
+            eToggleMining.find(".fa-legal").hide();
+            eToggleMining.find(".text").text("Stop Mining");
         }
 
         eActiveMinerCount.text(data.miner.RunningThreads);
-        eIncomeRate.text(data.miner.IncomeRate);
+        eIncomeRate.html(util.engNotation(data.miner.IncomeRate) + "SC/s");
 
         eAccountName.text(data.miner.AccountName);
 
-        eBalance.text(data.miner.Balance);
+        eBalance.text(util.engNotation(data.miner.Balance));
         if (data.miner.USDBalance !== undefined){
-            eUSDBalance.html("&asymp; " + data.wallet.USDBalance + " USD");
+            eUSDBalance.html("&asymp; " + util.engNotation(data.wallet.USDBalance) + "USD");
         }
+
     }
 
     return {

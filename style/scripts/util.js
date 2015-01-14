@@ -1,11 +1,12 @@
 var util = (function(){
 
-    var pSI = ["", "&kilo;", "M"];
+    var pSI = ["", "k", "M", "G", "T"];
     var nSI = ["", "m", "&micro;", "&nano;", "&pico;"];
 
     function engNotation(number, precision){
+        if (number === 0) return "0.0000 ";
         precision = precision || 5;
-        var sciNotation = number.toExponential();
+
         var degree = Math.floor(Math.log(Math.abs(number)) / Math.LN10 / 3);
 
         var numberString = String(number / Math.pow(1000,degree));
@@ -16,7 +17,7 @@ var util = (function(){
     }
 
     function USDConvert(balance){
-        return balance * 0.00172;
+        return balance * 0.0000000172;
     }
 
     return {

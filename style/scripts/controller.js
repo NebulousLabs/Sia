@@ -79,7 +79,10 @@ var controller = (function(){
             var balance = data.wallet ? data.wallet.Balance : 0;
             var balanceDifference = balance - lastBalance;
             var incomeRate = balanceDifference / timeDifference;
-            runningIncomeRateAverage = (runningIncomeRateAverage * 49 + incomeRate)/50;
+            runningIncomeRateAverage = (runningIncomeRateAverage * 1999 + incomeRate)/2000;
+            if (response.State == "Off"){
+                runningIncomeRateAverage = 0;
+            }
             data.miner = {
                 "State": response.State,
                 "Threads": response.Threads,
@@ -88,7 +91,7 @@ var controller = (function(){
                 "AccountName": "Main Account",
                 "Balance": balance,
                 "USDBalance": util.USDConvert(balance),
-                "IncomeRate": runningIncomeRateAverage + " SC/s"
+                "IncomeRate": runningIncomeRateAverage
             };
             lastBalance = balance;
             lastUpdateTime = Date.now();

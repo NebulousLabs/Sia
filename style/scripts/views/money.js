@@ -55,9 +55,9 @@ ui._money = (function(){
     }
 
     function update(data){
-        eBalance.text(data.wallet.Balance);
+        eBalance.text(util.engNotation(data.wallet.Balance));
         if (data.wallet.USDBalance !== undefined){
-            eUSDBalance.html("&asymp; " + data.wallet.USDBalance + " USD");
+            eUSDBalance.html("&asymp; " + util.engNotation(data.wallet.USDBalance) + " USD");
         }
 
         eItems.remove();
