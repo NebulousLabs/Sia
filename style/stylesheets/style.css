@@ -200,8 +200,7 @@
 }
 .miner-control {
   text-align: right;
-  margin-right: 20px;
-  margin-left: 20px;
+  margin: 20px;
   color: #757575;
 }
 .miner-control .display {
