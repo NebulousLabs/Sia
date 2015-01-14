@@ -106,7 +106,7 @@
   color: #757575;
 }
 .sumdisplay .amtusd {
-  display: inline-block;
+  display: none;
   color: #9e9e9e;
 }
 .sumdisplay .fund-buttons {
