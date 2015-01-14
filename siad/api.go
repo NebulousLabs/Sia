@@ -17,16 +17,6 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
 
-	// Plaintext API
-	http.HandleFunc("/sync", d.syncHandler)
-	http.HandleFunc("/peer", d.peerHandler)
-	http.HandleFunc("/host", d.hostHandler)
-	http.HandleFunc("/rent", d.rentHandler)
-	http.HandleFunc("/download", d.downloadHandler)
-	http.HandleFunc("/status", d.statusHandler)
-	http.HandleFunc("/update", d.updateHandler)
-	http.HandleFunc("/stop", d.stopHandler)
-
 	// Wallet API Calls
 	http.HandleFunc("/wallet/address", d.walletAddressHandler)
 	http.HandleFunc("/wallet/send", d.walletSendHandler)
@@ -37,21 +27,36 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/miner/status", d.minerStatusHandler)
 	http.HandleFunc("/miner/stop", d.minerStopHandler)
 
-	// JSON API
-	http.HandleFunc("/json/status", d.jsonStatusHandler)
+	// File API Calls
+	http.HandleFunc("/host", d.hostHandler)
+	http.HandleFunc("/rent", d.rentHandler)
+	http.HandleFunc("/download", d.downloadHandler)
+
+	// Misc. API Calls
+	http.HandleFunc("/sync", d.syncHandler)
+	http.HandleFunc("/peer", d.peerHandler)
+	http.HandleFunc("/status", d.statusHandler)
+	http.HandleFunc("/update", d.updateHandler)
+	http.HandleFunc("/stop", d.stopHandler)
 
 	http.ListenAndServe(addr, nil)
 }
 
-// jsonStatusHandler responds to a status call with a json object of the status.
-func (d *daemon) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := d.core.StateInfo()
-	resp, err := json.Marshal(status)
-	if err != nil {
-		http.Error(w, "Failed to encode status object", 500)
-		return
+// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
+// error is written instead.
+func writeJSON(w http.ResponseWriter, obj interface{}) {
+	if json.NewEncoder(w).Encode(obj) != nil {
+		http.Error(w, "Failed to encode response", 500)
 	}
-	w.Write(resp)
+}
+
+// success wraps a boolean in a struct for easier JSON parsing
+type success struct {
+	Success bool
+}
+
+func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, d.core.StateInfo())
 }
 
 func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
@@ -62,9 +67,11 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: don't spawn multiple CatchUps
-	// TODO: return error if no peers exist
-	go d.core.CatchUp(d.core.RandomPeer())
-	fmt.Fprint(w, "Sync initiated")
+	havePeers := len(d.core.AddressBook()) == 0
+	if havePeers {
+		go d.core.CatchUp(d.core.RandomPeer())
+	}
+	writeJSON(w, success{havePeers})
 }
 
 func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
@@ -72,13 +79,14 @@ func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.FormValue("action") {
 	case "add":
 		d.core.AddPeer(addr)
-		fmt.Fprintf(w, "Added %s", req.FormValue("addr"))
 	case "remove":
 		d.core.RemovePeer(addr)
-		fmt.Fprintf(w, "Removed %s", req.FormValue("addr"))
 	default:
 		http.Error(w, "Invalid peer action", 400)
+		return
 	}
+	// TODO: should Add/RemovePeer return a bool?
+	writeJSON(w, success{true})
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
@@ -162,7 +170,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	*/
 
-	fmt.Fprint(w, "Update successful")
+	writeJSON(w, success{true})
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
@@ -193,19 +201,17 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
-	enc := json.NewEncoder(w)
-
 	switch req.FormValue("action") {
 	case "check":
 		available, err := d.checkForUpdate()
-		enc.Encode(struct {
+		writeJSON(w, struct {
 			Available bool
 			Error     string
 		}{available, err.Error()})
 
 	case "apply":
 		applied, err := d.applyUpdate()
-		enc.Encode(struct {
+		writeJSON(w, struct {
 			Applied bool
 			Error   string
 		}{applied, err.Error()})
@@ -214,43 +220,4 @@ func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Unrecognized action", 400)
 		return
 	}
-}
-
-// TODO: this should probably just return JSON. Leave formatting to the client.
-func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
-	info := d.core.StateInfo()
-
-	// set mining status
-	mineStatus := "OFF"
-
-	// create peer listing
-	peers := "\n"
-	for _, addr := range d.core.AddressBook() {
-		peers += fmt.Sprintf("\t\t%s\n", addr)
-	}
-
-	// create friend listing
-	/*
-		friends := "\n"
-		for name, address := range d.core.FriendMap() {
-			friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
-		}
-	*/
-
-	// write stats to ResponseWriter
-	fmt.Fprintf(w, `General Information:
-
-	Mining Status: %s
-
-	Wallet Balance: %v
-	Full Wallet Balance: %v
-
-	Current Block Height: %v
-	Current Block Target: %v
-	Current Block Depth: %v
-
-	Networked Peers: %s`,
-		mineStatus, d.core.WalletBalance(false), d.core.WalletBalance(true),
-		info.Height, info.Target, info.Depth, peers,
-	)
 }
