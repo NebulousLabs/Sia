@@ -204,11 +204,10 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
-	co := contractObligation{
+	h.contracts[t.FileContractID(0)] = contractObligation{
 		inConsensus: false,
 		filename:    filename,
 	}
-	h.contracts[t.FileContractID(0)] = co
 	fmt.Println("Accepted contract")
 
 	return

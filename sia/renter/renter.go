@@ -223,12 +223,17 @@ func (r *Renter) Download(nickname, filename string) (err error) {
 	// doesn't return an error.
 	for _, piece := range entry.Pieces {
 		err = r.downloadPiece(piece, filename)
-		if err != nil {
+		if err == nil {
 			return
 		} else {
 			fmt.Println(err)
 			r.hostDB.FlagHost(piece.Host.ID)
 		}
+	}
+
+	if err != nil {
+		err = errors.New("Too many hosts returned errors - could not recover the file.")
+		return
 	}
 
 	return
