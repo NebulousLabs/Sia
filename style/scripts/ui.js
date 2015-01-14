@@ -239,7 +239,7 @@ var ui = (function(){
     function _tooltip(element, content){
         element = $(element);
         eTooltip.show();
-        eTooltip.text(content);
+        eTooltip.html(content);
         var middleX = element.offset().left + element.width()/2;
         var topY = element.offset().top - element.height();
         eTooltip.offset({
