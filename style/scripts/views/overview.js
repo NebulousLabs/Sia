@@ -31,14 +31,14 @@ ui._overview = (function(){
         });
 
         eAddFunds.click(function(){
-            console.error("NOT IMPLEMENTED");
+            ui._tooltip(this, "Not Implemented");
             // TODO enable exchange view
             // ui._exchange.setTarget("all");
             // ui._exchange.setSource(null);
             // ui.switchView("exchange");
         });
         eWithdrawFunds.click(function(){
-            console.error("NOT IMPLEMENTED");
+            ui._tooltip(this, "Not Implemented");
             // TODO enable exchange view
             // ui._exchange.setTarget(null);
             // ui._exchange.setSource("all");

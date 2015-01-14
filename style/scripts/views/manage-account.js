@@ -1,7 +1,8 @@
 ui._manageAccount = ui["_manage-account"] = (function(){
 
     var view,eBackToMoney, eBalance, eUSDBalance, eAccountName, eAddFunds, eWithdraw,
-        eAddressBlueprint,eAddresses,eTransactionBlueprint,eTransactions;
+        eAddressBlueprint,eAddresses,eTransactionBlueprint, eTransactions, eCreateAddress,
+        eSendMoney, eTransferFunds, eDeleteAccount;
 
     var accountName;
 
@@ -13,7 +14,13 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         eUSDBalance = view.find(".sumdisplay .amtusd");
         eAccountName = view.find(".account-name");
         eBackToMoney = $("#back-to-money");
+        eCreateAddress = view.find(".create-address");
+        eSendMoney = view.find(".send-money");
+        eTransferFunds = view.find(".transfer-funds");
+        eDeleteAccount = view.find(".delete-account");
         eAddressBlueprint = view.find(".addresses .item.blueprint");
+        eAddFunds = view.find(".add-funds");
+        eWithdraw = view.find(".withdraw");
         eAddresses = $();
         eTransactionBlueprint = view.find(".transactions .item.blueprint");
         eTransactions = $();
@@ -24,6 +31,24 @@ ui._manageAccount = ui["_manage-account"] = (function(){
     function addEvents(){
         eBackToMoney.click(function(){
             ui.switchView("money");
+        });
+        eAddFunds.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eWithdraw.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eCreateAddress.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eSendMoney.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eTransferFunds.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eDeleteAccount.click(function(){
+            ui._tooltip(this, "Not Implemented");
         });
     }
 

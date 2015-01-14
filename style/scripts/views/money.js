@@ -1,6 +1,7 @@
 ui._money = (function(){
 
-    var view, eBalance, eUSDBalance, eAddFunds, eWithdrawFunds, eItems;
+    var view, eBalance, eUSDBalance, eAddFunds, eWithdrawFunds, eItems, eAddAccount,
+        eSendMoney, eTransferFunds, eDeleteAccount;
 
     function init(){
         view = $("#money");
@@ -9,7 +10,12 @@ ui._money = (function(){
         eUSDBalance = view.find(".amtusd");
 
         eAddFunds = view.find(".add-funds");
-        eWithdrawFunds = view.find(".withdraw-funds");
+        eWithdrawFunds = view.find(".withdraw");
+
+        eAddAccount = view.find(".add-account");
+        eSendMoney = view.find(".send-money");
+        eTransferFunds = view.find(".transfer-funds");
+        eDeleteAccount = view.find(".delete-account");
 
         eItems = $();
 
@@ -17,7 +23,24 @@ ui._money = (function(){
     }
 
     function addEvents(){
-
+        eAddFunds.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eWithdrawFunds.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eAddAccount.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eSendMoney.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eTransferFunds.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        eDeleteAccount.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
     }
 
     function addItemEvents(){
