@@ -228,7 +228,9 @@ func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) integrateBlock(b Block) (diffs []OutputDiff, err error) {
+func (s *State) integrateBlock(b Block, bd *BlockDiff) (diffs []OutputDiff, err error) {
+	bd.CatalystBlock = b.ID()
+
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
@@ -238,9 +240,10 @@ func (s *State) integrateBlock(b Block) (diffs []OutputDiff, err error) {
 		}
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		diffSet := s.applyTransaction(txn)
+		transactionDiff := s.applyTransaction(txn)
 		appliedTransactions = append(appliedTransactions, txn)
-		diffs = append(diffs, diffSet...)
+		diffs = append(diffs, transactionDiff.OutputDiffs...)
+		bd.TransactionDiffs = append(bd.TransactionDiffs, transactionDiff)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
@@ -257,7 +260,7 @@ func (s *State) integrateBlock(b Block) (diffs []OutputDiff, err error) {
 	}
 
 	// Perform maintanence on all open contracts.
-	diffSet := s.applyContractMaintenance()
+	diffSet := s.applyContractMaintenance(&bd.BlockChanges)
 	diffs = append(diffs, diffSet...)
 
 	// Update the current block and current path variables of the longest fork.
@@ -278,6 +281,7 @@ func (s *State) integrateBlock(b Block) (diffs []OutputDiff, err error) {
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
 	diff := OutputDiff{New: true, ID: b.SubsidyID(), Output: minerSubsidyOutput}
 	diffs = append(diffs, diff)
+	bd.BlockChanges.OutputDiffs = append(bd.BlockChanges.OutputDiffs, diffs...)
 
 	return
 }
@@ -297,6 +301,9 @@ func (s *State) invalidateNode(node *BlockNode) {
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
 func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+	// Create a block diff for use when calling integrateBlock.
+	var cc ConsensusChange
+
 	// Find the common parent between the new fork and the current
 	// fork, keeping track of which path is taken through the
 	// children of the parents so that we can re-trace as we
@@ -320,6 +327,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
 		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock())
+		cc.InvertedBlocks = append(cc.InvertedBlocks, s.currentBlockNode().BlockDiff)
 		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
 	}
 
@@ -331,7 +339,8 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 	for i := len(parentHistory) - 1; i >= 0; i-- {
 		appliedBlock := *s.blockMap[parentHistory[i]].Block
 		appliedBlocks = append(appliedBlocks, appliedBlock)
-		diffSet, err := s.integrateBlock(appliedBlock)
+		var bd BlockDiff
+		diffSet, err := s.integrateBlock(appliedBlock, &bd)
 		if err != nil {
 			// Add the whole tree of blocks to BadBlocks,
 			// deleting them from BlockMap
@@ -344,7 +353,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 
 			// Integrate the rewound blocks
 			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				_, err = s.integrateBlock(rewoundBlocks[i])
+				_, err = s.integrateBlock(rewoundBlocks[i], &BlockDiff{}) // this diff is not used, because the state has not changed. TODO: change how reapply works.
 				if err != nil {
 					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
 				}
@@ -354,6 +363,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 			appliedBlocks = nil
 			rewoundBlocks = nil
 			outputDiffs = nil
+			bd = BlockDiff{}
 
 			// Check that the state hash is the same as before forking and then returning.
 			if DEBUG {
@@ -364,6 +374,9 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 
 			break
 		}
+		cc.AppliedBlocks = append(cc.AppliedBlocks, bd)
+		s.blockMap[parentHistory[i]].BlockDiff = bd
+		// TODO: Add the block diff to the block node, for retrieval during inversion.
 		validatedBlocks += 1
 		outputDiffs = append(outputDiffs, diffSet...)
 	}
@@ -371,6 +384,11 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 	// Update the transaction pool to remove any transactions that have
 	// invalidated on account of invalidated storage proofs.
 	s.cleanTransactionPool()
+
+	// Notify all subscribers of the changes.
+	if appliedBlocks != nil {
+		s.notifySubscribers(cc)
+	}
 
 	return
 }
@@ -399,6 +417,10 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 			return
 		}
 	}
+
+	// Notify subscribers of the consensus change.
+	var cc ConsensusChange
+	s.notifySubscribers(cc)
 
 	// Perform a sanity check if debug flag is set.
 	if DEBUG {

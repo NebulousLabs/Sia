@@ -13,37 +13,49 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+// TODO: Changing the host path should automatically move all of the files
+// over.
+
 const (
 	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
 	maxContractLen         = 1 << 24
 )
 
+type contractObligation struct {
+	inConsensus bool   // Whether the contract is recognized by the network.
+	filename    string // Where on disk the file is stored.
+}
+
 type Host struct {
+	state *consensus.State
+
 	announcement   components.HostAnnouncement
 	spaceRemaining int64
 	wallet         components.Wallet
-	state          components.ReadOnlyState
 
-	height          consensus.BlockHeight      // Current height of the state.
-	transactionChan chan consensus.Transaction // Can send channels to the state.
+	transactionChan chan consensus.Transaction // TODO: Deprecated, subscription model should be implemented.
 
 	hostDir     string
 	fileCounter int
-	files       map[hash.Hash]string
-
-	forwardContracts  map[consensus.BlockHeight][]ContractEntry
-	backwardContracts map[consensus.BlockHeight][]ContractEntry
+	contracts   map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
 
 	rwLock sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New() (h *Host) {
-	return &Host{
-		files:             make(map[hash.Hash]string),
-		forwardContracts:  make(map[consensus.BlockHeight][]ContractEntry),
-		backwardContracts: make(map[consensus.BlockHeight][]ContractEntry),
+func New(s *consensus.State) (h *Host) {
+	h = &Host{
+		state:     s,
+		contracts: make(map[consensus.ContractID]contractObligation),
 	}
+
+	// Subscribe to the state and begin listening for updates.
+	// TODO: Get all changes/diffs from the genesis to current block in a way
+	// that doesn't cause a race condition with the subscription.
+	updateChan := s.ConsensusSubscribe()
+	go h.consensusListen(updateChan)
+
+	return
 }
 
 // UpdateHost changes the settings of the host to the input settings.
@@ -57,9 +69,7 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 	h.spaceRemaining += storageDiff
 
 	h.announcement = update.Announcement
-	h.height = update.Height
 	h.hostDir = update.HostDir
-	h.state = update.State
 	h.transactionChan = update.TransactionChan
 	h.wallet = update.Wallet
 	return nil
@@ -71,22 +81,25 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 // intensive operations. All necessary interaction with the host involves
 // looking up the filepath of the file being requested. This is done all at
 // once.
+//
+// TODO: Move this function to a different file in the package?
 func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
-	var merkle hash.Hash
-	err = encoding.ReadObject(conn, &merkle, hash.HashSize)
+	var contractID consensus.ContractID
+	err = encoding.ReadObject(conn, &contractID, hash.HashSize)
 	if err != nil {
 		return
 	}
 
 	// Verify the file exists, using a mutex while reading the host.
 	h.rLock()
-	filename, exists := h.files[merkle]
-	fullname := h.hostDir + filename
-	h.rUnlock()
+	contractObligation, exists := h.contracts[contractID]
 	if !exists {
+		h.rUnlock()
 		return errors.New("no record of that file")
 	}
+	fullname := h.hostDir + contractObligation.filename
+	h.rUnlock()
 
 	// Open the file.
 	file, err := os.Open(fullname)

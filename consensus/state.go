@@ -23,6 +23,13 @@ type (
 // struct, you need to either have a read lock or a write lock on the state.
 // Internally, the state has no concurrency, so the mutex is never used within
 // the consensus package.
+//
+// TODO: The mutexing in the consensus package breaks convention.
+//
+// TODO: When applying blocks and transactions, make the state changes in real
+// time (?) and then if DEBUG, remove and reapply the diffs and make sure that
+// the resulting state is identical to the one that was created when applying
+// in real time.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -50,10 +57,15 @@ type State struct {
 	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]*OpenContract
-	spentOutputs   map[OutputID]Output // Useful for remembering how many coins an input had.
+	openContracts  map[ContractID]*OpenContract // TODO: This probably shouldn't be a pointer.
+	spentOutputs   map[OutputID]Output          // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
 
-	// AcceptBlock() and AcceptTransaction() can be called concurrently.
+	// consensusSubscriptions is a list of channels that receive notifications
+	// each time the state of consensus changes. Consensus changes only happen
+	// through the application and inversion of blocks. See notifications.go
+	// for more information.
+	consensusSubscriptions []chan ConsensusChange
+
 	sync.RWMutex
 }
 
@@ -90,17 +102,10 @@ type BlockNode struct {
 	Target           Target        // Target for next block.
 	RecentTimestamps [11]Timestamp // The 11 recent timestamps.
 
+	BlockDiff            BlockDiff       // Soon to replace the other 3 entirely
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof
 	SuccessfulWindows    []ContractID
-}
-
-// An OutputDiff indicates an output that has either been added to or removed
-// from the unspent outputs set. This is used by the wallet.
-type OutputDiff struct {
-	New    bool
-	ID     OutputID
-	Output Output
 }
 
 // CreateGenesisState will create the state that contains the genesis block and

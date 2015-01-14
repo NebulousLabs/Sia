@@ -12,11 +12,10 @@ import (
 // The config struct is used when calling CreateCore(), and prevents the input
 // line from being excessively long.
 type Config struct {
-	// Settings available through flags.
-	HostDir     string
-	WalletFile  string
-	ServerAddr  string
-	Nobootstrap bool
+	// The State, which is separate from a componenent as it is not an
+	// interface. There is a single implementation which is considered
+	// acceptible.
+	State *consensus.State
 
 	// Interface implementations.
 	Host   components.Host
@@ -24,6 +23,12 @@ type Config struct {
 	Miner  components.Miner
 	Renter components.Renter
 	Wallet components.Wallet
+
+	// Settings available through flags.
+	HostDir     string
+	WalletFile  string
+	ServerAddr  string
+	Nobootstrap bool
 }
 
 // Core is the struct that serves as the state for siad. It contains a
@@ -55,6 +60,10 @@ type Core struct {
 // puts it all in a single environment struct that's used as the state for the
 // main package.
 func CreateCore(config Config) (c *Core, err error) {
+	if config.State == nil {
+		err = errors.New("cannot have nil state")
+		return
+	}
 	if config.Host == nil {
 		err = errors.New("cannot have nil host")
 		return
@@ -81,6 +90,8 @@ func CreateCore(config Config) (c *Core, err error) {
 
 	// Fill out the basic information.
 	c = &Core{
+		state: config.State,
+
 		host:   config.Host,
 		hostDB: config.HostDB,
 		miner:  config.Miner,
@@ -96,9 +107,12 @@ func CreateCore(config Config) (c *Core, err error) {
 		walletFile: config.WalletFile,
 	}
 
-	// Create a state.
-	var genesisOutputDiffs []consensus.OutputDiff
-	c.state, genesisOutputDiffs = consensus.CreateGenesisState()
+	// TODO: Figure out if there's any way that we need to sync to the state.
+	/*
+		// Create a state.
+		var genesisOutputDiffs []consensus.OutputDiff
+		c.state, genesisOutputDiffs = consensus.CreateGenesisState()
+	*/
 	genesisBlock, err := c.state.BlockAtHeight(0)
 	if err != nil {
 		return
@@ -117,14 +131,12 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateRenter()
-	if err != nil {
-		return
-	}
+	/* wallet will ne to be switched to subscription before it starts seeing genesis diffs.
 	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}
+	*/
 
 	// Bootstrap to the network.
 	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
