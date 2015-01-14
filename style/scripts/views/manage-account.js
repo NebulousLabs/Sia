@@ -83,6 +83,10 @@ ui._manageAccount = ui["_manage-account"] = (function(){
 
         // TODO this balance should represent the account's balance
         eBalance.html(util.engNotation(account.Balance) + "SC");
+        eBalance.off("hover");
+        eBalance.click(function(){
+            ui._tooltip(this, account.Balance + " SC", {left:0,top:30});
+        });
         if (account.USDBalance !== undefined){
             eUSDBalance.html("&asymp; " + util.engNotation(account.USDBalance) + "USD");
         }

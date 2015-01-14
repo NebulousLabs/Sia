@@ -236,15 +236,16 @@ var ui = (function(){
 
     // Shows tooltip with content on given element
     var tooltipTimeout,tooltipVisible;
-    function _tooltip(element, content){
+    function _tooltip(element, content, offset){
+        offset = offset || {top:0,left:0};
         element = $(element);
         eTooltip.show();
         eTooltip.html(content);
         var middleX = element.offset().left + element.width()/2;
         var topY = element.offset().top - element.height();
         eTooltip.offset({
-            top: topY - eTooltip.height(),
-            left: middleX - eTooltip.width()/2
+            top: topY - eTooltip.height() + offset.top,
+            left: middleX - eTooltip.width()/2 + offset.left
         });
         if (!tooltipVisible){
             eTooltip.stop();
