@@ -69,6 +69,7 @@ var ui = (function(){
     };
     var lastData;
     var eTooltip;
+    var eventListeners = {};
 
     function switchView(newView){
         // Check that parameter is specified
@@ -187,7 +188,9 @@ var ui = (function(){
             "switchView": "switchView(<string newView>) \
             \nPossible Views: " + viewNames.join(", "),
             "update": "update(<json data object>) \
-            \nData object generated from requests from server, see top of ui.js"
+            \nData object generated from requests from server, see top of ui.js",
+            "addListener": "addListener(<string event>, <function callback>)\
+            \nAdd listener when a ui event occurs"
         }[functionName];
     }
 
@@ -201,7 +204,7 @@ var ui = (function(){
         viewNames.forEach(function(view){
             $("." + view + "-button").click(function(){
                 switchView(view);
-            })
+            });
         });
 
         eTooltip = $("#tooltip");
@@ -225,6 +228,10 @@ var ui = (function(){
     // Triggers an event, many ui actions cause triggers
     function _trigger(event){
         console.log("Event Triggered:",event);
+        var callbacks = eventListeners[event] || [];
+        for (var i = 0;i < callbacks.length;i++){
+            callbacks[i]();
+        }
     }
 
     // Shows tooltip with content on given element
@@ -263,9 +270,15 @@ var ui = (function(){
         },1400);
     }
 
+    function addListener(event, callback){
+        eventListeners[event] = eventListeners[event] || [];
+        eventListeners[event].push(callback);
+    }
+
     return {
         "switchView": switchView,
         "update": update,
+        "addListener": addListener,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
         "help": help,

@@ -639,6 +639,7 @@ body {
 }
 #tooltip {
   display: inline-block;
+  display: none;
   position: absolute;
   padding: 8px;
   font-size: 14px;

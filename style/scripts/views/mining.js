@@ -59,6 +59,8 @@ ui._mining = (function(){
         eActiveMinerCount.text(data.miner.RunningThreads);
         eIncomeRate.text(data.miner.IncomeRate);
 
+        eAccountName.text(data.miner.AccountName);
+
         eBalance.text(data.miner.Balance);
         if (data.miner.USDBalance !== undefined){
             eUSDBalance.html("&asymp; " + data.wallet.USDBalance + " USD");
