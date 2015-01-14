@@ -70,6 +70,10 @@ ui._money = (function(){
             var item = blueprint.clone().removeClass("blueprint");
             blueprint.parent().append(item);
             item.find(".name").text(account.Name);
+            item.find(".money").text(account.Balance + " SC");
+            item.find(".money").hover(function(){
+                ui._tooltip(this, account.USDBalance + " USD");
+            });
             accountElements.push(item[0]);
         });
         eItems = $(accountElements);
