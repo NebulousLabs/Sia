@@ -21,9 +21,9 @@
           ui.init();
           ui.update({
               "miner":{
-                  "State":"Off",
-                  "Threads":1,
-                  "RunningThreads":0,
+                  "State":"On",
+                  "Threads":2,
+                  "RunningThreads":1,
                   "Address":[126,66,"...",173,53]
               },
               "wallet":{
@@ -237,9 +237,9 @@
             <div class='header'>
               <div class='title'>Mining</div>
               <div class='capsule'>
-                <div class='pod button'>Mining</div>
-                <div class='pod'>0.122 SC/h</div>
-                <div class='pod'>3 Active Miners</div>
+                <div class='pod button mining-status'>Mining</div>
+                <div class='pod income-rate'>0.122 SC/h</div>
+                <div class='pod active-miners'>3 Active Miners</div>
               </div>
             </div>
             <div class='graph-controls'>
@@ -257,15 +257,15 @@
                 <div class='number'>3</div>
                 <div class='text'>Active Miner Threads</div>
               </div>
-              <div class='button'>
+              <div class='button add-miner'>
                 <i class='fa fa-plus fa-fw'></i>
                 Add Miner
               </div>
-              <div class='button'>
+              <div class='button remove-miner'>
                 <i class='fa fa-minus fa-fw'></i>
                 Remove Miner
               </div>
-              <div class='button'>
+              <div class='button stop-mining'>
                 <i class='fa fa-remove fa-fw'></i>
                 Stop Mining
               </div>
@@ -643,5 +643,6 @@
         </div>
       </div>
     </div>
+    <span id='tooltip'>Tooltip</span>
   </body>
 </html>

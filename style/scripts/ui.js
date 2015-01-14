@@ -224,21 +224,21 @@ var ui = (function(){
 
     // Triggers an event, many ui actions cause triggers
     function _trigger(event){
-        alert(event);
+        console.log("Event Triggered:",event);
     }
 
     // Shows tooltip with content on given element
     var tooltipTimeout,tooltipVisible;
     function _tooltip(element, content){
         element = $(element);
+        eTooltip.show();
+        eTooltip.text(content);
         var middleX = element.offset().left + element.width()/2;
         var topY = element.offset().top - element.height();
-        eTooltip.show();
         eTooltip.offset({
-            top: topY - $("#tooltip").height(),
-            left: middleX
+            top: topY - eTooltip.height(),
+            left: middleX - eTooltip.width()/2
         });
-        eTooltip.text(content);
         if (!tooltipVisible){
             eTooltip.stop();
             eTooltip.css({"opacity":0});

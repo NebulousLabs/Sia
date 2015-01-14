@@ -624,3 +624,26 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
 }
+#tooltip {
+  display: inline-block;
+  position: absolute;
+  padding: 8px;
+  font-size: 14px;
+  color: #fff;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.75);
+}
+#tooltip:after {
+  top: 100%;
+  left: 50%;
+  border: solid transparent;
+  content: " ";
+  height: 0;
+  width: 0;
+  position: absolute;
+  pointer-events: none;
+  border-color: rgba(0, 0, 0, 0);
+  border-top-color: rgba(0, 0, 0, 0.75);
+  border-width: 8px;
+  margin-left: -8px;
+}

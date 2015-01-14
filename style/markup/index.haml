@@ -37,9 +37,9 @@
                 ui.init();
                 ui.update({
                     "miner":{
-                        "State":"Off",
-                        "Threads":1,
-                        "RunningThreads":0,
+                        "State":"On",
+                        "Threads":2,
+                        "RunningThreads":1,
                         "Address":[126,66,"...",173,53]
                     },
                     "wallet":{
@@ -164,3 +164,4 @@
                     = Haml::Engine.new(File.read('markup/pages/files.haml')).render
                     = Haml::Engine.new(File.read('markup/pages/hosting.haml')).render
             = Haml::Engine.new(File.read('markup/footer.haml')).render
+        = Haml::Engine.new(File.read('markup/hovering.haml')).render

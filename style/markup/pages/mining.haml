@@ -2,9 +2,9 @@
     .header
         .title Mining
         .capsule
-            .pod.button Mining
-            .pod 0.122 SC/h
-            .pod 3 Active Miners
+            .pod.button.mining-status Mining
+            .pod.income-rate 0.122 SC/h
+            .pod.active-miners 3 Active Miners
     .graph-controls
         .button Past Hour
         .button Today
@@ -17,12 +17,12 @@
         .display
             .number 3
             .text Active Miner Threads
-        .button
+        .button.add-miner
             %i.fa.fa-plus.fa-fw
             Add Miner
-        .button
+        .button.remove-miner
             %i.fa.fa-minus.fa-fw
             Remove Miner
-        .button
+        .button.stop-mining
             %i.fa.fa-remove.fa-fw
             Stop Mining
