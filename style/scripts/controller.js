@@ -50,6 +50,10 @@ var controller = (function(){
         });
     }
 
+    var lastUpdateTime = Date.now();
+    var lastBalance = 0;
+    var runningIncomeRateAverage = 0;
+
     function update(){
         // Get json objects from each source and merge
         $.getJSON("/wallet/status", function(response){
@@ -70,13 +74,12 @@ var controller = (function(){
             };
             updateUI();
         });
-        var lastUpdateTime = Date.now();
-        var lastBalance = 0;
         $.getJSON("/miner/status", function(response){
             var timeDifference = (Date.now() - lastUpdateTime) * 1000;
             var balance = data.wallet ? data.wallet.Balance : 0;
             var balanceDifference = balance - lastBalance;
             var incomeRate = balanceDifference / timeDifference;
+            runningIncomeRateAverage = (runningIncomeRateAverage * 49 + incomeRate)/50;
             data.miner = {
                 "State": response.State,
                 "Threads": response.Threads,
@@ -85,7 +88,7 @@ var controller = (function(){
                 "AccountName": "Main Account",
                 "Balance": balance,
                 "USDBalance": util.USDConvert(balance),
-                "IncomeRate": incomeRate + " SC/s"
+                "IncomeRate": runningIncomeRateAverage + " SC/s"
             };
             lastBalance = balance;
             lastUpdateTime = Date.now();
