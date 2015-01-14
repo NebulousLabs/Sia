@@ -21,19 +21,19 @@ ui._mining = (function(){
 
     function addEvents(){
         eMiningStatus.click(function(){
-            ui._tooltip(eMiningStatus, "Not Implemented");
+            ui._tooltip(eMiningStatus, "Toggling Mining");
             ui._trigger("toggle-mining");
         });
         eAddMiner.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._tooltip(this, "Adding Miner");
             ui._trigger("add-miner");
         });
         eRemoveMiner.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._tooltip(this, "Removing Miner");
             ui._trigger("remove-miner");
         });
         eStopMining.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._tooltip(this, "Stopping Miners");
             ui._trigger("stop-mining");
         });
     }
