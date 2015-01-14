@@ -64,6 +64,8 @@ func createDaemon(config Config) (d *daemon, err error) {
 		downloadDir: expandedDownloadDir,
 	}
 
+	// mr is used to resolve conflicts between packages and variable names
+
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
 	mrWallet, err := wallet.New(expandedWalletFile)
 	if err != nil {
