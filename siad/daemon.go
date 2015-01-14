@@ -10,6 +10,7 @@ import (
 	"github.com/NebulousLabs/Sia/sia/host"
 	"github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/sia/wallet"
 
 	"github.com/mitchellh/go-homedir"
@@ -63,18 +64,24 @@ func createDaemon(config Config) (d *daemon, err error) {
 		downloadDir: expandedDownloadDir,
 	}
 
-	// Create the web interface template.
-	d.template, err = template.ParseFiles(expandedStyleDir + "template.html")
+	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
+	mrWallet, err := wallet.New(expandedWalletFile)
 	if err != nil {
-		err = fmt.Errorf("template.html not found! Please move the styles folder to '%v'", expandedStyleDir)
+		return
+	}
+	hostDB, err := hostdb.New()
+	if err != nil {
+		return
+	}
+	mrHost, err := host.New(state, mrWallet)
+	if err != nil {
+		return
+	}
+	mrRenter, err := renter.New(state, hostDB, mrWallet)
+	if err != nil {
 		return
 	}
 
-	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
-	wallet, err := wallet.New(expandedWalletFile)
-	if err != nil {
-		return
-	}
 	siaconfig := sia.Config{
 		HostDir:     expandedHostDir,
 		WalletFile:  expandedWalletFile,
@@ -83,10 +90,11 @@ func createDaemon(config Config) (d *daemon, err error) {
 
 		State: state,
 
-		Host:   host.New(state),
-		HostDB: hostdb.New(),
+		Host:   mrHost,
+		HostDB: hostDB,
 		Miner:  miner.New(),
-		Wallet: wallet,
+		Renter: mrRenter,
+		Wallet: mrWallet,
 	}
 
 	d.core, err = sia.CreateCore(siaconfig)
