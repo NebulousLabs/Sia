@@ -1,10 +1,9 @@
 package main
 
 import (
-	"html/template"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 )
 
 // webIndex loads a partial page according to the http request and composes it
@@ -16,9 +15,9 @@ func (d *daemon) webIndex(w http.ResponseWriter, req *http.Request) {
 	var fileToLoad string
 	if req.URL.Path == "/" {
 		// Make a special case for the index.
-		fileToLoad = d.styleDir + "index.partial"
+		fileToLoad = d.styleDir + "index.html"
 	} else {
-		fileToLoad = d.styleDir + strings.TrimSuffix(req.URL.Path, "html") + "partial"
+		fileToLoad = d.styleDir + "index.html#" + req.URL.Path
 	}
 
 	// Load the partial file.
@@ -29,5 +28,5 @@ func (d *daemon) webIndex(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Compose the partial into a full page and serve the page.
-	d.template.Execute(w, template.HTML(indexBody))
+	fmt.Fprintf(w, "%s", indexBody)
 }

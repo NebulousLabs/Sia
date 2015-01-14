@@ -4,6 +4,12 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+type WalletInfo struct {
+	Balance      consensus.Currency
+	FullBalance  consensus.Currency
+	NumAddresses int
+}
+
 // Wallet in an interface that helps to build and sign transactions. The user
 // can make a new transaction-in-progress by calling Register(), and then can
 // add outputs, fees, etc.
@@ -15,7 +21,7 @@ type Wallet interface {
 	// about the wallet in the form of json. The frontend will have to know how
 	// to parse it, but Core and Daemon don't need to understand what's in the
 	// json.
-	Info() ([]byte, error)
+	Info() (WalletInfo, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set

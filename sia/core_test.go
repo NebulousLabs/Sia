@@ -31,9 +31,20 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	walletFilename := "test.wallet"
 	w, err := wallet.New(walletFilename)
 	if err != nil {
+		t.Fatal(err)
+	}
+	hdb, err := hostdb.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	Host, err := host.New(state, w)
+	if err != nil {
 		return
 	}
-	hdb := hostdb.New()
+	Renter, err := renter.New(state, hdb, w)
+	if err != nil {
+		return
+	}
 	coreConfig := Config{
 		HostDir:     "hostdir",
 		WalletFile:  walletFilename,
@@ -42,10 +53,10 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 
 		State: state,
 
-		Host:   host.New(state),
-		HostDB: hostdb.New(),
+		Host:   Host,
+		HostDB: hdb,
 		Miner:  miner.New(),
-		Renter: renter.New(state, hdb, w),
+		Renter: Renter,
 		Wallet: w,
 	}
 

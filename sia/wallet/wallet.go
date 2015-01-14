@@ -1,10 +1,10 @@
 package wallet
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported
@@ -34,12 +34,6 @@ type Wallet struct {
 	rwLock sync.RWMutex
 }
 
-type Status struct {
-	Balance      consensus.Currency
-	FullBalance  consensus.Currency
-	NumAddresses int
-}
-
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
 func New(filename string) (w *Wallet, err error) {
@@ -59,15 +53,15 @@ func New(filename string) (w *Wallet, err error) {
 }
 
 // Info implements the core.Wallet interface.
-func (w *Wallet) Info() ([]byte, error) {
+func (w *Wallet) Info() (status components.WalletInfo, err error) {
 	w.rLock()
 	defer w.rUnlock()
 
-	status := Status{
+	status = components.WalletInfo{
 		Balance:      w.Balance(false),
 		FullBalance:  w.Balance(true),
 		NumAddresses: len(w.spendableAddresses),
 	}
 
-	return json.Marshal(status)
+	return
 }

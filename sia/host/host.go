@@ -43,16 +43,26 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(s *consensus.State) (h *Host) {
+func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) {
+	if wallet == nil {
+		err = errors.New("host.New: cannot have nil wallet")
+		return
+	}
+	if state == nil {
+		err = errors.New("host.New: cannot have nil state")
+		return
+	}
+
 	h = &Host{
-		state:     s,
+		state:     state,
+		wallet:    wallet,
 		contracts: make(map[consensus.ContractID]contractObligation),
 	}
 
 	// Subscribe to the state and begin listening for updates.
 	// TODO: Get all changes/diffs from the genesis to current block in a way
 	// that doesn't cause a race condition with the subscription.
-	updateChan := s.ConsensusSubscribe()
+	updateChan := state.ConsensusSubscribe()
 	go h.consensusListen(updateChan)
 
 	return

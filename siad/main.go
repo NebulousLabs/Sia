@@ -30,21 +30,21 @@ type Config struct {
 }
 
 // findSiaDir first checks the current directory, then checks ~/.config/sia,
-// looking for the html template file that's needed to run the web app.
+// looking for the html index file that's needed to run the web app.
 // findSiaDir will return home="" if it can't find the home dir, but it won't
 // report an error for that. It'll only report an error if it can't find
-// template.html.
+// index.html.
 func findSiaDir() (home, siaDir string, err error) {
-	// Check the current directory for the template file.
+	// Check the current directory for the index file.
 	var found bool
-	if _, err = os.Stat("style/template.html"); err == nil {
+	if _, err = os.Stat("style/index.html"); err == nil {
 		found = true
 	}
 
-	// Check ~/.config/sia for the template file.
+	// Check ~/.config/sia for the index file.
 	home, err = homedir.Dir()
 	if err == nil && !found {
-		dirname := home + "/.config/sia/style/template.html"
+		dirname := home + "/.config/sia/style/index.html"
 		if _, err = os.Stat(dirname); err == nil {
 			siaDir = home + "/.config/sia/"
 			return
@@ -65,7 +65,7 @@ func findSiaDir() (home, siaDir string, err error) {
 func startEnvironment(cmd *cobra.Command, args []string) {
 	_, err := createDaemon(config)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error starting client:", err)
 	}
 }
 

@@ -1,0 +1,219 @@
+@import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,200,300,600,700,900);
+@import url(http://fonts.googleapis.com/css?family=Roboto+Condensed:400,300);
+@import "common.less";
+@import "money.less";
+@import "mining.less";
+@import "manage-account.less";
+@import "files.less";
+@import "hosting.less";
+
+@g50:#FAFAFA;
+@g100:#F5F5F5;
+@g200:#EEEEEE;
+@g300:#E0E0E0;
+@g400:#BDBDBD;
+@g500:#9E9E9E;
+@g600:#757575;
+@g700:#616161;
+@g800:#424242;
+@g900:#212121;
+
+body{
+    margin:0px;
+    padding:0px;
+    border-spacing:0px;
+
+    background-color:@g100;
+
+    font-family: 'Roboto Condensed', sans-serif;
+    // font-family: 'Source Sans Pro', sans-serif;
+    font-weight:300;
+    font-size:18px;
+}
+
+// ---------------------
+// HEADER
+// ---------------------
+#header{
+    height:120px;
+    background-color:#4eb980;
+    color:@g50;
+}
+#button-container{
+    padding-top:36px;
+    text-align:right;
+}
+.header-button{
+    display:inline-block;
+    margin-left:20px;
+    padding:10px;
+    padding-left:15px;
+    padding-right:15px;
+    // border:1px solid @g300;
+}
+.header-button:hover{
+    cursor:pointer;
+    background-color:rgba(255,255,255,.2);
+}
+#header #logo-container{
+    padding-top:32px;
+    font-size:36px;
+}
+
+// ---------------------
+// SIDEBAR
+// ---------------------
+
+#sidebar{
+    background-color:#fff;
+    color:@g700;
+    padding:0;
+}
+.large-sidebar{
+    height:800px;
+    border-left:1px solid @g200;
+    border-right:4px solid @g200;
+    border-bottom:2px solid @g200;
+}
+.large-sidebar .item{
+    padding-top:20px;
+    padding-bottom:20px;
+    border-bottom:1px solid @g200;
+    padding-left:32px;
+}
+.large-sidebar .item .text{
+    display:inline-block;
+    padding-left:16px;
+}
+.large-sidebar .item.current, .small-sidebar .item.current{
+    background-color:@g50;
+}
+.large-sidebar .item:hover{
+    background-color:@g50;
+    cursor:pointer;
+}
+.small-sidebar{
+    text-align:center;
+    border-bottom:2px solid @g200;
+}
+.small-sidebar .item{
+    .i;
+    width:120px;
+    height:120px;
+    margin:10px;
+    text-align:center;
+    padding:20px;
+}
+.small-sidebar .item:hover{
+    cursor:pointer;
+    background-color:@g100;
+}
+.small-sidebar .item .text{
+    padding-top:10px;
+    text-align:center;
+}
+.small-sidebar .item i{
+    font-size:48px;
+}
+
+// ---------------------
+// CONTENT
+// ---------------------
+
+#content{
+    height:800px;
+    background-color:#fff;
+    border-right:1px solid @g200;
+    border-bottom:2px solid @g200;
+    padding:0;
+    margin:0;
+    position:relative;
+    overflow-x:hidden;
+    overflow-y:hidden;
+}
+#content #loader{
+    position:absolute;
+    display:inline-block;
+    color:@g500;
+    font-size:32px;
+}
+
+// ---------------------
+// FOOTER
+// ---------------------
+
+#footer{
+    padding:30px;
+    text-align:center;
+}
+
+#footer .link-list{
+    padding-top:6px;
+}
+#footer .link-list .item{
+    .i;
+    color:@g600;
+    padding:6px;
+    margin-left:6px;
+    font-size:18px;
+    text-align:center;
+}
+
+#footer .link-list .item:hover{
+    cursor:pointer;
+    color:@g500;
+}
+
+@media (min-width:992px){
+    #footer .link-list{
+        text-align:right;
+    }
+}
+
+// ---------------------
+// SCROLLBAR
+// ---------------------
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background-color:@g300;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color:@g500;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    cursor:pointer;
+}
+
+// ---------------------
+// HOVERING
+// ---------------------
+#tooltip {
+    .i;
+    display:none;
+    position:absolute;
+    padding:8px;
+    font-size:14px;
+    color:#fff;
+    border-radius:2px;
+    background: rgba(0,0,0,.75);
+}
+#tooltip:after {
+    top: 100%;
+    left: 50%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(0, 0, 0, 0);
+    border-top-color: rgba(0,0,0,.75);
+    border-width: 8px;
+    margin-left: -8px;
+}

@@ -1,0 +1,669 @@
+@import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,200,300,600,700,900);
+@import url(http://fonts.googleapis.com/css?family=Roboto+Condensed:400,300);
+.i {
+  display: inline-block;
+}
+.blueprint {
+  display: none;
+}
+.title-text {
+  font-size: 32px;
+  color: #9e9e9e;
+  padding: 20px;
+}
+.button {
+  display: inline-block;
+  color: #9e9e9e;
+  padding: 10px;
+  padding-left: 15px;
+  padding-right: 15px;
+  font-size: 18px;
+}
+.button i {
+  margin-right: 5px;
+}
+.button:hover {
+  cursor: pointer;
+  color: #757575;
+  background-color: #fafafa;
+}
+.dropdown-button {
+  display: inline-block;
+  float: right;
+  padding: 1px;
+  padding-left: 4px;
+  padding-right: 4px;
+  margin: 7px;
+  background-color: #bdbdbd;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+}
+.dropdown-button:hover {
+  cursor: pointer;
+  background-color: #e0e0e0;
+}
+.capsule {
+  display: inline-block;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.capsule .pod {
+  display: inline-block;
+  padding: 10px;
+  padding-left: 16px;
+  padding-right: 16px;
+  border-right: 1px solid #e0e0e0;
+  color: #757575;
+}
+.capsule .pod:last-child {
+  border: none;
+  padding-right: 20px;
+}
+.capsule .pod.disabled {
+  background-color: #eeeeee;
+  margin-left: -4px;
+}
+.capsule .pod.button:hover {
+  cursor: pointer;
+  background-color: #fafafa;
+}
+#content .header {
+  padding: 20px;
+  border-bottom: 4px solid #f5f5f5;
+}
+#content .header .title {
+  display: inline-block;
+  font-size: 32px;
+  color: #9e9e9e;
+}
+#content .header .capsule {
+  float: right;
+}
+.search {
+  display: block;
+  margin-top: 4px;
+  margin-right: 20px;
+  border: 1px solid #bdbdbd;
+  font-size: 18px;
+  border-radius: 4px;
+  padding: 4px;
+}
+.search i {
+  float: right;
+  margin: 2px;
+}
+.sumdisplay {
+  color: #9e9e9e;
+  font-size: 32px;
+}
+.sumdisplay .amt {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 32px;
+  display: inline-block;
+  color: #757575;
+}
+.sumdisplay .amtusd {
+  display: none;
+  color: #9e9e9e;
+}
+.sumdisplay .fund-buttons {
+  display: inline-block;
+  text-align: right;
+  float: right;
+}
+.subhead {
+  color: #9e9e9e;
+  font-size: 32px;
+  padding-top: 18px;
+  padding-bottom: 0px;
+  padding-left: 30px;
+}
+.subhead .text {
+  color: #9e9e9e;
+}
+.accounts {
+  margin: 20px;
+  border: 1px solid #e0e0e0;
+  border-bottom: 2px solid #e0e0e0;
+  height: 420px;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  border-radius: 4px;
+}
+.accounts .item {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  background-color: #fafafa;
+  position: relative;
+  color: #616161;
+  padding-right: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 24px;
+}
+.accounts .item:hover {
+  background-color: #fff;
+  cursor: pointer;
+}
+.accounts .item .name {
+  display: inline-block;
+  padding-left: 24px;
+}
+.accounts .item .money {
+  display: inline-block;
+  float: right;
+}
+.address-control {
+  margin-left: 20px;
+  margin-right: 20px;
+  text-align: right;
+}
+.address-control .button {
+  display: inline-block;
+  color: #9e9e9e;
+  padding: 10px;
+  margin-left: 10px;
+}
+.address-control .button i {
+  margin-right: 5px;
+}
+.address-control .button:hover {
+  background-color: #fafafa;
+  color: #757575;
+  cursor: pointer;
+}
+#mining .capsule .income-rate {
+  width: 120px;
+  text-align: right;
+  padding-left: 0px;
+}
+.graph-container {
+  border: 1px solid #eeeeee;
+  margin: 20px;
+  margin-top: 0px;
+}
+.graph-controls {
+  margin-top: 10px;
+  margin-right: 20px;
+  text-align: right;
+}
+#mining .account-info {
+  font-size: 32px;
+  color: #9e9e9e;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+#mining .account-info .account-name {
+  display: inline-block;
+  color: #757575;
+}
+#mining .account-info .sumdisplay {
+  display: inline-block;
+  float: right;
+}
+.miner-control {
+  text-align: right;
+  margin: 20px;
+  color: #757575;
+}
+.miner-control .display {
+  display: inline-block;
+  float: left;
+  margin-top: 10px;
+}
+.miner-control .display .number {
+  display: inline-block;
+  font-weight: bolder;
+}
+.miner-control .display .text {
+  display: inline-block;
+}
+#manage-account {
+  padding-left: 14px;
+}
+#manage-account .header {
+  font-size: 32px;
+  color: #9e9e9e;
+  padding: 20px;
+  padding: 0;
+  border-bottom: 1px solid #eeeeee;
+}
+#manage-account .header .button {
+  display: inline-block;
+  margin-top: 19px;
+  vertical-align: top;
+  margin-left: 20px;
+}
+#manage-account .header .text {
+  display: inline-block;
+  padding: 16px;
+  padding-left: 8px;
+}
+#manage-account .header .account-name {
+  display: inline-block;
+  color: #757575;
+}
+#manage-account .sumdisplay {
+  padding: 16px;
+}
+#manage-account .addresses,
+#manage-account .transactions {
+  color: #757575;
+  font-size: 18px;
+  height: 300px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+#manage-account .addresses .items,
+#manage-account .transactions .items {
+  padding: 8px;
+  padding-right: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+#manage-account .transactions {
+  margin-right: 20px;
+}
+#manage-account .addresses .title,
+#manage-account .transactions .title {
+  font-size: 24px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px;
+  padding-left: 16px;
+}
+#manage-account .addresses .item .address {
+  display: inline-block;
+  font-size: 18px;
+}
+#manage-account .addresses .item .amt {
+  display: inline-block;
+  float: right;
+  font-size: 18px;
+}
+#manage-account .transactions .item .date {
+  display: inline-block;
+}
+#manage-account .transactions .item .icon {
+  display: inline-block;
+  float: right;
+  margin-right: 8px;
+}
+#manage-account .transactions .item .amt {
+  display: inline-block;
+  width: 80px;
+  text-align: left;
+  float: right;
+}
+#manage-account .account-control-buttons {
+  text-align: right;
+  padding-top: 16px;
+  padding-right: 32px;
+}
+#files .header {
+  font-size: 32px;
+  color: #9e9e9e;
+}
+#files .header .title {
+  display: inline-block;
+  margin-right: 40px;
+}
+#files .header .info {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  float: right;
+  font-size: 18px;
+}
+#files .header .space {
+  display: inline-block;
+  padding: 10px;
+  padding-left: 16px;
+  padding-right: 14px;
+  border-right: 1px solid #e0e0e0;
+  color: #757575;
+}
+#files .header .cost {
+  display: inline-block;
+  padding-left: 16px;
+  padding-top: 10px;
+  color: #757575;
+}
+#files .header .costusd {
+  display: inline-block;
+  padding: 10px;
+  padding-left: 0px;
+  padding-right: 16px;
+}
+#files .cloud-control {
+  color: #9e9e9e;
+  padding-left: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.upload-pane {
+  font-size: 18px;
+  color: #757575;
+  border-bottom: 1px solid #e0e0e0;
+}
+.upload-pane .button {
+  margin-top: 10px;
+}
+.upload-pane .path {
+  display: inline-block;
+  margin: 10px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+.upload-pane .path .text {
+  display: inline-block;
+  margin-left: -4px;
+  margin-right: -4px;
+  padding: 10px;
+  padding-right: 16px;
+}
+.upload-pane .path .text i {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.upload-pane .path .text:hover {
+  background-color: #fafafa;
+  cursor: pointer;
+}
+.upload-pane .path .meta {
+  display: inline-block;
+  border-left: 1px solid #e0e0e0;
+  padding: 10px;
+  padding-right: 16px;
+}
+.upload-pane .path .stop {
+  display: inline-block;
+  padding: 10px;
+  padding-left: 20px;
+  padding-right: 20px;
+  border-right: 1px solid #e0e0e0;
+}
+.upload-pane .path .stop:hover {
+  background-color: #fafafa;
+  cursor: pointer;
+}
+.upload-pane .account {
+  display: inline-block;
+  float: right;
+}
+.upload-pane .public {
+  display: inline-block;
+  float: right;
+}
+.upload-pane .size {
+  display: inline-block;
+  float: right;
+  padding: 20px;
+}
+.upload-pane .cost {
+  display: inline-block;
+  float: right;
+  padding: 20px;
+}
+.upload-pane .upload.button {
+  float: right;
+  margin-right: 10px;
+}
+.info-pane {
+  font-size: 18px;
+  color: #757575;
+  border-bottom: 1px solid #e0e0e0;
+}
+.info-pane .name {
+  display: inline-block;
+  padding: 20px;
+  border-right: 1px solid #e0e0e0;
+}
+.info-pane .size {
+  display: inline-block;
+  padding-right: 16px;
+}
+.info-pane .cost {
+  display: inline-block;
+  padding-right: 16px;
+}
+.info-pane .visibility {
+  display: inline-block;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.info-pane .button {
+  float: right;
+  margin-top: 10px;
+}
+.info-pane .button.delete {
+  margin-right: 10px;
+}
+.file-browser {
+  background-color: #fafafa;
+  height: 800px;
+}
+.file-browser .file {
+  display: inline-block;
+  background-color: #fff;
+  width: 100px;
+  height: 100px;
+  border: 1px solid #e0e0e0;
+  padding: 4px;
+  margin: 10px;
+  border-radius: 4px;
+  position: relative;
+  color: #757575;
+}
+.file-browser .file:hover {
+  cursor: pointer;
+  background-color: #fafafa;
+}
+.file .graphic {
+  font-size: 48px;
+  text-align: center;
+}
+.file .name {
+  text-align: center;
+  font-size: 14px;
+}
+#hosting {
+  background-color: #fafafa;
+  height: 800px;
+}
+#hosting .header {
+  background-color: #fff;
+}
+#hosting .host-config {
+  margin: 30px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fff;
+}
+#hosting .host-config .title {
+  padding: 10px;
+  font-size: 32px;
+  color: #9e9e9e;
+  border-bottom: 1px solid #e0e0e0;
+}
+#hosting .host-config .property {
+  border-bottom: 1px solid #e0e0e0;
+  color: #757575;
+}
+#hosting .host-config .property:last-child {
+  border: none;
+}
+#hosting .host-config .property .name {
+  padding: 10px;
+}
+#hosting .host-config .property .value {
+  border-left: 1px solid #e0e0e0;
+  padding: 10px;
+}
+#hosting .host-config .control {
+  text-align: right;
+}
+body {
+  margin: 0px;
+  padding: 0px;
+  border-spacing: 0px;
+  background-color: #f5f5f5;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-weight: 300;
+  font-size: 18px;
+}
+#header {
+  height: 120px;
+  background-color: #4eb980;
+  color: #fafafa;
+}
+#button-container {
+  padding-top: 36px;
+  text-align: right;
+}
+.header-button {
+  display: inline-block;
+  margin-left: 20px;
+  padding: 10px;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+.header-button:hover {
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+#header #logo-container {
+  padding-top: 32px;
+  font-size: 36px;
+}
+#sidebar {
+  background-color: #fff;
+  color: #616161;
+  padding: 0;
+}
+.large-sidebar {
+  height: 800px;
+  border-left: 1px solid #eeeeee;
+  border-right: 4px solid #eeeeee;
+  border-bottom: 2px solid #eeeeee;
+}
+.large-sidebar .item {
+  padding-top: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eeeeee;
+  padding-left: 32px;
+}
+.large-sidebar .item .text {
+  display: inline-block;
+  padding-left: 16px;
+}
+.large-sidebar .item.current,
+.small-sidebar .item.current {
+  background-color: #fafafa;
+}
+.large-sidebar .item:hover {
+  background-color: #fafafa;
+  cursor: pointer;
+}
+.small-sidebar {
+  text-align: center;
+  border-bottom: 2px solid #eeeeee;
+}
+.small-sidebar .item {
+  display: inline-block;
+  width: 120px;
+  height: 120px;
+  margin: 10px;
+  text-align: center;
+  padding: 20px;
+}
+.small-sidebar .item:hover {
+  cursor: pointer;
+  background-color: #f5f5f5;
+}
+.small-sidebar .item .text {
+  padding-top: 10px;
+  text-align: center;
+}
+.small-sidebar .item i {
+  font-size: 48px;
+}
+#content {
+  height: 800px;
+  background-color: #fff;
+  border-right: 1px solid #eeeeee;
+  border-bottom: 2px solid #eeeeee;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+#content #loader {
+  position: absolute;
+  display: inline-block;
+  color: #9e9e9e;
+  font-size: 32px;
+}
+#footer {
+  padding: 30px;
+  text-align: center;
+}
+#footer .link-list {
+  padding-top: 6px;
+}
+#footer .link-list .item {
+  display: inline-block;
+  color: #757575;
+  padding: 6px;
+  margin-left: 6px;
+  font-size: 18px;
+  text-align: center;
+}
+#footer .link-list .item:hover {
+  cursor: pointer;
+  color: #9e9e9e;
+}
+@media (min-width: 992px) {
+  #footer .link-list {
+    text-align: right;
+  }
+}
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background-color: #e0e0e0;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #9e9e9e;
+}
+::-webkit-scrollbar-thumb:hover {
+  cursor: pointer;
+}
+#tooltip {
+  display: inline-block;
+  display: none;
+  position: absolute;
+  padding: 8px;
+  font-size: 14px;
+  color: #fff;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.75);
+}
+#tooltip:after {
+  top: 100%;
+  left: 50%;
+  border: solid transparent;
+  content: " ";
+  height: 0;
+  width: 0;
+  position: absolute;
+  pointer-events: none;
+  border-color: rgba(0, 0, 0, 0);
+  border-top-color: rgba(0, 0, 0, 0.75);
+  border-width: 8px;
+  margin-left: -8px;
+}

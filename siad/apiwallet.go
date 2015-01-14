@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -51,7 +52,12 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 // out how to use the json. The daemon and envrionment don't really know what's
 // contained within in an attempt to keep things modular.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	json, err := d.core.WalletInfo()
+	walletStatus, err := d.core.WalletInfo()
+	if err != nil {
+		http.Error(w, "Failed to get wallet info", 500)
+		return
+	}
+	json, err := json.Marshal(walletStatus)
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
 		return
