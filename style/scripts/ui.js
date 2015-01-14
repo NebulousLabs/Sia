@@ -11,53 +11,161 @@
 // Example UI Data Format
 /*
 {
-    "miner":{
-        "State":"Off",
-        "Threads":1,
-        "RunningThreads":0,
-        "Address":[126,66,...,173,53]
+    "miner": {
+        "State": "On",
+        "Threads": 2,
+        "RunningThreads": 1,
+        "Address": [
+        126,
+        66,
+        "...",
+        173,
+        53
+        ],
+        "AccountName": "Personal",
+        "Balance": 1,
+        "USDBalance": 2,
+        "IncomeRate": "20.345 SC/h"
     },
-    "wallet":{
-        "Balance":0,
+    "wallet": {
+        "Balance": 0,
         "USDBalance": 0,
-        "FullBalance":0,
-        "NumAddresses":2392
+        "FullBalance": 0,
+        "NumAddresses": 2392,
+        "DefaultAccount": "Personal",
+        "Accounts": [
+    {
+        "Name": "Personal",
+        "Balance": 1,
+        "USDBalance": 2,
+        "FullBalance": 0,
+        "NumAddresses": 231,
+        "Addresses": [
+    {
+        "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+        "Balance": 2.13
     },
-    "status": {
-        "StateInfo": {
-            "CurrentBlock": [231, 83, ..., 114, 111, 159],
-            "Height": 0,
-            "Target": [0 ,0 , ..., 0 ,0],
-            "Depth": [255, 255, ..., 255, 255],
-            "EarliestLegalTimestamp": 1417070299
-        },
-        "RenterFiles": null,
-        "IPAddress": ":9988",
-        "HostSettings": {
-            "IPAddress": ":9988",
-            "TotalStorage": 0,
-            "MinFilesize": 0,
-            "MaxFilesize": 0,
-            "MinDuration": 0,
-            "MaxDuration": 0,
-            "MinChallengeWindow": 0,
-            "MaxChallengeWindow": 0,
-            "MinTolerance": 0,
-            "Price": 0,
-            "Burn": 0,
-            "CoinAddress": [0 ,0 ,... ,0 ,0]
-            "SpendConditions": {
-                "TimeLock": 0,
-                "NumSignatures": 0,
-                "PublicKeys": null
-            }
-            "FreezeIndex": 0
-        },
-        "HostSpaceRemaining": 0,
-        "HostContractCount": 0
-    }
+{
+    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+    "Balance": 0.001
+},
+{
+    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+    "Balance": 1.32
 }
-*/
+],
+"Transactions": [
+{
+    "Date": "01/02/2015",
+    "Amount": "2.67",
+    "USDAmount": "3.90",
+    "Deposit": true
+},
+{
+    "Date": "01/02/2015",
+    "Amount": "3.14",
+    "USDAmount": "3.90",
+    "Deposit": false
+}
+]
+},
+{
+    "Name": "Work",
+    "Balance": 0,
+    "USDBalance": 0,
+    "FullBalance": 0,
+    "NumAddresses": 101,
+    "Addresses": [
+{
+    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+    "Amount": 2.13
+},
+{
+    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+    "Amount": 0.001
+},
+{
+    "Address": "aaaaaaaaaaaaaaaaaaaaaa",
+    "Amount": 1.32
+}
+],
+"Transactions": [
+{
+    "Date": "01/02/2015",
+    "Amount": "2.67",
+    "USDAmount": "3.90",
+    "Deposit": true
+},
+{
+    "Date": "01/02/2015",
+    "Amount": "2.67",
+    "USDAmount": "3.90",
+    "Deposit": true
+}
+]
+}
+]
+},
+"status": {
+    "StateInfo": {
+        "CurrentBlock": [
+        231,
+        83,
+        "...",
+        114,
+        111,
+        159
+        ],
+        "Height": 0,
+        "Target": [
+        0,
+        0,
+        "...",
+        0,
+        0
+        ],
+        "Depth": [
+        255,
+        255,
+        "...",
+        255,
+        255
+        ],
+        "EarliestLegalTimestamp": 1417070299
+    },
+    "RenterFiles": null,
+    "IPAddress": ":9988",
+    "HostSettings": {
+        "IPAddress": ":9988",
+        "TotalStorage": 0,
+        "MinFilesize": 0,
+        "MaxFilesize": 0,
+        "MinDuration": 0,
+        "MaxDuration": 0,
+        "MinChallengeWindow": 0,
+        "MaxChallengeWindow": 0,
+        "MinTolerance": 0,
+        "Price": 0,
+        "Burn": 0,
+        "CoinAddress": [
+        0,
+        0,
+        "...",
+        0,
+        0
+        ],
+        "SpendConditions": {
+            "TimeLock": 0,
+            "NumSignatures": 0,
+            "PublicKeys": null
+        },
+        "FreezeIndex": 0
+    },
+    "HostSpaceRemaining": 0,
+    "HostContractCount": 0
+}
+}*/
+
 
 var ui = (function(){
 
