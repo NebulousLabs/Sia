@@ -1,10 +1,8 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"reflect" // for Config.expand()
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
@@ -35,19 +33,31 @@ type Config struct {
 
 // expand all ~ characters in Config values
 func (c *Config) expand() (err error) {
-	ex, err := homedir.Expand(c.Siacore.HostDirectory)
+	c.Siacore.HostDirectory, err = homedir.Expand(c.Siacore.HostDirectory)
 	if err != nil {
 		return
 	}
-	c.Siacore.HostDirectory = ex
-
-	s := reflect.ValueOf(&c.Siad).Elem()
-	for i := 0; i < s.NumField(); i++ {
-		if ex, err = homedir.Expand(s.Field(i).String()); err != nil {
-			return errors.New("could not expand " + s.Field(i).String())
-		}
-		s.Field(i).SetString(ex)
+	c.Siad.APIaddr, err = homedir.Expand(c.Siad.APIaddr)
+	if err != nil {
+		return
 	}
+	c.Siad.ConfigFilename, err = homedir.Expand(c.Siad.ConfigFilename)
+	if err != nil {
+		return
+	}
+	c.Siad.DownloadDirectory, err = homedir.Expand(c.Siad.DownloadDirectory)
+	if err != nil {
+		return
+	}
+	c.Siad.StyleDirectory, err = homedir.Expand(c.Siad.StyleDirectory)
+	if err != nil {
+		return
+	}
+	c.Siad.WalletFile, err = homedir.Expand(c.Siad.WalletFile)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
