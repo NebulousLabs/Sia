@@ -12,6 +12,13 @@ import (
 
 const VERSION = "0.1.0"
 
+// Updates work like this: each version is stored in a folder on a Linode
+// server operated by the developers The most recent version is stored in
+// current/. The folder contains the files changed by the update, as well as a
+// MANIFEST file that contains the version number and a file listing. To check
+// for an update, we first read the version number from current/MANIFEST. If
+// the version is newer, we download and apply the files listed in the update
+// manifest.
 var updateURL = "http://23.239.14.98/releases/" + runtime.GOOS + "_" + runtime.GOARCH + "/current/"
 
 // returns true if version is "greater than" VERSION.
