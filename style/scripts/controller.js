@@ -4,6 +4,9 @@ var controller = (function(){
 
     function init(){
         update();
+        setInterval(function(){
+            update();
+        },250);
     }
 
     function update(){
