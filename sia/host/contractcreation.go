@@ -164,6 +164,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// If there's an error upon return, delete the file that's been created.
 	defer func() {
 		if err != nil {
+			panic(err)
 			os.Remove(filename)
 		}
 	}()
@@ -199,9 +200,6 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		return
 	}
 
-	// Submit the transaction.
-	h.transactionChan <- t
-
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
 	h.contracts[t.FileContractID(0)] = contractObligation{
@@ -209,6 +207,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		filename:    filename,
 	}
 	fmt.Println("Accepted contract")
+
+	// Submit the transaction.
+	h.transactionChan <- t
 
 	return
 }

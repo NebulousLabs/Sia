@@ -70,7 +70,7 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 
 		// Fund the client portion of the transaction.
 		minerFee := consensus.Currency(10) // TODO: ask wallet.
-		renterPortion := host.Price * consensus.Currency(duration) * consensus.Currency(fileContract.FileSize)
+		renterPortion := host.Price * consensus.Currency(duration+delay) * consensus.Currency(fileContract.FileSize)
 		var id string
 		id, err = r.wallet.RegisterTransaction(consensus.Transaction{})
 		if err != nil {
@@ -124,7 +124,7 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 		}
 	}
 
-	// Record the file in to the renter database.
+	// Record the file into the renter database.
 	fp = FilePiece{
 		Host:     host,
 		Contract: fileContract,

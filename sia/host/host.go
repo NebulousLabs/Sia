@@ -140,5 +140,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 
 // TODO: Deprecate this function.
 func (h *Host) NumContracts() int {
+	h.lock()
+	defer h.unlock()
 	return len(h.contracts)
 }
