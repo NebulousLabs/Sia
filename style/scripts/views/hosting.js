@@ -65,7 +65,7 @@ ui._hosting = (function(){
                 // item.find(".value").text(data.hosting.HostingSettings[editableProps[i]]);
             }
             // Make control on top
-            view.ePropBlueprint.parent().append(eControl);
+            ePropBlueprint.parent().append(eControl);
         }
 
         // lastHostSettings = data.hosting.HostingSettings;
