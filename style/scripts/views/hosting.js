@@ -23,6 +23,15 @@ ui._hosting = (function(){
     }
 
     function addEvents(){
+        ePreset16GB.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        ePreset32GB.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
+        ePreset64GB.click(function(){
+            ui._tooltip(this, "Not Implemented");
+        });
         eSave.click(function(){
             ui._tooltip(this, "Saving");
             ui._trigger("save-host-config", parseHostSettings());
