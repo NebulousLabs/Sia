@@ -34,9 +34,11 @@ func (d *daemon) handle(addr string) {
 
 	// Misc. API Calls
 	http.HandleFunc("/sync", d.syncHandler)
-	http.HandleFunc("/peer", d.peerHandler)
+	http.HandleFunc("/peer/add", d.peerAddHandler)
+	http.HandleFunc("/peer/remove", d.peerRemoveHandler)
 	http.HandleFunc("/status", d.statusHandler)
-	http.HandleFunc("/update", d.updateHandler)
+	http.HandleFunc("/update/check", d.updateCheckHandler)
+	http.HandleFunc("/update/apply", d.updateApplyHandler)
 	http.HandleFunc("/stop", d.stopHandler)
 
 	http.ListenAndServe(addr, nil)
@@ -48,11 +50,6 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 	if json.NewEncoder(w).Encode(obj) != nil {
 		http.Error(w, "Failed to encode response", 500)
 	}
-}
-
-// success wraps a boolean in a struct for easier JSON parsing
-type success struct {
-	Success bool
 }
 
 func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
@@ -67,59 +64,34 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: don't spawn multiple CatchUps
-	havePeers := len(d.core.AddressBook()) == 0
-	if havePeers {
-		go d.core.CatchUp(d.core.RandomPeer())
-	}
-	writeJSON(w, success{havePeers})
-}
-
-func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
-	addr := network.Address(req.FormValue("addr"))
-	switch req.FormValue("action") {
-	case "add":
-		d.core.AddPeer(addr)
-	case "remove":
-		d.core.RemovePeer(addr)
-	default:
-		http.Error(w, "Invalid peer action", 400)
+	if len(d.core.AddressBook()) == 0 {
+		http.Error(w, "No peers available for syncing", 500)
 		return
 	}
-	// TODO: should Add/RemovePeer return a bool?
-	writeJSON(w, success{true})
+
+	go d.core.CatchUp(d.core.RandomPeer())
+	w.WriteHeader(200)
+}
+
+func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: this should return an error
+	d.core.AddPeer(network.Address(req.FormValue("addr")))
+	w.WriteHeader(200)
+}
+
+func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: this should return an error
+	d.core.RemovePeer(network.Address(req.FormValue("addr")))
+	w.WriteHeader(200)
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Create all of the variables that get scanned in.
-	// var ipAddress network.Address
 	var totalStorage int64
 	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
 	var price, burn, freezeCoins consensus.Currency
-	var coinAddress consensus.CoinAddress
 
-	// Get the ip address.
-	// ipAddress = network.Address(req.FormValue("ipaddress"))
-
-	// The address can be either a coin address or a friend name
-	caString := req.FormValue("coinaddress")
-	// if ca, ok := e.friends[caString]; ok {
-	//	coinAddress = ca
-	// } else
-	if len(caString) != 64 {
-		http.Error(w, "Friend not found (or malformed coin address)", 400)
-		return
-	} else {
-		var coinAddressBytes []byte
-		_, err := fmt.Sscanf(caString, "%x", &coinAddressBytes)
-		if err != nil {
-			http.Error(w, "Malformed coin address", 400)
-			return
-		}
-		copy(coinAddress[:], coinAddressBytes)
-	}
-
-	// other vars require no special parsing
 	qsVars := map[string]interface{}{
 		"totalstorage":   &totalStorage,
 		"minfile":        &minFilesize,
@@ -169,8 +141,7 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	*/
-
-	writeJSON(w, success{true})
+	w.WriteHeader(200)
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
@@ -183,6 +154,7 @@ func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
 		}
 	*/
+	w.WriteHeader(200)
 }
 
 func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
@@ -198,26 +170,26 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Download complete!")
 		}
 	*/
+	w.WriteHeader(200)
 }
 
-func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
-	switch req.FormValue("action") {
-	case "check":
-		available, err := d.checkForUpdate()
+func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
+	available, err := d.checkForUpdate()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	} else {
 		writeJSON(w, struct {
 			Available bool
-			Error     string
-		}{available, err.Error()})
+			Version   string
+		}{available, ""})
+	}
+}
 
-	case "apply":
-		applied, err := d.applyUpdate()
-		writeJSON(w, struct {
-			Applied bool
-			Error   string
-		}{applied, err.Error()})
-
-	default:
-		http.Error(w, "Unrecognized action", 400)
-		return
+func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
+	err := d.applyUpdate(req.FormValue("version"))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	} else {
+		w.WriteHeader(200)
 	}
 }
