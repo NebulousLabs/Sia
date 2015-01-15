@@ -520,12 +520,66 @@
   border-top: 1px solid #e0e0e0;
   text-align: right;
 }
+#transfer-funds {
+  font-size: 24px;
+  color: #757575;
+}
 #transfer-funds .subhead {
   font-size: 24px;
   padding-left: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
 }
 #transfer-funds .right-column {
   border-left: 1px solid #e0e0e0;
+}
+#transfer-funds .from-column i {
+  padding-left: 10px;
+}
+#transfer-funds .to-column i {
+  padding-right: 10px;
+}
+#transfer-funds .from-column {
+  min-height: 400px;
+}
+#transfer-funds .to-column {
+  min-height: 400px;
+}
+#transfer-funds .eqn {
+  padding: 10px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+#transfer-funds .eqn .text {
+  display: inline-block;
+}
+#transfer-funds .eqn .amt {
+  display: inline-block;
+  float: right;
+}
+#transfer-funds .eqn .amt.input {
+  min-height: 30px;
+  min-width: 100px;
+  text-align: right;
+  padding-right: 8px;
+  border-bottom: 1px dashed #bdbdbd;
+  border-radius: 4px;
+}
+#transfer-funds .eqn .unit {
+  display: inline-block;
+  float: right;
+}
+#transfer-funds .eqn .icon {
+  float: right;
+  font-size: 14px;
+  padding-top: 12px;
+  color: #9e9e9e;
+}
+#transfer-funds .eqn:first-child {
+  border-top: 0;
+}
+#transfer-funds .eqn:last-child {
+  border-top: 1px solid #e0e0e0;
 }
 body {
   margin: 0px;
