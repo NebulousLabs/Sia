@@ -3,6 +3,7 @@ package sia
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
@@ -38,7 +39,10 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.processTransaction(transaction) // Force the transaction to process before the block is mined.
+	err = c.processTransaction(transaction)
+	if err != nil && err != consensus.ConflictingTransactionErr {
+		t.Error(err)
+	}
 
 	// Mine a block so that the host announcement is processed.
 	mineSingleBlock(t, c)

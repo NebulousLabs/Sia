@@ -44,7 +44,7 @@ func testTransactionBlock(t *testing.T, c *Core) {
 		return
 	}
 	err = c.processTransaction(txn)
-	if err != nil {
+	if err != nil && err != consensus.ConflictingTransactionErr {
 		t.Error(err)
 	}
 

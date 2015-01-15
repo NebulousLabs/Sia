@@ -23,16 +23,17 @@ func testSendToSelf(t *testing.T, c *Core) {
 		return
 	}
 	txn, err := c.SpendCoins(c.wallet.Balance(false)-10, dest)
-	// TODO: This error checking is hacky, instead should use some sort of
-	// synchronization technique.
-	if err != nil && err != consensus.ConflictingTransactionErr {
+	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	// Process the transaction and check the balance, which should now be 0.
+	//
+	// TODO: This error checking is hacky, instead should use some sort of
+	// synchronization technique.
 	err = c.processTransaction(txn)
-	if err != nil {
+	if err != nil && err != consensus.ConflictingTransactionErr {
 		t.Error(err)
 	}
 	if c.wallet.Balance(false) != 0 {
