@@ -138,7 +138,7 @@ func CreateCore(config Config) (c *Core, err error) {
 	}
 	*/
 
-	// Bootstrap to the network.
+	// Bootstrap to the network (may take a few seconds).
 	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
 	if err == network.ErrNoPeers {
 		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")

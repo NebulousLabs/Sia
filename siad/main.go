@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	config Config
+	config  Config
+	homeDir string
+	siaDir  string
 )
 
 type Config struct {
@@ -29,56 +31,77 @@ type Config struct {
 	}
 }
 
-// findSiaDir first checks the current directory, then checks ~/.config/sia,
-// looking for the html index file that's needed to run the web app.
-// findSiaDir will return home="" if it can't find the home dir, but it won't
-// report an error for that. It'll only report an error if it can't find
-// index.html.
-func findSiaDir() (home, siaDir string, err error) {
-	// Check the current directory for the index file.
-	var found bool
-	if _, err = os.Stat("style/index.html"); err == nil {
-		found = true
+// expand all ~ characters in Config values
+func (c *Config) expand() (err error) {
+	c.Siacore.HostDirectory, err = homedir.Expand(c.Siacore.HostDirectory)
+	if err != nil {
+		return
+	}
+	c.Siad.APIaddr, err = homedir.Expand(c.Siad.APIaddr)
+	if err != nil {
+		return
+	}
+	c.Siad.ConfigFilename, err = homedir.Expand(c.Siad.ConfigFilename)
+	if err != nil {
+		return
+	}
+	c.Siad.DownloadDirectory, err = homedir.Expand(c.Siad.DownloadDirectory)
+	if err != nil {
+		return
+	}
+	c.Siad.StyleDirectory, err = homedir.Expand(c.Siad.StyleDirectory)
+	if err != nil {
+		return
+	}
+	c.Siad.WalletFile, err = homedir.Expand(c.Siad.WalletFile)
+	if err != nil {
+		return
 	}
 
-	// Check ~/.config/sia for the index file.
-	home, err = homedir.Dir()
-	if err == nil && !found {
-		dirname := home + "/.config/sia/style/index.html"
-		if _, err = os.Stat(dirname); err == nil {
-			siaDir = home + "/.config/sia/"
-			return
-		}
-	}
-
-	// This is the only error that can be returned.
-	if !found {
-		err = fmt.Errorf("Style folder not found, please put the 'style/' folder in the current directory")
-	} else {
-		err = nil
-	}
 	return
 }
 
-// startEnvironment calls createEnvironment(), which will handle everything
-// else.
-func startEnvironment(cmd *cobra.Command, args []string) {
-	_, err := createDaemon(config)
+// Helper function for determining existence of a file. Technically, err != nil
+// does not necessarily mean that the file does not exist, but it does mean
+// that it cannot be read, and for our purposes these are equivalent.
+func exists(filename string) bool {
+	ex, err := homedir.Expand(filename)
 	if err != nil {
-		fmt.Println("Error starting client:", err)
+		return false
+	}
+	_, err = os.Stat(ex)
+	return err == nil
+}
+
+func init() {
+	// locate siaDir by checking for style/ folder
+	switch {
+	case exists("style"):
+		siaDir = ""
+	case exists("~/.config/sia/style"):
+		siaDir = "~/.config/sia/"
+	default:
+		fmt.Println("Warning: style folder not found. Please put the 'style/' folder in the current directory.")
 	}
 }
 
-// Prints version information about Sia Daemon.
-func version(cmd *cobra.Command, args []string) {
-	fmt.Println("Sia Daemon v0.1.0")
+func startEnvironment(*cobra.Command, []string) {
+	if err := config.expand(); err != nil {
+		fmt.Println("Bad config value:", err)
+	} else if err := startDaemon(config); err != nil {
+		fmt.Println("Failed to start daemon:", err)
+	}
+}
+
+func version(*cobra.Command, []string) {
+	fmt.Println("Sia Daemon v" + VERSION)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Daemon v0.1.0",
-		Long:  "Sia Daemon v0.1.0",
+		Short: "Sia Daemon v" + VERSION,
+		Long:  "Sia Daemon v" + VERSION,
 		Run:   startEnvironment,
 	}
 
@@ -89,35 +112,31 @@ func main() {
 		Run:   version,
 	})
 
-	// Add flag defaults, which have the lowest priority.
-	home, siaDir, err := findSiaDir()
-	if err != nil {
-		fmt.Println("Warning:", err)
-	}
+	// Set default values, which have the lowest priority.
+	// TODO: use path.Join
 	defaultConfigFile := siaDir + "config"
 	defaultHostDir := siaDir + "host/"
 	defaultStyleDir := siaDir + "style/"
-	defaultDownloadDir := home + "/Downloads/"
+	defaultDownloadDir := "~/Downloads/"
 	defaultWalletFile := siaDir + "sia.wallet"
-	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which port is used to communicate with the user")
+	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
 	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port is used when talking to other nodes on the network")
-	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run.")
-	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "tell siad where to load the config file")
-	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "where the host puts all uploaded files")
-	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "where to find the files that compose the frontend")
-	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "where to download files")
-	root.PersistentFlags().StringVarP(&config.Siad.WalletFile, "wallet-file", "w", defaultWalletFile, "where to keep the wallet")
+	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
+	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "location of the siad config file")
+	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "location of hosted files")
+	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "location of HTTP server assets")
+	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "location of downloaded files")
+	root.PersistentFlags().StringVarP(&config.Siad.WalletFile, "wallet-file", "w", defaultWalletFile, "location of the wallet file")
 
-	// Load the config file, which has the middle priorty. Only values defined
-	// in the config file will be set.
-	if _, err = os.Stat(config.Siad.ConfigFilename); err == nil {
-		err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename)
-		if err != nil {
-			fmt.Println("Error reading config file:", err)
+	// Load the config file, which will overwrite the default values.
+	if exists(config.Siad.ConfigFilename) {
+		if err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename); err != nil {
+			fmt.Println("Failed to load config file:", err)
+			return
 		}
 	}
 
-	// Execute wil over-write any flags set by the config file, but only if the
-	// user specified them manually.
+	// Parse cmdline flags, overwriting both the default values and the config
+	// file values.
 	root.Execute()
 }
