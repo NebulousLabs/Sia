@@ -6,6 +6,10 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
         view = $("#transfer-funds");
     }
 
+    function onViewOpened(){
+        
+    }
+
     function addEvents(){
 
     }
