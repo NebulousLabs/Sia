@@ -584,6 +584,18 @@
 #transfer-funds .eqn:last-child {
   border-top: 1px solid #e0e0e0;
 }
+#transfer-funds .address .amt.input.field-address {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  padding: 8px;
+  border: 1px dashed #e0e0e0;
+  border-radius: 4px;
+}
+#transfer-funds .address .amt.input.field-address .icon {
+  margin-bottom: 0px;
+}
 body {
   margin: 0px;
   padding: 0px;
