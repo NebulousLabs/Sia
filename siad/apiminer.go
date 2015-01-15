@@ -17,13 +17,13 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 
 	d.core.UpdateMiner(threads)
 	d.core.StartMining()
-	fmt.Fprintf(w, "Now mining on %v threads.", threads)
+	w.WriteHeader(200)
 }
 
 // Calls StopMining() on the core.
 func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	d.core.StopMining()
-	fmt.Fprintf(w, "Turning off mining.")
+	w.WriteHeader(200)
 }
 
 // Returns json of the miners status.

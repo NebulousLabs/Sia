@@ -140,9 +140,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Check that the contained FileContract fits host criteria for taking
 	// files, replying with the error if there's a problem.
-	h.lock()
+	h.mu.Lock()
 	t, err = h.considerContract(t)
-	h.unlock()
+	h.mu.Unlock()
 	if err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
 		return
@@ -153,9 +153,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// Create file.
-	h.lock()
+	h.mu.Lock()
 	filename := h.nextFilename()
-	h.unlock()
+	h.mu.Unlock()
 	file, err := os.Create(filename)
 	if err != nil {
 		return
@@ -192,8 +192,8 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Network communication is finished, and disk intense operations are
 	// finished. We can lock the host for the remainder of the function.
-	h.lock()
-	defer h.unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	// Check that the file arrived in time.
 	if h.state.Height() >= t.FileContracts[0].Start-2 {

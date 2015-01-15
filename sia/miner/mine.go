@@ -40,31 +40,31 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 func (m *Miner) mine() {
 	// Increment the number of threads running, because this thread is spinning
 	// up. Also grab a number that will tell us when to shut down.
-	m.lock()
+	m.mu.Lock()
 	m.runningThreads++
 	myThread := m.runningThreads
-	m.unlock()
+	m.mu.Unlock()
 
 	// Try to solve a block repeatedly.
 	for {
 		// Grab the number of threads that are supposed to be running.
-		m.rLock()
+		m.mu.RLock()
 		desiredThreads := m.desiredThreads
-		m.rUnlock()
+		m.mu.RUnlock()
 
 		// If we are allowed to be running, mine a block, otherwise shut down.
 		if desiredThreads >= myThread {
 			m.SolveBlock()
 		} else {
-			m.lock()
+			m.mu.Lock()
 			// Need to check the mining status again, something might have
 			// changed while waiting for the lock.
 			if desiredThreads < myThread {
 				m.runningThreads--
-				m.unlock()
+				m.mu.Unlock()
 				return
 			}
-			m.unlock()
+			m.mu.Unlock()
 		}
 	}
 }
@@ -76,11 +76,11 @@ func (m *Miner) mine() {
 // the miner for the remaining work, which does not interact with the miner.
 func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 	// Lock the miner and grab the information necessary for grinding hashes.
-	m.rLock()
+	m.mu.RLock()
 	b = m.blockForWork()
 	target := m.target
 	iterations := m.iterationsPerAttempt
-	m.rUnlock()
+	m.mu.RUnlock()
 
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.
@@ -98,8 +98,8 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 // StartMining spawns a bunch of mining threads which will mine until stop is
 // called.
 func (m *Miner) StartMining() error {
-	m.lock()
-	defer m.unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Increase the number of threads to m.desiredThreads.
 	m.desiredThreads = m.threads
@@ -113,8 +113,8 @@ func (m *Miner) StartMining() error {
 // StopMining sets desiredThreads to 0, a value which is polled by mining
 // threads. When set to 0, the mining threads will all cease mining.
 func (m *Miner) StopMining() error {
-	m.lock()
-	defer m.unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Set desiredThreads to 0. The miners will shut down automatically.
 	m.desiredThreads = 0

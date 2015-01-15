@@ -28,8 +28,8 @@ type MinerStatus struct {
 //
 // Address is the current address that is receiving block payouts.
 func (m *Miner) Info() ([]byte, error) {
-	m.rLock()
-	defer m.rUnlock()
+	m.mu.RLock()
+	defer m.mu.RLock()
 
 	status := MinerStatus{
 		Threads:        m.threads,
@@ -57,15 +57,15 @@ func (m *Miner) Info() ([]byte, error) {
 
 // Threads returns the number of threads being used by the miner.
 func (m *Miner) Threads() int {
-	m.rLock()
-	defer m.rUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.threads
 }
 
 // SubsidyAddress returns the address that is currently being used by the miner
 // while searching for blocks.
 func (m *Miner) SubsidyAddress() consensus.CoinAddress {
-	m.lock()
-	defer m.unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.address
 }

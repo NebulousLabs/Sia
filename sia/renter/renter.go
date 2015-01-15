@@ -27,7 +27,8 @@ type Renter struct {
 	files  map[string]FileEntry
 	hostDB components.HostDB
 	wallet components.Wallet
-	rwLock sync.RWMutex
+
+	mu sync.RWMutex
 }
 
 func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter, err error) {

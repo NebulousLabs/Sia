@@ -5,7 +5,7 @@ func (hdb *HostDB) Info() ([]byte, error) {
 }
 
 func (hdb *HostDB) Size() int {
-	hdb.rLock()
-	defer hdb.rUnlock()
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
 	return len(hdb.activeHosts)
 }

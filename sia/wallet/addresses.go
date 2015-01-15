@@ -77,14 +77,14 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
 func (w *Wallet) TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
-	w.lock()
-	defer w.unlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.timelockedCoinAddress(unlockHeight)
 }
 
 // CoinAddress implements the core.Wallet interface.
 func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
-	w.lock()
-	defer w.unlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.coinAddress()
 }

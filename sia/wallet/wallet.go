@@ -35,7 +35,7 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	rwLock sync.RWMutex
+	mu sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -63,8 +63,8 @@ func New(state *consensus.State, filename string) (w *Wallet, err error) {
 
 // Info implements the core.Wallet interface.
 func (w *Wallet) Info() (status components.WalletInfo, err error) {
-	w.rLock()
-	defer w.rUnlock()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 
 	status = components.WalletInfo{
 		Balance:      w.Balance(false),

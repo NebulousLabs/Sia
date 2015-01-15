@@ -135,8 +135,8 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 
 // TODO: Do the uploading in parallel.
 func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
-	r.lock()
-	defer r.unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	_, exists := r.files[rfp.Nickname]
 	if exists {

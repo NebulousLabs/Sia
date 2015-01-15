@@ -44,15 +44,15 @@ func (w *Wallet) save() (err error) {
 
 // Save implements the core.Wallet interface.
 func (w *Wallet) Save() (err error) {
-	w.rLock()
-	defer w.rUnlock()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.save()
 }
 
 // Load implements the core.Wallet interface.
 func (w *Wallet) Load(filename string) (err error) {
-	w.lock()
-	defer w.unlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// Check if the file exists, then read it into memory.
 	if _, err = os.Stat(filename); os.IsNotExist(err) {
