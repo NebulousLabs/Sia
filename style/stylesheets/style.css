@@ -27,6 +27,14 @@
   color: #757575;
   background-color: #fafafa;
 }
+.back.button {
+  padding-bottom: 6px;
+  padding-top: 14px;
+}
+.back.button i {
+  display: inline-block;
+  vertical-align: top;
+}
 .dropdown-button {
   display: inline-block;
   float: right;
@@ -586,7 +594,10 @@
 #transfer-funds .eqn .amt.input:hover .icon {
   color: #9e9e9e;
 }
-#transfer-funds .eqn:first-child {
+#transfer-funds .from-column .eqn:first-child {
+  border-top: 0;
+}
+#transfer-funds .to-column .eqn:first-child {
   border-top: 0;
 }
 #transfer-funds .eqn:last-child {

@@ -2,7 +2,7 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
 
     var view, fAccountTransfer, fAccountFinalBalance, eAccountBalance, fAddressAddress,
         accountBalance, accountName, transferFromType, transferToType, eSummaryAmount,
-        eSummaryFrom, eSummaryTo, eSendMoney;
+        eSummaryFrom, eSummaryTo, eSendMoney, eBack;
 
     var numberPrecision = 18;
 
@@ -34,7 +34,7 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
 
         function setValue(text){
             icon.remove();
-            element.text(text);
+            element.text(text || " ");
             element.prepend(icon);
         }
 
@@ -74,6 +74,7 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
         eSummaryFrom = view.find(".summary .from");
         eSummaryTo = view.find(".summary .to");
         eSendMoney = view.find(".send-money");
+        eBack = view.find(".back.button");
 
         addEvents();
     }
@@ -100,6 +101,9 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
 
         fAddressAddress.setOnChangeListener(function(val){
             eSummaryTo.text(val.slice(0,12) + "...");
+        });
+        eBack.click(function(){
+            ui.switchView("manage-account");
         });
 
         eSendMoney.click(function(e){
