@@ -84,17 +84,29 @@
 
 // HEADER
 
-#content .header{
+#content .header:first-child{
     padding:20px;
     border-bottom:4px solid @g100;
 }
-#content .header .title{
+#content .header:first-child .title{
     .i;
     font-size:32px;
     color:@g500;
 }
-#content .header .capsule{
+#content .header:first-child .capsule{
     float:right;
+}
+
+#content .subhead{
+    color:@g500;
+    font-size:32px;
+    padding-top:18px;
+    padding-bottom:0px;
+    padding-left:30px;
+    padding-right:16px;
+}
+#content .subhead .text{
+    color:@g500;
 }
 
 // SEARCH BAR

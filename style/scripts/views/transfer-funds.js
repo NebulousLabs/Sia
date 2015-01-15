@@ -7,7 +7,7 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
     }
 
     function onViewOpened(){
-        
+
     }
 
     function addEvents(){
