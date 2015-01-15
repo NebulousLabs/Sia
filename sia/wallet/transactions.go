@@ -62,13 +62,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 	// Add a refund output if needed.
 	if total-amount > 0 {
-		// TODO: This is dirty and should probably happen some other way. It's
-		// also a problem because for a very brief moment the lock is taken
-		// off, which might result in the current transaction getting altered,
-		// causing a race condition. TODO TODO TODO
-		w.unlock()
-		coinAddress, _, err := w.CoinAddress()
-		w.lock()
+		coinAddress, _, err := w.coinAddress()
 
 		if err != nil {
 			return err
@@ -126,7 +120,7 @@ func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, relea
 	t := ot.transaction
 
 	// Get a frozen coin address.
-	_, spendConditions, err = w.TimelockedCoinAddress(release)
+	_, spendConditions, err = w.timelockedCoinAddress(release)
 	if err != nil {
 		return
 	}
