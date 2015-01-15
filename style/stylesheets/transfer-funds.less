@@ -72,16 +72,45 @@
 
     .address{
         .amt.input.field-address{
-            display:block;
-            width:100%;
+            // display:block;
+            width:240px;
             text-align:left;
             font-size:11px;
             padding:8px;
             border:1px dashed @g300;
             border-radius:4px;
+            word-wrap:break-all;
+            word-break: break-all;
+        }
+        .text.address-title{
+            padding-bottom:6px;
         }
         .amt.input.field-address .icon{
             margin-bottom:0px;
         }
     }
+
+    .control{
+        border-top:1px solid @g300;
+        padding:10px;
+
+        .summary{
+            .i;
+            font-size:18px;
+            margin:10px;
+
+            .amt, .from, .to{
+                .i;
+                font-weight:bold;
+            }
+
+        }
+
+        .button{
+            float:right;
+            margin-right:20px;
+        }
+
+    }
+
 }

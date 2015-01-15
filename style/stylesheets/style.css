@@ -520,6 +520,14 @@
   border-top: 1px solid #e0e0e0;
   text-align: right;
 }
+#hosting .host-config .control .warning {
+  display: inline-block;
+  float: left;
+  font-size: 14px;
+  color: #E57373;
+  padding-top: 14px;
+  padding-left: 10px;
+}
 #transfer-funds {
   font-size: 24px;
   color: #757575;
@@ -585,16 +593,39 @@
   border-top: 1px solid #e0e0e0;
 }
 #transfer-funds .address .amt.input.field-address {
-  display: block;
-  width: 100%;
+  width: 240px;
   text-align: left;
   font-size: 11px;
   padding: 8px;
   border: 1px dashed #e0e0e0;
   border-radius: 4px;
+  word-wrap: break-all;
+  word-break: break-all;
+}
+#transfer-funds .address .text.address-title {
+  padding-bottom: 6px;
 }
 #transfer-funds .address .amt.input.field-address .icon {
   margin-bottom: 0px;
+}
+#transfer-funds .control {
+  border-top: 1px solid #e0e0e0;
+  padding: 10px;
+}
+#transfer-funds .control .summary {
+  display: inline-block;
+  font-size: 18px;
+  margin: 10px;
+}
+#transfer-funds .control .summary .amt,
+#transfer-funds .control .summary .from,
+#transfer-funds .control .summary .to {
+  display: inline-block;
+  font-weight: bold;
+}
+#transfer-funds .control .button {
+  float: right;
+  margin-right: 20px;
 }
 body {
   margin: 0px;

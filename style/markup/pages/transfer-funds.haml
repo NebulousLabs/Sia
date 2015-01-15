@@ -5,13 +5,13 @@
         .col-xs-6
             .from-column
                 .subhead
-                    Transferring from Savings
                     %i.fa.fa-sign-out
+                    Transferring from Savings
                 .account
                     .eqn.current-balance
                         .text Balance
                         .unit SC
-                        .amt.current-balance 32.001
+                        .amt 32.001&nbsp;
                     .eqn.transfer-amt
                         .text Transfer
                         .unit SC
@@ -31,6 +31,17 @@
                     Transferring to Address
                 .address
                     .eqn
-                        .text SC Address
+                        .text.address-title SC Address
                         .amt.input.field-address
                             %i.icon.fa.fa-pencil
+    .control
+        .summary
+            Transferring
+            .amt 2.142 SC
+            from
+            .from Savings Account
+            to
+            .to 0cc175bd71c7...
+        .button.send-money
+            %i.fa.fa-send
+            Send Funds

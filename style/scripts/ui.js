@@ -193,7 +193,10 @@ var ui = (function(){
         }
 
         // Refresh the new view's data
-        ui["_" + newView].update(ui._data);
+        if (ui["_" + newView].update) ui["_" + newView].update(ui._data);
+
+        // Call the onViewOpened event if the view has it
+        if (ui["_" + newView].onViewOpened) ui["_" + newView].onViewOpened(ui._data);
 
         // Make the currently selected button greyed
         $("#sidebar .current").removeClass("current");
@@ -334,7 +337,7 @@ var ui = (function(){
 
     function update(data){
         viewNames.forEach(function(view){
-            ui["_" + view].update(data);
+            if (ui["_" + view].update) ui["_" + view].update(data);
         });
         ui._data = data;
     }
