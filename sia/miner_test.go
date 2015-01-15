@@ -15,7 +15,7 @@ func mineSingleBlock(t *testing.T, c *Core) {
 		t.Error(err)
 	}
 	err = c.processBlock(b)
-	if err != nil {
+	if err != nil && err != consensus.BlockKnownErr {
 		t.Error(err)
 	}
 }
