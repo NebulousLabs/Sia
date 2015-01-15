@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -24,7 +25,7 @@ type ContractEntry struct {
 
 func (h *Host) nextFilename() string {
 	h.fileCounter++
-	return h.hostDir + strconv.Itoa(h.fileCounter)
+	return filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
 }
 
 // considerContract takes a contract and verifies that the terms such as price

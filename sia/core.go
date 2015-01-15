@@ -3,6 +3,7 @@ package sia
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -26,6 +27,9 @@ type Config struct {
 	Wallet components.Wallet
 
 	// Settings available through flags.
+	//
+	// TODO: Most of these should be deprecated as inputs to the core - each
+	// component should manage its own settings.
 	HostDir     string
 	WalletFile  string
 	ServerAddr  string
@@ -38,8 +42,7 @@ type Config struct {
 type Core struct {
 	state *consensus.State
 
-	// server *network.TCPServer // one of these things is not like the others :)
-	server *network.TCPServer
+	server *network.TCPServer // one of these things is not like the others :)
 	host   components.Host
 	hostDB components.HostDB
 	miner  components.Miner
@@ -107,6 +110,11 @@ func CreateCore(config Config) (c *Core, err error) {
 
 		hostDir:    config.HostDir,
 		walletFile: config.WalletFile,
+	}
+	// TODO: The host object should be managing this on its own.
+	err = os.MkdirAll(c.hostDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		return
 	}
 
 	// TODO: Figure out if there's any way that we need to sync to the state.
