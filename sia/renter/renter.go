@@ -28,7 +28,8 @@ type Renter struct {
 	files  map[string]FileEntry
 	hostDB components.HostDB
 	wallet components.Wallet
-	rwLock sync.RWMutex
+
+	mu sync.RWMutex
 }
 
 func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter, err error) {
@@ -178,8 +179,8 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 
 // TODO: Do the uploading in parallel.
 func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
-	r.lock()
-	defer r.unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	_, exists := r.files[rfp.Nickname]
 	if exists {

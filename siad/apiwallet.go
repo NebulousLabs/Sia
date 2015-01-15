@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -44,7 +43,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Sent %v coins to %x", amount, dest)
+	w.WriteHeader(200)
 }
 
 // I wasn't sure the best way to manage this. I've implemented it so that the
@@ -57,12 +56,7 @@ func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Failed to get wallet info", 500)
 		return
 	}
-	json, err := json.Marshal(walletStatus)
-	if err != nil {
-		http.Error(w, "Failed to encode status object", 500)
-		return
-	}
-	w.Write(json)
+	writeJSON(w, walletStatus)
 }
 
 // walletAddressHandler manages requests for CoinAddresses from the wallet.
@@ -72,5 +66,7 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 		http.Error(w, "Failed to get a coin address", 500)
 		return
 	}
-	fmt.Fprintf(w, "You can now use this address: %x", coinAddress)
+	writeJSON(w, struct {
+		Address string
+	}{fmt.Sprintf("%x", coinAddress)})
 }

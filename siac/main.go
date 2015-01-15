@@ -81,22 +81,6 @@ func main() {
 		Run:   downloadcmd,
 	})
 
-	save := &cobra.Command{
-		Use:   "save",
-		Short: "Save the wallet address of the server",
-		Long:  "Save the wallet address of the server to a specified file.",
-		Run:   savecmd,
-	}
-	root.AddCommand(save)
-
-	load := &cobra.Command{
-		Use:   "load",
-		Short: "Load a wallet address",
-		Long:  "Load the wallet address of another peer.",
-		Run:   loadcmd,
-	}
-	root.AddCommand(load)
-
 	status := &cobra.Command{
 		Use:   "status [check|apply]",
 		Short: "Print the current state of the daemon",

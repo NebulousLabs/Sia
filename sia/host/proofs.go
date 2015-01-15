@@ -22,7 +22,7 @@ import (
 // blockchain reorganization.
 func (h *Host) consensusListen(updateChan chan consensus.ConsensusChange) {
 	for consensusChange := range updateChan {
-		h.lock()
+		h.mu.Lock()
 
 		var importantChanges []consensus.ContractDiff
 		for _, blockDiff := range consensusChange.AppliedBlocks {
@@ -112,7 +112,7 @@ func (h *Host) consensusListen(updateChan chan consensus.ConsensusChange) {
 			delete(h.contracts, contractID)
 		}
 
-		h.unlock()
+		h.mu.Unlock()
 	}
 }
 
