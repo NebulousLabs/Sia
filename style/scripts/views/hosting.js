@@ -2,7 +2,7 @@ ui._hosting = (function(){
 
     var view, ePropBlueprint, ePreset16GB, ePreset32GB, ePreset64GB, eProps, eControl, eSave, eReset;
 
-    var editableProps = ["TotalStorage","MinFilesize","MaxFilesize","MinDuration","MaxDuration","MinChallengeWindow","MaxChallengeWindow","MinTolerance","Price","Burn"];
+    var editableProps = ["TotalStorage","MaxFilesize","MaxDuration","MinTolerance","Price","Burn"];
 
     var lastHostSettings;
 
