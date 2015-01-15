@@ -70,19 +70,16 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go d.core.CatchUp(d.core.RandomPeer())
-	w.WriteHeader(200)
 }
 
 func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: this should return an error
 	d.core.AddPeer(network.Address(req.FormValue("addr")))
-	w.WriteHeader(200)
 }
 
 func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: this should return an error
 	d.core.RemovePeer(network.Address(req.FormValue("addr")))
-	w.WriteHeader(200)
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
@@ -141,7 +138,6 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	*/
-	w.WriteHeader(200)
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
@@ -154,7 +150,6 @@ func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
 		}
 	*/
-	w.WriteHeader(200)
 }
 
 func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
@@ -170,7 +165,6 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Download complete!")
 		}
 	*/
-	w.WriteHeader(200)
 }
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
@@ -189,7 +183,5 @@ func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := d.applyUpdate(req.FormValue("version"))
 	if err != nil {
 		http.Error(w, err.Error(), 500)
-	} else {
-		w.WriteHeader(200)
 	}
 }
