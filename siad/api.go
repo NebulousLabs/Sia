@@ -168,14 +168,14 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
-	available, err := d.checkForUpdate()
+	available, version, err := d.checkForUpdate()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	} else {
 		writeJSON(w, struct {
 			Available bool
 			Version   string
-		}{available, ""})
+		}{available, version})
 	}
 }
 

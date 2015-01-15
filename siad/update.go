@@ -54,10 +54,11 @@ func fetchManifest(version string) (string, []string, error) {
 }
 
 // checkForUpdate checks a centralized server for a more recent version of
-// Sia, and returns true if an update is available.
-func (d *daemon) checkForUpdate() (bool, error) {
-	currentVersion, _, err := fetchManifest("current")
-	return newerVersion(currentVersion), err
+// Sia. If an update is available, it returns true, along with the newer
+// version.
+func (d *daemon) checkForUpdate() (bool, string, error) {
+	version, _, err := fetchManifest("current")
+	return newerVersion(version), version, err
 }
 
 // applyUpdate downloads and applies an update.
