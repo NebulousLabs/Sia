@@ -233,18 +233,18 @@
 }
 #manage-account .header .button {
   display: inline-block;
-  margin-top: 19px;
   vertical-align: top;
   margin-left: 20px;
+  padding-top: 12px;
+  margin-left: 0px;
 }
 #manage-account .header .text {
   display: inline-block;
-  padding: 16px;
-  padding-left: 8px;
 }
 #manage-account .header .account-name {
   display: inline-block;
   color: #757575;
+  margin-left: 10px;
 }
 #manage-account .sumdisplay {
   padding: 16px;
@@ -519,6 +519,13 @@
 #hosting .host-config .control {
   border-top: 1px solid #e0e0e0;
   text-align: right;
+}
+#transfer-funds .subhead {
+  font-size: 24px;
+  padding-left: 16px;
+}
+#transfer-funds .right-column {
+  border-left: 1px solid #e0e0e0;
 }
 body {
   margin: 0px;
