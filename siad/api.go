@@ -17,16 +17,6 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
 
-	// Plaintext API
-	http.HandleFunc("/sync", d.syncHandler)
-	http.HandleFunc("/peer", d.peerHandler)
-	http.HandleFunc("/host", d.hostHandler)
-	http.HandleFunc("/rent", d.rentHandler)
-	http.HandleFunc("/download", d.downloadHandler)
-	http.HandleFunc("/status", d.statusHandler)
-	http.HandleFunc("/update", d.updateHandler)
-	http.HandleFunc("/stop", d.stopHandler)
-
 	// Wallet API Calls
 	http.HandleFunc("/wallet/address", d.walletAddressHandler)
 	http.HandleFunc("/wallet/send", d.walletSendHandler)
@@ -37,21 +27,33 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/miner/status", d.minerStatusHandler)
 	http.HandleFunc("/miner/stop", d.minerStopHandler)
 
-	// JSON API
-	http.HandleFunc("/json/status", d.jsonStatusHandler)
+	// File API Calls
+	http.HandleFunc("/host", d.hostHandler)
+	http.HandleFunc("/rent", d.rentHandler)
+	http.HandleFunc("/download", d.downloadHandler)
+
+	// Misc. API Calls
+	http.HandleFunc("/sync", d.syncHandler)
+	http.HandleFunc("/peer/add", d.peerAddHandler)
+	http.HandleFunc("/peer/remove", d.peerRemoveHandler)
+	http.HandleFunc("/status", d.statusHandler)
+	http.HandleFunc("/update/check", d.updateCheckHandler)
+	http.HandleFunc("/update/apply", d.updateApplyHandler)
+	http.HandleFunc("/stop", d.stopHandler)
 
 	http.ListenAndServe(addr, nil)
 }
 
-// jsonStatusHandler responds to a status call with a json object of the status.
-func (d *daemon) jsonStatusHandler(w http.ResponseWriter, req *http.Request) {
-	status := d.core.StateInfo()
-	resp, err := json.Marshal(status)
-	if err != nil {
-		http.Error(w, "Failed to encode status object", 500)
-		return
+// writeJSON writes the object to the ResponseWriter. If the encoding fails, an
+// error is written instead.
+func writeJSON(w http.ResponseWriter, obj interface{}) {
+	if json.NewEncoder(w).Encode(obj) != nil {
+		http.Error(w, "Failed to encode response", 500)
 	}
-	w.Write(resp)
+}
+
+func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, d.core.StateInfo())
 }
 
 func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
@@ -62,56 +64,31 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: don't spawn multiple CatchUps
-	// TODO: return error if no peers exist
+	if len(d.core.AddressBook()) == 0 {
+		http.Error(w, "No peers available for syncing", 500)
+		return
+	}
+
 	go d.core.CatchUp(d.core.RandomPeer())
-	fmt.Fprint(w, "Sync initiated")
 }
 
-func (d *daemon) peerHandler(w http.ResponseWriter, req *http.Request) {
-	addr := network.Address(req.FormValue("addr"))
-	switch req.FormValue("action") {
-	case "add":
-		d.core.AddPeer(addr)
-		fmt.Fprintf(w, "Added %s", req.FormValue("addr"))
-	case "remove":
-		d.core.RemovePeer(addr)
-		fmt.Fprintf(w, "Removed %s", req.FormValue("addr"))
-	default:
-		http.Error(w, "Invalid peer action", 400)
-	}
+func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: this should return an error
+	d.core.AddPeer(network.Address(req.FormValue("addr")))
+}
+
+func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
+	// TODO: this should return an error
+	d.core.RemovePeer(network.Address(req.FormValue("addr")))
 }
 
 func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 	// Create all of the variables that get scanned in.
-	// var ipAddress network.Address
 	var totalStorage int64
 	var minFilesize, maxFilesize, minTolerance uint64
 	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
 	var price, burn, freezeCoins consensus.Currency
-	var coinAddress consensus.CoinAddress
 
-	// Get the ip address.
-	// ipAddress = network.Address(req.FormValue("ipaddress"))
-
-	// The address can be either a coin address or a friend name
-	caString := req.FormValue("coinaddress")
-	// if ca, ok := e.friends[caString]; ok {
-	//	coinAddress = ca
-	// } else
-	if len(caString) != 64 {
-		http.Error(w, "Friend not found (or malformed coin address)", 400)
-		return
-	} else {
-		var coinAddressBytes []byte
-		_, err := fmt.Sscanf(caString, "%x", &coinAddressBytes)
-		if err != nil {
-			http.Error(w, "Malformed coin address", 400)
-			return
-		}
-		copy(coinAddress[:], coinAddressBytes)
-	}
-
-	// other vars require no special parsing
 	qsVars := map[string]interface{}{
 		"totalstorage":   &totalStorage,
 		"minfile":        &minFilesize,
@@ -161,8 +138,6 @@ func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	*/
-
-	fmt.Fprint(w, "Update successful")
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
@@ -192,65 +167,21 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 	*/
 }
 
-func (d *daemon) updateHandler(w http.ResponseWriter, req *http.Request) {
-	enc := json.NewEncoder(w)
-
-	switch req.FormValue("action") {
-	case "check":
-		available, err := d.checkForUpdate()
-		enc.Encode(struct {
+func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
+	available, version, err := d.checkForUpdate()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	} else {
+		writeJSON(w, struct {
 			Available bool
-			Error     string
-		}{available, err.Error()})
-
-	case "apply":
-		applied, err := d.applyUpdate()
-		enc.Encode(struct {
-			Applied bool
-			Error   string
-		}{applied, err.Error()})
-
-	default:
-		http.Error(w, "Unrecognized action", 400)
-		return
+			Version   string
+		}{available, version})
 	}
 }
 
-// TODO: this should probably just return JSON. Leave formatting to the client.
-func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
-	info := d.core.StateInfo()
-
-	// set mining status
-	mineStatus := "OFF"
-
-	// create peer listing
-	peers := "\n"
-	for _, addr := range d.core.AddressBook() {
-		peers += fmt.Sprintf("\t\t%s\n", addr)
+func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
+	err := d.applyUpdate(req.FormValue("version"))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
 	}
-
-	// create friend listing
-	/*
-		friends := "\n"
-		for name, address := range d.core.FriendMap() {
-			friends += fmt.Sprintf("\t\t%v\t%x\n", name, address)
-		}
-	*/
-
-	// write stats to ResponseWriter
-	fmt.Fprintf(w, `General Information:
-
-	Mining Status: %s
-
-	Wallet Balance: %v
-	Full Wallet Balance: %v
-
-	Current Block Height: %v
-	Current Block Target: %v
-	Current Block Depth: %v
-
-	Networked Peers: %s`,
-		mineStatus, d.core.WalletBalance(false), d.core.WalletBalance(true),
-		info.Height, info.Target, info.Depth, peers,
-	)
 }

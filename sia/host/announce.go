@@ -9,8 +9,8 @@ import (
 // HostAnnounceSelf creates a host announcement transaction, adding
 // information to the arbitrary data and then signing the transaction.
 func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (t consensus.Transaction, err error) {
-	h.lock()
-	defer h.unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	// Get the encoded announcement based on the host settings.
 	info := h.announcement

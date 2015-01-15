@@ -24,7 +24,7 @@ type HostDB struct {
 	activeHosts   map[string]*hostNode
 	inactiveHosts map[string]*components.HostEntry
 
-	rwLock sync.RWMutex
+	mu sync.RWMutex
 }
 
 // New returns an empty HostDatabase.
@@ -58,8 +58,8 @@ func (hdb *HostDB) insert(entry components.HostEntry) error {
 // sometimes insert needs to be called internally when there is already a lock
 // in place.
 func (hdb *HostDB) Insert(entry components.HostEntry) error {
-	hdb.lock()
-	defer hdb.unlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	return hdb.insert(entry)
 }
 
@@ -74,8 +74,8 @@ func (hdb *HostDB) FlagHost(id string) error {
 
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) Remove(id string) error {
-	hdb.lock()
-	defer hdb.unlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[id]
@@ -100,8 +100,8 @@ func (hdb *HostDB) Remove(id string) error {
 
 // Update throws a bunch of blocks at the hostdb to be integrated.
 func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) (err error) {
-	hdb.lock()
-	defer hdb.unlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 
 	// Remove hosts found in blocks that were rewound. Because the hostdb is
 	// like a stack, you can just pop the hosts and be certain that they are
@@ -143,8 +143,8 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 // RandomHost pulls a random host from the hostdb weighted according to
 // whatever internal metrics exist within the hostdb.
 func (hdb *HostDB) RandomHost() (h components.HostEntry, err error) {
-	hdb.rLock()
-	defer hdb.rUnlock()
+	hdb.mu.RLock()
+	defer hdb.mu.RUnlock()
 	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
 		return
