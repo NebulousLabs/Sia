@@ -177,7 +177,6 @@ var ui = (function(){
         "manage-account->transfer-funds": "slideleft",
         "transfer-funds->manage-account": "slideright"
     };
-    var lastData;
     var eTooltip;
     var eventListeners = {};
 
@@ -194,10 +193,7 @@ var ui = (function(){
         }
 
         // Refresh the new view's data
-        ui["_" + newView].update(lastData);
-
-        // Call the view onViewOpened event
-        if (ui["_" + newView].onViewOpened) ui["_" + newView].onViewOpened();
+        ui["_" + newView].update(ui._data);
 
         // Make the currently selected button greyed
         $("#sidebar .current").removeClass("current");
@@ -340,7 +336,7 @@ var ui = (function(){
         viewNames.forEach(function(view){
             ui["_" + view].update(data);
         });
-        lastData = data;
+        ui._data = data;
     }
 
     // Triggers an event, many ui actions cause triggers
@@ -400,6 +396,7 @@ var ui = (function(){
         "addListener": addListener,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
+        "_data": null,
         "help": help,
         "init": init
     };
