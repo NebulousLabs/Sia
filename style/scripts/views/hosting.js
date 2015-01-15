@@ -1,8 +1,10 @@
 ui._hosting = (function(){
 
-    var view, ePropBlueprint, ePreset16GB, ePreset32GB, ePreset64GB, eProps, eControl;
+    var view, ePropBlueprint, ePreset16GB, ePreset32GB, ePreset64GB, eProps, eControl, eSave, eReset;
 
     var editableProps = ["TotalStorage","MinFilesize","MaxFilesize","MinDuration","MaxDuration","MinChallengeWindow","MaxChallengeWindow","MinTolerance","Price","Burn"];
+
+    var lastHostSettings;
 
     function init(){
 
@@ -14,11 +16,36 @@ ui._hosting = (function(){
         ePreset64GB = view.find(".preset3");
         eControl = view.find(".control");
         eProps = $();
+        eSave = view.find(".control .save");
+        eReset = view.find(".control .reset");
 
+        addEvents();
+    }
+
+    function addEvents(){
+        eSave.click(function(){
+            ui._tooltip(this, "Saving");
+            ui._trigger("save-host-config", parseHostSettings());
+        });
+        eReset.click(function(){
+            ui._tooltip(this, "Reseting");
+            for (var i = 0;i < editableProps.length;i ++){
+                var item = $(eProps[i]);
+                // item.find(".value").text(lastHostSettings[editableProps[i]]);
+            }
+        });
+    }
+
+    function parseHostSettings(){
+        var newSettings = {};
+        for (var i = 0;i < editableProps.length;i ++){
+            var item = $(eProps[i]);
+            newSettings[editableProps[i]] = item.find(".value").text();
+        }
+        return newSettings;
     }
 
     function update(data){
-        console.log(data);
         // If this is the first time, create and load all properties
         if (eProps.length === 0){
             for (var i = 0; i < editableProps.length; i++){
@@ -30,6 +57,8 @@ ui._hosting = (function(){
                 // item.find(".value").text(data.hosting.HostingSettings[editableProps[i]]);
             }
         }
+
+        // lastHostSettings = data.hosting.HostingSettings;
 
     }
 

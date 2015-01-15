@@ -48,6 +48,12 @@ var controller = (function(){
                 console.log(e);
             });
         });
+        ui.addListener("save-host-config", function(hostSettings){
+            /*$.get("/hosting/setsettings", function(e){
+                // TODO: handle error
+                console.log(e);
+            });*/
+        });
     }
 
     var lastUpdateTime = Date.now();
