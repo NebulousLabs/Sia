@@ -39,7 +39,7 @@ func startDaemon(config Config) (err error) {
 	}
 
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
-	Wallet, err := wallet.New(config.Siad.WalletFile)
+	Wallet, err := wallet.New(state, config.Siad.WalletFile)
 	if err != nil {
 		return
 	}

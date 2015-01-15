@@ -23,7 +23,8 @@ import (
 // within the wallet. The transactionCounter ensures that each
 // transaction-in-progress gets a unique ID.
 type Wallet struct {
-	state *consensus.State
+	state      *consensus.State
+	prevHeight consensus.BlockHeight // TODO: This will deprecate when we switch to state subscriptions.
 
 	saveFilename string
 
