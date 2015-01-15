@@ -31,10 +31,11 @@ func newerVersion(version string) bool {
 		// inputs are trusted, so no need to check the error
 		ni, _ := strconv.Atoi(nums[i])
 		Ni, _ := strconv.Atoi(NUMS[i])
-		if ni > Ni {
-			return true
+		if ni != Ni {
+			return ni > Ni
 		}
 	}
+	// versions are equal
 	return false
 }
 
