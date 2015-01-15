@@ -328,6 +328,7 @@
   display: inline-block;
   padding-left: 16px;
   padding-top: 10px;
+  padding-right: 16px;
   color: #757575;
 }
 #files .header .costusd {
@@ -335,6 +336,7 @@
   padding: 10px;
   padding-left: 0px;
   padding-right: 16px;
+  display: none;
 }
 #files .cloud-control {
   color: #9e9e9e;
@@ -484,9 +486,15 @@
 }
 #hosting .host-config .title {
   padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+#hosting .host-config .title .text {
+  display: inline-block;
   font-size: 32px;
   color: #9e9e9e;
-  border-bottom: 1px solid #e0e0e0;
+}
+#hosting .host-config .title .capsule {
+  float: right;
 }
 #hosting .host-config .property {
   border-bottom: 1px solid #e0e0e0;
