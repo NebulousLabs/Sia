@@ -4,7 +4,6 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
 
     function init(){
         view = $("#transfer-funds");
-
     }
 
     function addEvents(){
@@ -14,8 +13,21 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
     function update(){
     }
 
+
+    // Sets where funds should be coming out of
+    function setFrom(type, info){
+
+    }
+
+    // Sets where funds should be going to
+    function setTo(type, info){
+
+    }
+
     return {
         init:init,
-        update:update
+        update:update,
+        setFrom: setFrom,
+        setTo: setTo
     };
 })();

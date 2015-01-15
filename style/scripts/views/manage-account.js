@@ -45,7 +45,7 @@ ui._manageAccount = ui["_manage-account"] = (function(){
             ui._trigger("create-address", accountName);
         });
         eSendMoney.click(function(){
-            ui._transferFunds.setFrom(accountName);
+            ui._transferFunds.setFrom("account", accountName);
             ui.switchView("transfer-funds");
         });
         eTransferFunds.click(function(){
