@@ -194,6 +194,9 @@ var ui = (function(){
         // Refresh the new view's data
         ui["_" + newView].update(lastData);
 
+        // Call the view onViewOpened event
+        if (ui["_" + newView].onViewOpened) ui["_" + newView].onViewOpened();
+
         // Make the currently selected button greyed
         $("#sidebar .current").removeClass("current");
         $("." + newView + "-button").addClass("current");

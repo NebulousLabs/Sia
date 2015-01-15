@@ -27,6 +27,7 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
     return {
         init:init,
         update:update,
+        onViewOpened: onViewOpened,
         setFrom: setFrom,
         setTo: setTo
     };
