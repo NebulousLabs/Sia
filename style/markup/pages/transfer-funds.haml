@@ -11,17 +11,19 @@
                     .eqn.current-balance
                         .text Balance
                         .unit SC
-                        .amt 32.001
+                        .amt.current-balance 32.001
                     .eqn.transfer-amt
                         .text Transfer
                         .unit SC
-                        .amt.input 2.142
-                        %i.icon.fa.fa-pencil
+                        .amt.input.field-transfer-amt
+                            %i.icon.fa.fa-pencil
+                            2.142
                     .eqn.final-balance
                         .text Final Balance
                         .unit SC
-                        .amt.input 28.859
-                        %i.icon.fa.fa-pencil
+                        .amt.input.field-final-balance
+                            %i.icon.fa.fa-pencil
+                            28.859
         .col-xs-6.right-column
             .to-column
                 .subhead
@@ -30,4 +32,5 @@
                 .address
                     .eqn
                         .text SC Address
-                        .amt.input &nbsp;
+                        .amt.input.field-address
+                            %i.icon.fa.fa-pencil
