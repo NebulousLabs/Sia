@@ -17,7 +17,7 @@ func testSendToSelf(t *testing.T, c *Core) {
 	originalBalance := c.wallet.Balance(false)
 
 	// Get a new coin address from the wallet and send the coins to yourself.
-	dest, err := c.wallet.CoinAddress()
+	dest, _, err := c.wallet.CoinAddress()
 	if err != nil {
 		t.Error(err)
 		return

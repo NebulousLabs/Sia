@@ -13,7 +13,7 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	prevSize := c.hostDB.Size()
 
 	// Add test settings to the host.
-	coinAddress, err := c.wallet.CoinAddress()
+	coinAddress, _, err := c.wallet.CoinAddress()
 	if err != nil {
 		t.Fatal(err)
 	}

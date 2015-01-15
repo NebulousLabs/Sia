@@ -2,6 +2,8 @@ package sia
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/consensus"
 )
 
 // mineSingleBlock mines a single block and then uses the blocking function
