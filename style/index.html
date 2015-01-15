@@ -23,6 +23,7 @@
           ui.init();
           controller.init();
           setTimeout(function(){
+              ui._transferFunds.setFrom("account", "Main Account");
               $("#overview").hide();
               $("#transfer-funds").show();
           },100);
@@ -447,6 +448,9 @@
                 </div>
               </div>
               <div class='control'>
+                <div class='warning'>
+                  Warning: Changing hosting configuration values frequently will decrease your selection by potential clients
+                </div>
                 <div class='button reset'>
                   <i class='fa fa-refresh'></i>
                   Reset
@@ -466,14 +470,14 @@
               <div class='col-xs-6'>
                 <div class='from-column'>
                   <div class='subhead'>
-                    Transferring from Savings
                     <i class='fa fa-sign-out'></i>
+                    Transferring from Savings
                   </div>
                   <div class='account'>
                     <div class='eqn current-balance'>
                       <div class='text'>Balance</div>
                       <div class='unit'>SC</div>
-                      <div class='amt current-balance'>32.001</div>
+                      <div class='amt'>32.001&nbsp;</div>
                     </div>
                     <div class='eqn transfer-amt'>
                       <div class='text'>Transfer</div>
@@ -502,13 +506,27 @@
                   </div>
                   <div class='address'>
                     <div class='eqn'>
-                      <div class='text'>SC Address</div>
+                      <div class='text address-title'>SC Address</div>
                       <div class='amt input field-address'>
                         <i class='icon fa fa-pencil'></i>
                       </div>
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+            <div class='control'>
+              <div class='summary'>
+                Transferring
+                <div class='amt'>2.142 SC</div>
+                from
+                <div class='from'>Savings Account</div>
+                to
+                <div class='to'>0cc175bd71c7...</div>
+              </div>
+              <div class='button send-money'>
+                <i class='fa fa-send'></i>
+                Send Funds
               </div>
             </div>
           </div>
