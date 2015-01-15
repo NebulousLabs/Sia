@@ -6,14 +6,28 @@
             .from-column
                 .subhead
                     Transferring from Savings
+                    %i.fa.fa-sign-out
                 .account
-                    .current-balance 32.001 SC
-                    .transfer-amt 2.142 SC
-                    .final-balance 28.859 SC
-        .col-xs-6
+                    .eqn.current-balance
+                        .text Balance
+                        .unit SC
+                        .amt 32.001
+                    .eqn.transfer-amt
+                        .text Transfer
+                        .unit SC
+                        .amt.input 2.142
+                        %i.icon.fa.fa-pencil
+                    .eqn.final-balance
+                        .text Final Balance
+                        .unit SC
+                        .amt.input 28.859
+                        %i.icon.fa.fa-pencil
+        .col-xs-6.right-column
             .to-column
                 .subhead
-                    Transferring to <b>Address</b>
+                    %i.fa.fa-sign-in
+                    Transferring to Address
                 .address
-                    Address:
-                    .input
+                    .eqn
+                        .text SC Address
+                        .amt.input &nbsp;

@@ -1,0 +1,69 @@
+#transfer-funds{
+
+    font-size:24px;
+    color:@g600;
+
+    .subhead{
+        font-size:24px;
+        padding-left:16px;
+        padding-bottom:16px;
+        border-bottom:1px solid @g300;
+    }
+    .right-column{
+        border-left:1px solid @g300;
+    }
+    .from-column i{
+        padding-left:10px;
+    }
+    .to-column i{
+        padding-right:10px;
+    }
+
+    .from-column{
+        min-height:400px;
+    }
+
+    .to-column{
+        min-height:400px;
+    }
+
+    .eqn{
+        // border-top:1px dashed @g200;
+
+        padding:10px;
+        padding-left:16px;
+        padding-right:16px;
+
+        .text{
+            .i;
+        }
+        .amt{
+            .i;
+            float:right;
+        }
+        .amt.input{
+            min-height:30px;
+            min-width:100px;
+            text-align:right;
+            padding-right:8px;
+            border-bottom:1px dashed @g400;
+            border-radius:4px;
+        }
+        .unit{
+            .i;
+            float:right;
+        }
+        .icon{
+            float:right;
+            font-size:14px;
+            padding-top:12px;
+            color:@g500;
+        }
+    }
+    .eqn:first-child{
+        border-top:0;
+    }
+    .eqn:last-child{
+        border-top:1px solid @g300;
+    }
+}

@@ -22,6 +22,10 @@
       $(window).ready(function(){
           ui.init();
           controller.init();
+          setTimeout(function(){
+              $("#overview").hide();
+              $("#transfer-funds").show();
+          },100);
       });
     </script>
   </head>
@@ -463,22 +467,40 @@
                 <div class='from-column'>
                   <div class='subhead'>
                     Transferring from Savings
+                    <i class='fa fa-sign-out'></i>
                   </div>
                   <div class='account'>
-                    <div class='current-balance'>32.001 SC</div>
-                    <div class='transfer-amt'>2.142 SC</div>
-                    <div class='final-balance'>28.859 SC</div>
+                    <div class='eqn current-balance'>
+                      <div class='text'>Balance</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt'>32.001</div>
+                    </div>
+                    <div class='eqn transfer-amt'>
+                      <div class='text'>Transfer</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt input'>2.142</div>
+                      <i class='icon fa fa-pencil'></i>
+                    </div>
+                    <div class='eqn final-balance'>
+                      <div class='text'>Final Balance</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt input'>28.859</div>
+                      <i class='icon fa fa-pencil'></i>
+                    </div>
                   </div>
                 </div>
               </div>
               <div class='col-xs-6 right-column'>
                 <div class='to-column'>
                   <div class='subhead'>
+                    <i class='fa fa-sign-in'></i>
                     Transferring to Address
                   </div>
                   <div class='address'>
-                    Address:
-                    <div class='input'></div>
+                    <div class='eqn'>
+                      <div class='text'>SC Address</div>
+                      <div class='amt input'>&nbsp;</div>
+                    </div>
                   </div>
                 </div>
               </div>
