@@ -484,6 +484,11 @@
   border-radius: 4px;
   background-color: #fff;
 }
+#hosting .host-config .properties {
+  height: 400px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 #hosting .host-config .title {
   padding: 10px;
   border-bottom: 1px solid #e0e0e0;
@@ -511,6 +516,7 @@
   padding: 10px;
 }
 #hosting .host-config .control {
+  border-top: 1px solid #e0e0e0;
   text-align: right;
 }
 body {

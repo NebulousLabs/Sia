@@ -51,11 +51,12 @@ ui._hosting = (function(){
             for (var i = 0; i < editableProps.length; i++){
                 var item = ePropBlueprint.clone().removeClass("blueprint");
                 ePropBlueprint.parent().append(item);
-                eProps.add(item);
+                eProps = eProps.add(item);
                 item.find(".name").text(editableProps[i]);
-                view.append(eControl);
                 // item.find(".value").text(data.hosting.HostingSettings[editableProps[i]]);
             }
+            // Make control on top
+            view.ePropBlueprint.parent().append(eControl);
         }
 
         // lastHostSettings = data.hosting.HostingSettings;
