@@ -360,7 +360,10 @@ var ui = (function(){
         console.log("Event Triggered:",event);
         var callbacks = eventListeners[event] || [];
         for (var i = 0;i < callbacks.length;i++){
-            callbacks[i].apply(this, Array.prototype.slice.call(arguments).slice(1,arguments.length));
+            // Convert the arguments to trigger to an array so we can slice off
+            // the first parameter (event)
+            var argumentArray = Array.prototype.slice.call(arguments);
+            callbacks[i].apply(this, argumentArray.slice(1,arguments.length));
         }
     }
 
