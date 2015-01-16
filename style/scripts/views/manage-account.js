@@ -41,10 +41,13 @@ ui._manageAccount = ui["_manage-account"] = (function(){
             ui._tooltip(this, "Not Implemented");
         });
         eCreateAddress.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._tooltip(this, "Creating Address");
+            ui._trigger("create-address", accountName);
         });
         eSendMoney.click(function(){
-            ui._tooltip(this, "Not Implemented");
+            ui._transferFunds.setFrom("account", accountName);
+            ui._transferFunds.setTo("address");
+            ui.switchView("transfer-funds");
         });
         eTransferFunds.click(function(){
             ui._tooltip(this, "Not Implemented");
@@ -65,7 +68,7 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         eAccountName.text(accountName);
     }
 
-    function update(data){
+    function onViewOpened(data){
 
         // Find specified account
         var account;
@@ -128,6 +131,6 @@ ui._manageAccount = ui["_manage-account"] = (function(){
     return {
         init:init,
         setAccount: setAccount,
-        update:update
+        onViewOpened:onViewOpened
     };
 })();

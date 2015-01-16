@@ -20,8 +20,13 @@ var util = (function(){
         return balance * 0.0000000172;
     }
 
+    function limitPrecision(number,precision){
+        return number.toString().slice(0,precision+1);
+    }
+
     return {
         "engNotation": engNotation,
-        "USDConvert": USDConvert
+        "USDConvert": USDConvert,
+        "limitPrecision": limitPrecision
     };
 })();

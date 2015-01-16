@@ -106,7 +106,7 @@
                 <div class='hosting-status pod button disabled'>Hosting Off</div>
               </div>
             </div>
-            <div class='header'>
+            <div class='subhead'>
               <div class='sumdisplay'>
                 Balance
                 <div class='amt'>4.60010 SC</div>
@@ -419,83 +419,38 @@
               </div>
             </div>
             <div class='host-config'>
-              <div class='title'>Configure Hosting</div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
+              <div class='title'>
+                <div class='text'>Configure Hosting</div>
+                <div class='capsule'>
+                  <div class='pod'>
+                    Presets
                   </div>
-                  <div class='col-xs-8'>
-                    <div class='value' contentEditable='true'>0</div>
-                  </div>
+                  <div class='pod button preset1'>16 GB</div>
+                  <div class='pod button preset2'>32 GB</div>
+                  <div class='pod button preset3'>64 GB</div>
                 </div>
               </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
-                  </div>
-                </div>
-              </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
-                  </div>
-                </div>
-              </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
-                  </div>
-                </div>
-              </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
-                  </div>
-                </div>
-              </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
-                  </div>
-                </div>
-              </div>
-              <div class='property'>
-                <div class='row'>
-                  <div class='col-xs-4'>
-                    <div class='name'>Property Name</div>
-                  </div>
-                  <div class='col-xs-8'>
-                    <div class='value'>0</div>
+              <div class='properties'>
+                <div class='property blueprint'>
+                  <div class='row'>
+                    <div class='col-xs-4'>
+                      <div class='name'>Property Name</div>
+                    </div>
+                    <div class='col-xs-8'>
+                      <div class='value' contentEditable='true'>0</div>
+                    </div>
                   </div>
                 </div>
               </div>
               <div class='control'>
-                <div class='button'>
+                <div class='warning'>
+                  Warning: Changing hosting configuration values frequently will reduce client selections
+                </div>
+                <div class='button reset'>
                   <i class='fa fa-refresh'></i>
                   Reset
                 </div>
-                <div class='button'>
+                <div class='button save'>
                   <i class='fa fa-save'></i>
                   Save
                 </div>
@@ -504,7 +459,73 @@
           </div>
           <div id='transfer-funds'>
             <div class='header'>
+              <div class='back button'>
+                <i class='fa fa-chevron-left'></i>
+              </div>
               <div class='title'>Transfer Funds</div>
+            </div>
+            <div class='row'>
+              <div class='col-xs-6'>
+                <div class='from-column'>
+                  <div class='subhead'>
+                    <i class='fa fa-sign-out'></i>
+                    Transferring from Savings
+                  </div>
+                  <div class='account'>
+                    <div class='eqn current-balance'>
+                      <div class='text'>Balance</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt'>32.001&nbsp;</div>
+                    </div>
+                    <div class='eqn transfer-amt'>
+                      <div class='text'>Transfer</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt input field-transfer'>
+                        <i class='icon fa fa-pencil'></i>
+                        2.142
+                      </div>
+                    </div>
+                    <div class='eqn final-balance'>
+                      <div class='text'>Final Balance</div>
+                      <div class='unit'>SC</div>
+                      <div class='amt input field-final-balance'>
+                        <i class='icon fa fa-pencil'></i>
+                        28.859
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class='col-xs-6 right-column'>
+                <div class='to-column'>
+                  <div class='subhead'>
+                    <i class='fa fa-sign-in'></i>
+                    Transferring to Address
+                  </div>
+                  <div class='address'>
+                    <div class='eqn'>
+                      <div class='text address-title'>SC Address</div>
+                      <div class='amt input field-address'>
+                        <i class='icon fa fa-pencil'></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class='control'>
+              <div class='summary'>
+                Transferring
+                <div class='amt'>2.142 SC</div>
+                from
+                <div class='from'>Savings Account</div>
+                to
+                <div class='to'>0cc175bd71c7...</div>
+              </div>
+              <div class='button send-money'>
+                <i class='fa fa-send'></i>
+                Send Funds
+              </div>
             </div>
           </div>
         </div>

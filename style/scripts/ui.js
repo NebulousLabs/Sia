@@ -173,9 +173,10 @@ var ui = (function(){
     var viewNames = ["overview", "money", "manage-account", "files", "hosting", "mining", "transfer-funds"];
     var transitionTypes = {
         "money->manage-account": "slideleft",
-        "manage-account->money": "slideright"
+        "manage-account->money": "slideright",
+        "manage-account->transfer-funds": "slideleft",
+        "transfer-funds->manage-account": "slideright"
     };
-    var lastData;
     var eTooltip;
     var eventListeners = {};
 
@@ -192,7 +193,10 @@ var ui = (function(){
         }
 
         // Refresh the new view's data
-        ui["_" + newView].update(lastData);
+        if (ui["_" + newView].update) ui["_" + newView].update(ui._data);
+
+        // Call the onViewOpened event if the view has it
+        if (ui["_" + newView].onViewOpened) ui["_" + newView].onViewOpened(ui._data);
 
         // Make the currently selected button greyed
         $("#sidebar .current").removeClass("current");
@@ -217,26 +221,37 @@ var ui = (function(){
 
     }
 
-    function startLoadingAnimation(){
+    function startLoadingAnimation(effects){
+        if (!effects) effects = {fade:true};
         // Position rotating loader icon in center of content
         $("#loader").css({
             "left": $("#content").width()/2 - $("#loader").width()/2,
             "top": "250px"
         });
 
-        // Animate the loader in
-        $("#loader").stop().fadeIn();
+        if (effects.fade){
+            // Animate the loader in
+            $("#loader").stop().fadeIn();
 
-        // Make all content (excluding the loader) non-visible
-        $("#content").children().filter(function(i){
-            return this != $("#loader")[0];
-        }).fadeOut();
+            // Make all content (excluding the loader) non-visible
+            $("#content").children().filter(function(i){
+                return this != $("#loader")[0];
+            }).stop().fadeOut();
+        }else{
+            $("#loader").stop().show();
+        }
     }
 
-    function stopLoadingAnimation(newView){
+    function stopLoadingAnimation(newView,effects){
+        if (!effects) effects = {fade:true};
         currentView = newView;
-        $("#loader").stop().fadeOut();
-        $("#" + newView).fadeIn();
+
+        if (effects.fade){
+            $("#loader").stop().fadeOut();
+            $("#" + newView).stop().fadeIn();
+        }else{
+            $("#loader").stop().hide();
+        }
     }
 
     function slideAnimation(newView, directionString){
@@ -303,7 +318,11 @@ var ui = (function(){
             "update": "update(<json data object>) \
             \nData object generated from requests from server, see top of ui.js",
             "addListener": "addListener(<string event>, <function callback>)\
-            \nAdd listener when a ui event occurs"
+            \nAdd listener when a ui event occurs",
+            "wait": "wait()\
+            \nShows loading icon until stopWaiting() is called",
+            "stopWaiting": "stopWaiting()\
+            \nAllows user to continue using UI after wait() call"
         }[functionName];
     }
 
@@ -333,9 +352,18 @@ var ui = (function(){
 
     function update(data){
         viewNames.forEach(function(view){
-            ui["_" + view].update(data);
+            if (ui["_" + view].update) ui["_" + view].update(data);
         });
-        lastData = data;
+        ui._data = data;
+    }
+
+    function wait(){
+        startLoadingAnimation({fade:false});
+    }
+
+    function stopWaiting(){
+        if (ui["_" + currentView].onViewOpened) ui["_" + currentView].onViewOpened(ui._data);
+        stopLoadingAnimation(currentView,{fade:false});
     }
 
     // Triggers an event, many ui actions cause triggers
@@ -343,7 +371,10 @@ var ui = (function(){
         console.log("Event Triggered:",event);
         var callbacks = eventListeners[event] || [];
         for (var i = 0;i < callbacks.length;i++){
-            callbacks[i]();
+            // Convert the arguments to trigger to an array so we can slice off
+            // the first parameter (event)
+            var argumentArray = Array.prototype.slice.call(arguments);
+            callbacks[i].apply(this, argumentArray.slice(1,arguments.length));
         }
     }
 
@@ -393,8 +424,11 @@ var ui = (function(){
         "switchView": switchView,
         "update": update,
         "addListener": addListener,
+        "wait": wait,
+        "stopWaiting": stopWaiting,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
+        "_data": null,
         "help": help,
         "init": init
     };

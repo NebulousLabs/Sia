@@ -11,53 +11,27 @@
             .pod
                 Hosting
     .host-config
-        .title Configure Hosting
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value{:contentEditable=>:true} 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
-        .property
-            .row
-                .col-xs-4
-                    .name Property Name
-                .col-xs-8
-                    .value 0
+        .title
+            .text Configure Hosting
+            .capsule
+                .pod
+                    Presets
+                .pod.button.preset1 16 GB
+                .pod.button.preset2 32 GB
+                .pod.button.preset3 64 GB
+        .properties
+            .property.blueprint
+                .row
+                    .col-xs-4
+                        .name Property Name
+                    .col-xs-8
+                        .value{:contentEditable=>:true} 0
         .control
-            .button
+            .warning
+                Warning: Changing hosting configuration values frequently will reduce client selections
+            .button.reset
                 %i.fa.fa-refresh
                 Reset
-            .button
+            .button.save
                 %i.fa.fa-save
                 Save

@@ -54,7 +54,7 @@ ui._money = (function(){
         });
     }
 
-    function update(data){
+    function onViewOpened(data){
         eBalance.html(util.engNotation(data.wallet.Balance) + "SC");
         if (data.wallet.USDBalance !== undefined){
             eUSDBalance.html("&asymp; " + util.engNotation(data.wallet.USDBalance) + "USD");
@@ -82,6 +82,6 @@ ui._money = (function(){
 
     return {
         init:init,
-        update:update
+        onViewOpened:onViewOpened
     };
 })();

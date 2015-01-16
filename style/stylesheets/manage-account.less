@@ -1,81 +1,83 @@
 #manage-account{
+
     padding-left:14px;
-}
-#manage-account .header{
-    .title-text;
-    padding:0;
-    border-bottom:1px solid @g200;
-}
-#manage-account .header .button{
-    .i;
-    margin-top:19px;
-    vertical-align:top;
-    margin-left:20px;
-}
-#manage-account .header .text{
-    .i;
-    padding:16px;
-    padding-left:8px;
-}
-#manage-account .header .account-name{
-    .i;
-    color:@g600;
-}
 
-#manage-account .sumdisplay{
-    padding:16px;
-}
+    .header{
+        .title-text;
+        padding:0;
+        border-bottom:1px solid @g200;
+    }
+    .header .button{
+        .i;
+        vertical-align:top;
+        margin-left:20px;
+        padding-top:12px;
+        margin-left:0px;
+    }
+    .header .text{
+        .i;
+    }
+    .header .account-name{
+        .i;
+        color:@g600;
+        margin-left:10px;
+    }
 
-#manage-account .addresses, #manage-account .transactions{
-    color:@g600;
-    font-size:18px;
-    height:300px;
-    border:1px solid @g300;
-    border-radius:4px;
-}
-#manage-account .addresses .items, #manage-account .transactions .items{
-    padding:8px;
-    padding-right:16px;
-    overflow-x:hidden;
-    overflow-y:auto;
-}
-#manage-account .transactions{
-    margin-right:20px;
-}
-#manage-account .addresses .title, #manage-account .transactions .title{
-    font-size:24px;
-    margin-bottom:4px;
-    border-bottom:1px solid @g300;
-    padding:8px;
-    padding-left:16px;
-}
-#manage-account .addresses .item .address{
-    .i;
-    font-size:18px;
-}
-#manage-account .addresses .item .amt{
-    .i;
-    float:right;
-    font-size:18px;
-}
-#manage-account .transactions{
-}
-#manage-account .transactions .item .date{
-    .i;
-}
-#manage-account .transactions .item .icon{
-    .i;
-    float:right;
-    margin-right:8px;
-}
-#manage-account .transactions .item .amt{
-    .i;
-    width:80px;
-    text-align:left;
-    float:right;
-}
-#manage-account .account-control-buttons{
-    text-align:right;
-    padding-top:16px;
-    padding-right:32px;
+    .sumdisplay{
+        padding:16px;
+    }
+
+    .addresses, .transactions{
+        color:@g600;
+        font-size:18px;
+        border:1px solid @g300;
+        border-radius:4px;
+    }
+    .addresses .items, .transactions .items{
+        padding:8px;
+        padding-right:16px;
+        overflow-x:hidden;
+        overflow-y:auto;
+        height:200px;
+    }
+    .transactions{
+        margin-right:20px;
+    }
+    .addresses .title, .transactions .title{
+        font-size:24px;
+        margin-bottom:4px;
+        border-bottom:1px solid @g300;
+        padding:8px;
+        padding-left:16px;
+    }
+    .addresses .item .address{
+        .i;
+        font-size:14px;
+    }
+    .addresses .item .amt{
+        .i;
+        display:none;
+        font-size:14px;
+    }
+    .transactions{
+    }
+    .transactions .item .date{
+        .i;
+    }
+    .transactions .item .icon{
+        .i;
+        float:right;
+        margin-right:8px;
+    }
+    .transactions .item .amt{
+        .i;
+        width:80px;
+        text-align:left;
+        float:right;
+    }
+    .account-control-buttons{
+        text-align:right;
+        padding-top:16px;
+        padding-right:32px;
+    }
 }
