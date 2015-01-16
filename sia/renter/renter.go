@@ -31,6 +31,13 @@ type Renter struct {
 	mu sync.RWMutex
 }
 
+func (r *Renter) RentInfo() (ri components.RentInfo, err error) {
+	for key := range r.files {
+		ri.Files = append(ri.Files, key)
+	}
+	return
+}
+
 func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter, err error) {
 	if state == nil {
 		err = errors.New("renter.New: cannot have nil state")
