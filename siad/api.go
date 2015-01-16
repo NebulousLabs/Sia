@@ -129,7 +129,7 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
-	available, version, err := d.checkForUpdate()
+	available, version, err := checkForUpdate()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	} else {
@@ -141,7 +141,7 @@ func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.applyUpdate(req.FormValue("version"))
+	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	}
