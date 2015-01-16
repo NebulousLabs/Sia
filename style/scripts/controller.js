@@ -63,7 +63,10 @@ var controller = (function(){
                 "dest": address
             }, function(data){
                 // TODO: Handle error
-                ui.stopWaiting();
+                updateWallet(function(){
+                    ui.stopWaiting();
+                    ui.switchView("manage-account");
+                });
                 console.log(data);
             }).error(function(){
                 console.log(arguments);

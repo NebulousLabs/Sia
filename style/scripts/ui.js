@@ -221,26 +221,37 @@ var ui = (function(){
 
     }
 
-    function startLoadingAnimation(){
+    function startLoadingAnimation(effects){
+        if (!effects) effects = {fade:true};
         // Position rotating loader icon in center of content
         $("#loader").css({
             "left": $("#content").width()/2 - $("#loader").width()/2,
             "top": "250px"
         });
 
-        // Animate the loader in
-        $("#loader").stop().fadeIn();
+        if (effects.fade){
+            // Animate the loader in
+            $("#loader").stop().fadeIn();
 
-        // Make all content (excluding the loader) non-visible
-        $("#content").children().filter(function(i){
-            return this != $("#loader")[0];
-        }).fadeOut();
+            // Make all content (excluding the loader) non-visible
+            $("#content").children().filter(function(i){
+                return this != $("#loader")[0];
+            }).stop().fadeOut();
+        }else{
+            $("#loader").stop().show();
+        }
     }
 
-    function stopLoadingAnimation(newView){
+    function stopLoadingAnimation(newView,effects){
+        if (!effects) effects = {fade:true};
         currentView = newView;
-        $("#loader").stop().fadeOut();
-        $("#" + newView).fadeIn();
+
+        if (effects.fade){
+            $("#loader").stop().fadeOut();
+            $("#" + newView).stop().fadeIn();
+        }else{
+            $("#loader").stop().hide();
+        }
     }
 
     function slideAnimation(newView, directionString){
@@ -347,12 +358,12 @@ var ui = (function(){
     }
 
     function wait(){
-        startLoadingAnimation();
+        startLoadingAnimation({fade:false});
     }
 
     function stopWaiting(){
         if (ui["_" + currentView].onViewOpened) ui["_" + currentView].onViewOpened(ui._data);
-        stopLoadingAnimation(currentView);
+        stopLoadingAnimation(currentView,{fade:false});
     }
 
     // Triggers an event, many ui actions cause triggers
