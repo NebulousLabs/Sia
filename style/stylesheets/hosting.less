@@ -1,36 +1,56 @@
 #hosting{
     background-color:@g50;
     height:800px;
-}
-#hosting .header{
-    background-color:#fff;
-}
-#hosting .host-config{
-    margin:30px;
-    border:1px solid @g300;
-    border-radius:4px;
-    background-color:#fff;
-}
-#hosting .host-config .title{
-    padding:10px;
-    font-size:32px;
-    color:@g500;
-    border-bottom:1px solid @g300;
-}
-#hosting .host-config .property{
-    border-bottom:1px solid @g300;
-    color:@g600;
-}
-#hosting .host-config .property:last-child{
-    border:none;
-}
-#hosting .host-config .property .name{
-    padding:10px;
-}
-#hosting .host-config .property .value{
-    border-left:1px solid @g300;
-    padding:10px;
-}
-#hosting .host-config .control{
-    text-align:right;
+
+    .header{
+        background-color:#fff;
+    }
+    .host-config{
+
+        margin:30px;
+        border:1px solid @g300;
+        border-radius:4px;
+        background-color:#fff;
+
+        .properties{
+            height:400px;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        .title{
+            padding:10px;
+            border-bottom:1px solid @g300;
+        }
+        .title .text{
+            .i;
+            font-size:32px;
+            color:@g500;
+        }
+        .title .capsule{
+            float:right;
+        }
+        .property{
+            border-bottom:1px solid @g300;
+            color:@g600;
+        }
+        .property .name{
+            padding:10px;
+        }
+        .property .value{
+            border-left:1px solid @g300;
+            padding:10px;
+        }
+        .control{
+            border-top:1px solid @g300;
+            text-align:right;
+        }
+        .control .warning{
+            .i;
+            float:left;
+            font-size:14px;
+            color:#E57373;
+            padding-top:14px;
+            padding-left:10px;
+        }
+    }
 }
