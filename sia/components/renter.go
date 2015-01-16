@@ -8,7 +8,13 @@ type RentFileParameters struct {
 	OptimalPieces  int
 }
 
+type RentInfo struct {
+	Files []string
+}
+
 type Renter interface {
+	Download(nickname, filepath string) error
+	RentInfo() (RentInfo, error)
 	RenameFile(currentName, newName string) error
 	RentFile(RentFileParameters) error
 }

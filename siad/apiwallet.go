@@ -43,7 +43,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.WriteHeader(200)
+	writeSuccess(w)
 }
 
 // I wasn't sure the best way to manage this. I've implemented it so that the
