@@ -1,0 +1,120 @@
+#transfer-funds{
+
+    font-size:24px;
+    color:@g600;
+
+    .subhead{
+        font-size:24px;
+        padding-left:16px;
+        padding-bottom:16px;
+        border-bottom:1px solid @g300;
+    }
+    .right-column{
+        border-left:1px solid @g300;
+    }
+    .from-column i{
+        padding-left:10px;
+    }
+    .to-column i{
+        padding-right:10px;
+    }
+
+    .from-column{
+        min-height:400px;
+    }
+
+    .to-column{
+        min-height:400px;
+    }
+
+    .eqn{
+        // border-top:1px dashed @g200;
+
+        padding:10px;
+        padding-left:16px;
+        padding-right:16px;
+
+        .text{
+            .i;
+        }
+        .amt{
+            .i;
+            float:right;
+        }
+        .amt.input{
+            min-height:30px;
+            min-width:100px;
+            text-align:right;
+            padding-right:8px;
+            border-radius:4px;
+        }
+        .unit{
+            .i;
+            float:right;
+        }
+        .icon{
+            font-size:14px;
+            padding-right:6px;
+            vertical-align:text-bottom;
+            margin-bottom:8px;
+            color:@g300;
+        }
+        .amt.input:hover .icon{
+            color:@g500;
+        }
+    }
+    .from-column .eqn:first-child{
+        border-top:0;
+    }
+
+    .to-column .eqn:first-child{
+        border-top:0;
+    }
+    .eqn:last-child{
+        border-top:1px solid @g300;
+    }
+
+    .address{
+        .amt.input.field-address{
+            // display:block;
+            width:240px;
+            text-align:left;
+            font-size:11px;
+            padding:8px;
+            border:1px dashed @g300;
+            border-radius:4px;
+            word-wrap:break-all;
+            word-break: break-all;
+        }
+        .text.address-title{
+            padding-bottom:6px;
+        }
+        .amt.input.field-address .icon{
+            margin-bottom:0px;
+        }
+    }
+
+    .control{
+        border-top:1px solid @g300;
+        padding:10px;
+
+        .summary{
+            .i;
+            font-size:18px;
+            margin:10px;
+
+            .amt, .from, .to{
+                .i;
+                font-weight:bold;
+            }
+
+        }
+
+        .button{
+            float:right;
+            margin-right:20px;
+        }
+
+    }
+
+}
