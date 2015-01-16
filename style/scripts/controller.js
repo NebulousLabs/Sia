@@ -50,10 +50,10 @@ var controller = (function(){
             });
         });
         ui.addListener("save-host-config", function(hostSettings){
-            /*$.get("/hosting/setsettings", function(e){
+            $.get("/host/setconfig", hostSettings, function(e){
                 // TODO: handle error
                 console.log(e);
-            });*/
+            });
         });
         ui.addListener("send-money", function(info){
             ui.wait();
@@ -67,7 +67,6 @@ var controller = (function(){
                     ui.stopWaiting();
                     ui.switchView("manage-account");
                 });
-                console.log(data);
             }).error(function(){
                 console.log(arguments);
             });
@@ -149,14 +148,27 @@ var controller = (function(){
         });
     }
 
+    function updateHost(callback){
+        $.getJSON("/host/config", function(response){
+            data.host = {
+                "HostSettings": response.Announcement
+            };
+            updateUI();
+            if (callback) callback();
+        }).error(function(){
+            console.log(arguments);
+        });
+    }
+
     function update(){
         updateWallet();
         updateMiner();
         updateStatus();
+        updateHost();
     }
 
     function updateUI(){
-        if (data.wallet && data.miner && data.status){
+        if (data.wallet && data.miner && data.status && data.host){
             ui.update(data);
         }
     }

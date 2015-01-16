@@ -40,7 +40,7 @@ ui._hosting = (function(){
             ui._tooltip(this, "Reseting");
             for (var i = 0;i < editableProps.length;i ++){
                 var item = $(eProps[i]);
-                // item.find(".value").text(lastHostSettings[editableProps[i]]);
+                item.find(".value").text(ui._data.HostSettings[editableProps[i]]);
             }
         });
     }
@@ -54,24 +54,21 @@ ui._hosting = (function(){
         return newSettings;
     }
 
-    function update(data){
+    function onViewOpened(data){
         // If this is the first time, create and load all properties
-        if (eProps.length === 0){
-            for (var i = 0; i < editableProps.length; i++){
-                var item = ePropBlueprint.clone().removeClass("blueprint");
-                ePropBlueprint.parent().append(item);
-                eProps = eProps.add(item);
-                item.find(".name").text(editableProps[i]);
-                // item.find(".value").text(data.hosting.HostingSettings[editableProps[i]]);
-            }
+        for (var i = 0; i < editableProps.length; i++){
+            var item = ePropBlueprint.clone().removeClass("blueprint");
+            ePropBlueprint.parent().append(item);
+            eProps = eProps.add(item);
+            console.log(data.host.HostSettings);
+            item.find(".name").text(editableProps[i]);
+            item.find(".value").text(data.host.HostSettings[editableProps[i]]);
         }
-
-        // lastHostSettings = data.hosting.HostingSettings;
 
     }
 
     return {
         init:init,
-        update:update
+        onViewOpened:onViewOpened
     };
 })();
