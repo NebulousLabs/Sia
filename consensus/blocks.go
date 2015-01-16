@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
 
@@ -405,6 +406,13 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 	// Check that the header of the block is valid.
 	err = s.validateHeader(parentBlockNode, &b)
 	if err != nil {
+		return
+	}
+
+	// Check that the block is the correct size.
+	encodedBlock := encoding.Marshal(b)
+	if len(encodedBlock) > BlockSizeLimit {
+		err = errors.New("Block is too large, will not be accepted.")
 		return
 	}
 
