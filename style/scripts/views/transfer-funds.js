@@ -127,12 +127,13 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
             // Find account balance
             accountBalance = null;
             for (var i = 0;i < data.wallet.Accounts.length;i++){
+                console.log(data.wallet.Accounts[i], accountName);
                 if (data.wallet.Accounts[i].Name == accountName){
                     accountBalance = data.wallet.Accounts[i].Balance;
                 }
             }
 
-            if (!accountBalance){
+            if (accountBalance === null){
                 console.error("Could not find account \"" + accountName + "\"");
                 return;
             }
