@@ -55,6 +55,14 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 	}
 }
 
+// writeSuccess writes the success json object ({"Success":true}) to the
+// ResponseWriter
+func writeSuccess(w http.ResponseWriter) {
+	writeJSON(w, struct {
+		Success bool
+	}{true})
+}
+
 func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.core.StateInfo())
 }
@@ -73,16 +81,22 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go d.core.CatchUp(d.core.RandomPeer())
+
+	writeSuccess(w)
 }
 
 func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: this should return an error
 	d.core.AddPeer(network.Address(req.FormValue("addr")))
+
+	writeSuccess(w)
 }
 
 func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: this should return an error
 	d.core.RemovePeer(network.Address(req.FormValue("addr")))
+
+	writeSuccess(w)
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
@@ -95,6 +109,7 @@ func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
 		}
 	*/
+	http.Error(w, "Unimplemented", 405)
 }
 
 func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
@@ -110,6 +125,7 @@ func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Download complete!")
 		}
 	*/
+	http.Error(w, "Unimplemented", 405)
 }
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
@@ -129,4 +145,5 @@ func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	}
+	writeSuccess(w)
 }
