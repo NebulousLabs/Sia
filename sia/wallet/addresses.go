@@ -5,51 +5,65 @@ import (
 	"github.com/NebulousLabs/Sia/signatures"
 )
 
-// timelockedCoinAddress returns a CoinAddress with a timelock, as well as the
-// conditions needed to spend it.
-func (w *Wallet) timelockedCoinAddress(release consensus.BlockHeight) (spendConditions consensus.SpendConditions, err error) {
+// TimelockedCoinAddress returns an address that can only be spent after block
+// `unlockHeight`.
+func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+	// Create the address + spend conditions.
 	sk, pk, err := signatures.GenerateKeyPair()
 	if err != nil {
 		return
 	}
-
 	spendConditions = consensus.SpendConditions{
-		TimeLock:      release,
+		TimeLock:      unlockHeight,
 		NumSignatures: 1,
 		PublicKeys:    []signatures.PublicKey{pk},
 	}
+	coinAddress = spendConditions.CoinAddress()
 
+	// Create a spendableAddress for the keys and add it to the
+	// timelockedSpendableAddresses map. If the address has already been
+	// unlocked, also add it to the list of currently spendable addresses. It
+	// needs to go in both though in case there is a reorganization of the
+	// blockchain.
 	newSpendableAddress := &spendableAddress{
 		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
 		spendConditions:  spendConditions,
 		secretKey:        sk,
 	}
+	spendableAddressSlice := w.timelockedSpendableAddresses[unlockHeight]
+	spendableAddressSlice = append(spendableAddressSlice, newSpendableAddress)
+	w.timelockedSpendableAddresses[unlockHeight] = spendableAddressSlice
+	if unlockHeight <= w.state.Height() {
+		w.spendableAddresses[coinAddress] = newSpendableAddress
+	}
 
-	coinAddress := spendConditions.CoinAddress()
-	w.spendableAddresses[coinAddress] = newSpendableAddress
-	return
-}
-
-// CoinAddress implements the core.Wallet interface.
-func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	sk, pk, err := signatures.GenerateKeyPair()
+	err = w.save()
 	if err != nil {
 		return
 	}
 
+	return
+}
+
+// coinAddress implements the core.Wallet interface.
+func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+	// Create the keys and address.
+	sk, pk, err := signatures.GenerateKeyPair()
+	if err != nil {
+		return
+	}
+	spendConditions = consensus.SpendConditions{
+		NumSignatures: 1,
+		PublicKeys:    []signatures.PublicKey{pk},
+	}
+	coinAddress = spendConditions.CoinAddress()
+
+	// Add the address to the set of spendable addresses.
 	newSpendableAddress := &spendableAddress{
 		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
-		spendConditions: consensus.SpendConditions{
-			NumSignatures: 1,
-			PublicKeys:    []signatures.PublicKey{pk},
-		},
-		secretKey: sk,
+		spendConditions:  spendConditions,
+		secretKey:        sk,
 	}
-
-	coinAddress = newSpendableAddress.spendConditions.CoinAddress()
 	w.spendableAddresses[coinAddress] = newSpendableAddress
 
 	err = w.save()
@@ -58,4 +72,19 @@ func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, err error) {
 	}
 
 	return
+}
+
+// TimelockedCoinAddress returns an address that can only be spent after block
+// `unlockHeight`.
+func (w *Wallet) TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.timelockedCoinAddress(unlockHeight)
+}
+
+// CoinAddress implements the core.Wallet interface.
+func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.coinAddress()
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -24,7 +25,7 @@ type ContractEntry struct {
 
 func (h *Host) nextFilename() string {
 	h.fileCounter++
-	return h.hostDir + strconv.Itoa(h.fileCounter)
+	return filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
 }
 
 // considerContract takes a contract and verifies that the terms such as price
@@ -96,7 +97,7 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 	}
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
-	requiredFund := (h.announcement.Burn + h.announcement.Price) * consensus.Currency(fileSize) * consensus.Currency(fullDuration)
+	requiredFund := (h.announcement.Price*consensus.Currency(fullDuration) + h.announcement.Burn*consensus.Currency(contractDuration)) * consensus.Currency(fileSize)
 	if t.FileContracts[0].ContractFund < requiredFund {
 		err = errors.New("ContractFund does not cover the entire duration of the contract.")
 		return
@@ -164,6 +165,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// If there's an error upon return, delete the file that's been created.
 	defer func() {
 		if err != nil {
+			panic(err)
 			os.Remove(filename)
 		}
 	}()
@@ -199,9 +201,6 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		return
 	}
 
-	// Submit the transaction.
-	h.transactionChan <- t
-
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
 	h.contracts[t.FileContractID(0)] = contractObligation{
@@ -209,6 +208,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		filename:    filename,
 	}
 	fmt.Println("Accepted contract")
+
+	// Submit the transaction.
+	h.transactionChan <- t
 
 	return
 }

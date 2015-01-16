@@ -62,10 +62,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 	// Add a refund output if needed.
 	if total-amount > 0 {
-		// This is dirty and should probably happen some other way.
-		w.mu.Unlock()
-		coinAddress, err := w.CoinAddress()
-		w.mu.Lock()
+		coinAddress, _, err := w.coinAddress()
 
 		if err != nil {
 			return err
@@ -123,7 +120,7 @@ func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, relea
 	t := ot.transaction
 
 	// Get a frozen coin address.
-	spendConditions, err = w.timelockedCoinAddress(release)
+	_, spendConditions, err = w.timelockedCoinAddress(release)
 	if err != nil {
 		return
 	}
@@ -186,12 +183,12 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	defer w.mu.Unlock()
 
 	// Fetch the transaction.
-	ot, exists := w.transactions[id]
+	openTransaction, exists := w.transactions[id]
 	if !exists {
 		err = errors.New("no transaction found for given id")
 		return
 	}
-	transaction = *ot.transaction
+	transaction = *openTransaction.transaction
 
 	// Get the coveredfields struct.
 	var coveredFields consensus.CoveredFields
@@ -221,7 +218,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	}
 
 	// For each input in the transaction that we added, provide a signature.
-	for _, inputIndex := range ot.inputs {
+	for _, inputIndex := range openTransaction.inputs {
 		input := transaction.Inputs[inputIndex]
 		sig := consensus.TransactionSignature{
 			InputID:        input.OutputID,
@@ -235,6 +232,9 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+		if err != nil {
+			return
+		}
 
 		// Mark the input as spent. Maps :)
 		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter

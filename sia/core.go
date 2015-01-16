@@ -2,6 +2,8 @@ package sia
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -25,6 +27,9 @@ type Config struct {
 	Wallet components.Wallet
 
 	// Settings available through flags.
+	//
+	// TODO: Most of these should be deprecated as inputs to the core - each
+	// component should manage its own settings.
 	HostDir     string
 	WalletFile  string
 	ServerAddr  string
@@ -106,13 +111,16 @@ func CreateCore(config Config) (c *Core, err error) {
 		hostDir:    config.HostDir,
 		walletFile: config.WalletFile,
 	}
+	// TODO: The host object should be managing this on its own.
+	err = os.MkdirAll(c.hostDir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		return
+	}
 
 	// TODO: Figure out if there's any way that we need to sync to the state.
-	/*
-		// Create a state.
-		var genesisOutputDiffs []consensus.OutputDiff
-		c.state, genesisOutputDiffs = consensus.CreateGenesisState()
-	*/
+	// Create a state.
+	var genesisOutputDiffs []consensus.OutputDiff
+	_, genesisOutputDiffs = consensus.CreateGenesisState()
 	genesisBlock, err := c.state.BlockAtHeight(0)
 	if err != nil {
 		return
@@ -131,21 +139,18 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	/* wallet will ne to be switched to subscription before it starts seeing genesis diffs.
 	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}
-	*/
 
 	// Bootstrap to the network (may take a few seconds).
 	err = c.initializeNetwork(config.ServerAddr, config.Nobootstrap)
 	if err == network.ErrNoPeers {
-		// log.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+		fmt.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
 	} else if err != nil {
 		return
 	}
-	// c.host.Settings.IPAddress = c.server.Address()
 
 	return
 }

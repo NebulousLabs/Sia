@@ -14,14 +14,14 @@ type WalletInfo struct {
 // can make a new transaction-in-progress by calling Register(), and then can
 // add outputs, fees, etc.
 //
-// TODO: CoinAddress returns spend conditions, add a TimeLockedCoinAddress().
+// TODO: CoinAddress returns spend conditions, add a TimelockedCoinAddress().
 // This will obsolete the AddTimelockedRefund() function.
 type Wallet interface {
 	// Info takes zero arguments and returns an arbitrary set of information
 	// about the wallet in the form of json. The frontend will have to know how
 	// to parse it, but Core and Daemon don't need to understand what's in the
 	// json.
-	Info() (WalletInfo, error)
+	WalletInfo() (WalletInfo, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
@@ -40,9 +40,10 @@ type Wallet interface {
 	Balance(full bool) consensus.Currency
 
 	// CoinAddress return an address into which coins can be paid.
-	//
-	// CoinAddress should potentially also return the spend conditions.
-	CoinAddress() (consensus.CoinAddress, error)
+	CoinAddress() (consensus.CoinAddress, consensus.SpendConditions, error)
+
+	// TimelockedCoinAddress returns an address that can only be spent after block `unlockHeight`.
+	TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (consensus.CoinAddress, consensus.SpendConditions, error)
 
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to
@@ -66,7 +67,7 @@ type Wallet interface {
 	// wallet to know that it can spend a timelocked address is if the wallet
 	// made the address itself.
 	//
-	// Eventually, there should be an extension that allows requests of
+	// TODO: Eventually, there should be an extension that allows requests of
 	// timelocked coin addresses.
 	AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (sc consensus.SpendConditions, refundIndex uint64, err error)
 

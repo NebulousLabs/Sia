@@ -28,7 +28,7 @@ func (c *Core) UpdateMiner(threads int) (err error) {
 	recentBlock := c.state.CurrentBlock()
 	address := c.miner.SubsidyAddress()
 	if address == recentBlock.MinerAddress {
-		address, err = c.wallet.CoinAddress()
+		address, _, err = c.wallet.CoinAddress()
 		if err != nil {
 			return
 		}

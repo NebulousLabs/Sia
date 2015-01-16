@@ -27,9 +27,9 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
 	// Pull together the configuration for the Core.
-	state, _ := consensus.CreateGenesisState() // The missing piece is not an error. TODO: That missing piece is deprecated.
+	state, _ := consensus.CreateGenesisState() // The missing piece is not of type error. TODO: That missing piece is deprecated.
 	walletFilename := "test.wallet"
-	w, err := wallet.New(walletFilename)
+	w, err := wallet.New(state, walletFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestEverything(t *testing.T) {
 	testSendToSelf(t, c)
 	testWalletInfo(t, c)
 	testHostAnnouncement(t, c)
+	testUploadFile(t, c)
+	sendManyTransactions(t, c)
 	testMinerDeadlocking(t, c)
-
-	// TODO: add some tests which probe the miner implementation more.
 }

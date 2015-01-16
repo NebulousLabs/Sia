@@ -14,11 +14,26 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 		return
 	}
 
-	c.server.Register("AcceptBlock", c.AcceptBlock)
-	c.server.Register("AcceptTransaction", c.AcceptTransaction)
-	c.server.Register("SendBlocks", c.SendBlocks)
-	// c.server.Register("NegotiateContract", c.NegotiateContract)
-	// c.server.Register("RetrieveFile", c.RetrieveFile)
+	err = c.server.RegisterRPC("AcceptBlock", c.AcceptBlock)
+	if err != nil {
+		return
+	}
+	err = c.server.RegisterRPC("AcceptTransaction", c.AcceptTransaction)
+	if err != nil {
+		return
+	}
+	err = c.server.RegisterRPC("SendBlocks", c.SendBlocks)
+	if err != nil {
+		return
+	}
+	c.server.RegisterRPC("NegotiateContract", c.host.NegotiateContract)
+	if err != nil {
+		return
+	}
+	c.server.RegisterRPC("RetrieveFile", c.host.RetrieveFile)
+	if err != nil {
+		return
+	}
 
 	// Start listener thread
 	go c.listen()

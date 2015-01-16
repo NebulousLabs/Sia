@@ -2,6 +2,8 @@ package sia
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/consensus"
 )
 
 // mineSingleBlock mines a single block and then uses the blocking function
@@ -15,7 +17,7 @@ func mineSingleBlock(t *testing.T, c *Core) {
 		t.Error(err)
 	}
 	err = c.processBlock(b)
-	if err != nil {
+	if err != nil && err != consensus.BlockKnownErr {
 		t.Error(err)
 	}
 }

@@ -202,10 +202,10 @@ func NewTCPServer(addr string) (tcps *TCPServer, err error) {
 		handlerMap:  make(map[string]func(net.Conn) error),
 	}
 	// default handlers (defined in handlers.go)
-	tcps.Register("Ping", pong)
-	tcps.Register("SendHostname", sendHostname)
-	tcps.Register("SharePeers", tcps.sharePeers)
-	tcps.Register("AddMe", tcps.addRemote)
+	tcps.RegisterRPC("Ping", pong)
+	tcps.RegisterRPC("SendHostname", sendHostname)
+	tcps.RegisterRPC("SharePeers", tcps.sharePeers)
+	tcps.RegisterRPC("AddMe", tcps.addRemote)
 
 	// spawn listener
 	go tcps.listen()

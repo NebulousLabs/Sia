@@ -2,13 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	// "github.com/NebulousLabs/Sia/sia"
 )
 
 // TODO: timeouts?
@@ -17,18 +14,24 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/", d.webIndex)
 	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
 
-	// Wallet API Calls
-	http.HandleFunc("/wallet/address", d.walletAddressHandler)
-	http.HandleFunc("/wallet/send", d.walletSendHandler)
-	http.HandleFunc("/wallet/status", d.walletStatusHandler)
+	// Host API Calls
+	//
+	// TODO: SetConfig also calls announce(), there should be smarter ways to
+	// handle this.
+	http.HandleFunc("/host/config", d.hostConfigHandler)
+	http.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
 
 	// Miner API Calls
 	http.HandleFunc("/miner/start", d.minerStartHandler)
 	http.HandleFunc("/miner/status", d.minerStatusHandler)
 	http.HandleFunc("/miner/stop", d.minerStopHandler)
 
+	// Wallet API Calls
+	http.HandleFunc("/wallet/address", d.walletAddressHandler)
+	http.HandleFunc("/wallet/send", d.walletSendHandler)
+	http.HandleFunc("/wallet/status", d.walletStatusHandler)
+
 	// File API Calls
-	http.HandleFunc("/host", d.hostHandler)
 	http.HandleFunc("/rent", d.rentHandler)
 	http.HandleFunc("/download", d.downloadHandler)
 
@@ -80,64 +83,6 @@ func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: this should return an error
 	d.core.RemovePeer(network.Address(req.FormValue("addr")))
-}
-
-func (d *daemon) hostHandler(w http.ResponseWriter, req *http.Request) {
-	// Create all of the variables that get scanned in.
-	var totalStorage int64
-	var minFilesize, maxFilesize, minTolerance uint64
-	var minDuration, maxDuration, minWindow, maxWindow, freezeDuration consensus.BlockHeight
-	var price, burn, freezeCoins consensus.Currency
-
-	qsVars := map[string]interface{}{
-		"totalstorage":   &totalStorage,
-		"minfile":        &minFilesize,
-		"maxfile":        &maxFilesize,
-		"mintolerance":   &minTolerance,
-		"minduration":    &minDuration,
-		"maxduration":    &maxDuration,
-		"minwin":         &minWindow,
-		"maxwin":         &maxWindow,
-		"freezeduration": &freezeDuration,
-		"price":          &price,
-		"penalty":        &burn,
-		"freezevolume":   &freezeCoins,
-	}
-	for qs := range qsVars {
-		_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
-		if err != nil {
-			http.Error(w, "Malformed "+qs, 400)
-			return
-		}
-	}
-
-	// Set the host settings.
-	/*
-		d.core.SetHostSettings(sia.HostAnnouncement{
-			IPAddress:          ipAddress,
-			TotalStorage:       totalStorage,
-			MinFilesize:        minFilesize,
-			MaxFilesize:        maxFilesize,
-			MinDuration:        minDuration,
-			MaxDuration:        maxDuration,
-			MinChallengeWindow: minWindow,
-			MaxChallengeWindow: maxWindow,
-			MinTolerance:       minTolerance,
-			Price:              price,
-			Burn:               burn,
-			CoinAddress:        coinAddress,
-			// SpendConditions and FreezeIndex handled by HostAnnounceSelf
-		})
-	*/
-
-	/*
-		// Make the host announcement.
-		 _, err := d.core.HostAnnounceSelf(freezeCoins, freezeDuration+d.core.Height(), 10)
-		if err != nil {
-			http.Error(w, "Failed to announce host: "+err.Error(), 500)
-			return
-		}
-	*/
 }
 
 func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {

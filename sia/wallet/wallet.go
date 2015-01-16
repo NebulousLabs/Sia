@@ -23,10 +23,14 @@ import (
 // within the wallet. The transactionCounter ensures that each
 // transaction-in-progress gets a unique ID.
 type Wallet struct {
+	state      *consensus.State
+	prevHeight consensus.BlockHeight // TODO: This will deprecate when we switch to state subscriptions.
+
 	saveFilename string
 
-	spentCounter       int
-	spendableAddresses map[consensus.CoinAddress]*spendableAddress
+	spentCounter                 int
+	spendableAddresses           map[consensus.CoinAddress]*spendableAddress
+	timelockedSpendableAddresses map[consensus.BlockHeight][]*spendableAddress
 
 	transactionCounter int
 	transactions       map[string]*openTransaction
@@ -36,12 +40,17 @@ type Wallet struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(filename string) (w *Wallet, err error) {
+func New(state *consensus.State, filename string) (w *Wallet, err error) {
 	w = &Wallet{
-		spentCounter:       1,
-		saveFilename:       filename,
-		spendableAddresses: make(map[consensus.CoinAddress]*spendableAddress),
-		transactions:       make(map[string]*openTransaction),
+		state: state,
+
+		saveFilename: filename,
+
+		spentCounter:                 1,
+		spendableAddresses:           make(map[consensus.CoinAddress]*spendableAddress),
+		timelockedSpendableAddresses: make(map[consensus.BlockHeight][]*spendableAddress),
+
+		transactions: make(map[string]*openTransaction),
 	}
 
 	err = w.Load(filename)
@@ -53,7 +62,7 @@ func New(filename string) (w *Wallet, err error) {
 }
 
 // Info implements the core.Wallet interface.
-func (w *Wallet) Info() (status components.WalletInfo, err error) {
+func (w *Wallet) WalletInfo() (status components.WalletInfo, err error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
