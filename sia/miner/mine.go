@@ -86,7 +86,9 @@ func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
+			m.mu.RLock()
 			m.blockChan <- b
+			m.mu.RUnlock()
 			solved = true
 			return
 		}
