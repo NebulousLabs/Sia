@@ -307,7 +307,11 @@ var ui = (function(){
             "update": "update(<json data object>) \
             \nData object generated from requests from server, see top of ui.js",
             "addListener": "addListener(<string event>, <function callback>)\
-            \nAdd listener when a ui event occurs"
+            \nAdd listener when a ui event occurs",
+            "wait": "wait()\
+            \nShows loading icon until stopWaiting() is called",
+            "stopWaiting": "stopWaiting()\
+            \nAllows user to continue using UI after wait() call"
         }[functionName];
     }
 
@@ -340,6 +344,14 @@ var ui = (function(){
             if (ui["_" + view].update) ui["_" + view].update(data);
         });
         ui._data = data;
+    }
+
+    function wait(){
+        startLoadingAnimation();
+    }
+
+    function stopWaiting(){
+        stopLoadingAnimation(currentView);
     }
 
     // Triggers an event, many ui actions cause triggers
@@ -397,6 +409,8 @@ var ui = (function(){
         "switchView": switchView,
         "update": update,
         "addListener": addListener,
+        "wait": wait,
+        "stopWaiting": stopWaiting,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
         "_data": null,

@@ -54,6 +54,17 @@ var controller = (function(){
                 console.log(e);
             });*/
         });
+        ui.addListener("send-money", function(info){
+            ui.wait();
+            $.getJSON("/wallet/send", {
+                "amount": info.from.amount,
+                "dest": info.to.address
+            }, function(data){
+                // TODO: Handle error
+                ui.stopWaiting();
+                console.log(data);
+            });
+        });
     }
 
     var lastUpdateTime = Date.now();
