@@ -55,5 +55,5 @@ func (c *Core) CoinAddress() (address consensus.CoinAddress, err error) {
 
 // Returns a []byte that's supposed to be json of some struct.
 func (c *Core) WalletInfo() (components.WalletInfo, error) {
-	return c.wallet.Info()
+	return c.wallet.WalletInfo()
 }

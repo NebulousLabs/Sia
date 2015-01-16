@@ -62,7 +62,7 @@ func New(state *consensus.State, filename string) (w *Wallet, err error) {
 }
 
 // Info implements the core.Wallet interface.
-func (w *Wallet) Info() (status components.WalletInfo, err error) {
+func (w *Wallet) WalletInfo() (status components.WalletInfo, err error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 

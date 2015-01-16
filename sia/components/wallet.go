@@ -21,7 +21,7 @@ type Wallet interface {
 	// about the wallet in the form of json. The frontend will have to know how
 	// to parse it, but Core and Daemon don't need to understand what's in the
 	// json.
-	Info() (WalletInfo, error)
+	WalletInfo() (WalletInfo, error)
 
 	// Update takes two sets of blocks. The first is the set of blocks that
 	// have been rewound since the previous call to update, and the second set
