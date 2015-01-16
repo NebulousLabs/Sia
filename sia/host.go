@@ -4,7 +4,7 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
-func (c *Core) HostInfo(info components.HostInfo) (components.HostInfo, error) {
+func (c *Core) HostInfo() (components.HostInfo, error) {
 	return c.host.HostInfo()
 }
 
