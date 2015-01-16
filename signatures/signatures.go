@@ -6,6 +6,11 @@ import (
 	"github.com/agl/ed25519"
 )
 
+// One thing that worries me about this file is that the library returns a
+// bunch of pointers to data, but the types copy the data into other memory and
+// pass that around instead. This may result in side channel attacks becoming
+// possible.
+
 type (
 	PublicKey [32]byte
 	SecretKey [64]byte

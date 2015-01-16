@@ -16,7 +16,7 @@ func sendManyTransactions(t *testing.T, c *Core) {
 
 	// Unfortunately, only 1 transaction per block can be sent, because the
 	// wallet doesn't work with txn pool changes yet.
-	blocks := 20
+	blocks := 12
 	for i := 0; i < blocks; i++ {
 		address, _, err := c.wallet.CoinAddress()
 		if err != nil {

@@ -230,7 +230,6 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		// Hash the transaction according to the covered fields and produce the
 		// cryptographic signature.
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
-		pubKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].publicKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
 		if err != nil {
