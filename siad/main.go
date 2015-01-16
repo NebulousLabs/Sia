@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
@@ -74,14 +75,14 @@ func exists(filename string) bool {
 }
 
 func init() {
-	// locate siaDir by checking for style/ folder
+	// locate siaDir by checking for config file
 	switch {
-	case exists("style"):
+	case exists("config"):
 		siaDir = ""
-	case exists("~/.config/sia/style"):
+	case exists("~/.config/sia/config"):
 		siaDir = "~/.config/sia/"
 	default:
-		fmt.Println("Warning: style folder not found. Please put the 'style/' folder in the current directory.")
+		fmt.Println("Warning: config file not found. Default values will be used.")
 	}
 }
 
@@ -113,12 +114,11 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	// TODO: use path.Join
-	defaultConfigFile := siaDir + "config"
-	defaultHostDir := siaDir + "host/"
-	defaultStyleDir := siaDir + "style/"
-	defaultDownloadDir := "~/Downloads/"
-	defaultWalletFile := siaDir + "sia.wallet"
+	defaultConfigFile := path.Join(siaDir, "config")
+	defaultHostDir := path.Join(siaDir, "host")
+	defaultStyleDir := path.Join(siaDir, "style")
+	defaultDownloadDir := "~/Downloads"
+	defaultWalletFile := path.Join(siaDir, "sia.wallet")
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
 	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port is used when talking to other nodes on the network")
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
