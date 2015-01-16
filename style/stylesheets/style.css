@@ -261,7 +261,6 @@
 #manage-account .transactions {
   color: #757575;
   font-size: 18px;
-  height: 300px;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
 }
@@ -271,6 +270,7 @@
   padding-right: 16px;
   overflow-x: hidden;
   overflow-y: auto;
+  height: 200px;
 }
 #manage-account .transactions {
   margin-right: 20px;
@@ -285,12 +285,12 @@
 }
 #manage-account .addresses .item .address {
   display: inline-block;
-  font-size: 18px;
+  font-size: 14px;
 }
 #manage-account .addresses .item .amt {
   display: inline-block;
-  float: right;
-  font-size: 18px;
+  display: none;
+  font-size: 14px;
 }
 #manage-account .transactions .item .date {
   display: inline-block;

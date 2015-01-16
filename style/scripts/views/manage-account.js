@@ -68,7 +68,7 @@ ui._manageAccount = ui["_manage-account"] = (function(){
         eAccountName.text(accountName);
     }
 
-    function update(data){
+    function onViewOpened(data){
 
         // Find specified account
         var account;
@@ -131,6 +131,6 @@ ui._manageAccount = ui["_manage-account"] = (function(){
     return {
         init:init,
         setAccount: setAccount,
-        update:update
+        onViewOpened:onViewOpened
     };
 })();

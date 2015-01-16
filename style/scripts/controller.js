@@ -1,6 +1,7 @@
 var controller = (function(){
 
     var data = {};
+    var createdAddressList = [];
 
     function init(){
         update();
@@ -56,22 +57,30 @@ var controller = (function(){
         });
         ui.addListener("send-money", function(info){
             ui.wait();
+            var address = info.to.address.replace(/[^A-Fa-f0-9]/g, "");
             $.getJSON("/wallet/send", {
                 "amount": info.from.amount,
-                "dest": info.to.address
+                "dest": address
             }, function(data){
                 // TODO: Handle error
                 ui.stopWaiting();
                 console.log(data);
+            }).error(function(){
+                console.log(arguments);
             });
         });
         ui.addListener("create-address", function(){
             ui.wait();
             $.getJSON("/wallet/address", function(info){
                 //TODO: Error handling
-                ui.stopWaiting();
                 console.log(info);
-                alert(info.Address);
+                createdAddressList.push({
+                    "Address": info.Address,
+                    "Balance": 0
+                });
+                updateWallet(function(){
+                    ui.stopWaiting();
+                });
             });
         })
     }
@@ -80,8 +89,7 @@ var controller = (function(){
     var lastBalance = 0;
     var runningIncomeRateAverage = 0;
 
-    function update(){
-        // Get json objects from each source and merge
+    function updateWallet(callback){
         $.getJSON("/wallet/status", function(response){
             data.wallet = {
                 "Balance": response.Balance,
@@ -94,12 +102,16 @@ var controller = (function(){
                     "Balance": response.Balance,
                     "USDBalance": util.USDConvert(response.Balance),
                     "NumAddresses": response.NumAddresses,
-                    "Addresses": [],
+                    "Addresses": createdAddressList,
                     "Transactions": []
                 }]
             };
             updateUI();
+            if (callback) callback();
         });
+    }
+
+    function updateMiner(callback){
         $.getJSON("/miner/status", function(response){
             var timeDifference = (Date.now() - lastUpdateTime) * 1000;
             var balance = data.wallet ? data.wallet.Balance : 0;
@@ -122,11 +134,22 @@ var controller = (function(){
             lastBalance = balance;
             lastUpdateTime = Date.now();
             updateUI();
+            if (callback) callback();
         });
+    }
+
+    function updateStatus(callback){
         $.getJSON("/status", function(response){
             data.status = response;
             updateUI();
+            if (callback) callback();
         });
+    }
+
+    function update(){
+        updateWallet();
+        updateMiner();
+        updateStatus();
     }
 
     function updateUI(){

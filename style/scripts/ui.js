@@ -351,6 +351,7 @@ var ui = (function(){
     }
 
     function stopWaiting(){
+        if (ui["_" + currentView].onViewOpened) ui["_" + currentView].onViewOpened(ui._data);
         stopLoadingAnimation(currentView);
     }
 
