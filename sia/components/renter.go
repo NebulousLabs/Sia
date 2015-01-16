@@ -8,6 +8,14 @@ type RentFileParameters struct {
 	OptimalPieces  int
 }
 
+type RentSmallFileParameters struct {
+	FullFile       []byte
+	Nickname       string
+	TotalPieces    int
+	RequiredPieces int
+	OptimalPieces  int
+}
+
 type RentInfo struct {
 	Files []string
 }
@@ -17,4 +25,6 @@ type Renter interface {
 	RentInfo() (RentInfo, error)
 	RenameFile(currentName, newName string) error
 	RentFile(RentFileParameters) error
+
+	RentSmallFile(RentSmallFileParameters) error
 }
