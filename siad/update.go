@@ -77,8 +77,17 @@ func (d *daemon) applyUpdate(version string) (err error) {
 		err, _ = update.New().Target(file).FromUrl(updateURL + "/" + version + "/" + file)
 		if err != nil {
 			// TODO: revert prior successful updates?
-			break
+			return
 		}
 	}
+
+	// the binary must always be updated, because if nothing else, the version
+	// number has to be bumped.
+	// TODO: should it be siad.exe on Windows?
+	err, _ = update.New().FromUrl(updateURL + "/" + version + "/siad")
+	if err != nil {
+		return
+	}
+
 	return
 }
