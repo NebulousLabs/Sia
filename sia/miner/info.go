@@ -29,7 +29,7 @@ type MinerStatus struct {
 // Address is the current address that is receiving block payouts.
 func (m *Miner) Info() ([]byte, error) {
 	m.mu.RLock()
-	defer m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	status := MinerStatus{
 		Threads:        m.threads,

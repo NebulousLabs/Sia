@@ -19,3 +19,12 @@ func mineSingleBlock(t *testing.T, c *Core) {
 		t.Error(err)
 	}
 }
+
+func testMinerDeadlocking(t *testing.T, c *Core) {
+	threads := 1
+	c.MinerInfo()
+	c.UpdateMiner(threads)
+	c.StartMining()
+	c.MinerInfo()
+	c.StopMining()
+}
