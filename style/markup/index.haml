@@ -36,6 +36,8 @@
                 :src  => "lib/scripts/views/files.js"}
         %script{:type => "text/javascript",
                 :src  => "lib/scripts/views/transfer-funds.js"}
+        %script{:type => "text/javascript",
+                :src  => "lib/scripts/views/upload-file.js"}
         :javascript
             $(window).ready(function(){
                 ui.init();
@@ -57,5 +59,6 @@
                     = Haml::Engine.new(File.read('markup/pages/files.haml')).render
                     = Haml::Engine.new(File.read('markup/pages/hosting.haml')).render
                     = Haml::Engine.new(File.read('markup/pages/transfer-funds.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/upload-file.haml')).render
             = Haml::Engine.new(File.read('markup/footer.haml')).render
         = Haml::Engine.new(File.read('markup/hovering.haml')).render

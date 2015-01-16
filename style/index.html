@@ -18,6 +18,7 @@
     <script src='lib/scripts/views/money.js' type='text/javascript'></script>
     <script src='lib/scripts/views/files.js' type='text/javascript'></script>
     <script src='lib/scripts/views/transfer-funds.js' type='text/javascript'></script>
+    <script src='lib/scripts/views/upload-file.js' type='text/javascript'></script>
     <script>
       $(window).ready(function(){
           ui.init();
@@ -326,78 +327,6 @@
               </div>
             </div>
             <div class='file-browser'>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-folder-open'></i>
-                </div>
-                <div class='name'>exampledir1</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-folder-open'></i>
-                </div>
-                <div class='name'>exampledir2</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-folder-open'></i>
-                </div>
-                <div class='name'>exampledir3</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-folder-open'></i>
-                </div>
-                <div class='name'>exampledir4</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file'></i>
-                </div>
-                <div class='name'>example3.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-excel-o'></i>
-                </div>
-                <div class='name'>example4.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-text'></i>
-                </div>
-                <div class='name'>example5.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-text'></i>
-                </div>
-                <div class='name'>example5.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-archive-o'></i>
-                </div>
-                <div class='name'>example6.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file'></i>
-                </div>
-                <div class='name'>example7.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-movie-o'></i>
-                </div>
-                <div class='name'>example8.txt</div>
-              </div>
-              <div class='file'>
-                <div class='graphic'>
-                  <i class='fa fa-file-text'></i>
-                </div>
-                <div class='name'>example5.txt</div>
-              </div>
             </div>
           </div>
           <div id='hosting'>
@@ -523,6 +452,16 @@
                 Send Funds
               </div>
             </div>
+          </div>
+          <div id='upload-file'>
+            <div class='header'>
+              <div class='title'>
+                Upload File
+              </div>
+            </div>
+            <input id='upload-box' type='file'>
+            <input class='description-field' placeholder="Put'er'ere">
+            <div class='button upload'>Upload</div>
           </div>
         </div>
       </div>
