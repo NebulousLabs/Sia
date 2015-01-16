@@ -26,6 +26,7 @@ dependencies:
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
 	go get -u github.com/inconshreveable/go-update
+	go get -u github.com/agl/ed25519
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:

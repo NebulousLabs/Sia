@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // Wallet holds your coins, manages privacy, outputs, ect. The balance reported

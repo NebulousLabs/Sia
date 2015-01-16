@@ -183,12 +183,12 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	defer w.mu.Unlock()
 
 	// Fetch the transaction.
-	ot, exists := w.transactions[id]
+	openTransaction, exists := w.transactions[id]
 	if !exists {
 		err = errors.New("no transaction found for given id")
 		return
 	}
-	transaction = *ot.transaction
+	transaction = *openTransaction.transaction
 
 	// Get the coveredfields struct.
 	var coveredFields consensus.CoveredFields
@@ -218,7 +218,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	}
 
 	// For each input in the transaction that we added, provide a signature.
-	for _, inputIndex := range ot.inputs {
+	for _, inputIndex := range openTransaction.inputs {
 		input := transaction.Inputs[inputIndex]
 		sig := consensus.TransactionSignature{
 			InputID:        input.OutputID,
@@ -230,8 +230,12 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		// Hash the transaction according to the covered fields and produce the
 		// cryptographic signature.
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
+		pubKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].publicKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
 		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+		if err != nil {
+			return
+		}
 
 		// Mark the input as spent. Maps :)
 		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter

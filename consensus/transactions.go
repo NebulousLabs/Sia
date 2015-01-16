@@ -10,6 +10,7 @@ import (
 // Exported errors
 var (
 	ConflictingTransactionErr = errors.New("conflicting transaction exists in transaction pool")
+	InvalidSignatureErr       = errors.New("invalid signature in transaction")
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -228,7 +229,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 		// Check that the signature matches the public key.
 		sigHash := t.SigHash(i)
 		if !signatures.VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
-			err = errors.New("invalid signature in transaction")
+			err = InvalidSignatureErr
 			return
 		}
 

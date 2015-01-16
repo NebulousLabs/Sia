@@ -6,11 +6,9 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// sendManyTransactions was created becuase occasionally transaction sending
-// would fail, returning an invalid signature error. This sent many simple
-// transactions to trigger the seemingly random error. This doesn't actually
-// test anything, it just does a bunch of actions and sees if an error
-// triggers.
+// sendManyTransactions repeatedly sends transactions, attempting to trigger a
+// bug where transactions randomly fail to verify. Though this bug has since
+// been found and fixed, the tests have been left behind.
 func sendManyTransactions(t *testing.T, c *Core) {
 	if testing.Short() {
 		return
