@@ -141,7 +141,12 @@ func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
-	err := applyUpdate(req.FormValue("version"))
+	version := req.FormValue("version")
+	// if no version supplied, use current
+	if version == "" {
+		version = "current"
+	}
+	err := applyUpdate(version)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	}
