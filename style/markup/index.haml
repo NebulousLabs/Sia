@@ -40,11 +40,6 @@
             $(window).ready(function(){
                 ui.init();
                 controller.init();
-                setTimeout(function(){
-                    ui._transferFunds.setFrom("account", "Main Account");
-                    $("#overview").hide();
-                    $("#transfer-funds").show();
-                },100);
             });
 
     %body
