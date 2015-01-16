@@ -9,6 +9,7 @@ import (
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
 var (
+	BlockSizeLimit  = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
 	BlockFrequency  = Timestamp(600)         // In seconds.
 	TargetWindow    = BlockHeight(2000)      // Number of blocks to use when calculating the target.
 	FutureThreshold = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.

@@ -127,7 +127,11 @@ func CreateCore(config Config) (c *Core, err error) {
 	}
 
 	// Update componenets to see genesis block.
-	err = c.UpdateHost(components.HostAnnouncement{})
+	hostInfo, err := c.host.HostInfo()
+	if err != nil {
+		return
+	}
+	err = c.UpdateHost(hostInfo.Announcement)
 	if err != nil {
 		return
 	}
