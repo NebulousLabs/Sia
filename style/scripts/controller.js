@@ -65,6 +65,15 @@ var controller = (function(){
                 console.log(data);
             });
         });
+        ui.addListener("create-address", function(){
+            ui.wait();
+            $.getJSON("/wallet/address", function(info){
+                //TODO: Error handling
+                ui.stopWaiting();
+                console.log(info);
+                alert(info.Address);
+            });
+        })
     }
 
     var lastUpdateTime = Date.now();
