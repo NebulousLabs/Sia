@@ -114,7 +114,7 @@ var controller = (function(){
             lastUpdateTime = Date.now();
             updateUI();
         });
-        $.getJSON("/json/status", function(response){
+        $.getJSON("/status", function(response){
             data.status = response;
             updateUI();
         });
