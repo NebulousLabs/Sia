@@ -74,11 +74,8 @@ func (na *Address) RPC(name string, arg, resp interface{}) error {
 // Broadcast calls the RPC on each peer in the address book.
 func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
 	for _, addr := range tcps.AddressBook() {
-		err := addr.RPC(name, arg, resp)
-		// remove unresponsive peers
-		if err != nil {
-			tcps.RemovePeer(addr)
-		}
+		// TODO: remove unresponsive peers
+		_ = addr.RPC(name, arg, resp)
 	}
 }
 
