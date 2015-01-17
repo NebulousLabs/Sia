@@ -702,8 +702,8 @@
   float: right;
   margin-right: 20px;
 }
-#file-upload .description-field {
-  width: 100%;
+#upload-file .inputs {
+  padding: 20px;
 }
 body {
   margin: 0px;

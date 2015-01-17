@@ -33,6 +33,10 @@ ui._uploadFile = ui["_upload-file"] = (function(){
                 }
             });
         });
+
+        view.find(".back.button").click(function(){
+            ui.switchView("files");
+        });
     }
 
     function setPrivacy(_privacyType){
