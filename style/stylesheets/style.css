@@ -720,10 +720,16 @@
   color: #757575;
   border-bottom: 1px solid #e0e0e0;
 }
-#network .peer-table .items .item .icon {
+#network .peer-table .items .item .peer-icon {
   display: inline-block;
   padding-left: 8px;
   padding-right: 4px;
+}
+#network .peer-table .items .item .value .icon {
+  display: inline-block;
+  padding-left: 4px;
+  padding-right: 4px;
+  color: #9e9e9e;
 }
 #network .peer-table .items .item .value {
   display: inline-block;

@@ -1,9 +1,13 @@
 ui._network = (function(){
 
-    var view;
+    var view, eItems, fItems, eItemBlueprint, eAddPeer, eApply;
 
     function init(){
-
+        view = $("#network");
+        eItems = $();
+        eItemBlueprint = view.find(".item.blueprint");
+        eAddPeer = view.find(".add-peer");
+        eApply = view.find(".apply");
     }
 
     function onViewOpened(data){
@@ -15,6 +19,23 @@ ui._network = (function(){
             };
         }
 
+        if (data.peers){
+            eItems.remove();
+            var newEItems = [];
+            fItems = [];
+            data.peers.Peers.forEach(function(peerAddr){
+                console.log(peerAddr);
+                var eItem = eItemBlueprint.clone().removeClass("blueprint");
+                eItemBlueprint.parent().append(eItem);
+                newEItems.push(eItem[0]);
+                var fItem = ui.FieldElement(eItem.find(".value"));
+                fItem.setValue(peerAddr);
+                fItems.push(fItem);
+
+            });
+            eItems = $(newEItems);
+        }
+
 
 
     }
@@ -22,6 +43,6 @@ ui._network = (function(){
     return {
         init: init,
         onViewOpened: onViewOpened
-    }
+    };
 
 })();
