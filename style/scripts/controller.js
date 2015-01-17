@@ -34,13 +34,17 @@ var controller = (function(){
         $.get("/update/apply", {version:version});
     }
 
-    function httpApiCall(url, params, callback){
+    function httpApiCall(url, params, callback, errorCallback){
         params = params || {};
         $.getJSON(url, params, function(data){
             if (callback) callback(data);
         }).error(function(){
-            console.error("BAD CALL TO", url, arguments);
-            ui.notify("An error occurred calling " + url, "alert");
+            if (!errorCallback){
+                console.error("BAD CALL TO", url, arguments);
+                ui.notify("An error occurred calling " + url, "alert");
+            }else{
+                errorCallback();
+            }
         });
     }
 
@@ -97,11 +101,36 @@ var controller = (function(){
         });
         ui.addListener("download-file", function(fileNickname){
             ui.notify("Downloading " + fileNickname + " to Downloads folder", "download");
-            $.getJSON("/file/download", {
+            httpApiCall("/file/download", {
                 "nickname": fileNickname,
                 "filename": fileNickname
-            },function(response){
-                console.log(response);
+            });
+        });
+        ui.addListener("update-peers", function(peers){
+            ui.notify("Updating Network...", "peers");
+
+            function addPeer(peerAddr){
+                httpApiCall("/peer/add", {
+                    "addr": peerAddr
+                });
+            }
+            function removePeer(peerAddr){
+                httpApiCall("/peer/remove", {
+                    "addr": peerAddr
+                });
+            }
+            var oldPeers = data.peer.Peers;
+            for (var i = 0;i < oldPeers.length; i++){
+                if (peers.indexOf(oldPeers[i]) == -1){
+                    // this peer has been removed
+                    removePeer(oldPeers[i]);
+                }
+            }
+            peers.forEach(function(peerAddr){
+                if (data.peer.Peers.indexOf(peerAddr) == -1){
+                    // This peer needs to be added
+                    addPeer(peerAddr);
+                }
             });
         });
     }
@@ -191,12 +220,25 @@ var controller = (function(){
         });
     }
 
+    function updatePeer(callback){
+        $.getJSON("/peer/status", function(response){
+            data.peer = {
+                "Peers": response
+            };
+            updateUI();
+            if (callback) callback();
+        }).error(function(){
+            console.log(arguments);
+        });
+    }
+
     function update(){
         updateWallet();
         updateMiner();
         updateStatus();
         updateHost();
         updateFile();
+        updatePeer();
     }
 
     function updateUI(){

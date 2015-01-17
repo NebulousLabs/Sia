@@ -39,7 +39,7 @@ func (d *daemon) handle(addr string) {
 	// Peer API Calls
 	http.HandleFunc("/peer/add", d.peerAddHandler)
 	http.HandleFunc("/peer/remove", d.peerRemoveHandler)
-	http.HandleFunc("/peer/status", d.peerRemoveHandler)
+	http.HandleFunc("/peer/status", d.peerStatusHandler)
 
 	// Misc. API Calls
 	http.HandleFunc("/sync", d.syncHandler)

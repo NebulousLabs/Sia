@@ -165,12 +165,15 @@
         },
         "FreezeIndex": 0
     }
+},
+"peer": {
+    "Peers": ["123.456.987:9981", "123.456.987:9981"]
 }
 */
 var ui = (function(){
 
     var currentView = "overview";
-    var viewNames = ["overview", "money", "manage-account", "files", "hosting", "mining", "transfer-funds", "upload-file"];
+    var viewNames = ["overview", "money", "manage-account", "files", "hosting", "mining", "transfer-funds", "upload-file", "network"];
     var transitionTypes = {
         "money->manage-account": "slideleft",
         "manage-account->money": "slideright",
@@ -433,7 +436,8 @@ var ui = (function(){
         "sent": "send",
         "received": "sign-in",
         "fix": "wrench",
-        "download": "arrow-circle-down"
+        "download": "arrow-circle-down",
+        "peers": "group"
     };
     function notify(message, type, clickAction){
         type = type || "alert";

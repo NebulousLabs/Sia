@@ -6,70 +6,14 @@ ui._transferFunds = ui["_transfer-funds"] = (function(){
 
     var numberPrecision = 18;
 
-    // Field elements have a pencil icon, when they're editted the pencil
-    // disappears
-    function FieldElement(element, changeListener){
-
-        var icon = element.find(".icon");
-
-        var onChangeListener = changeListener || function(){};
-
-        element.click(function(){
-            icon.remove();
-            element.attr("contentEditable","true");
-            element.focus();
-        });
-
-        element.keydown(function(e){
-            if (e.keyCode == 13){
-                element.blur();
-            }
-        })
-
-        element.blur(function(){
-            element.attr("contentEditable","");
-            onChangeListener(element.text());
-            element.prepend(icon);
-        });
-
-        function setValue(text){
-            icon.remove();
-            element.text(text || " ");
-            element.prepend(icon);
-        }
-
-        function getValue(){
-            icon.remove();
-            var text = element.text();
-            element.prepend(icon);
-            return text;
-        }
-
-        function setOnChangeListener(callback){
-            onChangeListener = callback;
-        }
-
-        function triggerChange(){
-            onChangeListener(getValue());
-        }
-
-        return {
-            element: element,
-            setOnChangeListener: setOnChangeListener,
-            triggerChange: triggerChange,
-            setValue: setValue,
-            getValue: getValue
-        };
-    }
-
     function init(){
 
         // Get all the elements
         view = $("#transfer-funds");
         eAccountBalance = view.find(".account .current-balance .amt");
-        fAccountTransfer = FieldElement(view.find(".account .field-transfer"));
-        fAccountFinalBalance = FieldElement(view.find(".account .field-final-balance"));
-        fAddressAddress = FieldElement(view.find(".address .field-address"));
+        fAccountTransfer = ui.FieldElement(view.find(".account .field-transfer"));
+        fAccountFinalBalance = ui.FieldElement(view.find(".account .field-final-balance"));
+        fAddressAddress = ui.FieldElement(view.find(".address .field-address"));
         eSummaryAmount = view.find(".summary .amt");
         eSummaryFrom = view.find(".summary .from");
         eSummaryTo = view.find(".summary .to");

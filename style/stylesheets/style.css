@@ -705,6 +705,51 @@
 #upload-file .inputs {
   padding: 20px;
 }
+#network .peer-table {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin: 10px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+#network .peer-table .items {
+  height: 350px;
+  overflow-y: auto;
+}
+#network .peer-table .items .item {
+  color: #757575;
+  border-bottom: 1px solid #e0e0e0;
+}
+#network .peer-table .items .item .peer-icon {
+  display: inline-block;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+#network .peer-table .items .item .value .icon {
+  display: inline-block;
+  padding-left: 4px;
+  padding-right: 8px;
+  color: #9e9e9e;
+}
+#network .peer-table .items .item .value {
+  display: inline-block;
+  min-width: 300px;
+  font-size: 18px;
+  padding: 4px;
+}
+#network .peer-table .items .item .cancel {
+  display: inline-block;
+  padding-top: 8px;
+  padding-right: 8px;
+  float: right;
+}
+#network .peer-table .items .item .cancel:hover {
+  cursor: pointer;
+}
+#network .peer-table .control {
+  border-top: 1px solid #e0e0e0;
+  text-align: right;
+}
 body {
   margin: 0px;
   padding: 0px;

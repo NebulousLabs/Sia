@@ -12,17 +12,19 @@
     <script src='lib/libraries/jquery.fileupload.js' type='text/javascript'></script>
     <script src='lib/libraries/bootstrap.min.js' type='text/javascript'></script>
     <script src='lib/scripts/util.js' type='text/javascript'></script>
-    <script src='lib/scripts/ui.js' type='text/javascript'></script>
     <script src='lib/scripts/controller.js' type='text/javascript'></script>
-    <script src='lib/scripts/header.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/overview.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/hosting.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/mining.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/manage-account.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/money.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/files.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/transfer-funds.js' type='text/javascript'></script>
-    <script src='lib/scripts/views/upload-file.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/ui.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/header.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/FieldElement.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/overview.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/hosting.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/mining.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/manage-account.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/money.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/files.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/transfer-funds.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/upload-file.js' type='text/javascript'></script>
+    <script src='lib/scripts/ui/views/network.js' type='text/javascript'></script>
     <script>
       $(window).ready(function(){
           ui.init();
@@ -70,6 +72,10 @@
               <i class='fa fa-folder-o fa-fw'></i>
               <div class='text'>Hosting</div>
             </div>
+            <div class='item network-button'>
+              <i class='fa fa-group fa-fw'></i>
+              <div class='text'>Network</div>
+            </div>
             <div class='item about-button'>
               <i class='fa fa-info fa-fw'></i>
               <div class='text'>About</div>
@@ -95,6 +101,14 @@
             <div class='item hosting-button'>
               <i class='fa fa-folder-o fa-fw'></i>
               <div class='text'>Hosting</div>
+            </div>
+            <div class='item network-button'>
+              <i class='fa fa-group fa-fw'></i>
+              <div class='text'>Network</div>
+            </div>
+            <div class='item about-button'>
+              <i class='fa fa-info fa-fw'></i>
+              <div class='text'>About</div>
             </div>
           </div>
         </div>
@@ -477,6 +491,33 @@
               <div class='filenames'></div>
               <input class='description-field' placeholder='File Nickname'>
               <div class='button upload'>Upload</div>
+            </div>
+          </div>
+          <div id='network'>
+            <div class='header'>
+              <div class='title'>Network Manager</div>
+            </div>
+            <div class='peer-table'>
+              <div class='items'>
+                <div class='item blueprint'>
+                  <i class='fa fa-user peer-icon'></i>
+                  <div class='value'>
+                    <i class='fa fa-pencil-square icon'></i>
+                    192.168.1.19:9950
+                  </div>
+                  <i class='fa fa-times cancel'></i>
+                </div>
+              </div>
+              <div class='control'>
+                <div class='button add-peer'>
+                  <i class='fa fa-plus'></i>
+                  Add Peer
+                </div>
+                <div class='button apply'>
+                  <i class='fa fa-refresh'></i>
+                  Apply
+                </div>
+              </div>
             </div>
           </div>
         </div>
