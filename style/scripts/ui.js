@@ -437,6 +437,7 @@ var ui = (function(){
         element.css({"opacity":0});
         $(".notification-container").prepend(element);
         if (clickAction){
+            element.addClass("hoverable");
             element.click(clickAction);
         }
 
