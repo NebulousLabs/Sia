@@ -59,17 +59,25 @@ func (tcps *TCPServer) setHostname(host string) {
 }
 
 // AddPeer safely adds a peer to the address book.
-func (tcps *TCPServer) AddPeer(addr Address) {
+func (tcps *TCPServer) AddPeer(addr Address) error {
 	tcps.Lock()
+	defer tcps.Unlock()
+	if _, exists := tcps.addressbook[addr]; exists {
+		return errors.New("Peer already added")
+	}
 	tcps.addressbook[addr] = struct{}{}
-	tcps.Unlock()
+	return nil
 }
 
 // Remove safely removes a peer from the address book.
-func (tcps *TCPServer) RemovePeer(addr Address) {
+func (tcps *TCPServer) RemovePeer(addr Address) error {
 	tcps.Lock()
+	defer tcps.Unlock()
+	if _, exists := tcps.addressbook[addr]; !exists {
+		return errors.New("No record of that peer")
+	}
 	delete(tcps.addressbook, addr)
-	tcps.Unlock()
+	return nil
 }
 
 // RandomPeer selects and returns a random peer from the address book.
