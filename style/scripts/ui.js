@@ -427,6 +427,7 @@ var ui = (function(){
     var notifications = [];
     var notificationIcons = {
         "alert": "exclamation",
+        "error": "exclamation",
         "update": "arrow-circle-o-up",
         "help": "question",
         "sent": "send",

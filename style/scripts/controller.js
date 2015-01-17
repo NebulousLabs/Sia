@@ -34,71 +34,58 @@ var controller = (function(){
         $.get("/update/apply", {version:version});
     }
 
+    function httpApiCall(url, params, callback){
+        params = params || {};
+        $.getJSON(url, params, function(data){
+            if (callback) callback(data);
+        }).error(function(){
+            console.error("BAD CALL TO", url, arguments);
+            ui.notify("An error occurred calling " + url, "alert");
+        });
+    }
+
     function addListeners(){
         ui.addListener("add-miner", function(){
-            $.get("/miner/start",{
+            httpApiCall("/miner/start",{
                 "threads": data.miner.Threads + 1
-            }, function(e){
-                // TODO: handle error
-                console.log(e);
             });
         });
         ui.addListener("remove-miner", function(){
-            $.get("/miner/start",{
+            httpApiCall("/miner/start",{
                 "threads": data.miner.Threads - 1 < 0 ? 0 : data.miner.Threads - 1
-            }, function(e){
-                // TODO: handle error
-                console.log(e);
             });
         });
         ui.addListener("toggle-mining", function(){
             if (data.miner.State == "Off"){
-                $.get("/miner/start",{
+                httpApiCall("/miner/start",{
                     "threads": data.miner.Threads
-                }, function(e){
-                    // TODO: handle error
-                    console.log(e);
                 });
             }else{
-                $.get("/miner/stop", function(e){
-                    // TODO: handle error
-                    console.log(e);
-                });
+                httpApiCall("/miner/stop");
             }
         });
         ui.addListener("stop-mining", function(){
-            $.get("/miner/stop", function(e){
-                // TODO: handle error
-                console.log(e);
-            });
+            httpApiCall("/miner/stop");
         });
         ui.addListener("save-host-config", function(hostSettings){
-            $.get("/host/setconfig", hostSettings, function(e){
-                // TODO: handle error
-                console.log(e);
-            });
+            httpApiCall("/host/setconfig", hostSettings);
         });
         ui.addListener("send-money", function(info){
             ui.wait();
             var address = info.to.address.replace(/[^A-Fa-f0-9]/g, "");
-            $.getJSON("/wallet/send", {
+            httpApiCall("/wallet/send", {
                 "amount": info.from.amount,
                 "dest": address
             }, function(data){
-                // TODO: Handle error
                 updateWallet(function(){
                     ui.stopWaiting();
                     ui.switchView("manage-account");
                 });
-            }).error(function(){
-                console.log(arguments);
             });
         });
         ui.addListener("create-address", function(){
             ui.wait();
-            $.getJSON("/wallet/address", function(info){
-                //TODO: Error handling
-                console.log(info);
+            httpApiCall("/wallet/address",{}, function(info){
                 createdAddressList.push({
                     "Address": info.Address,
                     "Balance": 0

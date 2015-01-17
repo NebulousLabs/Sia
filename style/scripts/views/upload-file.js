@@ -27,9 +27,11 @@ ui._uploadFile = ui["_upload-file"] = (function(){
                 },
                 done: function(e, data){
                     console.log(data._response.result);
+                    ui.notify("File successfully uploaded", "sent");
                 },
                 error: function(e, data){
                     console.log(e,data);
+                    ui.notify("Error occurred while uploading file", "error");
                 }
             });
         });
