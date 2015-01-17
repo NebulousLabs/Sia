@@ -436,7 +436,8 @@ var ui = (function(){
         "sent": "send",
         "received": "sign-in",
         "fix": "wrench",
-        "download": "arrow-circle-down"
+        "download": "arrow-circle-down",
+        "peers": "group"
     };
     function notify(message, type, clickAction){
         type = type || "alert";

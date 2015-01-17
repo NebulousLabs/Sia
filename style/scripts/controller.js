@@ -34,13 +34,17 @@ var controller = (function(){
         $.get("/update/apply", {version:version});
     }
 
-    function httpApiCall(url, params, callback){
+    function httpApiCall(url, params, callback, errorCallback){
         params = params || {};
         $.getJSON(url, params, function(data){
             if (callback) callback(data);
         }).error(function(){
-            console.error("BAD CALL TO", url, arguments);
-            ui.notify("An error occurred calling " + url, "alert");
+            if (!errorCallback){
+                console.error("BAD CALL TO", url, arguments);
+                ui.notify("An error occurred calling " + url, "alert");
+            }else{
+                errorCallback();
+            }
         });
     }
 
@@ -97,11 +101,28 @@ var controller = (function(){
         });
         ui.addListener("download-file", function(fileNickname){
             ui.notify("Downloading " + fileNickname + " to Downloads folder", "download");
-            $.getJSON("/file/download", {
+            httpApiCall("/file/download", {
                 "nickname": fileNickname,
                 "filename": fileNickname
-            },function(response){
-                console.log(response);
+            });
+        });
+        ui.addListener("update-peers", function(peers){
+            ui.notify("Updating Network...", "peers");
+            // We're supposed to do this by adding each peer individually, but
+            // we can just spam remove all peers, ignore the errors then
+            // add them all again
+            function addPeer(peerAddr){
+                return function(){
+                    httpApiCall("/peer/add", {
+                        "addr": peerAddr
+                    });
+                };
+            }
+            peers.forEach(function(peerAddr){
+                console.log(peerAddr);
+                httpApiCall("/peer/remove", {
+                    "addr": peerAddr
+                }, addPeer(peerAddr), addPeer(peerAddr));
             });
         });
     }
