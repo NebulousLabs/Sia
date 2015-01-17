@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
+	"path/filepath"
 )
 
 // webIndex loads a partial page according to the http request and composes it
@@ -14,9 +14,9 @@ func (d *daemon) webIndex(w http.ResponseWriter, req *http.Request) {
 	var fileToLoad string
 	if req.URL.Path == "/" {
 		// Make a special case for the index.
-		fileToLoad = path.Join(d.styleDir, "index.html")
+		fileToLoad = filepath.Join(d.styleDir, "index.html")
 	} else {
-		fileToLoad = path.Join(d.styleDir, "index.html#") + req.URL.Path
+		fileToLoad = filepath.Join(d.styleDir, "index.html#") + req.URL.Path
 	}
 
 	// Load the partial file.

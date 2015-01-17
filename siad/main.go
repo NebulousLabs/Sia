@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
@@ -114,11 +114,11 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	defaultConfigFile := path.Join(siaDir, "config")
-	defaultHostDir := path.Join(siaDir, "host")
-	defaultStyleDir := path.Join(siaDir, "style")
+	defaultConfigFile := filepath.Join(siaDir, "config")
+	defaultHostDir := filepath.Join(siaDir, "hostdir")
+	defaultStyleDir := filepath.Join(siaDir, "style")
 	defaultDownloadDir := "~/Downloads"
-	defaultWalletFile := path.Join(siaDir, "sia.wallet")
+	defaultWalletFile := filepath.Join(siaDir, "sia.wallet")
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
 	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port is used when talking to other nodes on the network")
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")

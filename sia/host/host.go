@@ -54,6 +54,10 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 		return
 	}
 
+	addr, _, err := wallet.CoinAddress()
+	if err != nil {
+		return
+	}
 	h = &Host{
 		state:  state,
 		wallet: wallet,
@@ -61,10 +65,12 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 		announcement: components.HostAnnouncement{
 			MaxFilesize:        4 * 1000 * 1000,
 			MaxDuration:        1008, // One week.
-			MinChallengeWindow: 3,
-			MinTolerance:       1,
+			MinChallengeWindow: 20,
+			MaxChallengeWindow: 100,
+			MinTolerance:       2,
 			Price:              1,
 			Burn:               1,
+			CoinAddress:        addr,
 		},
 
 		contracts: make(map[consensus.ContractID]contractObligation),

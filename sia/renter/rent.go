@@ -182,7 +182,7 @@ func (r *Renter) RentSmallFile(rsfp components.RentSmallFileParameters) (err err
 	var pieces []FilePiece
 	for i := 0; i < rsfp.TotalPieces; i++ {
 		var piece FilePiece
-		piece, err = r.proposeSmallContract(rsfp.FullFile, consensus.BlockHeight(2000))
+		piece, err = r.proposeSmallContract(rsfp.FullFile, consensus.BlockHeight(800))
 		if err != nil {
 			return
 		}
