@@ -729,6 +729,9 @@ body {
   padding-top: 32px;
   font-size: 36px;
 }
+#header .header-button i {
+  padding-left: 5px;
+}
 #sidebar {
   background-color: #fff;
   color: #616161;

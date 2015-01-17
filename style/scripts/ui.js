@@ -348,6 +348,7 @@ var ui = (function(){
     }
 
     function initViews(){
+        ui._header.init();
         viewNames.forEach(function(view){
             ui["_" + view].init();
         });
@@ -435,7 +436,9 @@ var ui = (function(){
         element.find(".content").text(message);
         element.css({"opacity":0});
         $(".notification-container").prepend(element);
-        if (clickAction) element.click(clickAction);
+        if (clickAction){
+            element.click(clickAction);
+        }
 
         // Removes the notification element
         function removeElement(){
@@ -459,7 +462,7 @@ var ui = (function(){
         element.animate({
             "opacity":1
         });
-        removeTimeout = setTimeout(removeElement, 3000);
+        removeTimeout = setTimeout(removeElement, 4000);
 
     }
 
