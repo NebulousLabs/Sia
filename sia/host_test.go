@@ -14,23 +14,12 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	prevSize := c.hostDB.Size()
 
 	// Add test settings to the host.
-	coinAddress, _, err := c.wallet.CoinAddress()
-	if err != nil {
-		t.Fatal(err)
-	}
 	hostAnnouncement := components.HostAnnouncement{
-		IPAddress:          c.server.Address(),
-		TotalStorage:       10 * 1000,
-		MinFilesize:        64,
-		MaxFilesize:        2 * 1000,
-		MinDuration:        20,
-		MaxDuration:        52 * 1008,
-		MinChallengeWindow: 50,
-		MaxChallengeWindow: 200,
-		MinTolerance:       5,
-		Price:              2,
-		Burn:               2,
-		CoinAddress:        coinAddress,
+		TotalStorage: 10 * 1000,
+		MaxFilesize:  2 * 1000,
+		MinTolerance: 5,
+		Price:        2,
+		Burn:         2,
 	}
 	c.UpdateHost(hostAnnouncement)
 

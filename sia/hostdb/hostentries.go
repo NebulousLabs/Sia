@@ -26,6 +26,19 @@ import (
 // price. This is also a bit simplistic however, because we're not sure what
 // the host might be charging for bandwidth.
 func entryWeight(entry components.HostEntry) consensus.Currency {
+	// Catch a divide by 0 error, and let all hosts have at least some weight.
+	//
+	// TODO: Perhaps there's a better way to do this.
+	if entry.Price == 0 {
+		entry.Price = 1
+	}
+	if entry.Burn == 0 {
+		entry.Burn = 1
+	}
+	if entry.Freeze == 0 {
+		entry.Freeze = 1
+	}
+
 	adjustedBurn := float64(entry.Burn)
 	adjustedFreeze := float64(entry.Freeze)
 	adjustedPrice := math.Sqrt(float64(entry.Price))

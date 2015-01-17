@@ -131,10 +131,6 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateHost(hostInfo.Announcement)
-	if err != nil {
-		return
-	}
 	err = c.hostDB.Update(0, nil, []consensus.Block{genesisBlock})
 	if err != nil {
 		return
@@ -153,6 +149,13 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err == network.ErrNoPeers {
 		fmt.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
 	} else if err != nil {
+		return
+	}
+
+	// TODO: Move this back up or something. The defaults are all being set in
+	// weird hacky places.
+	err = c.UpdateHost(hostInfo.Announcement)
+	if err != nil {
 		return
 	}
 

@@ -115,7 +115,7 @@ func main() {
 
 	// Set default values, which have the lowest priority.
 	defaultConfigFile := path.Join(siaDir, "config")
-	defaultHostDir := path.Join(siaDir, "host")
+	defaultHostDir := path.Join(siaDir, "hostdir")
 	defaultStyleDir := path.Join(siaDir, "style")
 	defaultDownloadDir := "~/Downloads"
 	defaultWalletFile := path.Join(siaDir, "sia.wallet")
