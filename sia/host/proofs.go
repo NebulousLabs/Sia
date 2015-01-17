@@ -127,7 +127,7 @@ func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.
 		err = errors.New("no record of that file")
 		return
 	}
-	fullname := h.hostDir + contractObligation.filename
+	fullname := filepath.Join(h.hostDir, contractObligation.filename)
 
 	// Open the file.
 	file, err := os.Open(fullname)
