@@ -12,34 +12,28 @@ import (
 // possible.
 
 type (
-	PublicKey [32]byte
-	SecretKey [64]byte
-	Signature [64]byte
+	PublicKey *[ed25519.PublicKeySize]byte
+	SecretKey *[ed25519.PrivateKeySize]byte
+	Signature *[ed25519.SignatureSize]byte
 )
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
 func GenerateKeyPair() (sk SecretKey, pk PublicKey, err error) {
-	edPK, edSK, err := ed25519.GenerateKey(rand.Reader)
+	pk, sk, err = ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return
 	}
-	copy(sk[:], edSK[:])
-	copy(pk[:], edPK[:])
 	return
 }
 
 // SignBytes signs a message using a secret key.
 func SignBytes(data []byte, sk SecretKey) (sig Signature, err error) {
-	edSK := [64]byte(sk)
-	edSig := ed25519.Sign(&edSK, data)
-	copy(sig[:], edSig[:])
+	sig = ed25519.Sign(sk, data)
 	return
 }
 
 // VerifyBytes uses a public key and input data to verify a signature.
 func VerifyBytes(data []byte, pk PublicKey, sig Signature) bool {
-	edPK := [32]byte(pk)
-	edSig := [64]byte(sig)
-	return ed25519.Verify(&edPK, data, &edSig)
+	return ed25519.Verify(pk, data, sig)
 }
