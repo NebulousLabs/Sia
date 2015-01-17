@@ -176,7 +176,8 @@ var ui = (function(){
         "manage-account->money": "slideright",
         "manage-account->transfer-funds": "slideleft",
         "transfer-funds->manage-account": "slideright",
-        "files->upload-file": "slideleft"
+        "files->upload-file": "slideleft",
+        "upload-file->files": "slideright"
     };
     var eTooltip;
     var eventListeners = {};
@@ -260,13 +261,17 @@ var ui = (function(){
         // Utility functions
         function setTranslate(element, x, y){
             element.css({
-                "-webkit-transform": "translate(" + x + "px," + y + "px)"
+                "-webkit-transform": "translate(" + x + "px," + y + "px)",
+                "transform": "translate(" + x + "px," + y + "px)",
+                "-moz-transform": "translate(" + x + "px," + y + "px)"
             });
         }
 
         function clearTransform(element){
             element.css({
-                "-webkit-transform": ""
+                "-webkit-transform": "",
+                "-moz-transform": "",
+                "transform": ""
             });
         }
 
@@ -426,7 +431,8 @@ var ui = (function(){
         "help": "question",
         "sent": "send",
         "received": "sign-in",
-        "fix": "wrench"
+        "fix": "wrench",
+        "download": "arrow-circle-down"
     };
     function notify(message, type, clickAction){
         type = type || "alert";

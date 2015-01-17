@@ -308,8 +308,8 @@
             <div class='header'>
               <div class='title'>File Manager</div>
               <div class='info'>
-                <div class='space'>12.2 GB</div>
-                <div class='cost'>0.122 &micro;SC/h</div>
+                <div class='space'>? GB</div>
+                <div class='cost'>? SC/Y</div>
                 <div class='costusd'>&asymp; 0.001 &micro;USD/h</div>
               </div>
             </div>
@@ -330,6 +330,13 @@
               </div>
             </div>
             <div class='file-browser'>
+              <div class='file blueprint'>
+                <div class='graphic'>
+                  <i class='fa fa-file'></i>
+                </div>
+                <div class='name'>exampledir1</div>
+                <div class='size'>29.4 MB</div>
+              </div>
             </div>
           </div>
           <div id='hosting'>
@@ -458,14 +465,19 @@
           </div>
           <div id='upload-file'>
             <div class='header'>
+              <div class='back button'>
+                <i class='fa fa-chevron-left'></i>
+              </div>
               <div class='title'>
                 Upload File
               </div>
             </div>
-            <input id="fileupload" type="file" name="file" data-url="/file/upload">
-            <div class='filenames'></div>
-            <input class='description-field' placeholder="Put'er'ere">
-            <div class='button upload'>Upload</div>
+            <div class='inputs'>
+              <input id="fileupload" type="file" name="file" data-url="/file/upload">
+              <div class='filenames'></div>
+              <input class='description-field' placeholder='File Nickname'>
+              <div class='button upload'>Upload</div>
+            </div>
           </div>
         </div>
       </div>

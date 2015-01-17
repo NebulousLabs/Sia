@@ -519,30 +519,33 @@
 .file-browser {
   background-color: #fafafa;
   height: 800px;
+  overflow-y: auto;
 }
 .file-browser .file {
-  display: inline-block;
-  background-color: #fff;
-  width: 100px;
-  height: 100px;
-  border: 1px solid #e0e0e0;
-  padding: 4px;
-  margin: 10px;
-  border-radius: 4px;
-  position: relative;
+  padding: 10px;
   color: #757575;
+  font-size: 14px;
+  background-color: #fff;
+  border-bottom: 1px solid #eeeeee;
 }
 .file-browser .file:hover {
   cursor: pointer;
   background-color: #fafafa;
 }
 .file .graphic {
-  font-size: 48px;
+  display: inline-block;
+  width: 20px;
+  font-size: 12px;
   text-align: center;
 }
 .file .name {
-  text-align: center;
+  display: inline-block;
+  width: 50%;
+  text-align: left;
   font-size: 14px;
+}
+.file .size {
+  display: inline-block;
 }
 #hosting {
   background-color: #fafafa;
@@ -699,8 +702,8 @@
   float: right;
   margin-right: 20px;
 }
-#file-upload .description-field {
-  width: 100%;
+#upload-file .inputs {
+  padding: 20px;
 }
 body {
   margin: 0px;

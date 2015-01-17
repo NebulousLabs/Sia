@@ -6,8 +6,6 @@ ui._header = (function(){
         headerElement = $("#header");
         eUpdate = headerElement.find(".update-button");
 
-        console.log(eUpdate);
-
         addEvents();
     }
 
