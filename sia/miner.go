@@ -15,7 +15,7 @@ func (c *Core) StopMining() error {
 }
 
 // MinerInfo calls Info on the miner.
-func (c *Core) MinerInfo() ([]byte, error) {
+func (c *Core) MinerInfo() (components.MinerInfo, error) {
 	return c.miner.Info()
 }
 
