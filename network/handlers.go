@@ -22,6 +22,8 @@ func pong() (string, error) {
 func sendHostname(conn net.Conn) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 	_, err := encoding.WriteObject(conn, host)
+	// write error
+	encoding.WriteObject(conn, "")
 	return err
 }
 
@@ -56,5 +58,7 @@ func (tcps *TCPServer) addRemote(conn net.Conn) (err error) {
 		return
 	}
 	tcps.AddPeer(addr)
+	// write error
+	encoding.WriteObject(conn, "")
 	return
 }
