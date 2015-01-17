@@ -210,7 +210,7 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 		contractProgress := s.Height() - contract.Start
 		if s.Height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
 			// If the proof was missed for this window, add an output.
-			cd := &ContractDiff{
+			cd := ContractDiff{
 				Contract:             openContract.FileContract,
 				ContractID:           openContract.ContractID,
 				New:                  false,
@@ -225,6 +225,7 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 			}
 			openContract.WindowSatisfied = false
 			cd.NewOpenContract = *openContract
+			td.ContractDiffs = append(td.ContractDiffs, cd)
 		}
 
 		// Check for a terminated contract.
