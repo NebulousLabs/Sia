@@ -36,10 +36,13 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/file/download", d.fileDownloadHandler)
 	http.HandleFunc("/file/status", d.fileStatusHandler)
 
-	// Misc. API Calls
-	http.HandleFunc("/sync", d.syncHandler)
+	// Peer API Calls
 	http.HandleFunc("/peer/add", d.peerAddHandler)
 	http.HandleFunc("/peer/remove", d.peerRemoveHandler)
+	http.HandleFunc("/peer/status", d.peerRemoveHandler)
+
+	// Misc. API Calls
+	http.HandleFunc("/sync", d.syncHandler)
 	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/update/check", d.updateCheckHandler)
 	http.HandleFunc("/update/apply", d.updateApplyHandler)
@@ -87,17 +90,27 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: this should return an error
-	d.core.AddPeer(network.Address(req.FormValue("addr")))
+	err := d.core.AddPeer(network.Address(req.FormValue("addr")))
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
 
 	writeSuccess(w)
 }
 
 func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: this should return an error
-	d.core.RemovePeer(network.Address(req.FormValue("addr")))
+	err := d.core.RemovePeer(network.Address(req.FormValue("addr")))
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
 
 	writeSuccess(w)
+}
+
+func (d *daemon) peerStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, d.core.AddressBook())
 }
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
