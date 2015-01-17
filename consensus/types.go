@@ -5,9 +5,9 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/signatures"
 )
 
 type (
@@ -65,7 +65,7 @@ type Output struct {
 type SpendConditions struct {
 	TimeLock      BlockHeight
 	NumSignatures uint64
-	PublicKeys    []signatures.PublicKey
+	PublicKeys    []crypto.PublicKey
 }
 
 // A StorageProof contains the fields needed for a host to prove that they are
@@ -102,7 +102,7 @@ type TransactionSignature struct {
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
 	PublicKeyIndex uint64
-	Signature      signatures.Signature
+	Signature      crypto.Signature
 }
 
 type CoveredFields struct {

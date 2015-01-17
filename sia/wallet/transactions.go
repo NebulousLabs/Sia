@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/signatures"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // Reset implements the core.Wallet interface.
@@ -231,7 +231,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 		// cryptographic signature.
 		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
 		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
-		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = signatures.SignBytes(sigHash[:], secKey)
+		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = crypto.SignBytes(sigHash[:], secKey)
 		if err != nil {
 			return
 		}
