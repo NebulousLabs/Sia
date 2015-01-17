@@ -426,7 +426,8 @@ var ui = (function(){
         "help": "question",
         "sent": "send",
         "received": "sign-in",
-        "fix": "wrench"
+        "fix": "wrench",
+        "download": "arrow-circle-down"
     };
     function notify(message, type, clickAction){
         type = type || "alert";

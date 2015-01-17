@@ -107,7 +107,16 @@ var controller = (function(){
                     ui.stopWaiting();
                 });
             });
-        })
+        });
+        ui.addListener("download-file", function(fileNickname){
+            ui.notify("Downloading " + fileNickname + " to Downloads folder", "download");
+            $.getJSON("/file/download", {
+                "nickname": fileNickname,
+                "filename": fileNickname
+            },function(response){
+                console.log(response);
+            });
+        });
     }
 
     var lastUpdateTime = Date.now();
@@ -183,15 +192,28 @@ var controller = (function(){
         });
     }
 
+    function updateFile(callback){
+        $.getJSON("/file/status", function(response){
+            data.file = {
+                "Files": response.Files || []
+            };
+            updateUI();
+            if (callback) callback();
+        }).error(function(){
+            console.log(arguments);
+        });
+    }
+
     function update(){
         updateWallet();
         updateMiner();
         updateStatus();
         updateHost();
+        updateFile();
     }
 
     function updateUI(){
-        if (data.wallet && data.miner && data.status && data.host){
+        if (data.wallet && data.miner && data.status && data.host && data.file){
             ui.update(data);
         }
     }

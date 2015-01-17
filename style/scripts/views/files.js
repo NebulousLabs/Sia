@@ -19,21 +19,20 @@ ui._files = (function(){
     }
 
     function onViewOpened(data){
-        data.file = {
-            "Files":["example.txt","one.txt","two.txt","three.txt","four.txt"]
-        };
-
         if (data.file.Files){
             var files = data.file.Files;
             eFiles.remove();
             var newFileElements = [];
-            for (var i = 0;i < files.length;i++){
+            files.forEach(function(fileNickname){
                 var eFile = eFileBlueprint.clone().removeClass("blueprint");
-                eFile.find(".name").text(files[i]);
+                eFile.find(".name").text(fileNickname);
                 eFile.find(".size").text("? MB");
                 eFileBlueprint.parent().append(eFile);
                 newFileElements.push(eFile[0]);
-            }
+                eFile.click(function(){
+                    ui._trigger("download-file", fileNickname);
+                });
+            });
             eFiles = $(newFileElements);
         }
     }
