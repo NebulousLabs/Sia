@@ -444,6 +444,7 @@ var ui = (function(){
 
         var element = $(".notification.blueprint").clone().removeClass("blueprint");
         element.find(".icon i").addClass("fa-" + notificationIcons[type]);
+        element.addClass("type-" + type);
         element.find(".content").text(message);
         element.css({"opacity":0});
         $(".notification-container").prepend(element);
