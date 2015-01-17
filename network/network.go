@@ -43,13 +43,14 @@ func (tcps *TCPServer) Address() Address {
 }
 
 // AddressBook returns the server's address book as a slice.
-func (tcps *TCPServer) AddressBook() (book []Address) {
+func (tcps *TCPServer) AddressBook() []Address {
 	tcps.RLock()
 	defer tcps.RUnlock()
+	book := []Address{}
 	for address := range tcps.addressbook {
 		book = append(book, address)
 	}
-	return
+	return book
 }
 
 // setHostname sets the hostname of the server. The port is unchanged.
