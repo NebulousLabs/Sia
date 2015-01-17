@@ -19,7 +19,7 @@ ui._uploadFile = ui["_upload-file"] = (function(){
                 add: function(e, data){
                     view.find(".button.upload").off("click").click(function(){
                         data.formData = {
-                            "nickname": eDescription.text(),
+                            "nickname": eDescription.val(),
                             "pieces": 12
                         };
                         data.submit();
