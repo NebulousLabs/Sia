@@ -728,7 +728,7 @@
 #network .peer-table .items .item .value .icon {
   display: inline-block;
   padding-left: 4px;
-  padding-right: 4px;
+  padding-right: 8px;
   color: #9e9e9e;
 }
 #network .peer-table .items .item .value {
