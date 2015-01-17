@@ -6,6 +6,7 @@ import (
 	// "io"
 	"net"
 	// "os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -169,14 +170,16 @@ func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
 }
 
 // TODO: Do the uploading in parallel.
+//
+// On mutexes: cannot do network stuff with a lock on, so we need to get the
+// lock, get the contracts, and then drop the lock.
 func (r *Renter) RentSmallFile(rsfp components.RentSmallFileParameters) (err error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
+	r.mu.RLock()
 	_, exists := r.files[rsfp.Nickname]
 	if exists {
 		return errors.New("file of that nickname already exists")
 	}
+	r.mu.RUnlock()
 
 	// Make an entry for this file.
 	var pieces []FilePiece
@@ -187,9 +190,11 @@ func (r *Renter) RentSmallFile(rsfp components.RentSmallFileParameters) (err err
 			return
 		}
 		pieces = append(pieces, piece)
+		r.mu.Lock()
+		r.files[rsfp.Nickname] = FileEntry{Pieces: pieces}
+		r.mu.Unlock()
 	}
 
-	r.files[rsfp.Nickname] = FileEntry{Pieces: pieces}
 	return
 }
 
@@ -238,10 +243,22 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 		if err != nil {
 			return
 		}
+
+		// Try to fund the transaction, and wait if there isn't enough money.
 		err = r.wallet.FundTransaction(id, renterPortion+minerFee)
-		if err != nil {
+		if err != nil && err != components.LowBalanceErr {
 			return
 		}
+		for err == components.LowBalanceErr {
+			// TODO: This is a dirty hack - the system will try to get the file
+			// through until it has enough money to actually get the file
+			// through. Significant problem :(
+
+			// There should be no locks at this point.
+			time.Sleep(time.Second * 30)
+			err = r.wallet.FundTransaction(id, renterPortion+minerFee)
+		}
+
 		err = r.wallet.AddMinerFee(id, minerFee)
 		if err != nil {
 			return
