@@ -323,7 +323,9 @@ var ui = (function(){
             "wait": "wait()\
             \nShows loading icon until stopWaiting() is called",
             "stopWaiting": "stopWaiting()\
-            \nAllows user to continue using UI after wait() call"
+            \nAllows user to continue using UI after wait() call",
+            "notify": "notify(<string message>, <string type>, <clickCallback function>)\
+            \nCreates notification. types are ['alert','update','help','sent','received','fix']"
         }[functionName];
     }
 
@@ -416,6 +418,51 @@ var ui = (function(){
         },1400);
     }
 
+    var notifications = [];
+    var notificationIcons = {
+        "alert": "exclamation",
+        "update": "arrow-circle-o-up",
+        "help": "question",
+        "sent": "send",
+        "received": "sign-in",
+        "fix": "wrench"
+    };
+    function notify(message, type, clickAction){
+        type = type || "alert";
+
+        var element = $(".notification.blueprint").clone().removeClass("blueprint");
+        element.find(".icon i").addClass("fa-" + notificationIcons[type]);
+        element.find(".content").text(message);
+        element.css({"opacity":0});
+        $(".notification-container").prepend(element);
+        if (clickAction) element.click(clickAction);
+
+        // Removes the notification element
+        function removeElement(){
+            element.slideUp(function(){
+                element.remove();
+            });
+        }
+
+        var removeTimeout;
+        element.mouseover(function(){
+            // don't let the notification disappear if the user is debating
+            // clicking
+            clearTimeout(removeTimeout)
+        });
+
+        element.mouseout(function(){
+            // the user isn't interested, restart deletion timer
+            removeTimeout = setTimeout(removeElement, 2500);
+        })
+
+        element.animate({
+            "opacity":1
+        });
+        removeTimeout = setTimeout(removeElement, 3000);
+
+    }
+
     function addListener(event, callback){
         eventListeners[event] = eventListeners[event] || [];
         eventListeners[event].push(callback);
@@ -427,6 +474,7 @@ var ui = (function(){
         "addListener": addListener,
         "wait": wait,
         "stopWaiting": stopWaiting,
+        "notify": notify,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
         "_data": null,
