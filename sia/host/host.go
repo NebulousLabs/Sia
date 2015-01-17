@@ -58,8 +58,8 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 		wallet: wallet,
 
 		announcement: components.HostAnnouncement{
-			MaxFilesize:        1024 * 1024,
-			MaxDuration:        52 * 1008, // one year
+			MaxFilesize:        4 * 1000 * 1000,
+			MaxDuration:        1008,
 			MinChallengeWindow: 3,
 			MinTolerance:       1,
 			Price:              1,
