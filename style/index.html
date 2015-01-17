@@ -7,6 +7,9 @@
     <link href='lib/libraries/font-awesome-4.2.0/css/font-awesome.min.css' rel='stylesheet'>
     <link href='lib/stylesheets/style.css' rel='stylesheet'>
     <script src='lib/libraries/jquery.js' type='text/javascript'></script>
+    <script src='lib/libraries/jquery.ui.widget.js' type='text/javascript'></script>
+    <script src='lib/libraries/jquery.iframe-transport.js' type='text/javascript'></script>
+    <script src='lib/libraries/jquery.fileupload.js' type='text/javascript'></script>
     <script src='lib/libraries/bootstrap.min.js' type='text/javascript'></script>
     <script src='lib/scripts/util.js' type='text/javascript'></script>
     <script src='lib/scripts/ui.js' type='text/javascript'></script>
@@ -459,7 +462,8 @@
                 Upload File
               </div>
             </div>
-            <input id='upload-box' type='file'>
+            <input id="fileupload" type="file" name="files[]" data-url="/file/upload">
+            <div class='filenames'></div>
             <input class='description-field' placeholder="Put'er'ere">
             <div class='button upload'>Upload</div>
           </div>

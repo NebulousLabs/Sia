@@ -2,6 +2,7 @@
     .header
         .title
             Upload File
-    %input#upload-box{:type=>"file"}
+    <input id="fileupload" type="file" name="files[]" data-url="/file/upload">
+    .filenames
     %input.description-field{:placeholder=>"Put'er'ere"}
     .button.upload Upload
