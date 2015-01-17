@@ -22,19 +22,19 @@ func (d *daemon) hostSetConfigHandler(w http.ResponseWriter, req *http.Request) 
 
 	qsVars := map[string]interface{}{
 		"totalstorage": &hAnnouncement.TotalStorage,
-		"minfile":      &hAnnouncement.MinFilesize,
-		"maxfile":      &hAnnouncement.MaxFilesize,
+		// "minfile":      &hAnnouncement.MinFilesize,
+		"maxfilesize":  &hAnnouncement.MaxFilesize,
 		"mintolerance": &hAnnouncement.MinTolerance,
-		"minduration":  &hAnnouncement.MinDuration,
-		"maxduration":  &hAnnouncement.MaxDuration,
-		"price":        &hAnnouncement.Price,
-		"penalty":      &hAnnouncement.Burn,
+		// "minduration":  &hAnnouncement.MinDuration,
+		"maxduration": &hAnnouncement.MaxDuration,
+		"price":       &hAnnouncement.Price,
+		"burn":        &hAnnouncement.Burn,
 	}
 
 	for qs := range qsVars {
 		_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 		if err != nil {
-			http.Error(w, "Malformed "+qs, 400)
+			http.Error(w, "Malformed "+qs+" "+err.Error(), 400)
 			return
 		}
 	}

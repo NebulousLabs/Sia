@@ -135,6 +135,10 @@
     },
     "RenterFiles": null,
     "IPAddress": ":9988",
+    "HostSpaceRemaining": 0,
+    "HostContractCount": 0
+},
+"host": {
     "HostSettings": {
         "IPAddress": ":9988",
         "TotalStorage": 0,
@@ -160,13 +164,9 @@
             "PublicKeys": null
         },
         "FreezeIndex": 0
-    },
-    "HostSpaceRemaining": 0,
-    "HostContractCount": 0
+    }
 }
-}*/
-
-
+*/
 var ui = (function(){
 
     var currentView = "overview";

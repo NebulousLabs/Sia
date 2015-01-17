@@ -2,7 +2,10 @@ ui._hosting = (function(){
 
     var view, ePropBlueprint, ePreset16GB, ePreset32GB, ePreset64GB, eProps, eControl, eSave, eReset;
 
+    // TODO: make this an associative array for readability
     var editableProps = ["TotalStorage","MaxFilesize","MaxDuration","MinTolerance","Price","Burn"];
+    var propUnits = ["MB", "KB", "Day", "# Contracts", "SC", "SC"];
+    var propConversion = [1/1000/1000, 1/1000, 10/60/24, 1, 1, 1];
 
     var lastHostSettings;
 
@@ -40,7 +43,8 @@ ui._hosting = (function(){
             ui._tooltip(this, "Reseting");
             for (var i = 0;i < editableProps.length;i ++){
                 var item = $(eProps[i]);
-                // item.find(".value").text(lastHostSettings[editableProps[i]]);
+                var value = parseFloat(data.host.HostSettings[editableProps[i]]);
+                item.find(".value").text(value * propConversion[i]);
             }
         });
     }
@@ -49,29 +53,28 @@ ui._hosting = (function(){
         var newSettings = {};
         for (var i = 0;i < editableProps.length;i ++){
             var item = $(eProps[i]);
-            newSettings[editableProps[i]] = item.find(".value").text();
+            var value = parseFloat(item.find(".value").text());
+            newSettings[editableProps[i].toLowerCase()] = value / propConversion[i];
         }
         return newSettings;
     }
 
-    function update(data){
+    function onViewOpened(data){
+        eProps.remove();
         // If this is the first time, create and load all properties
-        if (eProps.length === 0){
-            for (var i = 0; i < editableProps.length; i++){
-                var item = ePropBlueprint.clone().removeClass("blueprint");
-                ePropBlueprint.parent().append(item);
-                eProps = eProps.add(item);
-                item.find(".name").text(editableProps[i]);
-                // item.find(".value").text(data.hosting.HostingSettings[editableProps[i]]);
-            }
+        for (var i = 0; i < editableProps.length; i++){
+            var item = ePropBlueprint.clone().removeClass("blueprint");
+            ePropBlueprint.parent().append(item);
+            eProps = eProps.add(item);
+            item.find(".name").text(editableProps[i] + " ("+ propUnits[i] +")");
+            var value = parseFloat(data.host.HostSettings[editableProps[i]]);
+            item.find(".value").text(value * propConversion[i]);
         }
-
-        // lastHostSettings = data.hosting.HostingSettings;
 
     }
 
     return {
         init:init,
-        update:update
+        onViewOpened:onViewOpened
     };
 })();
