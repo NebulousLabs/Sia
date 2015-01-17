@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/hash"
@@ -100,11 +101,12 @@ func (h *Host) consensusListen(updateChan chan consensus.ConsensusChange) {
 		for _, contractID := range deletions {
 			expiredContract := h.contracts[contractID]
 
-			stat, err := os.Stat(h.hostDir + expiredContract.filename)
+			fullpath := filepath.Join(h.hostDir, expiredContract.filename)
+			stat, err := os.Stat(fullpath)
 			if err != nil {
 				fmt.Println(err)
 			}
-			err = os.Remove(h.hostDir + expiredContract.filename)
+			err = os.Remove(fullpath)
 			h.spaceRemaining += stat.Size()
 			if err != nil {
 				fmt.Println(err)

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -59,7 +60,7 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 
 		announcement: components.HostAnnouncement{
 			MaxFilesize:        4 * 1000 * 1000,
-			MaxDuration:        1008,
+			MaxDuration:        1008, // One week.
 			MinChallengeWindow: 3,
 			MinTolerance:       1,
 			Price:              1,
@@ -118,10 +119,10 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
-	fullname := h.hostDir + contractObligation.filename
 	h.mu.RUnlock()
 
 	// Open the file.
+	fullname := filepath.Join(h.hostDir, contractObligation.filename)
 	file, err := os.Open(fullname)
 	if err != nil {
 		return
