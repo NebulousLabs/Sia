@@ -8,6 +8,7 @@ ui._network = (function(){
         eItemBlueprint = view.find(".item.blueprint");
         eAddPeer = view.find(".add-peer");
         eApply = view.find(".apply");
+        fItems = [];
 
         addEvents();
     }
@@ -31,18 +32,11 @@ ui._network = (function(){
 
     function onViewOpened(data){
 
-        // TODO: remove dummy data here
-        if (!data.peers){
-            data.peers = {
-                "Peers": ["123.456.789:4050","123.456.789:4050","123.456.789:4050"]
-            };
-        }
-
-        if (data.peers){
+        if (data.peer){
             eItems.remove();
             var newEItems = [];
             fItems = [];
-            data.peers.Peers.forEach(function(peerAddr){
+            data.peer.Peers.forEach(function(peerAddr){
                 var eItem = eItemBlueprint.clone().removeClass("blueprint");
                 eItemBlueprint.parent().append(eItem);
                 newEItems.push(eItem[0]);

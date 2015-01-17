@@ -212,12 +212,25 @@ var controller = (function(){
         });
     }
 
+    function updatePeer(callback){
+        $.getJSON("/peer/status", function(response){
+            data.peer = {
+                "Peers": response
+            };
+            updateUI();
+            if (callback) callback();
+        }).error(function(){
+            console.log(arguments);
+        });
+    }
+
     function update(){
         updateWallet();
         updateMiner();
         updateStatus();
         updateHost();
         updateFile();
+        updatePeer();
     }
 
     function updateUI(){
