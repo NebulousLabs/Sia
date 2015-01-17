@@ -108,21 +108,29 @@ var controller = (function(){
         });
         ui.addListener("update-peers", function(peers){
             ui.notify("Updating Network...", "peers");
-            // We're supposed to do this by adding each peer individually, but
-            // we can just spam remove all peers, ignore the errors then
-            // add them all again
+
             function addPeer(peerAddr){
-                return function(){
-                    httpApiCall("/peer/add", {
-                        "addr": peerAddr
-                    });
-                };
+                httpApiCall("/peer/add", {
+                    "addr": peerAddr
+                });
             }
-            peers.forEach(function(peerAddr){
-                console.log(peerAddr);
+            function removePeer(peerAddr){
                 httpApiCall("/peer/remove", {
                     "addr": peerAddr
-                }, addPeer(peerAddr), addPeer(peerAddr));
+                });
+            }
+            var oldPeers = data.peer.Peers;
+            for (var i = 0;i < oldPeers.length; i++){
+                if (peers.indexOf(oldPeers[i]) == -1){
+                    // this peer has been removed
+                    removePeer(oldPeers[i]);
+                }
+            }
+            peers.forEach(function(peerAddr){
+                if (data.peer.Peers.indexOf(peerAddr) == -1){
+                    // This peer needs to be added
+                    addPeer(peerAddr);
+                }
             });
         });
     }
