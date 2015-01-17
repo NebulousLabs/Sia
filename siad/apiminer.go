@@ -30,10 +30,10 @@ func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 
 // Returns json of the miners status.
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	json, err := d.core.MinerInfo()
+	mInfo, err := d.core.MinerInfo()
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
 		return
 	}
-	w.Write(json)
+	writeJSON(w, mInfo)
 }

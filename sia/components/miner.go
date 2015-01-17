@@ -17,12 +17,21 @@ type MinerUpdate struct {
 	Threads   int
 }
 
+// MinerStatus is the information that gets returned to the front end. Each
+// item is returned in the format that it's meant to be displayed.
+type MinerInfo struct {
+	State          string
+	Threads        int
+	RunningThreads int
+	Address        consensus.CoinAddress
+}
+
 // The miner is used by the Core to facilitate the mining of blocks.
 type Miner interface {
 	// Info returns an arbitrary byte slice presumably with information about
 	// the status of the miner. Info is not relevant to the sia package, but
 	// instead to the front end.
-	Info() ([]byte, error)
+	Info() (MinerInfo, error)
 
 	// Threads returns the number of threads being used by the miner.
 	Threads() int
