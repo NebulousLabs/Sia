@@ -92,9 +92,9 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	if skew > FutureThreshold {
 		go func(skew Timestamp, b Block) {
 			time.Sleep(time.Duration(skew-FutureThreshold) * time.Second)
-			s.Lock()
+			// s.Lock()
 			s.AcceptBlock(b)
-			s.Unlock()
+			// s.Unlock()
 		}(skew, *b)
 		err = FutureBlockErr
 		return

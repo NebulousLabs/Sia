@@ -32,12 +32,13 @@ func (c *Core) AcceptTransaction(t consensus.Transaction) error {
 
 // processBlock locks the state and then attempts to integrate the block.
 // Invalid blocks will result in an error.
+//
+// Mutex note: state mutexes are pretty broken. TODO: Fix this.
 func (c *Core) processBlock(b consensus.Block) (err error) {
 	c.state.Lock()
-	defer c.state.Unlock()
-
 	initialStateHeight := c.state.Height()
 	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
+	c.state.Unlock()
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
@@ -70,11 +71,12 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 // processTransaction locks the state and then attempts to integrate the
 // transaction into the state. An error will be returned for invalid or
 // duplicate transactions.
+//
+// Mutex note: state mutexes are pretty broken. TODO: fix
 func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 	c.state.Lock()
-	defer c.state.Unlock()
-
 	err = c.state.AcceptTransaction(t)
+	c.state.Unlock()
 	if err != nil {
 		if err != consensus.ConflictingTransactionErr {
 			fmt.Println("AcceptTransaction Error:", err)
