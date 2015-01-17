@@ -32,8 +32,9 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/wallet/status", d.walletStatusHandler)
 
 	// File API Calls
-	http.HandleFunc("/rent", d.rentHandler)
-	http.HandleFunc("/download", d.downloadHandler)
+	http.HandleFunc("file/upload", d.fileUploadHandler)
+	http.HandleFunc("file/download", d.fileDownloadHandler)
+	http.HandleFunc("file/status", d.fileStatusHandler)
 
 	// Misc. API Calls
 	http.HandleFunc("/sync", d.syncHandler)
@@ -99,45 +100,17 @@ func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-func (d *daemon) rentHandler(w http.ResponseWriter, req *http.Request) {
-	// filename, nickname := req.FormValue("sourcefile"), req.FormValue("nickname")
-	// err := d.core.ClientProposeContract(filename, nickname)
-	/*
-		if err != nil {
-			http.Error(w, "Failed to create file contract: "+err.Error(), 500)
-		} else {
-			fmt.Fprintf(w, "Upload complete: %s (%s)", nickname, filename)
-		}
-	*/
-	http.Error(w, "Unimplemented", 405)
-}
-
-func (d *daemon) downloadHandler(w http.ResponseWriter, req *http.Request) {
-	nickname, filename := req.FormValue("nickname"), req.FormValue("destination")
-	if filename == "" {
-		filename = d.downloadDir + nickname
-	}
-	/*
-		 err := d.core.Download(nickname, filename)
-		if err != nil {
-			http.Error(w, "Failed to download file: "+err.Error(), 500)
-		} else {
-			fmt.Fprint(w, "Download complete!")
-		}
-	*/
-	http.Error(w, "Unimplemented", 405)
-}
-
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
-	} else {
-		writeJSON(w, struct {
-			Available bool
-			Version   string
-		}{available, version})
+		return
 	}
+
+	writeJSON(w, struct {
+		Available bool
+		Version   string
+	}{available, version})
 }
 
 func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
@@ -150,5 +123,6 @@ func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 	}
+
 	writeSuccess(w)
 }

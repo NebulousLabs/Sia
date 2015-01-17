@@ -1,9 +1,19 @@
 package hash
 
 import (
+	"bytes"
 	"errors"
 	"io"
 )
+
+// BytesMerkleRoot takes a byte slice and returns the merkle root created by
+// splitting the slice into small pieces and then treating each piece as an
+// element of the tree.
+func BytesMerkleRoot(data []byte) (hash Hash, err error) {
+	reader := bytes.NewReader(data)
+	numSegments := CalculateSegments(uint64(len(data)))
+	return ReaderMerkleRoot(reader, numSegments)
+}
 
 // ReaderMerkleRoot splits the provided data into segments. It then recursively
 // transforms these segments into a Merkle tree, and returns the root hash.
@@ -57,10 +67,7 @@ func CalculateSegments(fileSize uint64) (numSegments uint64) {
 // ReaderMerkleRoot on the segment of data corresponding to the sister. This
 // segment will double in size on each iteration until we reach the root.
 //
-// SOME SORT OF MATH PROOF FOR WHY IT WORKS WOULD BE PREFERABLE. I CAN DO THAT
-// IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
-// PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
-// IMPLEMENTATION IS CORRECT.
+// TODO: Gain higher certianty of correctness.
 func BuildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSegment [SegmentSize]byte, hashSet []Hash, err error) {
 	// Find the base segment that is being requested.
 	if _, err = rs.Seek(int64(proofIndex)*int64(SegmentSize), 0); err != nil {
@@ -70,8 +77,6 @@ func BuildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSeg
 		return
 	}
 
-	// THIS FOR LOOP IS MESSY AND I DONT UNDERSTAND IT VERY WELL. THERE SHOULD
-	// BE MORE COMMENTS AND SOME EXPLAINATION FOR WHY ITS CORRECT.
 	// Construct the hash set that proves the base segment is a part of the
 	// merkle tree of the reader. (Verifier needs to know the merkle root of
 	// the file in advance.)
@@ -121,14 +126,10 @@ func BuildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSeg
 // binary representation of numSegments-1, where a 0 indicates "skip" and a 1
 // indicates "keep." I don't know why this works, I just noticed the pattern.
 //
-// SOME SORT OF MATH PROOF FOR WHY IT WORKS WOULD BE PREFERABLE. I CAN DO THAT
-// IF YOU WANT, BUT IT MIGHT INVOLVE ME COMPLETELY REWRITING IT ALL SINCE THE
-// PROOF MIGHT LOOK DIFFERENT THAN WHAT YOUVE IMPLEMENTED, EVEN IF YOUR
-// IMPLEMENTATION IS CORRECT.
+// TODO: Gain higher certainty of correctness.
 func VerifyReaderProof(baseSegment [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, expectedRoot Hash) bool {
 	h := HashBytes(baseSegment[:])
 
-	// NEED MORE COMMENTS, AND SOME EXPLAINATION FOR WHY ITS CORRECT.
 	depth := uint64(0)
 	for (1 << depth) < numSegments {
 		depth++
