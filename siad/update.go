@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"runtime"
@@ -39,26 +40,32 @@ func newerVersion(version string) bool {
 	return false
 }
 
-// helper function that requests and parses the update manifest. It returns a
-// boolean indicating whether an update is available, and a list of urls
-// pointing to files targeted by the update.
-func fetchManifest(version string) (string, []string, error) {
+// helper function that requests and parses the update manifest.
+// It returns the manifest (if available) as a slice of lines.
+func fetchManifest(version string) (lines []string, err error) {
 	resp, err := http.Get(updateURL + "/" + version + "/MANIFEST")
 	if err != nil {
-		return "", nil, err
+		return
 	}
 	defer resp.Body.Close()
 	manifest, _ := ioutil.ReadAll(resp.Body)
-	lines := strings.Split(strings.TrimSpace(string(manifest)), "\n")
-	return lines[0], lines[1:], nil
+	lines = strings.Split(strings.TrimSpace(string(manifest)), "\n")
+	if len(lines) == 0 {
+		err = errors.New("could not parse MANIFEST file")
+	}
+	return
 }
 
 // checkForUpdate checks a centralized server for a more recent version of
 // Sia. If an update is available, it returns true, along with the newer
 // version.
-func (d *daemon) checkForUpdate() (bool, string, error) {
-	version, _, err := fetchManifest("current")
-	return newerVersion(version), version, err
+func checkForUpdate() (bool, string, error) {
+	manifest, err := fetchManifest("current")
+	if err != nil {
+		return false, "", err
+	}
+	version := manifest[0]
+	return newerVersion(version), version, nil
 }
 
 // applyUpdate downloads and applies an update.
@@ -67,18 +74,27 @@ func (d *daemon) checkForUpdate() (bool, string, error) {
 //   - binary diffs
 //   - signed updates
 //   - zipped updates
-func (d *daemon) applyUpdate(version string) (err error) {
-	_, files, err := fetchManifest(version)
+func applyUpdate(version string) (err error) {
+	manifest, err := fetchManifest(version)
 	if err != nil {
 		return
 	}
 
-	for _, file := range files {
+	for _, file := range manifest[1:] {
 		err, _ = update.New().Target(file).FromUrl(updateURL + "/" + version + "/" + file)
 		if err != nil {
 			// TODO: revert prior successful updates?
-			break
+			return
 		}
 	}
+
+	// the binary must always be updated, because if nothing else, the version
+	// number has to be bumped.
+	// TODO: should it be siad.exe on Windows?
+	err, _ = update.New().FromUrl(updateURL + "/" + version + "/siad")
+	if err != nil {
+		return
+	}
+
 	return
 }
