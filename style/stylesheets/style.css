@@ -179,6 +179,7 @@
 }
 .notification.type-error .icon {
   color: #E57373;
+  background-color: #FFCDD2;
 }
 .sumdisplay {
   color: #9e9e9e;

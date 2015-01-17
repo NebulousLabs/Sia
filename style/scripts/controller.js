@@ -38,10 +38,10 @@ var controller = (function(){
         params = params || {};
         $.getJSON(url, params, function(data){
             if (callback) callback(data);
-        }).error(function(){
+        }).error(function(err){
             if (!errorCallback){
                 console.error("BAD CALL TO", url, arguments);
-                ui.notify("An error occurred calling " + url, "error");
+                ui.notify("Error calling " + url + " : " + err.responseText, "error");
             }else{
                 errorCallback();
             }
