@@ -267,7 +267,8 @@ func (sc *SpendConditions) CoinAddress() CoinAddress {
 // Transaction.fileContractID returns the id of a file contract given the index of the contract.
 func (t Transaction) FileContractID(index int) ContractID {
 	return ContractID(hash.HashAll(
-		encoding.Marshal(t),
+		encoding.Marshal(t.Outputs[0]),
+		encoding.Marshal(t.FileContracts[index]),
 		[]byte("contract"),
 		encoding.Marshal(index),
 	))

@@ -25,7 +25,7 @@ type ContractEntry struct {
 
 func (h *Host) nextFilename() string {
 	h.fileCounter++
-	return filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
+	return strconv.Itoa(h.fileCounter)
 }
 
 // considerContract takes a contract and verifies that the terms such as price
@@ -155,8 +155,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Create file.
 	h.mu.Lock()
 	filename := h.nextFilename()
+	fullname := filepath.Join(h.hostDir, filename)
 	h.mu.Unlock()
-	file, err := os.Create(filename)
+	file, err := os.Create(fullname)
 	if err != nil {
 		return
 	}
@@ -166,7 +167,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	defer func() {
 		if err != nil {
 			panic(err)
-			os.Remove(filename)
+			os.Remove(fullname)
 		}
 	}()
 

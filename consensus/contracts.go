@@ -127,7 +127,7 @@ func (s *State) invertStorageProof(sp StorageProof) (diff OutputDiff) {
 // context of the state, and returns an error if something about the contract
 // is invalid.
 func (s *State) validContract(c FileContract) (err error) {
-	if c.ContractFund < 0 {
+	if c.ContractFund <= 0 {
 		err = errors.New("contract must be funded.")
 		return
 	}

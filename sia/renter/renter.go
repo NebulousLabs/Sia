@@ -14,8 +14,9 @@ import (
 )
 
 type FilePiece struct {
-	Host     components.HostEntry   // Where to find the file.
-	Contract consensus.FileContract // The contract being enforced.
+	Host       components.HostEntry   // Where to find the file.
+	Contract   consensus.FileContract // The contract being enforced.
+	ContractID consensus.ContractID   // The ID of the contract.
 }
 
 type FileEntry struct {
@@ -81,7 +82,7 @@ func (r *Renter) RenameFile(currentName, newName string) error {
 func (r *Renter) downloadPiece(piece FilePiece, destination string) (err error) {
 	return piece.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
 		// send filehash
-		if _, err := encoding.WriteObject(conn, piece.Contract.FileMerkleRoot); err != nil {
+		if _, err := encoding.WriteObject(conn, piece.ContractID); err != nil {
 			return err
 		}
 		// TODO: read error
@@ -114,7 +115,7 @@ func (r *Renter) Download(nickname, filename string) (err error) {
 		if err == nil {
 			return
 		} else {
-			fmt.Println(err)
+			fmt.Println("Renter got error:", err)
 			r.hostDB.FlagHost(piece.Host.ID)
 		}
 	}
