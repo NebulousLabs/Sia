@@ -1,7 +1,13 @@
 package components
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/consensus"
+)
+
+var (
+	LowBalanceErr = errors.New("Insufficient Balance")
 )
 
 type WalletInfo struct {

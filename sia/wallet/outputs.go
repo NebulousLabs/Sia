@@ -2,9 +2,9 @@ package wallet
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/sia/components"
 	"github.com/NebulousLabs/Sia/signatures"
 )
 
@@ -63,7 +63,12 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (spendableOutputs []*spe
 
 	// This code will only be reached if total < amount, meaning insufficient
 	// funds.
-	err = fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
+	//
+	// TODO: Figure out some way to return a named error that also contains
+	// custom information.
+	// err = fmt.Errorf("insufficient funds, requested %v but only have %v", amount, total)
+	err = components.LowBalanceErr
+
 	return
 }
 

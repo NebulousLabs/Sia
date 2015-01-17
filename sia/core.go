@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -160,6 +161,47 @@ func CreateCore(config Config) (c *Core, err error) {
 	}
 
 	return
+}
+
+func (c *Core) ScanMutexes() {
+	var state, host, hostdb, miner, renter, wallet int
+	go func() {
+		c.state.Lock()
+		c.state.Unlock()
+		state++
+	}()
+	go func() {
+		c.host.HostInfo()
+		host++
+	}()
+	go func() {
+		c.hostDB.Size()
+		hostdb++
+	}()
+	go func() {
+		c.miner.Threads()
+		miner++
+	}()
+	go func() {
+		c.renter.RentInfo()
+		renter++
+	}()
+	go func() {
+		c.wallet.WalletInfo()
+		wallet++
+	}()
+
+	go func() {
+		fmt.Println("mutex testing has started.")
+		time.Sleep(time.Second * 10)
+		fmt.Println("mutext testing results (0 means deadlock, 1 means success):")
+		fmt.Println("State: ", state)
+		fmt.Println("Host: ", host)
+		fmt.Println("HostDB: ", hostdb)
+		fmt.Println("Miner: ", miner)
+		fmt.Println("Renter: ", renter)
+		fmt.Println("Wallet: ", wallet)
+	}()
 }
 
 // Close does any finishing maintenence before the environment can be garbage
