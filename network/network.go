@@ -53,10 +53,18 @@ func (tcps *TCPServer) AddressBook() []Address {
 	return book
 }
 
-// setHostname sets the hostname of the server. The port is unchanged.
-func (tcps *TCPServer) setHostname(host string) {
+// setHostname sets the hostname of the server. The port is unchanged. If we
+// can't ping ourselves using the new hostname, setHostname returns false and
+// the hostname is unchanged.
+func (tcps *TCPServer) setHostname(host string) bool {
 	_, port, _ := net.SplitHostPort(string(tcps.myAddr))
-	tcps.myAddr = Address(net.JoinHostPort(host, port))
+	newAddr := Address(net.JoinHostPort(host, port))
+	// try to ping ourselves
+	if !Ping(newAddr) {
+		return false
+	}
+	tcps.myAddr = newAddr
+	return true
 }
 
 // AddPeer safely adds a peer to the address book.
@@ -137,13 +145,13 @@ func (tcps *TCPServer) getExternalIP() (err error) {
 		return
 	}
 	defer resp.Body.Close()
-	buf := make([]byte, 32)
-	n, err := resp.Body.Read(buf)
-	if err != nil {
-		return
+	buf := make([]byte, 64)
+	n, _ := resp.Body.Read(buf)
+	hostname := string(buf[:n-1]) // trim newline
+	set := tcps.setHostname(hostname)
+	if !set {
+		return errors.New("external hostname " + hostname + " did not respond to ping")
 	}
-	// TODO: validate IP?
-	tcps.setHostname(string(buf[:n]))
 	return
 }
 
