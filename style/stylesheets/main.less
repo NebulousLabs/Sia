@@ -1,6 +1,7 @@
 @import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,200,300,600,700,900);
 @import url(http://fonts.googleapis.com/css?family=Roboto+Condensed:400,300);
 @import "common.less";
+@import "hovering.less";
 @import "money.less";
 @import "mining.less";
 @import "manage-account.less";
@@ -189,32 +190,4 @@ body{
 
 ::-webkit-scrollbar-thumb:hover{
     cursor:pointer;
-}
-
-// ---------------------
-// HOVERING
-// ---------------------
-#tooltip {
-    .i;
-    display:none;
-    position:absolute;
-    padding:8px;
-    font-size:14px;
-    color:#fff;
-    border-radius:2px;
-    background: rgba(0,0,0,.75);
-}
-#tooltip:after {
-    top: 100%;
-    left: 50%;
-    border: solid transparent;
-    content: " ";
-    height: 0;
-    width: 0;
-    position: absolute;
-    pointer-events: none;
-    border-color: rgba(0, 0, 0, 0);
-    border-top-color: rgba(0,0,0,.75);
-    border-width: 8px;
-    margin-left: -8px;
 }
