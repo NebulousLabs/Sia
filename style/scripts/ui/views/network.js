@@ -39,8 +39,12 @@ ui._network = (function(){
             data.peer.Peers.forEach(function(peerAddr){
                 var eItem = eItemBlueprint.clone().removeClass("blueprint");
                 eItemBlueprint.parent().append(eItem);
-                newEItems.push(eItem[0]);
                 var fItem = ui.FieldElement(eItem.find(".value"));
+                eItem.find(".cancel").click(function(){
+                    eItem.remove();
+                    fItems.splice(fItems.indexOf(fItem),1);
+                });
+                newEItems.push(eItem[0]);
                 fItem.setValue(peerAddr);
                 fItems.push(fItem);
 
