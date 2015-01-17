@@ -55,6 +55,14 @@ func (w *Wallet) Load(filename string) (err error) {
 	defer w.mu.Unlock()
 
 	// Check if the file exists, then read it into memory.
+	//
+	// If there is no existing wallet file, the wallet assumes that the higher
+	// level process (core or daemon) has already approved the filename, and
+	// that a wallet simply doesn't exist yet. A new wallet file will be
+	// created next time wallet.Save() is called.
+	//
+	// TODO: wallet should not return nil upon load if the file it's trying to
+	// load doesn't exist.
 	if _, err = os.Stat(filename); os.IsNotExist(err) {
 		err = nil
 		return

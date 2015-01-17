@@ -7,7 +7,7 @@ install: fmt
 	go install ./...
 
 clean:
-	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf sia/test.wallet sia/hostdir* sia/renterDownload
+	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload
 
 test: clean install
 	go test -short ./...
