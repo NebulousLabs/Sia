@@ -14,8 +14,16 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Malformed pieces", 400)
 		return
 	}
+
 	// this is slightly dangerous, but we assume the user won't try to attack siad
-	data, err := ioutil.ReadAll(req.Body)
+	file, _, err := req.FormFile("file")
+	if err != nil {
+		http.Error(w, "Malformed/missing file: "+err.Error(), 400)
+		return
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Could not read file data: "+err.Error(), 400)
 		return

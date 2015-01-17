@@ -170,12 +170,13 @@
 var ui = (function(){
 
     var currentView = "overview";
-    var viewNames = ["overview", "money", "manage-account", "files", "hosting", "mining", "transfer-funds"];
+    var viewNames = ["overview", "money", "manage-account", "files", "hosting", "mining", "transfer-funds", "upload-file"];
     var transitionTypes = {
         "money->manage-account": "slideleft",
         "manage-account->money": "slideright",
         "manage-account->transfer-funds": "slideleft",
-        "transfer-funds->manage-account": "slideright"
+        "transfer-funds->manage-account": "slideright",
+        "files->upload-file": "slideleft"
     };
     var eTooltip;
     var eventListeners = {};

@@ -12,30 +12,22 @@
         %link{:rel => "stylesheet",
              :href => "lib/stylesheets/style.css"}
 
-        %script{:type => "text/javascript",
-                :src  => "lib/libraries/jquery.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/libraries/bootstrap.min.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/util.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/ui.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/controller.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/overview.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/hosting.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/mining.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/manage-account.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/money.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/files.js"}
-        %script{:type => "text/javascript",
-                :src  => "lib/scripts/views/transfer-funds.js"}
+        %script{:type => "text/javascript",:src => "lib/libraries/jquery.js"}
+        %script{:type => "text/javascript",:src => "lib/libraries/jquery.ui.widget.js"}
+        %script{:type => "text/javascript",:src => "lib/libraries/jquery.iframe-transport.js"}
+        %script{:type => "text/javascript",:src => "lib/libraries/jquery.fileupload.js"}
+        %script{:type => "text/javascript",:src => "lib/libraries/bootstrap.min.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/util.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/ui.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/controller.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/overview.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/hosting.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/mining.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/manage-account.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/money.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/files.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/transfer-funds.js"}
+        %script{:type => "text/javascript",:src => "lib/scripts/views/upload-file.js"}
         :javascript
             $(window).ready(function(){
                 ui.init();
@@ -57,5 +49,6 @@
                     = Haml::Engine.new(File.read('markup/pages/files.haml')).render
                     = Haml::Engine.new(File.read('markup/pages/hosting.haml')).render
                     = Haml::Engine.new(File.read('markup/pages/transfer-funds.haml')).render
+                    = Haml::Engine.new(File.read('markup/pages/upload-file.haml')).render
             = Haml::Engine.new(File.read('markup/footer.haml')).render
         = Haml::Engine.new(File.read('markup/hovering.haml')).render
