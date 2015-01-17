@@ -44,6 +44,7 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/update/check", d.updateCheckHandler)
 	http.HandleFunc("/update/apply", d.updateApplyHandler)
 	http.HandleFunc("/stop", d.stopHandler)
+	http.HandleFunc("/mutextest", d.mutexTestHandler)
 
 	http.ListenAndServe(addr, nil)
 }
@@ -125,4 +126,8 @@ func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	writeSuccess(w)
+}
+
+func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
+	d.core.ScanMutexes()
 }

@@ -33,6 +33,9 @@ type Renter struct {
 }
 
 func (r *Renter) RentInfo() (ri components.RentInfo, err error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	for key := range r.files {
 		ri.Files = append(ri.Files, key)
 	}
