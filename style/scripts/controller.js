@@ -9,6 +9,29 @@ var controller = (function(){
         setInterval(function(){
             update();
         },250);
+
+        // Wait two seconds then check for a Sia client update
+        setTimeout(function(){
+            promptUserIfUpdateAvailable();
+        },2000);
+    }
+
+    function promptUserIfUpdateAvailable(){
+        checkForUpdate(function(update){
+            if (update.Available){
+                ui.notify("New Sia Client Available: Click to update to " + update.Version + "!", "update", function(){
+                    updateClient(update.Version);
+                });
+            }
+        });
+    }
+
+    function checkForUpdate(callback){
+        $.getJSON("/update/check", callback);
+    }
+
+    function updateClient(version){
+        $.get("/update/apply", {version:version});
     }
 
     function addListeners(){
@@ -175,6 +198,7 @@ var controller = (function(){
 
     return {
         "init": init,
-        "update": update
+        "update": update,
+        "promptUserIfUpdateAvailable": promptUserIfUpdateAvailable
     };
 })();

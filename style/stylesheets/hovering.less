@@ -42,6 +42,8 @@
     box-shadow:0px 0px 16px 0px rgba(0,0,0,.25);
     overflow-x:hidden;
     overflow-y:hidden;
+    -webkit-transition:box-shadow 2s;
+    transition:box-shadow .5s;
 
     .icon{
         .i;
@@ -64,4 +66,9 @@
         font-size:18px;
         color:@g600;
     }
+}
+
+.notification.hoverable:hover{
+    cursor:pointer;
+    box-shadow:0px 0px 16px 0px rgba(0,0,0,.4);
 }
