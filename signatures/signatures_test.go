@@ -25,7 +25,7 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Test the public keys for equality.
-	if pk != unmarshalledPK {
+	if *pk != *unmarshalledPK {
 		t.Error("pubkey not the same after marshalling and unmarshalling")
 	}
 
@@ -45,7 +45,7 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Test signatures for equality.
-	if sig != unmarSig {
+	if *sig != *unmarSig {
 		t.Error("signature not same after marshalling and unmarshalling")
 	}
 }
