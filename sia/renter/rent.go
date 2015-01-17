@@ -178,6 +178,8 @@ func (r *Renter) RentSmallFile(rsfp components.RentSmallFileParameters) (err err
 	_, exists := r.files[rsfp.Nickname]
 	if exists {
 		return errors.New("file of that nickname already exists")
+	} else if rsfp.Nickname == "" {
+		return errors.New("cannot use empty string for nickname")
 	}
 	r.mu.RUnlock()
 
