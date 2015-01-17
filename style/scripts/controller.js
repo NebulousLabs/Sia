@@ -41,7 +41,7 @@ var controller = (function(){
         }).error(function(){
             if (!errorCallback){
                 console.error("BAD CALL TO", url, arguments);
-                ui.notify("An error occurred calling " + url, "alert");
+                ui.notify("An error occurred calling " + url, "error");
             }else{
                 errorCallback();
             }
