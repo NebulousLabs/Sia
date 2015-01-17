@@ -171,20 +171,6 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 		return ErrNoPeers
 	}
 
-	// request peers
-	// TODO: maybe iterate until we have enough new peers?
-	var peers []Address
-	for _, addr := range tcps.AddressBook() {
-		var resp []Address
-		addr.RPC("SharePeers", nil, &resp)
-		peers = append(peers, resp...)
-	}
-	for _, addr := range peers {
-		if addr != tcps.myAddr && Ping(addr) {
-			tcps.AddPeer(addr)
-		}
-	}
-
 	// learn hostname
 	var set bool
 	for _, addr := range tcps.AddressBook() {
@@ -198,6 +184,20 @@ func (tcps *TCPServer) Bootstrap() (err error) {
 	// if no peers respond, fallback to centralized service
 	if !set {
 		tcps.getExternalIP()
+	}
+
+	// request peers
+	// TODO: maybe iterate until we have enough new peers?
+	var peers []Address
+	for _, addr := range tcps.AddressBook() {
+		var resp []Address
+		addr.RPC("SharePeers", nil, &resp)
+		peers = append(peers, resp...)
+	}
+	for _, addr := range peers {
+		if addr != tcps.myAddr && Ping(addr) {
+			tcps.AddPeer(addr)
+		}
 	}
 
 	// announce ourselves to new peers
