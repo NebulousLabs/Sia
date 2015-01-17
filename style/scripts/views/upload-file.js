@@ -1,23 +1,35 @@
 ui._uploadFile = ui["_upload-file"] = (function(){
 
-    var view;
+    var view, eDescription;
 
     var privacyType; // "public" or "private"
 
     function init(){
         view = $("#upload-file");
+        eDescription = view.find(".description-field");
+
+        addEvents();
+    }
+
+    function addEvents(){
+        //TODO: Abstract server call logic to controller
         $(function(){
             $("#fileupload").fileupload({
                 datatype: "plaintext",
                 add: function(e, data){
-                    console.log("File Added");
                     view.find(".button.upload").off("click").click(function(){
-                        console.log("Attempting upload");
+                        data.formData = {
+                            "nickname": eDescription.text(),
+                            "pieces": 12
+                        };
                         data.submit();
                     });
                 },
                 done: function(e, data){
-                    console.log("Upload Done");
+                    console.log(data._response.result);
+                },
+                error: function(e, data){
+                    console.log(e,data);
                 }
             });
         });

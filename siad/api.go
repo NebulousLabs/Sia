@@ -32,9 +32,9 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/wallet/status", d.walletStatusHandler)
 
 	// File API Calls
-	http.HandleFunc("file/upload", d.fileUploadHandler)
-	http.HandleFunc("file/download", d.fileDownloadHandler)
-	http.HandleFunc("file/status", d.fileStatusHandler)
+	http.HandleFunc("/file/upload", d.fileUploadHandler)
+	http.HandleFunc("/file/download", d.fileDownloadHandler)
+	http.HandleFunc("/file/status", d.fileStatusHandler)
 
 	// Misc. API Calls
 	http.HandleFunc("/sync", d.syncHandler)
