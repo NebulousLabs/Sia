@@ -3,14 +3,17 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/sia"
 	"github.com/NebulousLabs/Sia/sia/components"
-	"github.com/NebulousLabs/Sia/sia/miner"
 )
 
 type SuccessResponse struct {
@@ -49,6 +52,19 @@ func reqStatus(t *testing.T, url string, responseForm interface{}) {
 	return
 }
 
+func reqSuccess(t *testing.T, url string) SuccessResponse {
+	content, err := httpReq(t, url)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	var success SuccessResponse
+	err = json.Unmarshal(content, &success)
+	if err != nil {
+		t.Fatal("Could not parse json response: " + err.Error())
+	}
+	return success
+}
+
 func reqWalletStatus(t *testing.T) components.WalletInfo {
 	var r components.WalletInfo
 	reqStatus(t, "/wallet/status", r)
@@ -61,15 +77,35 @@ func reqHostConfig(t *testing.T) components.HostInfo {
 	return r
 }
 
-func reqMinerStatus(t *testing.T) miner.MinerInfo {
-
+func reqMinerStatus(t *testing.T) components.MinerInfo {
+	var r components.MinerInfo
+	reqStatus(t, "/miner/status", &r)
+	return r
 }
 
-// /miner/status
-// /wallet/address
+func reqWalletAddress(t *testing.T) struct{ Address string } {
+	var r struct{ Address string }
+	reqStatus(t, "/wallet/address", &r)
+	return r
+}
+
+func reqGenericStatus(t *testing.T) sia.StateInfo {
+	var r sia.StateInfo
+	reqStatus(t, "/status", &r)
+	return r
+}
+
+func reqFileStatus(t *testing.T) components.RentInfo {
+	var r components.RentInfo
+	reqStatus(t, "/file/status", &r)
+	return r
+}
+
+func reqHostSetConfig(t *testing.T) SuccessResponse {
+	// return reqSuccess(t, "/host/setconfig")
+}
+
 // /update/check
-// /status
-// /file/status
 
 // /host/setconfig
 // /miner/start
@@ -84,6 +120,15 @@ func reqMinerStatus(t *testing.T) miner.MinerInfo {
 // /stop
 
 func setupDaemon(t *testing.T) {
+
+	// Settings to speed up operations
+	consensus.BlockFrequency = consensus.Timestamp(1)
+	consensus.TargetWindow = consensus.BlockHeight(1000)
+	network.BootstrapPeers = []network.Address{"localhost:9988"}
+	consensus.RootTarget[0] = 255
+	consensus.MaxAdjustmentUp = big.NewRat(1005, 1000)
+	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
+
 	var config Config
 
 	config.Siad.ConfigFilename = filepath.Join(siaDir, "config")
