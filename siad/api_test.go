@@ -152,6 +152,22 @@ func reqRemovePeer(t *testing.T, peerAddr string) SuccessResponse {
 	return reqSuccess(t, "/peer/remove?addr="+peerAddr)
 }
 
+// This might kill the program...
+func reqApplyUpdate(t *testing.T) SuccessResponse {
+	return reqSuccess(t, "/update/apply")
+}
+
+func reqCheckUpdate(t *testing.T) struct{Version string, Available bool}{
+	var response struct{
+		Version string,
+		Available bool,
+	}
+	reqJSON(t, url, &response)
+	return response
+}
+
+
+
 // /update/check
 
 // /file/upload
