@@ -3,9 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // TODO: timeouts?
@@ -66,79 +63,6 @@ func writeSuccess(w http.ResponseWriter) {
 	writeJSON(w, struct {
 		Success bool
 	}{true})
-}
-
-func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.core.StateInfo())
-}
-
-func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: more graceful shutdown?
-	d.core.Close()
-	os.Exit(0)
-}
-
-func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: don't spawn multiple CatchUps
-	if len(d.core.AddressBook()) == 0 {
-		http.Error(w, "No peers available for syncing", 500)
-		return
-	}
-
-	go d.core.CatchUp(d.core.RandomPeer())
-
-	writeSuccess(w)
-}
-
-func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.core.AddPeer(network.Address(req.FormValue("addr")))
-	if err != nil {
-		http.Error(w, err.Error(), 400)
-		return
-	}
-
-	writeSuccess(w)
-}
-
-func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.core.RemovePeer(network.Address(req.FormValue("addr")))
-	if err != nil {
-		http.Error(w, err.Error(), 400)
-		return
-	}
-
-	writeSuccess(w)
-}
-
-func (d *daemon) peerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.core.AddressBook())
-}
-
-func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
-	available, version, err := checkForUpdate()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	writeJSON(w, struct {
-		Available bool
-		Version   string
-	}{available, version})
-}
-
-func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
-	version := req.FormValue("version")
-	// if no version supplied, use current
-	if version == "" {
-		version = "current"
-	}
-	err := applyUpdate(version)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-	}
-
-	writeSuccess(w)
 }
 
 func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
