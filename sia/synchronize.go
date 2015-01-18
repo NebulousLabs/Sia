@@ -92,12 +92,11 @@ func (c *Core) CatchUp(peer network.Address) {
 
 	// unlock state during network I/O
 	err := peer.RPC("SendBlocks", blockArray, &newBlocks)
-	if err != nil && err != moreBlocksErr {
+	if err != nil && err.Error() != moreBlocksErr.Error() {
 		// log error
 		// TODO: try a different peer?
 		return
 	}
-
 	for _, block := range newBlocks {
 		c.AcceptBlock(block)
 	}
@@ -105,7 +104,7 @@ func (c *Core) CatchUp(peer network.Address) {
 	// TODO: There is probably a better approach than to call CatchUp
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
-	if err == moreBlocksErr {
+	if err != nil && err.Error() == moreBlocksErr.Error() {
 		go c.CatchUp(peer)
 	}
 }
