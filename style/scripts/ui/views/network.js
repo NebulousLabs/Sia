@@ -1,6 +1,5 @@
 ui._network = (function(){
 
-    var view, eItems, fItems, eItemBlueprint, eAddPeer, eApply;
 
     function init(){
         view = $("#network");
@@ -8,51 +7,48 @@ ui._network = (function(){
         eItemBlueprint = view.find(".item.blueprint");
         eAddPeer = view.find(".add-peer");
         eApply = view.find(".apply");
-        fItems = [];
 
         addEvents();
     }
 
     function addEvents(){
         eAddPeer.click(function(){
-            var eItem = eItemBlueprint.clone().removeClass("blueprint");
-            eItemBlueprint.parent().append(eItem);
-            eItems = eItems.add(eItem);
-            var fItem = ui.FieldElement(eItem.find(".value"));
-            fItem.setValue("");
-            fItems.push(fItem);
+            addPeer("");
         });
         eApply.click(function(){
-            var peerAddresses = fItems.map(function(item){
-                return item.getValue();
-            });
-            ui._trigger("update-peers", peerAddresses);
+            applyChanges();
         });
+    }
+
+    function applyChanges(){
+        var peerAddresses = $.map(eItems, function(item,i){
+            return $(item).find(".value").val();
+        });
+        ui._trigger("update-peers", peerAddresses);
+    }
+
+    function addPeer(peerAddr){
+        var eItem = eItemBlueprint.clone().removeClass("blueprint");
+        eItemBlueprint.parent().append(eItem);
+        eItem.find(".cancel").click(function(){
+            eItem.remove();
+        });
+        eItem.find(".value").change(function(){
+            applyChanges();
+        });
+        eItem.find(".value").val(peerAddr);
+        eItems = eItems.add(eItem);
     }
 
     function onViewOpened(data){
 
         if (data.peer){
             eItems.remove();
-            var newEItems = [];
-            fItems = [];
+            eItems = $();
             data.peer.Peers.forEach(function(peerAddr){
-                var eItem = eItemBlueprint.clone().removeClass("blueprint");
-                eItemBlueprint.parent().append(eItem);
-                var fItem = ui.FieldElement(eItem.find(".value"));
-                eItem.find(".cancel").click(function(){
-                    eItem.remove();
-                    fItems.splice(fItems.indexOf(fItem),1);
-                });
-                newEItems.push(eItem[0]);
-                fItem.setValue(peerAddr);
-                fItems.push(fItem);
-
+                addPeer(peerAddr);
             });
-            eItems = $(newEItems);
         }
-
-
 
     }
 

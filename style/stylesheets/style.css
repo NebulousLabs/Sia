@@ -173,6 +173,20 @@
   font-size: 18px;
   color: #757575;
 }
+.notification.small .icon {
+  height: 40px;
+  width: 40px;
+  line-height: 40px;
+  font-size: 24px;
+}
+.notification.small .content {
+  padding: 0px;
+  padding-left: 14px;
+  line-height: 40px;
+  height: 40px;
+  width: 360px;
+  overflow-x: hidden;
+}
 .notification.hoverable:hover {
   cursor: pointer;
   box-shadow: 0px 0px 16px 0px rgba(0, 0, 0, 0.4);
@@ -180,6 +194,10 @@
 .notification.type-error .icon {
   color: #E57373;
   background-color: #FFCDD2;
+}
+.notification.type-success .icon {
+  color: #81C784;
+  background-color: #C8E6C9;
 }
 .sumdisplay {
   color: #9e9e9e;
@@ -729,11 +747,11 @@
   padding-left: 8px;
   padding-right: 4px;
 }
-#network .peer-table .items .item .value .icon {
+#network .peer-table .items .item .icon {
   display: inline-block;
   padding-left: 4px;
   padding-right: 8px;
-  color: #9e9e9e;
+  color: #e0e0e0;
 }
 #network .peer-table .items .item .value {
   display: inline-block;

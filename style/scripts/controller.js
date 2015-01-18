@@ -112,11 +112,19 @@ var controller = (function(){
             function addPeer(peerAddr){
                 httpApiCall("/peer/add", {
                     "addr": peerAddr
+                }, function(){
+                    ui.notifySmall("Successfully added peer: " + peerAddr, "success");
+                }, function(err){
+                    ui.notifySmall("Error adding peer: " + peerAddr, "error");
                 });
             }
             function removePeer(peerAddr){
                 httpApiCall("/peer/remove", {
                     "addr": peerAddr
+                }, function(){
+                    ui.notifySmall("Successfully removed peer: " + peerAddr, "success");
+                }, function(err){
+                    ui.notifySmall("Error removing peer: " + peerAddr, "error");
                 });
             }
             var oldPeers = data.peer.Peers;

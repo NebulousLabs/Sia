@@ -336,7 +336,9 @@ var ui = (function(){
             "stopWaiting": "stopWaiting()\
             \nAllows user to continue using UI after wait() call",
             "notify": "notify(<string message>, <string type>, <clickCallback function>)\
-            \nCreates notification. types are ['alert','update','help','sent','received','fix']"
+            \nCreates notification. types are ['alert','update','help','sent','received','fix']",
+            "notifySmall": "notifySmall(<see notify>)\
+            \nCreates smaller notification"
         }[functionName];
     }
 
@@ -440,14 +442,21 @@ var ui = (function(){
         "received": "sign-in",
         "fix": "wrench",
         "download": "arrow-circle-down",
-        "peers": "group"
+        "peers": "group",
+        "success": "check"
     };
-    function notify(message, type, clickAction){
+    function notifySmall(message, type, clickAction){
+        notify(message, type, clickAction, true);
+    }
+    function notify(message, type, clickAction, small){
         type = type || "alert";
 
         var element = $(".notification.blueprint").clone().removeClass("blueprint");
         element.find(".icon i").addClass("fa-" + notificationIcons[type]);
         element.addClass("type-" + type);
+        if (small){
+            element.addClass("small");
+        }
         element.find(".content").text(message);
         element.css({"opacity":0});
         $(".notification-container").prepend(element);
@@ -494,6 +503,7 @@ var ui = (function(){
         "wait": wait,
         "stopWaiting": stopWaiting,
         "notify": notify,
+        "notifySmall": notifySmall,
         "_tooltip": _tooltip,
         "_trigger": _trigger,
         "_data": null,
