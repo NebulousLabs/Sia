@@ -212,10 +212,13 @@ var ui = (function(){
 
         if (transitionType == "load"){
             // Play a dummy loading animation (we may need the time later)
-            startLoadingAnimation();
-            setTimeout(function(){
-                stopLoadingAnimation(newView);
-            },400);
+            // startLoadingAnimation();
+            // setTimeout(function(){
+            //     stopLoadingAnimation(newView);
+            // },50);
+            $("#" + currentView).hide();
+            $("#" + newView).show();
+            currentView = newView;
         }else if (transitionType == "slideright"){
             slideAnimation(newView, "right");
         }else if (transitionType == "slideleft"){

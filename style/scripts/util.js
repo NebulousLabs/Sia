@@ -5,7 +5,7 @@ var util = (function(){
 
     function engNotation(number, precision){
         if (number === 0) return "0.0000 ";
-        precision = precision || 5;
+        precision = precision || 8;
 
         var degree = Math.floor(Math.log(Math.abs(number)) / Math.LN10 / 3);
 
