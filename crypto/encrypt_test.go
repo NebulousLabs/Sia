@@ -11,8 +11,7 @@ import (
 // fails if the wrong iv's are used, and overall trying to probe the library
 // for something that doesn't work quite right.
 
-// Test encryption makes sure that things can be encrypted and decrypted, and
-// that they at least appear random.
+// TestEncryption makes sure that things can be encrypted and decrypted.
 func TestEncryption(t *testing.T) {
 	// Get a key for encryption.
 	key, err := GenerateEncryptionKey()
@@ -21,23 +20,31 @@ func TestEncryption(t *testing.T) {
 	}
 
 	// Encrypt the zero plaintext.
-	zeroPlaintext := make([]byte, 128)
-	ciphertext, iv, padding, err := EncryptBytes(key, zeroPlaintext)
+	plaintext := make([]byte, 128)
+	_, err = rand.Read(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertext, iv, padding, err := EncryptBytes(key, plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the decrypted plaintext.
-	decryptedZeroPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
+	decryptedPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Compare the original to the decrypted.
-	if bytes.Compare(zeroPlaintext, decryptedZeroPlaintext) != 0 {
+	if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
 		t.Fatal("Encrypted and decrypted zero plaintext do not match")
 	}
+}
 
+// TestPadding encrypts and decrypts a byte slice that invokes every possible
+// padding length.
+func TestPadding(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
@@ -63,18 +70,27 @@ func TestEncryption(t *testing.T) {
 			t.Fatal("Encrypted and decrypted zero plaintext do not match for i = ", i)
 		}
 	}
+}
+
+// TestEntropy encrypts and then decrypts a zero plaintext, checking that the
+// ciphertext is high entropy. This is simply to check for obvious mistakes and
+// not to guarantee security of the ciphertext.
+func TestEntropy(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 
 	// Encrypt a larger zero plaintext and make sure that the outcome is high
 	// entropy. We measure entropy by seeing how much gzip can compress the
 	// ciphertext. 10 * 1000 bytes was chosen because gzip overhead will exceed
 	// compression rate for smaller files, even low entropy files.
 	cipherSize := 10 * 1000
-	key, err = GenerateEncryptionKey()
+	key, err := GenerateEncryptionKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	plaintext := make([]byte, cipherSize)
-	ciphertext, iv, padding, err = EncryptBytes(key, plaintext)
+	ciphertext, _, _, err := EncryptBytes(key, plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,6 +101,6 @@ func TestEncryption(t *testing.T) {
 	zip.Write(ciphertext)
 	zip.Close()
 	if b.Len() < cipherSize {
-		t.Error("high entropy ciphertext is compressing!")
+		t.Error("supposedly high entropy ciphertext has been compressed!")
 	}
 }
