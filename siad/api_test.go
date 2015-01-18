@@ -132,19 +132,20 @@ func reqHostSetConfig(t *testing.T, hostInfo components.HostInfo) SuccessRespons
 	return fResponse
 }
 
-func reqMinerStart(t *testing.T) SuccessResponse {
-	return reqSuccess(t, "/miner/start")
+func reqMinerStart(t *testing.T, threads int) SuccessResponse {
+	return reqSuccess(t, "/miner/start?threads="+fmt.Sprintf("%d", threads))
 }
 
 func reqMinerStop(t *testing.T) SuccessResponse {
 	return reqSuccess(t, "/miner/stop")
 }
 
+func reqWalletSend(t *testing.T, amount int, address string) SuccessResponse {
+	return reqSuccess(t, "/wallet/send?dest="+address+"&amount="+fmt.Sprintf("%d", amount))
+}
+
 // /update/check
 
-// /host/setconfig
-// /miner/stop
-// /wallet/send
 // /file/upload
 // /file/download
 // /sync
