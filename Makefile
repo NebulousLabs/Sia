@@ -27,6 +27,7 @@ dependencies:
 	go get -u github.com/spf13/cobra
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/agl/ed25519
+	go get -u golang.org/x/crypto/twofish
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc:
