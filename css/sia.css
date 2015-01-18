@@ -28,14 +28,12 @@ body {
 .header{
 	margin-left:100px;
 	margin-right:100px;
-	/*box-shadow:0px 4px 4px -4px rgba(0,0,0,.5);*/
 }
 
 .header .logo{
 	margin-top:20px;
 	margin-bottom:20px;
 	height:60px;
-	margin-left:40px;
 	opacity:.75;
 }
 
@@ -87,7 +85,8 @@ body {
 }
 
 .footer{
-	padding:50px;
+	padding-top:50px;
+	padding-bottom:50px;
 }
 .footer .copyright{
 	float:left;
@@ -97,4 +96,15 @@ body {
 }
 .footer .footer-links .link{
 	margin-left:20px;
+}
+
+@media only screen and (max-width : 768px) {
+	.header{
+		margin-left:25px;
+		margin-right:25px;
+	}
+	.content{
+		margin-left:25px;
+		margin-right:25px;
+	}
 }
