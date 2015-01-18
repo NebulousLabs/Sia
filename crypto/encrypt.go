@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 
 	"golang.org/x/crypto/twofish"
 )
@@ -56,11 +57,11 @@ func EncryptBytes(key EncryptionKey, plaintext []byte) (ciphertext []byte, iv []
 	}
 
 	// Encrypt the ciphertext.
-	block, err := twofish.NewCipher(key[:])
+	blockCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
 		return
 	}
-	encrypter := cipher.NewCBCEncrypter(block, iv)
+	encrypter := cipher.NewCBCEncrypter(blockCipher, iv)
 	encrypter.CryptBlocks(ciphertext, ciphertext)
 
 	return
@@ -71,25 +72,28 @@ func EncryptBytes(key EncryptionKey, plaintext []byte) (ciphertext []byte, iv []
 func DecryptBytes(key EncryptionKey, ciphertext []byte, iv []byte, padding int) (plaintext []byte, err error) {
 	// Verify the iv is the correct length.
 	if len(iv) != BlockSize {
-		return errors.New("iv is not correct size")
+		err = errors.New("iv is not correct size")
+		return
 	}
-	if len(ciphertext) % BlockSize != 0 {
-		return errors.New("ciphertext is not correct size")
+	if len(ciphertext)%BlockSize != 0 {
+		err = errors.New("ciphertext is not correct size")
+		return
 	}
-	if padding > ciphertext {
-		return errors.New("stated padding is longer than the ciphertext")
+	if padding > len(ciphertext) {
+		err = errors.New("stated padding is longer than the ciphertext")
+		return
 	}
 
 	// Allocate the plaintext.
 	plaintext = make([]byte, len(ciphertext))
 
 	// Decrypt the ciphertext.
-	block, err := twofish.NewCipher(key[:])
+	blockCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
 		return
 	}
-	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(ciphertext, plaintext)
+	decrypter := cipher.NewCBCDecrypter(blockCipher, iv)
+	decrypter.CryptBlocks(plaintext, ciphertext)
 
 	// Remove the padding.
 	plaintext = plaintext[:len(ciphertext)-padding]
