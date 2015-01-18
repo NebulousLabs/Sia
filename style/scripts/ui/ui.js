@@ -433,6 +433,8 @@ var ui = (function(){
     }
 
     var notifications = [];
+    var lastNotificationTime = 0;
+    var notificationsInQueue = 0;
     var notificationIcons = {
         "alert": "exclamation",
         "error": "exclamation",
@@ -449,6 +451,29 @@ var ui = (function(){
         notify(message, type, clickAction, true);
     }
     function notify(message, type, clickAction, small){
+
+        // CONTRIBUTE: This delay system is technically broken, but not noticably
+        // wait approximately 250ms between notifications
+        if (new Date().getTime() < lastNotificationTime + 250){
+
+            notificationsInQueue ++;
+
+            setTimeout(function(){
+                notify(message, type, clickAction, small);
+            }, notificationsInQueue * 250);
+
+            return;
+        }
+
+        lastNotificationTime = new Date().getTime();
+        if (notificationsInQueue > 0){
+            notificationsInQueue --;
+        }
+
+        showNotification(message, type, clickAction, small);
+    }
+
+    function showNotification(message, type, clickAction, small){
         type = type || "alert";
 
         var element = $(".notification.blueprint").clone().removeClass("blueprint");
@@ -488,7 +513,6 @@ var ui = (function(){
             "opacity":1
         });
         removeTimeout = setTimeout(removeElement, 4000);
-
     }
 
     function addListener(event, callback){
