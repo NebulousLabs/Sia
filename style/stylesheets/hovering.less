@@ -68,6 +68,26 @@
     }
 }
 
+.notification.small{
+
+    .icon{
+        height:40px;
+        width:40px;
+        line-height:40px;
+        font-size:24px;
+    }
+
+    .content{
+        padding:0px;
+        padding-left:14px;
+        line-height:40px;
+        height:40px;
+        width:340px;
+        overflow-x:hidden;
+    }
+
+}
+
 .notification.hoverable:hover{
     cursor:pointer;
     box-shadow:0px 0px 16px 0px rgba(0,0,0,.4);
@@ -76,4 +96,9 @@
 .notification.type-error .icon{
     color:#E57373;
     background-color:#FFCDD2;
+}
+
+.notification.type-success .icon{
+    color:#81C784;
+    background-color:#C8E6C9;
 }
