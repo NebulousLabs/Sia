@@ -52,8 +52,8 @@ Troubleshooting
   Port forwarding is how you let your router know that it's okay for other Sia
   peers to connect to you. If you are behind a firewall, you will most likely
   need to do this. By default, Sia traffic happens on port 9988. The specific
-  instructions for forwarding a port varies by router. Consult this guide for
-  more information: portfoward.com.
+  instructions for forwarding a port varies by router. Consult [this guide](http://portforward.com/) for
+  more information.
 
   In future versions, we will add support for UPnP, which will allow you to
   skip this step.
