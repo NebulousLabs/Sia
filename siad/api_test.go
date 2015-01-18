@@ -144,13 +144,19 @@ func reqWalletSend(t *testing.T, amount int, address string) SuccessResponse {
 	return reqSuccess(t, "/wallet/send?dest="+address+"&amount="+fmt.Sprintf("%d", amount))
 }
 
+func reqAddPeer(t *testing.T, peerAddr string) SuccessResponse {
+	return reqSuccess(t, "/peer/add?addr="+peerAddr)
+}
+
+func reqRemovePeer(t *testing.T, peerAddr string) SuccessResponse {
+	return reqSuccess(t, "/peer/remove?addr="+peerAddr)
+}
+
 // /update/check
 
 // /file/upload
 // /file/download
 // /sync
-// /peer/add
-// /peer/remove
 // /update/apply
 // /stop
 
