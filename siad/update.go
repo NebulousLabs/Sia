@@ -11,7 +11,7 @@ import (
 	"github.com/inconshreveable/go-update"
 )
 
-const VERSION = "0.1.0"
+const VERSION = "0.2.0"
 
 // Updates work like this: each version is stored in a folder on a Linode
 // server operated by the developers. The most recent version is stored in
