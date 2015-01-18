@@ -7,6 +7,18 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+// walletAddressHandler manages requests for CoinAddresses from the wallet.
+func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
+	coinAddress, err := d.core.CoinAddress()
+	if err != nil {
+		http.Error(w, "Failed to get a coin address", 500)
+		return
+	}
+	writeJSON(w, struct {
+		Address string
+	}{fmt.Sprintf("%x", coinAddress)})
+}
+
 // walletSendHandler manages 'send' requests that are made to the wallet.
 func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
@@ -57,16 +69,4 @@ func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, walletStatus)
-}
-
-// walletAddressHandler manages requests for CoinAddresses from the wallet.
-func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, err := d.core.CoinAddress()
-	if err != nil {
-		http.Error(w, "Failed to get a coin address", 500)
-		return
-	}
-	writeJSON(w, struct {
-		Address string
-	}{fmt.Sprintf("%x", coinAddress)})
 }

@@ -39,11 +39,12 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/peer/status", d.peerStatusHandler)
 
 	// Misc. API Calls
-	http.HandleFunc("/sync", d.syncHandler)
-	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/update/check", d.updateCheckHandler)
 	http.HandleFunc("/update/apply", d.updateApplyHandler)
+	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/stop", d.stopHandler)
+	http.HandleFunc("/sync", d.syncHandler)
+	// For debugging purposes only
 	http.HandleFunc("/mutextest", d.mutexTestHandler)
 
 	http.ListenAndServe(addr, nil)
