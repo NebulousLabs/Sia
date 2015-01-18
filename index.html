@@ -1,73 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<meta name="description" content="Sia, Industrial Grade Decentralized Storge">
-		<meta name="author" content="David Vorick, Luke Champine">
-
-		<title>Sia</title>
-
-		<link href="css/bootstrap.min.css" rel="stylesheet">
-		<link href="css/sia.css" rel="stylesheet">
-	</head>
-
-	<body>
-		<div class="container-fluid light">
-			<div class="navbar-collapse">
-				<ul class="nav navbar-nav navbar-right nav-style">
-					<li><a href="http://www.siacoin.com/">Sia</a></li>
-					<li><a href="http://www.siacoin.com/sia.pdf">Whitepaper</a></li>
-					<li><a href="http://github.com/NebulousLabs/Sia">Github</a></li>
-					<li><a href="http://www.siacoin.com/sianotes.html">Sianotes</a></li>
-				</ul>
-			</div>
-		</div>
-
-		<div class="container-fluid shadow fill">
-			<div class="row">
-				<div class="col-xs-12 pad-top">
-					<center> <div id="logo"></div> </center>
-				</div>
-			</div>
-
-			<div class="row">
-				<div class="col-xs-10 col-xs-offset-1 body-text pad-top pad-bottom">
-					Sia is a new, highly efficient decentralized file storage network that operates using cryptocurrency-based compensation.
-					Hosts can join Sia, offering their local storage space to consumers in return for compensation.
-					Consumers can then rent storage from these hosts by spending cryptocurrency.
-					<br><br>
-					On Sia, many hosts work together to store large volumes of data.
-					The network has been designed with speed, reliability, and affordability as the highest priorities.
-					To achieve this, data is split up into hundreds of erasure coded pieces distributed across the network.
-					The network is self-repairing, such that if any host drops offline, the missing piece will be recovered and replaced within a few hours.
-					A file will survive even if dozens of hosts drop offline at the same time.
-					Having the file in hundreds of places enables massively parallel downloads, like a torrent with hundreds of seeders.
-					The throughput on Sia should max out most consumer-grade connections.
-					<br><br>
-					One of the biggest improvements Sia brings to the cloud storage market is the price.
-					Currently, 1 TB of high-speed and high-reliability storage can cost upwards of $20 per month, but a 1 TB hard drive costs ~$40 and has an expected lifetime of 18 months.
-					Even after electricity, bandwidth, and redundancy, the cost of cloud storage should only be $3-5 per month.
-					On Sia, anyone can join the network as a host.
-					This removes the barrier to entry for hosting data on the cloud, and lowers prices to the actual cost of storing data.
-					<br><br>
-					Anybody can join the network as a host, and anybody can use the network for storing files.
-					Every client receives the same quality of service, whether they are renting 5 megabytes or 500 terabytes.
-					There is no file discrimination, and there are no corporate deals or favors that occur over the network. 
-				</div>
-			</div>
-		</div>
-		
-		<!-- Google Analytics -->
-		<script>
-			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-			})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-			ga('create', 'UA-50786427-2', 'siacoin.com');
-			ga('send', 'pageview');
-		</script>
-	</body>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Sia, Industrial Grade Decentralized Storge">
+    <meta name="author" content="David Vorick, Luke Champine, Severin Ibarluzea">
+    <title>Sia</title>
+    <link href='http://fonts.googleapis.com/css?family=Roboto:300,400' rel='stylesheet' type='text/css'>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/sia.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class='container'>
+      <div class='page'>
+        <div class='row header'>
+          <div class='col-xs-4'>
+            <img class='logo' src='img/sia.png'>
+          </div>
+          <div class='col-xs-8'>
+            <div class='header-links'>
+              <span class='item'><a href="./">Home</a></span>
+              <span class='item'><a href="./about.html">About</a></span>
+              <span class='item'><a href="./sia.pdf">Whitepaper</a></span>
+              <span class='item'><a href="http://github.com/NebulousLabs/Sia">Github</a></span>
+              <span class='item'><a href="./sianotes.html">Sianotes</a></span>
+            </div>
+          </div>
+        </div>
+        <div class='row'>
+          <div class='col-xs-12'>
+            <div class='content-title'>
+              Public Beta Launch
+            </div>
+          </div>
+        </div>
+        <div class='row'>
+          <div class='col-xs-12'>
+            <div class='content'>
+              <div>
+              Sia is a new, highly efficient decentralized file storage network that operates using cryptocurrency-based compensation.
+              Hosts can join Sia, offering their local storage space to consumers in return for compensation.
+              Consumers can then rent storage from these hosts by spending cryptocurrency.
+              <br><br>
+              On Sia, many hosts work together to store large volumes of data.
+              The network has been designed with speed, reliability, and affordability as the highest priorities.
+              To achieve this, data is split up into hundreds of erasure coded pieces distributed across the network.
+              The network is self-repairing, such that if any host drops offline, the missing piece will be recovered and replaced within a few hours.
+              A file will survive even if dozens of hosts drop offline at the same time.
+              Having the file in hundreds of places enables massively parallel downloads, like a torrent with hundreds of seeders.
+              The throughput on Sia should max out most consumer-grade connections.
+              <br><br>
+              One of the biggest improvements Sia brings to the cloud storage market is the price.
+              Currently, 1 TB of high-speed and high-reliability storage can cost upwards of $20 per month, but a 1 TB hard drive costs ~$40 and has an expected lifetime of 18 months.
+              Even after electricity, bandwidth, and redundancy, the cost of cloud storage should only be $3-5 per month.
+              On Sia, anyone can join the network as a host.
+              This removes the barrier to entry for hosting data on the cloud, and lowers prices to the actual cost of storing data.
+              <br><br>
+              Anybody can join the network as a host, and anybody can use the network for storing files.
+              Every client receives the same quality of service, whether they are renting 5 megabytes or 500 terabytes.
+              There is no file discrimination, and there are no corporate deals or favors that occur over the network.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class='row extra-stuff'>
+          <div class='col-xs-6'>
+            <div class='logo-container'>
+              <img class='logo' src='img/sia.png'>
+            </div>
+          </div>
+          <div class='col-xs-6'>
+            <div class='download-links'>
+              Download Sia for
+              <a class='link'>Windows 32bit</a>
+              or
+              <a class='link'>Windows 64bit<br/></a>
+              Download Sia for
+              <a class='link'>Linux 32bit</a>
+              or
+              <a class='link'>Linux 64bit<br/></a>
+              Download Sia for
+              <a class='link'>OSX</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class='row'>
+        <div class='col-xs-12'>
+          <div class='footer'>
+            <div class='copyright'>Sia Copyright Notice</div>
+            <div class='footer-links'>
+              <span class='link'><a href="./">Home</a></span>
+              <span class='link'><a href="./about.html">About</a></span>
+              <span class='link'><a href="./sia.pdf">Whitepaper</a></span>
+              <span class='link'><a href="http://github.com/NebulousLabs/Sia">Github</a></span>
+              <span class='link'><a href="./sianotes.html">Sianotes</a></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>

@@ -1,59 +1,100 @@
 html,
 body {
-	height: 100%;
-	background-color: #fff;
-	max-width: 1024px;
-	margin: 0 auto;
+	background-color:#F5F5F5;
+	font-family: 'Roboto', sans-serif;
+	font-weight:300;
+	font-size:18px;
+	color: #616161;
 }
 
-.body-text {
-	font-size: 16px;
+/*
+@g50:#FAFAFA;
+@g100:#F5F5F5;
+@g200:#EEEEEE;
+@g300:#E0E0E0;
+@g400:#BDBDBD;
+@g500:#9E9E9E;
+@g600:#757575;
+@g700:#616161;
+@g800:#424242;
+@g900:#212121;
+*/
+
+.page{
+	background-color:#fff;
+	box-shadow:0px 0px 8px rgba(0,0,0,.5);
 }
 
-.fill {
-	min-height: 100%;
+.header{
+	margin-left:100px;
+	margin-right:100px;
+	/*box-shadow:0px 4px 4px -4px rgba(0,0,0,.5);*/
 }
 
-.light {
-	background-color: rgba(235,235,235,.5);
+.header .logo{
+	margin-top:20px;
+	margin-bottom:20px;
+	height:60px;
+	margin-left:40px;
+	opacity:.75;
 }
 
-.nav-style > li > a {
-	color: rgba(0,0,0,.5);
-	font-size: 20px;
+.header .header-links{
+	padding-top:40px;
+	text-align:right;
 }
 
-.nav-style > li > a:hover,
-.nav-style > li > a:focus {
-	color: rgba(0,0,0,.85);
-	text-decoration:underline;
-	background-color: transparent;
+.header .header-links .item{
+	margin-left:20px;
 }
 
-.pad-top {
-	padding-top: 30px;
+.content-title{
+	font-size:48px;
+	margin-bottom:40px;
+	padding-left:100px;
+	padding-right:100px;
+	padding-top:40px;
+	border-top:1px solid #E0E0E0;
+	text-align:center;
 }
 
-.pad-bottom {
-	padding-bottom: 30px;
+.content{
+	margin-left:100px;
+	margin-right:100px;
 }
 
-.shadow {
-	box-shadow: inset 0 0 40px rgba(0,0,0,.3);
+.extra-stuff{
+	margin-top:40px;
+	padding-top:20px;
+	padding-bottom:40px;
+	border-top:1px solid #E0E0E0;
 }
 
-#logo {
-	background-image: url('../img/sia.png');
-	width: 438px;
-	height: 180px;
-	background-size: 438px 180px;
+.extra-stuff .logo-container{
+	padding:25px;
+	text-align:center;
+}
+.extra-stuff .logo{
+	height:80px;;
+	text-align:center;
 }
 
-@media only screen and (-webkit-min-device-pixel-ratio: 1.5),
-	   only screen and (-o-min-device-pixel-ratio: 3/2),
-	   only screen and (min--moz-device-pixel-ratio: 1.5),
-	   only screen and (min-device-pixel-ratio: 1.5) {
-	   #logo {
-		   background-image: url('../img/sia.svg');
-	   }
+.extra-stuff .download-links{
+	padding:30px;
+}
+
+.extra-stuff .link{
+}
+
+.footer{
+	padding:50px;
+}
+.footer .copyright{
+	float:left;
+}
+.footer .footer-links{
+	text-align:right;
+}
+.footer .footer-links .link{
+	margin-left:20px;
 }
