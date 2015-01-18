@@ -40,6 +40,19 @@ func TestEncryption(t *testing.T) {
 	if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
 		t.Fatal("Encrypted and decrypted zero plaintext do not match")
 	}
+
+	// Try to decrypt using a different key
+	key2, err := GenerateEncryptionKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	badtext, err := DecryptBytes(key2, ciphertext, iv, padding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(plaintext, badtext) == 0 {
+		t.Fatal("When using the wrong key, plaintext was still decrypted!")
+	}
 }
 
 // TestPadding encrypts and decrypts a byte slice that invokes every possible
