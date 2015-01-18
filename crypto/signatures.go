@@ -19,7 +19,7 @@ type (
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
-func GenerateKeyPair() (sk SecretKey, pk PublicKey, err error) {
+func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
 	pk, sk, err = ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return

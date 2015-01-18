@@ -9,7 +9,7 @@ import (
 // `unlockHeight`.
 func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
 	// Create the address + spend conditions.
-	sk, pk, err := crypto.GenerateKeyPair()
+	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
@@ -48,7 +48,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 // coinAddress implements the core.Wallet interface.
 func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
 	// Create the keys and address.
-	sk, pk, err := crypto.GenerateKeyPair()
+	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}

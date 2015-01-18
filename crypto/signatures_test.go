@@ -11,7 +11,7 @@ import (
 // does the same with a signature.
 func TestSignatureEncoding(t *testing.T) {
 	// Create key pair.
-	sk, pk, err := GenerateKeyPair()
+	sk, pk, err := GenerateSignatureKeys()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestSigning(t *testing.T) {
 
 	for i := 0; i < iterations; i++ {
 		// Generate the keys.
-		sk, pk, err := GenerateKeyPair()
+		sk, pk, err := GenerateSignatureKeys()
 		if err != nil {
 			t.Fatal(err)
 		}
