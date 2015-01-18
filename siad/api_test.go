@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -20,6 +22,8 @@ type SuccessResponse struct {
 	Success bool
 }
 
+// httpReq will request a byte stream from the provided url and log and return
+// and errors
 func httpReq(t *testing.T, url string) ([]byte, error) {
 	resp, err := http.Get("http://127.0.0.1:9980" + url)
 	if err != nil {
@@ -40,69 +44,92 @@ func httpReq(t *testing.T, url string) ([]byte, error) {
 	return content, nil
 }
 
-func reqStatus(t *testing.T, url string, responseForm interface{}) {
+// reqJSON will send an http request to the provided url and fill the response
+// struct
+func reqJSON(t *testing.T, url string, response interface{}) {
 	content, err := httpReq(t, url)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	err = json.Unmarshal(content, &responseForm)
+	err = json.Unmarshal(content, &response)
 	if err != nil {
-		t.Fatal("Could not parse json response: " + err.Error())
+		t.Fatal("Could not parse json response to " + url + ": " + err.Error())
 	}
 	return
 }
 
 func reqSuccess(t *testing.T, url string) SuccessResponse {
-	content, err := httpReq(t, url)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	var success SuccessResponse
-	err = json.Unmarshal(content, &success)
-	if err != nil {
-		t.Fatal("Could not parse json response: " + err.Error())
-	}
-	return success
+	var response SuccessResponse
+	reqJSON(t, url, &response)
+	return response
 }
 
 func reqWalletStatus(t *testing.T) components.WalletInfo {
 	var r components.WalletInfo
-	reqStatus(t, "/wallet/status", r)
+	reqJSON(t, "/wallet/status", r)
 	return r
 }
 
 func reqHostConfig(t *testing.T) components.HostInfo {
 	var r components.HostInfo
-	reqStatus(t, "/host/config", &r)
+	reqJSON(t, "/host/config", &r)
 	return r
 }
 
 func reqMinerStatus(t *testing.T) components.MinerInfo {
 	var r components.MinerInfo
-	reqStatus(t, "/miner/status", &r)
+	reqJSON(t, "/miner/status", &r)
 	return r
 }
 
 func reqWalletAddress(t *testing.T) struct{ Address string } {
 	var r struct{ Address string }
-	reqStatus(t, "/wallet/address", &r)
+	reqJSON(t, "/wallet/address", &r)
 	return r
 }
 
 func reqGenericStatus(t *testing.T) sia.StateInfo {
 	var r sia.StateInfo
-	reqStatus(t, "/status", &r)
+	reqJSON(t, "/status", &r)
 	return r
 }
 
 func reqFileStatus(t *testing.T) components.RentInfo {
 	var r components.RentInfo
-	reqStatus(t, "/file/status", &r)
+	reqJSON(t, "/file/status", &r)
 	return r
 }
 
-func reqHostSetConfig(t *testing.T) SuccessResponse {
+func reqHostSetConfig(t *testing.T, hostInfo components.HostInfo) SuccessResponse {
 	// return reqSuccess(t, "/host/setconfig")
+	var params url.Values
+	params.Add("totalstorage", fmt.Sprintf("%d", hostInfo.Announcement.TotalStorage))
+	params.Add("maxfilesize", fmt.Sprintf("%d", hostInfo.Announcement.MaxFilesize))
+	params.Add("mintolerance", fmt.Sprintf("%d", hostInfo.Announcement.MinTolerance))
+	params.Add("maxduration", fmt.Sprintf("%d", hostInfo.Announcement.MaxDuration))
+	params.Add("price", fmt.Sprintf("%d", hostInfo.Announcement.Price))
+	params.Add("burn", fmt.Sprintf("%d", hostInfo.Announcement.Burn))
+
+	urlWithParams := "http://127.0.0.1:9980/host/setconfig?" + params.Encode()
+
+	resp, err := http.Get(urlWithParams)
+	if err != nil {
+		t.Fatal("Couldn't set host config: " + err.Error())
+	}
+
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal("Could not read set host config response: " + err.Error())
+	}
+
+	var fResponse SuccessResponse
+
+	err = json.Unmarshal(content, &fResponse)
+	if err != nil {
+		t.Fatal("Could not parse set host config response: " + err.Error())
+	}
+
+	return fResponse
 }
 
 // /update/check
