@@ -132,10 +132,17 @@ func reqHostSetConfig(t *testing.T, hostInfo components.HostInfo) SuccessRespons
 	return fResponse
 }
 
+func reqMinerStart(t *testing.T) SuccessResponse {
+	return reqSuccess(t, "/miner/start")
+}
+
+func reqMinerStop(t *testing.T) SuccessResponse {
+	return reqSuccess(t, "/miner/stop")
+}
+
 // /update/check
 
 // /host/setconfig
-// /miner/start
 // /miner/stop
 // /wallet/send
 // /file/upload
