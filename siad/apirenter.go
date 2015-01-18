@@ -3,6 +3,7 @@ package main
 import (
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/sia/components"
@@ -44,7 +45,7 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.core.RenterDownload(req.FormValue("nickname"), d.downloadDir+req.FormValue("filename"))
+	err := d.core.RenterDownload(req.FormValue("nickname"), filepath.Join(d.downloadDir, req.FormValue("filename")))
 	if err != nil {
 		// TODO: if this err is a user error (e.g. bad nickname), return 400 instead
 		http.Error(w, "Download failed: "+err.Error(), 500)
