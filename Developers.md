@@ -1,6 +1,24 @@
 This file is meant to help a developer navagate the codebase and develop clean,
 maintainable code.
 
+///////////////////////////////
+// Documentation Conventions //
+///////////////////////////////
+
+All structs, functions, and interfaces must have a docstring.
+
+Anytime that something is left unfinished, place a comment containing the
+string 'TODO:'. This sends a clear message to other developers, and creates a
+greppable way to find unfinished parts of the codebase. Currently, it is okay
+to leave a large volume of 'TODO' statements in the codebase. As the codebase
+matures, 'TODO' statements will become increasingly frowned upon.
+
+A softer form of 'TODO' is 'CONTRIBUTE:', which indicates a place in the
+codebase that could use additional code, but it is only a 'would be nice', and
+is not a high enough priority to actually be implemented. It is meant to
+indicate to other developers (especially those new to the codebase) places that
+would be easy contribute to.
+
 ///////////////////////////
 // Consensus Conventions //
 ///////////////////////////
@@ -44,7 +62,7 @@ function), it must be documented in the function explanation.
 // Consensus Flow //
 ////////////////////
 
-WARNING: This is both no longer fully correct and also not the flow that's
+WARNING: This is both no longer fully correct and also not the flow that is
 going to be upheld in the future. Better strategies have been learned and will
 be implemented in a later iteration, after the Jan. 16th release.
 
@@ -76,7 +94,7 @@ Verifying a Transaction:
 3. Check that the spend conditions for each input match the hash of the output they spend.
 4. Check that the timelock on each output has expired.
 5. Check that no inputs are spent twice.
-6. Add up miner fees, outputs, and contract funds, make sure that's less than the sum of all inputs.
+6. Add up miner fees, outputs, and contract funds, make sure that is less than the sum of all inputs.
 7. Make sure there are no illegal values in the contracts.
 8. Make sure all storage proofs are valid.
 9. Make sure all signatures are non-frivilous and valid.

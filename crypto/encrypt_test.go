@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// Test encryption makes sure that things can be encrypted and decrypted, and
-// that they at least appear random.
-//
 // CONTRIBUTE: Additional tests could be used, such as testing that decryption
 // fails if the wrong iv's are used, and overall trying to probe the library
 // for something that doesn't work quite right.
+
+// Test encryption makes sure that things can be encrypted and decrypted, and
+// that they at least appear random.
 func TestEncryption(t *testing.T) {
 	// Get a key for encryption.
 	key, err := GenerateEncryptionKey()
