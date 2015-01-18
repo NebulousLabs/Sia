@@ -30,23 +30,23 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// dest can be either a coin address or a friend name
 	destString := req.FormValue("dest")
+	// dest can be either a coin address or a friend name
 	// if ca, ok := e.friends[destString]; ok {
-	//	dest = ca
-	//} else
-	if len(destString) != 64 {
-		http.Error(w, "Friend not found (or malformed coin address)", 400)
+	// 	destString = ca
+	// }
+	// if len(destString) != 64 {
+	// 	http.Error(w, "Friend not found (or malformed coin address)", 400)
+	// 	return
+	// }
+
+	var destAddressBytes []byte
+	_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
+	if err != nil {
+		http.Error(w, "Malformed coin address", 400)
 		return
-	} else {
-		var destAddressBytes []byte
-		_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
-		if err != nil {
-			http.Error(w, "Malformed coin address", 400)
-			return
-		}
-		copy(dest[:], destAddressBytes)
 	}
+	copy(dest[:], destAddressBytes)
 
 	// Spend the coins.
 	_, err = d.core.SpendCoins(amount, dest)
