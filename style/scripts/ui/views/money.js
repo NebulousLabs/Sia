@@ -1,7 +1,7 @@
 ui._money = (function(){
 
     var view, eBalance, eUSDBalance, eAddFunds, eWithdrawFunds, eItems, eAddAccount,
-        eSendMoney, eTransferFunds, eDeleteAccount;
+        eTransferFunds, eDeleteAccount;
 
     function init(){
         view = $("#money");
@@ -13,7 +13,6 @@ ui._money = (function(){
         eWithdrawFunds = view.find(".withdraw");
 
         eAddAccount = view.find(".add-account");
-        eSendMoney = view.find(".send-money");
         eTransferFunds = view.find(".transfer-funds");
         eDeleteAccount = view.find(".delete-account");
 
@@ -30,9 +29,6 @@ ui._money = (function(){
             ui._tooltip(this, "Not Implemented");
         });
         eAddAccount.click(function(){
-            ui._tooltip(this, "Not Implemented");
-        });
-        eSendMoney.click(function(){
             ui._tooltip(this, "Not Implemented");
         });
         eTransferFunds.click(function(){
