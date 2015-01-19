@@ -98,7 +98,7 @@ type MissedStorageProof struct {
 // contains some consensus information like which contracts have terminated and
 // where there were missed storage proofs.
 type BlockNode struct {
-	Block    *Block
+	Block    Block
 	Children []*BlockNode
 
 	Height           BlockHeight
@@ -131,7 +131,7 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
-	genesisBlock := &Block{
+	genesisBlock := Block{
 		Timestamp:    GenesisTimestamp,
 		MinerAddress: GenesisAddress,
 	}
@@ -180,7 +180,7 @@ func (s *State) Depth() Target {
 // input height.
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	if bn, ok := s.blockMap[s.currentPath[height]]; ok {
-		b = *bn.Block
+		b = bn.Block
 		return
 	}
 	err = fmt.Errorf("no block at height %v found.", height)
@@ -196,7 +196,7 @@ func (s *State) BlockFromID(bid BlockID) (b Block, err error) {
 		err = errors.New("no block of that id found")
 		return
 	}
-	b = *node.Block
+	b = node.Block
 	return
 }
 
@@ -219,7 +219,7 @@ func (s *State) currentBlockNode() *BlockNode {
 
 // CurrentBlock returns the most recent block in the longest fork.
 func (s *State) CurrentBlock() Block {
-	return *s.blockMap[s.currentBlockID].Block
+	return s.blockMap[s.currentBlockID].Block
 }
 
 // CurrentBlockWeight() returns the weight of the current block in the
