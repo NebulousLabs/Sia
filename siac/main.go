@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
 	"os"
 	"reflect"
 
@@ -11,6 +13,30 @@ const (
 	VERSION  = "0.2.0"
 	hostname = "http://localhost:9980"
 )
+
+// getAPI makes an API call and decodes the response.
+func getAPI(call string, obj interface{}) (err error) {
+	resp, err := http.Get(hostname + call)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(resp.Body).Decode(obj)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+	return
+}
+
+// callAPI makes an API call and discards the response.
+func callAPI(call string) (err error) {
+	resp, err := http.Get(hostname + call)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+	return
+}
 
 // wrap wraps a generic command with a check that the command has been
 // passed the correct number of arguments. The command must take only strings

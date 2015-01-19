@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/sia"
 )
 
 var (
@@ -50,52 +52,70 @@ var (
 	}
 )
 
+// TODO: this should be defined outside of siac
+type updateResp struct {
+	Available bool
+	Version   string
+}
+
 func updatecmd() {
-	version, err := getUpdate()
+	update := new(updateResp)
+	err := getAPI("/update/check", update)
 	if err != nil {
-		fmt.Println("Could not update:", err)
+		fmt.Println("Could not check for update:", err)
 		return
 	}
-	if version == VERSION {
+	if !update.Available {
 		fmt.Println("Already up to date.")
+		return
+	}
+	err = callAPI("/update/apply?version=" + update.Version)
+	if err != nil {
+		fmt.Println("Could not apply update:", err)
+		return
+	}
+	fmt.Printf("Updated to version %s! Restart siad now.\n", update.Version)
+}
+
+func updatecheckcmd() {
+	update := new(updateResp)
+	err := getAPI("/update/check", update)
+	if err != nil {
+		fmt.Println("Could not check for update:", err)
+		return
+	}
+	if !update.Available {
+		fmt.Println("Up to date!")
+		return
+	}
+	fmt.Printf("Update %s is available! Run 'siac update apply %s' to install it.\n", update.Version, update.Version)
+}
+
+func updateapplycmd(version string) {
+	err := callAPI("/update/apply?version=" + version)
+	if err != nil {
+		fmt.Println("Could not apply update:", err)
 		return
 	}
 	fmt.Printf("Updated to version %s! Restart siad now.\n", version)
 }
 
-func updatecheckcmd() {
-	version, err := getUpdateCheck()
-	if err != nil {
-		fmt.Println("Could not check for update:", err)
-		return
-	}
-	if version == VERSION {
-		fmt.Println("Up to date!")
-		return
-	}
-	fmt.Printf("Update %s is available! Run 'siac update %s' to install it.\n", version, version)
-}
-
-func updateapplycmd(version string) {
-	err := getUpdateApply(version)
-	if err != nil {
-		fmt.Println("Could not apply update:", err)
-		return
-	}
-	fmt.Println("Update", version, "applied! Restart siad now.")
-}
-
 func statuscmd() {
-	status, err := getStatus()
+	status := new(sia.StateInfo)
+	err := getAPI("/status", status)
 	if err != nil {
 		fmt.Println("Could not get daemon status:", err)
 		return
 	}
-	fmt.Println(status)
+	fmt.Printf(`Block:  %v
+Height: %v
+Target: %v
+Depth:  %v
+`, status.CurrentBlock, status.Height, status.Target, status.Depth)
 }
 
 func stopcmd() {
-	err := getStop()
+	err := callAPI("/stop")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
@@ -104,7 +124,7 @@ func stopcmd() {
 }
 
 func synccmd() {
-	err := getSync()
+	err := callAPI("/sync")
 	if err != nil {
 		fmt.Println("Could not sync:", err)
 	}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
@@ -37,7 +39,7 @@ var (
 )
 
 func peeraddcmd(addr string) {
-	err := getPeerAdd(addr)
+	err := callAPI("/peer/add?addr=" + addr)
 	if err != nil {
 		fmt.Println("Could not add peer:", err)
 		return
@@ -46,7 +48,7 @@ func peeraddcmd(addr string) {
 }
 
 func peerremovecmd(addr string) {
-	err := getPeerRemove(addr)
+	err := callAPI("/peer/remove?addr=" + addr)
 	if err != nil {
 		fmt.Println("Could not remove peer:", err)
 		return
@@ -55,10 +57,14 @@ func peerremovecmd(addr string) {
 }
 
 func peerstatuscmd() {
-	status, err := getPeerStatus()
+	var peers []network.Address
+	err := getAPI("/peer/status", &peers)
 	if err != nil {
 		fmt.Println("Could not get peer status:", err)
 		return
 	}
-	fmt.Println(status)
+	fmt.Println(len(peers), "active peers:")
+	for _, peer := range peers {
+		fmt.Println("\t", peer)
+	}
 }

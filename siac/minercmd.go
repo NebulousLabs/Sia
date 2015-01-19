@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 var (
@@ -37,7 +39,7 @@ var (
 )
 
 func minerstartcmd(threads string) {
-	err := getMinerStart(threads)
+	err := callAPI("/miner/start?threads=" + threads)
 	if err != nil {
 		fmt.Println("Could not start miner:", err)
 		return
@@ -46,16 +48,21 @@ func minerstartcmd(threads string) {
 }
 
 func minerstatuscmd() {
-	status, err := getMinerStatus()
+	status := new(components.MinerInfo)
+	err := getAPI("/miner/status", status)
 	if err != nil {
 		fmt.Println("Could not get miner status:", err)
 		return
 	}
-	fmt.Println(status)
+	fmt.Printf(`
+State:   %s
+Threads: %d (%d active)
+Address: %x
+`, status.State, status.Threads, status.RunningThreads, status.Address)
 }
 
 func minerstopcmd() {
-	err := getMinerStop()
+	err := callAPI("/miner/stop")
 	if err != nil {
 		fmt.Println("Could not stop miner:", err)
 		return

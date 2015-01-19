@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 var (
@@ -36,29 +38,38 @@ var (
 	}
 )
 
+// TODO: this should be defined outside of siac
+type walletAddr struct {
+	Address string
+}
+
 func walletaddresscmd() {
-	addr, err := getWalletAddress()
+	addr := new(walletAddr)
+	err := getAPI("/wallet/address", addr)
 	if err != nil {
 		fmt.Println("Could not generate new address:", err)
 		return
 	}
-	fmt.Println("Created new address:", addr)
+	fmt.Printf("Created new address: %s\n", addr.Address)
 }
 
 func walletsendcmd(amount, dest string) {
-	err := getWalletSend(amount, dest)
+	err := callAPI(fmt.Sprintf("/wallet/send?amount=%s&dest=%s", amount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
 	}
-	fmt.Println("Sent", amount, "coins to", dest)
+	fmt.Printf("Sent %s coins to %s\n", amount, dest)
 }
 
 func walletstatuscmd() {
-	status, err := getWalletStatus()
+	status := new(components.WalletInfo)
+	err := getAPI("/wallet/status", status)
 	if err != nil {
 		fmt.Println("Could not get wallet status:", err)
 		return
 	}
-	fmt.Println(m)
+	fmt.Printf(`Balance:   %v (full: %v)
+Addresses: %d
+`, status.Balance, status.FullBalance, status.NumAddresses)
 }

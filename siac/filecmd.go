@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 var (
@@ -37,7 +39,7 @@ var (
 )
 
 func fileuploadcmd(file, nickname, pieces string) {
-	err := getFileUpload(file, nickname, pieces)
+	err := callAPI(fmt.Sprintf("/file/upload?file=%s&nickname=%s&pieces=%s", file, nickname, pieces))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
@@ -46,7 +48,7 @@ func fileuploadcmd(file, nickname, pieces string) {
 }
 
 func filedownloadcmd(nickname, filename string) {
-	err := getFileDownload(nickname, filename)
+	err := callAPI(fmt.Sprintf("/file/download?nickname=%s&filename=%s", nickname, filename))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
@@ -55,10 +57,14 @@ func filedownloadcmd(nickname, filename string) {
 }
 
 func filestatuscmd() {
-	status, err := getFileStatus()
+	status := new(components.RentInfo)
+	err := getAPI("/file/status", status)
 	if err != nil {
 		fmt.Println("Could not get file status:", err)
 		return
 	}
-	fmt.Println(status)
+	fmt.Println(len(status.Files), "files stored:")
+	for _, file := range status.Files {
+		fmt.Println("\t", file)
+	}
 }
