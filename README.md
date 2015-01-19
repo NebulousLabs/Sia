@@ -52,8 +52,8 @@ Troubleshooting
   Port forwarding is how you let your router know that it's okay for other Sia
   peers to connect to you. If you are behind a firewall, you will most likely
   need to do this. By default, Sia traffic happens on port 9988. The specific
-  instructions for forwarding a port varies by router. Consult this guide for
-  more information: portfoward.com.
+  instructions for forwarding a port varies by router. For more information,
+  consult [this guide](http://portfoward.com).
 
   In future versions, we will add support for UPnP, which will allow you to
   skip this step.
@@ -66,24 +66,12 @@ If your issue is not addressed above, you can get in touch with us personally:
 Version Information
 -------------------
 
-- siad starts fresh every time you run it. When you close it, everything is
-  lost: your wallet, your coins, your files, the blockchain, everything. So
-  for the sake of other beta users, please leave siad running as long as
-  possible. And don't upload anything important!
+- Please mine. Mining helps keep the network running smoothly. It can also
+  cause changes to propagate if they seem to be taking a while.
 
-- Hosts don't keep track of coins they've frozen. They are lost forever. Don't
-  worry, beta coins are worthless anyway.
-
-- Files are only stored for 500 blocks (about 3 days). There is no way to
-  modify this. Future versions will make this a configurable setting.
-
-- Some elements of the web interface update in real time, but not all of them.
-  Most noticeably, on the Overview page, your block height will update in real
-  time, but your wallet balance will not. Simply click "Overview" again to
-  refresh your balance.
-
-- If you did not bootstrap, you need to manually enter your IP in order to
-  become a host. It will read `:9988`; change this to `your.ip.goes.here:9988`
+- Uploading may take a long time, since the file contract needs to make it
+  into a block. The default redundancy is also set very high, so uploading may
+  be more expensive than expected.
 
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
@@ -91,5 +79,7 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+v0.2.0: Open beta release.
 
 v0.1.0: Initial (closed) beta release.
