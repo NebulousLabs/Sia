@@ -32,15 +32,27 @@ var (
 	UnknownOrphanErr = errors.New("block is an unknown orphan")
 )
 
-// EarliestLegalChildTimestamp() returns the earliest a timestamp can be for the child
-// of a BlockNode to be legal.
-func (bn *BlockNode) earliestLegalChildTimestamp() Timestamp {
+// earliestChildTimestamp() returns the earliest timestamp that a child node
+// can have while still being valid. See section 'Timestamp Rules' in
+// Consensus.md.
+//
+// TODO: Rather than having the blocknode store the timestamps, blocknodes
+// should just point to their parent block, and this function should just crawl
+// through the parents.
+//
+// TODO: After changing how the timestamps are aquired, write some tests to
+// check that the timestamp code is working right.
+func (bn *BlockNode) earliestChildTimestamp() Timestamp {
+	// Get the MedianTimestampWindow previous timestamps and sort them. For
+	// now, bn.RecentTimestamps is expected to have the correct timestamps.
 	var intTimestamps []int
 	for _, timestamp := range bn.RecentTimestamps {
 		intTimestamps = append(intTimestamps, int(timestamp))
 	}
 	sort.Ints(intTimestamps)
-	return Timestamp(intTimestamps[5])
+
+	// Return the median of the sorted timestamps.
+	return Timestamp(intTimestamps[MedianTimestampWindow/2])
 }
 
 // State.checkMaps() looks through the maps known to the state and sees if the
@@ -110,7 +122,7 @@ func (s *State) validateHeader(parent *BlockNode, b *Block) (err error) {
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
-	if parent.earliestLegalChildTimestamp() > b.Timestamp {
+	if parent.earliestChildTimestamp() > b.Timestamp {
 		s.badBlocks[b.ID()] = struct{}{}
 		err = errors.New("timestamp invalid for being in the past")
 		return

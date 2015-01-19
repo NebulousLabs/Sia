@@ -227,7 +227,7 @@ func (s *State) CurrentBlockWeight() BlockWeight {
 // EarliestLegalTimestamp returns the earliest legal timestamp of the next
 // block - earlier timestamps will render the block invalid.
 func (s *State) EarliestLegalTimestamp() Timestamp {
-	return s.currentBlockNode().earliestLegalChildTimestamp()
+	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // CurrentTarget returns the target of the next block that needs to be
@@ -288,7 +288,7 @@ func (s *State) StateHash() hash.Hash {
 		hash.HashObject(s.Height()),
 		hash.HashObject(s.currentBlockNode().Target),
 		hash.HashObject(s.currentBlockNode().Depth),
-		hash.HashObject(s.currentBlockNode().earliestLegalChildTimestamp()),
+		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
 		hash.Hash(s.blockRoot.Block.ID()),
 	}
 

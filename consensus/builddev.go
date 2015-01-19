@@ -8,6 +8,10 @@ import (
 
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
+//
+// TODO: on startup, there should be a check that panics if one of the
+// constants has a funky or unusable value. For example, MedianTimestampWindow
+// should really be an odd number.
 var (
 	BlockSizeLimit        = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
 	BlockFrequency        = Timestamp(10)          // In seconds.

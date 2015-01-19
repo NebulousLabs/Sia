@@ -1,9 +1,9 @@
 This file is meant to help a developer navagate the codebase and develop clean,
 maintainable code.
 
-///////////////////////////////
-// Documentation Conventions //
-///////////////////////////////
+-------------------------------
+-- Documentation Conventions --
+-------------------------------
 
 All structs, functions, and interfaces must have a docstring.
 
@@ -19,9 +19,9 @@ is not a high enough priority to actually be implemented. It is meant to
 indicate to other developers (especially those new to the codebase) places that
 would be easy contribute to.
 
-///////////////////////////
-// Consensus Conventions //
-///////////////////////////
+---------------------------
+-- Consensus Conventions --
+---------------------------
 
 It is convention to use the term 'apply' any time that a function is changing
 the state as the result of information being introduced to the state. For
@@ -36,9 +36,9 @@ something is being checked. It is convention not to change the state in any
 capacity when inside of a validation function. For example 'validInput' and
 'validContract'.
 
-//////////////////////
-// Mutex Convetions //
-//////////////////////
+----------------------
+-- Mutex Convetions --
+----------------------
 
 WARNING, TODO: These conventions are not currently followed closely in the
 codebase. This is a bug, and needs to be fixed.
@@ -58,9 +58,9 @@ the locks already in all-encompassing `lock; defer unlock` calls. If there is a
 non exported function that breaks this convention (for example, a listen()
 function), it must be documented in the function explanation.
 
-////////////////////
-// Consensus Flow //
-////////////////////
+--------------------
+-- Consensus Flow --
+--------------------
 
 WARNING: This is both no longer fully correct and also not the flow that is
 going to be upheld in the future. Better strategies have been learned and will
