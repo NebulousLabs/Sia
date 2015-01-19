@@ -43,7 +43,7 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) Target {
 	} else {
 		// TODO: this code make unsafe assumptions - that the block node is on
 		// the current fork.
-		adjustmentBlock, err := s.BlockAtHeight(newNode.Height - TargetWindow)
+		adjustmentBlock, err := s.blockAtHeight(newNode.Height - TargetWindow)
 		if err != nil {
 			panic(err)
 		}

@@ -11,13 +11,13 @@ func TestApplyTransaction(t *testing.T) {
 
 	// Create a transaction with one input and one output.
 	transaction := Transaction{
-		Inputs:  []Input{Input{OutputID: s.CurrentBlock().SubsidyID()}},
+		Inputs:  []Input{Input{OutputID: s.currentBlock().SubsidyID()}},
 		Outputs: []Output{Output{Value: 1}},
 	}
 	s.applyTransaction(transaction)
 
 	// Check that the genesis subsidy got deleted.
-	_, exists := s.unspentOutputs[s.CurrentBlock().SubsidyID()]
+	_, exists := s.unspentOutputs[s.currentBlock().SubsidyID()]
 	if exists {
 		t.Error("apply transaction did not remove the output from the unspent outputs list.")
 	}

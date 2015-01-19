@@ -9,7 +9,7 @@ import (
 // CurrentPath.
 func (s *State) currentPathCheck() {
 	currentNode := s.currentBlockNode()
-	for i := s.Height(); ; i-- {
+	for i := s.height(); ; i-- {
 		// Check that the CurrentPath entry exists.
 		id, exists := s.currentPath[i]
 		if !exists {

@@ -39,7 +39,7 @@ func (s *State) invertTransaction(t Transaction) (diffs []OutputDiff) {
 
 	// Delete all financial outputs created by the transaction.
 	for i := range t.Outputs {
-		output, err := s.Output(t.OutputID(i))
+		output, err := s.output(t.OutputID(i))
 		if err != nil {
 			panic(err)
 		}
@@ -121,7 +121,7 @@ func (s *State) validInput(input Input) (err error) {
 	}
 
 	// Check the timelock on the spend conditions is expired.
-	if input.SpendConditions.TimeLock > s.Height() {
+	if input.SpendConditions.TimeLock > s.height() {
 		err = errors.New("output spent before timelock expiry.")
 		return
 	}
@@ -221,7 +221,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock > s.Height() {
+		if sig.TimeLock > s.height() {
 			err = errors.New("signature timelock has not expired")
 			return
 		}

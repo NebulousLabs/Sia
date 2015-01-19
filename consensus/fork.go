@@ -9,8 +9,8 @@ import (
 // State.heavierFork() returns true if the input node is 5% heavier than the
 // current node of the ConsensusState.
 func (s *State) heavierFork(newNode *BlockNode) bool {
-	threshold := new(big.Rat).Mul(s.CurrentBlockWeight(), SurpassThreshold)
-	currentCumDiff := s.Depth().Inverse()
+	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
+	currentCumDiff := s.depth().Inverse()
 	requiredCumDiff := new(big.Rat).Add(currentCumDiff, threshold)
 	newNodeCumDiff := newNode.Depth.Inverse()
 	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
@@ -23,8 +23,8 @@ func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 	//
 	// TODO: Update this for incentive stuff - miner doesn't get subsidy until
 	// 2000 or 5000 or 10000 blocks later.
-	subsidyID := s.CurrentBlock().SubsidyID()
-	subsidy, err := s.Output(subsidyID)
+	subsidyID := s.currentBlock().SubsidyID()
+	subsidy, err := s.output(subsidyID)
 	if err != nil {
 		panic(err)
 	}
@@ -38,14 +38,14 @@ func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 
 	// Reverse each transaction in the block, in reverse order from how
 	// they appear in the block.
-	for i := len(s.CurrentBlock().Transactions) - 1; i >= 0; i-- {
-		diffSet := s.invertTransaction(s.CurrentBlock().Transactions[i])
+	for i := len(s.currentBlock().Transactions) - 1; i >= 0; i-- {
+		diffSet := s.invertTransaction(s.currentBlock().Transactions[i])
 		diffs = append(diffs, diffSet...)
 	}
 
 	// Update the CurrentBlock and CurrentPath variables of the longest fork.
-	delete(s.currentPath, s.Height())
-	s.currentBlockID = s.CurrentBlock().ParentBlockID
+	delete(s.currentPath, s.height())
+	s.currentBlockID = s.currentBlock().ParentBlockID
 	return
 }
 
@@ -57,7 +57,7 @@ func (s *State) integrateBlock(b Block, bd *BlockDiff) (diffs []OutputDiff, err 
 	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
 	for _, txn := range b.Transactions {
-		err = s.ValidTransaction(txn)
+		err = s.validTransaction(txn)
 		if err != nil {
 			break
 		}
@@ -92,7 +92,7 @@ func (s *State) integrateBlock(b Block, bd *BlockDiff) (diffs []OutputDiff, err 
 	s.currentPath[height] = b.ID()
 
 	// Add coin inflation to the miner subsidy.
-	minerSubsidy += CalculateCoinbase(s.Height())
+	minerSubsidy += CalculateCoinbase(s.height())
 
 	// Add output contianing miner fees + block subsidy.
 	//
@@ -145,13 +145,13 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {
-		stateHash = s.StateHash()
+		stateHash = s.stateHash()
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
 	for s.currentBlockID != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.CurrentBlock())
+		rewoundBlocks = append(rewoundBlocks, s.currentBlock())
 		cc.InvertedBlocks = append(cc.InvertedBlocks, s.currentBlockNode().BlockDiff)
 		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
 	}
@@ -192,7 +192,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 
 			// Check that the state hash is the same as before forking and then returning.
 			if DEBUG {
-				if stateHash != s.StateHash() {
+				if stateHash != s.stateHash() {
 					panic("state hash does not match after an unsuccessful fork attempt")
 				}
 			}
