@@ -65,12 +65,16 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 	}
 }
 
+func version(*cobra.Command, []string) {
+	println("Sia Client v" + VERSION)
+}
+
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Client v" + VERSION,
 		Long:  "Sia Client v" + VERSION,
-		Run:   wrap(func() { println("Sia Client v" + VERSION) }),
+		Run:   version,
 	}
 
 	// create command tree
@@ -78,7 +82,7 @@ func main() {
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information.",
-		Run:   wrap(func() { println("Sia Client v" + VERSION) }),
+		Run:   version,
 	})
 
 	root.AddCommand(hostCmd)
