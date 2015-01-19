@@ -39,11 +39,15 @@ body {
 
 .header .header-links{
 	padding-top:40px;
+	padding-bottom:40px;
 	text-align:right;
 }
 
 .header .header-links .item{
 	margin-left:20px;
+}
+.header .header-links .item:first-child{
+	margin-left:0px;
 }
 
 .content-title{
@@ -98,10 +102,16 @@ body {
 	margin-left:20px;
 }
 
-@media only screen and (max-width : 768px) {
+@media only screen and (max-width : 992px) {
 	.header{
 		margin-left:25px;
 		margin-right:25px;
+	}
+	.header .logo-container{
+		text-align:center;
+	}
+	.header .header-links{
+		text-align:center;
 	}
 	.content{
 		margin-left:25px;
