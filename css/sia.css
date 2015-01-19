@@ -121,3 +121,13 @@ body {
 		text-align:center;
 	}
 }
+
+.screenshots{
+	margin-top:50px;
+	text-align:center;
+}
+.screenshots img{
+	margin:20px;
+	width:300px;
+	border:4px solid #eee;
+}
