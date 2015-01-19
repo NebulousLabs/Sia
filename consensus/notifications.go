@@ -56,16 +56,6 @@ type ConsensusChange struct {
 	AppliedBlocks  []BlockDiff
 }
 
-// ConsensusSubscribe returns a channel that will receive a ConsensusChange
-// notification each time that the consensus changes (from incoming blocks or
-// invalidated blocks, etc.).
-func (s *State) ConsensusSubscribe() (alert chan ConsensusChange) {
-	// TODO: Put some locks in place.
-	alert = make(chan ConsensusChange)
-	s.consensusSubscriptions = append(s.consensusSubscriptions, alert)
-	return
-}
-
 // notifySubscribers sends a ConsensusChange notification to every subscriber
 //
 // TODO: What happens if a subscriber stops pulling info from their channel. If
@@ -81,4 +71,16 @@ func (s *State) notifySubscribers(cc ConsensusChange) {
 	for _, sub := range s.consensusSubscriptions {
 		sub <- cc
 	}
+}
+
+// ConsensusSubscribe returns a channel that will receive a ConsensusChange
+// notification each time that the consensus changes (from incoming blocks or
+// invalidated blocks, etc.).
+func (s *State) ConsensusSubscribe() (alert chan ConsensusChange) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	alert = make(chan ConsensusChange)
+	s.consensusSubscriptions = append(s.consensusSubscriptions, alert)
+	return
 }

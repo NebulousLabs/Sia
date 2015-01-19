@@ -7,7 +7,7 @@ import (
 // CurrentPathCheck looks at every block listed in CurrentPath and verifies
 // that every block from current to genesis matches the block listed in
 // CurrentPath.
-func (s *State) CurrentPathCheck() {
+func (s *State) currentPathCheck() {
 	currentNode := s.currentBlockNode()
 	for i := s.Height(); ; i-- {
 		// Check that the CurrentPath entry exists.

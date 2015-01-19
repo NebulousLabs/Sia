@@ -70,7 +70,7 @@ type State struct {
 	// for more information.
 	consensusSubscriptions []chan ConsensusChange
 
-	sync.RWMutex
+	mu sync.RWMutex
 }
 
 // An open contract contains all information necessary to properly enforce a

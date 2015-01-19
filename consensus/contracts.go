@@ -7,10 +7,10 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// storageProofSegmentIndex takes a contractID and a windowIndex and calculates
 // the index of the segment that should be proven on when doing a proof of
 // storage.
-func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+func (s *State) storageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
 	openContract, exists := s.openContracts[contractID]
 	if !exists {
 		err = errors.New("unrecognized contractID")
@@ -33,6 +33,15 @@ func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex Bloc
 	return
 }
 
+// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// the index of the segment that should be proven on when doing a proof of
+// storage.
+func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.storageProofSegmentIndex(contractID, windowIndex)
+}
+
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
 func (s *State) validProof(sp StorageProof) error {
@@ -47,7 +56,7 @@ func (s *State) validProof(sp StorageProof) error {
 	}
 
 	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.StorageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
+	segmentIndex, err := s.storageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
 	if err != nil {
 		return err
 	}

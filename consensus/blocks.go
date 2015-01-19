@@ -126,41 +126,6 @@ func (s *State) validHeader(b Block) (err error) {
 	return
 }
 
-// State.childTarget() calculates the proper target of a child node given the
-// parent node, and copies the target into the child node.
-func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) Target {
-	var timePassed, expectedTimePassed Timestamp
-	if newNode.Height < TargetWindow {
-		timePassed = newNode.Block.Timestamp - s.blockRoot.Block.Timestamp
-		expectedTimePassed = BlockFrequency * Timestamp(newNode.Height)
-	} else {
-		// THIS CODE ASSUMES THAT THE BLOCK AT HEIGHT
-		// NEWNODE.HEIGHT-TARGETWINDOW IS THE SAME FOR BOTH THE NEW NODE AND
-		// THE CURRENT FORK. IN GENERAL THIS IS A PRETTY SAFE ASSUMPTION AS ITS
-		// LOOKING BACKWARDS BY 5000 BLOCKS. BUT WE SHOULD PROBABLY IMPLEMENT
-		// SOMETHING THATS FULLY SAFE REGARDLESS.
-		adjustmentBlock, err := s.BlockAtHeight(newNode.Height - TargetWindow)
-		if err != nil {
-			panic(err)
-		}
-		timePassed = newNode.Block.Timestamp - adjustmentBlock.Timestamp
-		expectedTimePassed = BlockFrequency * Timestamp(TargetWindow)
-	}
-
-	// Adjustment = timePassed / expectedTimePassed.
-	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
-
-	// Enforce a maximum targetAdjustment
-	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
-		targetAdjustment = MaxAdjustmentUp
-	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
-		targetAdjustment = MaxAdjustmentDown
-	}
-
-	newTarget := new(big.Rat).Mul(parentNode.Target.Rat(), targetAdjustment)
-	return RatToTarget(newTarget)
-}
-
 // State.addBlockToTree() takes a block and a parent node, and adds a child
 // node to the parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
@@ -172,6 +137,8 @@ func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
 	newNode.Height = parentNode.Height + 1
 
 	// Copy over the timestamps.
+	//
+	// TODO: Change how timestamps work.
 	copy(newNode.RecentTimestamps[:], parentNode.RecentTimestamps[1:])
 	newNode.RecentTimestamps[10] = b.Timestamp
 
@@ -189,6 +156,9 @@ func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
 func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// See if the block is a known invalid block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
@@ -227,7 +197,7 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 
 	// Perform a sanity check if debug flag is set.
 	if DEBUG {
-		s.CurrentPathCheck()
+		s.currentPathCheck()
 	}
 
 	return

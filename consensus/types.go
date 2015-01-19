@@ -198,7 +198,7 @@ func (b Block) SubsidyID() OutputID {
 
 // SigHash returns the hash of a transaction for a specific index.
 // The index determines which TransactionSignature is included in the hash.
-func (t *Transaction) SigHash(i int) hash.Hash {
+func (t Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if t.Signatures[i].CoveredFields.WholeTransaction {
 		signedData = append(signedData, encoding.MarshalAll(
@@ -253,7 +253,7 @@ func (t Transaction) OutputID(index int) OutputID {
 // SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
 // SpendConditions object, using the timelock, number of signatures required,
 // and each public key as leaves.
-func (sc *SpendConditions) CoinAddress() CoinAddress {
+func (sc SpendConditions) CoinAddress() CoinAddress {
 	tlHash := hash.HashObject(sc.TimeLock)
 	nsHash := hash.HashObject(sc.NumSignatures)
 	pkHashes := make([]hash.Hash, len(sc.PublicKeys))
@@ -276,7 +276,7 @@ func (t Transaction) FileContractID(index int) ContractID {
 
 // WindowIndex returns the index of the challenge window that is
 // open during block height 'height'.
-func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
+func (fc FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
 	if height < fc.Start {
 		err = errors.New("height below start point")
 		return
@@ -291,7 +291,7 @@ func (fc *FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight
 
 // StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
-func (fc *FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
+func (fc FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
 	proofString := proofString(proofValid)
 	windowIndex, err := fc.WindowIndex(height)
 	if err != nil {
