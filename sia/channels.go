@@ -35,10 +35,8 @@ func (c *Core) AcceptTransaction(t consensus.Transaction) error {
 //
 // Mutex note: state mutexes are pretty broken. TODO: Fix this.
 func (c *Core) processBlock(b consensus.Block) (err error) {
-	c.state.Lock()
 	initialStateHeight := c.state.Height()
 	rewoundBlocks, appliedBlocks, outputDiffs, err := c.state.AcceptBlock(b)
-	c.state.Unlock()
 	if err == consensus.BlockKnownErr || err == consensus.KnownOrphanErr {
 		return
 	} else if err != nil {
@@ -74,9 +72,7 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 //
 // Mutex note: state mutexes are pretty broken. TODO: fix
 func (c *Core) processTransaction(t consensus.Transaction) (err error) {
-	c.state.Lock()
 	err = c.state.AcceptTransaction(t)
-	c.state.Unlock()
 	if err != nil {
 		if err != consensus.ConflictingTransactionErr {
 			fmt.Println("AcceptTransaction Error:", err)

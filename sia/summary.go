@@ -35,27 +35,21 @@ type DeepStateInfo struct {
 // If accurate data is paramount, SafeStateInfo() should be called, though this
 // can adversely affect performance.
 func (c *Core) StateInfo() StateInfo {
-	c.state.RLock()
-	defer c.state.RUnlock()
-
 	return StateInfo{
 		CurrentBlock: c.state.CurrentBlock().ID(),
 		Height:       c.state.Height(),
 		Target:       c.state.CurrentTarget(),
 		Depth:        c.state.Depth(),
-		EarliestLegalTimestamp: c.state.EarliestLegalTimestamp(),
+		EarliestLegalTimestamp: c.state.EarliestTimestamp(),
 	}
 }
 
 func (c *Core) DeepStateInfo() DeepStateInfo {
-	c.state.RLock()
-	defer c.state.RUnlock()
-
 	return DeepStateInfo{
 		StateHash: c.state.StateHash(),
 
 		UtxoSet:         c.state.SortedUtxoSet(),
-		TransactionList: c.state.TransactionList(),
+		TransactionList: c.state.TransactionPoolDump(),
 	}
 }
 
@@ -63,37 +57,25 @@ func (c *Core) DeepStateInfo() DeepStateInfo {
 // not lock the mutex, which means it could potentially (but usually doesn't)
 // produce weird or incorrect output.
 func (c *Core) Output(id consensus.OutputID) (output consensus.Output, err error) {
-	c.state.RLock()
-	defer c.state.RUnlock()
 	return c.state.Output(id)
 }
 
 func (c *Core) Height() consensus.BlockHeight {
-	c.state.RLock()
-	defer c.state.RUnlock()
 	return c.state.Height()
 }
 
-func (c *Core) TransactionList() []consensus.Transaction {
-	c.state.RLock()
-	defer c.state.RUnlock()
-	return c.state.TransactionList()
+func (c *Core) TransactionPoolDump() []consensus.Transaction {
+	return c.state.TransactionPoolDump()
 }
 
 func (c *Core) BlockFromID(bid consensus.BlockID) (consensus.Block, error) {
-	c.state.RLock()
-	defer c.state.RUnlock()
 	return c.state.BlockFromID(bid)
 }
 
 func (c *Core) BlockAtHeight(height consensus.BlockHeight) (consensus.Block, error) {
-	c.state.RLock()
-	defer c.state.RUnlock()
 	return c.state.BlockAtHeight(height)
 }
 
 func (c *Core) StorageProofSegmentIndex(contractID consensus.ContractID, windowIndex consensus.BlockHeight) (index uint64, err error) {
-	c.state.RLock()
-	defer c.state.RUnlock()
 	return c.state.StorageProofSegmentIndex(contractID, windowIndex)
 }
