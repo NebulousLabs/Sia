@@ -21,7 +21,7 @@ Errors are sent as plaintext, accompanied by an appropriate status code.
 | /peer/remove      | `addr`                       |                              |
 | /peer/status      |                              | `[ "Address" ]`              |
 | /update/check     |                              | `{ "Available", "Version" }` |
-| /update/apply     | `version` (optional)         |                              |
+| /update/apply     | `version`                    |                              |
 | /status           |                              | See StateInfo                |
 | /stop             |                              |                              |
 | /sync             |                              |                              |
