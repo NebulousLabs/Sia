@@ -79,8 +79,8 @@ func DecryptBytes(key EncryptionKey, ciphertext []byte, iv []byte, padding int) 
 		err = errors.New("ciphertext is not correct size")
 		return
 	}
-	if padding > len(ciphertext) {
-		err = errors.New("stated padding is longer than the ciphertext")
+	if padding > len(ciphertext) || padding < 0 {
+		err = errors.New("invalid padding on ciphertext")
 		return
 	}
 
