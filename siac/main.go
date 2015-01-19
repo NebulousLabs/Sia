@@ -1,101 +1,121 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
 	"os"
+	"reflect"
 
 	"github.com/spf13/cobra"
 )
 
-func versioncmd(*cobra.Command, []string) {
-	println("Sia Client v0.1.0")
+const (
+	VERSION  = "0.2.0"
+	hostname = "http://localhost:9980"
+)
+
+// getAPI makes an API call and decodes the response.
+func getAPI(call string, obj interface{}) (err error) {
+	resp, err := http.Get(hostname + call)
+	if err != nil {
+		return
+	}
+	err = json.NewDecoder(resp.Body).Decode(obj)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+	return
+}
+
+// callAPI makes an API call and discards the response.
+func callAPI(call string) (err error) {
+	resp, err := http.Get(hostname + call)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
+	return
+}
+
+// wrap wraps a generic command with a check that the command has been
+// passed the correct number of arguments. The command must take only strings
+// as arguments.
+func wrap(fn interface{}) func(*cobra.Command, []string) {
+	fnVal, fnType := reflect.ValueOf(fn), reflect.TypeOf(fn)
+	if fnType.Kind() != reflect.Func {
+		panic("wrapped function has wrong type signature")
+	}
+	for i := 0; i < fnType.NumIn(); i++ {
+		if fnType.In(i).Kind() != reflect.String {
+			panic("wrapped function has wrong type signature")
+		}
+	}
+
+	return func(cmd *cobra.Command, args []string) {
+		if len(args) != fnType.NumIn() {
+			cmd.Usage()
+			return
+		}
+		argVals := make([]reflect.Value, fnType.NumIn())
+		for i := range args {
+			argVals[i] = reflect.ValueOf(args[i])
+		}
+		fnVal.Call(argVals)
+	}
+}
+
+func version(*cobra.Command, []string) {
+	println("Sia Client v" + VERSION)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Client v0.1.0",
-		Long:  "Sia Client v0.1.0",
-		Run:   versioncmd,
+		Short: "Sia Client v" + VERSION,
+		Long:  "Sia Client v" + VERSION,
+		Run:   version,
 	}
 
+	// create command tree
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information.",
-		Run:   versioncmd,
+		Run:   version,
 	})
 
-	root.AddCommand(&cobra.Command{
-		Use:   "stop",
-		Short: "Stop the Sia daemon",
-		Long:  "Stop the Sia daemon.",
-		Run:   stopcmd,
-	})
+	root.AddCommand(hostCmd)
+	hostCmd.AddCommand(hostConfigCmd)
+	hostCmd.AddCommand(hostSetConfigCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "mine [on|off]",
-		Short: "Start or stop mining",
-		Long:  "Start or stop mining blocks.",
-		Run:   minecmd,
-	})
+	root.AddCommand(minerCmd)
+	minerCmd.AddCommand(minerStartCmd)
+	minerCmd.AddCommand(minerStatusCmd)
+	minerCmd.AddCommand(minerStopCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "sync",
-		Short: "Synchronize with the network",
-		Long:  "Attempt to synchronize with a randomly selected peer.",
-		Run:   synccmd,
-	})
+	root.AddCommand(walletCmd)
+	walletCmd.AddCommand(walletAddressCmd)
+	walletCmd.AddCommand(walletSendCmd)
+	walletCmd.AddCommand(walletStatusCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "peer [add|remove] [address]",
-		Short: "Manually add or remove a peer",
-		Long:  "Manually add or remove a peer from the server's peer list.",
-		Run:   peercmd,
-	})
+	root.AddCommand(fileCmd)
+	fileCmd.AddCommand(fileUploadCmd)
+	fileCmd.AddCommand(fileDownloadCmd)
+	fileCmd.AddCommand(fileStatusCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "send [amount] [fee] [dest]",
-		Short: "Send coins to an address",
-		Long:  "Send coins to an address, or to a friend. The destination is first interpreted as an friend, and then as an address if the friend lookup fails.",
-		Run:   sendcmd,
-	})
+	root.AddCommand(peerCmd)
+	peerCmd.AddCommand(peerAddCmd)
+	peerCmd.AddCommand(peerRemoveCmd)
+	peerCmd.AddCommand(peerStatusCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "host [MB] [price] [freezecoins] [freezeblocks]",
-		Short: "Become a host",
-		Long:  "Submit a host announcement to the network, including the amount of storage offered and the price of renting storage.",
-		Run:   hostcmd,
-	})
+	root.AddCommand(updateCmd)
+	updateCmd.AddCommand(updateCheckCmd)
+	updateCmd.AddCommand(updateApplyCmd)
+	root.AddCommand(statusCmd)
+	root.AddCommand(stopCmd)
+	root.AddCommand(syncCmd)
 
-	root.AddCommand(&cobra.Command{
-		Use:   "rent [filename] [nickname]",
-		Short: "Store a file on a host",
-		Long:  "Negotiate a file contract with a host, and upload the file to them if negotiation is successful.",
-		Run:   rentcmd,
-	})
-
-	root.AddCommand(&cobra.Command{
-		Use:   "download [nickname] [destination]",
-		Short: "Download a file from a host",
-		Long:  "Download a file previously stored with a host",
-		Run:   downloadcmd,
-	})
-
-	status := &cobra.Command{
-		Use:   "status [check|apply]",
-		Short: "Print the current state of the daemon",
-		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
-		Run:   statuscmd,
-	}
-	root.AddCommand(status)
-
-	update := &cobra.Command{
-		Use:   "update",
-		Short: "Update Sia",
-		Long:  "Check for (and/or download) available updates for Sia.",
-		Run:   updatecmd,
-	}
-	root.AddCommand(update)
-
+	// run
 	root.Execute()
 }

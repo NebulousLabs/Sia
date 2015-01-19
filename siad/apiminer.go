@@ -21,13 +21,6 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// Calls StopMining() on the core.
-func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
-	d.core.StopMining()
-
-	writeSuccess(w)
-}
-
 // Returns json of the miners status.
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 	mInfo, err := d.core.MinerInfo()
@@ -36,4 +29,11 @@ func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, mInfo)
+}
+
+// Calls StopMining() on the core.
+func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
+	d.core.StopMining()
+
+	writeSuccess(w)
 }
