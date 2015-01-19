@@ -283,7 +283,7 @@ func (s *State) Output(id OutputID) (output Output, err error) {
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
+func (s *State) sortedUtxoSet() (sortedOutputs []Output) {
 	var unspentOutputStrings []string
 	for outputID := range s.unspentOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
@@ -293,13 +293,19 @@ func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
 	for _, utxoString := range unspentOutputStrings {
 		var outputID OutputID
 		copy(outputID[:], utxoString)
-		output, err := s.Output(outputID)
+		output, err := s.output(outputID)
 		if err != nil {
 			panic(err)
 		}
 		sortedOutputs = append(sortedOutputs, output)
 	}
 	return
+}
+
+func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.sortedUtxoSet()
 }
 
 // StateHash returns the markle root of the current state of consensus.
@@ -318,7 +324,7 @@ func (s *State) stateHash() hash.Hash {
 	// Create a slice of hashes representing all items of interest.
 	leaves := []hash.Hash{
 		hash.Hash(s.currentBlockID),
-		hash.HashObject(s.Height()),
+		hash.HashObject(s.height()),
 		hash.HashObject(s.currentBlockNode().Target),
 		hash.HashObject(s.currentBlockNode().Depth),
 		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
@@ -331,7 +337,7 @@ func (s *State) stateHash() hash.Hash {
 	}
 
 	// Sort the unspent outputs by the string value of their ID.
-	sortedUtxos := s.SortedUtxoSet()
+	sortedUtxos := s.sortedUtxoSet()
 
 	// Add the unspent outputs in sorted order.
 	for _, output := range sortedUtxos {
