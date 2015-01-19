@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 // A non-consensus rule that dictates how much heavier a competing chain has to
@@ -22,7 +21,9 @@ import (
 // maximum difficulty shift will prevent people from manipulating timestamps
 // enough to produce a block that is substantially heavier, thus making 5% an
 // acceptible value.
-var SurpassThreshold = big.NewRat(5, 100)
+var (
+	SurpassThreshold = big.NewRat(5, 100)
+)
 
 // Exported Errors
 var (
@@ -32,34 +33,11 @@ var (
 	UnknownOrphanErr = errors.New("block is an unknown orphan")
 )
 
-// earliestChildTimestamp() returns the earliest timestamp that a child node
-// can have while still being valid. See section 'Timestamp Rules' in
-// Consensus.md.
-//
-// TODO: Rather than having the blocknode store the timestamps, blocknodes
-// should just point to their parent block, and this function should just crawl
-// through the parents.
-//
-// TODO: After changing how the timestamps are aquired, write some tests to
-// check that the timestamp code is working right.
-func (bn *BlockNode) earliestChildTimestamp() Timestamp {
-	// Get the MedianTimestampWindow previous timestamps and sort them. For
-	// now, bn.RecentTimestamps is expected to have the correct timestamps.
-	var intTimestamps []int
-	for _, timestamp := range bn.RecentTimestamps {
-		intTimestamps = append(intTimestamps, int(timestamp))
-	}
-	sort.Ints(intTimestamps)
-
-	// Return the median of the sorted timestamps.
-	return Timestamp(intTimestamps[MedianTimestampWindow/2])
-}
-
 // handleOrphanBlock adds a block to the list of orphans, returning an error
 // indicating whether the orphan existed previously or not. handleOrphanBlock
 // always returns an error.
 func (s *State) handleOrphanBlock(b Block) error {
-	// Sanity check that the function is being used correctly.
+	// Sanity check - block must be an orphan!
 	if DEBUG {
 		_, exists := s.blockMap[b.ParentBlockID]
 		if exists {
@@ -468,10 +446,6 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 			return
 		}
 	}
-
-	// Notify subscribers of the consensus change.
-	var cc ConsensusChange
-	s.notifySubscribers(cc)
 
 	// Perform a sanity check if debug flag is set.
 	if DEBUG {
