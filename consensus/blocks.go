@@ -55,9 +55,41 @@ func (bn *BlockNode) earliestChildTimestamp() Timestamp {
 	return Timestamp(intTimestamps[MedianTimestampWindow/2])
 }
 
-// State.checkMaps() looks through the maps known to the state and sees if the
-// block id has been cached anywhere.
-func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
+// handleOrphanBlock adds a block to the list of orphans, returning an error
+// indicating whether the orphan existed previously or not. handleOrphanBlock
+// always returns an error.
+func (s *State) handleOrphanBlock(b Block) error {
+	// Sanity check that the function is being used correctly.
+	if DEBUG {
+		_, exists := s.blockMap[b.ParentBlockID]
+		if exists {
+			panic("Incorrect use of handleOrphanBlock")
+		}
+	}
+
+	// Check if the missing parent is unknown
+	missingParent, exists := s.missingParents[b.ParentBlockID]
+	if !exists {
+		// Add an entry for the parent and add the orphan block to the entry.
+		s.missingParents[b.ParentBlockID] = make(map[BlockID]Block)
+		s.missingParents[b.ParentBlockID][b.ID()] = b
+		return UnknownOrphanErr
+	}
+
+	// Check if the orphan is already known, and add the orphan if not.
+	_, exists = missingParent[b.ID()]
+	if exists {
+		return KnownOrphanErr
+	}
+	missingParent[b.ID()] = b
+	return UnknownOrphanErr
+}
+
+// checkDestiny determines if the blocks destiny is already known within the
+// state, and returns an error if a destiny is discovered. The destiny of a
+// block will already be known if the block is an orphan or if the block has
+// been seen before.
+func (s *State) checkDestiny(b Block) (err error) {
 	// See if the block is a known invalid block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
@@ -65,35 +97,19 @@ func (s *State) checkMaps(b *Block) (parentBlockNode *BlockNode, err error) {
 		return
 	}
 
-	// See if the block is a known valid block.
+	// See if the block is valid block.
 	_, exists = s.blockMap[b.ID()]
 	if exists {
 		err = BlockKnownErr
 		return
 	}
 
-	// See if the block's parent is known.
-	parentBlockNode, exists = s.blockMap[b.ParentBlockID]
+	// See if the block is an orphan.
+	_, exists = s.blockMap[b.ParentBlockID]
 	if !exists {
-		// See if the block is a known orphan block.
-		orphansOfParent, exists := s.orphanMap[b.ParentBlockID]
-		if !exists {
-			// Make the map for the parent - parent has not been seen before.
-			s.orphanMap[b.ParentBlockID] = make(map[BlockID]*Block)
-		} else {
-			_, exists = orphansOfParent[b.ID()]
-			if exists {
-				err = KnownOrphanErr
-				return
-			}
-		}
-		// Add the block to the list of known orphans.
-		s.orphanMap[b.ParentBlockID][b.ID()] = b
-
-		err = UnknownOrphanErr
+		err = s.handleOrphanBlock(b)
 		return
 	}
-
 	return
 }
 
@@ -418,14 +434,20 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
 func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+	// TODO: Before spending a lot of computational resources on verifying a
+	// block, we need to check that the block at least represents a reasonable
+	// amount of work done, which will help mitigate certain types of DoS
+	// attacks.
+
 	// Check the maps in the state to see if the block is already known.
-	parentBlockNode, err := s.checkMaps(&b)
+	err = s.checkDestiny(b)
 	if err != nil {
 		return
 	}
+	parentNode := s.blockMap[b.ParentBlockID]
 
-	// Check that the header of the block is valid.
-	err = s.validateHeader(parentBlockNode, &b)
+	// Check that the header of the block is acceptible.
+	err = s.validateHeader(parentNode, &b)
 	if err != nil {
 		return
 	}
@@ -437,7 +459,7 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 		return
 	}
 
-	newBlockNode := s.addBlockToTree(parentBlockNode, &b)
+	newBlockNode := s.addBlockToTree(parentNode, &b)
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {

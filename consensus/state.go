@@ -35,10 +35,14 @@ type State struct {
 	// blocktree.
 	blockRoot *BlockNode
 
-	// One map for each potential type of block.
-	badBlocks map[BlockID]struct{}           // A list of blocks that don't verify.
-	blockMap  map[BlockID]*BlockNode         // A list of all blocks in the blocktree.
-	orphanMap map[BlockID]map[BlockID]*Block // First map = ID of missing parent, second map = ID of orphan block.
+	// Missing parents is a double map, the first a map of missing parents, and
+	// the second is a map of the known children to the parent. The first is
+	// necessary so that if a parent is found, all the children can be added to
+	// the parent. The second is necessary for checking if a new block is a
+	// known orphan.
+	badBlocks      map[BlockID]struct{}          // A list of blocks that don't verify.
+	blockMap       map[BlockID]*BlockNode        // A list of all blocks in the blocktree.
+	missingParents map[BlockID]map[BlockID]Block // A list of all missing parents and their known children.
 
 	// The transaction pool works by storing a list of outputs that are
 	// spent by transactions in the pool, and pointing to the transaction
@@ -116,7 +120,7 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 		blockRoot:              new(BlockNode),
 		badBlocks:              make(map[BlockID]struct{}),
 		blockMap:               make(map[BlockID]*BlockNode),
-		orphanMap:              make(map[BlockID]map[BlockID]*Block),
+		missingParents:         make(map[BlockID]map[BlockID]Block),
 		currentPath:            make(map[BlockHeight]BlockID),
 		openContracts:          make(map[ContractID]*OpenContract),
 		unspentOutputs:         make(map[OutputID]Output),
