@@ -10,9 +10,18 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// TODO: Find a better place for this. SurpassThreshold isn't really a
-// consensus rule, it can be modified. That tells me it should be in siad but
-// deciding when to fork is pretty fundamental to the AcceptBlock code.
+// A non-consensus rule that dictates how much heavier a competing chain has to
+// be before the node will switch to mining on that chain. It is set to 5%,
+// which actually means that the heavier chain needs to be heavier by 5% of
+// _one block_, not 5% heavier as a whole.
+//
+// This rule is in place because the difficulty gets updated every block, and
+// that means that of two competing blocks, one could be very slightly heavier.
+// The slightly heavier one should not be switched to if it was not seen first,
+// because the amount of extra weight in the chain is inconsequential. The
+// maximum difficulty shift will prevent people from manipulating timestamps
+// enough to produce a block that is substantially heavier, thus making 5% an
+// acceptible value.
 var SurpassThreshold = big.NewRat(5, 100)
 
 // Exported Errors
