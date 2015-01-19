@@ -10,21 +10,21 @@ import (
 
 var (
 	updateCmd = &cobra.Command{
-		Use:   "update [check|apply]",
+		Use:   "update",
 		Short: "Update Sia",
 		Long:  "Check for (and/or download) available updates for Sia.",
 		Run:   wrap(updatecmd),
 	}
 
 	updateCheckCmd = &cobra.Command{
-		Use:   "update check",
+		Use:   "check",
 		Short: "Check for available updates",
 		Long:  "Check for available updates.",
 		Run:   wrap(updatecheckcmd),
 	}
 
 	updateApplyCmd = &cobra.Command{
-		Use:   "update apply [version]",
+		Use:   "apply [version]",
 		Short: "Apply an update",
 		Long:  "Update Sia to 'version'. To use the latest version, run 'update apply current', or simply 'update'.",
 		Run:   wrap(updateapplycmd),

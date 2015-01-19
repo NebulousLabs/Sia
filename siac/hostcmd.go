@@ -10,21 +10,21 @@ import (
 
 var (
 	hostCmd = &cobra.Command{
-		Use:   "host [config|setconfig]",
+		Use:   "host",
 		Short: "Perform host actions",
 		Long:  "View or modify host settings. Modifying host settings also announces the host to the network.",
 		Run:   wrap(hostconfigcmd),
 	}
 
 	hostConfigCmd = &cobra.Command{
-		Use:   "host config",
+		Use:   "config",
 		Short: "View host settings",
 		Long:  "View host settings, including available storage, price, and more.",
 		Run:   wrap(hostconfigcmd),
 	}
 
 	hostSetConfigCmd = &cobra.Command{
-		Use:   "host setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
+		Use:   "setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
 		Short: "Modify host settings",
 		Long:  "Modify host settings, including available storage, price, and more. The new settings will be be announced to the network.",
 		Run:   wrap(hostsetconfigcmd),
@@ -38,7 +38,7 @@ func hostconfigcmd() {
 		fmt.Println("Could not fetch host settings:", err)
 		return
 	}
-	fmt.Sprintf(`Host settings:
+	fmt.Printf(`Host settings:
 Storage:      %v bytes (%v remaining)
 Price:        %v coins
 Max Filesize: %v

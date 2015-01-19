@@ -10,28 +10,28 @@ import (
 
 var (
 	peerCmd = &cobra.Command{
-		Use:   "peer [add|remove|status]",
+		Use:   "peer",
 		Short: "Perform peer actions",
 		Long:  "Add or remove a peer, or view the current peer list.",
 		Run:   wrap(peerstatuscmd),
 	}
 
 	peerAddCmd = &cobra.Command{
-		Use:   "peer add [addr]",
+		Use:   "add [addr]",
 		Short: "Add a peer",
 		Long:  "Add a new peer. The peer will only be added if it responds to a ping request.",
 		Run:   wrap(peeraddcmd),
 	}
 
 	peerRemoveCmd = &cobra.Command{
-		Use:   "peer remove [addr]",
+		Use:   "remove [addr]",
 		Short: "Remove a peer",
 		Long:  "Remove a peer from the peer list.",
 		Run:   wrap(peerremovecmd),
 	}
 
 	peerStatusCmd = &cobra.Command{
-		Use:   "peer status",
+		Use:   "status",
 		Short: "View a list of peers",
 		Long:  "View the current peer list.",
 		Run:   wrap(peerstatuscmd),

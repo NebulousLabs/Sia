@@ -10,28 +10,28 @@ import (
 
 var (
 	minerCmd = &cobra.Command{
-		Use:   "miner [start|stop|status]",
+		Use:   "miner",
 		Short: "Perform miner actions",
 		Long:  "Start mining, stop mining, or view the current mining status, including number of threads, deposit address, and more.",
 		Run:   wrap(minerstatuscmd),
 	}
 
 	minerStartCmd = &cobra.Command{
-		Use:   "miner start [threads]",
+		Use:   "start [threads]",
 		Short: "Start mining on 'threads' threads",
 		Long:  "Start mining on a specified number of threads. If the miner is already running, the number of threads is adjusted.",
 		Run:   wrap(minerstartcmd),
 	}
 
 	minerStatusCmd = &cobra.Command{
-		Use:   "miner status",
+		Use:   "status",
 		Short: "View miner status",
 		Long:  "View the current mining status, including number of threads, deposit address, and more.",
 		Run:   wrap(minerstatuscmd),
 	}
 
 	minerStopCmd = &cobra.Command{
-		Use:   "miner stop",
+		Use:   "stop",
 		Short: "Stop mining",
 		Long:  "Stop mining (this may take a few moments).",
 		Run:   wrap(minerstopcmd),
@@ -54,7 +54,7 @@ func minerstatuscmd() {
 		fmt.Println("Could not get miner status:", err)
 		return
 	}
-	fmt.Printf(`
+	fmt.Printf(`Miner status:
 State:   %s
 Threads: %d (%d active)
 Address: %x

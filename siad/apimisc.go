@@ -22,6 +22,7 @@ func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
 		http.Error(w, err.Error(), 500)
+		return
 	}
 
 	writeSuccess(w)

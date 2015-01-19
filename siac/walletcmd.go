@@ -10,28 +10,28 @@ import (
 
 var (
 	walletCmd = &cobra.Command{
-		Use:   "wallet [address|send|status]",
+		Use:   "wallet",
 		Short: "Perform wallet actions",
 		Long:  "Generate a new address, send coins to another wallet, or view info about the wallet.",
 		Run:   wrap(walletstatuscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
-		Use:   "wallet address",
+		Use:   "address",
 		Short: "Get a new wallet address",
 		Long:  "Generate a new wallet address.",
 		Run:   wrap(walletaddresscmd),
 	}
 
 	walletSendCmd = &cobra.Command{
-		Use:   "wallet send [amount] [dest]",
+		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
 		Long:  "Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.",
 		Run:   wrap(walletsendcmd),
 	}
 
 	walletStatusCmd = &cobra.Command{
-		Use:   "wallet status",
+		Use:   "status",
 		Short: "View wallet status",
 		Long:  "View wallet status, including the current balance and number of addresses.",
 		Run:   wrap(walletstatuscmd),
@@ -69,7 +69,9 @@ func walletstatuscmd() {
 		fmt.Println("Could not get wallet status:", err)
 		return
 	}
-	fmt.Printf(`Balance:   %v (full: %v)
+	fmt.Printf(`Wallet status:
+Balance:   %v (confirmed) 
+           %v (unconfirmed)
 Addresses: %d
 `, status.Balance, status.FullBalance, status.NumAddresses)
 }

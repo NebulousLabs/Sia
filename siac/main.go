@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -14,9 +17,24 @@ const (
 	hostname = "http://localhost:9980"
 )
 
+// get wraps a GET request with a status code check, such that if the GET does
+// not return 200, the error will be read and returned.
+func get(call string) (resp *http.Response, err error) {
+	resp, err = http.Get(hostname + call)
+	if err != nil {
+		return
+	}
+	// check error code
+	if resp.StatusCode != 200 {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		err = errors.New(strings.TrimSpace(string(errResp)))
+	}
+	return
+}
+
 // getAPI makes an API call and decodes the response.
 func getAPI(call string, obj interface{}) (err error) {
-	resp, err := http.Get(hostname + call)
+	resp, err := get(call)
 	if err != nil {
 		return
 	}
@@ -30,7 +48,7 @@ func getAPI(call string, obj interface{}) (err error) {
 
 // callAPI makes an API call and discards the response.
 func callAPI(call string) (err error) {
-	resp, err := http.Get(hostname + call)
+	resp, err := get(call)
 	if err != nil {
 		return
 	}
@@ -86,35 +104,24 @@ func main() {
 	})
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd)
-	hostCmd.AddCommand(hostSetConfigCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostSetConfigCmd)
 
 	root.AddCommand(minerCmd)
-	minerCmd.AddCommand(minerStartCmd)
-	minerCmd.AddCommand(minerStatusCmd)
-	minerCmd.AddCommand(minerStopCmd)
+	minerCmd.AddCommand(minerStartCmd, minerStatusCmd, minerStopCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd)
-	walletCmd.AddCommand(walletSendCmd)
-	walletCmd.AddCommand(walletStatusCmd)
+	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)
 
 	root.AddCommand(fileCmd)
-	fileCmd.AddCommand(fileUploadCmd)
-	fileCmd.AddCommand(fileDownloadCmd)
-	fileCmd.AddCommand(fileStatusCmd)
+	fileCmd.AddCommand(fileUploadCmd, fileDownloadCmd, fileStatusCmd)
 
 	root.AddCommand(peerCmd)
-	peerCmd.AddCommand(peerAddCmd)
-	peerCmd.AddCommand(peerRemoveCmd)
-	peerCmd.AddCommand(peerStatusCmd)
+	peerCmd.AddCommand(peerAddCmd, peerRemoveCmd, peerStatusCmd)
 
 	root.AddCommand(updateCmd)
-	updateCmd.AddCommand(updateCheckCmd)
-	updateCmd.AddCommand(updateApplyCmd)
-	root.AddCommand(statusCmd)
-	root.AddCommand(stopCmd)
-	root.AddCommand(syncCmd)
+	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
+
+	root.AddCommand(statusCmd, stopCmd, syncCmd)
 
 	// run
 	root.Execute()

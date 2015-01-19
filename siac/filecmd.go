@@ -10,28 +10,28 @@ import (
 
 var (
 	fileCmd = &cobra.Command{
-		Use:   "file [upload|download|status]",
+		Use:   "file",
 		Short: "Perform file actions",
 		Long:  "Generate a new address, send coins to another file, or view info about the file.",
 		Run:   wrap(filestatuscmd),
 	}
 
 	fileUploadCmd = &cobra.Command{
-		Use:   "file upload [file] [nickname] [pieces]",
+		Use:   "upload [file] [nickname] [pieces]",
 		Short: "Upload a file",
 		Long:  "Upload a file using a given nickname and split across 'pieces' hosts.",
 		Run:   wrap(fileuploadcmd),
 	}
 
 	fileDownloadCmd = &cobra.Command{
-		Use:   "file download [nickname] [filename]",
+		Use:   "download [nickname] [filename]",
 		Short: "Download a file",
 		Long:  "Download a previously-uploaded file to a specified destination.",
 		Run:   wrap(filedownloadcmd),
 	}
 
 	fileStatusCmd = &cobra.Command{
-		Use:   "file status",
+		Use:   "status",
 		Short: "View a list of uploaded files",
 		Long:  "View a list of files that have been uploaded to the network.",
 		Run:   wrap(filestatuscmd),
@@ -63,7 +63,11 @@ func filestatuscmd() {
 		fmt.Println("Could not get file status:", err)
 		return
 	}
-	fmt.Println(len(status.Files), "files stored:")
+	if len(status.Files) == 0 {
+		fmt.Println("Not files have been uploaded.")
+		return
+	}
+	fmt.Println("Uploaded", len(status.Files), "files:")
 	for _, file := range status.Files {
 		fmt.Println("\t", file)
 	}
