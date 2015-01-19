@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/sia/components"
-	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // openTransaction is a type that the wallet uses to track a transaction as it
@@ -33,7 +33,7 @@ type spendableOutput struct {
 type spendableAddress struct {
 	spendableOutputs map[consensus.OutputID]*spendableOutput
 	spendConditions  consensus.SpendConditions
-	secretKey        signatures.SecretKey
+	secretKey        crypto.SecretKey
 }
 
 // findOutputs returns a set of spendable outputs that add up to at least

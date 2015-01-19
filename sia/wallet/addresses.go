@@ -2,21 +2,21 @@ package wallet
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/signatures"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
 func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
 	// Create the address + spend conditions.
-	sk, pk, err := signatures.GenerateKeyPair()
+	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
 	spendConditions = consensus.SpendConditions{
 		TimeLock:      unlockHeight,
 		NumSignatures: 1,
-		PublicKeys:    []signatures.PublicKey{pk},
+		PublicKeys:    []crypto.PublicKey{pk},
 	}
 	coinAddress = spendConditions.CoinAddress()
 
@@ -48,13 +48,13 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 // coinAddress implements the core.Wallet interface.
 func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
 	// Create the keys and address.
-	sk, pk, err := signatures.GenerateKeyPair()
+	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
 	spendConditions = consensus.SpendConditions{
 		NumSignatures: 1,
-		PublicKeys:    []signatures.PublicKey{pk},
+		PublicKeys:    []crypto.PublicKey{pk},
 	}
 	coinAddress = spendConditions.CoinAddress()
 

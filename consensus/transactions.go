@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/signatures"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // Exported errors
@@ -18,7 +18,7 @@ var (
 // more signatures are needed.
 type InputSignatures struct {
 	RemainingSignatures uint64
-	PossibleKeys        []signatures.PublicKey
+	PossibleKeys        []crypto.PublicKey
 	UsedKeys            map[uint64]struct{}
 	Index               int
 }
@@ -228,7 +228,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 
 		// Check that the signature matches the public key.
 		sigHash := t.SigHash(i)
-		if !signatures.VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
+		if !crypto.VerifyBytes(sigHash[:], inputSignaturesMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
 			err = InvalidSignatureErr
 			return
 		}

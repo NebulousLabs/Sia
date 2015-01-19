@@ -5,15 +5,15 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/signatures"
 )
 
 // AddressKey is how we serialize and store spendable addresses on
 // disk.
 type AddressKey struct {
 	SpendConditions consensus.SpendConditions
-	SecretKey       signatures.SecretKey
+	SecretKey       crypto.SecretKey
 }
 
 func (w *Wallet) save() (err error) {
