@@ -161,14 +161,6 @@ func (s *State) childTarget(parentNode *BlockNode, newNode *BlockNode) Target {
 	return RatToTarget(newTarget)
 }
 
-// State.childDepth() returns the cumulative weight of all the blocks leading
-// up to and including the child block.
-// childDepth := (1/parentTarget + 1/parentDepth)^-1
-func (s *State) childDepth(parentNode *BlockNode) (depth Target) {
-	cumulativeDifficulty := new(big.Rat).Add(parentNode.Target.Inverse(), parentNode.Depth.Inverse())
-	return RatToTarget(new(big.Rat).Inv(cumulativeDifficulty))
-}
-
 // State.addBlockToTree() takes a block and a parent node, and adds a child
 // node to the parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
@@ -185,7 +177,7 @@ func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
 
 	// Calculate target and depth.
 	newNode.Target = s.childTarget(parentNode, newNode)
-	newNode.Depth = s.childDepth(parentNode)
+	newNode.Depth = parentNode.childDepth()
 
 	// Add the node to the block map and the list of its parents children.
 	s.blockMap[b.ID()] = newNode
