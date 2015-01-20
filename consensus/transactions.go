@@ -39,7 +39,7 @@ func (s *State) invertTransaction(t Transaction) (diffs []OutputDiff) {
 
 	// Delete all financial outputs created by the transaction.
 	for i := range t.Outputs {
-		output, err := s.Output(t.OutputID(i))
+		output, err := s.output(t.OutputID(i))
 		if err != nil {
 			panic(err)
 		}
@@ -121,7 +121,7 @@ func (s *State) validInput(input Input) (err error) {
 	}
 
 	// Check the timelock on the spend conditions is expired.
-	if input.SpendConditions.TimeLock > s.Height() {
+	if input.SpendConditions.TimeLock > s.height() {
 		err = errors.New("output spent before timelock expiry.")
 		return
 	}
@@ -131,7 +131,7 @@ func (s *State) validInput(input Input) (err error) {
 
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
-func (s *State) ValidTransaction(t Transaction) (err error) {
+func (s *State) validTransaction(t Transaction) (err error) {
 	// Iterate through each input, summing the value, checking for
 	// correctness, and creating an InputSignatures object.
 	inputSum := Currency(0)
@@ -221,7 +221,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 		}
 
 		// Check the timelock on the signature.
-		if sig.TimeLock > s.Height() {
+		if sig.TimeLock > s.height() {
 			err = errors.New("signature timelock has not expired")
 			return
 		}
@@ -248,11 +248,20 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 	return
 }
 
+func (s *State) ValidTransaction(t Transaction) (err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validTransaction(t)
+}
+
 // State.AcceptTransaction() checks for a conflict of the transaction with the
 // transaction pool, then checks that the transaction is valid given the
 // current state, then adds the transaction to the transaction pool.
 // AcceptTransaction() is thread safe, and can be called concurrently.
 func (s *State) AcceptTransaction(t Transaction) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	if s.transactionPoolConflict(&t) {
@@ -261,7 +270,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	}
 
 	// Check that the transaction is potentially valid.
-	err = s.ValidTransaction(t)
+	err = s.validTransaction(t)
 	if err != nil {
 		return
 	}
@@ -269,12 +278,5 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Add the transaction to the pool.
 	s.addTransactionToPool(&t)
 
-	return
-}
-
-func (s *State) TransactionList() (txns []Transaction) {
-	for _, txn := range s.transactionList {
-		txns = append(txns, *txn)
-	}
 	return
 }

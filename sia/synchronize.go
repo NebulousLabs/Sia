@@ -15,9 +15,6 @@ var moreBlocksErr = errors.New("more blocks are available")
 
 // SendBlocks takes a list of block ids as input, and sends all blocks from
 func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
-	c.state.RLock()
-	defer c.state.RUnlock()
-
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
 	var highest consensus.BlockHeight
@@ -61,7 +58,6 @@ func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus
 // these blocks to find the most recent block seen by both peers, and then
 // transmits blocks sequentially until the requester is fully synchronized.
 func (c *Core) CatchUp(peer network.Address) {
-	c.state.RLock() // Lock the state while building the block request.
 	knownBlocks := make([]consensus.BlockID, 0, 32)
 	for i := consensus.BlockHeight(0); i < 12; i++ {
 		block, badBlockErr := c.state.BlockAtHeight(c.state.Height() - i)
@@ -83,7 +79,6 @@ func (c *Core) CatchUp(peer network.Address) {
 	// always include the genesis block
 	genesis, _ := c.state.BlockAtHeight(0)
 	knownBlocks = append(knownBlocks, genesis.ID())
-	c.state.RUnlock() // Lock is released once the set of known blocks has been built.
 
 	// prepare for RPC
 	var newBlocks []consensus.Block

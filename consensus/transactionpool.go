@@ -1,22 +1,5 @@
 package consensus
 
-// TransactionPoolDump() returns the list of transactions that are valid but
-// haven't yet appeared in a block. It performs a safety/sanity check to verify
-// that no bad transactions have snuck in.
-func (s *State) TransactionPoolDump() (transactions []Transaction) {
-	for _, transaction := range s.transactionList {
-		// Sanity check: make sure each transaction being dumped is valid.
-		err := s.ValidTransaction(*transaction)
-		if err != nil {
-			panic(err)
-		}
-
-		transactions = append(transactions, *transaction)
-	}
-
-	return
-}
-
 // State.addTransactionToPool() adds a transaction to the transaction pool and
 // transaction list. A panic will trigger if there is a conflicting transaction
 // in the pool.
@@ -120,7 +103,7 @@ func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
 func (s *State) cleanTransactionPool() {
 	var badTransactions []*Transaction
 	for _, transaction := range s.transactionList {
-		err := s.ValidTransaction(*transaction)
+		err := s.validTransaction(*transaction)
 		if err != nil {
 			badTransactions = append(badTransactions, transaction)
 		}
@@ -151,6 +134,27 @@ func (s *State) transactionPoolConflict(t *Transaction) (conflict bool) {
 		_, exists := s.transactionPoolProofs[proof.ContractID]
 		if exists {
 			conflict = true
+		}
+	}
+
+	return
+}
+
+// TransactionPoolDump() returns the list of transactions that are valid but
+// haven't yet appeared in a block.
+func (s *State) TransactionPoolDump() (transactions []Transaction) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, transaction := range s.transactionList {
+		transactions = append(transactions, *transaction)
+
+		if DEBUG {
+			// Sanity check: make sure each transaction being dumped is valid.
+			err := s.validTransaction(*transaction)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 

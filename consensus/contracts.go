@@ -7,10 +7,10 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// storageProofSegmentIndex takes a contractID and a windowIndex and calculates
 // the index of the segment that should be proven on when doing a proof of
 // storage.
-func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+func (s *State) storageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
 	openContract, exists := s.openContracts[contractID]
 	if !exists {
 		err = errors.New("unrecognized contractID")
@@ -20,7 +20,7 @@ func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex Bloc
 
 	// Get random number seed used to pick the index.
 	triggerBlockHeight := contract.Start + contract.ChallengeWindow*windowIndex - 1
-	triggerBlock, err := s.BlockAtHeight(triggerBlockHeight)
+	triggerBlock, err := s.blockAtHeight(triggerBlockHeight)
 	if err != nil {
 		return
 	}
@@ -31,6 +31,15 @@ func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex Bloc
 	seedInt := new(big.Int).SetBytes(seed[:])
 	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
 	return
+}
+
+// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// the index of the segment that should be proven on when doing a proof of
+// storage.
+func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.storageProofSegmentIndex(contractID, windowIndex)
 }
 
 // validProof returns err = nil if the storage proof provided is valid given
@@ -47,7 +56,7 @@ func (s *State) validProof(sp StorageProof) error {
 	}
 
 	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.StorageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
+	segmentIndex, err := s.storageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
 	if err != nil {
 		return err
 	}
@@ -90,7 +99,7 @@ func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
 		Value:     payout,
 		SpendHash: openContract.FileContract.ValidProofAddress,
 	}
-	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.height(), true)
 	if err != nil {
 		panic(err)
 	}
@@ -107,11 +116,11 @@ func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
 
 func (s *State) invertStorageProof(sp StorageProof) (diff OutputDiff) {
 	openContract := s.openContracts[sp.ContractID]
-	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.Height(), true)
+	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.height(), true)
 	if err != nil {
 		panic(err)
 	}
-	output, err := s.Output(outputID)
+	output, err := s.output(outputID)
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +140,7 @@ func (s *State) validContract(c FileContract) (err error) {
 		err = errors.New("contract must be funded.")
 		return
 	}
-	if c.Start <= s.Height() {
+	if c.Start <= s.height() {
 		err = errors.New("contract must start in the future.")
 		return
 	}
@@ -174,7 +183,7 @@ func (s *State) applyMissedProof(openContract *OpenContract) (diff OutputDiff) {
 	}
 
 	// Create the output for the missed proof.
-	newOutputID, err := contract.StorageProofOutputID(openContract.ContractID, s.Height(), false)
+	newOutputID, err := contract.StorageProofOutputID(openContract.ContractID, s.height(), false)
 	if err != nil {
 		panic(err)
 	}
@@ -207,8 +216,8 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 	for _, openContract := range s.openContracts {
 		// Check if the window index is changing.
 		contract := openContract.FileContract
-		contractProgress := s.Height() - contract.Start
-		if s.Height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
+		contractProgress := s.height() - contract.Start
+		if s.height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
 			// If the proof was missed for this window, add an output.
 			cd := ContractDiff{
 				Contract:             openContract.FileContract,
@@ -229,7 +238,7 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 		}
 
 		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || contract.End == s.Height() || contract.Tolerance == openContract.Failures {
+		if openContract.FundsRemaining == 0 || contract.End == s.height() || contract.Tolerance == openContract.Failures {
 			if openContract.FundsRemaining != 0 {
 				// Create a new output that terminates the contract.
 				output := Output{

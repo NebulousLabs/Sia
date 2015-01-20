@@ -166,8 +166,7 @@ func CreateCore(config Config) (c *Core, err error) {
 func (c *Core) ScanMutexes() {
 	var state, host, hostdb, miner, renter, wallet int
 	go func() {
-		c.state.Lock()
-		c.state.Unlock()
+		c.state.Height()
 		state++
 	}()
 	go func() {

@@ -40,7 +40,7 @@ func (c *Core) UpdateMiner(threads int) (err error) {
 		Transactions:      c.state.TransactionPoolDump(),
 		Target:            c.state.CurrentTarget(),
 		Address:           address,
-		EarliestTimestamp: c.state.EarliestLegalTimestamp(),
+		EarliestTimestamp: c.state.EarliestTimestamp(),
 
 		BlockChan: c.BlockChan(),
 		Threads:   threads,
