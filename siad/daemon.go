@@ -105,5 +105,7 @@ func (d *daemon) handleSignal() {
 	// either signal results in shutdown
 	<-c
 	println("\nCaught deadly signal.")
-	d.core.Close()
+	go func() {
+		d.stop <- struct{}{}
+	}()
 }
