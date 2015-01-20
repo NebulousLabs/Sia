@@ -21,6 +21,8 @@ type daemon struct {
 	downloadDir string
 
 	template *template.Template
+
+	stop chan struct{}
 }
 
 func startDaemon(config Config) (err error) {
@@ -36,6 +38,7 @@ func startDaemon(config Config) (err error) {
 	d := &daemon{
 		styleDir:    config.Siad.StyleDirectory,
 		downloadDir: config.Siad.DownloadDirectory,
+		stop:        make(chan struct{}),
 	}
 
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
