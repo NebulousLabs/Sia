@@ -22,6 +22,8 @@ var controller = (function(){
                 ui.notify("New Sia Client Available: Click to update to " + update.Version + "!", "update", function(){
                     updateClient(update.Version);
                 });
+            }else{
+                ui.notifySmall("No updates available", "alert");
             }
         });
     }
