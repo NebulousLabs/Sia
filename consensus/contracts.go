@@ -10,7 +10,7 @@ import (
 // storageProofSegmentIndex takes a contractID and a windowIndex and calculates
 // the index of the segment that should be proven on when doing a proof of
 // storage.
-func (s *State) storageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+func (s *State) storageProofSegmentIndex(contractID ContractID) (index uint64, err error) {
 	openContract, exists := s.openContracts[contractID]
 	if !exists {
 		err = errors.New("unrecognized contractID")
@@ -19,7 +19,7 @@ func (s *State) storageProofSegmentIndex(contractID ContractID, windowIndex Bloc
 	contract := openContract.FileContract
 
 	// Get random number seed used to pick the index.
-	triggerBlockHeight := contract.Start + contract.ChallengeWindow*windowIndex - 1
+	triggerBlockHeight := contract.Start - 1
 	triggerBlock, err := s.blockAtHeight(triggerBlockHeight)
 	if err != nil {
 		return
@@ -36,10 +36,10 @@ func (s *State) storageProofSegmentIndex(contractID ContractID, windowIndex Bloc
 // StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
 // the index of the segment that should be proven on when doing a proof of
 // storage.
-func (s *State) StorageProofSegmentIndex(contractID ContractID, windowIndex BlockHeight) (index uint64, err error) {
+func (s *State) StorageProofSegmentIndex(contractID ContractID) (index uint64, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.storageProofSegmentIndex(contractID, windowIndex)
+	return s.storageProofSegmentIndex(contractID)
 }
 
 // validProof returns err = nil if the storage proof provided is valid given
@@ -50,13 +50,8 @@ func (s *State) validProof(sp StorageProof) error {
 		return errors.New("unrecognized contract id in storage proof")
 	}
 
-	// Check that the proof has not already been submitted.
-	if openContract.WindowSatisfied {
-		return errors.New("storage proof has already been completed for this contract")
-	}
-
 	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.storageProofSegmentIndex(sp.ContractID, sp.WindowIndex)
+	segmentIndex, err := s.storageProofSegmentIndex(sp.ContractID)
 	if err != nil {
 		return err
 	}
@@ -89,10 +84,7 @@ func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
 
 	// Set the payout of the output - payout cannot be greater than the
 	// amount of funds remaining.
-	payout := openContract.FileContract.ValidProofPayout
-	if openContract.FundsRemaining < openContract.FileContract.ValidProofPayout {
-		payout = openContract.FundsRemaining
-	}
+	payout := openContract.FileContract.Payout
 
 	// Create the output and add it to the list of unspent outputs.
 	output := Output{
@@ -108,8 +100,6 @@ func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
 
 	// Mark the proof as complete for this window, and subtract from the
 	// FundsRemaining.
-	s.openContracts[sp.ContractID].WindowSatisfied = true
-	s.openContracts[sp.ContractID].FundsRemaining -= payout
 	contractDiff.NewOpenContract = *s.openContracts[sp.ContractID]
 	return
 }
@@ -126,9 +116,6 @@ func (s *State) invertStorageProof(sp StorageProof) (diff OutputDiff) {
 	}
 	diff = OutputDiff{New: false, ID: outputID, Output: output}
 	delete(s.unspentOutputs, outputID)
-
-	// Restore the contract window to being incomplete.
-	s.openContracts[sp.ContractID].WindowSatisfied = false
 	return
 }
 
@@ -136,10 +123,6 @@ func (s *State) invertStorageProof(sp StorageProof) (diff OutputDiff) {
 // context of the state, and returns an error if something about the contract
 // is invalid.
 func (s *State) validContract(c FileContract) (err error) {
-	if c.ContractFund <= 0 {
-		err = errors.New("contract must be funded.")
-		return
-	}
 	if c.Start <= s.height() {
 		err = errors.New("contract must start in the future.")
 		return
@@ -156,19 +139,14 @@ func (s *State) validContract(c FileContract) (err error) {
 // it to the state.
 func (s *State) applyContract(contract FileContract, id ContractID, td *TransactionDiff) {
 	s.openContracts[id] = &OpenContract{
-		FileContract:    contract,
-		ContractID:      id,
-		FundsRemaining:  contract.ContractFund,
-		Failures:        0,
-		WindowSatisfied: false,
+		FileContract: contract,
+		ContractID:   id,
 	}
 
 	cd := ContractDiff{
-		Contract:        contract,
-		ContractID:      id,
-		New:             true,
-		Terminated:      false,
-		NewOpenContract: *s.openContracts[id],
+		Contract:   contract,
+		ContractID: id,
+		New:        true,
 	}
 	td.ContractDiffs = append(td.ContractDiffs, cd)
 }
@@ -177,10 +155,7 @@ func (s *State) applyContract(contract FileContract, id ContractID, td *Transact
 // on a file contract.
 func (s *State) applyMissedProof(openContract *OpenContract) (diff OutputDiff) {
 	contract := openContract.FileContract
-	payout := contract.MissedProofPayout
-	if openContract.FundsRemaining < contract.MissedProofPayout {
-		payout = openContract.FundsRemaining
-	}
+	payout := contract.Payout
 
 	// Create the output for the missed proof.
 	newOutputID, err := contract.StorageProofOutputID(openContract.ContractID, s.height(), false)
@@ -200,8 +175,6 @@ func (s *State) applyMissedProof(openContract *OpenContract) (diff OutputDiff) {
 
 	// Update the open contract to reflect the missed payment.
 	s.currentBlockNode().MissedStorageProofs = append(s.currentBlockNode().MissedStorageProofs, msp)
-	openContract.FundsRemaining -= payout
-	openContract.Failures += 1
 	return
 }
 
@@ -214,10 +187,9 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 	// Scan all open contracts and perform any required maintenance on each.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.openContracts {
-		// Check if the window index is changing.
+		// Check if the contract has ended.
 		contract := openContract.FileContract
-		contractProgress := s.height() - contract.Start
-		if s.height() > contract.Start && contractProgress%contract.ChallengeWindow == 0 {
+		if s.height() == contract.Start
 			// If the proof was missed for this window, add an output.
 			cd := ContractDiff{
 				Contract:             openContract.FileContract,

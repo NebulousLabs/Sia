@@ -84,9 +84,8 @@ type FileContract struct {
 	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
-	ValidProofPayout   Currency
+	Payout             Currency
 	ValidProofAddress  CoinAddress
-	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
 }
 

@@ -20,16 +20,9 @@ type OutputDiff struct {
 }
 
 type ContractDiff struct {
-	Contract   FileContract
+	New        bool
 	ContractID ContractID
-
-	New        bool // Whether a new OpenContract should be inserted.
-	Terminated bool // Whether the existing OpenContract should be deleted.
-
-	// Either of these will be empty depending on the value of New and
-	// Terminated.
-	PreviousOpenContract OpenContract
-	NewOpenContract      OpenContract
+	Contract   FileContract
 }
 
 // A TransactionDiff is the diff that gets applied to the state in the presense
