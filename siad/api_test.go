@@ -26,8 +26,8 @@ type SuccessResponse struct {
 	Success bool
 }
 
-// httpReq will request a byte stream from the provided url and log and return
-// and errors
+// httpReq will request a byte stream from the provided url then log and return
+// any errors
 func httpReq(t *testing.T, url string) ([]byte, error) {
 	resp, err := http.Get("http://127.0.0.1:9980" + url)
 	if err != nil {
