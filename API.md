@@ -4,27 +4,28 @@ Siad API
 Unless otherwise specified, API calls return the JSON object { "Success": true }.
 Errors are sent as plaintext, accompanied by an appropriate status code.
 
-| Path              | Params                       | Response                     |
-|:------------------|:-----------------------------|:-----------------------------|
-| /host/config      |                              | See HostInfo                 |
-| /host/setconfig   | See HostInfo                 |                              |
-| /miner/start      | `threads`                    |                              |
-| /miner/status     |                              | See MinerInfo                |
-| /miner/stop       |                              |                              |
-| /wallet/address   |                              | `{ "Address" }`              |
-| /wallet/send      | `amount`, `dest`             |                              |
-| /wallet/status    |                              | See WalletInfo               |
-| /file/upload      | `pieces`, `file`, `nickname` |                              |
-| /file/download    | `nickname`, `filename`       |                              |
-| /file/status      |                              | `[ "File" ]`                 |
-| /peer/add         | `addr`                       |                              |
-| /peer/remove      | `addr`                       |                              |
-| /peer/status      |                              | `[ "Address" ]`              |
-| /update/check     |                              | `{ "Available", "Version" }` |
-| /update/apply     | `version`                    |                              |
-| /status           |                              | See StateInfo                |
-| /stop             |                              |                              |
-| /sync             |                              |                              |
+| Path              | Params                           | Response                     |
+|:------------------|:---------------------------------|:-----------------------------|
+| /host/config      |                                  | See HostInfo                 |
+| /host/setconfig   | See HostInfo                     |                              |
+| /miner/start      | `threads`                        |                              |
+| /miner/status     |                                  | See MinerInfo                |
+| /miner/stop       |                                  |                              |
+| /wallet/address   |                                  | `{ "Address" }`              |
+| /wallet/send      | `amount`, `dest`                 |                              |
+| /wallet/status    |                                  | See WalletInfo               |
+| /file/upload      | `file`, `nickname`, `pieces`     |                              |
+| /file/uploadpath  | `filename`, `nickname`, `pieces` |                              |
+| /file/download    | `nickname`, `filename`           |                              |
+| /file/status      |                                  | `[ "File" ]`                 |
+| /peer/add         | `addr`                           |                              |
+| /peer/remove      | `addr`                           |                              |
+| /peer/status      |                                  | `[ "Address" ]`              |
+| /update/check     |                                  | `{ "Available", "Version" }` |
+| /update/apply     | `version`                        |                              |
+| /status           |                                  | See StateInfo                |
+| /stop             |                                  |                              |
+| /sync             |                                  |                              |
 
 HostInfo comprises the following values:
 ```

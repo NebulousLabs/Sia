@@ -17,7 +17,7 @@ var (
 	}
 
 	fileUploadCmd = &cobra.Command{
-		Use:   "upload [file] [nickname] [pieces]",
+		Use:   "upload [filename] [nickname] [pieces]",
 		Short: "Upload a file",
 		Long:  "Upload a file using a given nickname and split across 'pieces' hosts.",
 		Run:   wrap(fileuploadcmd),
@@ -38,13 +38,14 @@ var (
 	}
 )
 
-func fileuploadcmd(file, nickname, pieces string) {
-	err := callAPI(fmt.Sprintf("/file/upload?file=%s&nickname=%s&pieces=%s", file, nickname, pieces))
+// siac does not support /file/upload, only /file/uploadpath
+func fileuploadcmd(filename, nickname, pieces string) {
+	err := callAPI(fmt.Sprintf("/file/uploadpath?filename=%s&nickname=%s&pieces=%s", filename, nickname, pieces))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Println("Uploaded", file, "as", nickname)
+	fmt.Println("Uploaded", filename, "as", nickname)
 }
 
 func filedownloadcmd(nickname, filename string) {

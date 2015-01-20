@@ -44,6 +44,27 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
+func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request) {
+	pieces, err := strconv.Atoi(req.FormValue("pieces"))
+	if err != nil {
+		http.Error(w, "Malformed pieces", 400)
+		return
+	}
+
+	// TODO: is "" a valid nickname? The renter should probably prevent this.
+	err = d.core.RentFile(components.RentFileParameters{
+		Filepath:    req.FormValue("filename"),
+		Nickname:    req.FormValue("nickname"),
+		TotalPieces: pieces,
+	})
+	if err != nil {
+		http.Error(w, "Upload failed: "+err.Error(), 500)
+		return
+	}
+
+	writeSuccess(w)
+}
+
 func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := d.core.RenterDownload(req.FormValue("nickname"), filepath.Join(d.downloadDir, req.FormValue("filename")))
 	if err != nil {

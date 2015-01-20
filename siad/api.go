@@ -30,6 +30,7 @@ func (d *daemon) handle(addr string) {
 
 	// File API Calls
 	http.HandleFunc("/file/upload", d.fileUploadHandler)
+	http.HandleFunc("/file/uploadpath", d.fileUploadPathHandler)
 	http.HandleFunc("/file/download", d.fileDownloadHandler)
 	http.HandleFunc("/file/status", d.fileStatusHandler)
 
