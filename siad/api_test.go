@@ -70,7 +70,7 @@ func reqSuccess(t *testing.T, url string) SuccessResponse {
 
 func reqWalletStatus(t *testing.T) components.WalletInfo {
 	var r components.WalletInfo
-	reqJSON(t, "/wallet/status", r)
+	reqJSON(t, "/wallet/status", &r)
 	return r
 }
 
