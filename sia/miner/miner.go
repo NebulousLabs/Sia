@@ -89,13 +89,10 @@ func (m *Miner) update() {
 // listen will continuously wait for an update notification from the state, and
 // then call update() upon receiving one.
 func (m *Miner) threadedListen() {
-	for {
-		select {
-		case _ = <-m.stateSubscription:
-			m.mu.Lock()
-			m.update()
-			m.mu.Unlock()
-		}
+	for _ = range m.stateSubscription {
+		m.mu.Lock()
+		m.update()
+		m.mu.Unlock()
 	}
 }
 
