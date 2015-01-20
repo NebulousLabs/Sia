@@ -78,9 +78,9 @@ func (s *State) notifySubscribers(cc ConsensusChange) {
 	for _, sub := range s.subscriptions {
 		select {
 		case sub <- struct{}{}:
-			continue
+			// Receiver has been notified of an update.
 		default:
-			continue
+			// Receiver already has notification to check for updates.
 		}
 	}
 }
