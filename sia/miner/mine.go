@@ -37,7 +37,7 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 // function.
 //
 // The threading is fragile. Edit with caution!
-func (m *Miner) mine() {
+func (m *Miner) threadedMine() {
 	// Increment the number of threads running, because this thread is spinning
 	// up. Also grab a number that will tell us when to shut down.
 	m.mu.Lock()
@@ -54,7 +54,14 @@ func (m *Miner) mine() {
 
 		// If we are allowed to be running, mine a block, otherwise shut down.
 		if desiredThreads >= myThread {
-			m.SolveBlock()
+			// Grab the necessary variables for mining, and then attempt to
+			// mine a block.
+			m.mu.RLock()
+			bfw := m.blockForWork()
+			target := m.target
+			iterations := m.iterationsPerAttempt
+			m.mu.RUnlock()
+			m.solveBlock(bfw, target, iterations)
 		} else {
 			m.mu.Lock()
 			// Need to check the mining status again, something might have
@@ -69,32 +76,50 @@ func (m *Miner) mine() {
 	}
 }
 
-// SolveBlock grabs a block from the miner and grinds on the block, trying to
-// find a winning solution.
-//
-// SolveBlock locks the miner for long enough to grab a block, and then unlocks
-// the miner for the remaining work, which does not interact with the miner.
-func (m *Miner) SolveBlock() (b consensus.Block, solved bool, err error) {
-	// Lock the miner and grab the information necessary for grinding hashes.
-	m.mu.RLock()
-	b = m.blockForWork()
-	target := m.target
-	iterations := m.iterationsPerAttempt
-	m.mu.RUnlock()
-
+// solveBlock takes a block, target, and number of iterations as input and
+// tries to find a block that meets the target. This function can take a long
+// time to complete, and should not be called with a lock.
+func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target, iterations uint64) (b consensus.Block, solved bool, err error) {
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			m.mu.RLock()
-			m.blockChan <- b
-			m.mu.RUnlock()
+			// TODO: If debug, check the error value of AcceptBlock and panic
+			// for err != nil.
+			m.state.AcceptBlock(b)
 			solved = true
+
+			// Grab a new address for the miner.
+			m.mu.Lock()
+			var addr consensus.CoinAddress
+			addr, _, err = m.wallet.CoinAddress()
+			if err == nil { // Special case: we only update the address if there was no error while generating one.
+				m.address = addr
+			}
+			m.mu.Unlock()
 			return
 		}
 	}
 
 	return
+}
+
+// SolveBlock is an exported function which will attempt to solve a block to
+// add to the state. SolveBlock is less efficient than StartMining(), but is
+// guaranteed to solve at most one block (useful for testing).
+//
+// solveBlock is both blocking and takes a long time to complete, therefore
+// needs to be called without the miner being locked. For this reason,
+// SolveBlock breaks typical mutex conventions and unlocks before returning.
+func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
+	m.mu.Lock()
+	m.update()
+	bfw := m.blockForWork()
+	target := m.target
+	iterations := m.iterationsPerAttempt
+	m.mu.Unlock()
+
+	return m.solveBlock(bfw, target, iterations)
 }
 
 // StartMining spawns a bunch of mining threads which will mine until stop is
@@ -106,7 +131,7 @@ func (m *Miner) StartMining() error {
 	// Increase the number of threads to m.desiredThreads.
 	m.desiredThreads = m.threads
 	for i := m.runningThreads; i < m.desiredThreads; i++ {
-		go m.mine()
+		go m.threadedMine()
 	}
 
 	return nil

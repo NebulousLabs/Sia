@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
@@ -50,12 +49,4 @@ func (m *Miner) Threads() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.threads
-}
-
-// SubsidyAddress returns the address that is currently being used by the miner
-// while searching for blocks.
-func (m *Miner) SubsidyAddress() consensus.CoinAddress {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.address
 }

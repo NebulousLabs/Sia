@@ -136,10 +136,6 @@ func CreateCore(config Config) (c *Core, err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateMiner(c.miner.Threads())
-	if err != nil {
-		return
-	}
 	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return

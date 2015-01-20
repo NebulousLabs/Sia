@@ -68,7 +68,12 @@ type State struct {
 	// each time the state of consensus changes. Consensus changes only happen
 	// through the application and inversion of blocks. See notifications.go
 	// for more information.
+	//
+	// TODO: deprecate
 	consensusSubscriptions []chan ConsensusChange
+
+	// TODO: docstring
+	subscriptions []chan struct{}
 
 	mu sync.RWMutex
 }
@@ -359,6 +364,16 @@ func (s *State) stateHash() hash.Hash {
 	}
 
 	return hash.MerkleRoot(leaves)
+}
+
+// RLock is an exported function of the state, allowing modules to lock the
+// state to make multiple atmoic reads. Lock() is not exported, and is not
+// meant to be used by modules.
+func (s *State) RLock() {
+	s.mu.RLock()
+}
+func (s *State) RUnlock() {
+	s.mu.RUnlock()
 }
 
 func (s *State) StateHash() hash.Hash {

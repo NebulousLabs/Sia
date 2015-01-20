@@ -58,6 +58,11 @@ the locks already in all-encompassing `lock; defer unlock` calls. If there is a
 non exported function that breaks this convention (for example, a listen()
 function), it must be documented in the function explanation.
 
+Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
+in their own goroutine ('go threadedMine()') and will manage their own mutexes.
+These functions typically loop forever, either listening on a channel or
+performing some regular task, and should not be called with a mutex locked.
+
 --------------------
 -- Consensus Flow --
 --------------------
