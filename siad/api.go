@@ -3,53 +3,66 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/stretchr/graceful"
 )
+
+const apiTimeout = 5e9 // 5 seconds
 
 // TODO: timeouts?
 func (d *daemon) handle(addr string) {
+	mux := http.NewServeMux()
+
 	// Web Interface
-	http.HandleFunc("/", d.webIndex)
-	http.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
+	mux.HandleFunc("/", d.webIndex)
+	mux.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
 
 	// Host API Calls
 	//
 	// TODO: SetConfig also calls announce(), there should be smarter ways to
 	// handle this.
-	http.HandleFunc("/host/config", d.hostConfigHandler)
-	http.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
+	mux.HandleFunc("/host/config", d.hostConfigHandler)
+	mux.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
 
 	// Miner API Calls
-	http.HandleFunc("/miner/start", d.minerStartHandler)
-	http.HandleFunc("/miner/status", d.minerStatusHandler)
-	http.HandleFunc("/miner/stop", d.minerStopHandler)
+	mux.HandleFunc("/miner/start", d.minerStartHandler)
+	mux.HandleFunc("/miner/status", d.minerStatusHandler)
+	mux.HandleFunc("/miner/stop", d.minerStopHandler)
 
 	// Wallet API Calls
-	http.HandleFunc("/wallet/address", d.walletAddressHandler)
-	http.HandleFunc("/wallet/send", d.walletSendHandler)
-	http.HandleFunc("/wallet/status", d.walletStatusHandler)
+	mux.HandleFunc("/wallet/address", d.walletAddressHandler)
+	mux.HandleFunc("/wallet/send", d.walletSendHandler)
+	mux.HandleFunc("/wallet/status", d.walletStatusHandler)
 
 	// File API Calls
-	http.HandleFunc("/file/upload", d.fileUploadHandler)
-	http.HandleFunc("/file/uploadpath", d.fileUploadPathHandler)
-	http.HandleFunc("/file/download", d.fileDownloadHandler)
-	http.HandleFunc("/file/status", d.fileStatusHandler)
+	mux.HandleFunc("/file/upload", d.fileUploadHandler)
+	mux.HandleFunc("/file/uploadpath", d.fileUploadPathHandler)
+	mux.HandleFunc("/file/download", d.fileDownloadHandler)
+	mux.HandleFunc("/file/status", d.fileStatusHandler)
 
 	// Peer API Calls
-	http.HandleFunc("/peer/add", d.peerAddHandler)
-	http.HandleFunc("/peer/remove", d.peerRemoveHandler)
-	http.HandleFunc("/peer/status", d.peerStatusHandler)
+	mux.HandleFunc("/peer/add", d.peerAddHandler)
+	mux.HandleFunc("/peer/remove", d.peerRemoveHandler)
+	mux.HandleFunc("/peer/status", d.peerStatusHandler)
 
 	// Misc. API Calls
-	http.HandleFunc("/update/check", d.updateCheckHandler)
-	http.HandleFunc("/update/apply", d.updateApplyHandler)
-	http.HandleFunc("/status", d.statusHandler)
-	http.HandleFunc("/stop", d.stopHandler)
-	http.HandleFunc("/sync", d.syncHandler)
+	mux.HandleFunc("/update/check", d.updateCheckHandler)
+	mux.HandleFunc("/update/apply", d.updateApplyHandler)
+	mux.HandleFunc("/status", d.statusHandler)
+	mux.HandleFunc("/stop", d.stopHandler)
+	mux.HandleFunc("/sync", d.syncHandler)
 	// For debugging purposes only
-	http.HandleFunc("/mutextest", d.mutexTestHandler)
+	mux.HandleFunc("/mutextest", d.mutexTestHandler)
 
-	go http.ListenAndServe(addr, nil)
-	<-d.stop
+	// create graceful HTTP server
+	d.srv = &graceful.Server{
+		Timeout: apiTimeout,
+		Server:  &http.Server{Addr: addr, Handler: mux},
+	}
+
+	// graceful will run until it catches a signal.
+	// it can also be stopped manually by stopHandler.
+	d.srv.ListenAndServe()
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an

@@ -4,7 +4,8 @@ import (
 	"errors"
 	"html/template"
 	"os"
-	"os/signal"
+
+	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia"
@@ -28,7 +29,7 @@ type daemon struct {
 
 	template *template.Template
 
-	stop chan struct{}
+	srv *graceful.Server
 }
 
 func startDaemon(config Config) (err error) {
@@ -44,7 +45,6 @@ func startDaemon(config Config) (err error) {
 	d := &daemon{
 		styleDir:    config.Siad.StyleDirectory,
 		downloadDir: config.Siad.DownloadDirectory,
-		stop:        make(chan struct{}),
 	}
 
 	d.state, _ = consensus.CreateGenesisState() // the `_` is not of type error. TODO: Deprecate this.
@@ -90,20 +90,11 @@ func startDaemon(config Config) (err error) {
 	}
 
 	// Begin listening for requests on the API.
-	go d.handle(config.Siad.APIaddr)
+	// handle will run until /stop is called or an interrupt is caught.
+	d.handle(config.Siad.APIaddr)
 
-	// wait for kill signal and shut down gracefully
-	d.handleSignal()
+	// clean up
+	d.core.Close()
 
 	return
-}
-
-func (d *daemon) handleSignal() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
-
-	// either signal results in shutdown
-	<-c
-	println("\nCaught deadly signal.")
-	d.core.Close()
 }
