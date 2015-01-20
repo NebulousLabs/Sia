@@ -229,10 +229,6 @@ func reqDownloadFile(t *testing.T, nickname string, filename string) SuccessResp
 	return reqSuccess(t, "/file/download?nickname="+nickname+"&filename="+filename)
 }
 
-// /sync
-// /update/apply
-// /stop
-
 func setupDaemon(t *testing.T) {
 
 	// Settings to speed up operations
@@ -275,15 +271,20 @@ func setupDaemon(t *testing.T) {
 	}
 }
 
-// This only works if there is already a daemon running
-func TestWalletLockup(t *testing.T) {
+// Tests that the miner is able to mine i.e. gets some coins after a couple
+// ms (this should be easy given the difficulty settings)
+func TestBasicMining(t *testing.T) {
 
 	setupDaemon(t)
 
-	reqUploadFile(t, "/home/seve/workspace/senv/Sia/README.md", "readme", "readme", 12)
+	reqMinerStart(t, 2)
 
-	// if !testing.Short() {
-	//
-	// }
+	time.Sleep(5 * time.Millisecond)
+
+	w := reqWalletStatus(t)
+
+	if w.Balance == 0 {
+		t.Fatal("Miner wasn't able to mine any coins!")
+	}
 
 }
