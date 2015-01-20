@@ -1,4 +1,4 @@
-Sia 0.1.0
+Sia 0.2.0
 =========
 
 This distribution is an early beta release. It is likely to have many bugs,
@@ -59,8 +59,13 @@ Troubleshooting
   skip this step.
 
 If your issue is not addressed above, you can get in touch with us personally:
-  email: david@nebulouslabs.com
-         luke@nebulouslabs.com
+
+  email:
+  
+  david@nebulouslabs.com
+  
+  luke@nebulouslabs.com
+  
   IRC:   #siacoin on freenode
 
 Version Information
