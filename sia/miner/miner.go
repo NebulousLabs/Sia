@@ -80,36 +80,9 @@ func (m *Miner) SetThreads(threads int) error {
 // update will readlock the state and update all of the miner's block variables
 // in one atomic action.
 //
-// TODO: For some reason, these locks will cause a deadlock during the testing.
-// Commented out for now, but we need to figure out why there's a deadlock.
-// Once the state locks, it shouldn't depend on any other interaction to
-// unlock, and these locks are only read-locks, which means there should be no
-// interference.
-//
-// The deadlocking problem is especially weird because all of the internal
-// functions call RLock as well. If they can get the RLock without problems,
-// why can't update() do it at the same time?
-//
-// Also weird, inverting the comments in this function still results in
-// deadlock. So for some reason just calling m.state.RLock() causes problems.
-// No idea what to do about it, except maybe give up on the idea of letting
-// people lock the state, and instead implementing functions in the consensus
-// package that will return all of this information in one go. But that's ugly
-// too.
-//
-// I've gotten around it by adding a MinerVars() function to the state. It
-// shouldn't be necessary though and I don't want to keep it this way. But at
-// least the update is atmoic now.
+// TODO: Try again on getting multiple atomic state reads working, instead of
+// needing this one massive function.
 func (m *Miner) update() {
-	/*
-		m.state.RLock()
-		m.parent = m.state.CurrentBlock().ID()
-		m.transactions = m.state.TransactionPoolDump()
-		m.target = m.state.CurrentTarget()
-		m.earliestTimestamp = m.state.EarliestTimestamp()
-		m.state.RUnlock()
-	*/
-
 	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
 }
 
