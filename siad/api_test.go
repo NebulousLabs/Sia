@@ -157,13 +157,13 @@ func reqApplyUpdate(t *testing.T) SuccessResponse {
 	return reqSuccess(t, "/update/apply")
 }
 
-func reqCheckUpdate(t *testing.T) struct{Version string, Available bool}{
-	var response struct{
-		Version string,
-		Available bool,
+func reqCheckUpdate(t *testing.T) (Available bool, Version string) {
+	var response struct {
+		Version   string
+		Available bool
 	}
-	reqJSON(t, url, &response)
-	return response
+	reqJSON(t, "/update/check", &response)
+	return response.Available, response.Version
 }
 
 
