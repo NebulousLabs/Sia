@@ -229,6 +229,10 @@ func reqDownloadFile(t *testing.T, nickname string, filename string) SuccessResp
 	return reqSuccess(t, "/file/download?nickname="+nickname+"&filename="+filename)
 }
 
+func reqStop(t *testing.T) {
+	httpReq(t, "/stop")
+}
+
 func setupDaemon(t *testing.T) {
 
 	// Settings to speed up operations
@@ -245,7 +249,7 @@ func setupDaemon(t *testing.T) {
 	config.Siacore.HostDirectory = filepath.Join(siaDir, "hostdir")
 	config.Siad.StyleDirectory = filepath.Join(siaDir, "style")
 	config.Siad.DownloadDirectory = "~/Downloads"
-	config.Siad.WalletFile = filepath.Join(siaDir, "sia.wallet")
+	config.Siad.WalletFile = filepath.Join(siaDir, "test.wallet")
 	config.Siad.APIaddr = "localhost:9980"
 	config.Siacore.RPCaddr = ":9988"
 	config.Siacore.NoBootstrap = false
@@ -271,10 +275,53 @@ func setupDaemon(t *testing.T) {
 	}
 }
 
+// Tests that the initial status of the daemon is sane - additionally tests that
+// each component can return it's status
+func TestBasicStatus(t *testing.T) {
+	setupDaemon(t)
+
+	// Test getting miner status
+	mInfo := reqMinerStatus(t)
+	if mInfo.State != "Off" {
+		t.Fatal("Miner initial state was not off: (" + strconv.Itoa(mInfo.Threads) + ")")
+	}
+	if mInfo.RunningThreads != 0 {
+		t.Fatal("Miner initial RunningThreads was not 0: (" + strconv.Itoa(mInfo.Threads) + ")")
+	}
+	if mInfo.Threads != 1 {
+		t.Fatal("Miner initial Threads was not 1 (" + strconv.Itoa(mInfo.Threads) + ")")
+	}
+
+	// Test getting wallet status
+	wInfo := reqWalletStatus(t)
+	if wInfo.Balance > 0 {
+		t.Fatal("Miner wallet started with initial balance greater than 0")
+	}
+	if wInfo.FullBalance > 0 {
+		t.Fatal("Miner full balance started with initial balance greater than 0")
+	}
+
+	// Test getting general status
+	gInfo := reqGenericStatus(t)
+	if gInfo.Height > 0 {
+		t.Fatal("Block height started greater than 0")
+	}
+
+	// Test getting host config
+	hConfig := reqHostConfig(t)
+	if hConfig.Announcement.TotalStorage > 0 {
+		t.Fatal("Host started with more than 0 TotalStorage!")
+	}
+
+	// TODO: we need some way of guranteeing that the daemon will stop so that
+	// other tests can be run
+}
+
+// TODO: this test can't be run because we have no way of shutting off the other
+// daemon ATM
 // Tests that the miner is able to mine i.e. gets some coins after a couple
 // ms (this should be easy given the difficulty settings)
-func TestBasicMining(t *testing.T) {
-
+/*func TestBasicMining(t *testing.T) {
 	setupDaemon(t)
 
 	reqMinerStart(t, 2)
@@ -287,4 +334,7 @@ func TestBasicMining(t *testing.T) {
 		t.Fatal("Miner wasn't able to mine any coins!")
 	}
 
-}
+	// TODO: we need some way of guaranteeing that the daemon will stop so that
+	// other tests can be run
+	reqStop(t)
+}*/
