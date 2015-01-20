@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -166,9 +170,57 @@ func reqCheckUpdate(t *testing.T) (Available bool, Version string) {
 	return response.Available, response.Version
 }
 
+func reqUploadFile(t *testing.T, localpath string, nickname string, filename string, pieces int) {
+	// Read in file
+	file, err := os.Open(localpath)
+	if err != nil {
+		t.Fatal("Couldn't open file to upload: " + err.Error())
+	}
+	defer file.Close()
 
+	// Write file to form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatal("Error creating form file: " + err.Error())
+	}
+	_, err = io.Copy(part, file)
 
-// /update/check
+	// Populate other parameters
+	writer.WriteField("filename", filename)
+	writer.WriteField("nickname", nickname)
+	writer.WriteField("pieces", strconv.Itoa(pieces))
+
+	err = writer.Close()
+	if err != nil {
+		t.Fatal("Error closing writer: " + err.Error())
+	}
+
+	// Create the http request
+	req, err := http.NewRequest("POST", "http://127.0.0.1:9980/file/upload", body)
+	if err != nil {
+		t.Fatal("Error creating POST request: " + err.Error())
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Actually make the request
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal("Error creating http client: " + err.Error())
+	}
+
+	// Read response body
+	resContent, err := ioutil.ReadAll(res.Body)
+
+	// Check the response
+	if res.StatusCode != http.StatusOK {
+		t.Fatal("/file/upload returne " + strconv.Itoa(res.StatusCode) + ": " + string(resContent))
+	}
+
+	//TODO: Read response into JSON success object
+	//TODO: return success object
+}
 
 // /file/upload
 // /file/download
@@ -222,6 +274,8 @@ func setupDaemon(t *testing.T) {
 func TestWalletLockup(t *testing.T) {
 
 	setupDaemon(t)
+
+	reqUploadFile(t, "/home/seve/workspace/senv/Sia/README.md", "readme", "readme", 12)
 
 	// if !testing.Short() {
 	//
