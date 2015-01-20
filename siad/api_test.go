@@ -212,6 +212,9 @@ func reqUploadFile(t *testing.T, localpath string, nickname string, filename str
 
 	// Read response body
 	resContent, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal("Error reading response content: " + err.Error())
+	}
 
 	// Check the response
 	if res.StatusCode != http.StatusOK {
@@ -222,8 +225,10 @@ func reqUploadFile(t *testing.T, localpath string, nickname string, filename str
 	//TODO: return success object
 }
 
-// /file/upload
-// /file/download
+func reqDownloadFile(t *testing.T, nickname string, filename string) SuccessResponse {
+	return reqSuccess(t, "/file/download?nickname="+nickname+"&filename="+filename)
+}
+
 // /sync
 // /update/apply
 // /stop
