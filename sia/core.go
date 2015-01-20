@@ -205,6 +205,7 @@ func (c *Core) ScanMutexes() {
 
 // Close does any finishing maintenence before the environment can be garbage
 // collected. Right now that just means closing the server.
+// TODO: save wallet
 func (c *Core) Close() {
 	c.server.Close()
 }

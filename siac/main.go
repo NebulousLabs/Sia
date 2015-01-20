@@ -18,7 +18,8 @@ const (
 )
 
 // get wraps a GET request with a status code check, such that if the GET does
-// not return 200, the error will be read and returned.
+// not return 200, the error will be read and returned. The response body is
+// not closed.
 func get(call string) (resp *http.Response, err error) {
 	resp, err = http.Get(hostname + call)
 	if err != nil {
@@ -38,11 +39,11 @@ func getAPI(call string, obj interface{}) (err error) {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
 		return
 	}
-	resp.Body.Close()
 	return
 }
 
