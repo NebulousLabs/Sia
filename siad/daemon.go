@@ -29,7 +29,7 @@ type daemon struct {
 
 	template *template.Template
 
-	srv *graceful.Server
+	apiServer *graceful.Server
 }
 
 func startDaemon(config Config) (err error) {

@@ -35,7 +35,7 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 
 	// send stop signal
-	d.srv.Stop(1e9)
+	d.apiServer.Stop(1e9)
 }
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {

@@ -55,14 +55,14 @@ func (d *daemon) handle(addr string) {
 	mux.HandleFunc("/mutextest", d.mutexTestHandler)
 
 	// create graceful HTTP server
-	d.srv = &graceful.Server{
+	d.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
 	}
 
 	// graceful will run until it catches a signal.
 	// it can also be stopped manually by stopHandler.
-	d.srv.ListenAndServe()
+	d.apiServer.ListenAndServe()
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an
