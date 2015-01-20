@@ -58,10 +58,18 @@ func New(state *consensus.State, wallet components.Wallet) (m *Miner, err error)
 	}
 	m.address = addr
 
-	m.update()
-	go m.threadedListen()
+	m.checkUpdate()
 
 	return
+}
+
+// TODO: depricate. This is gross but it's only here while I move everything
+// over to subscription. Stuff will break if the miner isn't feeding blocks
+// directly to the core instead of directly to the state.
+func (m *Miner) SetBlockChan(blockChan chan consensus.Block) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockChan = blockChan
 }
 
 // SetThreads establishes how many threads the miner will use when mining.
@@ -82,25 +90,15 @@ func (m *Miner) SetThreads(threads int) error {
 //
 // TODO: Try again on getting multiple atomic state reads working, instead of
 // needing this one massive function.
-func (m *Miner) update() {
+func (m *Miner) checkUpdate() {
 	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-}
 
-// listen will continuously wait for an update notification from the state, and
-// then call update() upon receiving one.
-func (m *Miner) threadedListen() {
-	for _ = range m.stateSubscription {
-		m.mu.Lock()
-		m.update()
-		m.mu.Unlock()
+	/*
+	select {
+	case <-m.stateSubscription:
+		m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
+	default:
+		// nothing to do
 	}
-}
-
-// TODO: depricate. This is gross but it's only here while I move everything
-// over to subscription. Stuff will break if the miner isn't feeding blocks
-// directly to the core instead of directly to the state.
-func (m *Miner) SetBlockChan(blockChan chan consensus.Block) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.blockChan = blockChan
+	*/
 }

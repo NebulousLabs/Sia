@@ -9,6 +9,9 @@ import (
 
 // Creates a block that is ready for nonce grinding.
 func (m *Miner) blockForWork() (b consensus.Block) {
+	// Check for updates from the state.
+	m.checkUpdate()
+
 	// Fill out the block with potentially ready values.
 	b = consensus.Block{
 		ParentBlockID: m.parent,
@@ -126,7 +129,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 // SolveBlock breaks typical mutex conventions and unlocks before returning.
 func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
 	m.mu.Lock()
-	m.update()
+	m.checkUpdate()
 	bfw := m.blockForWork()
 	target := m.target
 	iterations := m.iterationsPerAttempt
