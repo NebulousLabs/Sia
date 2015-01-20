@@ -26,6 +26,9 @@ type Miner struct {
 
 	stateSubscription chan struct{}
 
+	// TODO: Depricate
+	blockChan chan consensus.Block
+
 	mu sync.RWMutex
 }
 
@@ -55,6 +58,7 @@ func New(state *consensus.State, wallet components.Wallet) (m *Miner, err error)
 	}
 	m.address = addr
 
+	m.update()
 	go m.threadedListen()
 
 	return
@@ -75,13 +79,19 @@ func (m *Miner) SetThreads(threads int) error {
 
 // update will readlock the state and update all of the miner's block variables
 // in one atomic action.
+//
+// TODO: For some reason, these locks will cause a deadlock during the testing.
+// Commented out for now, but we need to figure out why there's a deadlock.
+// Once the state locks, it shouldn't depend on any other interaction to
+// unlock, and these locks are only read-locks, which means there should be no
+// interference.
 func (m *Miner) update() {
-	m.state.RLock()
+	// m.state.RLock()
 	m.parent = m.state.CurrentBlock().ID()
 	m.transactions = m.state.TransactionPoolDump()
 	m.target = m.state.CurrentTarget()
 	m.earliestTimestamp = m.state.EarliestTimestamp()
-	m.state.RUnlock()
+	// m.state.RUnlock()
 }
 
 // listen will continuously wait for an update notification from the state, and
@@ -95,4 +105,13 @@ func (m *Miner) threadedListen() {
 			m.mu.Unlock()
 		}
 	}
+}
+
+// TODO: depricate. This is gross but it's only here while I move everything
+// over to subscription. Stuff will break if the miner isn't feeding blocks
+// directly to the core instead of directly to the state.
+func (m *Miner) SetBlockChan(blockChan chan consensus.Block) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockChan = blockChan
 }

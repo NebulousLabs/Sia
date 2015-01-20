@@ -16,17 +16,19 @@ func mineSingleBlock(t *testing.T, c *Core) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// TODO: Depricate
 	err = c.processBlock(b)
-	if err != nil && err != consensus.BlockKnownErr {
+	if err != nil && err != consensus.BlockKnownErr { // TODO: depricate
 		t.Error(err)
 	}
 }
 
 func testMinerDeadlocking(t *testing.T, c *Core) {
-	threads := 1
-	c.MinerInfo()
-	c.UpdateMiner(threads)
-	c.StartMining()
-	c.MinerInfo()
-	c.StopMining()
+	c.miner.Threads()
+	c.miner.SetThreads(2)
+	c.miner.StartMining()
+	c.miner.Threads()
+	c.miner.StopMining()
+	c.miner.Threads()
 }

@@ -80,13 +80,26 @@ func (m *Miner) threadedMine() {
 // tries to find a block that meets the target. This function can take a long
 // time to complete, and should not be called with a lock.
 func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target, iterations uint64) (b consensus.Block, solved bool, err error) {
+	// solveBlock could operate on a pointer, but it's not strictly necessary
+	// and it makes calling weirder/more opaque.
+	b = blockForWork
+
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			// TODO: If debug, check the error value of AcceptBlock and panic
-			// for err != nil.
-			m.state.AcceptBlock(b)
+			// TODO: Eventually, we'll be calling AcceptBlock directly.
+			// Unfortunately, that throws off all of the other modules right
+			// now.
+			/*
+				// TODO: If debug, check the error value of AcceptBlock and panic
+				// for err != nil.
+				m.state.AcceptBlock(b)
+			*/
+			m.mu.RLock()
+			m.blockChan <- b
+			m.mu.RUnlock()
+
 			solved = true
 
 			// Grab a new address for the miner.
