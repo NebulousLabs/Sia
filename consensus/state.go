@@ -381,3 +381,14 @@ func (s *State) StateHash() hash.Hash {
 	defer s.mu.RUnlock()
 	return s.stateHash()
 }
+
+// Cheater function.
+func (s *State) MinerVars() (parent BlockID, txns []Transaction, target Target, earliestTimestamp Timestamp) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	parent = s.currentBlock().ID()
+	txns = s.transactionPoolDump()
+	target = s.currentBlockNode().Target
+	earliestTimestamp = s.currentBlockNode().earliestChildTimestamp()
+	return
+}

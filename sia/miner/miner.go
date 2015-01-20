@@ -97,15 +97,20 @@ func (m *Miner) SetThreads(threads int) error {
 // package that will return all of this information in one go. But that's ugly
 // too.
 //
-// Until the miner has an atomic way to grab the 4 values, this is a race
-// condition, but not one that the race library will be able to detect.
+// I've gotten around it by adding a MinerVars() function to the state. It
+// shouldn't be necessary though and I don't want to keep it this way. But at
+// least the update is atmoic now.
 func (m *Miner) update() {
-	// m.state.RLock()
-	m.parent = m.state.CurrentBlock().ID()
-	m.transactions = m.state.TransactionPoolDump()
-	m.target = m.state.CurrentTarget()
-	m.earliestTimestamp = m.state.EarliestTimestamp()
-	// m.state.RUnlock()
+	/*
+		m.state.RLock()
+		m.parent = m.state.CurrentBlock().ID()
+		m.transactions = m.state.TransactionPoolDump()
+		m.target = m.state.CurrentTarget()
+		m.earliestTimestamp = m.state.EarliestTimestamp()
+		m.state.RUnlock()
+	*/
+
+	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
 }
 
 // listen will continuously wait for an update notification from the state, and
