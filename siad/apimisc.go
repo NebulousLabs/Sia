@@ -32,7 +32,6 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
-	d.core.Close()
 	writeSuccess(w)
 	// send stop signal
 	d.stop <- struct{}{}

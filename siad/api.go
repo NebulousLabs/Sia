@@ -61,9 +61,15 @@ func (d *daemon) handle(addr string) (err error) {
 		},
 	}
 
+	println("P1")
 	go server.ListenAndServe()
+	println("P2")
 	<-d.stop
+	println("P3")
+	d.core.Close()
+	println("P4")
 	server.Stop(10 * time.Millisecond)
+	println("P5")
 
 	return nil
 }
