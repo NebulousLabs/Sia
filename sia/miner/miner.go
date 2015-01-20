@@ -85,6 +85,20 @@ func (m *Miner) SetThreads(threads int) error {
 // Once the state locks, it shouldn't depend on any other interaction to
 // unlock, and these locks are only read-locks, which means there should be no
 // interference.
+//
+// The deadlocking problem is especially weird because all of the internal
+// functions call RLock as well. If they can get the RLock without problems,
+// why can't update() do it at the same time?
+//
+// Also weird, inverting the comments in this function still results in
+// deadlock. So for some reason just calling m.state.RLock() causes problems.
+// No idea what to do about it, except maybe give up on the idea of letting
+// people lock the state, and instead implementing functions in the consensus
+// package that will return all of this information in one go. But that's ugly
+// too.
+//
+// Until the miner has an atomic way to grab the 4 values, this is a race
+// condition, but not one that the race library will be able to detect.
 func (m *Miner) update() {
 	// m.state.RLock()
 	m.parent = m.state.CurrentBlock().ID()
