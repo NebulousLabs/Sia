@@ -68,7 +68,12 @@ type State struct {
 	// each time the state of consensus changes. Consensus changes only happen
 	// through the application and inversion of blocks. See notifications.go
 	// for more information.
+	//
+	// TODO: deprecate
 	consensusSubscriptions []chan ConsensusChange
+
+	// TODO: docstring
+	subscriptions []chan struct{}
 
 	mu sync.RWMutex
 }
@@ -365,4 +370,15 @@ func (s *State) StateHash() hash.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.stateHash()
+}
+
+// Cheater function.
+func (s *State) MinerVars() (parent BlockID, txns []Transaction, target Target, earliestTimestamp Timestamp) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	parent = s.currentBlock().ID()
+	txns = s.transactionPoolDump()
+	target = s.currentBlockNode().Target
+	earliestTimestamp = s.currentBlockNode().earliestChildTimestamp()
+	return
 }

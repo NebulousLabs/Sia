@@ -15,15 +15,19 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	d.core.UpdateMiner(threads)
-	d.core.StartMining()
+	d.miner.SetThreads(threads)
+	err = d.miner.StartMining()
+	if err != nil {
+		http.Error(w, err.Error(), 500) // TODO: Need to verify that this is the proper error code to be returning.
+		return
+	}
 
 	writeSuccess(w)
 }
 
 // Returns json of the miners status.
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	mInfo, err := d.core.MinerInfo()
+	mInfo, err := d.miner.Info()
 	if err != nil {
 		http.Error(w, "Failed to encode status object", 500)
 		return
@@ -33,7 +37,7 @@ func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 
 // Calls StopMining() on the core.
 func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
-	d.core.StopMining()
+	d.miner.StopMining()
 
 	writeSuccess(w)
 }

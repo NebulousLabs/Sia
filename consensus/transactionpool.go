@@ -142,10 +142,7 @@ func (s *State) transactionPoolConflict(t *Transaction) (conflict bool) {
 
 // TransactionPoolDump() returns the list of transactions that are valid but
 // haven't yet appeared in a block.
-func (s *State) TransactionPoolDump() (transactions []Transaction) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *State) transactionPoolDump() (transactions []Transaction) {
 	for _, transaction := range s.transactionList {
 		transactions = append(transactions, *transaction)
 
@@ -159,4 +156,11 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 	}
 
 	return
+}
+
+// Passthrough for transactionPoolDump
+func (s *State) TransactionPoolDump() (transactions []Transaction) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.transactionPoolDump()
 }

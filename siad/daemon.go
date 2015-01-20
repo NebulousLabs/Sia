@@ -18,6 +18,11 @@ import (
 type daemon struct {
 	core *sia.Core
 
+	// Modules. TODO: Implement all of them. So far it's just the miner.
+	state  *consensus.State
+	wallet *wallet.Wallet
+	miner  *miner.Miner
+
 	styleDir    string
 	downloadDir string
 
@@ -42,8 +47,12 @@ func startDaemon(config Config) (err error) {
 		stop:        make(chan struct{}),
 	}
 
-	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
-	Wallet, err := wallet.New(state, config.Siad.WalletFile)
+	d.state, _ = consensus.CreateGenesisState() // the `_` is not of type error. TODO: Deprecate this.
+	d.wallet, err = wallet.New(d.state, config.Siad.WalletFile)
+	if err != nil {
+		return
+	}
+	d.miner, err = miner.New(d.state, d.wallet)
 	if err != nil {
 		return
 	}
@@ -51,11 +60,11 @@ func startDaemon(config Config) (err error) {
 	if err != nil {
 		return errors.New("could not load wallet file: " + err.Error())
 	}
-	Host, err := host.New(state, Wallet)
+	Host, err := host.New(d.state, d.wallet)
 	if err != nil {
 		return
 	}
-	Renter, err := renter.New(state, hostDB, Wallet)
+	Renter, err := renter.New(d.state, hostDB, d.wallet)
 	if err != nil {
 		return
 	}
@@ -66,13 +75,13 @@ func startDaemon(config Config) (err error) {
 		ServerAddr:  config.Siacore.RPCaddr,
 		Nobootstrap: config.Siacore.NoBootstrap,
 
-		State: state,
+		State: d.state,
 
 		Host:   Host,
 		HostDB: hostDB,
-		Miner:  miner.New(),
+		Miner:  d.miner,
 		Renter: Renter,
-		Wallet: Wallet,
+		Wallet: d.wallet,
 	}
 
 	d.core, err = sia.CreateCore(siaconfig)

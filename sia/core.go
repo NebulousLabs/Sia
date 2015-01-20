@@ -112,6 +112,7 @@ func CreateCore(config Config) (c *Core, err error) {
 		hostDir:    config.HostDir,
 		walletFile: config.WalletFile,
 	}
+	c.miner.SetBlockChan(c.blockChan) // TODO: depricate this line.
 	// TODO: The host object should be managing this on its own.
 	err = os.MkdirAll(c.hostDir, os.ModeDir|os.ModePerm)
 	if err != nil {
@@ -133,10 +134,6 @@ func CreateCore(config Config) (c *Core, err error) {
 		return
 	}
 	err = c.hostDB.Update(0, nil, []consensus.Block{genesisBlock})
-	if err != nil {
-		return
-	}
-	err = c.UpdateMiner(c.miner.Threads())
 	if err != nil {
 		return
 	}

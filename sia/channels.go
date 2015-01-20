@@ -55,11 +55,6 @@ func (c *Core) processBlock(b consensus.Block) (err error) {
 	if err != nil {
 		return
 	}
-	err = c.UpdateMiner(c.miner.Threads())
-	if err != nil {
-		return
-	}
-	// c.storageProofMaintenance(initialStateHeight, rewoundBlockIDs, appliedBlockIDs)
 
 	// Broadcast all valid blocks.
 	go c.server.Broadcast("AcceptBlock", b, nil)
@@ -79,8 +74,6 @@ func (c *Core) processTransaction(t consensus.Transaction) (err error) {
 		}
 		return
 	}
-
-	c.UpdateMiner(c.miner.Threads())
 
 	go c.server.Broadcast("AcceptTransaction", t, nil)
 	return

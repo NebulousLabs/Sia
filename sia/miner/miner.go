@@ -8,54 +8,97 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
-// TODO: integrate the miner as a state listener.
 type Miner struct {
+	state  *consensus.State
+	wallet components.Wallet
+
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
 	transactions      []consensus.Transaction
-	address           consensus.CoinAddress
 	target            consensus.Target
 	earliestTimestamp consensus.Timestamp
+	address           consensus.CoinAddress
 
 	threads              int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads       int // 0 if not mining.
 	runningThreads       int
 	iterationsPerAttempt uint64
 
+	stateSubscription chan struct{}
+
+	// TODO: Depricate
 	blockChan chan consensus.Block
-	mu        sync.RWMutex
+
+	mu sync.RWMutex
 }
 
-// New returns a miner that needs to be updated/initialized.
-//
-// TODO: Formalize components so that
-func New() (m *Miner) {
-	return &Miner{
+// New returns a ready-to-go miner that is not mining.
+func New(state *consensus.State, wallet components.Wallet) (m *Miner, err error) {
+	if state == nil {
+		err = errors.New("miner cannot use a nil state")
+		return
+	}
+	if wallet == nil {
+		err = errors.New("miner cannot use a nil wallet")
+		return
+	}
+
+	m = &Miner{
+		state:                state,
+		wallet:               wallet,
 		threads:              1,
 		iterationsPerAttempt: 256 * 1024,
 	}
+
+	// Subscribe to the state and get a mining address.
+	m.stateSubscription = state.Subscribe()
+	addr, _, err := m.wallet.CoinAddress()
+	if err != nil {
+		return
+	}
+	m.address = addr
+
+	m.checkUpdate()
+
+	return
 }
 
-// TODO: write docstring.
-//
-// TODO: contemplate giving the miner access to a read only state that it
-// queries for block information, instead of needing to pass all of that
-// information through the update struct.
-func (m *Miner) UpdateMiner(mu components.MinerUpdate) error {
+// TODO: depricate. This is gross but it's only here while I move everything
+// over to subscription. Stuff will break if the miner isn't feeding blocks
+// directly to the core instead of directly to the state.
+func (m *Miner) SetBlockChan(blockChan chan consensus.Block) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockChan = blockChan
+}
+
+// SetThreads establishes how many threads the miner will use when mining.
+func (m *Miner) SetThreads(threads int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if mu.Threads == 0 {
+	if threads == 0 {
 		return errors.New("cannot have a miner with 0 threads.")
 	}
-
-	m.parent = mu.Parent
-	m.transactions = mu.Transactions
-	m.target = mu.Target
-	m.address = mu.Address
-	m.earliestTimestamp = mu.EarliestTimestamp
-	m.threads = mu.Threads
-	m.blockChan = mu.BlockChan
+	m.threads = threads
 
 	return nil
+}
+
+// update will readlock the state and update all of the miner's block variables
+// in one atomic action.
+//
+// TODO: Try again on getting multiple atomic state reads working, instead of
+// needing this one massive function.
+func (m *Miner) checkUpdate() {
+	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
+
+	/*
+	select {
+	case <-m.stateSubscription:
+		m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
+	default:
+		// nothing to do
+	}
+	*/
 }
