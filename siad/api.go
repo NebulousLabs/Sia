@@ -48,7 +48,8 @@ func (d *daemon) handle(addr string) {
 	// For debugging purposes only
 	http.HandleFunc("/mutextest", d.mutexTestHandler)
 
-	http.ListenAndServe(addr, nil)
+	go http.ListenAndServe(addr, nil)
+	<-d.stop
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an

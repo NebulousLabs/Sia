@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
 )
 
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
@@ -33,9 +32,10 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: more graceful shutdown?
 	d.core.Close()
-	os.Exit(0)
+	writeSuccess(w)
+	// send stop signal
+	d.stop <- struct{}{}
 }
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {

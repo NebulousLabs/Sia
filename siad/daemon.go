@@ -4,6 +4,7 @@ import (
 	"errors"
 	"html/template"
 	"os"
+	"os/signal"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia"
@@ -21,6 +22,8 @@ type daemon struct {
 	downloadDir string
 
 	template *template.Template
+
+	stop chan struct{}
 }
 
 func startDaemon(config Config) (err error) {
@@ -36,6 +39,7 @@ func startDaemon(config Config) (err error) {
 	d := &daemon{
 		styleDir:    config.Siad.StyleDirectory,
 		downloadDir: config.Siad.DownloadDirectory,
+		stop:        make(chan struct{}),
 	}
 
 	state, _ := consensus.CreateGenesisState() // the `_` is not of type error.
@@ -77,7 +81,20 @@ func startDaemon(config Config) (err error) {
 	}
 
 	// Begin listening for requests on the API.
-	d.handle(config.Siad.APIaddr)
+	go d.handle(config.Siad.APIaddr)
+
+	// wait for kill signal and shut down gracefully
+	d.handleSignal()
 
 	return
+}
+
+func (d *daemon) handleSignal() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+
+	// either signal results in shutdown
+	<-c
+	println("\nCaught deadly signal.")
+	d.core.Close()
 }
