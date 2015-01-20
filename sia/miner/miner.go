@@ -85,20 +85,19 @@ func (m *Miner) SetThreads(threads int) error {
 	return nil
 }
 
-// update will readlock the state and update all of the miner's block variables
-// in one atomic action.
+// checkUpdate actually just updates the miner.
 //
-// TODO: Try again on getting multiple atomic state reads working, instead of
-// needing this one massive function.
+// TODO: checkUpdate will only update the miner if something has been sent down
+// a channel.
 func (m *Miner) checkUpdate() {
 	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
 
 	/*
-	select {
-	case <-m.stateSubscription:
-		m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-	default:
-		// nothing to do
-	}
+		select {
+		case <-m.stateSubscription:
+			m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
+		default:
+			// nothing to do
+		}
 	*/
 }

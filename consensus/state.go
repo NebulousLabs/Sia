@@ -124,9 +124,6 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 	}
 	s.blockRoot.Block = genesisBlock
 	s.blockRoot.Height = 0
-	for i := range s.blockRoot.RecentTimestamps {
-		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
-	}
 	s.blockRoot.Target = RootTarget
 	s.blockRoot.Depth = RootDepth
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
