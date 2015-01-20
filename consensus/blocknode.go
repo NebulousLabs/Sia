@@ -16,6 +16,7 @@ type BlockNode struct {
 	Depth  Target // Cumulative weight of all parents.
 	Target Target // Target for next block.
 
+	DiffsGenerated       bool
 	BlockDiff            BlockDiff       // Soon to replace the other 3 entirely
 	ContractTerminations []*OpenContract // Contracts that terminated this block.
 	MissedStorageProofs  []MissedStorageProof

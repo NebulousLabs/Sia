@@ -81,12 +81,9 @@ type StorageProof struct {
 // A FileContract contains the information necessary to enforce that a host
 // stores a file.
 type FileContract struct {
-	ContractFund       Currency
 	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
-	ChallengeWindow    BlockHeight // size of window, one window at a time
-	Tolerance          uint64      // number of missed proofs before triggering unsuccessful termination
 	ValidProofPayout   Currency
 	ValidProofAddress  CoinAddress
 	MissedProofPayout  Currency

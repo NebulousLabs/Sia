@@ -81,11 +81,8 @@ type State struct {
 // An open contract contains all information necessary to properly enforce a
 // contract with no knowledge of the history of the contract.
 type OpenContract struct {
-	FileContract    FileContract
-	ContractID      ContractID
-	FundsRemaining  Currency
-	Failures        uint64
-	WindowSatisfied bool
+	ContractID   ContractID
+	FileContract FileContract
 }
 
 // A missed storage proof indicates which contract missed the proof, and which

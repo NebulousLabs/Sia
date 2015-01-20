@@ -16,6 +16,37 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
 }
 
+// backtrackToBlockchain returns a list of nodes that go from the current node
+// to the first parent that is in the current blockchain.
+func (s *State) backtrackToBlockchain(node *BlockNode) (nodes []*BlockNode) {
+	nodes = append(nodes, node)
+	currentChainID := s.currentPath[node.Height]
+	for currentChainID != node.Block.ID() {
+		node = node.Parent
+		currentChainID = s.currentPath[node.Height]
+		nodes = append(nodes, node)
+	}
+	return
+}
+
+// rewindBlockchain will rewind blocks until the common parent is the highest
+// block.
+func (s *State) rewindBlockchain(commonParent *BlockNode) (rewoundNodes []*BlockNode) {
+	// Sanity check to make sure that commonParent is in the currentPath.
+	if DEBUG {
+		if commonParent.Block.ID() != s.currentPath[commonParent.Height] {
+			panic("bad use of rewindBlockchain")
+		}
+	}
+	// Remove blocks from the ConsensusState until we get to the
+	// same parent that we are forking from.
+	for s.currentBlockID != commonParent.Block.ID() {
+		rewoundNodes = append(rewoundNodes, s.currentBlockNode())
+		s.invertRecentBlock()
+	}
+	return
+}
+
 // State.rewindABlock() removes the most recent block from the ConsensusState,
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) invertRecentBlock() (diffs []OutputDiff) {
@@ -123,56 +154,34 @@ func (s *State) invalidateNode(node *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
-	// Create a block diff for use when calling integrateBlock.
-	//
-	// TODO: Move this somewhere else.
-	var cc ConsensusChange
-
-	// Find the common parent between the new fork and the current
-	// fork, keeping track of which path is taken through the
-	// children of the parents so that we can re-trace as we
-	// validate the blocks.
-	currentNode := newNode
-	value := s.currentPath[currentNode.Height]
-	var parentHistory []BlockID
-	for value != currentNode.Block.ID() {
-		parentHistory = append(parentHistory, currentNode.Block.ID())
-		currentNode = s.blockMap[currentNode.Block.ParentBlockID]
-		value = s.currentPath[currentNode.Height]
-	}
-
+func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, cc ConsensusChange, err error) {
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {
 		stateHash = s.stateHash()
 	}
 
-	// Remove blocks from the ConsensusState until we get to the
-	// same parent that we are forking from.
-	for s.currentBlockID != currentNode.Block.ID() {
-		rewoundBlocks = append(rewoundBlocks, s.currentBlock())
-		cc.InvertedBlocks = append(cc.InvertedBlocks, s.currentBlockNode().BlockDiff)
-		outputDiffs = append(outputDiffs, s.invertRecentBlock()...)
-	}
+	// Get the list of blocks tracing from the new node to the blockchain.
+	backtrackNodes := s.backtrackToBlockchain(newNode)
+
+	// Rewind the blockchain to the common parent.
+	commonParent := backtrackNodes[len(backtrackNodes)-1]
+	rewoundNodes := s.rewindBlockchain(commonParent)
 
 	// Validate each block in the parent history in order, updating
 	// the state as we go.  If at some point a block doesn't
 	// verify, you get to walk all the way backwards and forwards
 	// again.
-	validatedBlocks := 0
-	for i := len(parentHistory) - 1; i >= 0; i-- {
-		appliedBlock := s.blockMap[parentHistory[i]].Block
-		appliedBlocks = append(appliedBlocks, appliedBlock)
-		var bd BlockDiff
-		diffSet, err := s.integrateBlock(appliedBlock, &bd)
+	var appliedNodes []*BlockNode
+	for i := len(backtrackNodes) - 1; i >= 0; i-- {
+		appliedNodes = append(appliedNodes, backtrackNodes[i])
+		err = s.generateAndApplyDiff(backtrackNodes[i])
 		if err != nil {
-			// Add the whole tree of blocks to BadBlocks,
-			// deleting them from BlockMap
-			s.invalidateNode(s.blockMap[parentHistory[i]])
+			// Invalidate and delete all of the nodes after the bad block.
+			s.invalidateNode(parentHistory[i])
 
 			// Rewind the validated blocks
-			for i := 0; i < validatedBlocks; i++ {
+			for i := 0; i < len(appliedNodes); i++ {
 				s.invertRecentBlock()
 			}
 

@@ -113,22 +113,3 @@ Applying a Transaction:
 4. Add all outputs created by the storage proofs.
 5. Add all open contracts created by the file contracts.
 6. (scan arbitrary data to fill out the host db)
-
-Removing a Block:
-
-1. Remove the output responsible for the miner subsidy.
-2. Perform Inverse Contract Maintenance
-	2a. Update contract states to set any storage proof windows that have retreated to the previous window.
-	2b. Remove any outputs created from terminated contracts, and then restore the contract.
-	2c. Remove any outputs created from missed storage proofs.
-3. Remove each transaction that was in the block.
-4. Update the values for the current block and current path.
-
-Removing a Transaction:
-
-1. (scan arbitrary data and remove any hosts from the host db)
-2. Delete all open contracts created by the file contracts.
-3. Delete all outputs created by the storage proofs.
-4. Delete all financial outputs created by the transaction.
-5. Restore all transaction inputs to the unspent outputs list.
-6. Add the transaction back to the transaction pool.

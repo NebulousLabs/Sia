@@ -159,8 +159,9 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 	newBlockNode := s.addBlockToTree(b)
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
+	var cc ConsensusChange
 	if s.heavierFork(newBlockNode) {
-		rewoundBlocks, appliedBlocks, outputDiffs, err = s.forkBlockchain(newBlockNode)
+		rewoundBlocks, appliedBlocks, outputDiffs, cc, err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}
