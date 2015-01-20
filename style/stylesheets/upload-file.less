@@ -1,10 +1,90 @@
 #upload-file{
 
+    .capsule{
+        .pod{
+            vertical-align:top;
+            padding:0;
+        }
+    }
+
+    .file-upload-container{
+        .i;
+        position:relative;
+        width:150px;
+        height:40px;
+        overflow:hidden;
+    }
+    .pod:hover .file-upload-container, ::-webkit-file-upload-button{
+        cursor:pointer;
+    }
+    .file-upload-label{
+        // margin-top:10px;
+        // margin-left:15px;
+        width:150px;
+        height:40px;
+        text-align:center;
+    }
+    .file-upload-label i{
+        margin-right:8px;
+    }
+    #fileupload{
+        position:absolute;
+        top:0;
+        left:0;
+        margin:0;
+        padding:0;
+        font-size:60px;
+        cursor:pointer;
+        opacity:0;
+        filter: alpha(opacity=0);
+    }
+    .file-upload-filename{
+        .i;
+        vertical-align:top;
+        margin-top:2px;
+        height:40px;
+        line-height:40px;
+        margin-left:16px;
+        margin-right:24px;
+    }
+
     .description-field{
+        padding:10px;
+        border-radius:4px;
     }
 
     .inputs{
-        padding:20px;
     }
+
+    .step{
+        background-color:@g600;
+        text-align:right;
+        height:120px;
+        padding-top:32px;
+        padding-left:32px;
+        padding-right:32px;
+        border-bottom:4px solid #fff;
+
+        .step-text{
+            float:left;
+            font-size:32px;
+            color:#fff;
+        }
+
+        .capsule{
+            background-color:#fff;
+        }
+
+    }
+    .button.upload{
+        font-size:24px;
+        padding:20px;
+        color:@g200;
+        margin-top:-10px;
+    }
+    .button.upload:hover{
+        background-color:rgba(0,0,0,.25);
+    }
+
 
 }

@@ -23,7 +23,7 @@ var controller = (function(){
                     updateClient(update.Version);
                 });
             }else{
-                ui.notifySmall("No updates available", "alert");
+                ui.notify("Sia client up to date!", "success");
             }
         });
     }

@@ -724,8 +724,78 @@
   float: right;
   margin-right: 20px;
 }
-#upload-file .inputs {
+#upload-file .capsule .pod {
+  vertical-align: top;
+  padding: 0;
+}
+#upload-file .file-upload-container {
+  display: inline-block;
+  position: relative;
+  width: 150px;
+  height: 40px;
+  overflow: hidden;
+}
+#upload-file .pod:hover .file-upload-container,
+#upload-file ::-webkit-file-upload-button {
+  cursor: pointer;
+}
+#upload-file .file-upload-label {
+  width: 150px;
+  height: 40px;
+  text-align: center;
+}
+#upload-file .file-upload-label i {
+  margin-right: 8px;
+}
+#upload-file #fileupload {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 60px;
+  cursor: pointer;
+  opacity: 0;
+  filter: alpha(opacity=0);
+}
+#upload-file .file-upload-filename {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 2px;
+  height: 40px;
+  line-height: 40px;
+  margin-left: 16px;
+  margin-right: 24px;
+}
+#upload-file .description-field {
+  padding: 10px;
+  border-radius: 4px;
+}
+#upload-file .step {
+  background-color: #757575;
+  text-align: right;
+  height: 120px;
+  padding-top: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+  border-bottom: 4px solid #fff;
+}
+#upload-file .step .step-text {
+  float: left;
+  font-size: 32px;
+  color: #fff;
+}
+#upload-file .step .capsule {
+  background-color: #fff;
+}
+#upload-file .button.upload {
+  font-size: 24px;
   padding: 20px;
+  color: #eeeeee;
+  margin-top: -10px;
+}
+#upload-file .button.upload:hover {
+  background-color: rgba(0, 0, 0, 0.25);
 }
 #network .peer-table {
   border: 1px solid #e0e0e0;

@@ -439,6 +439,7 @@ var ui = (function(){
         "alert": "exclamation",
         "error": "exclamation",
         "update": "arrow-circle-o-up",
+        "upload": "upload",
         "help": "question",
         "sent": "send",
         "received": "sign-in",
