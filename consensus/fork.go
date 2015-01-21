@@ -31,12 +31,19 @@ func (s *State) backtrackToBlockchain(node *BlockNode) (nodes []*BlockNode) {
 
 func (s *State) invertRecentBlock() {
 	bn := s.currentBlockNode()
+
+	// Invert all of the diffs.
+	direction := false // blockchain is inverting, set direction flag to false.
 	for _, od := range bn.OutputDiffs {
-		s.invertOutputDiff(od)
+		s.commitOutputDiff(od, direction)
 	}
 	for _, cd := range bn.ContractDiffs {
-		s.invertContractDiff(cd)
+		s.commitContractDiff(cd, direction)
 	}
+
+	// Update the current path and currentBlockID
+	delete(s.currentPath, bn.Height)
+	s.currentBlockID = bn.Parent.Block.ID()
 }
 
 // rewindBlockchain will rewind blocks until the common parent is the highest
@@ -61,14 +68,19 @@ func (s *State) rewindBlockchain(commonParent *BlockNode) (rewoundNodes []*Block
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
 func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
+	// Sanity check - generate should only be called if the diffs have not yet
+	// been generated.
 	if DEBUG {
 		if bn.DiffsGenerated {
 			panic("misuse of generateAndApplyDiff")
 		}
 	}
-	bn.BlockDiff.CatalystBlock = bn.Block.ID()
 
-	minerSubsidy := Currency(0)
+	// Update the current block and current path.
+	s.currentBlockID = bn.Block.ID()
+	s.currentPath[bn.Height] = bn.Block.ID()
+
+	minerSubsidy := CalculateCoinbase(s.height())
 	for _, txn := range bn.Block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
@@ -77,8 +89,8 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
 		outputDiffs, contractDiffs := s.applyTransaction(txn)
-		bn.BlockDiff.OutputDiffs = append(bn.BlockDiff.OutputDiffs, outputDiffs...)
-		bn.BlockDiff.ContractDiffs = append(bn.BlockDiff.ContractDiffs, contractDiffs...)
+		bn.OutputDiffs = append(bn.OutputDiffs, outputDiffs...)
+		bn.ContractDiffs = append(bn.ContractDiffs, contractDiffs...)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
@@ -86,35 +98,27 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 		}
 	}
 	if err != nil {
-		invertBlockNode(bn)
+		s.invertRecentBlock()
 		return
 	}
 
 	// Perform maintanence on all open contracts.
-	s.applyContractMaintenance(bn)
+	outputDiffs, contractDiffs := s.applyContractMaintenance()
+	bn.OutputDiffs = append(bn.OutputDiffs, outputDiffs...)
+	bn.ContractDiffs = append(bn.ContractDiffs, contractDiffs...)
 
-	// Add coin inflation to the miner subsidy.
-	minerSubsidy += CalculateCoinbase(s.height())
-
-	// Add output contianing miner fees + block subsidy.
-	//
-	// TODO: Add this to the list of future miner subsidies
-	minerSubsidyOutput := Output{
+	// Add output contianing miner subsidy.
+	subsidyOutput := Output{
 		Value:     minerSubsidy,
-		SpendHash: b.MinerAddress,
+		SpendHash: bn.Block.MinerAddress,
 	}
 	subsidyDiff := OutputDiff{
 		New:    true,
-		ID:     b.SubsidyID(),
-		Output: minerSubsidyOutput,
+		ID:     bn.Block.SubsidyID(),
+		Output: subsidyOutput,
 	}
-	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
-	bn.BlockDiff.OutputDiffs = append(bn.BlockDiff.OutputDiffs, subsidyDiff)
-
-	// Update the current block and current path variables of the longest fork.
-	height := s.blockMap[b.ID()].Height
-	s.currentBlockID = b.ID()
-	s.currentPath[height] = b.ID()
+	s.unspentOutputs[bn.Block.SubsidyID()] = subsidyOutput
+	bn.OutputDiffs = append(bn.OutputDiffs, subsidyDiff)
 
 	return
 }
@@ -130,10 +134,32 @@ func (s *State) invalidateNode(node *BlockNode) {
 	s.badBlocks[node.Block.ID()] = struct{}{}
 }
 
+func (s *State) applyBlockNode(bn *BlockNode) {
+	// Sanity check - current node must be the input node's parent.
+	if DEBUG {
+		if bn.Parent.Block.ID() != s.currentBlockID {
+			panic("applying a block node when it's not a valid successor")
+		}
+	}
+
+	// Update current id and current path.
+	s.currentBlockID = bn.Block.ID()
+	s.currentPath[bn.Height] = bn.Block.ID()
+
+	// Apply all of the diffs.
+	direction := true // blockchain is going forward, set direction flag to true.
+	for _, od := range bn.OutputDiffs {
+		s.commitOutputDiff(od, direction)
+	}
+	for _, cd := range bn.ContractDiffs {
+		s.commitContractDiff(cd, direction)
+	}
+}
+
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {
@@ -157,26 +183,17 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 		err = s.generateAndApplyDiff(backtrackNodes[i])
 		if err != nil {
 			// Invalidate and delete all of the nodes after the bad block.
-			s.invalidateNode(parentHistory[i])
+			s.invalidateNode(backtrackNodes[i])
 
 			// Rewind the validated blocks
-			for i := 0; i < len(appliedNodes); i++ {
+			for j := 0; j < i; j++ {
 				s.invertRecentBlock()
 			}
 
-			// Integrate the rewound blocks
-			for i := len(rewoundBlocks) - 1; i >= 0; i-- {
-				_, err = s.integrateBlock(rewoundBlocks[i], &BlockDiff{}) // this diff is not used, because the state has not changed. TODO: change how reapply works.
-				if err != nil {
-					panic("Once-validated blocks are no longer validating - state logic has mistakes.")
-				}
+			// Integrate the rewound nodes
+			for i := len(rewoundNodes) - 1; i >= 0; i-- {
+				s.applyBlockNode(rewoundNodes[i])
 			}
-
-			// Reset diffs to nil since nothing in sum was changed.
-			appliedBlocks = nil
-			rewoundBlocks = nil
-			outputDiffs = nil
-			bd = BlockDiff{}
 
 			// Check that the state hash is the same as before forking and then returning.
 			if DEBUG {
@@ -185,23 +202,14 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appli
 				}
 			}
 
-			break
+			return
 		}
-		cc.AppliedBlocks = append(cc.AppliedBlocks, bd)
-		s.blockMap[parentHistory[i]].BlockDiff = bd
-		// TODO: Add the block diff to the block node, for retrieval during inversion.
-		validatedBlocks += 1
-		outputDiffs = append(outputDiffs, diffSet...)
 	}
 
 	// Update the transaction pool to remove any transactions that have
 	// invalidated on account of invalidated storage proofs.
 	s.cleanTransactionPool()
-
-	// Notify all subscribers of the changes.
-	if appliedBlocks != nil {
-		s.notifySubscribers(cc)
-	}
+	s.notifySubscribers()
 
 	return
 }

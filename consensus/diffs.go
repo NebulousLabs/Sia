@@ -25,9 +25,9 @@ type ContractDiff struct {
 	Contract FileContract
 }
 
-// applyOutputDiff takes an output diff and applies it to the state. Forward
+// commitOutputDiff takes an output diff and applies it to the state. Forward
 // indicates the direction of the blockchain.
-func (s *State) applyOutputDiff(od OutputDiff, forward bool) {
+func (s *State) commitOutputDiff(od OutputDiff, forward bool) {
 	add := od.New
 	if !forward {
 		add = !add
@@ -56,9 +56,9 @@ func (s *State) applyOutputDiff(od OutputDiff, forward bool) {
 	}
 }
 
-// applyContractDiff takes a contract diff and applies it to the state. Forward
+// commitContractDiff takes a contract diff and applies it to the state. Forward
 // indicates the direction of the blockchain.
-func (s *State) applyContractDiff(cd ContractDiff, forward bool) {
+func (s *State) commitContractDiff(cd ContractDiff, forward bool) {
 	add := cd.New
 	if !forward {
 		add = !add
