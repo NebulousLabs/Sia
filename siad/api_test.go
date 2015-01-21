@@ -236,6 +236,7 @@ func reqStop(t *testing.T) {
 func setupDaemon(t *testing.T) {
 
 	// Settings to speed up operations
+	// TODO: This should automatically happen when the Makefile is run
 	consensus.BlockFrequency = consensus.Timestamp(1)
 	consensus.TargetWindow = consensus.BlockHeight(1000)
 	network.BootstrapPeers = []network.Address{"localhost:9988"}
@@ -266,6 +267,7 @@ func setupDaemon(t *testing.T) {
 	}()
 
 	// Give the daemon time to initialize
+	// TODO: Switch to signal-based instead of sleep-based
 	time.Sleep(10 * time.Millisecond)
 
 	// First call is just to see if daemon booted
@@ -275,11 +277,15 @@ func setupDaemon(t *testing.T) {
 	}
 }
 
+func TestAPI(t *testing.T) {
+	setupDaemon(t)
+	testBasicStatus(t)
+	testBasicMining(t)
+}
+
 // Tests that the initial status of the daemon is sane - additionally tests that
 // each component can return it's status
-func TestBasicStatus(t *testing.T) {
-	setupDaemon(t)
-
+func testBasicStatus(t *testing.T) {
 	// Test getting miner status
 	mInfo := reqMinerStatus(t)
 	if mInfo.State != "Off" {
@@ -287,9 +293,6 @@ func TestBasicStatus(t *testing.T) {
 	}
 	if mInfo.RunningThreads != 0 {
 		t.Fatal("Miner initial RunningThreads was not 0: (" + strconv.Itoa(mInfo.Threads) + ")")
-	}
-	if mInfo.Threads != 1 {
-		t.Fatal("Miner initial Threads was not 1 (" + strconv.Itoa(mInfo.Threads) + ")")
 	}
 
 	// Test getting wallet status
@@ -312,20 +315,17 @@ func TestBasicStatus(t *testing.T) {
 	if hConfig.Announcement.TotalStorage > 0 {
 		t.Fatal("Host started with more than 0 TotalStorage!")
 	}
-
-	// TODO: we need some way of guranteeing that the daemon will stop so that
-	// other tests can be run
 }
 
 // TODO: this test can't be run because we have no way of shutting off the other
 // daemon ATM
 // Tests that the miner is able to mine i.e. gets some coins after a couple
 // ms (this should be easy given the difficulty settings)
-/*func TestBasicMining(t *testing.T) {
-	setupDaemon(t)
+func testBasicMining(t *testing.T) {
 
 	reqMinerStart(t, 2)
 
+	// TODO: switch to signal-based instead of sleep-based
 	time.Sleep(5 * time.Millisecond)
 
 	w := reqWalletStatus(t)
@@ -333,8 +333,4 @@ func TestBasicStatus(t *testing.T) {
 	if w.Balance == 0 {
 		t.Fatal("Miner wasn't able to mine any coins!")
 	}
-
-	// TODO: we need some way of guaranteeing that the daemon will stop so that
-	// other tests can be run
-	reqStop(t)
-}*/
+}
