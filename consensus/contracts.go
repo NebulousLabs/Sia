@@ -11,12 +11,11 @@ import (
 // the index of the segment that should be proven on when doing a proof of
 // storage.
 func (s *State) storageProofSegmentIndex(contractID ContractID) (index uint64, err error) {
-	openContract, exists := s.openContracts[contractID]
+	contract, exists := s.openContracts[contractID]
 	if !exists {
 		err = errors.New("unrecognized contractID")
 		return
 	}
-	contract := openContract.FileContract
 
 	// Get random number seed used to pick the index.
 	triggerBlockHeight := contract.Start - 1
@@ -45,7 +44,7 @@ func (s *State) StorageProofSegmentIndex(contractID ContractID) (index uint64, e
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
 func (s *State) validProof(sp StorageProof) error {
-	openContract, exists := s.openContracts[sp.ContractID]
+	contract, exists := s.openContracts[sp.ContractID]
 	if !exists {
 		return errors.New("unrecognized contract id in storage proof")
 	}
@@ -58,9 +57,9 @@ func (s *State) validProof(sp StorageProof) error {
 	if !hash.VerifyReaderProof(
 		sp.Segment,
 		sp.HashSet,
-		hash.CalculateSegments(openContract.FileContract.FileSize),
+		hash.CalculateSegments(contract.FileSize),
 		segmentIndex,
-		openContract.FileContract.FileMerkleRoot,
+		contract.FileMerkleRoot,
 	) {
 		return errors.New("provided storage proof is invalid")
 	}
@@ -70,52 +69,34 @@ func (s *State) validProof(sp StorageProof) error {
 
 // applyStorageProof takes a storage proof and adds any outputs created by it
 // to the consensus state.
-//
-// TODO: Though the contract terminates here, code later on handles that. That
-// should be changed.
-func (s *State) applyStorageProof(sp StorageProof, td *TransactionDiff) {
-	openContract := s.openContracts[sp.ContractID]
-	contractDiff := ContractDiff{
-		Contract:             openContract.FileContract,
-		ContractID:           sp.ContractID,
-		New:                  false,
-		PreviousOpenContract: *openContract,
-	}
-
-	// Set the payout of the output - payout cannot be greater than the
-	// amount of funds remaining.
-	payout := openContract.FileContract.Payout
-
+func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDiff) {
 	// Create the output and add it to the list of unspent outputs.
+	contract := s.openContracts[sp.ContractID]
 	output := Output{
-		Value:     payout,
-		SpendHash: openContract.FileContract.ValidProofAddress,
+		Value:     contract.Payout,
+		SpendHash: contract.ValidProofAddress,
 	}
-	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.height(), true)
+	outputID, err := contract.StorageProofOutputID(sp.ContractID, s.height(), true)
 	if err != nil {
-		panic(err)
+		if DEBUG {
+			panic(err) // hard to avoid
+		}
 	}
 	s.unspentOutputs[outputID] = output
-	td.OutputDiffs = append(td.OutputDiffs, OutputDiff{New: true, ID: outputID, Output: output})
 
-	// Mark the proof as complete for this window, and subtract from the
-	// FundsRemaining.
-	contractDiff.NewOpenContract = *s.openContracts[sp.ContractID]
-	return
-}
+	// Delete the contract.
+	delete(s.openContracts, sp.ContractID)
 
-func (s *State) invertStorageProof(sp StorageProof) (diff OutputDiff) {
-	openContract := s.openContracts[sp.ContractID]
-	outputID, err := openContract.FileContract.StorageProofOutputID(openContract.ContractID, s.height(), true)
-	if err != nil {
-		panic(err)
+	od = OutputDiff{
+		New:    true,
+		ID:     outputID,
+		Output: output,
 	}
-	output, err := s.output(outputID)
-	if err != nil {
-		panic(err)
+	cd = ContractDiff{
+		New:        false,
+		ContractID: sp.ContractID,
+		Contract:   contract,
 	}
-	diff = OutputDiff{New: false, ID: outputID, Output: output}
-	delete(s.unspentOutputs, outputID)
 	return
 }
 
@@ -137,18 +118,15 @@ func (s *State) validContract(c FileContract) (err error) {
 
 // addContract takes a FileContract and its corresponding ContractID and adds
 // it to the state.
-func (s *State) applyContract(contract FileContract, id ContractID, td *TransactionDiff) {
-	s.openContracts[id] = &OpenContract{
-		FileContract: contract,
-		ContractID:   id,
-	}
+func (s *State) applyContract(contract FileContract, id ContractID) (cd ContractDiff) {
+	s.openContracts[id] = contract
 
-	cd := ContractDiff{
-		Contract:   contract,
-		ContractID: id,
+	cd = ContractDiff{
 		New:        true,
+		ContractID: id,
+		Contract:   contract,
 	}
-	td.ContractDiffs = append(td.ContractDiffs, cd)
+	return
 }
 
 // applyMissedProof adds outputs to the State to manage a missed storage proof
@@ -183,63 +161,24 @@ func (s *State) applyMissedProof(openContract *OpenContract) (diff OutputDiff) {
 // any storage proof windows.
 //
 // TODO: Contracts should terminate immediately...
-func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDiff) {
+func (s *State) applyContractMaintenance(bn *BlockNode) {
 	// Scan all open contracts and perform any required maintenance on each.
 	var contractsToDelete []ContractID
 	for _, openContract := range s.openContracts {
 		// Check if the contract has ended.
 		contract := openContract.FileContract
-		if s.height() == contract.Start
+		if s.height() == contract.End {
 			// If the proof was missed for this window, add an output.
 			cd := ContractDiff{
-				Contract:             openContract.FileContract,
-				ContractID:           openContract.ContractID,
-				New:                  false,
-				Terminated:           false,
-				PreviousOpenContract: *openContract,
+				Contract:   openContract.FileContract,
+				ContractID: openContract.ContractID,
+				New:        false,
 			}
-			if openContract.WindowSatisfied == false {
-				diff := s.applyMissedProof(openContract)
-				diffs = append(diffs, diff)
-			} else {
-				s.currentBlockNode().SuccessfulWindows = append(s.currentBlockNode().SuccessfulWindows, openContract.ContractID)
-			}
-			openContract.WindowSatisfied = false
-			cd.NewOpenContract = *openContract
-			td.ContractDiffs = append(td.ContractDiffs, cd)
+			diff := s.applyMissedProof(openContract)
+			diffs = append(diffs, diff)
 		}
 
-		// Check for a terminated contract.
-		if openContract.FundsRemaining == 0 || contract.End == s.height() || contract.Tolerance == openContract.Failures {
-			if openContract.FundsRemaining != 0 {
-				// Create a new output that terminates the contract.
-				output := Output{
-					Value: openContract.FundsRemaining,
-				}
-
-				// Get the output address.
-				contractSuccess := openContract.Failures != openContract.FileContract.Tolerance
-				if contractSuccess {
-					output.SpendHash = contract.ValidProofAddress
-				} else {
-					output.SpendHash = contract.MissedProofAddress
-				}
-
-				// Create the output.
-				outputID := ContractTerminationOutputID(openContract.ContractID, contractSuccess)
-				s.unspentOutputs[outputID] = output
-				diff := OutputDiff{New: true, ID: outputID, Output: output}
-				diffs = append(diffs, diff)
-			}
-
-			// Add the contract to contract terminations.
-			s.currentBlockNode().ContractTerminations = append(s.currentBlockNode().ContractTerminations, openContract)
-
-			// Mark contract for deletion (can't delete from a map while
-			// iterating through it - results in undefined behavior of the
-			// iterator.
-			contractsToDelete = append(contractsToDelete, openContract.ContractID)
-		}
+		contractsToDelete = append(contractsToDelete, openContract.ContractID)
 	}
 
 	// Delete all of the contracts that terminated.
@@ -252,30 +191,6 @@ func (s *State) applyContractMaintenance(td *TransactionDiff) (diffs []OutputDif
 // inverseContractMaintenance does the inverse of contract maintenance, moving
 // the state of contracts backwards instead forwards.
 func (s *State) invertContractMaintenance() (diffs []OutputDiff) {
-	// Repen all contracts that terminated, and remove the corresponding output.
-	for _, openContract := range s.currentBlockNode().ContractTerminations {
-		id := openContract.ContractID
-		s.openContracts[id] = openContract
-		contractStatus := openContract.Failures == openContract.FileContract.Tolerance
-		outputID := ContractTerminationOutputID(id, contractStatus)
-		diff := OutputDiff{New: false, ID: outputID, Output: s.unspentOutputs[outputID]}
-		delete(s.unspentOutputs, outputID)
-		diffs = append(diffs, diff)
-	}
-
-	// Reverse all outputs created by missed storage proofs.
-	for _, missedProof := range s.currentBlockNode().MissedStorageProofs {
-		cid, oid := missedProof.ContractID, missedProof.OutputID
-		s.openContracts[cid].FundsRemaining += s.unspentOutputs[oid].Value
-		s.openContracts[cid].Failures -= 1
-		diff := OutputDiff{New: false, ID: oid, Output: s.unspentOutputs[oid]}
-		delete(s.unspentOutputs, oid)
-		diffs = append(diffs, diff)
-	}
-
-	// Reset the window satisfied variable to true for all successful windows.
-	for _, id := range s.currentBlockNode().SuccessfulWindows {
-		s.openContracts[id].WindowSatisfied = true
-	}
+	// function unsalvageable.
 	return
 }

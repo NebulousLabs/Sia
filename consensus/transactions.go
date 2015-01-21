@@ -23,53 +23,16 @@ type InputSignatures struct {
 	Index               int
 }
 
-// reverseTransaction removes a given transaction from the
-// ConsensusState, making it as though the transaction had never happened.
-func (s *State) invertTransaction(t Transaction) (diffs []OutputDiff) {
-	// Delete all the open contracts created by new contracts.
-	for i := range t.FileContracts {
-		contractID := t.FileContractID(i)
-		delete(s.openContracts, contractID)
-	}
-
-	// Delete all outputs created by storage proofs.
-	for _, sp := range t.StorageProofs {
-		diffs = append(diffs, s.invertStorageProof(sp))
-	}
-
-	// Delete all financial outputs created by the transaction.
-	for i := range t.Outputs {
-		output, err := s.output(t.OutputID(i))
-		if err != nil {
-			panic(err)
-		}
-		diff := OutputDiff{New: false, ID: t.OutputID(i), Output: output}
-		delete(s.unspentOutputs, t.OutputID(i))
-		diffs = append(diffs, diff)
-	}
-
-	// Restore all inputs to the unspent outputs list.
-	for _, input := range t.Inputs {
-		diff := OutputDiff{New: true, ID: input.OutputID, Output: s.spentOutputs[input.OutputID]}
-		s.unspentOutputs[input.OutputID] = s.spentOutputs[input.OutputID]
-		diffs = append(diffs, diff)
-		delete(s.spentOutputs, input.OutputID)
-	}
-
-	// Add the transaction to the transaction pool.
-	s.addTransactionToPool(&t)
-	return
-}
-
 // applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
-func (s *State) applyTransaction(t Transaction) (diffs TransactionDiff) {
+func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
 	// Update the transaction pool to resolve any conflicts.
 	s.removeTransactionConflictsFromPool(&t)
 
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
-		// Sanity check.
+		// Sanity check - the input must exist within the blockchain, should
+		// have already been verified.
 		if DEBUG {
 			_, exists := s.unspentOutputs[input.OutputID]
 			if !exists {
@@ -77,28 +40,35 @@ func (s *State) applyTransaction(t Transaction) (diffs TransactionDiff) {
 			}
 		}
 
-		s.spentOutputs[input.OutputID] = s.unspentOutputs[input.OutputID]
-		diff := OutputDiff{New: false, ID: input.OutputID, Output: s.unspentOutputs[input.OutputID]}
+		outputDiff := OutputDiff{
+			New:    false,
+			ID:     input.OutputID,
+			Output: s.unspentOutputs[input.OutputID],
+		}
+		outputDiffs = append(outputDiffs, outputDiff)
 		delete(s.unspentOutputs, input.OutputID)
-		diffs.OutputDiffs = append(diffs.OutputDiffs, diff)
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
-		diff := OutputDiff{New: true, ID: t.OutputID(i), Output: output}
+		diff := OutputDiff{
+			New:    true,
+			ID:     t.OutputID(i),
+			Output: output,
+		}
 		s.unspentOutputs[t.OutputID(i)] = output
 		diffs.OutputDiffs = append(diffs.OutputDiffs, diff)
 	}
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		s.applyStorageProof(sp, &diffs)
+		outputDiff, contractDiff := s.applyStorageProof(sp)
+		outputDiffs = append(outputDiffs, outputDiff)
+		contractDiffs = append(contractDiffs, contractDiff)
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		// Diff not needed here, because applying a contract doesn't change the
-		// outputs set, a contract is merely being created.
 		s.applyContract(contract, t.FileContractID(i), &diffs)
 	}
 	return

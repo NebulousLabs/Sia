@@ -61,8 +61,7 @@ type State struct {
 	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
 	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]*OpenContract // TODO: This probably shouldn't be a pointer.
-	spentOutputs   map[OutputID]Output          // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
+	openContracts  map[ContractID]FileContract
 
 	// consensusSubscriptions is a list of channels that receive notifications
 	// each time the state of consensus changes. Consensus changes only happen
@@ -76,13 +75,6 @@ type State struct {
 	subscriptions []chan struct{}
 
 	mu sync.RWMutex
-}
-
-// An open contract contains all information necessary to properly enforce a
-// contract with no knowledge of the history of the contract.
-type OpenContract struct {
-	ContractID   ContractID
-	FileContract FileContract
 }
 
 // A missed storage proof indicates which contract missed the proof, and which

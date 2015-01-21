@@ -25,20 +25,13 @@ type ContractDiff struct {
 	Contract   FileContract
 }
 
-// A TransactionDiff is the diff that gets applied to the state in the presense
-// of a transaction.
-type TransactionDiff struct {
-	OutputDiffs   []OutputDiff
-	ContractDiffs []ContractDiff
-}
-
 // A BlockDiff contains the list of changes that happened to the state when
 // changing from one block to another. A diff is bi-directional, and
 // deterministically applied.
 type BlockDiff struct {
-	CatalystBlock    BlockID // Which block was used to derive the diffs.
-	TransactionDiffs []TransactionDiff
-	BlockChanges     TransactionDiff // Changes specific to the block being in place - subsidies and contract maintenance.
+	CatalystBlock BlockID // Which block was used to derive the diffs.
+	OutputDiffs   []OutputDiff
+	ContractDiffs []ContractDiff
 }
 
 // A ConsensusChange is a list of block diffs that have been applied to the
@@ -63,6 +56,8 @@ type ConsensusChange struct {
 // just being slow, it can do some catching up and re-subscribe. If we do end
 // up closing subscription channels then we should switch from a slice to a
 // map for s.consensusSubscriptions.
+//
+// TODO: This seems to be causing deadlock.
 func (s *State) notifySubscribers(cc ConsensusChange) {
 	for _, sub := range s.consensusSubscriptions {
 		sub <- cc

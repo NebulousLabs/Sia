@@ -29,24 +29,6 @@ func (s *State) backtrackToBlockchain(node *BlockNode) (nodes []*BlockNode) {
 	return
 }
 
-// rewindBlockchain will rewind blocks until the common parent is the highest
-// block.
-func (s *State) rewindBlockchain(commonParent *BlockNode) (rewoundNodes []*BlockNode) {
-	// Sanity check to make sure that commonParent is in the currentPath.
-	if DEBUG {
-		if commonParent.Block.ID() != s.currentPath[commonParent.Height] {
-			panic("bad use of rewindBlockchain")
-		}
-	}
-	// Remove blocks from the ConsensusState until we get to the
-	// same parent that we are forking from.
-	for s.currentBlockID != commonParent.Block.ID() {
-		rewoundNodes = append(rewoundNodes, s.currentBlockNode())
-		s.invertRecentBlock()
-	}
-	return
-}
-
 // State.rewindABlock() removes the most recent block from the ConsensusState,
 // making the ConsensusState as though the block had never been integrated.
 func (s *State) invertRecentBlock() (diffs []OutputDiff) {
@@ -80,47 +62,59 @@ func (s *State) invertRecentBlock() (diffs []OutputDiff) {
 	return
 }
 
+// rewindBlockchain will rewind blocks until the common parent is the highest
+// block.
+func (s *State) rewindBlockchain(commonParent *BlockNode) (rewoundNodes []*BlockNode) {
+	// Sanity check to make sure that commonParent is in the currentPath.
+	if DEBUG {
+		if commonParent.Block.ID() != s.currentPath[commonParent.Height] {
+			panic("bad use of rewindBlockchain")
+		}
+	}
+
+	// Remove blocks from the ConsensusState until we get to the
+	// same parent that we are forking from.
+	for s.currentBlockID != commonParent.Block.ID() {
+		rewoundNodes = append(rewoundNodes, s.currentBlockNode())
+		s.invertRecentBlock()
+	}
+	return
+}
+
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) integrateBlock(b Block, bd *BlockDiff) (diffs []OutputDiff, err error) {
-	bd.CatalystBlock = b.ID()
+func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
+	if DEBUG {
+		if bn.DiffsGenerated {
+			panic("misuse of generateAndApplyDiff")
+		}
+	}
+	bn.BlockDiff.CatalystBlock = bn.Block.ID()
 
-	var appliedTransactions []Transaction
 	minerSubsidy := Currency(0)
-	for _, txn := range b.Transactions {
+	for _, txn := range bn.Block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
 			break
 		}
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
-		transactionDiff := s.applyTransaction(txn)
-		appliedTransactions = append(appliedTransactions, txn)
-		diffs = append(diffs, transactionDiff.OutputDiffs...)
-		bd.TransactionDiffs = append(bd.TransactionDiffs, transactionDiff)
+		outputDiffs, contractDiffs := s.applyTransaction(txn)
+		bn.BlockDiff.OutputDiffs = append(bn.BlockDiff.OutputDiffs, outputDiffs...)
+		bn.BlockDiff.ContractDiffs = append(bn.BlockDiff.ContractDiffs, contractDiffs...)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
 			minerSubsidy += fee
 		}
 	}
-
 	if err != nil {
-		// Rewind transactions added.
-		for i := len(appliedTransactions) - 1; i >= 0; i-- {
-			s.invertTransaction(appliedTransactions[i])
-		}
+		invertBlockNode(bn)
 		return
 	}
 
 	// Perform maintanence on all open contracts.
-	diffSet := s.applyContractMaintenance(&bd.BlockChanges)
-	diffs = append(diffs, diffSet...)
-
-	// Update the current block and current path variables of the longest fork.
-	height := s.blockMap[b.ID()].Height
-	s.currentBlockID = b.ID()
-	s.currentPath[height] = b.ID()
+	s.applyContractMaintenance(bn)
 
 	// Add coin inflation to the miner subsidy.
 	minerSubsidy += CalculateCoinbase(s.height())
@@ -132,10 +126,18 @@ func (s *State) integrateBlock(b Block, bd *BlockDiff) (diffs []OutputDiff, err 
 		Value:     minerSubsidy,
 		SpendHash: b.MinerAddress,
 	}
+	subsidyDiff := OutputDiff{
+		New:    true,
+		ID:     b.SubsidyID(),
+		Output: minerSubsidyOutput,
+	}
 	s.unspentOutputs[b.SubsidyID()] = minerSubsidyOutput
-	diff := OutputDiff{New: true, ID: b.SubsidyID(), Output: minerSubsidyOutput}
-	diffs = append(diffs, diff)
-	bd.BlockChanges.OutputDiffs = append(bd.BlockChanges.OutputDiffs, diffs...)
+	bn.BlockDiff.OutputDiffs = append(bn.BlockDiff.OutputDiffs, subsidyDiff)
+
+	// Update the current block and current path variables of the longest fork.
+	height := s.blockMap[b.ID()].Height
+	s.currentBlockID = b.ID()
+	s.currentPath[height] = b.ID()
 
 	return
 }
