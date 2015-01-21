@@ -77,7 +77,7 @@ func (s *State) removeTransactionFromPool(t *Transaction) {
 // removeTransactionConflictsFromPool removes all transactions from the
 // transaction pool that are in conflict with 't', called when 't' is in a
 // block.
-func (s *State) removeTransactionConflictsFromPool(t *Transaction) {
+func (s *State) removeTransactionConflictsFromPool(t Transaction) {
 	// For each input, see if there's a conflicting transaction and if there
 	// is, remove the conflicting transaction.
 	for _, input := range t.Inputs {
@@ -163,4 +163,31 @@ func (s *State) TransactionPoolDump() (transactions []Transaction) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.transactionPoolDump()
+}
+
+// State.AcceptTransaction() checks for a conflict of the transaction with the
+// transaction pool, then checks that the transaction is valid given the
+// current state, then adds the transaction to the transaction pool.
+// AcceptTransaction() is thread safe, and can be called concurrently.
+func (s *State) AcceptTransaction(t Transaction) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Check that the transaction is not in conflict with the transaction
+	// pool.
+	if s.transactionPoolConflict(&t) {
+		err = ConflictingTransactionErr
+		return
+	}
+
+	// Check that the transaction is potentially valid.
+	err = s.validTransaction(t)
+	if err != nil {
+		return
+	}
+
+	// Add the transaction to the pool.
+	s.addTransactionToPool(&t)
+
+	return
 }

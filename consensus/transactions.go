@@ -27,7 +27,7 @@ type InputSignatures struct {
 // ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
 	// Update the transaction pool to resolve any conflicts.
-	s.removeTransactionConflictsFromPool(&t)
+	s.removeTransactionConflictsFromPool(t)
 
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
@@ -51,13 +51,22 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 
 	// Add all finanacial outputs to the unspent outputs list.
 	for i, output := range t.Outputs {
+		// Sanity check - the output must not exist within the state, should
+		// have already been verified.
+		if DEBUG {
+			_, exists := s.unspentOutputs[t.OutputID(i)]
+			if exists {
+				panic("applying a  transaction with an invalid new output")
+			}
+		}
+
 		diff := OutputDiff{
 			New:    true,
 			ID:     t.OutputID(i),
 			Output: output,
 		}
 		s.unspentOutputs[t.OutputID(i)] = output
-		diffs.OutputDiffs = append(diffs.OutputDiffs, diff)
+		outputDiffs = append(outputDiffs, diff)
 	}
 
 	// Add all outputs created by storage proofs.
@@ -69,7 +78,8 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		s.applyContract(contract, t.FileContractID(i), &diffs)
+		contractDiff := s.applyContract(contract, t.FileContractID(i))
+		contractDiffs = append(contractDiffs, contractDiff)
 	}
 	return
 }
@@ -119,12 +129,12 @@ func (s *State) validTransaction(t Transaction) (err error) {
 			err = errors.New("output spent twice in same transaction")
 			return
 		}
-		newInputSignatures := &InputSignatures{
+		inSig := &InputSignatures{
 			RemainingSignatures: input.SpendConditions.NumSignatures,
 			PossibleKeys:        input.SpendConditions.PublicKeys,
 			Index:               i,
 		}
-		inputSignaturesMap[input.OutputID] = newInputSignatures
+		inputSignaturesMap[input.OutputID] = inSig
 
 		// Add the input value to the coin sum.
 		inputSum += s.unspentOutputs[input.OutputID].Value
@@ -146,7 +156,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 			return
 		}
 
-		outputSum += contract.ContractFund
+		outputSum += contract.Payout
 	}
 
 	// Check that all provided proofs are valid.
@@ -158,21 +168,26 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	}
 
 	// Check that the outputs are less than or equal to the outputs.
-	if inputSum < outputSum {
-		errorString := fmt.Sprintf("Inputs do not equal outputs for transaction: inputs=%v : outputs=%v", inputSum, outputSum)
-		for _, input := range t.Inputs {
-			errorString += fmt.Sprintf("\nInput: %v", s.unspentOutputs[input.OutputID].Value)
+	if inputSum != outputSum {
+		if DEBUG {
+			errorString := fmt.Sprintf("Inputs do not equal outputs for transaction: inputs=%v : outputs=%v", inputSum, outputSum)
+			for _, input := range t.Inputs {
+				errorString += fmt.Sprintf("\nInput: %v", s.unspentOutputs[input.OutputID].Value)
+			}
+			for _, fee := range t.MinerFees {
+				errorString += fmt.Sprintf("\nMiner Fee: %v", fee)
+			}
+			for _, output := range t.Outputs {
+				errorString += fmt.Sprintf("\nOutput: %v", output.Value)
+			}
+			for _, fc := range t.FileContracts {
+				errorString += fmt.Sprintf("\nContract Fund: %v", fc.Payout)
+			}
+			err = errors.New(errorString)
+			return
 		}
-		for _, fee := range t.MinerFees {
-			errorString += fmt.Sprintf("\nMiner Fee: %v", fee)
-		}
-		for _, output := range t.Outputs {
-			errorString += fmt.Sprintf("\nOutput: %v", output.Value)
-		}
-		for _, fc := range t.FileContracts {
-			errorString += fmt.Sprintf("\nContract Fund: %v", fc.ContractFund)
-		}
-		err = errors.New(errorString)
+
+		err = errors.New("inputs do not equal outputs for transaction.")
 		return
 	}
 
@@ -210,7 +225,12 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	// Check that all inputs have been signed by sufficient public keys.
 	for _, inputSignatures := range inputSignaturesMap {
 		if inputSignatures.RemainingSignatures != 0 {
-			err = fmt.Errorf("an input has not been fully signed: %v", inputSignatures.Index)
+			if DEBUG {
+				err = fmt.Errorf("an input has not been fully signed: %v", inputSignatures.Index)
+				return
+			}
+
+			err = errors.New("invalid signing of transaction")
 			return
 		}
 	}
@@ -222,31 +242,4 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.validTransaction(t)
-}
-
-// State.AcceptTransaction() checks for a conflict of the transaction with the
-// transaction pool, then checks that the transaction is valid given the
-// current state, then adds the transaction to the transaction pool.
-// AcceptTransaction() is thread safe, and can be called concurrently.
-func (s *State) AcceptTransaction(t Transaction) (err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Check that the transaction is not in conflict with the transaction
-	// pool.
-	if s.transactionPoolConflict(&t) {
-		err = ConflictingTransactionErr
-		return
-	}
-
-	// Check that the transaction is potentially valid.
-	err = s.validTransaction(t)
-	if err != nil {
-		return
-	}
-
-	// Add the transaction to the pool.
-	s.addTransactionToPool(&t)
-
-	return
 }
