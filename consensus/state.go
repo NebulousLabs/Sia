@@ -14,22 +14,6 @@ type (
 	BlockWeight *big.Rat
 )
 
-// The state struct contains a list of all known blocks, sorted into a tree
-// according to the shape of the network. It also contains the
-// 'ConsensusState', which represents the state of consensus on the current
-// longest fork.
-//
-// The state has a RWMutex. Any time you read from or write to the State
-// struct, you need to either have a read lock or a write lock on the state.
-// Internally, the state has no concurrency, so the mutex is never used within
-// the consensus package.
-//
-// TODO: The mutexing in the consensus package breaks convention.
-//
-// TODO: When applying blocks and transactions, make the state changes in real
-// time (?) and then if DEBUG, remove and reapply the diffs and make sure that
-// the resulting state is identical to the one that was created when applying
-// in real time.
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -59,33 +43,14 @@ type State struct {
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
 	currentBlockID BlockID
-	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
+	currentPath    map[BlockHeight]BlockID
 	unspentOutputs map[OutputID]Output
 	openContracts  map[ContractID]FileContract
-
-	// consensusSubscriptions is a list of channels that receive notifications
-	// each time the state of consensus changes. Consensus changes only happen
-	// through the application and inversion of blocks. See notifications.go
-	// for more information.
-	//
-	// TODO: deprecate
-	consensusSubscriptions []chan ConsensusChange
 
 	// TODO: docstring
 	subscriptions []chan struct{}
 
 	mu sync.RWMutex
-}
-
-// A missed storage proof indicates which contract missed the proof, and which
-// output resulted from the missed proof. This is necessary because missed
-// proofs are passive - they happen in the absense of a transaction, not in the
-// presense of one. They must be stored in the block nodes so that a block can
-// be correctly rewound without needing to scroll through the past
-// 'ChallengeWindow' blocks to figure out if a proof was missed or not.
-type MissedStorageProof struct {
-	OutputID   OutputID
-	ContractID ContractID
 }
 
 // CreateGenesisState will create the state that contains the genesis block and

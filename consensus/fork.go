@@ -133,7 +133,7 @@ func (s *State) invalidateNode(node *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, cc ConsensusChange, err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {

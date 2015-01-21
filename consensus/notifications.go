@@ -1,47 +1,5 @@
 package consensus
 
-// A block is composed of many transactions. Blocks that have transactions that
-// depend on other transactions, but the transactions must all be applied in a
-// deterministic order. Transactions cannot have inter-dependencies, meaning
-// that an output cannot be created and then spent in the same transaction. As
-// far as diffs are concenred, this means that the elements of a transaction
-// diff should be able to be applied in any order and the outcome should be the
-// same. The elements of a block diff however must be applied in a specific
-// order, as transactions may depend on each other.
-
-// An OutputDiff indicates an output that has either been added to or removed
-// from the unspent outputs set. New=true means that the output was added when
-// the block was applied, and new=false means that the output was deleted when
-// the block was applied.
-type OutputDiff struct {
-	New    bool
-	ID     OutputID
-	Output Output
-}
-
-type ContractDiff struct {
-	New        bool
-	ContractID ContractID
-	Contract   FileContract
-}
-
-// A BlockDiff contains the list of changes that happened to the state when
-// changing from one block to another. A diff is bi-directional, and
-// deterministically applied.
-type BlockDiff struct {
-	CatalystBlock BlockID // Which block was used to derive the diffs.
-	OutputDiffs   []OutputDiff
-	ContractDiffs []ContractDiff
-}
-
-// A ConsensusChange is a list of block diffs that have been applied to the
-// state. The ConsensusChange is sent to everyone who has subscribed to the
-// state.
-type ConsensusChange struct {
-	InvertedBlocks []BlockDiff
-	AppliedBlocks  []BlockDiff
-}
-
 // notifySubscribers sends a ConsensusChange notification to every subscriber
 //
 // The sending is done in a separate goroutine to prevent deadlock if one
@@ -58,11 +16,7 @@ type ConsensusChange struct {
 // map for s.consensusSubscriptions.
 //
 // TODO: This seems to be causing deadlock.
-func (s *State) notifySubscribers(cc ConsensusChange) {
-	for _, sub := range s.consensusSubscriptions {
-		sub <- cc
-	}
-
+func (s *State) notifySubscribers() {
 	for _, sub := range s.subscriptions {
 		select {
 		case sub <- struct{}{}:
@@ -71,20 +25,6 @@ func (s *State) notifySubscribers(cc ConsensusChange) {
 			// Receiver already has notification to check for updates.
 		}
 	}
-}
-
-// ConsensusSubscribe returns a channel that will receive a ConsensusChange
-// notification each time that the consensus changes (from incoming blocks or
-// invalidated blocks, etc.).
-//
-// TODO: Depricate in favor not sending a whole diff down the channel.
-func (s *State) ConsensusSubscribe() (alert chan ConsensusChange) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	alert = make(chan ConsensusChange)
-	s.consensusSubscriptions = append(s.consensusSubscriptions, alert)
-	return
 }
 
 // Subscribe allows a module to subscribe to the state, which means that it'll

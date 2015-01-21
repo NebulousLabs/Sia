@@ -90,9 +90,9 @@ func (s *State) validProof(sp StorageProof) error {
 func (s *State) applyContract(contract FileContract, id ContractID) (cd ContractDiff) {
 	s.openContracts[id] = contract
 	cd = ContractDiff{
-		New:        true,
-		ContractID: id,
-		Contract:   contract,
+		New:      true,
+		ID:       id,
+		Contract: contract,
 	}
 	return
 }
@@ -123,9 +123,9 @@ func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDi
 		Output: output,
 	}
 	cd = ContractDiff{
-		New:        false,
-		ContractID: sp.ContractID,
-		Contract:   contract,
+		New:      false,
+		ID:       sp.ContractID,
+		Contract: contract,
 	}
 	return
 }
@@ -148,9 +148,9 @@ func (s *State) applyMissedProof(contract FileContract, id ContractID) (od Outpu
 	delete(s.openContracts, id)
 
 	cd = ContractDiff{
-		New:        false,
-		ContractID: id,
-		Contract:   contract,
+		New:      false,
+		ID:       id,
+		Contract: contract,
 	}
 	od = OutputDiff{
 		New:    true,
