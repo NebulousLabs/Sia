@@ -63,13 +63,11 @@ func (s *State) handleOrphanBlock(b Block) error {
 	return UnknownOrphanErr
 }
 
-// earliestChildTimestamp() returns the earliest timestamp that a child node
+// earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-//
-// TODO: Write some tests to check that the timestamp code is working right.
 func (bn *BlockNode) earliestChildTimestamp() Timestamp {
-	// Get the previous MedianTimestampWindow timestamps.
+	// Get the previous `MedianTimestampWindow` timestamps.
 	var intTimestamps []int
 	referenceNode := bn
 	for i := 0; i < MedianTimestampWindow; i++ {
@@ -160,15 +158,21 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		err = s.forkBlockchain(newBlockNode)
+		var rewoundNodes, appliedNodes []*BlockNode
+		rewoundNodes, appliedNodes, err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}
-	}
 
-	// Perform a sanity check if debug flag is set.
-	if DEBUG {
-		s.currentPathCheck()
+		// Get the rewound blocks, applied blocks, and output diffs.
+		for _, rewoundNode := range rewoundNodes {
+			rewoundBlocks = append(rewoundBlocks, rewoundNode.Block)
+			outputDiffs = append(outputDiffs, rewoundNode.OutputDiffs...)
+		}
+		for _, appliedNode := range appliedNodes {
+			appliedBlocks = append(appliedBlocks, appliedNode.Block)
+			outputDiffs = append(outputDiffs, appliedNode.OutputDiffs...)
+		}
 	}
 
 	return

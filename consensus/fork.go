@@ -159,7 +159,7 @@ func (s *State) applyBlockNode(bn *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
+func (s *State) forkBlockchain(newNode *BlockNode) (rewoundNodes, appliedNodes []*BlockNode, err error) {
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {
@@ -171,13 +171,12 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 
 	// Rewind the blockchain to the common parent.
 	commonParent := backtrackNodes[len(backtrackNodes)-1]
-	rewoundNodes := s.rewindBlockchain(commonParent)
+	rewoundNodes = s.rewindBlockchain(commonParent)
 
 	// Validate each block in the parent history in order, updating
 	// the state as we go.  If at some point a block doesn't
 	// verify, you get to walk all the way backwards and forwards
 	// again.
-	var appliedNodes []*BlockNode
 	for i := len(backtrackNodes) - 1; i >= 0; i-- {
 		appliedNodes = append(appliedNodes, backtrackNodes[i])
 		err = s.generateAndApplyDiff(backtrackNodes[i])
@@ -205,11 +204,10 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 			return
 		}
 	}
-
-	// Update the transaction pool to remove any transactions that have
-	// invalidated on account of invalidated storage proofs.
-	s.cleanTransactionPool()
-	s.notifySubscribers()
+	// Sanity check - make sure the currentPath makes sense.
+	if DEBUG {
+		s.currentPathCheck()
+	}
 
 	return
 }
