@@ -6,7 +6,19 @@
             Upload File
     -# TODO: Abstract away the data-url
     .inputs
-        <input id="fileupload" type="file" name="file" data-url="/file/upload">
-        .filenames
-        %input.description-field{:placeholder=>"File Nickname"}
-        .button.upload Upload
+        .step1.step
+            .step-text Select a file
+            .capsule
+                .pod
+                    <div class='file-upload-container'>
+                    <span class='file-upload-label button'><i class='fa fa-hand-o-up'></i>Select File</span>
+                    <input id="fileupload" type="file" name="file" data-url="/file/upload">
+                    </div>
+                .pod
+                    .file-upload-filename No File Selected
+        .step2.step
+            .step-text Give it a name
+            %input.description-field{:placeholder=>"File Nickname"}
+        .step3.step
+            .step-text Upload to Sia
+            .button.upload Upload
