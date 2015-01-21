@@ -29,37 +29,14 @@ func (s *State) backtrackToBlockchain(node *BlockNode) (nodes []*BlockNode) {
 	return
 }
 
-// State.rewindABlock() removes the most recent block from the ConsensusState,
-// making the ConsensusState as though the block had never been integrated.
-func (s *State) invertRecentBlock() (diffs []OutputDiff) {
-	// Remove the output for the miner subsidy.
-	//
-	// TODO: Update this for incentive stuff - miner doesn't get subsidy until
-	// 2000 or 5000 or 10000 blocks later.
-	subsidyID := s.currentBlock().SubsidyID()
-	subsidy, err := s.output(subsidyID)
-	if err != nil {
-		panic(err)
+func (s *State) invertRecentBlock() {
+	bn := s.currentBlockNode()
+	for _, od := range bn.OutputDiffs {
+		s.invertOutputDiff(od)
 	}
-	diff := OutputDiff{New: false, ID: subsidyID, Output: subsidy}
-	diffs = append(diffs, diff)
-	delete(s.unspentOutputs, subsidyID)
-
-	// Perform inverse contract maintenance.
-	diffSet := s.invertContractMaintenance()
-	diffs = append(diffs, diffSet...)
-
-	// Reverse each transaction in the block, in reverse order from how
-	// they appear in the block.
-	for i := len(s.currentBlock().Transactions) - 1; i >= 0; i-- {
-		diffSet := s.invertTransaction(s.currentBlock().Transactions[i])
-		diffs = append(diffs, diffSet...)
+	for _, cd := range bn.ContractDiffs {
+		s.invertContractDiff(cd)
 	}
-
-	// Update the CurrentBlock and CurrentPath variables of the longest fork.
-	delete(s.currentPath, s.height())
-	s.currentBlockID = s.currentBlock().ParentBlockID
-	return
 }
 
 // rewindBlockchain will rewind blocks until the common parent is the highest

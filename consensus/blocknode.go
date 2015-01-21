@@ -17,7 +17,8 @@ type BlockNode struct {
 	Target Target // Target for next block.
 
 	DiffsGenerated bool
-	BlockDiff      BlockDiff // Soon to replace the other 3 entirely
+	OutputDiffs    []OutputDiff
+	ContractDiffs  []ContractDiff
 }
 
 // childDepth returns the depth that any child node would have.
