@@ -13,10 +13,6 @@ const apiTimeout = 5e9 // 5 seconds
 func (d *daemon) handle(addr string) {
 	mux := http.NewServeMux()
 
-	// Web Interface
-	mux.HandleFunc("/", d.webIndex)
-	mux.Handle("/lib/", http.StripPrefix("/lib/", http.FileServer(http.Dir(d.styleDir))))
-
 	// Host API Calls
 	//
 	// TODO: SetConfig also calls announce(), there should be smarter ways to
