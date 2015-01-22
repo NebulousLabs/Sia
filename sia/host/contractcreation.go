@@ -56,7 +56,7 @@ func (h *Host) considerContract(t consensus.Transaction, startBlock consensus.Bl
 	// These variables are here for convenience.
 	contract := t.FileContracts[0]
 	window := contract.End - contract.Start
-	duration := contract.Start - startBlock
+	duration := contract.End - startBlock
 	fileSize := contract.FileSize
 
 	// Check that the file size listed in the contract is in bounds.

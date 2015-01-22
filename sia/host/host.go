@@ -28,7 +28,8 @@ type contractObligation struct {
 }
 
 type Host struct {
-	state *consensus.State
+	state       *consensus.State
+	latestBlock consensus.BlockID
 
 	announcement   components.HostAnnouncement
 	spaceRemaining int64
@@ -78,7 +79,7 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 	// TODO: Get all changes/diffs from the genesis to current block in a way
 	// that doesn't cause a race condition with the subscription.
 	updateChan := state.Subscribe()
-	go h.consensusListen(updateChan)
+	go h.threadedConsensusListen(updateChan)
 
 	return
 }

@@ -33,7 +33,10 @@ func (s *State) notifySubscribers() {
 // OutputDiffsSince returns a set of output diffs representing how the state
 // has changed since block `id`. OutputDiffsSince will flip the `new` value for
 // diffs that got reversed.
-func (s *State) DiffsSince(id BlockID) (outputDiffs []OutputDiff, contractDiffs []ContractDiff, err error) {
+func (s *State) DiffsSince(id BlockID) (outputDiffs []OutputDiff, contractDiffs []ContractDiff, latestBlock BlockID, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	node, exists := s.blockMap[id]
 	if !exists {
 		err = errors.New("block is not known to the state or is an orphan")

@@ -21,18 +21,27 @@ import (
 // TODO: Hold off on both storage proofs and deleting files for a few blocks
 // after the first possible opportunity to reduce risk of loss due to
 // blockchain reorganization.
-func (h *Host) consensusListen(updateChan chan struct{}) {
+func (h *Host) threadedConsensusListen(updateChan chan struct{}) {
 	for _ = range updateChan {
 		h.mu.Lock()
 
-		var importantChanges []consensus.ContractDiff
-		for _, blockDiff := range consensusChange.AppliedBlocks {
-			for _, transactionChanges := range blockDiff.TransactionDiffs {
-				importantChanges = append(importantChanges, transactionChanges.ContractDiffs...)
+		// Get all of the diffs since the previous update.
+		var err error
+		var contractDiffs []consensus.ContractDiff
+		_, contractDiffs, h.latestBlock, err = h.state.DiffsSince(h.latestBlock)
+		if err != nil {
+			// This is a severe error and means that the host has somehow
+			// desynchronized. In debug mode, panic, but otherwise grab the
+			// most recent block and miss out on a bunch of diffs.
+			if consensus.DEBUG {
+				panic(err)
 			}
-			importantChanges = append(importantChanges, blockDiff.BlockChanges.ContractDiffs...)
+
+			// Log the error
+			h.latestBlock = h.state.CurrentBlock().ID()
 		}
 
+		// Iterate through the diffs and submit storage proofs for any contract we recognize.
 		var deletions []consensus.ContractID
 		var proofs []consensus.StorageProof
 		for _, contractDiff := range importantChanges {
