@@ -6,26 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// testEmptyBlock creates an emtpy block and submits it to the state, checking that a utxo is created for the miner subisdy.
-func testEmptyBlock(t *testing.T, c *Core) {
-	// Check that the block will actually be empty.
-	if len(c.state.TransactionPoolDump()) != 0 {
-		t.Error("TransactionPoolDump is not of len 0")
-		return
-	}
-
-	// Create and submit the block.
-	height := c.state.Height()
-	utxoSize := len(c.state.SortedUtxoSet())
-	mineSingleBlock(t, c)
-	if height+1 != c.state.Height() {
-		t.Errorf("height should have increased by one, went from %v to %v.", height, c.state.Height())
-	}
-	if utxoSize+1 != len(c.state.SortedUtxoSet()) {
-		t.Errorf("utxo set should have increased by one, went from %v to %v.", utxoSize, len(c.state.SortedUtxoSet()))
-	}
-}
-
 // testTransactionBlock creates a transaction and checks that it makes it into
 // the utxo set.
 func testTransactionBlock(t *testing.T, c *Core) {
@@ -55,7 +35,7 @@ func testTransactionBlock(t *testing.T, c *Core) {
 	}
 
 	// Mine the block and see if the outputs moved.
-	mineSingleBlock(t, c)
+	// mineSingleBlock(t, c)
 	sortedSet := c.state.SortedUtxoSet()
 	if len(sortedSet) != 3 {
 		t.Error(sortedSet)

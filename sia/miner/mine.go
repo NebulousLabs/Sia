@@ -91,17 +91,9 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			// TODO: Eventually, we'll be calling AcceptBlock directly.
-			// Unfortunately, that throws off all of the other modules right
-			// now.
-			/*
-				// TODO: If debug, check the error value of AcceptBlock and panic
-				// for err != nil.
-				m.state.AcceptBlock(b)
-			*/
-			m.mu.RLock()
-			m.blockChan <- b
-			m.mu.RUnlock()
+			// TODO: If debug, check the error value of AcceptBlock and panic
+			// for err != nil.
+			m.state.AcceptBlock(b)
 
 			solved = true
 

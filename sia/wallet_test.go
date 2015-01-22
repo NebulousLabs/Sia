@@ -38,7 +38,7 @@ func testSendToSelf(t *testing.T, c *Core) {
 
 	// Mine the block and check the balance, which should now be
 	// originalBalance + Coinbase.
-	mineSingleBlock(t, c)
+	// mineSingleBlock(t, c)
 	if c.wallet.Balance(false) != originalBalance+consensus.CalculateCoinbase(c.state.Height()) {
 		t.Errorf("Expecting a balance of %v, got %v", originalBalance+consensus.CalculateCoinbase(c.state.Height()), c.wallet.Balance(false))
 	}

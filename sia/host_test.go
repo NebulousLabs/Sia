@@ -28,7 +28,7 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	}
 
 	// Mine a block so that the host announcement is processed.
-	mineSingleBlock(t, c)
+	// mineSingleBlock(t, c)
 
 	// Check that the hostdb has updated.
 	if prevSize != c.hostDB.Size()-1 {

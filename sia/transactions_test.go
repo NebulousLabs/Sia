@@ -31,6 +31,6 @@ func sendManyTransactions(t *testing.T, c *Core) {
 			}
 		}
 
-		mineSingleBlock(t, c)
+		// mineSingleBlock(t, c)
 	}
 }
