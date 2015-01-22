@@ -25,7 +25,7 @@ func sendManyTransactions(t *testing.T, c *Core) {
 		// send things to ourselves and then get the refund as well, we get a
 		// new transaction we send, but the delay is one block.
 		for j := 0; j < i; j++ {
-			_, err := c.SpendCoins(123, address)
+			_, err := c.wallet.SpendCoins(123, address)
 			if err != nil {
 				t.Error(err)
 			}

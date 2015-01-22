@@ -54,7 +54,8 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	go d.core.CatchUp(d.network.RandomPeer())
+	// TODO: `go d.network.CatchUp(...`
+	go d.CatchUp(d.network.RandomPeer())
 
 	writeSuccess(w)
 }

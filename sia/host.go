@@ -18,7 +18,7 @@ func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 	// TODO: This stuff should not happen here, it should be managed by
 	// hostSetConfigHandler.
 	announcementUpdate := info.Announcement
-	announcementUpdate.IPAddress = c.server.Address()
+	// announcementUpdate.IPAddress = c.server.Address()
 	announcementUpdate.TotalStorage = announcement.TotalStorage
 	announcementUpdate.MaxFilesize = announcement.MaxFilesize
 	announcementUpdate.Price = announcement.Price

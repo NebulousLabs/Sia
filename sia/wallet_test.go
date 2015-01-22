@@ -22,7 +22,7 @@ func testSendToSelf(t *testing.T, c *Core) {
 		t.Error(err)
 		return
 	}
-	_, err = c.SpendCoins(c.wallet.Balance(false)-10, dest)
+	_, err = c.wallet.SpendCoins(c.wallet.Balance(false)-10, dest)
 	if err != nil {
 		t.Error(err)
 		return
@@ -50,7 +50,7 @@ func testSendToSelf(t *testing.T, c *Core) {
 // testWalletInfo calles wallet.Info to see if an error is thrown. Also make sure
 // there is no deadlock.
 func testWalletInfo(t *testing.T, c *Core) {
-	_, err := c.WalletInfo()
+	_, err := c.wallet.WalletInfo()
 	if err != nil {
 		t.Error(err)
 	}

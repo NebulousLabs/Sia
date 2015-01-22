@@ -95,4 +95,7 @@ type Wallet interface {
 	// Upon being signed and returned, the transaction-in-progress is deleted
 	// from the wallet.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
+
+	// TODO: depricate
+	SpendCoins(consensus.Currency, consensus.CoinAddress) (consensus.Transaction, error)
 }

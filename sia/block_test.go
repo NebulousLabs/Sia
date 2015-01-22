@@ -38,7 +38,7 @@ func testTransactionBlock(t *testing.T, c *Core) {
 
 	// Send all coins to the `1` address.
 	dest := consensus.CoinAddress{1}
-	_, err := c.SpendCoins(c.wallet.Balance(false)-10, dest)
+	_, err := c.wallet.SpendCoins(c.wallet.Balance(false)-10, dest)
 	if err != nil {
 		t.Error(err)
 		return

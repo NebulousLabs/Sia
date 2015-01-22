@@ -1,16 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
-	"github.com/NebulousLabs/Sia/sia/host"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
+	// "github.com/NebulousLabs/Sia/sia/host"
+	// "github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
-	"github.com/NebulousLabs/Sia/sia/renter"
+	// "github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
@@ -31,9 +32,6 @@ type DaemonConfig struct {
 
 	// Wallet Variables
 	WalletDir string
-
-	// Deprecated Stuff
-	StyleDir string
 }
 
 type daemon struct {
@@ -65,16 +63,25 @@ func startDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	hostDB, err := hostdb.New()
-	if err != nil {
-		return
-	}
-	Host, err := host.New(d.state, d.wallet)
-	if err != nil {
-		return
-	}
-	Renter, err := renter.New(d.state, hostDB, d.wallet)
-	if err != nil {
+	/*
+		hostDB, err := hostdb.New()
+		if err != nil {
+			return
+		}
+			Host, err := host.New(d.state, d.wallet)
+			if err != nil {
+				return
+			}
+			Renter, err := renter.New(d.state, hostDB, d.wallet)
+			if err != nil {
+				return
+			}
+	*/
+
+	d.initializeNetwork(config.RPCAddr, config.NoBootstrap)
+	if err == network.ErrNoPeers {
+		fmt.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+	} else if err != nil {
 		return
 	}
 
