@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -124,7 +125,7 @@ func (s *State) validHeader(b Block) (err error) {
 
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+func (s *State) AcceptBlock(b Block) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -132,6 +133,8 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
 		err = errors.New("block is known to be invalid")
+		errStr := fmt.Sprintf("%v", b.ID())
+		panic(errStr)
 		return
 	}
 
@@ -158,20 +161,9 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		var rewoundNodes, appliedNodes []*BlockNode
-		rewoundNodes, appliedNodes, err = s.forkBlockchain(newBlockNode)
+		err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
-		}
-
-		// Get the rewound blocks, applied blocks, and output diffs.
-		for _, rewoundNode := range rewoundNodes {
-			rewoundBlocks = append(rewoundBlocks, rewoundNode.Block)
-			outputDiffs = append(outputDiffs, rewoundNode.OutputDiffs...)
-		}
-		for _, appliedNode := range appliedNodes {
-			appliedBlocks = append(appliedBlocks, appliedNode.Block)
-			outputDiffs = append(outputDiffs, appliedNode.OutputDiffs...)
 		}
 	}
 

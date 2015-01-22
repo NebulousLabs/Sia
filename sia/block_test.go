@@ -15,11 +15,11 @@ func testEmptyBlock(t *testing.T, c *Core) {
 	}
 
 	// Create and submit the block.
-	height := c.Height()
+	height := c.state.Height()
 	utxoSize := len(c.state.SortedUtxoSet())
 	mineSingleBlock(t, c)
-	if height+1 != c.Height() {
-		t.Errorf("height should have increased by one, went from %v to %v.", height, c.Height())
+	if height+1 != c.state.Height() {
+		t.Errorf("height should have increased by one, went from %v to %v.", height, c.state.Height())
 	}
 	if utxoSize+1 != len(c.state.SortedUtxoSet()) {
 		t.Errorf("utxo set should have increased by one, went from %v to %v.", utxoSize, len(c.state.SortedUtxoSet()))
@@ -38,14 +38,10 @@ func testTransactionBlock(t *testing.T, c *Core) {
 
 	// Send all coins to the `1` address.
 	dest := consensus.CoinAddress{1}
-	txn, err := c.SpendCoins(c.wallet.Balance(false)-10, dest)
+	_, err := c.SpendCoins(c.wallet.Balance(false)-10, dest)
 	if err != nil {
 		t.Error(err)
 		return
-	}
-	err = c.processTransaction(txn)
-	if err != nil && err != consensus.ConflictingTransactionErr {
-		t.Error(err)
 	}
 
 	// Check that the transaction made it into the transaction pool.
@@ -83,7 +79,7 @@ func testTransactionBlock(t *testing.T, c *Core) {
 
 	// Check that the full wallet balance is reporting to only have the miner
 	// subsidy.
-	minerSubsidy := consensus.CalculateCoinbase(c.Height())
+	minerSubsidy := consensus.CalculateCoinbase(c.state.Height())
 	minerSubsidy += 10 // TODO: Wallet figures out miner fee.
 	if c.wallet.Balance(true) != minerSubsidy {
 		t.Errorf("full balance not reporting correctly, should be %v but instead is %v", minerSubsidy, c.wallet.Balance(true))

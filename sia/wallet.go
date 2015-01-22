@@ -35,7 +35,7 @@ func (c *Core) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress)
 	if err != nil {
 		return
 	}
-	err = c.AcceptTransaction(t)
+	err = c.state.AcceptTransaction(t)
 	return
 }
 

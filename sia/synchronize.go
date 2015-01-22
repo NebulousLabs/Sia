@@ -93,7 +93,10 @@ func (c *Core) CatchUp(peer network.Address) {
 		return
 	}
 	for _, block := range newBlocks {
-		c.AcceptBlock(block)
+		err = c.state.AcceptBlock(block)
+		if err != nil {
+			// TODO: something
+		}
 	}
 
 	// TODO: There is probably a better approach than to call CatchUp

@@ -39,7 +39,7 @@ func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight 
 		return
 	}
 
-	h.transactionChan <- t
+	h.state.AcceptTransaction(t)
 
 	return
 }

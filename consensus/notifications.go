@@ -33,7 +33,7 @@ func (s *State) notifySubscribers() {
 // OutputDiffsSince returns a set of output diffs representing how the state
 // has changed since block `id`. OutputDiffsSince will flip the `new` value for
 // diffs that got reversed.
-func (s *State) DiffsSince(id BlockID) (outputDiffs []OutputDiff, contractDiffs []ContractDiff, latestBlock BlockID, err error) {
+func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -42,42 +42,22 @@ func (s *State) DiffsSince(id BlockID) (outputDiffs []OutputDiff, contractDiffs 
 		err = errors.New("block is not known to the state or is an orphan")
 		return
 	}
-	if !node.DiffsGenerated {
-		err = errors.New("block is known to the state but has not had its diffs generated.")
-		return
-	}
 
-	// Get all the diffs going backward, but reverse the new flag because they
-	// are going backward. `reversedNodes` will contain a common parent whose
-	// diffs should not be included, so we strip the last block provided.
+	// Get all the ids from going backwards to the blockchain.
 	reversedNodes := s.backtrackToBlockchain(node)
-	println("DOUBLE CHECK - first should be 1 larger than the second")
-	println(len(reversedNodes))
+	// Eliminate the last node, which is the pivot node, whose diffs are already
+	// known.
 	reversedNodes = reversedNodes[:len(reversedNodes)-1]
-	println(len(reversedNodes))
-	for _, node := range reversedNodes {
-		for _, diff := range node.OutputDiffs {
-			diff.New = !diff.New
-			outputDiffs = append(outputDiffs, diff)
-		}
-		for _, diff := range node.ContractDiffs {
-			diff.New = !diff.New
-			contractDiffs = append(contractDiffs, diff)
-		}
+	for _, reversedNode := range reversedNodes {
+		removedBlocks = append(removedBlocks, reversedNode.Block.ID())
 	}
 
-	// Get all of the diffs going forward, starting from the height after the
-	// pivot.
+	// Get all the ids going forward from the pivot node.
 	height := reversedNodes[len(reversedNodes)-1].Height
 	_, exists = s.currentPath[height]
 	for exists {
 		node := s.blockMap[s.currentPath[height]]
-		for _, diff := range node.OutputDiffs {
-			outputDiffs = append(outputDiffs, diff)
-		}
-		for _, diff := range node.ContractDiffs {
-			contractDiffs = append(contractDiffs, diff)
-		}
+		addedBlocks = append(addedBlocks, node.Block.ID())
 
 		height++
 		_, exists = s.currentPath[height]

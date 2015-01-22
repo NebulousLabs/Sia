@@ -14,11 +14,11 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 		return
 	}
 
-	err = c.server.RegisterRPC("AcceptBlock", c.AcceptBlock)
+	err = c.server.RegisterRPC("AcceptBlock", c.state.AcceptBlock)
 	if err != nil {
 		return
 	}
-	err = c.server.RegisterRPC("AcceptTransaction", c.AcceptTransaction)
+	err = c.server.RegisterRPC("AcceptTransaction", c.state.AcceptTransaction)
 	if err != nil {
 		return
 	}
@@ -34,9 +34,6 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 	if err != nil {
 		return
 	}
-
-	// Start listener thread
-	go c.listen()
 
 	// If we aren't bootstrapping, then we're done.
 	// TODO: this means the CatchUp thread isn't spawned.

@@ -25,9 +25,7 @@ func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 	announcementUpdate.Burn = announcement.Burn
 
 	update := components.HostUpdate{
-		Announcement:    announcementUpdate,
-		Height:          c.state.Height(),
-		TransactionChan: c.transactionChan,
+		Announcement: announcementUpdate,
 	}
 
 	return c.host.UpdateHost(update)

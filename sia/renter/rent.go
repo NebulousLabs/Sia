@@ -224,16 +224,12 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 		delay := consensus.BlockHeight(20)
 		contractFund := (host.Price*consensus.Currency(duration+delay) + host.Burn*consensus.Currency(duration)) * consensus.Currency(int64(len(fullFile)))
 		fileContract = consensus.FileContract{
-			ContractFund:       contractFund,
 			FileMerkleRoot:     merkle,
 			FileSize:           uint64(len(fullFile)),
 			Start:              r.state.Height() + delay,
 			End:                r.state.Height() + duration + delay,
-			ChallengeWindow:    host.Window,
-			Tolerance:          host.Tolerance,
-			ValidProofPayout:   host.Price * consensus.Currency(len(fullFile)) * consensus.Currency(host.Window),
+			Payout:             contractFund,
 			ValidProofAddress:  host.CoinAddress,
-			MissedProofPayout:  host.Burn * consensus.Currency(len(fullFile)) * consensus.Currency(host.Window),
 			MissedProofAddress: consensus.CoinAddress{}, // The empty address is the burn address.
 		}
 

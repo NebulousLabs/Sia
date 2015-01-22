@@ -71,10 +71,9 @@ type SpendConditions struct {
 // still storing a file. Though WindowIndex is of type BlockHeight, it refers
 // to the index of the window, and not the height at which the window starts.
 type StorageProof struct {
-	ContractID  ContractID
-	WindowIndex BlockHeight
-	Segment     [hash.SegmentSize]byte
-	HashSet     []hash.Hash
+	ContractID ContractID
+	Segment    [hash.SegmentSize]byte
+	HashSet    []hash.Hash
 }
 
 // A FileContract contains the information necessary to enforce that a host

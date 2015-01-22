@@ -43,10 +43,9 @@ Storage:      %v bytes (%v remaining)
 Price:        %v coins
 Max Filesize: %v
 Max Duration: %v
-Tolerance:    %v
 Burn:         %v
 `, config.Announcement.TotalStorage, config.StorageRemaining, config.Announcement.Price, config.Announcement.MaxFilesize,
-		config.Announcement.MaxDuration, config.Announcement.MinTolerance, config.Announcement.Burn)
+		config.Announcement.MaxDuration, config.Announcement.Burn)
 }
 
 // TODO: settings should be updated individually, then submitted together in a

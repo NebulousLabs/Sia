@@ -23,23 +23,20 @@ const (
 )
 
 type contractObligation struct {
-	inConsensus bool   // Whether the contract is recognized by the network.
-	filename    string // Where on disk the file is stored.
+	filename string // Where on disk the file is stored.
 }
 
 type Host struct {
 	state       *consensus.State
+	wallet      components.Wallet
 	latestBlock consensus.BlockID
 
+	hostDir        string
 	announcement   components.HostAnnouncement
 	spaceRemaining int64
-	wallet         components.Wallet
+	fileCounter    int
 
-	transactionChan chan consensus.Transaction // TODO: Deprecated, subscription model should be implemented.
-
-	hostDir     string
-	fileCounter int
-	contracts   map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
+	contracts map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
 
 	mu sync.RWMutex
 }
@@ -91,11 +88,10 @@ func (h *Host) UpdateHost(update components.HostUpdate) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	h.announcement = update.Announcement
 	storageDiff := update.Announcement.TotalStorage - h.announcement.TotalStorage
 	h.spaceRemaining += storageDiff
 
-	h.announcement = update.Announcement
-	h.transactionChan = update.TransactionChan
 	return nil
 }
 

@@ -11,9 +11,7 @@ const (
 )
 
 type HostUpdate struct {
-	Announcement    HostAnnouncement
-	Height          consensus.BlockHeight
-	TransactionChan chan consensus.Transaction
+	Announcement HostAnnouncement
 }
 
 type HostInfo struct {

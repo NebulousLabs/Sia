@@ -2,8 +2,6 @@ package sia
 
 import (
 	"testing"
-
-	"github.com/NebulousLabs/Sia/consensus"
 )
 
 // mineSingleBlock mines a single block and then uses the blocking function
@@ -18,10 +16,7 @@ func mineSingleBlock(t *testing.T, c *Core) {
 	}
 
 	// TODO: Depricate
-	err = c.processBlock(b)
-	if err != nil && err != consensus.BlockKnownErr { // TODO: depricate
-		t.Error(err)
-	}
+	t.Error("Submitting block:", b.ID())
 }
 
 func testMinerDeadlocking(t *testing.T, c *Core) {

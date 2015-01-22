@@ -2,8 +2,6 @@ package sia
 
 import (
 	"testing"
-
-	"github.com/NebulousLabs/Sia/consensus"
 )
 
 // sendManyTransactions repeatedly sends transactions, attempting to trigger a
@@ -27,12 +25,8 @@ func sendManyTransactions(t *testing.T, c *Core) {
 		// send things to ourselves and then get the refund as well, we get a
 		// new transaction we send, but the delay is one block.
 		for j := 0; j < i; j++ {
-			txn, err := c.SpendCoins(123, address)
+			_, err := c.SpendCoins(123, address)
 			if err != nil {
-				t.Error(err)
-			}
-			err = c.processTransaction(txn)
-			if err != nil && err != consensus.ConflictingTransactionErr {
 				t.Error(err)
 			}
 		}

@@ -243,14 +243,13 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// storage.
 	h.mu.Lock()
 	h.contracts[txn.FileContractID(0)] = contractObligation{
-		inConsensus: false,
-		filename:    filename,
+		filename: filename,
 	}
 	h.mu.Unlock()
 	fmt.Println("Accepted contract")
 
 	// Submit the transaction.
-	h.transactionChan <- txn
+	h.state.AcceptTransaction(txn)
 
 	return
 }

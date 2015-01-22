@@ -22,7 +22,7 @@ func testSendToSelf(t *testing.T, c *Core) {
 		t.Error(err)
 		return
 	}
-	txn, err := c.SpendCoins(c.wallet.Balance(false)-10, dest)
+	_, err = c.SpendCoins(c.wallet.Balance(false)-10, dest)
 	if err != nil {
 		t.Error(err)
 		return
@@ -32,10 +32,6 @@ func testSendToSelf(t *testing.T, c *Core) {
 	//
 	// TODO: This error checking is hacky, instead should use some sort of
 	// synchronization technique.
-	err = c.processTransaction(txn)
-	if err != nil && err != consensus.ConflictingTransactionErr {
-		t.Error(err)
-	}
 	if c.wallet.Balance(false) != 0 {
 		t.Error("Expecting a balance of 0, got", c.wallet.Balance(false))
 	}
@@ -43,8 +39,8 @@ func testSendToSelf(t *testing.T, c *Core) {
 	// Mine the block and check the balance, which should now be
 	// originalBalance + Coinbase.
 	mineSingleBlock(t, c)
-	if c.wallet.Balance(false) != originalBalance+consensus.CalculateCoinbase(c.Height()) {
-		t.Errorf("Expecting a balance of %v, got %v", originalBalance+consensus.CalculateCoinbase(c.Height()), c.wallet.Balance(false))
+	if c.wallet.Balance(false) != originalBalance+consensus.CalculateCoinbase(c.state.Height()) {
+		t.Errorf("Expecting a balance of %v, got %v", originalBalance+consensus.CalculateCoinbase(c.state.Height()), c.wallet.Balance(false))
 	}
 	if c.wallet.Balance(false) != c.wallet.Balance(true) {
 		t.Errorf("Expecting balance and full balance to be equal, but instead they are false: %v, full: %v", c.wallet.Balance(false), c.wallet.Balance(true))

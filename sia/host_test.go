@@ -3,7 +3,6 @@ package sia
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
@@ -17,20 +16,15 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 	hostAnnouncement := components.HostAnnouncement{
 		TotalStorage: 10 * 1000,
 		MaxFilesize:  2 * 1000,
-		MinTolerance: 5,
 		Price:        2,
 		Burn:         2,
 	}
 	c.UpdateHost(hostAnnouncement)
 
 	// Submit a host announcement.
-	transaction, err := c.host.AnnounceHost(1500, 120)
+	_, err := c.host.AnnounceHost(1500, 120)
 	if err != nil {
 		t.Fatal(err)
-	}
-	err = c.processTransaction(transaction)
-	if err != nil && err != consensus.ConflictingTransactionErr {
-		t.Error(err)
 	}
 
 	// Mine a block so that the host announcement is processed.
