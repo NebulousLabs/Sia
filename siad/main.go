@@ -95,10 +95,15 @@ func startEnvironment(*cobra.Command, []string) {
 
 		WalletDir: config.Siad.WalletFile,
 	}
-	if err := config.expand(); err != nil {
+	err := config.expand()
+	if err != nil {
 		fmt.Println("Bad config value:", err)
-	} else if _, err := startDaemon(daemonConfig); err != nil {
+	}
+	_, err = newDaemon(daemonConfig)
+	if err != nil {
 		fmt.Println("Failed to start daemon:", err)
+	} else {
+		select {}
 	}
 }
 

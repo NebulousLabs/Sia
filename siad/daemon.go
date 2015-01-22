@@ -49,7 +49,8 @@ type daemon struct {
 	apiServer *graceful.Server
 }
 
-func startDaemon(config DaemonConfig) (d *daemon, err error) {
+func newDaemon(config DaemonConfig) (d *daemon, err error) {
+	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
 	d.network, err = network.NewTCPServer(config.RPCAddr)
 	if err != nil {
@@ -87,7 +88,7 @@ func startDaemon(config DaemonConfig) (d *daemon, err error) {
 
 	// Begin listening for requests on the API.
 	// handle will run until /stop is called or an interrupt is caught.
-	d.handle(config.APIAddr)
+	go d.handle(config.APIAddr)
 
 	return
 }
