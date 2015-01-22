@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/sia"
+	"github.com/NebulousLabs/Sia/consensus"
 )
 
 var (
@@ -101,7 +101,7 @@ func updateapplycmd(version string) {
 }
 
 func statuscmd() {
-	status := new(sia.StateInfo)
+	status := new(consensus.StateInfo)
 	err := getAPI("/status", status)
 	if err != nil {
 		fmt.Println("Could not get daemon status:", err)

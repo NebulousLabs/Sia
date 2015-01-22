@@ -87,9 +87,24 @@ func init() {
 }
 
 func startEnvironment(*cobra.Command, []string) {
+	daemonConfig := DaemonConfig{
+		APIAddr:     config.Siad.APIaddr,
+		RPCAddr:     config.Siacore.RPCaddr,
+		NoBootstrap: config.Siacore.NoBootstrap,
+
+		HostDir: config.Siacore.HostDirectory,
+
+		Threads: 1,
+
+		DownloadDir: config.Siad.DownloadDirectory,
+
+		WalletDir: config.Siad.WalletFile,
+
+		StyleDir: config.Siad.StyleDirectory,
+	}
 	if err := config.expand(); err != nil {
 		fmt.Println("Bad config value:", err)
-	} else if err := startDaemon(config); err != nil {
+	} else if _, err := startDaemon(daemonConfig); err != nil {
 		fmt.Println("Failed to start daemon:", err)
 	}
 }

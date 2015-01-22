@@ -74,3 +74,37 @@ func (w *Wallet) WalletInfo() (status components.WalletInfo, err error) {
 
 	return
 }
+
+// SpendCoins creates a transaction sending 'amount' to 'dest', and
+// allocateding 'minerFee' as a miner fee. The transaction is submitted to the
+// miner pool, but is also returned.
+func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
+	// Create and send the transaction.
+	minerFee := consensus.Currency(10) // TODO: wallet supplied miner fee
+	output := consensus.Output{
+		Value:     amount,
+		SpendHash: dest,
+	}
+	id, err := w.RegisterTransaction(t)
+	if err != nil {
+		return
+	}
+	err = w.FundTransaction(id, amount+minerFee)
+	if err != nil {
+		return
+	}
+	err = w.AddMinerFee(id, minerFee)
+	if err != nil {
+		return
+	}
+	err = w.AddOutput(id, output)
+	if err != nil {
+		return
+	}
+	t, err = w.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
+	err = w.state.AcceptTransaction(t)
+	return
+}

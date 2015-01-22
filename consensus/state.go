@@ -14,6 +14,15 @@ type (
 	BlockWeight *big.Rat
 )
 
+// Contains basic information about the state, but does not go into depth.
+type StateInfo struct {
+	CurrentBlock           BlockID
+	Height                 BlockHeight
+	Target                 Target
+	Depth                  Target
+	EarliestLegalTimestamp Timestamp
+}
+
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.

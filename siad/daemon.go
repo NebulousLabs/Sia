@@ -1,13 +1,12 @@
 package main
 
 import (
-	"errors"
 	"html/template"
 
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia"
+	"github.com/NebulousLabs/Sia/network"
 	"github.com/NebulousLabs/Sia/sia/host"
 	"github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/sia/miner"
@@ -39,9 +38,10 @@ type DaemonConfig struct {
 
 type daemon struct {
 	// Modules. TODO: Implement all modules.
-	state  *consensus.State
-	wallet *wallet.Wallet
-	miner  *miner.Miner
+	state   *consensus.State
+	miner   *miner.Miner
+	network *network.TCPServer
+	wallet  *wallet.Wallet
 
 	styleDir    string
 	downloadDir string
@@ -53,6 +53,10 @@ type daemon struct {
 
 func startDaemon(config DaemonConfig) (d *daemon, err error) {
 	d.state = consensus.CreateGenesisState()
+	d.network, err = network.NewTCPServer(config.RPCAddr)
+	if err != nil {
+		return
+	}
 	d.wallet, err = wallet.New(d.state, config.WalletDir)
 	if err != nil {
 		return
@@ -76,7 +80,7 @@ func startDaemon(config DaemonConfig) (d *daemon, err error) {
 
 	// Begin listening for requests on the API.
 	// handle will run until /stop is called or an interrupt is caught.
-	d.handle(config.Siad.APIaddr)
+	d.handle(config.APIAddr)
 
 	return
 }

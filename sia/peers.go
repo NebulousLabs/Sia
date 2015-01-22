@@ -55,36 +55,10 @@ func (c *Core) initializeNetwork(addr string, nobootstrap bool) (err error) {
 		// with regards to the longest chain. It's a bit of a hack but will
 		// make the network substantially more robust.
 		for {
-			go c.CatchUp(c.RandomPeer())
+			go c.CatchUp(c.server.RandomPeer())
 			time.Sleep(time.Minute * 2)
 		}
 	}()
 
 	return
-}
-
-// AddPeer adds a peer.
-func (c *Core) AddPeer(addr network.Address) error {
-	return c.server.AddPeer(addr)
-}
-
-// RemovePeer removes a peer.
-func (c *Core) RemovePeer(addr network.Address) error {
-	return c.server.RemovePeer(addr)
-}
-
-// RandomPeer provides a random peer from the peer list.
-func (c *Core) RandomPeer() network.Address {
-	return c.server.RandomPeer()
-}
-
-// AddressBook returns a listing of all known peers.
-func (c *Core) AddressBook() []network.Address {
-	return c.server.AddressBook()
-}
-
-// Address returns the address of the server. This may be inaccurate if the
-// server was unable to determine its external IP.
-func (c *Core) Address() network.Address {
-	return c.server.Address()
 }
