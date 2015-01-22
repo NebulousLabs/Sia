@@ -35,8 +35,9 @@ func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus
 		return
 	}
 
-	// Send over all blocks from the first known block.
-	for i := highest; i < highest+MaxCatchUpBlocks; i++ {
+	// Send blocks, starting with the child of the most recent known block.
+	start := highest + 1
+	for i := start; i < start+MaxCatchUpBlocks; i++ {
 		b, err := c.state.BlockAtHeight(i)
 		if err != nil {
 			break
@@ -45,7 +46,7 @@ func (c *Core) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus
 	}
 
 	// If more blocks are available, send a benign error
-	if _, maxErr := c.state.BlockAtHeight(highest + MaxCatchUpBlocks); maxErr == nil {
+	if _, maxErr := c.state.BlockAtHeight(start + MaxCatchUpBlocks); maxErr == nil {
 		err = moreBlocksErr
 	}
 
