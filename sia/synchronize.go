@@ -2,6 +2,7 @@ package sia
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -101,6 +102,9 @@ func (c *Core) CatchUp(peer network.Address) {
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
 	if err != nil && err.Error() == moreBlocksErr.Error() {
+		// sleep long enough for state to accept all blocks
+		// TODO: this needs to be replaced by a more deterministic wait.
+		time.Sleep(time.Second)
 		go c.CatchUp(peer)
 	}
 }
