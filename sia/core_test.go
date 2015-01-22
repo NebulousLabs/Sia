@@ -27,7 +27,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 	consensus.MaxAdjustmentDown = big.NewRat(995, 1000)
 
 	// Pull together the configuration for the Core.
-	state, _ := consensus.CreateGenesisState() // The missing piece is not of type error. TODO: That missing piece is deprecated.
+	state := consensus.CreateGenesisState() // The missing piece is not of type error. TODO: That missing piece is deprecated.
 	walletFilename := "test.wallet"
 	Wallet, err := wallet.New(state, walletFilename)
 	if err != nil {
@@ -74,7 +74,7 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 }
 
 func TestEverything(t *testing.T) {
-	c := establishTestingEnvironment(t)
+	establishTestingEnvironment(t)
 	// testEmptyBlock(t, c)
 	// testTransactionBlock(t, c)
 	// testSendToSelf(t, c)

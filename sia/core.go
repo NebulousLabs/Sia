@@ -122,7 +122,6 @@ func CreateCore(config Config) (c *Core, err error) {
 	// TODO: Figure out if there's any way that we need to sync to the state.
 	// Create a state.
 	var genesisOutputDiffs []consensus.OutputDiff
-	_, genesisOutputDiffs = consensus.CreateGenesisState()
 	genesisBlock, err := c.state.BlockAtHeight(0)
 	if err != nil {
 		return

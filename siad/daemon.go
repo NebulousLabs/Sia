@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"html/template"
-	"os"
 
 	"github.com/stretchr/graceful"
 
@@ -16,10 +15,30 @@ import (
 	"github.com/NebulousLabs/Sia/sia/wallet"
 )
 
-type daemon struct {
-	core *sia.Core
+type DaemonConfig struct {
+	// Network Variables
+	APIAddr     string
+	RPCAddr     string
+	NoBootstrap bool
 
-	// Modules. TODO: Implement all of them. So far it's just the miner.
+	// Host Variables
+	HostDir string
+
+	// Miner Variables
+	Threads int
+
+	// Renter Variables
+	DownloadDir string
+
+	// Wallet Variables
+	WalletDir string
+
+	// Deprecated Stuff
+	StyleDir string
+}
+
+type daemon struct {
+	// Modules. TODO: Implement all modules.
 	state  *consensus.State
 	wallet *wallet.Wallet
 	miner  *miner.Miner
@@ -32,23 +51,9 @@ type daemon struct {
 	apiServer *graceful.Server
 }
 
-func startDaemon(config Config) (err error) {
-	// Create download directory and host directory.
-	if err = os.MkdirAll(config.Siad.DownloadDirectory, os.ModeDir|os.ModePerm); err != nil {
-		return errors.New("failed to create download directory: " + err.Error())
-	}
-	if err = os.MkdirAll(config.Siacore.HostDirectory, os.ModeDir|os.ModePerm); err != nil {
-		return errors.New("failed to create host directory: " + err.Error())
-	}
-
-	// Create and fill out the daemon object.
-	d := &daemon{
-		styleDir:    config.Siad.StyleDirectory,
-		downloadDir: config.Siad.DownloadDirectory,
-	}
-
-	d.state, _ = consensus.CreateGenesisState() // the `_` is not of type error. TODO: Deprecate this.
-	d.wallet, err = wallet.New(d.state, config.Siad.WalletFile)
+func startDaemon(config DaemonConfig) (d *daemon, err error) {
+	d.state = consensus.CreateGenesisState()
+	d.wallet, err = wallet.New(d.state, config.WalletDir)
 	if err != nil {
 		return
 	}
@@ -58,7 +63,7 @@ func startDaemon(config Config) (err error) {
 	}
 	hostDB, err := hostdb.New()
 	if err != nil {
-		return errors.New("could not load wallet file: " + err.Error())
+		return
 	}
 	Host, err := host.New(d.state, d.wallet)
 	if err != nil {
@@ -69,32 +74,9 @@ func startDaemon(config Config) (err error) {
 		return
 	}
 
-	siaconfig := sia.Config{
-		HostDir:     config.Siacore.HostDirectory,
-		WalletFile:  config.Siad.WalletFile,
-		ServerAddr:  config.Siacore.RPCaddr,
-		Nobootstrap: config.Siacore.NoBootstrap,
-
-		State: d.state,
-
-		Host:   Host,
-		HostDB: hostDB,
-		Miner:  d.miner,
-		Renter: Renter,
-		Wallet: d.wallet,
-	}
-
-	d.core, err = sia.CreateCore(siaconfig)
-	if err != nil {
-		return
-	}
-
 	// Begin listening for requests on the API.
 	// handle will run until /stop is called or an interrupt is caught.
 	d.handle(config.Siad.APIaddr)
-
-	// clean up
-	d.core.Close()
 
 	return
 }

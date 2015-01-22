@@ -55,7 +55,7 @@ type State struct {
 
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
-func CreateGenesisState() (s *State, diffs []OutputDiff) {
+func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
 		blockRoot:              new(BlockNode),
@@ -91,14 +91,6 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 		SpendHash: GenesisAddress,
 	}
 	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
-
-	// Create the output diff for genesis subsidy.
-	diff := OutputDiff{
-		New:    true,
-		ID:     genesisBlock.SubsidyID(),
-		Output: genesisSubsidyOutput,
-	}
-	diffs = append(diffs, diff)
 
 	return
 }

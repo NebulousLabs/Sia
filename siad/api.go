@@ -83,5 +83,6 @@ func writeSuccess(w http.ResponseWriter) {
 }
 
 func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
-	d.core.ScanMutexes()
+	// TODO: Bring back.
+	// d.core.ScanMutexes()
 }
