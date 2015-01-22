@@ -15,6 +15,10 @@ import (
 	"github.com/NebulousLabs/Sia/sia/components"
 )
 
+var (
+	HostCapacityErr = errors.New("host is at capacity and can not take more files")
+)
+
 // ContractEntry houses a single contract with its id - you cannot derive the
 // id of a contract without having the transaction. Rather than keep the whole
 // transaction, we store only the id.
@@ -36,17 +40,25 @@ func (h *Host) nextFilename() string {
 // TODO: Need to save the space before the file is uploaded, not register it as
 // used after the file is uploaded, otherwise there could be a race condition
 // that uses more than the available space.
-func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction consensus.Transaction, err error) {
-	// These variables are here for convenience.
-	contractDuration := t.FileContracts[0].End - t.FileContracts[0].Start // Duration according to the contract.
-	fullDuration := t.FileContracts[0].End - h.state.Height()             // Duration that the host will actually be storing the file.
-	fileSize := t.FileContracts[0].FileSize
-
-	// Check that there is only one file contract.
+//
+// TODO: Make the host able to parse multiple contracts at once.
+func (h *Host) considerContract(t consensus.Transaction, startBlock consensus.BlockHeight) (updatedTransaction consensus.Transaction, err error) {
+	// Check that there is exactly one file contract.
 	if len(t.FileContracts) != 1 {
 		err = errors.New("transaction must have exactly one contract")
 		return
 	}
+	if startBlock > h.state.Height()+20 {
+		err = errors.New("startBlock is too far in the future")
+		return
+	}
+
+	// These variables are here for convenience.
+	contract := t.FileContracts[0]
+	window := contract.End - contract.Start
+	duration := contract.Start - startBlock
+	fileSize := contract.FileSize
+
 	// Check that the file size listed in the contract is in bounds.
 	if fileSize < h.announcement.MinFilesize || fileSize > h.announcement.MaxFilesize {
 		err = fmt.Errorf("file is of incorrect size - filesize %v, min %v, max %v", fileSize, h.announcement.MinFilesize, h.announcement.MaxFilesize)
@@ -54,68 +66,60 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 	}
 	// Check that there is space for the file.
 	if fileSize > uint64(h.spaceRemaining) {
-		err = errors.New("host is at capacity and can not take more files.")
+		err = HostCapacityErr
 		return
 	}
 	// Check that the duration of the contract is in bounds.
-	if fullDuration < h.announcement.MinDuration || fullDuration > h.announcement.MaxDuration {
+	if duration < h.announcement.MinDuration || duration > h.announcement.MaxDuration {
 		err = errors.New("contract duration is out of bounds")
 		return
 	}
-	// Check that challenges will not be happening too frequently or infrequently.
-	if t.FileContracts[0].ChallengeWindow < h.announcement.MinChallengeWindow || t.FileContracts[0].ChallengeWindow > h.announcement.MaxChallengeWindow {
-		err = errors.New("challenges frequency is too often")
-		return
-	}
-	// Check that tolerance is acceptible.
-	if t.FileContracts[0].Tolerance < h.announcement.MinTolerance {
-		err = errors.New("tolerance is too low")
+	// Check that the window is large enough.
+	if window < h.announcement.MinWindow {
+		err = errors.New("challenge window is not large enough")
 		return
 	}
 	// Outputs for successful proofs need to go to the correct address.
-	if t.FileContracts[0].ValidProofAddress != h.announcement.CoinAddress {
+	if contract.ValidProofAddress != h.announcement.CoinAddress {
 		err = errors.New("coins are not paying out to correct address")
-		return
-	}
-	// Outputs for successful proofs need to match the price.
-	requiredSize := h.announcement.Price * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
-	if t.FileContracts[0].ValidProofPayout < requiredSize {
-		err = errors.New("valid proof payout is too low")
 		return
 	}
 	// Output for failed proofs needs to be the 0 address.
 	emptyAddress := consensus.CoinAddress{}
-	if t.FileContracts[0].MissedProofAddress != emptyAddress {
+	if contract.MissedProofAddress != emptyAddress {
 		err = errors.New("burn payout needs to go to the empty address")
 		return
 	}
-	// Verify that output for failed proofs matches burn.
-	maxBurn := h.announcement.Burn * consensus.Currency(fileSize) * consensus.Currency(t.FileContracts[0].ChallengeWindow)
-	if t.FileContracts[0].MissedProofPayout > maxBurn {
-		err = errors.New("burn payout is too high for a missed proof.")
-		return
-	}
+
 	// Verify that the contract fund covers the payout and burn for the whole
 	// duration.
-	requiredFund := (h.announcement.Price*consensus.Currency(fullDuration) + h.announcement.Burn*consensus.Currency(contractDuration)) * consensus.Currency(fileSize)
-	if t.FileContracts[0].ContractFund < requiredFund {
-		err = errors.New("ContractFund does not cover the entire duration of the contract.")
+	requiredFund := (h.announcement.Price + h.announcement.Burn) * consensus.Currency(duration) * consensus.Currency(fileSize)
+	if contract.Payout != requiredFund {
+		err = errors.New("ContractFund does not match the terms of service.")
 		return
 	}
 
 	// Add enough funds to the transaction to cover the penalty half of the
 	// agreement.
-	penalty := h.announcement.Burn * consensus.Currency(fileSize) * consensus.Currency(contractDuration)
+	penalty := h.announcement.Burn * consensus.Currency(fileSize) * consensus.Currency(duration)
 	id, err := h.wallet.RegisterTransaction(t)
 	if err != nil {
+		err = HostCapacityErr // hide the fact that the host is having wallet issues.
 		return
 	}
 	err = h.wallet.FundTransaction(id, penalty)
 	if err != nil {
-		// TODO: This leaks that the host is out of money.
+		err = HostCapacityErr // hide the fact that the host is having wallet issues.
 		return
 	}
 	updatedTransaction, err = h.wallet.SignTransaction(id, true)
+	if err != nil {
+		err = HostCapacityErr // hide the fact that the host is having wallet issues.
+		return
+	}
+
+	// Update the amount of space the host has for sale.
+	h.spaceRemaining -= int64(fileSize)
 
 	return
 }
@@ -129,19 +133,54 @@ func (h *Host) considerContract(t consensus.Transaction) (updatedTransaction con
 // reason, all of the locking in this function is done manually. Edit with
 // caution, review with caution.
 //
-// TODO: Split some of this logic into helper functions, which in particular
-// will make mutex management easier.
+// TODO: Order of events: (not currently followed)
+//			1. Contract is sent over without signatures, and doesn't need an
+//			acurate merkle hash of the file. It's just for the host and client
+//			to confirm that the terms of the contract are correct and make
+//			sens.
+//
+//			2. Host sends a confirmation, along with an indication of how much
+//			the client should contribute for payment, and how much is available
+//			for burn.
+//
+//			3. File is sent over and loaded onto the host's disk. Eventually,
+//			micropayments will be worked into this situation to pay the host
+//			for bandwidth and whatever storage time.
+//
+//			4. Client sends over the final client version of the contract
+//			containing the appropriate price and burn, with signatures and the
+//			correct merkle root hash.
+//
+//			5. Host compares the contract with the earlier negotiations and
+//			confirms that everything is still the same. Host then verifies that
+//			the file which was uploaded has a matching hash to the file in the
+//			contract. Host will add burn dollars and submit the contract to the
+//			blockchain.
+//
+//			6. If the client double-spends, the host will remove the file. If
+//			the host holds the transaction hostage and does not submit it to
+//			the blockchain, it will become void.
+//
+// TODO: This functions error handling isn't safe, reveals too much info to the
+// other party.
 func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read the transaction from the connection.
-	var t consensus.Transaction
-	if err = encoding.ReadObject(conn, &t, maxContractLen); err != nil {
+	var txn consensus.Transaction
+	err = encoding.ReadObject(conn, &txn, maxContractLen)
+	if err != nil {
 		return
 	}
+	var startBlock consensus.BlockHeight
+	err = encoding.ReadObject(conn, &startBlock, maxContractLen) // what should be the maxlen here?
+	if err != nil {
+		return
+	}
+	contract := txn.FileContracts[0]
 
 	// Check that the contained FileContract fits host criteria for taking
 	// files, replying with the error if there's a problem.
 	h.mu.Lock()
-	t, err = h.considerContract(t)
+	txn, err = h.considerContract(txn, startBlock)
 	h.mu.Unlock()
 	if err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
@@ -166,13 +205,16 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// If there's an error upon return, delete the file that's been created.
 	defer func() {
 		if err != nil {
-			panic(err)
+			_, err = encoding.WriteObject(conn, err.Error())
 			os.Remove(fullname)
+			h.mu.Lock()
+			h.spaceRemaining -= int64(contract.FileSize)
+			h.mu.Unlock()
 		}
 	}()
 
 	// Download file contents.
-	_, err = io.CopyN(file, conn, int64(t.FileContracts[0].FileSize))
+	_, err = io.CopyN(file, conn, int64(contract.FileSize))
 	if err != nil {
 		return
 	}
@@ -182,36 +224,33 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
-	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(t.FileContracts[0].FileSize))
+	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(contract.FileSize))
 	if err != nil {
 		return
 	}
-	if merkleRoot != t.FileContracts[0].FileMerkleRoot {
+	if merkleRoot != contract.FileMerkleRoot {
 		err = errors.New("uploaded file has wrong merkle root")
 		return
 	}
 
-	// Network communication is finished, and disk intense operations are
-	// finished. We can lock the host for the remainder of the function.
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	// Check that the file arrived in time.
-	if h.state.Height() >= t.FileContracts[0].Start-2 {
+	if h.state.Height() >= contract.Start-2 {
 		err = errors.New("file not uploaded in time, refusing to go forward with contract")
 		return
 	}
 
 	// Put the contract in a list where the host will be performing proofs of
 	// storage.
-	h.contracts[t.FileContractID(0)] = contractObligation{
+	h.mu.Lock()
+	h.contracts[txn.FileContractID(0)] = contractObligation{
 		inConsensus: false,
 		filename:    filename,
 	}
+	h.mu.Unlock()
 	fmt.Println("Accepted contract")
 
 	// Submit the transaction.
-	h.transactionChan <- t
+	h.transactionChan <- txn
 
 	return
 }

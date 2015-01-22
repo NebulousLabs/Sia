@@ -32,12 +32,6 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
 				continue
 			}
-			if ha.MinChallengeWindow > 100 {
-				continue
-			}
-			if ha.MinTolerance > 10 {
-				continue
-			}
 			freeze := consensus.Currency(ha.SpendConditions.TimeLock-height) * t.Outputs[ha.FreezeIndex].Value
 			if freeze <= 0 {
 				continue
@@ -52,8 +46,6 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 				MaxFilesize: ha.MaxFilesize,
 				MinDuration: ha.MinDuration,
 				MaxDuration: ha.MaxDuration,
-				Window:      ha.MinChallengeWindow,
-				Tolerance:   ha.MinTolerance,
 				Price:       ha.Price,
 				Burn:        ha.Burn,
 				Freeze:      freeze,

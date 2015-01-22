@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
@@ -14,15 +13,7 @@ const (
 type HostUpdate struct {
 	Announcement    HostAnnouncement
 	Height          consensus.BlockHeight
-	HostDir         string
 	TransactionChan chan consensus.Transaction
-
-	Network network.TCPServer
-	Wallet  Wallet
-
-	InitialStateHeight consensus.BlockHeight
-	RewoundBlocks      []consensus.Block
-	AppliedBlocks      []consensus.Block
 }
 
 type HostInfo struct {

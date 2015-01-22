@@ -21,16 +21,13 @@ func (c *Core) UpdateHost(announcement components.HostAnnouncement) error {
 	announcementUpdate.IPAddress = c.server.Address()
 	announcementUpdate.TotalStorage = announcement.TotalStorage
 	announcementUpdate.MaxFilesize = announcement.MaxFilesize
-	announcementUpdate.MinTolerance = announcement.MinTolerance
 	announcementUpdate.Price = announcement.Price
 	announcementUpdate.Burn = announcement.Burn
 
 	update := components.HostUpdate{
 		Announcement:    announcementUpdate,
-		Height:          c.Height(),
-		HostDir:         c.hostDir,
+		Height:          c.state.Height(),
 		TransactionChan: c.transactionChan,
-		Wallet:          c.wallet,
 	}
 
 	return c.host.UpdateHost(update)
