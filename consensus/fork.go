@@ -18,13 +18,13 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 
 // backtrackToBlockchain returns a list of nodes that go from the current node
 // to the first parent that is in the current blockchain.
-func (s *State) backtrackToBlockchain(node *BlockNode) (nodes []*BlockNode) {
-	nodes = append(nodes, node)
-	currentChainID := s.currentPath[node.Height]
-	for currentChainID != node.Block.ID() {
-		node = node.Parent
-		currentChainID = s.currentPath[node.Height]
-		nodes = append(nodes, node)
+func (s *State) backtrackToBlockchain(bn *BlockNode) (nodes []*BlockNode) {
+	nodes = append(nodes, bn)
+	currentChainID := s.currentPath[bn.Height]
+	for currentChainID != bn.Block.ID() {
+		bn = bn.Parent
+		currentChainID = s.currentPath[bn.Height]
+		nodes = append(nodes, bn)
 	}
 	return
 }
@@ -46,19 +46,18 @@ func (s *State) invertRecentBlock() {
 	s.currentBlockID = bn.Parent.Block.ID()
 }
 
-// rewindBlockchain will rewind blocks until the common parent is the highest
-// block.
-func (s *State) rewindBlockchain(commonParent *BlockNode) (rewoundNodes []*BlockNode) {
-	// Sanity check to make sure that commonParent is in the currentPath.
+// rewindToNode will rewind blocks until `bn` is the highest block.
+func (s *State) rewindToNode(bn *BlockNode) (rewoundNodes []*BlockNode) {
+	// Sanity check  - make sure that bn is in the currentPath.
 	if DEBUG {
-		if commonParent.Block.ID() != s.currentPath[commonParent.Height] {
-			panic("bad use of rewindBlockchain")
+		if bn.Block.ID() != s.currentPath[bn.Height] {
+			panic("bad use of rewindToNode")
 		}
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
-	for s.currentBlockID != commonParent.Block.ID() {
+	for s.currentBlockID != bn.Block.ID() {
 		rewoundNodes = append(rewoundNodes, s.currentBlockNode())
 		s.invertRecentBlock()
 	}
@@ -171,7 +170,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (rewoundNodes, appliedNodes [
 
 	// Rewind the blockchain to the common parent.
 	commonParent := backtrackNodes[len(backtrackNodes)-1]
-	rewoundNodes = s.rewindBlockchain(commonParent)
+	rewoundNodes = s.rewindToNode(commonParent)
 
 	// Validate each block in the parent history in order, updating
 	// the state as we go.  If at some point a block doesn't

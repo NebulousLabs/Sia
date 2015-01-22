@@ -76,5 +76,7 @@ func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
 	s.blockMap[b.ID()] = newNode
 	parentNode.Children = append(parentNode.Children, newNode)
 
+	// TODO TODO TODO: reconnect any orphans that were liberated by this block.
+
 	return
 }

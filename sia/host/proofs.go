@@ -21,8 +21,8 @@ import (
 // TODO: Hold off on both storage proofs and deleting files for a few blocks
 // after the first possible opportunity to reduce risk of loss due to
 // blockchain reorganization.
-func (h *Host) consensusListen(updateChan chan consensus.ConsensusChange) {
-	for consensusChange := range updateChan {
+func (h *Host) consensusListen(updateChan chan struct{}) {
+	for _ = range updateChan {
 		h.mu.Lock()
 
 		var importantChanges []consensus.ContractDiff
