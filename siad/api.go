@@ -45,7 +45,8 @@ func (d *daemon) handle(addr string) {
 	http.HandleFunc("/status", d.statusHandler)
 	http.HandleFunc("/stop", d.stopHandler)
 	http.HandleFunc("/sync", d.syncHandler)
-	// For debugging purposes only
+
+	// Debugging API Calls
 	http.HandleFunc("/mutextest", d.mutexTestHandler)
 
 	go http.ListenAndServe(addr, nil)

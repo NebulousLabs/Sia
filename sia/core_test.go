@@ -75,9 +75,9 @@ func establishTestingEnvironment(t *testing.T) (c *Core) {
 
 func TestEverything(t *testing.T) {
 	c := establishTestingEnvironment(t)
-	testEmptyBlock(t, c)
-	testTransactionBlock(t, c)
-	testSendToSelf(t, c)
+	// testEmptyBlock(t, c)
+	// testTransactionBlock(t, c)
+	// testSendToSelf(t, c)
 	// testWalletInfo(t, c)
 	// testHostAnnouncement(t, c)
 	// testUploadFile(t, c)
