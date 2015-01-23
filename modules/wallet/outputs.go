@@ -5,11 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/sia/components"
-)
-
-var (
-	LowBalanceErr = errors.New("Insufficient Balance")
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // spendableOutput keeps track of an output, it's id, and whether or not it's
@@ -66,7 +62,7 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []knownOut
 
 	// This code will only be reached if total < amount, meaning insufficient
 	// funds.
-	err = components.LowBalanceErr
+	err = modules.LowBalanceErr
 	return
 }
 

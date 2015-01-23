@@ -12,7 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/sia/components"
 )
 
 var (

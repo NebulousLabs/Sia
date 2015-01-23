@@ -3,7 +3,7 @@ package hostdb
 import (
 	"fmt"
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TODO: add multiple different weight metrics to each node, so that things
@@ -23,12 +23,12 @@ type hostNode struct {
 	left  *hostNode
 	right *hostNode
 
-	taken     bool // Used because components.HostEntry can't be compared to nil.
-	hostEntry components.HostEntry
+	taken     bool // Used because modules.HostEntry can't be compared to nil.
+	hostEntry modules.HostEntry
 }
 
 // createNode makes a new node the fill a host entry.
-func createNode(parent *hostNode, entry components.HostEntry) *hostNode {
+func createNode(parent *hostNode, entry modules.HostEntry) *hostNode {
 	return &hostNode{
 		parent: parent,
 		weight: entryWeight(entry),
@@ -41,7 +41,7 @@ func createNode(parent *hostNode, entry components.HostEntry) *hostNode {
 
 // insert inserts a host entry into the node. insert is recursive. The value
 // returned is the number of nodes added to the tree, always 1 or 0.
-func (hn *hostNode) insert(entry components.HostEntry) (nodesAdded int, newNode *hostNode) {
+func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *hostNode) {
 	hn.weight += entryWeight(entry)
 
 	// If the current node is empty, add the entry but don't increase the
@@ -88,7 +88,7 @@ func (hn *hostNode) remove() {
 // weight. Though the tree has an arbitrary sorting, a sufficiently random
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
-func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry components.HostEntry, err error) {
+func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.HostEntry, err error) {
 	// Check for an errored weight call.
 	if weight > hn.weight {
 		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)

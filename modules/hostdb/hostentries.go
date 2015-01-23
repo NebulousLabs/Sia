@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TODO: Add a bunch of different ways to arrive at weight, which can each be
@@ -25,7 +25,7 @@ import (
 // We take the square of the price to heavily emphasize hosts that have a low
 // price. This is also a bit simplistic however, because we're not sure what
 // the host might be charging for bandwidth.
-func entryWeight(entry components.HostEntry) consensus.Currency {
+func entryWeight(entry modules.HostEntry) consensus.Currency {
 	// Catch a divide by 0 error, and let all hosts have at least some weight.
 	//
 	// TODO: Perhaps there's a better way to do this.

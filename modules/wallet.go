@@ -1,7 +1,13 @@
-package components
+package modules
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/consensus"
+)
+
+var (
+	LowBalanceErr = errors.New("Insufficient Balance")
 )
 
 // Wallet in an interface that helps to build and sign transactions. The user

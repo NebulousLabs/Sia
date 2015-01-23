@@ -1,4 +1,4 @@
-package components
+package modules
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"

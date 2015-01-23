@@ -1,4 +1,4 @@
-package components
+package modules
 
 import (
 	"net"
@@ -10,22 +10,9 @@ const (
 	AcceptContractResponse = "accept"
 )
 
-type HostUpdate struct {
-	Announcement HostAnnouncement
-}
-
-type HostInfo struct {
-	Announcement HostAnnouncement
-
-	StorageRemaining int
-	ContractCount    int
-}
-
 type Host interface {
 	// Announce puts an annoucement out so that clients can find the host.
 	AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (consensus.Transaction, error)
-
-	HostInfo() (HostInfo, error)
 
 	// NegotiateContract is a strict function that enables a client to
 	// communicate with the host to propose a contract.
@@ -42,7 +29,4 @@ type Host interface {
 	//
 	// TODO: Switch all of this to a status struct.
 	NumContracts() int
-
-	// UpdateHost changes the settings used by the host.
-	UpdateHost(HostUpdate) error
 }

@@ -10,11 +10,11 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 type FilePiece struct {
-	Host       components.HostEntry   // Where to find the file.
+	Host       modules.HostEntry      // Where to find the file.
 	Contract   consensus.FileContract // The contract being enforced.
 	ContractID consensus.ContractID   // The ID of the contract.
 }
@@ -26,13 +26,13 @@ type FileEntry struct {
 type Renter struct {
 	state  *consensus.State
 	files  map[string]FileEntry
-	hostDB components.HostDB
-	wallet components.Wallet
+	hostDB modules.HostDB
+	wallet modules.Wallet
 
 	mu sync.RWMutex
 }
 
-func (r *Renter) RentInfo() (ri components.RentInfo, err error) {
+func (r *Renter) RentInfo() (ri modules.RentInfo, err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -42,7 +42,7 @@ func (r *Renter) RentInfo() (ri components.RentInfo, err error) {
 	return
 }
 
-func New(state *consensus.State, hdb components.HostDB, wallet components.Wallet) (r *Renter, err error) {
+func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *Renter, err error) {
 	if state == nil {
 		err = errors.New("renter.New: cannot have nil state")
 		return

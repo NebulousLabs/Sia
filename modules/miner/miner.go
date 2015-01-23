@@ -5,12 +5,12 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 type Miner struct {
 	state  *consensus.State
-	wallet components.Wallet
+	wallet modules.Wallet
 
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -33,7 +33,7 @@ type Miner struct {
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(state *consensus.State, wallet components.Wallet) (m *Miner, err error) {
+func New(state *consensus.State, wallet modules.Wallet) (m *Miner, err error) {
 	if state == nil {
 		err = errors.New("miner cannot use a nil state")
 		return

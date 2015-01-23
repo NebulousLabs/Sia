@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TODO: Add a whole set of features to the host database that allow hosts to
@@ -22,7 +22,7 @@ import (
 type HostDB struct {
 	hostTree      *hostNode
 	activeHosts   map[string]*hostNode
-	inactiveHosts map[string]*components.HostEntry
+	inactiveHosts map[string]*modules.HostEntry
 
 	mu sync.RWMutex
 }
@@ -31,13 +31,13 @@ type HostDB struct {
 func New() (hdb *HostDB, err error) {
 	hdb = &HostDB{
 		activeHosts:   make(map[string]*hostNode),
-		inactiveHosts: make(map[string]*components.HostEntry),
+		inactiveHosts: make(map[string]*modules.HostEntry),
 	}
 	return
 }
 
 // insert will add a host entry to the state.
-func (hdb *HostDB) insert(entry components.HostEntry) error {
+func (hdb *HostDB) insert(entry modules.HostEntry) error {
 	_, exists := hdb.activeHosts[entry.ID]
 	if exists {
 		return errors.New("entry of given id already exists in host db")
@@ -57,7 +57,7 @@ func (hdb *HostDB) insert(entry components.HostEntry) error {
 // lock. When called externally, the lock needs to be in place, however
 // sometimes insert needs to be called internally when there is already a lock
 // in place.
-func (hdb *HostDB) Insert(entry components.HostEntry) error {
+func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 	return hdb.insert(entry)
@@ -107,7 +107,7 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 	// like a stack, you can just pop the hosts and be certain that they are
 	// the same hosts.
 	for _, b := range rewoundBlocks {
-		var entries []components.HostEntry
+		var entries []modules.HostEntry
 		entries, err = findHostAnnouncements(initialStateHeight, b)
 		if err != nil {
 			return
@@ -123,7 +123,7 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 
 	// Add hosts found in blocks that were applied.
 	for _, b := range appliedBlocks {
-		var entries []components.HostEntry
+		var entries []modules.HostEntry
 		entries, err = findHostAnnouncements(initialStateHeight, b)
 		if err != nil {
 			return
@@ -142,7 +142,7 @@ func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlock
 
 // RandomHost pulls a random host from the hostdb weighted according to
 // whatever internal metrics exist within the hostdb.
-func (hdb *HostDB) RandomHost() (h components.HostEntry, err error) {
+func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
 

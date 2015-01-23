@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TODO: Changing the host path should automatically move all of the files
@@ -28,11 +28,11 @@ type contractObligation struct {
 
 type Host struct {
 	state       *consensus.State
-	wallet      components.Wallet
+	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
 	hostDir        string
-	announcement   components.HostAnnouncement
+	announcement   modules.HostAnnouncement
 	spaceRemaining int64
 	fileCounter    int
 
@@ -42,7 +42,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) {
+func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 	if wallet == nil {
 		err = errors.New("host.New: cannot have nil wallet")
 		return
@@ -60,7 +60,7 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 		state:  state,
 		wallet: wallet,
 
-		announcement: components.HostAnnouncement{
+		announcement: modules.HostAnnouncement{
 			MaxFilesize: 4 * 1000 * 1000,
 			MaxDuration: 1008, // One week.
 			MinWindow:   20,
@@ -84,7 +84,7 @@ func New(state *consensus.State, wallet components.Wallet) (h *Host, err error) 
 // UpdateHost changes the settings of the host to the input settings.
 // SpaceRemaining will be changed accordingly, and will not return an error if
 // space remaining goes negative.
-func (h *Host) UpdateHost(update components.HostUpdate) error {
+func (h *Host) UpdateHost(update modules.HostUpdate) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

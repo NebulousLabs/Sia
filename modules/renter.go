@@ -1,4 +1,4 @@
-package components
+package modules
 
 type RentFileParameters struct {
 	Filepath       string

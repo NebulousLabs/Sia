@@ -11,7 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TODO: ALSO WARNING: There's a bunch of code duplication here as a result of
@@ -52,7 +52,7 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 		// hostdb.FlagHost() will be called and another host will be requested. If
 		// there is an internal error (no hosts, or an unsuccessful flagging for
 		// example), the loop will break.
-		var host components.HostEntry
+		var host modules.HostEntry
 		var fileContract consensus.FileContract
 		for {
 			host, err = r.hostDB.RandomHost()
@@ -115,7 +115,7 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 				if err := encoding.ReadObject(conn, &response, 128); err != nil {
 					return err
 				}
-				if response != components.AcceptContractResponse {
+				if response != modules.AcceptContractResponse {
 					return errors.New(response)
 				}
 				// host accepted, so transmit file data
@@ -145,7 +145,7 @@ func (r *Renter) proposeContract(filename string, duration consensus.BlockHeight
 }
 
 // TODO: Do the uploading in parallel.
-func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
+func (r *Renter) RentFile(rfp modules.RentFileParameters) (err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -173,7 +173,7 @@ func (r *Renter) RentFile(rfp components.RentFileParameters) (err error) {
 //
 // On mutexes: cannot do network stuff with a lock on, so we need to get the
 // lock, get the contracts, and then drop the lock.
-func (r *Renter) RentSmallFile(rsfp components.RentSmallFileParameters) (err error) {
+func (r *Renter) RentSmallFile(rsfp modules.RentSmallFileParameters) (err error) {
 	r.mu.RLock()
 	_, exists := r.files[rsfp.Nickname]
 	if exists {
@@ -210,7 +210,7 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 	// hostdb.FlagHost() will be called and another host will be requested. If
 	// there is an internal error (no hosts, or an unsuccessful flagging for
 	// example), the loop will break.
-	var host components.HostEntry
+	var host modules.HostEntry
 	var fileContract consensus.FileContract
 	var contractID consensus.ContractID
 	for {
@@ -244,10 +244,10 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 
 		// Try to fund the transaction, and wait if there isn't enough money.
 		err = r.wallet.FundTransaction(id, renterPortion+minerFee)
-		if err != nil && err != components.LowBalanceErr {
+		if err != nil && err != modules.LowBalanceErr {
 			return
 		}
-		for err == components.LowBalanceErr {
+		for err == modules.LowBalanceErr {
 			// TODO: This is a dirty hack - the system will try to get the file
 			// through until it has enough money to actually get the file
 			// through. Significant problem :(
@@ -283,7 +283,7 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 			if err := encoding.ReadObject(conn, &response, 128); err != nil {
 				return err
 			}
-			if response != components.AcceptContractResponse {
+			if response != modules.AcceptContractResponse {
 				return errors.New(response)
 			}
 			// host accepted, so transmit file data

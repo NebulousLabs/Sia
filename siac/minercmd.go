@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/modules/miner"
 )
 
 var (

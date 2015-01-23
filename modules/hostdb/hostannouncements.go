@@ -3,13 +3,13 @@ package hostdb
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // findHostAnnouncements scans a block and pulls out every host announcement
 // that appears in the block, returning a list of entries that correspond with
 // the announcements.
-func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (entries []components.HostEntry, err error) {
+func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (entries []modules.HostEntry, err error) {
 	for _, t := range b.Transactions {
 		// Check the arbitrary data of the transaction to fill out the host database.
 		if len(t.ArbitraryData) == 0 {
@@ -21,7 +21,7 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 
 		dataIndicator := encoding.DecUint64([]byte(t.ArbitraryData[0][0:8]))
 		if dataIndicator == 1 {
-			var ha components.HostAnnouncement
+			var ha modules.HostAnnouncement
 			err = encoding.Unmarshal([]byte(t.ArbitraryData[0][8:]), &ha)
 			if err != nil {
 				return
@@ -39,7 +39,7 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 
 			// Add the host to the host database.
 			entryID := t.OutputID(int(ha.FreezeIndex))
-			entries = append(entries, components.HostEntry{
+			entries = append(entries, modules.HostEntry{
 				ID:          string(entryID[:]),
 				IPAddress:   ha.IPAddress,
 				MinFilesize: ha.MinFilesize,

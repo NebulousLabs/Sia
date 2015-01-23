@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 )
 
 func hostconfigcmd() {
-	config := new(components.HostInfo)
+	config := new(modules.HostInfo)
 	err := getAPI("/host/config", config)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)

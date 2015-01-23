@@ -10,9 +10,9 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 	// "github.com/NebulousLabs/Sia/sia/host"
 	// "github.com/NebulousLabs/Sia/sia/hostdb"
-	"github.com/NebulousLabs/Sia/sia/miner"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	// "github.com/NebulousLabs/Sia/sia/renter"
-	"github.com/NebulousLabs/Sia/sia/wallet"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
 type DaemonConfig struct {

@@ -1,10 +1,13 @@
 package host
 
-import (
-	"github.com/NebulousLabs/Sia/sia/components"
-)
+type HostInfo struct {
+	Announcement HostAnnouncement
 
-func (h *Host) HostInfo() (info components.HostInfo, err error) {
+	StorageRemaining int
+	ContractCount    int
+}
+
+func (h *Host) Info() (info HostInfo, err error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
