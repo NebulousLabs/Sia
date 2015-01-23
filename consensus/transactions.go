@@ -123,7 +123,8 @@ func (s *State) validTransaction(t Transaction) (err error) {
 			return
 		}
 
-		// Create the condition for the input signatures and add it to the input signatures map.
+		// Create the condition for the input signatures and add it to the input
+		// signatures map.
 		_, exists := inputSignaturesMap[input.OutputID]
 		if exists {
 			err = errors.New("output spent twice in same transaction")
