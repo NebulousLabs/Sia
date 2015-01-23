@@ -13,11 +13,9 @@ type (
 
 // Contains basic information about the state, but does not go into depth.
 type StateInfo struct {
-	CurrentBlock           BlockID
-	Height                 BlockHeight
-	Target                 Target
-	Depth                  Target
-	EarliestLegalTimestamp Timestamp
+	CurrentBlock BlockID
+	Height       BlockHeight
+	Target       Target
 }
 
 type State struct {
@@ -146,6 +144,21 @@ func (s *State) output(id OutputID) (output Output, err error) {
 	return
 }
 
+// BlockAtHeight returns the block in the current fork found at `height`.
+func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	bn, exists := s.blockMap[s.currentPath[height]]
+	if !exists {
+		err = errors.New("no block found")
+		return
+	}
+	b = bn.Block
+	return
+}
+
+// CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() Block {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -165,6 +178,20 @@ func (s *State) Height() BlockHeight {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.height()
+}
+
+// HeightOfBlock returns the height of the block with id `bid`.
+func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	bn, exists := s.blockMap[bid]
+	if !exists {
+		err = errors.New("block not found")
+		return
+	}
+	height = bn.Height
+	return
 }
 
 // EarliestLegalTimestamp returns the earliest legal timestamp of the next

@@ -79,3 +79,18 @@ func (s *State) stateHash() hash.Hash {
 
 	return hash.MerkleRoot(leaves)
 }
+
+// Sorted UtxoSet returns all of the unspent transaction outputs sorted
+// according to the numerical value of their id.
+func (s *State) SortedUtxoSet() []Output {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.sortedUtxoSet()
+}
+
+// StateHash returns the markle root of the current state of consensus.
+func (s *State) StateHash() hash.Hash {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.stateHash()
+}

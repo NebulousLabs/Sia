@@ -160,9 +160,12 @@ func (d *daemon) CatchUp(peer network.Address) {
 		return
 	}
 	for _, block := range newBlocks {
-		err = d.state.AcceptBlock(block)
-		if err != nil {
+		err2 := d.state.AcceptBlock(block)
+		if err2 != nil {
 			// TODO: something
+			//
+			// TODO: If the error is a FutureBlockErr, need to wait before trying the
+			// block again.
 		}
 	}
 
@@ -170,9 +173,6 @@ func (d *daemon) CatchUp(peer network.Address) {
 	// recursively. Furthermore, if there is a reorg that's greater than 100
 	// blocks, CatchUp is going to fail outright.
 	if err != nil && err.Error() == moreBlocksErr.Error() {
-		// sleep long enough for state to accept all blocks
-		// TODO: this needs to be replaced by a more deterministic wait.
-		time.Sleep(time.Second)
 		go d.CatchUp(peer)
 	}
 }

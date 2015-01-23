@@ -110,8 +110,7 @@ func statuscmd() {
 	fmt.Printf(`Block:  %v
 Height: %v
 Target: %v
-Depth:  %v
-`, status.CurrentBlock, status.Height, status.Target, status.Depth)
+`, status.CurrentBlock, status.Height, status.Target)
 }
 
 func stopcmd() {

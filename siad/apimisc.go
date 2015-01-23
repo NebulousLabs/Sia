@@ -34,8 +34,6 @@ func (d *daemon) statusHandler(w http.ResponseWriter, req *http.Request) {
 		CurrentBlock: d.state.CurrentBlock().ID(),
 		Height:       d.state.Height(),
 		Target:       d.state.CurrentTarget(),
-		Depth:        d.state.Depth(),
-		EarliestLegalTimestamp: d.state.EarliestTimestamp(),
 	}
 	writeJSON(w, stateInfo)
 }
