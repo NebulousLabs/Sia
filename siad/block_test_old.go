@@ -1,5 +1,6 @@
-package sia
+package main
 
+/*
 import (
 	"testing"
 
@@ -66,3 +67,4 @@ func testTransactionBlock(t *testing.T, c *Core) {
 		return
 	}
 }
+*/

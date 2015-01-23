@@ -1,5 +1,6 @@
-package sia
+package main
 
+/*
 import (
 	"testing"
 
@@ -55,3 +56,4 @@ func testWalletInfo(t *testing.T, c *Core) {
 		t.Error(err)
 	}
 }
+*/

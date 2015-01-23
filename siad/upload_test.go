@@ -1,5 +1,6 @@
-package sia
+package main
 
+/*
 import (
 	"crypto/rand"
 	"testing"
@@ -63,3 +64,4 @@ func testUploadFile(t *testing.T, c *Core) {
 		t.Error(err)
 	}
 }
+*/

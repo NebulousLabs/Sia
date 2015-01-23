@@ -1,5 +1,6 @@
-package sia
+package main
 
+/*
 import (
 	"testing"
 )
@@ -34,3 +35,4 @@ func sendManyTransactions(t *testing.T, c *Core) {
 		// mineSingleBlock(t, c)
 	}
 }
+*/

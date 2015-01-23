@@ -1,5 +1,6 @@
-package sia
+package main
 
+/*
 import (
 	"testing"
 
@@ -35,3 +36,4 @@ func testHostAnnouncement(t *testing.T, c *Core) {
 		t.Error("HostDB did not increase in size after making a host announcement and mining a block.")
 	}
 }
+*/
