@@ -106,12 +106,7 @@ func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDi
 		Value:     contract.Payout,
 		SpendHash: contract.ValidProofAddress,
 	}
-	outputID, err := contract.StorageProofOutputID(sp.ContractID, s.height(), true)
-	if err != nil {
-		if DEBUG {
-			panic(err) // hard to avoid
-		}
-	}
+	outputID := sp.ContractID.StorageProofOutputID(true)
 
 	// Update the state.
 	s.unspentOutputs[outputID] = output
@@ -138,10 +133,7 @@ func (s *State) applyMissedProof(contract FileContract, id ContractID) (od Outpu
 		Value:     contract.Payout,
 		SpendHash: contract.MissedProofAddress,
 	}
-	outputID, err := contract.StorageProofOutputID(id, s.height(), false)
-	if err != nil {
-		panic(err) // hard to avoid
-	}
+	outputID := id.StorageProofOutputID(false)
 
 	// Update the state.
 	s.unspentOutputs[outputID] = output

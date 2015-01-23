@@ -270,7 +270,7 @@ func (t Transaction) FileContractID(index int) ContractID {
 
 // StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
-func (fc FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
+func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
 	proofString := proofString(proofValid)
 	outputID = OutputID(hash.HashAll(
 		fcID[:],
