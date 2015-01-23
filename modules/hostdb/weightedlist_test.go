@@ -36,7 +36,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 		// Pull a bunch of random hosts and count how many times we pull each
 		// host.
 		selectionMap := make(map[string]int)
-		expected := 50
+		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
 			entry, err := hdb.RandomHost()
 			if err != nil {
@@ -46,7 +46,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 		}
 
 		// See if each host was selected enough times.
-		errorBound := 30 // Pretty large, but will still detect if something is seriously wrong.
+		errorBound := 64 // Pretty large, but will still detect if something is seriously wrong.
 		for i, count := range selectionMap {
 			if count < expected-errorBound || count > expected+errorBound {
 				t.Error(i, count)
