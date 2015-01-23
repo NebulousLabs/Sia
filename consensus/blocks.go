@@ -63,22 +63,18 @@ func (s *State) handleOrphanBlock(b Block) error {
 	return UnknownOrphanErr
 }
 
-// earliestChildTimestamp() returns the earliest timestamp that a child node
+// earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-//
-// TODO: Rather than having the blocknode store the timestamps, blocknodes
-// should just point to their parent block, and this function should just crawl
-// through the parents.
-//
-// TODO: After changing how the timestamps are aquired, write some tests to
-// check that the timestamp code is working right.
 func (bn *BlockNode) earliestChildTimestamp() Timestamp {
-	// Get the MedianTimestampWindow previous timestamps and sort them. For
-	// now, bn.RecentTimestamps is expected to have the correct timestamps.
+	// Get the previous `MedianTimestampWindow` timestamps.
 	var intTimestamps []int
-	for _, timestamp := range bn.RecentTimestamps {
-		intTimestamps = append(intTimestamps, int(timestamp))
+	referenceNode := bn
+	for i := 0; i < MedianTimestampWindow; i++ {
+		intTimestamps = append(intTimestamps, int(referenceNode.Block.Timestamp))
+		if referenceNode.Parent != nil {
+			referenceNode = referenceNode.Parent
+		}
 	}
 	sort.Ints(intTimestamps)
 
@@ -126,36 +122,9 @@ func (s *State) validHeader(b Block) (err error) {
 	return
 }
 
-// State.addBlockToTree() takes a block and a parent node, and adds a child
-// node to the parent containing the block. No validation is done.
-func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
-	parentNode := s.blockMap[b.ParentBlockID]
-
-	// Create the child node.
-	newNode = new(BlockNode)
-	newNode.Block = b
-	newNode.Height = parentNode.Height + 1
-
-	// Copy over the timestamps.
-	//
-	// TODO: Change how timestamps work.
-	copy(newNode.RecentTimestamps[:], parentNode.RecentTimestamps[1:])
-	newNode.RecentTimestamps[10] = b.Timestamp
-
-	// Calculate target and depth.
-	newNode.Target = s.childTarget(parentNode, newNode)
-	newNode.Depth = parentNode.childDepth()
-
-	// Add the node to the block map and the list of its parents children.
-	s.blockMap[b.ID()] = newNode
-	parentNode.Children = append(parentNode.Children, newNode)
-
-	return
-}
-
 // State.AcceptBlock() will add blocks to the state, forking the blockchain if
 // they are on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Block, outputDiffs []OutputDiff, err error) {
+func (s *State) AcceptBlock(b Block) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -189,15 +158,10 @@ func (s *State) AcceptBlock(b Block) (rewoundBlocks []Block, appliedBlocks []Blo
 
 	// If the new node is 5% heavier than the current node, switch to the new fork.
 	if s.heavierFork(newBlockNode) {
-		rewoundBlocks, appliedBlocks, outputDiffs, err = s.forkBlockchain(newBlockNode)
+		err = s.forkBlockchain(newBlockNode)
 		if err != nil {
 			return
 		}
-	}
-
-	// Perform a sanity check if debug flag is set.
-	if DEBUG {
-		s.currentPathCheck()
 	}
 
 	return

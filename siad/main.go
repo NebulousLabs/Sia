@@ -27,7 +27,6 @@ type Config struct {
 		APIaddr           string
 		ConfigFilename    string
 		DownloadDirectory string
-		StyleDirectory    string
 		WalletFile        string
 	}
 }
@@ -47,10 +46,6 @@ func (c *Config) expand() (err error) {
 		return
 	}
 	c.Siad.DownloadDirectory, err = homedir.Expand(c.Siad.DownloadDirectory)
-	if err != nil {
-		return
-	}
-	c.Siad.StyleDirectory, err = homedir.Expand(c.Siad.StyleDirectory)
 	if err != nil {
 		return
 	}
@@ -87,11 +82,30 @@ func init() {
 }
 
 func startEnvironment(*cobra.Command, []string) {
-	if err := config.expand(); err != nil {
-		fmt.Println("Bad config value:", err)
-	} else if err := startDaemon(config); err != nil {
-		fmt.Println("Failed to start daemon:", err)
+	daemonConfig := DaemonConfig{
+		APIAddr:     config.Siad.APIaddr,
+		RPCAddr:     config.Siacore.RPCaddr,
+		NoBootstrap: config.Siacore.NoBootstrap,
+
+		HostDir: config.Siacore.HostDirectory,
+
+		Threads: 1,
+
+		DownloadDir: config.Siad.DownloadDirectory,
+
+		WalletDir: config.Siad.WalletFile,
 	}
+	err := config.expand()
+	if err != nil {
+		fmt.Println("Bad config value:", err)
+	}
+	d, err := newDaemon(daemonConfig)
+	if err != nil {
+		fmt.Println("Failed to start daemon:", err)
+		return
+	}
+
+	d.handle(daemonConfig.APIAddr)
 }
 
 func version(*cobra.Command, []string) {
@@ -116,7 +130,6 @@ func main() {
 	// Set default values, which have the lowest priority.
 	defaultConfigFile := filepath.Join(siaDir, "config")
 	defaultHostDir := filepath.Join(siaDir, "hostdir")
-	defaultStyleDir := filepath.Join(siaDir, "style")
 	defaultDownloadDir := "~/Downloads"
 	defaultWalletFile := filepath.Join(siaDir, "sia.wallet")
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
@@ -124,7 +137,6 @@ func main() {
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
 	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "location of the siad config file")
 	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "location of hosted files")
-	root.PersistentFlags().StringVarP(&config.Siad.StyleDirectory, "style-dir", "s", defaultStyleDir, "location of HTTP server assets")
 	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "location of downloaded files")
 	root.PersistentFlags().StringVarP(&config.Siad.WalletFile, "wallet-file", "w", defaultWalletFile, "location of the wallet file")
 

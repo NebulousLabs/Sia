@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -58,7 +58,7 @@ func filedownloadcmd(nickname, filename string) {
 }
 
 func filestatuscmd() {
-	status := new(components.RentInfo)
+	status := new(modules.RentInfo)
 	err := getAPI("/file/status", status)
 	if err != nil {
 		fmt.Println("Could not get file status:", err)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
 var (
@@ -63,7 +63,7 @@ func walletsendcmd(amount, dest string) {
 }
 
 func walletstatuscmd() {
-	status := new(components.WalletInfo)
+	status := new(wallet.WalletInfo)
 	err := getAPI("/wallet/status", status)
 	if err != nil {
 		fmt.Println("Could not get wallet status:", err)

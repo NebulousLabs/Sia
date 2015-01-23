@@ -1,28 +1,45 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"html/template"
-	"os"
 
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia"
-	"github.com/NebulousLabs/Sia/sia/host"
-	"github.com/NebulousLabs/Sia/sia/hostdb"
-	"github.com/NebulousLabs/Sia/sia/miner"
-	"github.com/NebulousLabs/Sia/sia/renter"
-	"github.com/NebulousLabs/Sia/sia/wallet"
+	"github.com/NebulousLabs/Sia/network"
+	// "github.com/NebulousLabs/Sia/sia/host"
+	// "github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	// "github.com/NebulousLabs/Sia/sia/renter"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
-type daemon struct {
-	core *sia.Core
+type DaemonConfig struct {
+	// Network Variables
+	APIAddr     string
+	RPCAddr     string
+	NoBootstrap bool
 
-	// Modules. TODO: Implement all of them. So far it's just the miner.
-	state  *consensus.State
-	wallet *wallet.Wallet
-	miner  *miner.Miner
+	// Host Variables
+	HostDir string
+
+	// Miner Variables
+	Threads int
+
+	// Renter Variables
+	DownloadDir string
+
+	// Wallet Variables
+	WalletDir string
+}
+
+type daemon struct {
+	// Modules. TODO: Implement all modules.
+	state   *consensus.State
+	miner   *miner.Miner
+	network *network.TCPServer
+	wallet  *wallet.Wallet
 
 	styleDir    string
 	downloadDir string
@@ -32,23 +49,14 @@ type daemon struct {
 	apiServer *graceful.Server
 }
 
-func startDaemon(config Config) (err error) {
-	// Create download directory and host directory.
-	if err = os.MkdirAll(config.Siad.DownloadDirectory, os.ModeDir|os.ModePerm); err != nil {
-		return errors.New("failed to create download directory: " + err.Error())
+func newDaemon(config DaemonConfig) (d *daemon, err error) {
+	d = new(daemon)
+	d.state = consensus.CreateGenesisState()
+	d.network, err = network.NewTCPServer(config.RPCAddr)
+	if err != nil {
+		return
 	}
-	if err = os.MkdirAll(config.Siacore.HostDirectory, os.ModeDir|os.ModePerm); err != nil {
-		return errors.New("failed to create host directory: " + err.Error())
-	}
-
-	// Create and fill out the daemon object.
-	d := &daemon{
-		styleDir:    config.Siad.StyleDirectory,
-		downloadDir: config.Siad.DownloadDirectory,
-	}
-
-	d.state, _ = consensus.CreateGenesisState() // the `_` is not of type error. TODO: Deprecate this.
-	d.wallet, err = wallet.New(d.state, config.Siad.WalletFile)
+	d.wallet, err = wallet.New(d.state, config.WalletDir)
 	if err != nil {
 		return
 	}
@@ -56,45 +64,27 @@ func startDaemon(config Config) (err error) {
 	if err != nil {
 		return
 	}
-	hostDB, err := hostdb.New()
-	if err != nil {
-		return errors.New("could not load wallet file: " + err.Error())
-	}
-	Host, err := host.New(d.state, d.wallet)
-	if err != nil {
+	/*
+		hostDB, err := hostdb.New()
+		if err != nil {
+			return
+		}
+			Host, err := host.New(d.state, d.wallet)
+			if err != nil {
+				return
+			}
+			Renter, err := renter.New(d.state, hostDB, d.wallet)
+			if err != nil {
+				return
+			}
+	*/
+
+	d.initializeNetwork(config.RPCAddr, config.NoBootstrap)
+	if err == network.ErrNoPeers {
+		fmt.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+	} else if err != nil {
 		return
 	}
-	Renter, err := renter.New(d.state, hostDB, d.wallet)
-	if err != nil {
-		return
-	}
-
-	siaconfig := sia.Config{
-		HostDir:     config.Siacore.HostDirectory,
-		WalletFile:  config.Siad.WalletFile,
-		ServerAddr:  config.Siacore.RPCaddr,
-		Nobootstrap: config.Siacore.NoBootstrap,
-
-		State: d.state,
-
-		Host:   Host,
-		HostDB: hostDB,
-		Miner:  d.miner,
-		Renter: Renter,
-		Wallet: d.wallet,
-	}
-
-	d.core, err = sia.CreateCore(siaconfig)
-	if err != nil {
-		return
-	}
-
-	// Begin listening for requests on the API.
-	// handle will run until /stop is called or an interrupt is caught.
-	d.handle(config.Siad.APIaddr)
-
-	// clean up
-	d.core.Close()
 
 	return
 }

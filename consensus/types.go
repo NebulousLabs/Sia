@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -72,24 +71,19 @@ type SpendConditions struct {
 // still storing a file. Though WindowIndex is of type BlockHeight, it refers
 // to the index of the window, and not the height at which the window starts.
 type StorageProof struct {
-	ContractID  ContractID
-	WindowIndex BlockHeight
-	Segment     [hash.SegmentSize]byte
-	HashSet     []hash.Hash
+	ContractID ContractID
+	Segment    [hash.SegmentSize]byte
+	HashSet    []hash.Hash
 }
 
 // A FileContract contains the information necessary to enforce that a host
 // stores a file.
 type FileContract struct {
-	ContractFund       Currency
 	FileMerkleRoot     hash.Hash
 	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
 	Start, End         BlockHeight
-	ChallengeWindow    BlockHeight // size of window, one window at a time
-	Tolerance          uint64      // number of missed proofs before triggering unsuccessful termination
-	ValidProofPayout   Currency
+	Payout             Currency
 	ValidProofAddress  CoinAddress
-	MissedProofPayout  Currency
 	MissedProofAddress CoinAddress
 }
 
@@ -274,45 +268,15 @@ func (t Transaction) FileContractID(index int) ContractID {
 	))
 }
 
-// WindowIndex returns the index of the challenge window that is
-// open during block height 'height'.
-func (fc FileContract) WindowIndex(height BlockHeight) (windowIndex BlockHeight, err error) {
-	if height < fc.Start {
-		err = errors.New("height below start point")
-		return
-	} else if height >= fc.End {
-		err = errors.New("height above end point")
-		return
-	}
-
-	windowIndex = (height - fc.Start) / fc.ChallengeWindow
-	return
-}
-
 // StorageProofOutput() returns the OutputID of the output created
 // during the window index that was active at height 'height'.
-func (fc FileContract) StorageProofOutputID(fcID ContractID, height BlockHeight, proofValid bool) (outputID OutputID, err error) {
+func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
 	proofString := proofString(proofValid)
-	windowIndex, err := fc.WindowIndex(height)
-	if err != nil {
-		return
-	}
-
 	outputID = OutputID(hash.HashAll(
 		fcID[:],
 		proofString,
-		encoding.Marshal(windowIndex),
 	))
 	return
-}
-
-// ContractTerminationOutputID() returns the ID of a contract termination
-// output, given the id of the contract and the status of the termination.
-func ContractTerminationOutputID(fcID ContractID, successfulTermination bool) OutputID {
-	return OutputID(hash.HashAll(
-		fcID[:],
-		terminationString(successfulTermination),
-	))
 }
 
 // proofString() returns the string to be used when generating the output id of
@@ -323,16 +287,5 @@ func proofString(proofValid bool) []byte {
 		return []byte("validproof")
 	} else {
 		return []byte("missedproof")
-	}
-}
-
-// terminationString() returns the string to be used when generating the output
-// id of a successful terminated contract if the bool is set to true, and of an
-// unsuccessful termination if the bool is set to false.
-func terminationString(success bool) []byte {
-	if success {
-		return []byte("successfultermination")
-	} else {
-		return []byte("unsuccessfultermination")
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 // walletAddressHandler manages requests for CoinAddresses from the wallet.
 func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, err := d.core.CoinAddress()
+	coinAddress, _, err := d.wallet.CoinAddress()
 	if err != nil {
 		http.Error(w, "Failed to get a coin address", 500)
 		return
@@ -49,7 +49,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	copy(dest[:], destAddressBytes)
 
 	// Spend the coins.
-	_, err = d.core.SpendCoins(amount, dest)
+	_, err = d.wallet.SpendCoins(amount, dest)
 	if err != nil {
 		http.Error(w, "Failed to create transaction: "+err.Error(), 500)
 		return
@@ -63,7 +63,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 // out how to use the json. The daemon and envrionment don't really know what's
 // contained within in an attempt to keep things modular.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	walletStatus, err := d.core.WalletInfo()
+	walletStatus, err := d.wallet.Info()
 	if err != nil {
 		http.Error(w, "Failed to get wallet info", 500)
 		return

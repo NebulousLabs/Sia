@@ -4,32 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"sync"
-
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 type (
 	BlockWeight *big.Rat
 )
 
-// The state struct contains a list of all known blocks, sorted into a tree
-// according to the shape of the network. It also contains the
-// 'ConsensusState', which represents the state of consensus on the current
-// longest fork.
-//
-// The state has a RWMutex. Any time you read from or write to the State
-// struct, you need to either have a read lock or a write lock on the state.
-// Internally, the state has no concurrency, so the mutex is never used within
-// the consensus package.
-//
-// TODO: The mutexing in the consensus package breaks convention.
-//
-// TODO: When applying blocks and transactions, make the state changes in real
-// time (?) and then if DEBUG, remove and reapply the diffs and make sure that
-// the resulting state is identical to the one that was created when applying
-// in real time.
+// Contains basic information about the state, but does not go into depth.
+type StateInfo struct {
+	CurrentBlock BlockID
+	Height       BlockHeight
+	Target       Target
+}
+
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
@@ -59,18 +47,9 @@ type State struct {
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
 	currentBlockID BlockID
-	currentPath    map[BlockHeight]BlockID // Points to the block id for a given height.
+	currentPath    map[BlockHeight]BlockID
 	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]*OpenContract // TODO: This probably shouldn't be a pointer.
-	spentOutputs   map[OutputID]Output          // Useful for remembering how many coins an input had. TODO: This should be available in the diffs, not here.
-
-	// consensusSubscriptions is a list of channels that receive notifications
-	// each time the state of consensus changes. Consensus changes only happen
-	// through the application and inversion of blocks. See notifications.go
-	// for more information.
-	//
-	// TODO: deprecate
-	consensusSubscriptions []chan ConsensusChange
+	openContracts  map[ContractID]FileContract
 
 	// TODO: docstring
 	subscriptions []chan struct{}
@@ -78,30 +57,9 @@ type State struct {
 	mu sync.RWMutex
 }
 
-// An open contract contains all information necessary to properly enforce a
-// contract with no knowledge of the history of the contract.
-type OpenContract struct {
-	FileContract    FileContract
-	ContractID      ContractID
-	FundsRemaining  Currency
-	Failures        uint64
-	WindowSatisfied bool
-}
-
-// A missed storage proof indicates which contract missed the proof, and which
-// output resulted from the missed proof. This is necessary because missed
-// proofs are passive - they happen in the absense of a transaction, not in the
-// presense of one. They must be stored in the block nodes so that a block can
-// be correctly rewound without needing to scroll through the past
-// 'ChallengeWindow' blocks to figure out if a proof was missed or not.
-type MissedStorageProof struct {
-	OutputID   OutputID
-	ContractID ContractID
-}
-
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else.
-func CreateGenesisState() (s *State, diffs []OutputDiff) {
+func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
 		blockRoot:              new(BlockNode),
@@ -109,9 +67,8 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 		blockMap:               make(map[BlockID]*BlockNode),
 		missingParents:         make(map[BlockID]map[BlockID]Block),
 		currentPath:            make(map[BlockHeight]BlockID),
-		openContracts:          make(map[ContractID]*OpenContract),
+		openContracts:          make(map[ContractID]FileContract),
 		unspentOutputs:         make(map[OutputID]Output),
-		spentOutputs:           make(map[OutputID]Output),
 		transactionPoolOutputs: make(map[OutputID]*Transaction),
 		transactionPoolProofs:  make(map[ContractID]*Transaction),
 		transactionList:        make(map[OutputID]*Transaction),
@@ -124,9 +81,6 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 	}
 	s.blockRoot.Block = genesisBlock
 	s.blockRoot.Height = 0
-	for i := range s.blockRoot.RecentTimestamps {
-		s.blockRoot.RecentTimestamps[i] = GenesisTimestamp
-	}
 	s.blockRoot.Target = RootTarget
 	s.blockRoot.Depth = RootDepth
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
@@ -142,38 +96,7 @@ func CreateGenesisState() (s *State, diffs []OutputDiff) {
 	}
 	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 
-	// Create the output diff for genesis subsidy.
-	diff := OutputDiff{
-		New:    true,
-		ID:     genesisBlock.SubsidyID(),
-		Output: genesisSubsidyOutput,
-	}
-	diffs = append(diffs, diff)
-
 	return
-}
-
-func (s *State) height() BlockHeight {
-	return s.blockMap[s.currentBlockID].Height
-}
-
-// State.Height() returns the height of the longest fork.
-func (s *State) Height() BlockHeight {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.height()
-}
-
-// depth returns the depth of the current block of the state.
-func (s *State) depth() Target {
-	return s.currentBlockNode().Depth
-}
-
-// Depth returns the depth of the current block of the state.
-func (s *State) Depth() Target {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.depth()
 }
 
 // BlockAtHeight() returns the block from the current history at the
@@ -187,57 +110,10 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, err error) {
 	return
 }
 
-func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.blockAtHeight(height)
-}
-
-// BlockFromID returns the block associated with a given id. This function
-// isn't actually used anywhere right now but it seems like it might be useful
-// so I'm keeping it around.
-func (s *State) BlockFromID(bid BlockID) (b Block, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	node := s.blockMap[bid]
-	if node == nil {
-		err = errors.New("no block of that id found")
-		return
-	}
-	b = node.Block
-	return
-}
-
-// HeightOfBlock returns the height of a block given the id.
-func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	node := s.blockMap[bid]
-	if node == nil {
-		err = errors.New("no block of that id found")
-		return
-	}
-	height = node.Height
-	return
-}
-
 // currentBlockNode returns the node of the most recent block in the
 // longest fork.
 func (s *State) currentBlockNode() *BlockNode {
 	return s.blockMap[s.currentBlockID]
-}
-
-func (s *State) currentBlock() Block {
-	return s.blockMap[s.currentBlockID].Block
-}
-
-// CurrentBlock returns the most recent block in the longest fork.
-func (s *State) CurrentBlock() Block {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlock()
 }
 
 // CurrentBlockWeight() returns the weight of the current block in the
@@ -246,26 +122,14 @@ func (s *State) currentBlockWeight() BlockWeight {
 	return s.currentBlockNode().Target.Inverse()
 }
 
-func (s *State) CurrentBlockWeight() BlockWeight {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockWeight()
+// depth returns the depth of the current block of the state.
+func (s *State) depth() Target {
+	return s.currentBlockNode().Depth
 }
 
-// EarliestLegalTimestamp returns the earliest legal timestamp of the next
-// block - earlier timestamps will render the block invalid.
-func (s *State) EarliestTimestamp() Timestamp {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockNode().earliestChildTimestamp()
-}
-
-// CurrentTarget returns the target of the next block that needs to be
-// submitted to the state.
-func (s *State) CurrentTarget() Target {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockNode().Target
+// height returns the current height of the state.
+func (s *State) height() BlockHeight {
+	return s.blockMap[s.currentBlockID].Height
 }
 
 // State.Output returns the Output associated with the id provided for input,
@@ -280,103 +144,69 @@ func (s *State) output(id OutputID) (output Output, err error) {
 	return
 }
 
-func (s *State) Output(id OutputID) (output Output, err error) {
+// BlockAtHeight returns the block in the current fork found at `height`.
+func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.output(id)
-}
 
-// Sorted UtxoSet returns all of the unspent transaction outputs sorted
-// according to the numerical value of their id.
-func (s *State) sortedUtxoSet() (sortedOutputs []Output) {
-	var unspentOutputStrings []string
-	for outputID := range s.unspentOutputs {
-		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
+	bn, exists := s.blockMap[s.currentPath[height]]
+	if !exists {
+		err = errors.New("no block found")
+		return
 	}
-	sort.Strings(unspentOutputStrings)
-
-	for _, utxoString := range unspentOutputStrings {
-		var outputID OutputID
-		copy(outputID[:], utxoString)
-		output, err := s.output(outputID)
-		if err != nil {
-			panic(err)
-		}
-		sortedOutputs = append(sortedOutputs, output)
-	}
+	b = bn.Block
 	return
 }
 
-func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
+// CurrentBlock returns the highest block on the tallest fork.
+func (s *State) CurrentBlock() Block {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.sortedUtxoSet()
+	return s.currentBlockNode().Block
 }
 
-// StateHash returns the markle root of the current state of consensus.
-func (s *State) stateHash() hash.Hash {
-	// Items of interest:
-	// 1. CurrentBlockID
-	// 2. Current Height
-	// 3. Current Target
-	// 4. Current Depth
-	// 5. Earliest Allowed Timestamp of Next Block
-	// 6. Genesis Block
-	// 7. CurrentPath, ordered by height.
-	// 8. UnspentOutputs, sorted by id.
-	// 9. OpenContracts, sorted by id.
-
-	// Create a slice of hashes representing all items of interest.
-	leaves := []hash.Hash{
-		hash.Hash(s.currentBlockID),
-		hash.HashObject(s.height()),
-		hash.HashObject(s.currentBlockNode().Target),
-		hash.HashObject(s.currentBlockNode().Depth),
-		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-		hash.Hash(s.blockRoot.Block.ID()),
-	}
-
-	// Add all the blocks in the current path.
-	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, hash.Hash(s.currentPath[BlockHeight(i)]))
-	}
-
-	// Sort the unspent outputs by the string value of their ID.
-	sortedUtxos := s.sortedUtxoSet()
-
-	// Add the unspent outputs in sorted order.
-	for _, output := range sortedUtxos {
-		leaves = append(leaves, hash.HashObject(output))
-	}
-
-	// Sort the open contracts by the string value of their ID.
-	var openContractStrings []string
-	for contractID := range s.openContracts {
-		openContractStrings = append(openContractStrings, string(contractID[:]))
-	}
-	sort.Strings(openContractStrings)
-
-	// Add the open contracts in sorted order.
-	for _, stringContractID := range openContractStrings {
-		var contractID ContractID
-		copy(contractID[:], stringContractID)
-		leaves = append(leaves, hash.HashObject(s.openContracts[contractID]))
-	}
-
-	return hash.MerkleRoot(leaves)
-}
-
-func (s *State) StateHash() hash.Hash {
+// CurrentTarget returns the target of the next block that needs to be
+// submitted to the state.
+func (s *State) CurrentTarget() Target {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.stateHash()
+	return s.currentBlockNode().Target
+}
+
+// State.Height() returns the height of the longest fork.
+func (s *State) Height() BlockHeight {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.height()
+}
+
+// HeightOfBlock returns the height of the block with id `bid`.
+func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	bn, exists := s.blockMap[bid]
+	if !exists {
+		err = errors.New("block not found")
+		return
+	}
+	height = bn.Height
+	return
+}
+
+// EarliestLegalTimestamp returns the earliest legal timestamp of the next
+// block - earlier timestamps will render the block invalid.
+func (s *State) EarliestTimestamp() Timestamp {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // Cheater function.
 func (s *State) MinerVars() (parent BlockID, txns []Transaction, target Target, earliestTimestamp Timestamp) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	parent = s.currentBlock().ID()
+	parent = s.currentBlockNode().Block.ID()
 	txns = s.transactionPoolDump()
 	target = s.currentBlockNode().Target
 	earliestTimestamp = s.currentBlockNode().earliestChildTimestamp()
