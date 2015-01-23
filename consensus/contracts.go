@@ -47,14 +47,11 @@ func (s *State) StorageProofSegment(id ContractID) (index uint64, err error) {
 // is invalid.
 func (s *State) validContract(fc FileContract) (err error) {
 	if fc.Start <= s.height() {
-		err = errors.New("contract must start in the future.")
-		return
+		return errors.New("contract must start in the future.")
 	}
 	if fc.End <= fc.Start {
-		err = errors.New("contract duration must be at least one block.")
-		return
+		return errors.New("contract duration must be at least one block.")
 	}
-
 	return
 }
 

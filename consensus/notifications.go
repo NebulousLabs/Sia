@@ -54,12 +54,9 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 
 	// Get all the ids going forward from the pivot node.
 	height := reversedNodes[len(reversedNodes)-1].Height
-	_, exists = s.currentPath[height]
-	for exists {
+	for _, exists := s.currentPath[height]; exists; height++ {
 		node := s.blockMap[s.currentPath[height]]
 		addedBlocks = append(addedBlocks, node.Block.ID())
-
-		height++
 		_, exists = s.currentPath[height]
 	}
 

@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -133,8 +132,6 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
 		err = errors.New("block is known to be invalid")
-		errStr := fmt.Sprintf("%v", b.ID())
-		panic(errStr)
 		return
 	}
 

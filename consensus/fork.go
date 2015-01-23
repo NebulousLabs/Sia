@@ -20,10 +20,8 @@ func (s *State) heavierFork(newNode *BlockNode) bool {
 // to the first parent that is in the current blockchain.
 func (s *State) backtrackToBlockchain(bn *BlockNode) (nodes []*BlockNode) {
 	nodes = append(nodes, bn)
-	currentChainID := s.currentPath[bn.Height]
-	for currentChainID != bn.Block.ID() {
+	for s.currentPath[bn.Height] != bn.Block.ID() {
 		bn = bn.Parent
-		currentChainID = s.currentPath[bn.Height]
 		nodes = append(nodes, bn)
 	}
 	return

@@ -10,8 +10,8 @@ const (
 	DEBUG = true
 
 	BlockSizeLimit        = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
-	BlockFrequency        = Timestamp(10)          // In seconds.
-	TargetWindow          = BlockHeight(80)        // Number of blocks to use when calculating the target.
+	BlockFrequency        = Timestamp(1)          // In seconds.
+	TargetWindow          = BlockHeight(1000)        // Number of blocks to use when calculating the target.
 	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid.
 	FutureThreshold       = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 
@@ -22,11 +22,11 @@ const (
 )
 
 var (
-	RootTarget = Target{0, 0, 8}
+	RootTarget = Target{64}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-	MaxAdjustmentUp   = big.NewRat(103, 100)
-	MaxAdjustmentDown = big.NewRat(97, 100)
+	MaxAdjustmentUp   = big.NewRat(1001, 1001)
+	MaxAdjustmentDown = big.NewRat(999, 1000)
 
 	GenesisAddress = CoinAddress{}
 )
