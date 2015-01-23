@@ -4,34 +4,48 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
 )
 
-// Wallet holds your coins, manages privacy, outputs, ect. The balance reported
-// ignores outputs you've already spent even if they haven't made it into the
-// blockchain yet.
-//
-// The spentCounter is used to indicate which transactions have been spent but
-// have not appeared in the blockchain. It's used as an int for an easy reset.
-// Each transaction also has a spent counter. If the transaction's spent
-// counter is equal to the wallet's spent counter, then the transaction has
-// been spent since the last reset. Upon reset, the wallet's spent counter is
-// incremented, which means all transactions will no longer register as having
-// been spent since the last reset.
-//
-// Wallet.transactions is a list of transactions that are currently being built
-// within the wallet. The transactionCounter ensures that each
-// transaction-in-progress gets a unique ID.
+const (
+	// AgeDelay indicates how long the wallet will wait before allowing the
+	// user to double-spend a transaction under standard circumstances. The
+	// rationale is that most transactions are meant to be submitted to the
+	// blockchain immediately, and ones that take more than AgeDelay blocks
+	// have probably failed in some way. There are means to increase the
+	// AgeDelay for specific transactions.
+	AgeDelay = 80
+)
+
+// The wallet contains a list of addresses and the methods to spend them (the
+// keys), as well as an interactive way to construct and sign transactions.
 type Wallet struct {
-	state      *consensus.State
-	prevHeight consensus.BlockHeight // TODO: This will deprecate when we switch to state subscriptions.
+	state *consensus.State
 
-	saveFilename string
+	// Location of the wallet's file, for saving and loading keys.
+	filename string
 
-	spentCounter        int
-	addresses           map[consensus.CoinAddress]*spendableAddress
-	timelockedAddresses map[consensus.BlockHeight][]*spendableAddress
+	// A key contains all the information necessary to spend a particular
+	// address, as well as all the known outputs that use the address.
+	//
+	// age is a tool to determine whether or not an output can be spent. When
+	// an output is spent by the wallet, the age of the output is marked equal
+	// to the age of the wallet. It will not be spent again until the age is
+	// `AgeDelay` less than the wallet. The wallet ages by 1 every block. The
+	// wallet can also be manually aged, which is a convenient and efficient
+	// way of resetting spent outputs. Transactions are not intended to be
+	// broadcast for a while can be given an age that is much greater than the
+	// wallet.
+	//
+	// Timelocked keys is a list of addresses found in `keys` that can't be
+	// spent until a certain height. The wallet will use `timelockedKeys` to
+	// mark keys as unspendable until the timelock has lifted.
+	age            int
+	keys           map[consensus.CoinAddress]*key
+	timelockedKeys map[consensus.BlockHeight][]consensus.CoinAddress
 
+	// transactions is a list of transactions that are currently being built by
+	// the wallet. Each transaction has a unique id, which is enforced by the
+	// transactionCounter.
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
@@ -44,11 +58,11 @@ func New(state *consensus.State, filename string) (w *Wallet, err error) {
 	w = &Wallet{
 		state: state,
 
-		saveFilename: filename,
+		filename: filename,
 
-		spentCounter:                 1,
-		spendableAddresses:           make(map[consensus.CoinAddress]*spendableAddress),
-		timelockedSpendableAddresses: make(map[consensus.BlockHeight][]*spendableAddress),
+		age:            1,
+		keys:           make(map[consensus.CoinAddress]key),
+		timelockedKeys: make(map[consensus.BlockHeight][]consensus.CoinAddress),
 
 		transactions: make(map[string]*openTransaction),
 	}
@@ -61,26 +75,10 @@ func New(state *consensus.State, filename string) (w *Wallet, err error) {
 	return
 }
 
-// Info implements the core.Wallet interface.
-func (w *Wallet) WalletInfo() (status components.WalletInfo, err error) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-
-	status = components.WalletInfo{
-		Balance:      w.Balance(false),
-		FullBalance:  w.Balance(true),
-		NumAddresses: len(w.spendableAddresses),
-	}
-
-	return
-}
-
-// SpendCoins creates a transaction sending 'amount' to 'dest', and
-// allocateding 'minerFee' as a miner fee. The transaction is submitted to the
-// miner pool, but is also returned.
+// SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
+// is submitted to the miner pool, but is also returned.
 func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
-	minerFee := consensus.Currency(10) // TODO: wallet supplied miner fee
 	output := consensus.Output{
 		Value:     amount,
 		SpendHash: dest,
@@ -93,10 +91,6 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddres
 	if err != nil {
 		return
 	}
-	err = w.AddMinerFee(id, minerFee)
-	if err != nil {
-		return
-	}
 	err = w.AddOutput(id, output)
 	if err != nil {
 		return
@@ -106,5 +100,9 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddres
 		return
 	}
 	err = w.state.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
+
 	return
 }

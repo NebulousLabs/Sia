@@ -25,18 +25,24 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 	// unlocked, also add it to the list of currently spendable addresses. It
 	// needs to go in both though in case there is a reorganization of the
 	// blockchain.
-	newSpendableAddress := &spendableAddress{
-		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
-		spendConditions:  spendConditions,
-		secretKey:        sk,
-	}
-	spendableAddressSlice := w.timelockedSpendableAddresses[unlockHeight]
-	spendableAddressSlice = append(spendableAddressSlice, newSpendableAddress)
-	w.timelockedSpendableAddresses[unlockHeight] = spendableAddressSlice
-	if unlockHeight <= w.state.Height() {
-		w.spendableAddresses[coinAddress] = newSpendableAddress
-	}
+	newKey := &key{
+		spendConditions: spendConditions,
+		secretKey:       sk,
 
+		outputs: make(map[consensus.OutputID]*knownOutput),
+	}
+	if unlockHeight <= w.state.Height() {
+		newKey.spendable = true
+	}
+	w.keys[coinAddress] = newKey
+
+	// Add this key to the list of addresses that get unlocked at
+	// `unlockHeight`
+	heightAddrs := w.timelockedKeys[unlockHeight]
+	heightAddrs = append(heightAddrs, coinAddress)
+	w.timelockedKeys[unlockHeight] = heightAddrs
+
+	// Save the wallet state, which now includes the new address.
 	err = w.save()
 	if err != nil {
 		return
@@ -45,7 +51,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 	return
 }
 
-// coinAddress implements the core.Wallet interface.
+// coinAddress returns a new address for receiving coins.
 func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
 	// Create the keys and address.
 	sk, pk, err := crypto.GenerateSignatureKeys()
@@ -59,13 +65,16 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 	coinAddress = spendConditions.CoinAddress()
 
 	// Add the address to the set of spendable addresses.
-	newSpendableAddress := &spendableAddress{
-		spendableOutputs: make(map[consensus.OutputID]*spendableOutput),
-		spendConditions:  spendConditions,
-		secretKey:        sk,
-	}
-	w.spendableAddresses[coinAddress] = newSpendableAddress
+	newKey := &key{
+		spendable:       true,
+		spendConditions: spendConditions,
+		secretKey:       sk,
 
+		outputs: make(map[consensus.OutputID]*knownOutput),
+	}
+	w.keys[coinAddress] = newKey
+
+	// Save the wallet state, which now includes the new address.
 	err = w.save()
 	if err != nil {
 		return

@@ -8,18 +8,19 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// Reset implements the core.Wallet interface.
-func (w *Wallet) Reset() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	w.spentCounter++
-	w.transactions = make(map[string]*openTransaction)
-
-	return nil
+// openTransaction is a type that the wallet uses to track a transaction as it
+// adds inputs and other features. `inputs` is a list of inputs (their indicies
+// in the transaction) that the wallet has added personally, so that the inputs
+// can be signed when SignTransaction() is called.
+type openTransaction struct {
+	transaction *consensus.Transaction
+	inputs      []int
 }
 
-// RegisterTransaction implements the core.Wallet interface.
+// RegisterTransaction starts with a transaction as input and adds that
+// transaction to the list of open transactions, returning an id. That id can
+// then be used to modify and sign the transaction. An empty transaction is
+// legal input.
 func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -31,7 +32,8 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 	return
 }
 
-// FundTransaction implements the core.Wallet interface.
+// FundTransaction adds enough inputs to equal `amount` of input to the
+// transaction, and also adds any refunds necessary to get the balance correct.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -43,7 +45,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	}
 	t := ot.transaction
 
-	// Get the set of outputs.
+	// Get the set of outputs to use as inputs.
 	spendableOutputs, total, err := w.findOutputs(amount)
 	if err != nil {
 		return err

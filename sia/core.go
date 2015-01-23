@@ -121,7 +121,6 @@ func CreateCore(config Config) (c *Core, err error) {
 
 	// TODO: Figure out if there's any way that we need to sync to the state.
 	// Create a state.
-	var genesisOutputDiffs []consensus.OutputDiff
 	genesisBlock, err := c.state.BlockAtHeight(0)
 	if err != nil {
 		return
@@ -133,10 +132,6 @@ func CreateCore(config Config) (c *Core, err error) {
 		return
 	}
 	err = c.hostDB.Update(0, nil, []consensus.Block{genesisBlock})
-	if err != nil {
-		return
-	}
-	err = c.wallet.Update(genesisOutputDiffs)
 	if err != nil {
 		return
 	}
@@ -174,7 +169,7 @@ func (c *Core) ScanMutexes() {
 		renter++
 	}()
 	go func() {
-		c.wallet.WalletInfo()
+		c.wallet.Balance(false)
 		wallet++
 	}()
 
