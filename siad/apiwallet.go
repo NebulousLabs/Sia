@@ -63,7 +63,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 // out how to use the json. The daemon and envrionment don't really know what's
 // contained within in an attempt to keep things modular.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	walletStatus, err := d.wallet.WalletInfo()
+	walletStatus, err := d.wallet.Info()
 	if err != nil {
 		http.Error(w, "Failed to get wallet info", 500)
 		return

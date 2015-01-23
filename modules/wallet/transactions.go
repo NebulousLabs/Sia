@@ -39,38 +39,41 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	defer w.mu.Unlock()
 
 	// Get the transaction.
-	ot, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction of given id found")
 	}
-	t := ot.transaction
+	txn := openTxn.transaction
 
 	// Get the set of outputs to use as inputs.
-	spendableOutputs, total, err := w.findOutputs(amount)
+	knownOutputs, total, err := w.findOutputs(amount)
 	if err != nil {
 		return err
 	}
 
 	// Create and add all of the inputs.
-	for _, spendableOutput := range spendableOutputs {
-		spendableAddress := w.spendableAddresses[spendableOutput.output.SpendHash]
+	for _, knownOutput := range knownOutputs {
+		key := w.keys[knownOutput.output.SpendHash]
 		newInput := consensus.Input{
-			OutputID:        spendableOutput.id,
-			SpendConditions: spendableAddress.spendConditions,
+			OutputID:        knownOutput.id,
+			SpendConditions: key.spendConditions,
 		}
-		ot.inputs = append(ot.inputs, len(t.Inputs))
-		t.Inputs = append(t.Inputs, newInput)
+		openTxn.inputs = append(openTxn.inputs, len(txn.Inputs))
+		txn.Inputs = append(txn.Inputs, newInput)
+
+		// Set the age of the knownOutput to prevent accidental double spends.
+		knownOutput.age = w.age
 	}
 
 	// Add a refund output if needed.
 	if total-amount > 0 {
 		coinAddress, _, err := w.coinAddress()
-
 		if err != nil {
 			return err
 		}
-		t.Outputs = append(
-			t.Outputs,
+
+		txn.Outputs = append(
+			txn.Outputs,
 			consensus.Output{
 				Value:     total - amount,
 				SpendHash: coinAddress,
@@ -80,61 +83,33 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	return nil
 }
 
-// AddMinerFee implements the core.Wallet interface.
+// AddMinerFee will add a miner fee to the transaction, but will not add any
+// inputs.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	to, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.MinerFees = append(to.transaction.MinerFees, fee)
+	openTxn.transaction.MinerFees = append(openTxn.transaction.MinerFees, fee)
 	return nil
 }
 
-// AddOutput implements the core.Wallet interface.
-func (w *Wallet) AddOutput(id string, o consensus.Output) error {
+// AddOutput adds an output to the transaction, but will not add any inputs.
+func (w *Wallet) AddOutput(id string, output consensus.Output) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	to, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.Outputs = append(to.transaction.Outputs, o)
+	openTxn.transaction.Outputs = append(openTxn.transaction.Outputs, output)
 	return nil
-}
-
-// AddTimelockedRefund implements the core.Wallet interface.
-func (w *Wallet) AddTimelockedRefund(id string, amount consensus.Currency, release consensus.BlockHeight) (spendConditions consensus.SpendConditions, refundIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Get the transaction
-	ot, exists := w.transactions[id]
-	if !exists {
-		err = errors.New("no transaction found for given id")
-		return
-	}
-	t := ot.transaction
-
-	// Get a frozen coin address.
-	_, spendConditions, err = w.timelockedCoinAddress(release)
-	if err != nil {
-		return
-	}
-
-	// Add the output to the transaction
-	output := consensus.Output{
-		Value:     amount,
-		SpendHash: spendConditions.CoinAddress(),
-	}
-	refundIndex = uint64(len(t.Outputs))
-	t.Outputs = append(t.Outputs, output)
-	return
 }
 
 // AddFileContract implements the core.Wallet interface.
@@ -142,12 +117,12 @@ func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	to, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.FileContracts = append(to.transaction.FileContracts, fc)
+	openTxn.transaction.FileContracts = append(openTxn.transaction.FileContracts, fc)
 	return nil
 }
 
@@ -156,12 +131,12 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	to, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.StorageProofs = append(to.transaction.StorageProofs, sp)
+	openTxn.transaction.StorageProofs = append(openTxn.transaction.StorageProofs, sp)
 	return nil
 }
 
@@ -170,49 +145,49 @@ func (w *Wallet) AddArbitraryData(id string, arb string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	to, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction found for given id")
 	}
 
-	to.transaction.ArbitraryData = append(to.transaction.ArbitraryData, arb)
+	openTxn.transaction.ArbitraryData = append(openTxn.transaction.ArbitraryData, arb)
 	return nil
 }
 
 // SignTransaction implements the core.Wallet interface.
-func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction consensus.Transaction, err error) {
+func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensus.Transaction, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	// Fetch the transaction.
-	openTransaction, exists := w.transactions[id]
+	openTxn, exists := w.transactions[id]
 	if !exists {
 		err = errors.New("no transaction found for given id")
 		return
 	}
-	transaction = *openTransaction.transaction
+	txn = *openTxn.transaction
 
 	// Get the coveredfields struct.
 	var coveredFields consensus.CoveredFields
 	if wholeTransaction {
 		coveredFields = consensus.CoveredFields{WholeTransaction: true}
 	} else {
-		for i := range transaction.MinerFees {
+		for i := range txn.MinerFees {
 			coveredFields.MinerFees = append(coveredFields.MinerFees, uint64(i))
 		}
-		for i := range transaction.Inputs {
+		for i := range txn.Inputs {
 			coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
 		}
-		for i := range transaction.Outputs {
+		for i := range txn.Outputs {
 			coveredFields.Outputs = append(coveredFields.Outputs, uint64(i))
 		}
-		for i := range transaction.FileContracts {
+		for i := range txn.FileContracts {
 			coveredFields.Contracts = append(coveredFields.Contracts, uint64(i))
 		}
-		for i := range transaction.StorageProofs {
+		for i := range txn.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
 		}
-		for i := range transaction.ArbitraryData {
+		for i := range txn.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
 
@@ -220,26 +195,25 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (transaction 
 	}
 
 	// For each input in the transaction that we added, provide a signature.
-	for _, inputIndex := range openTransaction.inputs {
-		input := transaction.Inputs[inputIndex]
+	for _, inputIndex := range openTxn.inputs {
+		input := txn.Inputs[inputIndex]
 		sig := consensus.TransactionSignature{
 			InputID:        input.OutputID,
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
 		}
-		transaction.Signatures = append(transaction.Signatures, sig)
+		txn.Signatures = append(txn.Signatures, sig)
 
 		// Hash the transaction according to the covered fields and produce the
 		// cryptographic signature.
-		secKey := w.spendableAddresses[input.SpendConditions.CoinAddress()].secretKey
-		sigHash := transaction.SigHash(len(transaction.Signatures) - 1)
-		transaction.Signatures[len(transaction.Signatures)-1].Signature, err = crypto.SignBytes(sigHash[:], secKey)
+		coinAddress := input.SpendConditions.CoinAddress()
+		sigIndex := len(txn.Signatures) - 1
+		secKey := w.keys[coinAddress].secretKey
+		sigHash := txn.SigHash(sigIndex)
+		txn.Signatures[sigIndex].Signature, err = crypto.SignBytes(sigHash[:], secKey)
 		if err != nil {
 			return
 		}
-
-		// Mark the input as spent. Maps :)
-		w.spendableAddresses[input.SpendConditions.CoinAddress()].spendableOutputs[input.OutputID].spentCounter = w.spentCounter
 	}
 
 	// Delete the open transaction.

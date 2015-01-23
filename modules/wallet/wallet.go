@@ -61,7 +61,7 @@ func New(state *consensus.State, filename string) (w *Wallet, err error) {
 		filename: filename,
 
 		age:            1,
-		keys:           make(map[consensus.CoinAddress]key),
+		keys:           make(map[consensus.CoinAddress]*key),
 		timelockedKeys: make(map[consensus.BlockHeight][]consensus.CoinAddress),
 
 		transactions: make(map[string]*openTransaction),
@@ -87,7 +87,7 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddres
 	if err != nil {
 		return
 	}
-	err = w.FundTransaction(id, amount+minerFee)
+	err = w.FundTransaction(id, amount)
 	if err != nil {
 		return
 	}

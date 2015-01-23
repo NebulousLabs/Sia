@@ -81,20 +81,6 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 	return
 }
 
-// UpdateHost changes the settings of the host to the input settings.
-// SpaceRemaining will be changed accordingly, and will not return an error if
-// space remaining goes negative.
-func (h *Host) UpdateHost(update modules.HostUpdate) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	h.announcement = update.Announcement
-	storageDiff := update.Announcement.TotalStorage - h.announcement.TotalStorage
-	h.spaceRemaining += storageDiff
-
-	return nil
-}
-
 // RetrieveFile is an RPC that uploads a specified file to a client.
 //
 // Mutexes are applied carefully to avoid any disk intensive or network

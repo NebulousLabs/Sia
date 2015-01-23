@@ -26,9 +26,6 @@ type Miner struct {
 
 	stateSubscription chan struct{}
 
-	// TODO: Depricate
-	blockChan chan consensus.Block
-
 	mu sync.RWMutex
 }
 
@@ -61,15 +58,6 @@ func New(state *consensus.State, wallet modules.Wallet) (m *Miner, err error) {
 	m.checkUpdate()
 
 	return
-}
-
-// TODO: depricate. This is gross but it's only here while I move everything
-// over to subscription. Stuff will break if the miner isn't feeding blocks
-// directly to the core instead of directly to the state.
-func (m *Miner) SetBlockChan(blockChan chan consensus.Block) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.blockChan = blockChan
 }
 
 // SetThreads establishes how many threads the miner will use when mining.

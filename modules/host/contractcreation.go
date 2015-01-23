@@ -12,6 +12,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -185,7 +186,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		_, err = encoding.WriteObject(conn, err.Error())
 		return
 	}
-	_, err = encoding.WriteObject(conn, components.AcceptContractResponse)
+	_, err = encoding.WriteObject(conn, modules.AcceptContractResponse)
 	if err != nil {
 		return
 	}

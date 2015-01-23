@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // uniformTreeVerification checks that everything makes sense in the tree given
@@ -67,7 +67,7 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		entry := components.HostEntry{
+		entry := modules.HostEntry{
 			ID:     strconv.Itoa(i),
 			Burn:   10,
 			Freeze: 10,
@@ -108,7 +108,7 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := components.HostEntry{
+		entry := modules.HostEntry{
 			ID:     strconv.Itoa(i),
 			Burn:   10,
 			Freeze: 10,
