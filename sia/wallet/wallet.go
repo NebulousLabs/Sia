@@ -28,9 +28,9 @@ type Wallet struct {
 
 	saveFilename string
 
-	spentCounter                 int
-	spendableAddresses           map[consensus.CoinAddress]*spendableAddress
-	timelockedSpendableAddresses map[consensus.BlockHeight][]*spendableAddress
+	spentCounter        int
+	addresses           map[consensus.CoinAddress]*spendableAddress
+	timelockedAddresses map[consensus.BlockHeight][]*spendableAddress
 
 	transactionCounter int
 	transactions       map[string]*openTransaction

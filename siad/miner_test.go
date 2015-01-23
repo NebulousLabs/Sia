@@ -16,6 +16,7 @@ func mineSingleBlock(t *testing.T, d *daemon) {
 	}
 }
 
+/*
 func testMinerDeadlocking(t *testing.T, d *daemon) {
 	d.miner.Threads()
 	d.miner.SetThreads(2)
@@ -24,3 +25,4 @@ func testMinerDeadlocking(t *testing.T, d *daemon) {
 	d.miner.StopMining()
 	d.miner.Threads()
 }
+*/

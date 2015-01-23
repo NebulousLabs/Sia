@@ -9,9 +9,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// AddressKey is how we serialize and store spendable addresses on
-// disk.
-type AddressKey struct {
+// Key is how we serialize and store spendable addresses on disk.
+type Key struct {
 	SpendConditions consensus.SpendConditions
 	SecretKey       crypto.SecretKey
 }
@@ -19,21 +18,33 @@ type AddressKey struct {
 func (w *Wallet) save() (err error) {
 	// Add every known spendable address + secret key.
 	var i int
-	keys := make([]AddressKey, len(w.spendableAddresses))
-	for _, spendableAddress := range w.spendableAddresses {
-		key := AddressKey{
-			SpendConditions: spendableAddress.spendConditions,
-			SecretKey:       spendableAddress.secretKey,
+	keys := make([]Key, len(w.addresses))
+	for _, address := range w.addresses {
+		key := Key{
+			SpendConditions: address.spendConditions,
+			SecretKey:       address.secretKey,
 		}
 		keys[i] = key
 		i++
 	}
 
-	//  write the file
-	fileData := encoding.Marshal(keys)
+	timelockedKeys := make([]AddressKey, len(w.timelockedAddresses))
+	for _, address := range w.timelockedAddresses {
+		key := Key{
+			SpendConditions: address.spendConditions,
+			SecretKey:       address.secretKey,
+		}
+		timelockedKeys[i] = key
+		i++
+	}
+
+	// Write the file.
+	fileData := encoding.MarshalAll(keys, timelockedKeys)
 	if err != nil {
 		return
 	}
+	// TODO: Instead of using WriteFile, write to a temp file and then do a move,
+	// this is an action that should probably appear in a library somewhere.
 	err = ioutil.WriteFile(w.saveFilename, fileData, 0666)
 	if err != nil {
 		return
@@ -50,6 +61,8 @@ func (w *Wallet) Save() (err error) {
 }
 
 // Load implements the core.Wallet interface.
+//
+// TODO TODO TODO: update load so that it also loads timelocked keys.
 func (w *Wallet) Load(filename string) (err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
