@@ -86,9 +86,5 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
-	// Begin listening for requests on the API.
-	// handle will run until /stop is called or an interrupt is caught.
-	go d.handle(config.APIAddr)
-
 	return
 }

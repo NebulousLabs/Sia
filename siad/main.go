@@ -99,15 +99,13 @@ func startEnvironment(*cobra.Command, []string) {
 	if err != nil {
 		fmt.Println("Bad config value:", err)
 	}
-	_, err = newDaemon(daemonConfig)
+	d, err := newDaemon(daemonConfig)
 	if err != nil {
 		fmt.Println("Failed to start daemon:", err)
 		return
 	}
 
-	// TODO: Instead of blocking forever, call a function that can receive a
-	// close signal.
-	select {}
+	d.handle(daemonConfig.APIAddr)
 }
 
 func version(*cobra.Command, []string) {

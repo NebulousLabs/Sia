@@ -1,7 +1,7 @@
 package main
 
-func daemonTestConfig() (dc DaemonConfig) {
-	return DaemonConfig{
+func testingDaemon() (d *daemon, err error) {
+	dc := DaemonConfig{
 		APIAddr:     ":9020",
 		RPCAddr:     ":9021",
 		NoBootstrap: true,
@@ -14,4 +14,12 @@ func daemonTestConfig() (dc DaemonConfig) {
 
 		WalletDir: "walletDir",
 	}
+
+	d, err = newDaemon(dc)
+	if err != nil {
+		return
+	}
+
+	go d.handle(dc.APIAddr)
+	return
 }

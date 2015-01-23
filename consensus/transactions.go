@@ -168,7 +168,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		}
 	}
 
-	// Check that the outputs are less than or equal to the outputs.
+	// Check that the inputs equal the outputs.
 	if inputSum != outputSum {
 		if DEBUG {
 			errorString := fmt.Sprintf("Inputs do not equal outputs for transaction: inputs=%v : outputs=%v", inputSum, outputSum)

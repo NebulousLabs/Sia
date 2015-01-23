@@ -23,8 +23,7 @@ func testEmptyBlock(t *testing.T, d *daemon) {
 }
 
 func TestBlockHandling(t *testing.T) {
-	config := daemonTestConfig()
-	d, err := newDaemon(config)
+	d, err := testingDaemon()
 	if err != nil {
 		t.Fatal(err)
 	}
