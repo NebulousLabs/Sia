@@ -4,10 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"sync"
-
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 type (
@@ -104,29 +101,6 @@ func CreateGenesisState() (s *State) {
 	return
 }
 
-func (s *State) height() BlockHeight {
-	return s.blockMap[s.currentBlockID].Height
-}
-
-// State.Height() returns the height of the longest fork.
-func (s *State) Height() BlockHeight {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.height()
-}
-
-// depth returns the depth of the current block of the state.
-func (s *State) depth() Target {
-	return s.currentBlockNode().Depth
-}
-
-// Depth returns the depth of the current block of the state.
-func (s *State) Depth() Target {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.depth()
-}
-
 // BlockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) blockAtHeight(height BlockHeight) (b Block, err error) {
@@ -138,57 +112,10 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, err error) {
 	return
 }
 
-func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.blockAtHeight(height)
-}
-
-// BlockFromID returns the block associated with a given id. This function
-// isn't actually used anywhere right now but it seems like it might be useful
-// so I'm keeping it around.
-func (s *State) BlockFromID(bid BlockID) (b Block, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	node := s.blockMap[bid]
-	if node == nil {
-		err = errors.New("no block of that id found")
-		return
-	}
-	b = node.Block
-	return
-}
-
-// HeightOfBlock returns the height of a block given the id.
-func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	node := s.blockMap[bid]
-	if node == nil {
-		err = errors.New("no block of that id found")
-		return
-	}
-	height = node.Height
-	return
-}
-
 // currentBlockNode returns the node of the most recent block in the
 // longest fork.
 func (s *State) currentBlockNode() *BlockNode {
 	return s.blockMap[s.currentBlockID]
-}
-
-func (s *State) currentBlock() Block {
-	return s.blockMap[s.currentBlockID].Block
-}
-
-// CurrentBlock returns the most recent block in the longest fork.
-func (s *State) CurrentBlock() Block {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlock()
 }
 
 // CurrentBlockWeight() returns the weight of the current block in the
@@ -197,26 +124,14 @@ func (s *State) currentBlockWeight() BlockWeight {
 	return s.currentBlockNode().Target.Inverse()
 }
 
-func (s *State) CurrentBlockWeight() BlockWeight {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockWeight()
+// depth returns the depth of the current block of the state.
+func (s *State) depth() Target {
+	return s.currentBlockNode().Depth
 }
 
-// EarliestLegalTimestamp returns the earliest legal timestamp of the next
-// block - earlier timestamps will render the block invalid.
-func (s *State) EarliestTimestamp() Timestamp {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockNode().earliestChildTimestamp()
-}
-
-// CurrentTarget returns the target of the next block that needs to be
-// submitted to the state.
-func (s *State) CurrentTarget() Target {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.currentBlockNode().Target
+// height returns the current height of the state.
+func (s *State) height() BlockHeight {
+	return s.blockMap[s.currentBlockID].Height
 }
 
 // State.Output returns the Output associated with the id provided for input,
@@ -231,103 +146,40 @@ func (s *State) output(id OutputID) (output Output, err error) {
 	return
 }
 
-func (s *State) Output(id OutputID) (output Output, err error) {
+func (s *State) CurrentBlock() Block {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.output(id)
+	return s.currentBlockNode().Block
 }
 
-// Sorted UtxoSet returns all of the unspent transaction outputs sorted
-// according to the numerical value of their id.
-func (s *State) sortedUtxoSet() (sortedOutputs []Output) {
-	var unspentOutputStrings []string
-	for outputID := range s.unspentOutputs {
-		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
-	}
-	sort.Strings(unspentOutputStrings)
-
-	for _, utxoString := range unspentOutputStrings {
-		var outputID OutputID
-		copy(outputID[:], utxoString)
-		output, err := s.output(outputID)
-		if err != nil {
-			panic(err)
-		}
-		sortedOutputs = append(sortedOutputs, output)
-	}
-	return
-}
-
-func (s *State) SortedUtxoSet() (sortedOutputs []Output) {
+// CurrentTarget returns the target of the next block that needs to be
+// submitted to the state.
+func (s *State) CurrentTarget() Target {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.sortedUtxoSet()
+	return s.currentBlockNode().Target
 }
 
-// StateHash returns the markle root of the current state of consensus.
-func (s *State) stateHash() hash.Hash {
-	// Items of interest:
-	// 1. CurrentBlockID
-	// 2. Current Height
-	// 3. Current Target
-	// 4. Current Depth
-	// 5. Earliest Allowed Timestamp of Next Block
-	// 6. Genesis Block
-	// 7. CurrentPath, ordered by height.
-	// 8. UnspentOutputs, sorted by id.
-	// 9. OpenContracts, sorted by id.
-
-	// Create a slice of hashes representing all items of interest.
-	leaves := []hash.Hash{
-		hash.Hash(s.currentBlockID),
-		hash.HashObject(s.height()),
-		hash.HashObject(s.currentBlockNode().Target),
-		hash.HashObject(s.currentBlockNode().Depth),
-		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-		hash.Hash(s.blockRoot.Block.ID()),
-	}
-
-	// Add all the blocks in the current path.
-	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, hash.Hash(s.currentPath[BlockHeight(i)]))
-	}
-
-	// Sort the unspent outputs by the string value of their ID.
-	sortedUtxos := s.sortedUtxoSet()
-
-	// Add the unspent outputs in sorted order.
-	for _, output := range sortedUtxos {
-		leaves = append(leaves, hash.HashObject(output))
-	}
-
-	// Sort the open contracts by the string value of their ID.
-	var openContractStrings []string
-	for contractID := range s.openContracts {
-		openContractStrings = append(openContractStrings, string(contractID[:]))
-	}
-	sort.Strings(openContractStrings)
-
-	// Add the open contracts in sorted order.
-	for _, stringContractID := range openContractStrings {
-		var contractID ContractID
-		copy(contractID[:], stringContractID)
-		leaves = append(leaves, hash.HashObject(s.openContracts[contractID]))
-	}
-
-	return hash.MerkleRoot(leaves)
-}
-
-func (s *State) StateHash() hash.Hash {
+// State.Height() returns the height of the longest fork.
+func (s *State) Height() BlockHeight {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.stateHash()
+	return s.height()
+}
+
+// EarliestLegalTimestamp returns the earliest legal timestamp of the next
+// block - earlier timestamps will render the block invalid.
+func (s *State) EarliestTimestamp() Timestamp {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // Cheater function.
 func (s *State) MinerVars() (parent BlockID, txns []Transaction, target Target, earliestTimestamp Timestamp) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	parent = s.currentBlock().ID()
+	parent = s.currentBlockNode().Block.ID()
 	txns = s.transactionPoolDump()
 	target = s.currentBlockNode().Target
 	earliestTimestamp = s.currentBlockNode().earliestChildTimestamp()
