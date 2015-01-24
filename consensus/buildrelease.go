@@ -1,4 +1,4 @@
-// +build release
+// +build !test,!dev
 
 package consensus
 

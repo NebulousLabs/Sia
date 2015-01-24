@@ -164,5 +164,8 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		}
 	}
 
+	// Notify subscribers that the state has adjusted.
+	s.notifySubscribers()
+
 	return
 }

@@ -30,13 +30,15 @@ dependencies:
 	go get -u github.com/agl/ed25519
 	go get -u golang.org/x/crypto/twofish
 	go get -u github.com/stretchr/graceful
+	go get -u github.com/laher/goxc
 
-release: clean dependencies test test-long install-release
+release: clean dependencies test test-long
+	go install -tags=release ./...
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: release
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.2.0          \
-		-br=developer -pr=beta -include=example-config,LICENSE*,README*  \
-		-tasks-=deb,deb-dev,deb-source -build-tags=release
+		-br=release -pr=beta -include=example-config,LICENSE*,README*           \
+		-tasks-=deb,deb-dev,deb-source,go-test
 
 .PHONY: all fmt install clean test test-long whitepaper dependencies release xc

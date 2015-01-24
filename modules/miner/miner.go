@@ -55,6 +55,8 @@ func New(state *consensus.State, wallet modules.Wallet) (m *Miner, err error) {
 	}
 	m.address = addr
 
+	// Fool the miner into grabbing the first update.
+	m.stateSubscription <- struct{}{}
 	m.checkUpdate()
 
 	return
@@ -78,14 +80,15 @@ func (m *Miner) SetThreads(threads int) error {
 // TODO: checkUpdate will only update the miner if something has been sent down
 // a channel.
 func (m *Miner) checkUpdate() {
-	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-
-	/*
-		select {
-		case <-m.stateSubscription:
-			m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-		default:
-			// nothing to do
-		}
-	*/
+	select {
+	case <-m.stateSubscription:
+		m.state.RLock()
+		m.parent = m.state.CurrentBlock().ID()
+		m.transactions = m.state.TransactionPoolDump()
+		m.target = m.state.CurrentTarget()
+		m.earliestTimestamp = m.state.EarliestTimestamp()
+		m.state.RUnlock()
+	default:
+		// nothing to do
+	}
 }

@@ -10,6 +10,9 @@ func mineSingleBlock(t *testing.T, d *daemon) {
 	_, found, err := d.miner.SolveBlock()
 	for !found && err == nil {
 		_, found, err = d.miner.SolveBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err != nil {
 		t.Error(err)
