@@ -10,8 +10,9 @@ import (
 func (s *State) Subscribe() (alert chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	alert = make(chan struct{})
+	alert = make(chan struct{}, 1)
 	s.subscriptions = append(s.subscriptions, alert)
+	alert <- struct{}{}
 	return
 }
 

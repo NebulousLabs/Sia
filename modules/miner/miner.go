@@ -78,14 +78,10 @@ func (m *Miner) SetThreads(threads int) error {
 // TODO: checkUpdate will only update the miner if something has been sent down
 // a channel.
 func (m *Miner) checkUpdate() {
-	m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-
-	/*
-		select {
-		case <-m.stateSubscription:
-			m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
-		default:
-			// nothing to do
-		}
-	*/
+	select {
+	case <-m.stateSubscription:
+		m.parent, m.transactions, m.target, m.earliestTimestamp = m.state.MinerVars()
+	default:
+		// nothing to do
+	}
 }
