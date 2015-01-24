@@ -12,7 +12,6 @@ func (s *State) Subscribe() (alert chan struct{}) {
 	defer s.mu.Unlock()
 	alert = make(chan struct{}, 1)
 	s.subscriptions = append(s.subscriptions, alert)
-	alert <- struct{}{}
 	return
 }
 

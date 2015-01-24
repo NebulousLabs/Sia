@@ -202,13 +202,10 @@ func (s *State) EarliestTimestamp() Timestamp {
 	return s.currentBlockNode().earliestChildTimestamp()
 }
 
-// Cheater function.
-func (s *State) MinerVars() (parent BlockID, txns []Transaction, target Target, earliestTimestamp Timestamp) {
+func (s *State) RLock() {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	parent = s.currentBlockNode().Block.ID()
-	txns = s.transactionPoolDump()
-	target = s.currentBlockNode().Target
-	earliestTimestamp = s.currentBlockNode().earliestChildTimestamp()
-	return
+}
+
+func (s *State) RUnlock() {
+	s.mu.RUnlock()
 }
