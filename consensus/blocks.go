@@ -121,8 +121,8 @@ func (s *State) validHeader(b Block) (err error) {
 	return
 }
 
-// State.AcceptBlock() will add blocks to the state, forking the blockchain if
-// they are on a fork that is heavier than the current fork.
+// AcceptBlock will add blocks to the state, forking the blockchain if they are
+// on a fork that is heavier than the current fork.
 func (s *State) AcceptBlock(b Block) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -154,7 +154,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	}
 
 	// Notify subscribers that the blockchain has updated.
-	go s.threadedNotifySubscribers()
+	s.notifySubscribers()
 
 	return
 }

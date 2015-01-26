@@ -18,10 +18,7 @@ func (s *State) Subscribe() (alert chan struct{}) {
 // notifySubscribers sends a ConsensusChange notification to every subscriber.
 // It is threaded because there have been weird delays when using this function
 // under a lock.
-func (s *State) threadedNotifySubscribers() {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *State) notifySubscribers() {
 	for _, sub := range s.subscriptions {
 		select {
 		case sub <- struct{}{}:
