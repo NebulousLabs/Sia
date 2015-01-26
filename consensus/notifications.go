@@ -15,11 +15,13 @@ func (s *State) Subscribe() (alert chan struct{}) {
 	return
 }
 
-// notifySubscribers sends a ConsensusChange notification to every subscriber
-//
-// The sending is done in a separate goroutine to prevent deadlock if one
-// subscriber becomes unresponsive.
-func (s *State) notifySubscribers() {
+// notifySubscribers sends a ConsensusChange notification to every subscriber.
+// It is threaded because there have been weird delays when using this function
+// under a lock.
+func (s *State) threadedNotifySubscribers() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	for _, sub := range s.subscriptions {
 		select {
 		case sub <- struct{}{}:
