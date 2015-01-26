@@ -61,9 +61,14 @@ func (node *BlockNode) setTarget() {
 
 // State.addBlockToTree() takes a block and a parent node, and adds a child
 // node to the parent containing the block. No validation is done.
-func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
+func (s *State) addBlockToTree(b Block) (err error) {
+	err = s.validHeader(b)
+	if err != nil {
+		return
+	}
+
 	parentNode := s.blockMap[b.ParentBlockID]
-	newNode = &BlockNode{
+	newNode := &BlockNode{
 		Block:  b,
 		Parent: parentNode,
 
@@ -72,11 +77,33 @@ func (s *State) addBlockToTree(b Block) (newNode *BlockNode) {
 	}
 	newNode.setTarget()
 
-	// Add the node to the block map and the list of its parents children.
+	// Add the node to the block map and update the list of its parents
+	// children.
 	s.blockMap[b.ID()] = newNode
 	parentNode.Children = append(parentNode.Children, newNode)
 
-	// TODO TODO TODO: reconnect any orphans that were liberated by this block.
+	if s.heavierFork(newNode) {
+		err = s.forkBlockchain(newNode)
+		if err != nil {
+			return
+		}
+	}
+
+	// Reconnect all orphans that now have a parent.
+	childMap := s.missingParents[b.ID()]
+	for _, child := range childMap {
+		// This is a recursive call, which means someone could make it take
+		// a long time by giving us a bunch of false orphan blocks with the
+		// same parent. We have to check them all anyway though, it just
+		// allows them to cluster the processing. Utimately I think
+		// bandwidth will be the bigger issue, we'll reject bad orphans
+		// before we verify signatures.
+		_ = s.addBlockToTree(child)
+		// There's nothing we can really do about this error, because it
+		// doesn't reflect a problem with the current block. It means that
+		// someone managed to give us orphans with errors.
+	}
+	delete(s.missingParents, b.ID())
 
 	return
 }

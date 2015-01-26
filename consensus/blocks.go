@@ -10,19 +10,18 @@ import (
 )
 
 // A non-consensus rule that dictates how much heavier a competing chain has to
-// be before the node will switch to mining on that chain. It is set to 5%,
-// which actually means that the heavier chain needs to be heavier by 5% of
-// _one block_, not 5% heavier as a whole.
+// be before the node will switch to mining on that chain. The percent refers
+// to the percent of the weight of the most recent block on the winning chain,
+// not the weight of the entire chain.
 //
 // This rule is in place because the difficulty gets updated every block, and
 // that means that of two competing blocks, one could be very slightly heavier.
 // The slightly heavier one should not be switched to if it was not seen first,
 // because the amount of extra weight in the chain is inconsequential. The
 // maximum difficulty shift will prevent people from manipulating timestamps
-// enough to produce a block that is substantially heavier, thus making 5% an
-// acceptible value.
+// enough to produce a block that is substantially heavier.
 var (
-	SurpassThreshold = big.NewRat(5, 100)
+	SurpassThreshold = big.NewRat(50, 100)
 )
 
 // Exported Errors
@@ -149,22 +148,12 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		return
 	}
 
-	// Check that the header of the block is acceptible.
-	err = s.validHeader(b)
+	err = s.addBlockToTree(b)
 	if err != nil {
 		return
 	}
-	newBlockNode := s.addBlockToTree(b)
 
-	// If the new node is 5% heavier than the current node, switch to the new fork.
-	if s.heavierFork(newBlockNode) {
-		err = s.forkBlockchain(newBlockNode)
-		if err != nil {
-			return
-		}
-	}
-
-	// Notify subscribers that the state has adjusted.
+	// Notify subscribers that the blockchain has updated.
 	s.notifySubscribers()
 
 	return
