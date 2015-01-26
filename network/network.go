@@ -90,12 +90,12 @@ func (tcps *TCPServer) RemovePeer(addr Address) error {
 }
 
 // RandomPeer selects and returns a random peer from the address book.
-func (tcps *TCPServer) RandomPeer() Address {
+func (tcps *TCPServer) RandomPeer() (Address, error) {
 	addrs := tcps.AddressBook()
 	if len(addrs) == 0 {
-		panic(ErrNoPeers)
+		return "", ErrNoPeers
 	}
-	return addrs[rand.Intn(len(addrs))]
+	return addrs[rand.Intn(len(addrs))], nil
 }
 
 // listen runs in the background, accepting incoming connections and serving
