@@ -11,7 +11,7 @@ var (
 )
 
 // Wallet in an interface that helps to build and sign transactions. The user
-// can make a new transaction-in-progress by calling Register(), and then can
+// can make a new transaction-in-progress by calling Register, and then can
 // add outputs, fees, etc. This gives other modules full flexibility in
 // creating dynamic transactions.
 type Wallet interface {

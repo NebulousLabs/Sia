@@ -31,8 +31,8 @@ type Host struct {
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	hostDir        string
-	announcement   modules.HostAnnouncement
+	hostDir string
+	// announcement   modules.HostAnnouncement
 	spaceRemaining int64
 	fileCounter    int
 
@@ -52,7 +52,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		return
 	}
 
-	addr, _, err := wallet.CoinAddress()
+	// addr, _, err := wallet.CoinAddress()
 	if err != nil {
 		return
 	}
@@ -60,14 +60,16 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		state:  state,
 		wallet: wallet,
 
-		announcement: modules.HostAnnouncement{
-			MaxFilesize: 4 * 1000 * 1000,
-			MaxDuration: 1008, // One week.
-			MinWindow:   20,
-			Price:       1,
-			Burn:        1,
-			CoinAddress: addr,
-		},
+		/*
+			announcement: modules.HostAnnouncement{
+				MaxFilesize: 4 * 1000 * 1000,
+				MaxDuration: 1008, // One week.
+				MinWindow:   20,
+				Price:       1,
+				Burn:        1,
+				CoinAddress: addr,
+			},
+		*/
 
 		contracts: make(map[consensus.ContractID]contractObligation),
 	}

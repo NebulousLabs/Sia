@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"fmt"
 
@@ -59,3 +60,4 @@ func hostsetconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, pric
 	}
 	fmt.Println("Host settings updated. You have been announced as a host on the network.")
 }
+*/
