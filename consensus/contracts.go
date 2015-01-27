@@ -33,26 +33,17 @@ func (s *State) storageProofSegment(contractID ContractID) (index uint64, err er
 	return
 }
 
-// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
-// the index of the segment that should be proven on when doing a proof of
-// storage.
-func (s *State) StorageProofSegment(id ContractID) (index uint64, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.storageProofSegment(id)
-}
-
 // validContract returns err = nil if the contract is valid in the current
 // context of the state, and returns an error if something about the contract
 // is invalid.
-func (s *State) validContract(fc FileContract) (err error) {
+func (s *State) validContract(fc FileContract) error {
 	if fc.Start <= s.height() {
 		return errors.New("contract must start in the future.")
 	}
 	if fc.End <= fc.Start {
 		return errors.New("contract duration must be at least one block.")
 	}
-	return
+	return nil
 }
 
 // validProof returns err = nil if the storage proof provided is valid given
@@ -154,9 +145,6 @@ func (s *State) applyContractMaintenance() (outputDiffs []OutputDiff, contractDi
 	// Expiring a contract deletes it from the map we are iterating through, so
 	// we need to store it and deleted once we're done iterating through the
 	// map.
-	//
-	// TODO: iterating through everything is inefficient, but sufficient for
-	// now.
 	var expiredContracts []ContractID
 	for id, contract := range s.openContracts {
 		if s.height() == contract.End {
@@ -173,4 +161,19 @@ func (s *State) applyContractMaintenance() (outputDiffs []OutputDiff, contractDi
 	}
 
 	return
+}
+
+// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
+// the index of the segment that should be proven on when doing a proof of
+// storage.
+func (s *State) StorageProofSegment(id ContractID) (index uint64, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.storageProofSegment(id)
+}
+
+func (s *State) ValidContract(fc FileContract) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validContract(fc)
 }

@@ -18,9 +18,9 @@ func (s *State) sortedUtxoSet() (sortedOutputs []Output) {
 	for _, utxoString := range unspentOutputStrings {
 		var outputID OutputID
 		copy(outputID[:], utxoString)
-		output, err := s.output(outputID)
-		if err != nil {
-			panic(err)
+		output, exists := s.output(outputID)
+		if !exists {
+			panic("output doesn't exist?")
 		}
 		sortedOutputs = append(sortedOutputs, output)
 	}

@@ -7,13 +7,14 @@ the rules for standard Sia transactions.
 -------------------------
 
 Storage Proof transactions should not have dependent transactions.  Meaning,
-any outputs that are spent with a storage proof should already by confirmed by
-the blockchain, and any refunds or outputs created by the storage proof should
-not be spent until the storage proof has been confirmed by the blockchain.
+any outputs created in a storage proof transaction should not be spent until
+the storage proof is confirmed by the blockchain.
 
 These restrictions are in place because storage proofs can be easily
 invalidated by a blockchain reorg - if the trigger block changes, the proof
-will be invalidated. This will screw up all dependents.
+will be invalidated. Storage proofs can by any reorg, where standard
+transactions can only be invalidated by a doublespend (which requires a
+signature from the double spender).
 
 --------------------------
 -- Arbitrary Data Usage --

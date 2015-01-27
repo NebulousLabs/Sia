@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"math/big"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -118,43 +117,6 @@ func CalculateCoinbase(height BlockHeight) Currency {
 	}
 }
 
-// Int returns a Target as a big.Int.
-func (t Target) Int() *big.Int {
-	return new(big.Int).SetBytes(t[:])
-}
-
-// Rat returns a Target as a big.Rat.
-func (t Target) Rat() *big.Rat {
-	return new(big.Rat).SetInt(t.Int())
-}
-
-// Inv returns the inverse of a Target as a big.Rat
-func (t Target) Inverse() *big.Rat {
-	r := t.Rat()
-	return r.Inv(r)
-}
-
-// IntToTarget converts a big.Int to a Target.
-func IntToTarget(i *big.Int) (t Target) {
-	// i may overflow the maximum target.
-	// In the event of overflow, return the maximum.
-	if i.BitLen() > 256 {
-		return RootDepth
-	}
-	b := i.Bytes()
-	// need to preserve big-endianness
-	offset := hash.HashSize - len(b)
-	copy(t[offset:], b)
-	return
-}
-
-// RatToTarget converts a big.Rat to a Target.
-func RatToTarget(r *big.Rat) Target {
-	// convert to big.Int to truncate decimal
-	i := new(big.Int).Div(r.Num(), r.Denom())
-	return IntToTarget(i)
-}
-
 // Block.ID() returns a hash of the block, which is used as the block
 // identifier. Transactions are not included in the hash.
 func (b Block) ID() BlockID {
@@ -189,8 +151,49 @@ func (b Block) SubsidyID() OutputID {
 	return OutputID(hash.HashBytes(append(bid[:], "blockreward"...)))
 }
 
-// SigHash returns the hash of a transaction for a specific index.
-// The index determines which TransactionSignature is included in the hash.
+// Transaction.fileContractID returns the id of a file contract given the index of the contract.
+func (t Transaction) FileContractID(index int) ContractID {
+	return ContractID(hash.HashAll(
+		encoding.Marshal(t.Outputs[0]),
+		encoding.Marshal(t.FileContracts[index]),
+		[]byte("contract"),
+		encoding.Marshal(index),
+	))
+}
+
+// OuptutID takes the index of the output and returns the output's ID.
+func (t Transaction) OutputID(index int) OutputID {
+	return OutputID(hash.HashAll(
+		encoding.Marshal(t),
+		[]byte("coinsend"),
+		encoding.Marshal(index),
+	))
+}
+
+// OutputSum returns the sum of all the outputs in the transaction, which must
+// match the sum of all the inputs. Outputs created by storage proofs are not
+// considered, as they were already considered when the contract was created.
+func (t Transaction) OutputSum() (sum Currency) {
+	// Add the miner fees.
+	for _, fee := range t.MinerFees {
+		sum += fee
+	}
+
+	// Add the contract payouts
+	for _, contract := range t.FileContracts {
+		sum += contract.Payout
+	}
+
+	// Add the outputs
+	for _, output := range t.Outputs {
+		sum += output.Value
+	}
+
+	return
+}
+
+// SigHash returns the hash of a transaction for a specific index.  The index
+// determines which TransactionSignature is included in the hash.
 func (t Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if t.Signatures[i].CoveredFields.WholeTransaction {
@@ -233,19 +236,20 @@ func (t Transaction) SigHash(i int) hash.Hash {
 	return hash.HashBytes(signedData)
 }
 
-// Transaction.OuptutID() takes the index of the output and returns the
-// output's ID.
-func (t Transaction) OutputID(index int) OutputID {
-	return OutputID(hash.HashAll(
-		encoding.Marshal(t),
-		[]byte("coinsend"),
-		encoding.Marshal(index),
+// StorageProofOutputID returns the OutputID of the output created during the
+// window index that was active at height 'height'.
+func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
+	proofString := proofString(proofValid)
+	outputID = OutputID(hash.HashAll(
+		fcID[:],
+		proofString,
 	))
+	return
 }
 
-// SpendConditions.CoinAddress() calculates the root hash of a merkle tree of the
-// SpendConditions object, using the timelock, number of signatures required,
-// and each public key as leaves.
+// CoinAddress calculates the root hash of a merkle tree of the SpendConditions
+// object, using the timelock, number of signatures required, and each public
+// key as leaves.
 func (sc SpendConditions) CoinAddress() CoinAddress {
 	tlHash := hash.HashObject(sc.TimeLock)
 	nsHash := hash.HashObject(sc.NumSignatures)
@@ -257,30 +261,9 @@ func (sc SpendConditions) CoinAddress() CoinAddress {
 	return CoinAddress(hash.MerkleRoot(leaves))
 }
 
-// Transaction.fileContractID returns the id of a file contract given the index of the contract.
-func (t Transaction) FileContractID(index int) ContractID {
-	return ContractID(hash.HashAll(
-		encoding.Marshal(t.Outputs[0]),
-		encoding.Marshal(t.FileContracts[index]),
-		[]byte("contract"),
-		encoding.Marshal(index),
-	))
-}
-
-// StorageProofOutput() returns the OutputID of the output created
-// during the window index that was active at height 'height'.
-func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	proofString := proofString(proofValid)
-	outputID = OutputID(hash.HashAll(
-		fcID[:],
-		proofString,
-	))
-	return
-}
-
-// proofString() returns the string to be used when generating the output id of
-// a valid proof if bool is set to true, and it returns the string to be used
-// in a missed proof if the bool is set to false.
+// proofString returns the string to be used when generating the output id of a
+// valid proof if bool is set to true, and it returns the string to be used in
+// a missed proof if the bool is set to false.
 func proofString(proofValid bool) []byte {
 	if proofValid {
 		return []byte("validproof")

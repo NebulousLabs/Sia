@@ -34,6 +34,8 @@ compare to. The expected time is 10 minutes * (block height).
 A transaction is valid if:
 	+ All inputs are fully signed, without frivilous signatures
 	+ All inputs spend known outputs
+	+ The spend conditions in each input match the spend hash of the output
+		being spent.
 	+ The inputs equal the outputs
 		- Outputs can be outputs
 		- Miner Fees can be outputs
@@ -41,3 +43,6 @@ A transaction is valid if:
 	+ All contracts have a non-zero payout
 	+ All storage proofs act on contracts found in the blockchain
 	+ All storage proofs are correct
+
+The output created by a storage proof is neither considered an input or an
+output.

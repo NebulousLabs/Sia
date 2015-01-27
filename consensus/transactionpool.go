@@ -1,5 +1,9 @@
 package consensus
 
+import (
+	"errors"
+)
+
 // State.addTransactionToPool() adds a transaction to the transaction pool and
 // transaction list. A panic will trigger if there is a conflicting transaction
 // in the pool.
@@ -176,7 +180,7 @@ func (s *State) AcceptTransaction(t Transaction) (err error) {
 	// Check that the transaction is not in conflict with the transaction
 	// pool.
 	if s.transactionPoolConflict(&t) {
-		err = ConflictingTransactionErr
+		err = errors.New("transaction is in conflict with an existing transaction")
 		return
 	}
 

@@ -134,13 +134,8 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (output Output, err error) {
-	output, exists := s.unspentOutputs[id]
-	if exists {
-		return
-	}
-
-	err = errors.New("output not in utxo set")
+func (s *State) output(id OutputID) (output Output, exists bool) {
+	output, exists = s.unspentOutputs[id]
 	return
 }
 
@@ -183,6 +178,14 @@ func (s *State) CurrentTarget() Target {
 	return s.currentBlockNode().Target
 }
 
+// EarliestLegalTimestamp returns the earliest legal timestamp of the next
+// block - earlier timestamps will render the block invalid.
+func (s *State) EarliestTimestamp() Timestamp {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentBlockNode().earliestChildTimestamp()
+}
+
 // State.Height() returns the height of the longest fork.
 func (s *State) Height() BlockHeight {
 	s.mu.RLock()
@@ -204,12 +207,10 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
 	return
 }
 
-// EarliestLegalTimestamp returns the earliest legal timestamp of the next
-// block - earlier timestamps will render the block invalid.
-func (s *State) EarliestTimestamp() Timestamp {
+func (s *State) Output(id OutputID) (output Output, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.currentBlockNode().earliestChildTimestamp()
+	return s.output(id)
 }
 
 func (s *State) RLock() {

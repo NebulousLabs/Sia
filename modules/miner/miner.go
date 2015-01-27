@@ -75,10 +75,8 @@ func (m *Miner) SetThreads(threads int) error {
 	return nil
 }
 
-// checkUpdate actually just updates the miner.
-//
-// TODO: checkUpdate will only update the miner if something has been sent down
-// a channel.
+// checkUpdate will update the miner if an update has been posted by the state,
+// otherwise it will do nothing.
 func (m *Miner) checkUpdate() {
 	select {
 	case <-m.stateSubscription:
