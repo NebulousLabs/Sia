@@ -47,13 +47,13 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: don't spawn multiple CatchUps
-	if len(d.network.AddressBook()) == 0 {
+	peer, err := d.network.RandomPeer()
+	if err != nil {
 		http.Error(w, "No peers available for syncing", 500)
 		return
 	}
 
-	// TODO: `go d.network.CatchUp(...`
-	go d.CatchUp(d.network.RandomPeer())
+	go d.CatchUp(peer)
 
 	writeSuccess(w)
 }

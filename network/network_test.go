@@ -81,7 +81,7 @@ func TestPeerSharing(t *testing.T) {
 	peer := Address("foo:9001")
 	tcps.AddPeer(peer)
 	// tcps only has one peer, so RandomPeer() should return peer
-	if tcps.RandomPeer() != peer {
+	if p, err := tcps.RandomPeer(); err != nil || p != peer {
 		t.Fatal("server has bad peer list:", tcps.AddressBook())
 	}
 

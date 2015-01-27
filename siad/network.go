@@ -54,19 +54,22 @@ func (d *daemon) initializeNetwork(addr string, nobootstrap bool) (err error) {
 		return
 	}
 
-	// Bootstrapping may take a while, use a gothread.
+	// Bootstrapping may take a while
 	go func() {
 		// Establish an initial peer list.
-		if err = d.network.Bootstrap(); err != nil {
+		if err := d.network.Bootstrap(); err != nil {
 			// log error
 			return
 		}
 
 		// Every 2 minutes, call CatchUp() on a random peer. This helps with
 		// synchronization.
-		for {
-			go d.CatchUp(d.network.RandomPeer())
-			time.Sleep(time.Minute * 2)
+		for ; ; time.Sleep(time.Minute * 2) {
+			peer, err := d.network.RandomPeer()
+			if err != nil {
+				continue
+			}
+			go d.CatchUp(peer)
 		}
 	}()
 
@@ -160,8 +163,8 @@ func (d *daemon) CatchUp(peer network.Address) {
 		return
 	}
 	for _, block := range newBlocks {
-		err2 := d.state.AcceptBlock(block)
-		if err2 != nil {
+		acceptErr := d.state.AcceptBlock(block)
+		if acceptErr != nil {
 			// TODO: something
 			//
 			// TODO: If the error is a FutureBlockErr, need to wait before trying the
