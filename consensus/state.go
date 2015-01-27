@@ -158,6 +158,16 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	return
 }
 
+func (s *State) Contract(id ContractID) (fc FileContract, err error) {
+	fc, exists := s.openContracts[id]
+	if !exists {
+		err = errors.New("no contract found")
+		return
+	}
+
+	return
+}
+
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() Block {
 	s.mu.RLock()

@@ -14,12 +14,11 @@ type (
 	BlockHeight uint64
 	Currency    uint64
 
-	BlockID       hash.Hash
-	OutputID      hash.Hash
-	ContractID    hash.Hash
-	TransactionID hash.Hash
-	CoinAddress   hash.Hash // The hash of the spend conditions of an output.
-	Target        hash.Hash
+	BlockID     hash.Hash
+	OutputID    hash.Hash
+	ContractID  hash.Hash
+	CoinAddress hash.Hash // The hash of the spend conditions of an output.
+	Target      hash.Hash
 )
 
 // Eventually, the Block and the block header will be two separate structs.

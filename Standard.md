@@ -6,9 +6,14 @@ the rules for standard Sia transactions.
 -- Storage Proof Rules --
 -------------------------
 
-All storage proofs must be in their own transactions. One storage proof per
-transaction, and if there is a storage proof in a transaction, it must not
-contain any inputs, contracts, outputs, etc.
+Storage Proof transactions should not have dependent transactions.  Meaning,
+any outputs that are spent with a storage proof should already by confirmed by
+the blockchain, and any refunds or outputs created by the storage proof should
+not be spent until the storage proof has been confirmed by the blockchain.
+
+These restrictions are in place because storage proofs can be easily
+invalidated by a blockchain reorg - if the trigger block changes, the proof
+will be invalidated. This will screw up all dependents.
 
 --------------------------
 -- Arbitrary Data Usage --
