@@ -10,10 +10,18 @@ import (
 // An unconfirmedTransaction contains a transaction that hasn't been confirmed
 // by the blockchain yet. It also points to the unconfirmedTransactions that it
 // depends on, and the unconfirmedTransactions that depend on it.
+//
+// An unconfirmedTransaction is additionally a member of a doubly linked list.
+// New transactions are added to the tail of this list, while transactions that
+// got pulled from the blockchain during a reorg are added to the beginning of
+// the list.
 type unconfirmedTransaction struct {
 	transaction  consensus.Transaction
 	requirements []*unconfirmedTransaction
 	dependents   []*unconfirmedTransaction
+
+	previous *unconfirmedTransaction
+	next     *unconfirmedTransaction
 }
 
 // The TransactionPool contains a list of transactions that have not yet been
@@ -21,6 +29,11 @@ type unconfirmedTransaction struct {
 // separately for reasons discussed in Standard.md
 type TransactionPool struct {
 	state *consensus.State
+
+	// The head and tail of the linked list of transactions that can be put
+	// into blocks.
+	head *unconfirmedTransaction
+	tail *unconfirmedTransaction
 
 	// Outputs contains a list of outputs that have been created by unconfirmed
 	// transactions. This list will not include outputs created by storage
