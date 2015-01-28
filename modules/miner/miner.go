@@ -26,6 +26,7 @@ type Miner struct {
 	iterationsPerAttempt uint64
 
 	stateSubscription chan struct{}
+	tpoolSubscription chan struct{}
 
 	mu sync.RWMutex
 }
@@ -53,17 +54,15 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		iterationsPerAttempt: 256 * 1024,
 	}
 
-	// Subscribe to the state and get a mining address.
-	m.stateSubscription = state.Subscribe()
+	// Subscribe to the state and tpool.
 	addr, _, err := m.wallet.CoinAddress()
 	if err != nil {
 		return
 	}
 	m.address = addr
 
-	// Fool the miner into grabbing the first update.
-	m.stateSubscription <- struct{}{}
-	m.checkUpdate()
+	// Update the miner.
+	m.update()
 
 	return
 }
@@ -81,28 +80,27 @@ func (m *Miner) SetThreads(threads int) error {
 	return nil
 }
 
-// checkUpdate will update the miner if an update has been posted by the state,
-// otherwise it will do nothing.
-func (m *Miner) checkUpdate() {
-	select {
-	case <-m.stateSubscription:
-		m.state.RLock()
-
-		// Get the transaction set from the transaction pool, using a blank set
-		// if there's an error.
-		tset, err := m.tpool.TransactionSet()
-		if err != nil {
-			tset = nil
-		}
-
-		// Update the mining variables.
-		m.parent = m.state.CurrentBlock().ID()
-		m.transactions = tset
-		m.target = m.state.CurrentTarget()
-		m.earliestTimestamp = m.state.EarliestTimestamp()
-
-		m.state.RUnlock()
-	default:
-		// nothing to do
+// Grabs the set of
+func (m *Miner) updateTransactionSet() {
+	tset, err := m.tpool.TransactionSet()
+	if err != nil {
+		tset = nil
 	}
+	m.transactions = tset
+}
+
+func (m *Miner) updateBlockInfo() {
+	m.parent = m.state.CurrentBlock().ID()
+	m.target = m.state.CurrentTarget()
+	m.earliestTimestamp = m.state.EarliestTimestamp()
+}
+
+// checkUpdate will update the miner if there has been a change in the state or
+// tpool, and otherwise do nothing. This idle checking might be an
+// overoptimization.
+func (m *Miner) update() {
+	m.state.RLock()
+	defer m.state.RUnlock()
+	m.updateTransactionSet()
+	m.updateBlockInfo()
 }

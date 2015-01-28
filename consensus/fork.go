@@ -177,13 +177,27 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	var appliedNodes []*BlockNode
 	for i := len(backtrackNodes) - 1; i >= 0; i-- {
 		appliedNodes = append(appliedNodes, backtrackNodes[i])
+
+		// If the diffs for this node have already been generated, apply them
+		// directly instead of generating them.
+		if backtrackNodes[i].DiffsGenerated {
+			for _, outputDiff := range backtrackNodes[i].OutputDiffs {
+				s.commitOutputDiff(outputDiff, true)
+			}
+			for _, contractDiff := range backtrackNodes[i].ContractDiffs {
+				s.commitContractDiff(contractDiff, true)
+			}
+			continue
+		}
+
+		// If the diffs have not been generated, call generateAndApply.
 		err = s.generateAndApplyDiff(backtrackNodes[i])
 		if err != nil {
 			// Invalidate and delete all of the nodes after the bad block.
 			s.invalidateNode(backtrackNodes[i])
 
 			// Rewind the validated blocks
-			for j := 0; j < i; j++ {
+			for j := 0; j < len(appliedNodes)-1; j++ {
 				s.invertRecentBlock()
 			}
 
@@ -202,6 +216,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 			return
 		}
 	}
+
 	// Sanity check - make sure the currentPath makes sense.
 	if DEBUG {
 		s.currentPathCheck()

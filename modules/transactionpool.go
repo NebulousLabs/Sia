@@ -12,5 +12,11 @@ type TransactionPool interface {
 
 	// TransactionSet will return a set of transactions not exceeding the block
 	// size that can be inserted into a block in order.
+	//
+	// TransactionSet has special behavior, it will always update with the
+	// state before returning anything. A function can safely update from both
+	// the transaction pool and the state by read locking the state, then
+	// updating from the transaction pool, then the state, and then unlocking
+	// the state.
 	TransactionSet() ([]consensus.Transaction, error)
 }
