@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 
 	"github.com/stretchr/graceful"
@@ -18,9 +17,8 @@ import (
 
 type DaemonConfig struct {
 	// Network Variables
-	APIAddr     string
-	RPCAddr     string
-	NoBootstrap bool
+	APIAddr string
+	RPCAddr string
 
 	// Host Variables
 	HostDir string
@@ -70,25 +68,38 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
+	// d.host, err = host.New(d.state, d.wallet)
+	// if err != nil {
+	// 	return
+	// }
 	/*
 		hostDB, err := hostdb.New()
 		if err != nil {
 			return
 		}
-			Host, err := host.New(d.state, d.wallet)
-			if err != nil {
-				return
-			}
+
 			Renter, err := renter.New(d.state, hostDB, d.wallet)
 			if err != nil {
 				return
 			}
 	*/
 
-	d.initializeNetwork(config.RPCAddr, config.NoBootstrap)
-	if err == network.ErrNoPeers {
-		fmt.Println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
-	} else if err != nil {
+	// register RPC handlers
+	// TODO: register all RPCs in a separate function
+	err = d.network.RegisterRPC("AcceptBlock", d.state.AcceptBlock)
+	if err != nil {
+		return
+	}
+	err = d.network.RegisterRPC("AcceptTransaction", d.state.AcceptTransaction)
+	if err != nil {
+		return
+	}
+	err = d.network.RegisterRPC("SendBlocks", d.SendBlocks)
+	if err != nil {
+		return
+	}
+	err = d.network.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
+	if err != nil {
 		return
 	}
 

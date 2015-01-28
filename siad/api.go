@@ -9,8 +9,7 @@ import (
 
 const apiTimeout = 5e9 // 5 seconds
 
-// TODO: timeouts?
-func (d *daemon) handle(addr string) {
+func (d *daemon) listen(addr string) {
 	mux := http.NewServeMux()
 
 	// Host API Calls
@@ -57,6 +56,10 @@ func (d *daemon) handle(addr string) {
 
 	// graceful will run until it catches a signal.
 	// it can also be stopped manually by stopHandler.
+	//
+	// TODO: this fails silently. The error should be checked, but then it
+	// will print an error even if interrupted normally. Need a better
+	// solution.
 	d.apiServer.ListenAndServe()
 }
 

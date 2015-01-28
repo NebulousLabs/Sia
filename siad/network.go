@@ -16,64 +16,29 @@ var (
 	moreBlocksErr = errors.New("more blocks are available")
 )
 
-// initializeNetwork registers the rpcs and bootstraps to the network,
-// downlading all of the blocks and establishing a peer list.
-func (d *daemon) initializeNetwork(addr string, nobootstrap bool) (err error) {
-	d.network, err = network.NewTCPServer(addr)
-	if err != nil {
+// bootstrap bootstraps to the network, downlading all of the blocks and
+// establishing a peer list.
+func (d *daemon) bootstrap() {
+	// Establish an initial peer list.
+	if err := d.network.Bootstrap(); err != nil {
+		if err == network.ErrNoPeers {
+			println("Warning: no peers responded to bootstrap request. Add peers manually to enable bootstrapping.")
+			// TODO: wait for new peers?
+		}
+		// log error
 		return
 	}
 
-	err = d.network.RegisterRPC("AcceptBlock", d.state.AcceptBlock)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("SendBlocks", d.SendBlocks)
-	if err != nil {
-		return
-	}
-	/*
-		d.network.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
+	// Every 2 minutes, call CatchUp() on a random peer. This helps with
+	// synchronization.
+	for ; ; time.Sleep(time.Minute * 2) {
+		peer, err := d.network.RandomPeer()
 		if err != nil {
-			return
+			// TODO: wait for new peers?
+			continue
 		}
-		d.network.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
-		if err != nil {
-			return
-		}
-	*/
-
-	// If we aren't bootstrapping, then we're done.
-	// TODO: this means the CatchUp thread isn't spawned.
-	// It should probably be spawned after the first peer connects.
-	if nobootstrap {
-		return
+		go d.CatchUp(peer)
 	}
-
-	// Bootstrapping may take a while
-	go func() {
-		// Establish an initial peer list.
-		if err := d.network.Bootstrap(); err != nil {
-			// log error
-			return
-		}
-
-		// Every 2 minutes, call CatchUp() on a random peer. This helps with
-		// synchronization.
-		for ; ; time.Sleep(time.Minute * 2) {
-			peer, err := d.network.RandomPeer()
-			if err != nil {
-				continue
-			}
-			go d.CatchUp(peer)
-		}
-	}()
-
-	return
 }
 
 // blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
@@ -104,7 +69,11 @@ func (d *daemon) blockHistory() (blockIDs [32]consensus.BlockID) {
 	}
 
 	// always include the genesis block
-	genesis, _ := d.state.BlockAtHeight(0)
+	genesis, err := d.state.BlockAtHeight(0)
+	if err != nil {
+		// this should never happen
+		return
+	}
 	knownBlocks = append(knownBlocks, genesis.ID())
 
 	copy(blockIDs[:], knownBlocks)
