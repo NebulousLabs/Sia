@@ -12,7 +12,7 @@ import (
 // prioritizes transactions that have already been in a block (on another
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
-func (tp *TransactionPool) TransactionSet(transactions []consensus.Transaction) (err error) {
+func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transaction, err error) {
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
 	remainingSize := consensus.BlockSizeLimit - 1024 // Leave 1kb for block header and metadata, which should actually only be about 120 bytes.

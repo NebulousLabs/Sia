@@ -1,9 +1,11 @@
 package wallet
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 // keys), as well as an interactive way to construct and sign transactions.
 type Wallet struct {
 	state *consensus.State
+	tpool modules.TransactionPool
 
 	// Location of the wallet's file, for saving and loading keys.
 	filename string
@@ -54,9 +57,19 @@ type Wallet struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(state *consensus.State, filename string) (w *Wallet, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, filename string) (w *Wallet, err error) {
+	if state == nil {
+		err = errors.New("wallet cannot use a nil state")
+		return
+	}
+	if tpool == nil {
+		err = errors.New("wallet cannot use a nil transaction pool")
+		return
+	}
+
 	w = &Wallet{
 		state: state,
+		tpool: tpool,
 
 		filename: filename,
 
@@ -99,7 +112,7 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddres
 	if err != nil {
 		return
 	}
-	err = w.state.AcceptTransaction(t)
+	err = w.tpool.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
