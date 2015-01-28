@@ -11,6 +11,7 @@ import (
 	// "github.com/NebulousLabs/Sia/sia/host"
 	// "github.com/NebulousLabs/Sia/sia/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	// "github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
@@ -37,6 +38,7 @@ type DaemonConfig struct {
 type daemon struct {
 	// Modules. TODO: Implement all modules.
 	state   *consensus.State
+	tpool   *transactionpool.TransactionPool
 	miner   *miner.Miner
 	network *network.TCPServer
 	wallet  *wallet.Wallet
@@ -52,15 +54,19 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
+	d.tpool, err = transactionpool.New(d.state)
+	if err != nil {
+		return
+	}
 	d.network, err = network.NewTCPServer(config.RPCAddr)
 	if err != nil {
 		return
 	}
-	d.wallet, err = wallet.New(d.state, config.WalletDir)
+	d.wallet, err = wallet.New(d.state, d.tpool, config.WalletDir)
 	if err != nil {
 		return
 	}
-	d.miner, err = miner.New(d.state, d.wallet)
+	d.miner, err = miner.New(d.state, d.tpool, d.wallet)
 	if err != nil {
 		return
 	}

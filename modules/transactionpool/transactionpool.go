@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -56,6 +57,25 @@ type TransactionPool struct {
 	storageProofs map[consensus.BlockHeight]map[hash.Hash]consensus.Transaction
 
 	mu sync.RWMutex
+}
+
+func New(state *consensus.State) (tp *TransactionPool, err error) {
+	if state == nil {
+		err = errors.New("transaction pool cannot use an nil state")
+		return
+	}
+
+	tp = &TransactionPool{
+		state: state,
+
+		outputs: make(map[consensus.OutputID]consensus.Output),
+
+		newOutputs:  make(map[consensus.OutputID]*unconfirmedTransaction),
+		usedOutputs: make(map[consensus.OutputID]*unconfirmedTransaction),
+
+		storageProofs: make(map[consensus.BlockHeight]map[hash.Hash]consensus.Transaction),
+	}
+	return
 }
 
 // addTransactionToTail takes an unconfirmedTransaction and adds it to the tail
