@@ -145,9 +145,6 @@ func (s *State) validTransaction(t Transaction) (err error) {
 // applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
-	// Update the transaction pool to resolve any conflicts.
-	s.removeTransactionConflictsFromPool(t)
-
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.Inputs {
 		// Sanity check - the input must exist within the blockchain, should
