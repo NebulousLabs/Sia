@@ -11,6 +11,10 @@ import (
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
 func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transaction, err error) {
+	// TODO: Call update.
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
 	remainingSize := consensus.BlockSizeLimit - 1024 // Leave 1kb for block header and metadata, which should actually only be about 120 bytes.
@@ -51,6 +55,53 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 		// the state or getting a new transaction)
 		transactions = append(transactions, currentTxn.transaction)
 		currentTxn = currentTxn.next
+	}
+
+	return
+}
+
+// Returns the set of diffs that would be applied to the state if all of the
+// transactions in the transaction pool (excluding storage proofs) got
+// accepted.
+func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+
+	// For each transaction in the linked list, grab the diffs that would be
+	// created by the transaction.
+	currentTxn := tp.head
+	for currentTxn != nil {
+		txn := currentTxn.transaction
+		for _, input := range txn.Inputs {
+			diff := consensus.OutputDiff{
+				New: false,
+				ID:  input.OutputID,
+			}
+
+			// Get the output from tpool if it's a new output, and from the
+			// state if it already existed.
+			output, exists := tp.outputs[input.OutputID]
+			if !exists {
+				output, exists = tp.state.Output(input.OutputID)
+				if consensus.DEBUG {
+					if !exists {
+						panic("output in tpool txn that's neither in the state or in the tpool")
+					}
+				}
+			}
+			diff.Output = output
+
+			diffs = append(diffs, diff)
+		}
+
+		for i, output := range txn.Outputs {
+			diff := consensus.OutputDiff{
+				New:    true,
+				ID:     txn.OutputID(i),
+				Output: output,
+			}
+			diffs = append(diffs, diff)
+		}
 	}
 
 	return
