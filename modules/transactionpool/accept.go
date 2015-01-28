@@ -143,22 +143,7 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 		tp.newOutputs[t.OutputID(i)] = ut
 	}
 
-	// Add the unconfirmedTransaction to the tail of the linked list.
-	if tp.tail == nil {
-		// Sanity check - tail should never be nil unless head is also nil.
-		if consensus.DEBUG {
-			if tp.head != nil {
-				panic("tail is nil but head is not nil")
-			}
-		}
-
-		tp.head = ut
-		tp.tail = ut
-	} else {
-		tp.tail.next = ut
-		ut.previous = tp.tail
-		tp.tail = ut
-	}
+	tp.addTransactionToTail(ut)
 }
 
 // AcceptTransaction takes a new transaction from the network and puts it in

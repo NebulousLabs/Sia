@@ -57,3 +57,59 @@ type TransactionPool struct {
 
 	mu sync.RWMutex
 }
+
+// addTransactionToTail takes an unconfirmedTransaction and adds it to the tail
+// of the linked list of transactions.
+func (tp *TransactionPool) addTransactionToTail(ut *unconfirmedTransaction) {
+	// Add the unconfirmedTransaction to the tail of the linked list.
+	if tp.tail == nil {
+		// Sanity check - tail should never be nil unless head is also nil.
+		if consensus.DEBUG {
+			if tp.head != nil {
+				panic("tail is nil but head is not nil")
+			}
+		}
+
+		tp.head = ut
+		tp.tail = ut
+	} else {
+		tp.tail.next = ut
+		ut.previous = tp.tail
+		tp.tail = ut
+	}
+}
+
+func (tp *TransactionPool) removeTransactionFromList(ut *unconfirmedTransaction) {
+	if ut.previous == nil {
+		// Sanity check - ut should be the head if ut.previous is nil.
+		if consensus.DEBUG {
+			if tp.head != ut {
+				panic("ut.previous is nil but tp.head is not ut")
+			}
+		}
+
+		tp.head = ut.next
+	} else {
+		ut.previous.next = ut.next
+	}
+
+	if ut.next == nil {
+		// Sanity check - ut should be the tail if ut.next is nil.
+		if consensus.DEBUG {
+			if tp.tail != ut {
+				panic("ut.next is nil but tp.tail is not ut")
+			}
+		}
+
+		tp.tail = ut.previous
+	} else {
+		ut.next.previous = ut.previous
+	}
+
+	// Sanity check - if head or tail is nil, both should be nil.
+	if consensus.DEBUG {
+		if (tp.head == nil || tp.tail == nil) && (tp.head != nil || tp.tail != nil) {
+			panic("one of tp.head and tp.tail is nil, but the other is not")
+		}
+	}
+}
