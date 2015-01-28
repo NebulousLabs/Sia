@@ -4,19 +4,17 @@ fmt:
 	go fmt ./...
 
 install: fmt
-	touch consensus/blocknode.go
-	go install -tags=dev ./...
+	go install -a -tags=dev ./...
 
 clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
 		sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload
 
 test: clean fmt
-	touch consensus/blocknode.go
-	go test -short -tags=test ./...
+	go test -a -short -tags=test ./...
 
 test-long: test
-	go test -v -race -tags=test ./...
+	go test -a -v -race -tags=test ./...
 
 # run twice to ensure references are updated properly
 whitepaper:
@@ -35,12 +33,10 @@ dependencies:
 	go get -u github.com/laher/goxc
 
 release: dependencies test-long
-	touch consensus/blocknode.go
-	go install ./...
+	go install -a ./...
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test-long
-	touch consensus/blocknode.go
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.2.0          \
 		-br=release -pr=beta -include=example-config,LICENSE*,README*           \
 		-tasks-=deb,deb-dev,deb-source,go-test
