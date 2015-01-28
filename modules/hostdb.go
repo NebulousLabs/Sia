@@ -12,18 +12,10 @@ const (
 // the Host struct is kept in the client package because it's what the client
 // uses to weigh hosts and pick them out when storing files.
 type HostEntry struct {
-	ID          string
-	IPAddress   network.Address
-	MinFilesize uint64
-	MaxFilesize uint64
-	MinDuration consensus.BlockHeight
-	MaxDuration consensus.BlockHeight
-	Window      consensus.BlockHeight
-	Tolerance   uint64
-	Price       consensus.Currency
-	Burn        consensus.Currency
-	Freeze      consensus.Currency
-	CoinAddress consensus.CoinAddress
+	HostAnnouncement
+	ID        string
+	Tolerance uint64 // curently unused?
+	Freeze    consensus.Currency
 }
 
 type HostDB interface {

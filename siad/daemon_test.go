@@ -2,9 +2,8 @@ package main
 
 func testingDaemon() (d *daemon, err error) {
 	dc := DaemonConfig{
-		APIAddr:     ":9020",
-		RPCAddr:     ":9021",
-		NoBootstrap: true,
+		APIAddr: ":9020",
+		RPCAddr: ":9021",
 
 		HostDir: "hostDir",
 
@@ -20,6 +19,6 @@ func testingDaemon() (d *daemon, err error) {
 		return
 	}
 
-	go d.handle(dc.APIAddr)
+	go d.listen(dc.APIAddr)
 	return
 }

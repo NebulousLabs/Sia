@@ -47,18 +47,14 @@ func (d *daemon) hostSetConfigHandler(w http.ResponseWriter, req *http.Request) 
 		if err != nil {
 			http.Error(w, "Could not update host:"+err.Error(), 400)
 		}
-
-
-
-
 	*/
 }
 
 func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err = d.core.AnnounceHost(1, d.state.Height()+20) // A freeze volume and unlock height.
-	if err != nil {
-		http.Error(w, "Could not update host:"+err.Error(), 400)
-		return
-	}
-	writeSuccess(w)
+	// err = d.AnnounceHost(1, d.state.Height()+20) // A freeze volume and unlock height.
+	// if err != nil {
+	// 	http.Error(w, "Could not update host:"+err.Error(), 400)
+	// 	return
+	// }
+	// writeSuccess(w)
 }

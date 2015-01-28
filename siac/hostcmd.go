@@ -16,18 +16,18 @@ var (
 		Run:   wrap(hostconfigcmd),
 	}
 
-	hostConfigCmd = &cobra.Command{
+	hostStatusCmd = &cobra.Command{
 		Use:   "config",
 		Short: "View host settings",
 		Long:  "View host settings, including available storage, price, and more.",
-		Run:   wrap(hostconfigcmd),
+		Run:   wrap(hoststatuscmd),
 	}
 
-	hostSetConfigCmd = &cobra.Command{
+	hostConfigCmd = &cobra.Command{
 		Use:   "setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
 		Short: "Modify host settings",
 		Long:  "Modify host settings, including available storage, price, and more.",
-		Run:   wrap(hostsetconfigcmd),
+		Run:   wrap(hostconfigcmd),
 	}
 
 	hostAnnounceCmd = &cobra.Command{
@@ -38,7 +38,7 @@ var (
 	}
 )
 
-func hostconfigcmd() {
+func hoststatuscmd() {
 	config := new(host.HostInfo)
 	err := getAPI("/host/config", config)
 	if err != nil {
@@ -51,13 +51,12 @@ Price:        %v coins
 Max Filesize: %v
 Max Duration: %v
 Burn:         %v
-`, config.Announcement.TotalStorage, config.StorageRemaining, config.Announcement.Price, config.Announcement.MaxFilesize,
-		config.Announcement.MaxDuration, config.Announcement.Burn)
+`, config.TotalStorage, config.StorageRemaining, config.Price, config.MaxFilesize, config.MaxDuration, config.Burn)
 }
 
 // TODO: settings should be updated individually, then submitted together in a
 // separate API call.
-func hostsetconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, price, burn string) {
+func hostconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, price, burn string) {
 	err := callAPI(fmt.Sprintf("/host/setconfig?totalstorage=%s&maxfilesize=%s&mintolerance=%s"+
 		"&maxduration=%s&price=%s&burn=%s", totalstorage, maxfilesize, mintolerance, maxduration, price, burn))
 	if err != nil {

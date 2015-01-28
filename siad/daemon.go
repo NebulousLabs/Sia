@@ -6,13 +6,11 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
-	// "github.com/NebulousLabs/Sia/sia/host"
-	// "github.com/NebulousLabs/Sia/sia/hostdb"
+	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	// "github.com/NebulousLabs/Sia/sia/renter"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 type DaemonConfig struct {
@@ -37,9 +35,10 @@ type daemon struct {
 	// Modules. TODO: Implement all modules.
 	state   *consensus.State
 	tpool   *transactionpool.TransactionPool
-	miner   *miner.Miner
 	network *network.TCPServer
 	wallet  *wallet.Wallet
+	miner   *miner.Miner
+	host    *host.Host
 
 	styleDir    string
 	downloadDir string
@@ -68,10 +67,10 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	// d.host, err = host.New(d.state, d.wallet)
-	// if err != nil {
-	// 	return
-	// }
+	d.host, err = host.New(d.state, d.wallet)
+	if err != nil {
+		return
+	}
 	/*
 		hostDB, err := hostdb.New()
 		if err != nil {

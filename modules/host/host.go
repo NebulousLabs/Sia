@@ -119,9 +119,22 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	return
 }
 
-// TODO: Deprecate this function.
-func (h *Host) NumContracts() int {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return len(h.contracts)
+type HostInfo struct {
+	modules.HostAnnouncement
+
+	StorageRemaining int64
+	ContractCount    int
+}
+
+func (h *Host) Info() (info HostInfo, err error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	info = HostInfo{
+		HostAnnouncement: h.announcement,
+
+		StorageRemaining: h.spaceRemaining,
+		ContractCount:    len(h.contracts),
+	}
+	return
 }

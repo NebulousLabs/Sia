@@ -105,10 +105,10 @@ func main() {
 	})
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostSetConfigCmd, hostAnnounceCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
 
 	root.AddCommand(minerCmd)
-	minerCmd.AddCommand(minerStartCmd, minerStatusCmd, minerStopCmd)
+	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)

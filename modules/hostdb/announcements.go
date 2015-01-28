@@ -59,16 +59,9 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 			// Add the host to the host database.
 			entryID := t.OutputID(int(ha.FreezeIndex))
 			entries = append(entries, modules.HostEntry{
-				ID:          string(entryID[:]),
-				IPAddress:   ha.IPAddress,
-				MinFilesize: ha.MinFilesize,
-				MaxFilesize: ha.MaxFilesize,
-				MinDuration: ha.MinDuration,
-				MaxDuration: ha.MaxDuration,
-				Price:       ha.Price,
-				Burn:        ha.Burn,
-				Freeze:      freeze,
-				CoinAddress: ha.CoinAddress,
+				HostAnnouncement: ha,
+				ID:               string(entryID[:]),
+				Freeze:           freeze,
 			})
 		}
 	}

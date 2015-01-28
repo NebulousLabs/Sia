@@ -67,12 +67,11 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		entry := modules.HostEntry{
-			ID:     strconv.Itoa(i),
-			Burn:   10,
-			Freeze: 10,
-			Price:  10,
-		}
+		var entry modules.HostEntry
+		entry.Burn = 10
+		entry.Price = 10
+		entry.Freeze = 10
+		entry.ID = strconv.Itoa(i)
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions, t)
@@ -108,12 +107,11 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := modules.HostEntry{
-			ID:     strconv.Itoa(i),
-			Burn:   10,
-			Freeze: 10,
-			Price:  10,
-		}
+		var entry modules.HostEntry
+		entry.Burn = 10
+		entry.Price = 10
+		entry.Freeze = 10
+		entry.ID = strconv.Itoa(i)
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)
