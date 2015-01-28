@@ -22,6 +22,19 @@ func standard(t consensus.Transaction) (err error) {
 		return
 	}
 
+	// Check that transactions with storage proofs follow the storage proof
+	// rules.
+	if len(t.StorageProofs) != 0 {
+		if len(t.Inputs) > 1 ||
+			len(t.MinerFees) > 1 ||
+			len(t.Outputs) > 1 ||
+			len(t.FileContracts) != 0 ||
+			len(t.ArbitraryData) != 0 {
+			err = errors.New("transaction has storage proofs but does not follow the storage proof rules")
+			return
+		}
+	}
+
 	// TODO: Check that the arbitrary data is either prefixed with 'NonSia' or
 	// is prefixed with 'HostAnnouncement' plus follows rules for making a host
 	// announcement.

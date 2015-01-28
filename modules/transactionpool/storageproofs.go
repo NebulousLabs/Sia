@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
 
@@ -47,6 +48,40 @@ func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction
 	return
 }
 
-// When doing a pool dump, need to find a way to grab all of the storageProofs
-// that you can without grabbing proofs that conflict with each other or repeat
-// on the same contract.
+func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transactions []consensus.Transaction, sizeUsed int) {
+	contractsSatisfied := make(map[consensus.ContractID]struct{})
+
+	// Get storage proofs for all heights from 12 earlier to the current
+	// height.
+	for height := tp.state.Height() - 12; height != tp.state.Height(); height++ {
+		for _, txn := range tp.storageProofs[height] {
+			// Check that the transaction is valid, and that none of the
+			// storage proofs have already been used in another transaction.
+			err := tp.state.ValidTransaction(txn)
+			if err != nil {
+				continue // don't remove the transaction because it might be valid on another fork. (this action is only taken for storage proofs)
+			}
+
+			for _, proof := range txn.StorageProofs {
+				_, exists := contractsSatisfied[proof.ContractID]
+				if exists {
+					continue // this storage proof was already made in a different transaction.
+				}
+			}
+			for _, proof := range txn.StorageProofs {
+				contractsSatisfied[proof.ContractID] = struct{}{}
+			}
+
+			// Check for size requirements.
+			encodedTxn := encoding.Marshal(txn)
+			remainingSize -= len(encodedTxn)
+			if remainingSize < 0 {
+				return
+			}
+			sizeUsed += len(encodedTxn)
+			transactions = append(transactions, txn)
+		}
+	}
+
+	return
+}

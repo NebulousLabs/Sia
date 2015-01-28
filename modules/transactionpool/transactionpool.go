@@ -29,7 +29,8 @@ type unconfirmedTransaction struct {
 // confirmed by a block. Transactions with storage proofs are handled
 // separately for reasons discussed in Standard.md
 type TransactionPool struct {
-	state *consensus.State
+	state             *consensus.State
+	stateSubscription chan struct{}
 
 	// The head and tail of the linked list of transactions that can be put
 	// into blocks.
@@ -66,7 +67,8 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 	}
 
 	tp = &TransactionPool{
-		state: state,
+		state:             state,
+		stateSubscription: state.Subscribe(),
 
 		outputs: make(map[consensus.OutputID]consensus.Output),
 

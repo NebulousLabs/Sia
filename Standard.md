@@ -44,6 +44,10 @@ proofs. If there are two competing reorgs, it is in the best interest of the
 network to keep storage proofs for each reorg, because each proof will only be
 valid on one reorg.
 
+Storage proofs are prioritized by the transaction pool. Because of their
+priority, they are ignored if there is any aribtrary data, or if there is more
+than one input, one output, one miner fee, and a collection of storage proofs.
+
 --------------------------
 -- Arbitrary Data Usage --
 --------------------------

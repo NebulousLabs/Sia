@@ -95,9 +95,12 @@ func (m *Miner) updateBlockInfo() {
 	m.earliestTimestamp = m.state.EarliestTimestamp()
 }
 
-// checkUpdate will update the miner if there has been a change in the state or
-// tpool, and otherwise do nothing. This idle checking might be an
-// overoptimization.
+// update will update the mining variables to match the most recent changes in
+// the blockchain and the transaction pool.
+//
+// Previously, these changes were only called if the state or transaction pool
+// had actually changed, but this greatly increased the complexity of the code,
+// and I'm not even sure it made things run faster.
 func (m *Miner) update() {
 	m.state.RLock()
 	defer m.state.RUnlock()

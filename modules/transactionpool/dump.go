@@ -5,8 +5,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// When doing a dump, make sure that all of the contracts are still legal.
-
 // TransactionSet will return a list of transactions that can be put in a block
 // in order, and will not result in the block being too large. TransactionSet
 // prioritizes transactions that have already been in a block (on another
@@ -16,6 +14,11 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
 	remainingSize := consensus.BlockSizeLimit - 1024 // Leave 1kb for block header and metadata, which should actually only be about 120 bytes.
+
+	// Add storage proofs.
+	transactions, sizeUsed := tp.storageProofTransactionSet(remainingSize)
+	remainingSize -= sizeUsed
+
 	currentTxn := tp.head
 	for currentTxn != nil {
 		// Make sure that any contracts created in the transaction are still
