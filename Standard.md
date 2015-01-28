@@ -2,6 +2,13 @@ Some transactions will not be accepted by miners unless they appear in a block.
 This is equivalent to the 'IsStandard' function in Bitcoin. This file dictates
 the rules for standard Sia transactions.
 
+----------------------
+-- Transaction Size --
+----------------------
+
+Consensus rules limit the size of a block, but not the size of a transaction.
+Standard rules however limit the size of a single transaction to 64kb.
+
 ------------------------
 -- Double Spend Rules --
 ------------------------

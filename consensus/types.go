@@ -20,8 +20,6 @@ type (
 	Target      hash.Hash
 )
 
-// Eventually, the Block and the block header will be two separate structs.
-// This will be put into practice when we implement merged mining.
 type Block struct {
 	ParentBlockID BlockID
 	Timestamp     Timestamp
