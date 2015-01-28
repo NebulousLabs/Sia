@@ -14,11 +14,9 @@ func (d *daemon) handle(addr string) {
 	mux := http.NewServeMux()
 
 	// Host API Calls
-	//
-	// TODO: SetConfig also calls announce(), there should be smarter ways to
-	// handle this.
 	mux.HandleFunc("/host/config", d.hostConfigHandler)
 	mux.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
+	mux.HandleFunc("/host/announce", d.hostAnnounceHandler)
 
 	// Miner API Calls
 	mux.HandleFunc("/miner/start", d.minerStartHandler)

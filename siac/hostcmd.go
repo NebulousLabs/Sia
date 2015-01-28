@@ -1,6 +1,5 @@
 package main
 
-/*
 import (
 	"fmt"
 
@@ -27,8 +26,15 @@ var (
 	hostSetConfigCmd = &cobra.Command{
 		Use:   "setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
 		Short: "Modify host settings",
-		Long:  "Modify host settings, including available storage, price, and more. The new settings will be be announced to the network.",
+		Long:  "Modify host settings, including available storage, price, and more.",
 		Run:   wrap(hostsetconfigcmd),
+	}
+
+	hostAnnounceCmd = &cobra.Command{
+		Use:   "announce",
+		Short: "Announce host",
+		Long:  "Announce yourself as a host on the network. You may wish to set your hosting parameters first, via 'host setconfig'.",
+		Run:   wrap(hostannouncecmd),
 	}
 )
 
@@ -60,4 +66,12 @@ func hostsetconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, pric
 	}
 	fmt.Println("Host settings updated. You have been announced as a host on the network.")
 }
-*/
+
+func hostannouncecmd() {
+	err := callAPI("/host/announce")
+	if err != nil {
+		fmt.Println("Could not announce host:", err)
+		return
+	}
+	fmt.Println("Host announcement submitted to network.")
+}
