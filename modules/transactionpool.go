@@ -10,6 +10,10 @@ type TransactionPool interface {
 	// transaction is rejected.
 	AcceptTransaction(consensus.Transaction) error
 
+	// OutputDiffs returns the set of diffs that are in the transaction pool
+	// but haven't been confirmed by a block yet.
+	OutputDiffs() []consensus.OutputDiff
+
 	// TransactionSet will return a set of transactions not exceeding the block
 	// size that can be inserted into a block in order.
 	//

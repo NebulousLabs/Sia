@@ -11,9 +11,9 @@ import (
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
 func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transaction, err error) {
-	// TODO: Call update.
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
+	tp.update()
 
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
@@ -66,6 +66,7 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
+	tp.update()
 
 	// For each transaction in the linked list, grab the diffs that would be
 	// created by the transaction.

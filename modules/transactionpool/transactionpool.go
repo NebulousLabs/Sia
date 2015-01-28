@@ -18,8 +18,8 @@ import (
 // the list.
 type unconfirmedTransaction struct {
 	transaction  consensus.Transaction
-	requirements []*unconfirmedTransaction
-	dependents   []*unconfirmedTransaction
+	requirements map[*unconfirmedTransaction]struct{}
+	dependents   map[*unconfirmedTransaction]struct{}
 
 	previous *unconfirmedTransaction
 	next     *unconfirmedTransaction
@@ -31,6 +31,7 @@ type unconfirmedTransaction struct {
 type TransactionPool struct {
 	state             *consensus.State
 	stateSubscription chan struct{}
+	recentBlock       consensus.BlockID
 
 	// The head and tail of the linked list of transactions that can be put
 	// into blocks.
@@ -69,6 +70,7 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 	tp = &TransactionPool{
 		state:             state,
 		stateSubscription: state.Subscribe(),
+		recentBlock:       state.CurrentBlock().ID(),
 
 		outputs: make(map[consensus.OutputID]consensus.Output),
 
@@ -77,7 +79,28 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 
 		storageProofs: make(map[consensus.BlockHeight]map[hash.Hash]consensus.Transaction),
 	}
+
+	go tp.threadedUpdate()
+
 	return
+}
+
+func (tp *TransactionPool) addTransactionToHead(ut *unconfirmedTransaction) {
+	if tp.head == nil {
+		// Sanity check - tail should never be nil unless head is also nil.
+		if consensus.DEBUG {
+			if tp.tail != nil {
+				panic("head is nil but tail is not nil")
+			}
+		}
+
+		tp.head = ut
+		tp.tail = ut
+	} else {
+		tp.head.previous = ut
+		ut.next = tp.head
+		tp.head = ut
+	}
 }
 
 // addTransactionToTail takes an unconfirmedTransaction and adds it to the tail

@@ -139,6 +139,16 @@ func (s *State) output(id OutputID) (output Output, exists bool) {
 	return
 }
 
+// Block returns the block associated with the given id.
+func (s *State) Block(id BlockID) (b Block, exists bool) {
+	node, exists := s.blockMap[id]
+	if !exists {
+		return
+	}
+	b = node.Block
+	return
+}
+
 // BlockAtHeight returns the block in the current fork found at `height`.
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	s.mu.RLock()

@@ -101,7 +101,9 @@ func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error)
 // addTransaction adds a transaction to the transaction pool.
 func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 	ut := &unconfirmedTransaction{
-		transaction: t,
+		transaction:  t,
+		requirements: make(map[*unconfirmedTransaction]struct{}),
+		dependents:   make(map[*unconfirmedTransaction]struct{}),
 	}
 
 	// Go through the inputs and them to the used outputs list, updating the
@@ -118,8 +120,8 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 
 		unconfirmedTxn, exists := tp.newOutputs[input.OutputID]
 		if exists {
-			unconfirmedTxn.dependents = append(unconfirmedTxn.dependents, ut)
-			ut.requirements = append(ut.requirements, unconfirmedTxn)
+			unconfirmedTxn.dependents[ut] = struct{}{}
+			ut.requirements[unconfirmedTxn] = struct{}{}
 		}
 		tp.usedOutputs[input.OutputID] = ut
 	}
