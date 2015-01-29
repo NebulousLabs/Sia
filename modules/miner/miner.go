@@ -10,6 +10,7 @@ import (
 
 type Miner struct {
 	state  *consensus.State
+	tpool  modules.TransactionPool
 	wallet modules.Wallet
 
 	// Block variables - helps the miner construct the next block.
@@ -25,14 +26,19 @@ type Miner struct {
 	iterationsPerAttempt uint64
 
 	stateSubscription chan struct{}
+	tpoolSubscription chan struct{}
 
 	mu sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(state *consensus.State, wallet modules.Wallet) (m *Miner, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (m *Miner, err error) {
 	if state == nil {
 		err = errors.New("miner cannot use a nil state")
+		return
+	}
+	if tpool == nil {
+		err = errors.New("miner cannot use a nil transaction pool")
 		return
 	}
 	if wallet == nil {
@@ -42,22 +48,21 @@ func New(state *consensus.State, wallet modules.Wallet) (m *Miner, err error) {
 
 	m = &Miner{
 		state:                state,
+		tpool:                tpool,
 		wallet:               wallet,
 		threads:              1,
 		iterationsPerAttempt: 256 * 1024,
 	}
 
-	// Subscribe to the state and get a mining address.
-	m.stateSubscription = state.Subscribe()
+	// Subscribe to the state and tpool.
 	addr, _, err := m.wallet.CoinAddress()
 	if err != nil {
 		return
 	}
 	m.address = addr
 
-	// Fool the miner into grabbing the first update.
-	m.stateSubscription <- struct{}{}
-	m.checkUpdate()
+	// Update the miner.
+	m.update()
 
 	return
 }
@@ -75,20 +80,30 @@ func (m *Miner) SetThreads(threads int) error {
 	return nil
 }
 
-// checkUpdate actually just updates the miner.
-//
-// TODO: checkUpdate will only update the miner if something has been sent down
-// a channel.
-func (m *Miner) checkUpdate() {
-	select {
-	case <-m.stateSubscription:
-		m.state.RLock()
-		m.parent = m.state.CurrentBlock().ID()
-		m.transactions = m.state.TransactionPoolDump()
-		m.target = m.state.CurrentTarget()
-		m.earliestTimestamp = m.state.EarliestTimestamp()
-		m.state.RUnlock()
-	default:
-		// nothing to do
+// Grabs the set of
+func (m *Miner) updateTransactionSet() {
+	tset, err := m.tpool.TransactionSet()
+	if err != nil {
+		tset = nil
 	}
+	m.transactions = tset
+}
+
+func (m *Miner) updateBlockInfo() {
+	m.parent = m.state.CurrentBlock().ID()
+	m.target = m.state.CurrentTarget()
+	m.earliestTimestamp = m.state.EarliestTimestamp()
+}
+
+// update will update the mining variables to match the most recent changes in
+// the blockchain and the transaction pool.
+//
+// Previously, these changes were only called if the state or transaction pool
+// had actually changed, but this greatly increased the complexity of the code,
+// and I'm not even sure it made things run faster.
+func (m *Miner) update() {
+	m.state.RLock()
+	defer m.state.RUnlock()
+	m.updateTransactionSet()
+	m.updateBlockInfo()
 }

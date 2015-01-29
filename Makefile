@@ -4,17 +4,17 @@ fmt:
 	go fmt ./...
 
 install: fmt
-	go install -tags=dev ./...
+	go install -a -tags=dev ./...
 
 clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
 		sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload
 
-test: clean
-	go test -short -tags=test ./...
+test: clean fmt
+	go test -a -short -tags=test ./...
 
-test-long: clean
-	go test -v -race -tags=test ./...
+test-long: test
+	go test -a -v -race -tags=test ./...
 
 # run twice to ensure references are updated properly
 whitepaper:
@@ -32,13 +32,14 @@ dependencies:
 	go get -u github.com/stretchr/graceful
 	go get -u github.com/laher/goxc
 
-release: clean dependencies test test-long
-	go install -tags=release ./...
+release: dependencies test-long
+	go install -a ./...
 
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
-xc: release
+xc: dependencies test-long
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.2.0          \
 		-br=release -pr=beta -include=example-config,LICENSE*,README*           \
 		-tasks-=deb,deb-dev,deb-source,go-test
+	# Need some command here to make sure that the release constants got used.
 
 .PHONY: all fmt install clean test test-long whitepaper dependencies release xc

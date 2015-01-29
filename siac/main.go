@@ -104,8 +104,9 @@ func main() {
 		Run:   version,
 	})
 
-	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostSetConfigCmd)
+	// TODO: Bring these back
+	// root.AddCommand(hostCmd)
+	// hostCmd.AddCommand(hostConfigCmd, hostSetConfigCmd)
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStatusCmd, minerStopCmd)

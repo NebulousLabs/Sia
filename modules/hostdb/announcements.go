@@ -4,7 +4,26 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/network"
 )
+
+// A HostAnnouncement is a struct that can appear in the arbitrary data field.
+// It is preceded by 8 bytes that decode to the integer 1.
+type HostAnnouncement struct {
+	IPAddress    network.Address
+	TotalStorage int64 // Can go negative.
+	MinFilesize  uint64
+	MaxFilesize  uint64
+	MinDuration  consensus.BlockHeight
+	MaxDuration  consensus.BlockHeight
+	MinWindow    consensus.BlockHeight
+	Price        consensus.Currency
+	Burn         consensus.Currency
+	CoinAddress  consensus.CoinAddress // Host may want to give different addresses to each client.
+
+	SpendConditions consensus.SpendConditions
+	FreezeIndex     uint64 // The index of the output that froze coins.
+}
 
 // findHostAnnouncements scans a block and pulls out every host announcement
 // that appears in the block, returning a list of entries that correspond with
@@ -21,7 +40,7 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ent
 
 		dataIndicator := encoding.DecUint64([]byte(t.ArbitraryData[0][0:8]))
 		if dataIndicator == 1 {
-			var ha modules.HostAnnouncement
+			var ha HostAnnouncement
 			err = encoding.Unmarshal([]byte(t.ArbitraryData[0][8:]), &ha)
 			if err != nil {
 				return

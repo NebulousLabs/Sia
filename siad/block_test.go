@@ -6,7 +6,11 @@ import (
 
 func testEmptyBlock(t *testing.T, d *daemon) {
 	// Check that the block will actually be empty.
-	if len(d.state.TransactionPoolDump()) != 0 {
+	tset, err := d.tpool.TransactionSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tset) != 0 {
 		t.Error("transaction pool is not empty")
 	}
 

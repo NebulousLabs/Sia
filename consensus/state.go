@@ -134,13 +134,18 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (output Output, err error) {
-	output, exists := s.unspentOutputs[id]
-	if exists {
+func (s *State) output(id OutputID) (output Output, exists bool) {
+	output, exists = s.unspentOutputs[id]
+	return
+}
+
+// Block returns the block associated with the given id.
+func (s *State) Block(id BlockID) (b Block, exists bool) {
+	node, exists := s.blockMap[id]
+	if !exists {
 		return
 	}
-
-	err = errors.New("output not in utxo set")
+	b = node.Block
 	return
 }
 
@@ -158,6 +163,16 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, err error) {
 	return
 }
 
+func (s *State) Contract(id ContractID) (fc FileContract, err error) {
+	fc, exists := s.openContracts[id]
+	if !exists {
+		err = errors.New("no contract found")
+		return
+	}
+
+	return
+}
+
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() Block {
 	s.mu.RLock()
@@ -171,6 +186,14 @@ func (s *State) CurrentTarget() Target {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.currentBlockNode().Target
+}
+
+// EarliestLegalTimestamp returns the earliest legal timestamp of the next
+// block - earlier timestamps will render the block invalid.
+func (s *State) EarliestTimestamp() Timestamp {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // State.Height() returns the height of the longest fork.
@@ -194,12 +217,10 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, err error) {
 	return
 }
 
-// EarliestLegalTimestamp returns the earliest legal timestamp of the next
-// block - earlier timestamps will render the block invalid.
-func (s *State) EarliestTimestamp() Timestamp {
+func (s *State) Output(id OutputID) (output Output, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.currentBlockNode().earliestChildTimestamp()
+	return s.output(id)
 }
 
 func (s *State) RLock() {

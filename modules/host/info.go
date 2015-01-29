@@ -1,11 +1,11 @@
 package host
 
 import (
-	"github.com/NebulousLabs/Sia/modules"
+// "github.com/NebulousLabs/Sia/modules"
 )
 
 type HostInfo struct {
-	Announcement modules.HostAnnouncement
+	// Announcement modules.HostEntry
 
 	StorageRemaining int
 	ContractCount    int
@@ -16,7 +16,7 @@ func (h *Host) Info() (info HostInfo, err error) {
 	defer h.mu.RUnlock()
 
 	info = HostInfo{
-		Announcement: h.announcement,
+		// Announcement: h.announcement,
 
 		StorageRemaining: int(h.spaceRemaining),
 		ContractCount:    len(h.contracts),
