@@ -1,5 +1,9 @@
 package consensus
 
+import (
+	"errors"
+)
+
 // A block is composed of many transactions. Blocks that have transactions that
 // depend on other transactions, but the transactions must all be applied in a
 // deterministic order. Transactions cannot have inter-dependencies, meaning
@@ -85,4 +89,18 @@ func (s *State) commitContractDiff(cd ContractDiff, forward bool) {
 
 		delete(s.openContracts, cd.ID)
 	}
+}
+
+func (s *State) BlockOutputDiffs(id BlockID) (diffs []OutputDiff, err error) {
+	node, exists := s.blockMap[id]
+	if !exists {
+		err = errors.New("requested an unknown block")
+		return
+	}
+	if !node.DiffsGenerated {
+		err = errors.New("diffs have not been generated for the requested block.")
+		return
+	}
+	diffs = node.OutputDiffs
+	return
 }

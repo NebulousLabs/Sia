@@ -21,8 +21,10 @@ const (
 // The wallet contains a list of addresses and the methods to spend them (the
 // keys), as well as an interactive way to construct and sign transactions.
 type Wallet struct {
-	state *consensus.State
-	tpool modules.TransactionPool
+	state            *consensus.State
+	tpool            modules.TransactionPool
+	recentBlock      consensus.BlockID
+	unconfirmedDiffs []consensus.OutputDiff
 
 	// Location of the wallet's file, for saving and loading keys.
 	filename string

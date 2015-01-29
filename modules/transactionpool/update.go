@@ -20,6 +20,9 @@ func (tp *TransactionPool) removeTransactionFromPool(ut *unconfirmedTransaction)
 }
 
 func (tp *TransactionPool) update() {
+	tp.state.RLock()
+	defer tp.state.RUnlock()
+
 	// Get the block diffs since the previous update.
 	removedBlocksIDs, addedBlocksIDs, err := tp.state.BlocksSince(tp.recentBlock)
 	if err != nil {
@@ -97,16 +100,6 @@ func (tp *TransactionPool) update() {
 			}
 		}
 	}
-}
 
-// threadedUpdate listens on a channel from the state for updates, and when an
-// update is announced the transaction pool gets updated.
-func (tp *TransactionPool) threadedUpdate() {
-	for _ = range tp.stateSubscription {
-		tp.state.RLock()
-		tp.mu.Lock()
-		tp.update()
-		tp.mu.Unlock()
-		tp.state.RUnlock()
-	}
+	tp.recentBlock = tp.state.CurrentBlock().ID()
 }
