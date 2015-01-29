@@ -13,21 +13,14 @@ var (
 		Use:   "host",
 		Short: "Perform host actions",
 		Long:  "View or modify host settings. Modifying host settings also announces the host to the network.",
-		Run:   wrap(hostconfigcmd),
-	}
-
-	hostStatusCmd = &cobra.Command{
-		Use:   "config",
-		Short: "View host settings",
-		Long:  "View host settings, including available storage, price, and more.",
 		Run:   wrap(hoststatuscmd),
 	}
 
-	hostConfigCmd = &cobra.Command{
-		Use:   "setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
+	hostSetCmd = &cobra.Command{
+		Use:   "set [setting] [value]",
 		Short: "Modify host settings",
-		Long:  "Modify host settings, including available storage, price, and more.",
-		Run:   wrap(hostconfigcmd),
+		Long:  "Modify host settings.\nAvailable settings:\n\ttotalstorage\n\tmaxfilesize\n\tmintolerance\n\tmaxduration\n\tprice\n\tburn",
+		Run:   wrap(hostsetcmd),
 	}
 
 	hostAnnounceCmd = &cobra.Command{
@@ -36,7 +29,33 @@ var (
 		Long:  "Announce yourself as a host on the network. You may wish to set your hosting parameters first, via 'host setconfig'.",
 		Run:   wrap(hostannouncecmd),
 	}
+
+	hostStatusCmd = &cobra.Command{
+		Use:   "status",
+		Short: "View host settings",
+		Long:  "View host settings, including available storage, price, and more.",
+		Run:   wrap(hoststatuscmd),
+	}
 )
+
+func hostsetcmd(param, value string) {
+	err := callAPI(fmt.Sprintf("/host/setconfig?%s=%s", param, value))
+	if err != nil {
+		fmt.Println("Could not update host settings:", err)
+		return
+	}
+	fmt.Println("Host settings updated.")
+}
+
+// TODO: needs freeze values
+func hostannouncecmd() {
+	err := callAPI("/host/announce")
+	if err != nil {
+		fmt.Println("Could not announce host:", err)
+		return
+	}
+	fmt.Println("Host announcement submitted to network.")
+}
 
 func hoststatuscmd() {
 	config := new(host.HostInfo)
@@ -52,25 +71,4 @@ Max Filesize: %v
 Max Duration: %v
 Burn:         %v
 `, config.TotalStorage, config.StorageRemaining, config.Price, config.MaxFilesize, config.MaxDuration, config.Burn)
-}
-
-// TODO: settings should be updated individually, then submitted together in a
-// separate API call.
-func hostconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, price, burn string) {
-	err := callAPI(fmt.Sprintf("/host/setconfig?totalstorage=%s&maxfilesize=%s&mintolerance=%s"+
-		"&maxduration=%s&price=%s&burn=%s", totalstorage, maxfilesize, mintolerance, maxduration, price, burn))
-	if err != nil {
-		fmt.Println("Could not update host settings:", err)
-		return
-	}
-	fmt.Println("Host settings updated. You have been announced as a host on the network.")
-}
-
-func hostannouncecmd() {
-	err := callAPI("/host/announce")
-	if err != nil {
-		fmt.Println("Could not announce host:", err)
-		return
-	}
-	fmt.Println("Host announcement submitted to network.")
 }

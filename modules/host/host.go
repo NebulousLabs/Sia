@@ -36,7 +36,7 @@ type Host struct {
 	spaceRemaining int64
 	fileCounter    int
 
-	contracts map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
+	contracts map[consensus.ContractID]contractObligation
 
 	mu sync.RWMutex
 }
@@ -96,11 +96,10 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Verify the file exists, using a mutex while reading the host.
 	h.mu.RLock()
 	contractObligation, exists := h.contracts[contractID]
+	h.mu.RUnlock()
 	if !exists {
-		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
-	h.mu.RUnlock()
 
 	// Open the file.
 	fullname := filepath.Join(h.hostDir, contractObligation.filename)
@@ -119,6 +118,14 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	return
 }
 
+// SetAnnouncement updates the host's internal announcement object. To modify
+// a specific field, use a combination of Info and SetAnnouncement.
+func (h *Host) SetAnnouncement(ha modules.HostAnnouncement) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.announcement = ha
+}
+
 type HostInfo struct {
 	modules.HostAnnouncement
 
@@ -126,15 +133,15 @@ type HostInfo struct {
 	ContractCount    int
 }
 
-func (h *Host) Info() (info HostInfo, err error) {
+func (h *Host) Info() HostInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	info = HostInfo{
+	info := HostInfo{
 		HostAnnouncement: h.announcement,
 
 		StorageRemaining: h.spaceRemaining,
 		ContractCount:    len(h.contracts),
 	}
-	return
+	return info
 }

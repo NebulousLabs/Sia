@@ -105,7 +105,7 @@ func main() {
 	})
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
+	hostCmd.AddCommand(hostSetCmd, hostAnnounceCmd, hostStatusCmd)
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)

@@ -14,8 +14,8 @@ func (d *daemon) listen(addr string) {
 
 	// Host API Calls
 	mux.HandleFunc("/host/config", d.hostConfigHandler)
-	mux.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
 	mux.HandleFunc("/host/announce", d.hostAnnounceHandler)
+	mux.HandleFunc("/host/status", d.hostStatusHandler)
 
 	// Miner API Calls
 	mux.HandleFunc("/miner/start", d.minerStartHandler)

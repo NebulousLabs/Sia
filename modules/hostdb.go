@@ -13,9 +13,8 @@ const (
 // uses to weigh hosts and pick them out when storing files.
 type HostEntry struct {
 	HostAnnouncement
-	ID        string
-	Tolerance uint64 // curently unused?
-	Freeze    consensus.Currency
+	ID     string
+	Freeze consensus.Currency
 }
 
 type HostDB interface {
