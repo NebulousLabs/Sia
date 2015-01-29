@@ -77,7 +77,7 @@ func (tp *TransactionPool) update() {
 			// If the transaction contains a storage proof or is non-standard,
 			// remove this transaction from the pool. This is done last because
 			// we also need to remove any dependents.
-			err = standard(txn)
+			err = tp.IsStandardTransaction(txn)
 			if err != nil || len(txn.StorageProofs) != 0 {
 				// TODO: Call the function to remove a tranasction and
 				// dependents.

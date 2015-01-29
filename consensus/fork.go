@@ -197,7 +197,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 			s.invalidateNode(backtrackNodes[i])
 
 			// Rewind the validated blocks
-			for j := 0; j < len(appliedNodes)-1; j++ {
+			for j := 0; j < i; j++ { // reverse all the blocks we applied.
 				s.invertRecentBlock()
 			}
 

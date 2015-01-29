@@ -10,6 +10,10 @@ type TransactionPool interface {
 	// transaction is rejected.
 	AcceptTransaction(consensus.Transaction) error
 
+	// IsStandardTransaction returns `err = nil` if the transaction is
+	// standard, otherwise it returns an error explaining what is not standard.
+	IsStandardTransaction(consensus.Transaction) error
+
 	// OutputDiffs returns the set of diffs that are in the transaction pool
 	// but haven't been confirmed by a block yet.
 	OutputDiffs() []consensus.OutputDiff

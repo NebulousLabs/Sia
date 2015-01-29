@@ -54,6 +54,7 @@ func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transa
 	// Get storage proofs for all heights from 12 earlier to the current
 	// height.
 	for height := tp.state.Height() - 12; height != tp.state.Height(); height++ {
+	TxnLoop:
 		for _, txn := range tp.storageProofs[height] {
 			// Check that the transaction is valid, and that none of the
 			// storage proofs have already been used in another transaction.
@@ -65,7 +66,7 @@ func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transa
 			for _, proof := range txn.StorageProofs {
 				_, exists := contractsSatisfied[proof.ContractID]
 				if exists {
-					continue // this storage proof was already made in a different transaction.
+					continue TxnLoop
 				}
 			}
 			for _, proof := range txn.StorageProofs {

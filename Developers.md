@@ -82,7 +82,7 @@ if consensus.DEBUG {
 }
 
 In the example, a panic is called for incorrect use of the function, but only
-in panic mode. This failure will be invisible in production code, but the code
+in debug mode. This failure will be invisible in production code, but the code
 will have higher performace because the code should never fail anyway.
 
 ---------------------------

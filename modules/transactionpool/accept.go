@@ -157,7 +157,7 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	defer tp.state.RUnlock()
 
 	// Check that the transaction follows 'Standard.md' guidelines.
-	err = standard(t)
+	err = tp.IsStandardTransaction(t)
 	if err != nil {
 		return
 	}
