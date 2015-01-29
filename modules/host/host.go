@@ -74,12 +74,6 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		contracts: make(map[consensus.ContractID]contractObligation),
 	}
 
-	// Subscribe to the state and begin listening for updates.
-	// TODO: Get all changes/diffs from the genesis to current block in a way
-	// that doesn't cause a race condition with the subscription.
-	updateChan := state.Subscribe()
-	go h.threadedConsensusListen(updateChan)
-
 	return
 }
 

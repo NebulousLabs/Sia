@@ -51,9 +51,6 @@ type State struct {
 	unspentOutputs map[OutputID]Output
 	openContracts  map[ContractID]FileContract
 
-	// TODO: docstring
-	subscriptions []chan struct{}
-
 	mu sync.RWMutex
 }
 

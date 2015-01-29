@@ -98,15 +98,3 @@ func (tp *TransactionPool) update() {
 		}
 	}
 }
-
-// threadedUpdate listens on a channel from the state for updates, and when an
-// update is announced the transaction pool gets updated.
-func (tp *TransactionPool) threadedUpdate() {
-	for _ = range tp.stateSubscription {
-		tp.state.RLock()
-		tp.mu.Lock()
-		tp.update()
-		tp.mu.Unlock()
-		tp.state.RUnlock()
-	}
-}

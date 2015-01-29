@@ -153,8 +153,5 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		return
 	}
 
-	// Notify subscribers that the blockchain has updated.
-	s.notifySubscribers()
-
 	return
 }
