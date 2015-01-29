@@ -5,7 +5,8 @@ import (
 	"net/http"
 )
 
-// Takes a number of threads and then begins mining on that many threads.
+// minerStartHandler looks for a number of threads and then starts the miner
+// with that many threads.
 func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan for the number of threads.
 	var threads int
@@ -25,7 +26,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// Returns json of the miners status.
+// minerStatusHandler retruns a json struct containing the miner's status.
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 	mInfo, err := d.miner.Info()
 	if err != nil {
@@ -35,7 +36,7 @@ func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, mInfo)
 }
 
-// Calls StopMining() on the core.
+// minerStopHandler stops the miner.
 func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	d.miner.StopMining()
 

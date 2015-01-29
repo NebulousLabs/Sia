@@ -14,6 +14,9 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 		http.Error(w, "Failed to get a coin address", 500)
 		return
 	}
+
+	// TODO: Explain what's happening here, and why it doesn't look like all of
+	// the other calls.
 	writeJSON(w, struct {
 		Address string
 	}{fmt.Sprintf("%x", coinAddress)})
@@ -30,16 +33,8 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Parse the string into an address.
 	destString := req.FormValue("dest")
-	// dest can be either a coin address or a friend name
-	// if ca, ok := e.friends[destString]; ok {
-	// 	destString = ca
-	// }
-	// if len(destString) != 64 {
-	// 	http.Error(w, "Friend not found (or malformed coin address)", 400)
-	// 	return
-	// }
-
 	var destAddressBytes []byte
 	_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
 	if err != nil {
@@ -58,10 +53,8 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// I wasn't sure the best way to manage this. I've implemented it so that the
-// wallet returns some arbitrary JSON and it's up to the front-end to figure
-// out how to use the json. The daemon and envrionment don't really know what's
-// contained within in an attempt to keep things modular.
+// walletStatusHandler returns a struct containing wallet information, like the
+// balance.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	walletStatus, err := d.wallet.Info()
 	if err != nil {
