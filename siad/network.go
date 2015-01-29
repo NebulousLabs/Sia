@@ -84,8 +84,8 @@ func (d *daemon) blockHistory() (blockIDs [32]consensus.BlockID) {
 	knownBlocks := make([]consensus.BlockID, 0, 32)
 	step := consensus.BlockHeight(1)
 	for height := d.state.Height(); ; height -= step {
-		block, err := d.state.BlockAtHeight(height)
-		if err != nil {
+		block, exists := d.state.BlockAtHeight(height)
+		if !exists {
 			// faulty state; log high-priority error
 			return
 		}
@@ -117,8 +117,8 @@ func (d *daemon) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consens
 	found := false
 	var start consensus.BlockHeight
 	for _, id := range knownBlocks {
-		height, err := d.state.HeightOfBlock(id)
-		if err == nil {
+		height, exists := d.state.HeightOfBlock(id)
+		if !exists {
 			found = true
 			start = height + 1 // start at child
 			break
@@ -134,15 +134,15 @@ func (d *daemon) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consens
 
 	// Send blocks, starting with the child of the most recent known block.
 	for i := start; i < start+MaxCatchUpBlocks; i++ {
-		b, err := d.state.BlockAtHeight(i)
-		if err != nil {
+		b, exists := d.state.BlockAtHeight(i)
+		if !exists {
 			break
 		}
 		blocks = append(blocks, b)
 	}
 
 	// If more blocks are available, send a benign error
-	if _, maxErr := d.state.BlockAtHeight(start + MaxCatchUpBlocks); maxErr == nil {
+	if _, exists := d.state.BlockAtHeight(start + MaxCatchUpBlocks); !exists {
 		err = moreBlocksErr
 	}
 

@@ -18,8 +18,9 @@ func (s *State) storageProofSegment(contractID ContractID) (index uint64, err er
 
 	// Get the id of the block used as the seed.
 	triggerHeight := contract.Start - 1
-	triggerBlock, err := s.blockAtHeight(triggerHeight)
-	if err != nil {
+	triggerBlock, exists := s.blockAtHeight(triggerHeight)
+	if !exists {
+		err = errors.New("no block found at contract trigger block height")
 		return
 	}
 	triggerID := triggerBlock.ID()
