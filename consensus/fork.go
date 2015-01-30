@@ -72,6 +72,12 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 			panic("misuse of generateAndApplyDiff")
 		}
 	}
+	// Sanity check - current node must be the input node's parent.
+	if DEBUG {
+		if bn.Parent.Block.ID() != s.currentBlockID {
+			panic("applying a block node when it's not a valid successor")
+		}
+	}
 
 	// Update the current block and current path.
 	s.currentBlockID = bn.Block.ID()
@@ -175,8 +181,10 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// the state as we go.  If at some point a block doesn't
 	// verify, you get to walk all the way backwards and forwards
 	// again.
+	//
+	// The final block in backtrackNodes has already been applied.
 	var appliedNodes []*BlockNode
-	for i := len(backtrackNodes) - 1; i >= 0; i-- {
+	for i := len(backtrackNodes) - 2; i >= 0; i-- {
 		appliedNodes = append(appliedNodes, backtrackNodes[i])
 
 		// If the diffs for this node have already been generated, apply them

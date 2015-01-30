@@ -47,7 +47,6 @@ type State struct {
 func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		blockRoot:      new(BlockNode),
 		badBlocks:      make(map[BlockID]struct{}),
 		blockMap:       make(map[BlockID]*BlockNode),
 		missingParents: make(map[BlockID]map[BlockID]Block),
@@ -61,10 +60,11 @@ func CreateGenesisState() (s *State) {
 		Timestamp:    GenesisTimestamp,
 		MinerAddress: GenesisAddress,
 	}
-	s.blockRoot.Block = genesisBlock
-	s.blockRoot.Height = 0
-	s.blockRoot.Target = RootTarget
-	s.blockRoot.Depth = RootDepth
+	s.blockRoot = &BlockNode{
+		Block:  genesisBlock,
+		Target: RootTarget,
+		Depth:  RootDepth,
+	}
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
 	// Fill out the consensus informaiton for the genesis block.

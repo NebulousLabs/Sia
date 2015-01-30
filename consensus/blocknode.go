@@ -59,8 +59,8 @@ func (node *BlockNode) setTarget() {
 	node.Target = RatToTarget(newRatTarget)
 }
 
-// State.addBlockToTree() takes a block and a parent node, and adds a child
-// node to the parent containing the block. No validation is done.
+// addBlockToTree takes a block and a parent node, and adds a child node to the
+// parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (err error) {
 	parentNode := s.blockMap[b.ParentBlockID]
 	newNode := &BlockNode{

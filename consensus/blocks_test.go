@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"testing"
 	"time"
 )
@@ -123,6 +124,69 @@ func testLargeBlock(t *testing.T, s *State) {
 	}
 }
 
+// testOrphanBlock creates an orphan block and submits it to the state to check
+// that orphans are handled correctly. Then it sumbmits the orphan's parent to
+// check that the reconnection happens correctly.
+func testOrphanBlock(t *testing.T, s *State) {
+	beforeStateHash := s.StateHash()
+	beforeHeight := s.Height()
+
+	// Mine the parent of the orphan.
+	parent, err := mineValidBlock(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mine the orphan using a target that's guaranteed to be sufficient.
+	parentTarget := s.CurrentTarget()
+	orphanRat := new(big.Rat).Mul(parentTarget.Rat(), MaxAdjustmentDown)
+	orphanTarget := RatToTarget(orphanRat)
+	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, orphanTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Submit the orphan and check that the block was ignored.
+	err = s.AcceptBlock(orphan)
+	if err != UnknownOrphanErr {
+		t.Error("unexpected error upon submitting an unknown orphan block:", err)
+	}
+	if s.StateHash() != beforeStateHash {
+		t.Error("state hash changed after submitting an orphan block")
+	}
+	_, exists := s.blockMap[orphan.ID()]
+	if exists {
+		t.Error("orphan got added to the block map")
+	}
+
+	// Submit the parent and check that both the orphan and the parent get
+	// accepted.
+	err = s.AcceptBlock(parent)
+	if err != nil {
+		t.Error("unexpected error upon submitting the parent to an orphan:", err)
+	}
+	_, exists = s.blockMap[parent.ID()]
+	if !exists {
+		t.Error("parent block is not in the block map")
+	}
+	_, exists = s.blockMap[orphan.ID()]
+	if !exists {
+		t.Error("orphan block is not in the block map after being reconnected")
+	}
+	if s.currentBlockID != orphan.ID() {
+		t.Error("the states current block is not the reconnected orphan")
+	}
+	if beforeHeight != s.Height()-2 {
+		t.Error("height should now be reporting 2 new blocks.")
+	}
+
+	// Check that the orphan has been removed from the orphan map.
+	_, exists = s.missingParents[parent.ID()]
+	if exists {
+		t.Error("orphan map was not cleaned out after orphans were connected")
+	}
+}
+
 // testRepeatBlock submits a block to the state, and then submits the same
 // block to the state. If anything in the state has changed, an error is noted.
 func testRepeatBlock(t *testing.T, s *State) {
@@ -178,10 +242,14 @@ func TestLargeBlock(t *testing.T) {
 	testLargeBlock(t, s)
 }
 
+// TestOrphanBlock creates a new state and uses it to call testOrphanBlock.
+func TestOrphanBlock(t *testing.T) {
+	s := CreateGenesisState()
+	testOrphanBlock(t, s)
+}
+
 // TestRepeatBlock creates a new state and uses it to call testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
 	s := CreateGenesisState()
 	testRepeatBlock(t, s)
 }
-
-// TODO: Test orphan block stuff.
