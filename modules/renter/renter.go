@@ -2,14 +2,9 @@ package renter
 
 import (
 	"errors"
-	"fmt"
-	"io"
-	"net"
-	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -19,13 +14,9 @@ type FilePiece struct {
 	ContractID consensus.ContractID   // The ID of the contract.
 }
 
-type FileEntry struct {
-	Pieces []FilePiece
-}
-
 type Renter struct {
 	state  *consensus.State
-	files  map[string]FileEntry
+	files  map[string][]FilePiece
 	hostDB modules.HostDB
 	wallet modules.Wallet
 
@@ -50,7 +41,7 @@ func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *
 		state:  state,
 		hostDB: hdb,
 		wallet: wallet,
-		files:  make(map[string]FileEntry),
+		files:  make(map[string][]FilePiece),
 	}
 	return
 }
@@ -70,55 +61,6 @@ func (r *Renter) Rename(currentName, newName string) error {
 	delete(r.files, currentName)
 	r.files[newName] = entry
 	return nil
-}
-
-func (r *Renter) downloadPiece(piece FilePiece, destination string) (err error) {
-	return piece.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) error {
-		// send filehash
-		if _, err := encoding.WriteObject(conn, piece.ContractID); err != nil {
-			return err
-		}
-		// TODO: read error
-		// copy response into file
-		file, err := os.Create(destination)
-		if err != nil {
-			return err
-		}
-		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
-		file.Close()
-		if err != nil {
-			os.Remove(destination)
-		}
-		return err
-	})
-}
-
-// Download requests a file from the host it was stored with, and downloads it
-// into the specified filename.
-func (r *Renter) Download(nickname, filename string) (err error) {
-	entry, exists := r.files[nickname]
-	if !exists {
-		return errors.New("no file entry for file: " + nickname)
-	}
-
-	// We just need to get one piece, we'll keep contacting hosts until one
-	// doesn't return an error.
-	for _, piece := range entry.Pieces {
-		err = r.downloadPiece(piece, filename)
-		if err == nil {
-			return
-		} else {
-			fmt.Println("Renter got error:", err)
-			r.hostDB.FlagHost(piece.Host.IPAddress)
-		}
-	}
-
-	if err != nil {
-		err = errors.New("Too many hosts returned errors - could not recover the file.")
-		return
-	}
-
-	return
 }
 
 func (r *Renter) Info() (ri modules.RentInfo) {

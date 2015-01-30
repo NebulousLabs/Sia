@@ -1,15 +1,20 @@
 package modules
 
-type RentFileParameters struct {
-	Filepath       string
-	Nickname       string
-	TotalPieces    int
-	RequiredPieces int
-	OptimalPieces  int
-}
+import (
+	"io"
 
-type RentSmallFileParameters struct {
-	FullFile       []byte
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/hash"
+)
+
+type UploadParams struct {
+	Data       io.ReadSeeker
+	Duration   consensus.BlockHeight
+	Delay      consensus.BlockHeight
+	FileSize   uint64
+	MerkleRoot hash.Hash
+
+	// these fields are not seen by the host
 	Nickname       string
 	TotalPieces    int
 	RequiredPieces int
@@ -21,10 +26,8 @@ type RentInfo struct {
 }
 
 type Renter interface {
+	Upload(UploadParams) error
 	Download(nickname, filepath string) error
-	Info() (RentInfo, error)
 	Rename(currentName, newName string) error
-	RentFile(RentFileParameters) error
-
-	RentSmallFile(RentSmallFileParameters) error
+	Info() (RentInfo, error)
 }
