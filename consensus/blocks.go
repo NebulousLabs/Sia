@@ -148,6 +148,11 @@ func (s *State) AcceptBlock(b Block) (err error) {
 		return
 	}
 
+	err = s.validHeader(b)
+	if err != nil {
+		return
+	}
+
 	err = s.addBlockToTree(b)
 	if err != nil {
 		return

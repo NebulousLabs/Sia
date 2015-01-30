@@ -9,7 +9,7 @@ import (
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
 const (
-	DEBUG = false
+	DEBUG = true // This is a temporary setting, will stay during beta.
 
 	BlockSizeLimit        = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
 	BlockFrequency        = Timestamp(600)         // In seconds.
@@ -30,5 +30,5 @@ var (
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
 
-	GenesisAddress = CoinAddress{} // TODO: NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisAddress = CoinAddress{} // TODO: get a hardcoded premine address
 )

@@ -21,6 +21,8 @@ type State struct {
 	// blocktree.
 	blockRoot *BlockNode
 
+	// TODO: explain bad blocks.
+	//
 	// Missing parents is a double map, the first a map of missing parents, and
 	// the second is a map of the known children to the parent. The first is
 	// necessary so that if a parent is found, all the children can be added to
@@ -29,18 +31,6 @@ type State struct {
 	badBlocks      map[BlockID]struct{}          // A list of blocks that don't verify.
 	blockMap       map[BlockID]*BlockNode        // A list of all blocks in the blocktree.
 	missingParents map[BlockID]map[BlockID]Block // A list of all missing parents and their known children.
-
-	// The transaction pool works by storing a list of outputs that are
-	// spent by transactions in the pool, and pointing to the transaction
-	// that spends them. That makes it really easy to look up conflicts as
-	// new transacitons arrive, and also easy to remove transactions from
-	// the pool (delete every input used in the transaction.) The
-	// transaction list contains only the first output, so that when
-	// building blocks you can more easily iterate through every
-	// transaction.
-	transactionPoolOutputs map[OutputID]*Transaction
-	transactionPoolProofs  map[ContractID]*Transaction
-	transactionList        map[OutputID]*Transaction
 
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
@@ -57,16 +47,13 @@ type State struct {
 func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		blockRoot:              new(BlockNode),
-		badBlocks:              make(map[BlockID]struct{}),
-		blockMap:               make(map[BlockID]*BlockNode),
-		missingParents:         make(map[BlockID]map[BlockID]Block),
-		currentPath:            make(map[BlockHeight]BlockID),
-		openContracts:          make(map[ContractID]FileContract),
-		unspentOutputs:         make(map[OutputID]Output),
-		transactionPoolOutputs: make(map[OutputID]*Transaction),
-		transactionPoolProofs:  make(map[ContractID]*Transaction),
-		transactionList:        make(map[OutputID]*Transaction),
+		blockRoot:      new(BlockNode),
+		badBlocks:      make(map[BlockID]struct{}),
+		blockMap:       make(map[BlockID]*BlockNode),
+		missingParents: make(map[BlockID]map[BlockID]Block),
+		currentPath:    make(map[BlockHeight]BlockID),
+		openContracts:  make(map[ContractID]FileContract),
+		unspentOutputs: make(map[OutputID]Output),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
