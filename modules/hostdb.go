@@ -15,7 +15,8 @@ const (
 // Renters can contact the host privately to obtain more detailed hosting
 // parameters (see HostSettings). To mitigate Sybil attacks, HostAnnouncements
 // are paired with a volume of 'frozen' coins. The FreezeIndex indicates which
-// output in the transaction contains the frozen coins.
+// output in the transaction contains the frozen coins, and the
+// SpendConditions indicate the number of blocks the coins are frozen for.
 type HostAnnouncement struct {
 	IPAddress       network.Address
 	FreezeIndex     uint64 // the index of the output that froze coins
@@ -43,7 +44,7 @@ type HostSettings struct {
 type HostEntry struct {
 	HostSettings
 	IPAddress network.Address
-	Freeze    consensus.Currency
+	Freeze    uint64 // actual units are Currency * BlockHeight: "CoinBlocks"
 }
 
 type HostDB interface {
