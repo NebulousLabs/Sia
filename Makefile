@@ -37,7 +37,7 @@ test-long: clean fmt
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
-coverpackages = consensus crypto encoding hash network siad
+coverpackages = consensus crypto encoding hash modules/hostdb network siad
 cover: clean
 	@mkdir -p cover
 	@for package in $(coverpackages); do \

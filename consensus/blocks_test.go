@@ -109,7 +109,7 @@ func testEmptyBlock(t *testing.T, s *State) {
 // and checks that it actually gets rejected.
 func testLargeBlock(t *testing.T, s *State) {
 	txns := make([]Transaction, 1)
-	bigData := string(make([]byte, BlockSizeLimit-BlockHeaderSize+1))
+	bigData := string(make([]byte, BlockSizeLimit))
 	txns[0] = Transaction{
 		ArbitraryData: []string{bigData},
 	}
