@@ -35,6 +35,64 @@ func mineValidBlock(s *State) (b Block, err error) {
 	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, s.CurrentTarget())
 }
 
+// testDoubleOrpanBlock creates a two-deep set of orphans and sees if they get
+// connected to the state properly after their parent is introduced.
+func testDoubleOrphanBlock(t *testing.T, s *State) {
+	// Mine the parent and the double layered orphans.
+	parent, err := mineValidBlock(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentTarget := s.CurrentTarget()
+	orphanRat := new(big.Rat).Mul(parentTarget.Rat(), MaxAdjustmentDown)
+	orphanTarget := RatToTarget(orphanRat)
+	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, orphanTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan2Rat := new(big.Rat).Mul(orphanRat, MaxAdjustmentDown)
+	orphan2Target := RatToTarget(orphan2Rat)
+	orphan2, err := mineTestingBlock(orphan.ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, orphan2Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Submit the two orphans to the state, followed by the parent.
+	err = s.AcceptBlock(orphan2)
+	if err != UnknownOrphanErr {
+		t.Error("unexpected error, expecting UnknownOrphanErr:", err)
+	}
+	err = s.AcceptBlock(orphan)
+	if err != UnknownOrphanErr {
+		t.Error("unexpected error, expecting UnknownOrphanErr:", err)
+	}
+	err = s.AcceptBlock(parent)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	// Check that the state updated to add all 3 blocks.
+	_, exists := s.blockMap[orphan2.ID()]
+	if !exists {
+		t.Error("second layer orphan never made it into block map")
+	}
+	_, exists = s.blockMap[orphan.ID()]
+	if !exists {
+		t.Error("first layer orphan never made it into block map")
+	}
+	_, exists = s.blockMap[parent.ID()]
+	if !exists {
+		t.Error("parent never made it into block map")
+	}
+	if s.currentBlockID != orphan2.ID() {
+		t.Error("orphan 2 is not updates as the head block")
+	}
+	_, exists = s.missingParents[orphan.ID()]
+	if exists {
+		t.Error("first orphan was never deleted from missing parents")
+	}
+}
+
 // testEmptyBlock adds an empty block to the state and checks for errors.
 func testEmptyBlock(t *testing.T, s *State) {
 	// Get prior stats about the state.
@@ -225,6 +283,13 @@ func testRepeatBlock(t *testing.T, s *State) {
 		stateHash != s.StateHash() {
 		t.Error("state changed after getting a repeat block.")
 	}
+}
+
+// TestDoubleOrphanBlock creates a new state and used it to call
+// testDoubleOrphanBlock.
+func TestDoubleOrphanBlock(t *testing.T) {
+	s := CreateGenesisState()
+	testDoubleOrphanBlock(t, s)
 }
 
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
