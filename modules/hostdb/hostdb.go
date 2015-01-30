@@ -21,6 +21,9 @@ import (
 
 // The HostDB is a set of hosts that get weighted and inserted into a tree
 type HostDB struct {
+	state       *consensus.State
+	recentBlock consensus.BlockID
+
 	hostTree      *hostNode
 	activeHosts   map[network.Address]*hostNode
 	inactiveHosts map[network.Address]*modules.HostEntry
@@ -29,8 +32,14 @@ type HostDB struct {
 }
 
 // New returns an empty HostDatabase.
-func New() (hdb *HostDB, err error) {
+func New(state *consensus.State) (hdb *HostDB, err error) {
+	if state == nil {
+		err = errors.New("HostDB can't use nil State")
+		return
+	}
 	hdb = &HostDB{
+		state:         state,
+		recentBlock:   state.CurrentBlock().ID(),
 		activeHosts:   make(map[network.Address]*hostNode),
 		inactiveHosts: make(map[network.Address]*modules.HostEntry),
 	}

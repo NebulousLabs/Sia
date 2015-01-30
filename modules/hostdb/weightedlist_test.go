@@ -60,7 +60,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
-	hdb, err := New()
+	hdb, err := New(consensus.CreateGenesisState())
 	if err != nil {
 		t.Fatal(err)
 	}
