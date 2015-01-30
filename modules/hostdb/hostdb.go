@@ -83,10 +83,7 @@ func (hdb *HostDB) FlagHost(addr network.Address) error {
 }
 
 // Remove deletes an entry from the hostdb.
-func (hdb *HostDB) Remove(addr network.Address) error {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-
+func (hdb *HostDB) remove(addr network.Address) error {
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[addr]
 	if !exists {
@@ -108,42 +105,51 @@ func (hdb *HostDB) Remove(addr network.Address) error {
 	return nil
 }
 
-// Update throws a bunch of blocks at the hostdb to be integrated.
-func (hdb *HostDB) Update(initialStateHeight consensus.BlockHeight, rewoundBlocks []consensus.Block, appliedBlocks []consensus.Block) (err error) {
+func (hdb *HostDB) Remove(addr network.Address) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
+	return hdb.remove(addr)
+}
 
-	// Remove hosts found in blocks that were rewound. Because the hostdb is
-	// like a stack, you can just pop the hosts and be certain that they are
-	// the same hosts.
-	for _, b := range rewoundBlocks {
-		var entries []modules.HostEntry
-		entries, err = findHostAnnouncements(initialStateHeight, b)
-		if err != nil {
-			return
+// Update throws a bunch of blocks at the hostdb to be integrated.
+func (hdb *HostDB) update() (err error) {
+	hdb.state.RLock()
+	initialStateHeight := hdb.state.Height()
+	rewoundBlocks, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
+	if err != nil {
+		// TODO: this may be a serious problem; if recentBlock is not updated,
+		// will BlocksSince always return an error?
+		hdb.state.RUnlock()
+		return
+	}
+	hdb.recentBlock = hdb.state.CurrentBlock().ID()
+	hdb.state.RUnlock()
+
+	// Remove hosts announced in blocks that were rewound.
+	for _, blockID := range rewoundBlocks {
+		block, exists := hdb.state.Block(blockID)
+		if !exists {
+			continue
 		}
-
-		for _, entry := range entries {
-			err = hdb.Remove(entry.IPAddress)
+		for _, entry := range findHostAnnouncements(initialStateHeight, block) {
+			err = hdb.remove(entry.IPAddress)
 			if err != nil {
 				return
 			}
 		}
 	}
 
-	// Add hosts found in blocks that were applied.
-	for _, b := range appliedBlocks {
-		var entries []modules.HostEntry
-		entries, err = findHostAnnouncements(initialStateHeight, b)
-		if err != nil {
-			return
+	// Add hosts announced in blocks that were applied. For security reasons,
+	// the announcements themselves do not contain hosting parameters; we must
+	// request these separately, using the address given in the announcement.
+	// Each such request is made in a separate thread.
+	for _, blockID := range appliedBlocks {
+		block, exists := hdb.state.Block(blockID)
+		if !exists {
+			continue
 		}
-
-		for _, entry := range entries {
-			err = hdb.insert(entry)
-			if err != nil {
-				return
-			}
+		for _, entry := range findHostAnnouncements(initialStateHeight, block) {
+			go hdb.threadedInsertFromAnnouncement(entry)
 		}
 	}
 

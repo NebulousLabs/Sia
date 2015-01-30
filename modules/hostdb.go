@@ -6,13 +6,26 @@ import (
 )
 
 const (
-	HostAnnouncementPrefix = 1
+	// Denotes a host announcement in the Arbitrary Data section.
+	HostAnnouncementPrefix = "HostAnnouncement"
 )
 
-// A HostEntry contains information about a host on the network. The HostDB
-// uses this information to select an optimal host.
-type HostEntry struct {
-	IPAddress    network.Address
+// HostAnnouncements are stored in the Arbitrary Data section of transactions
+// on the blockchain. They announce the willingness of a node to host files.
+// Renters can contact the host privately to obtain more detailed hosting
+// parameters (see HostSettings). To mitigate Sybil attacks, HostAnnouncements
+// are paired with a volume of 'frozen' coins. The FreezeIndex indicates which
+// output in the transaction contains the frozen coins.
+type HostAnnouncement struct {
+	IPAddress       network.Address
+	FreezeIndex     uint64 // the index of the output that froze coins
+	SpendConditions consensus.SpendConditions
+}
+
+// HostSettings are the parameters advertised by the host. These are the
+// values that the HostDB will request from the host in order to build its
+// database.
+type HostSettings struct {
 	TotalStorage int64 // Can go negative.
 	MinFilesize  uint64
 	MaxFilesize  uint64
@@ -21,10 +34,16 @@ type HostEntry struct {
 	MinWindow    consensus.BlockHeight
 	Price        consensus.Currency
 	Burn         consensus.Currency
-	Freeze       consensus.Currency
-	CoinAddress  consensus.CoinAddress // Host may want to give different addresses to each client.
+	CoinAddress  consensus.CoinAddress
+}
 
-	SpendConditions consensus.SpendConditions
+// A HostEntry is an entry in the HostDB. It contains the HostSettings, as
+// well as the IP address where the host can be found, and the value of the
+// coins frozen in the host's announcement transaction.
+type HostEntry struct {
+	HostSettings
+	IPAddress network.Address
+	Freeze    consensus.Currency
 }
 
 type HostDB interface {

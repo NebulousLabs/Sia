@@ -32,8 +32,8 @@ type Host struct {
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	// our HostEntry settings, embedded for convenience
-	modules.HostEntry
+	// our HostSettings, embedded for convenience
+	modules.HostSettings
 
 	hostDir        string
 	spaceRemaining int64
@@ -63,7 +63,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		state:  state,
 		wallet: wallet,
 
-		HostEntry: modules.HostEntry{
+		HostSettings: modules.HostSettings{
 			MaxFilesize: 4 * 1000 * 1000,
 			MaxDuration: 1008, // One week.
 			MinWindow:   20,
@@ -119,16 +119,16 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	return
 }
 
-// SetConfig updates the host's internal HostEntry object. To modify
-// a specific field, use a combination of Info and SetAnnouncement.
-func (h *Host) SetConfig(entry modules.HostEntry) {
+// SetConfig updates the host's internal HostSettings object. To modify
+// a specific field, use a combination of Info and SetConfig
+func (h *Host) SetConfig(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.HostEntry = entry
+	h.HostSettings = settings
 }
 
 type HostInfo struct {
-	modules.HostEntry
+	modules.HostSettings
 
 	StorageRemaining int64
 	ContractCount    int
@@ -139,7 +139,7 @@ func (h *Host) Info() HostInfo {
 	defer h.mu.RUnlock()
 
 	info := HostInfo{
-		HostEntry: h.HostEntry,
+		HostSettings: h.HostSettings,
 
 		StorageRemaining: h.spaceRemaining,
 		ContractCount:    len(h.contracts),

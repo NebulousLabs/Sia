@@ -7,7 +7,7 @@ import (
 
 func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
-	config := d.host.Info().HostEntry
+	config := d.host.Info().HostSettings
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{

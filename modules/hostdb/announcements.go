@@ -1,51 +1,63 @@
 package hostdb
 
 import (
+	"strings"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// findHostAnnouncements scans a block and pulls out every host announcement
-// that appears in the block, returning a list of entries that correspond with
-// the announcements.
-func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (entries []modules.HostEntry, err error) {
+// findHostAnnouncements returns a list of the host announcements found within
+// a given block.
+func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (announcements []modules.HostEntry) {
 	for _, t := range b.Transactions {
-		// Check the arbitrary data of the transaction to fill out the host database.
-		if len(t.ArbitraryData) == 0 {
-			continue
-		}
-		if len(t.ArbitraryData[0]) < 8 {
-			continue
-		}
-
-		// TODO: switch dataIndicator
-		// TODO: new announcement struct
-		dataIndicator := encoding.DecUint64([]byte(t.ArbitraryData[0][0:8]))
-		if dataIndicator == modules.HostAnnouncementPrefix {
-			var entry modules.HostEntry
-			err = encoding.Unmarshal([]byte(t.ArbitraryData[0][8:]), &entry)
-			if err != nil {
-				return
+		for _, data := range t.ArbitraryData {
+			// the HostAnnouncement must be prefaced by the standard host announcement string
+			if !strings.HasPrefix(data, modules.HostAnnouncementPrefix) {
+				continue
 			}
 
-			// Verify that the host has declared values that are relevant to our
-			// interests.
-			// TODO: need a way to get the freeze index
-			/*
-				if entry.SpendConditions.CoinAddress() != t.Outputs[entry.FreezeIndex].SpendHash {
-					continue
-				}
+			// decode the HostAnnouncement
+			var ha modules.HostAnnouncement
+			encAnnouncement := []byte(strings.TrimPrefix(data, modules.HostAnnouncementPrefix))
+			err := encoding.Unmarshal(encAnnouncement, &ha)
+			if err != nil {
+				continue
+			}
 
-				entry.Freeze = consensus.Currency(entry.SpendConditions.TimeLock-height) * t.Outputs[entry.FreezeIndex].Value
-				if entry.Freeze <= 0 {
-					continue
-				}
-			*/
+			// check that spend conditions are valid
+			if ha.SpendConditions.CoinAddress() != t.Outputs[ha.FreezeIndex].SpendHash {
+				continue
+			}
 
-			entries = append(entries, entry)
+			// calculate freeze
+			freeze := consensus.Currency(ha.SpendConditions.TimeLock-height) * t.Outputs[ha.FreezeIndex].Value
+
+			// check for sane freeze value
+			if freeze <= 0 {
+				continue
+			}
+
+			// At this point, the HostSettings are unknown. Before inserting
+			// the host, the HostDB will call threadedInsertFromAnnouncement
+			// to fill out the HostSettings.
+			announcements = append(announcements, modules.HostEntry{
+				IPAddress: ha.IPAddress,
+				Freeze:    freeze,
+			})
 		}
 	}
 
 	return
+}
+
+// threadedInsertFromAnnouncement requests a host's hosting parameters, and inserts
+// the resulting HostEntry into the database.
+func (hdb *HostDB) threadedInsertFromAnnouncement(entry modules.HostEntry) {
+	err := entry.IPAddress.RPC("HostSettings", nil, &entry.HostSettings)
+	if err != nil {
+		return
+	}
+	hdb.Insert(entry)
 }
