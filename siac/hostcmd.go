@@ -19,16 +19,25 @@ var (
 	hostSetCmd = &cobra.Command{
 		Use:   "set [setting] [value]",
 		Short: "Modify host settings",
-		Long:  "Modify host settings.\nAvailable settings:\n\ttotalstorage\n\tmaxfilesize\n\tmintolerance\n\tmaxduration\n\tprice\n\tburn",
-		Run:   wrap(hostsetcmd),
+		Long: `Modify host settings.
+Available settings:
+	totalstorage
+	maxfilesize
+	mintolerance
+	maxduration
+	price
+	burn`,
+		Run: wrap(hostsetcmd),
 	}
 
 	hostAnnounceCmd = &cobra.Command{
-		Use:   "announce",
-		Short: "Announce host",
-		Long:  "Announce yourself as a host on the network. You may wish to set your hosting parameters first, via 'host setconfig'.",
-		Run:   wrap(hostannouncecmd),
-	}
+		Use:   "announce [freezeVolume] [freezeDuration]",
+		Short: "Announce yourself as a host",
+		Long: `Announce yourself as a host on the network.
+An announcement requires 'freezing' a volume of coins for a number of blocks,
+as a defense against Sybil attacks. Before announcing, you should set your
+hosting parameters via 'host setconfig'.`,
+		Run: wrap(hostannouncecmd)}
 
 	hostStatusCmd = &cobra.Command{
 		Use:   "status",
@@ -47,9 +56,8 @@ func hostsetcmd(param, value string) {
 	fmt.Println("Host settings updated.")
 }
 
-// TODO: needs freeze values
-func hostannouncecmd() {
-	err := callAPI("/host/announce")
+func hostannouncecmd(freezeVolume, freezeDuration string) {
+	err := callAPI(fmt.Sprintf("/host/announce?freezeVolume=%s&freezeDuration=%s", freezeVolume, freezeDuration))
 	if err != nil {
 		fmt.Println("Could not announce host:", err)
 		return

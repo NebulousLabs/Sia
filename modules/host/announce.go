@@ -2,46 +2,65 @@ package host
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
-	// "github.com/NebulousLabs/Sia/encoding"
-	// "github.com/NebulousLabs/Sia/sia/components"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/network"
 )
 
-// HostAnnounceSelf creates a host announcement transaction, adding
-// information to the arbitrary data and then signing the transaction.
-func (h *Host) AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (t consensus.Transaction, err error) {
+// Announce creates a host announcement transaction, adding information to the
+// arbitrary data, signing the transaction, and submitting it to the
+// transaction pool.
+func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, freezeDuration consensus.BlockHeight) (err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	/*
-		// Get the encoded announcement based on the host settings.
-		info := h.announcement
+	// get current state height
+	h.state.RLock()
+	freezeUnlockHeight := h.state.Height() + freezeDuration
+	h.state.RUnlock()
 
-		// Fill out the transaction.
-		id, err := h.wallet.RegisterTransaction(t)
-		if err != nil {
-			return
-		}
-		err = h.wallet.FundTransaction(id, freezeVolume)
-		if err != nil {
-			return
-		}
-		info.SpendConditions, info.FreezeIndex, err = h.wallet.AddTimelockedRefund(id, freezeVolume, freezeUnlockHeight)
-		if err != nil {
-			return
-		}
-		announcement := string(encoding.MarshalAll(components.HostAnnouncementPrefix, info))
-		err = h.wallet.AddArbitraryData(id, announcement)
-		if err != nil {
-			return
-		}
-		// TODO: Have the wallet manually add a fee? How should this be managed?
-		t, err = h.wallet.SignTransaction(id, true)
-		if err != nil {
-			return
-		}
+	// create the transaction that will hold the announcement
+	var t consensus.Transaction
+	id, err := h.wallet.RegisterTransaction(t)
+	if err != nil {
+		return
+	}
+	err = h.wallet.FundTransaction(id, freezeVolume)
+	if err != nil {
+		return
+	}
+	spendHash, spendConditions, err := h.wallet.TimelockedCoinAddress(freezeUnlockHeight)
+	if err != nil {
+		return
+	}
+	output := consensus.Output{
+		Value:     freezeVolume,
+		SpendHash: spendHash,
+	}
+	freezeIndex, err := h.wallet.AddOutput(id, output)
+	if err != nil {
+		return
+	}
 
-		h.state.AcceptTransaction(t)
-	*/
+	// create and encode the announcement
+	announcement := encoding.Marshal(modules.HostAnnouncement{
+		IPAddress:       addr,
+		FreezeIndex:     freezeIndex,
+		SpendConditions: spendConditions,
+	})
+
+	// add announcement to arbitrary data field
+	err = h.wallet.AddArbitraryData(id, modules.HostAnnouncementPrefix+string(announcement))
+	if err != nil {
+		return
+	}
+	// TODO: Have the wallet manually add a fee? How should this be managed?
+	t, err = h.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
+
+	h.tpool.AcceptTransaction(t)
 
 	return
 }
