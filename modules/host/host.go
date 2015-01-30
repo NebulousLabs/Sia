@@ -63,6 +63,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		state:  state,
 		wallet: wallet,
 
+		// default host settings
 		HostSettings: modules.HostSettings{
 			MaxFilesize: 4 * 1000 * 1000,
 			MaxDuration: 1008, // One week.
@@ -125,6 +126,12 @@ func (h *Host) SetConfig(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.HostSettings = settings
+}
+
+// Settings is an RPC used to request the settings of a host.
+func (h *Host) Settings() (modules.HostSettings, error) {
+	// TODO: return an error if we haven't announced yet
+	return h.HostSettings, nil
 }
 
 type HostInfo struct {

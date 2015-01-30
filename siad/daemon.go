@@ -99,6 +99,10 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
+	err = d.network.RegisterRPC("HostSettings", d.host.Settings)
+	if err != nil {
+		return
+	}
 	err = d.network.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
 	if err != nil {
 		return
