@@ -32,16 +32,6 @@ type Renter struct {
 	mu sync.RWMutex
 }
 
-func (r *Renter) RentInfo() (ri modules.RentInfo, err error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	for key := range r.files {
-		ri.Files = append(ri.Files, key)
-	}
-	return
-}
-
 func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *Renter, err error) {
 	if state == nil {
 		err = errors.New("renter.New: cannot have nil state")
@@ -65,7 +55,7 @@ func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *
 	return
 }
 
-func (r *Renter) RenameFile(currentName, newName string) error {
+func (r *Renter) Rename(currentName, newName string) error {
 	// Check that the currentName exists and the newName doesn't.
 	entry, exists := r.files[currentName]
 	if !exists {
@@ -128,5 +118,15 @@ func (r *Renter) Download(nickname, filename string) (err error) {
 		return
 	}
 
+	return
+}
+
+func (r *Renter) Info() (ri modules.RentInfo) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for filename := range r.files {
+		ri.Files = append(ri.Files, filename)
+	}
 	return
 }

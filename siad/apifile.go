@@ -87,14 +87,5 @@ func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) fileStatusHandler(w http.ResponseWriter, req *http.Request) {
-	http.Error(w, "Unimplemented", 500)
-	/*
-		info, err := d.core.RentInfo()
-		if err != nil {
-			http.Error(w, "Couldn't get renter info: "+err.Error(), 500)
-			return
-		}
-
-		writeJSON(w, info)
-	*/
+	writeJSON(w, d.renter.Info())
 }

@@ -22,8 +22,8 @@ type RentInfo struct {
 
 type Renter interface {
 	Download(nickname, filepath string) error
-	RentInfo() (RentInfo, error)
-	RenameFile(currentName, newName string) error
+	Info() (RentInfo, error)
+	Rename(currentName, newName string) error
 	RentFile(RentFileParameters) error
 
 	RentSmallFile(RentSmallFileParameters) error

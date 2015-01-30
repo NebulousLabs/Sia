@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/network"
@@ -41,6 +42,7 @@ type daemon struct {
 	miner   *miner.Miner
 	host    *host.Host
 	hostDB  *hostdb.HostDB
+	renter  *renter.Renter
 
 	styleDir    string
 	downloadDir string
@@ -77,13 +79,10 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-
-	/*
-		Renter, err := renter.New(d.state, hostDB, d.wallet)
-		if err != nil {
-			return
-		}
-	*/
+	d.renter, err = renter.New(d.state, d.hostDB, d.wallet)
+	if err != nil {
+		return
+	}
 
 	// register RPC handlers
 	// TODO: register all RPCs in a separate function

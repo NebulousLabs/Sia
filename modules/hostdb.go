@@ -55,12 +55,12 @@ type HostDB interface {
 	FlagHost(network.Address) error
 
 	// Insert adds a host to the database.
-	InsertHost(HostEntry) error
+	Insert(HostEntry) error
 
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
 	RandomHost() (HostEntry, error)
 
 	// Remove deletes the host with the given address from the database.
-	RemoveHost(network.Address) error
+	Remove(network.Address) error
 }
