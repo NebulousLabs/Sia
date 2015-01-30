@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// CONTRIBUTE: Additional tests could be used, such as testing that decryption
-// fails if the wrong iv's are used, and overall trying to probe the library
-// for something that doesn't work quite right.
-
 // TestEncryption makes sure that things can be encrypted and decrypted.
 func TestEncryption(t *testing.T) {
 	// Get a key for encryption.
@@ -52,6 +48,35 @@ func TestEncryption(t *testing.T) {
 	}
 	if bytes.Compare(plaintext, badtext) == 0 {
 		t.Fatal("When using the wrong key, plaintext was still decrypted!")
+	}
+
+	// Try to decrypt using a different iv.
+	badIV := iv
+	badIV[0]++
+	badtext, err = DecryptBytes(key, ciphertext, badIV, padding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(plaintext, badtext) == 0 {
+		t.Fatal("When using the wrong key, plaintext was still decrypted!")
+	}
+
+	// Try to decrypt using incorrectly sized ivs, ciphertext, and padding.
+	_, err = DecryptBytes(key, ciphertext, iv[1:], padding)
+	if err == nil {
+		t.Fatal("Was able to decrypt with a bad iv.")
+	}
+	_, err = DecryptBytes(key, ciphertext[1:], iv, padding)
+	if err == nil {
+		t.Fatal("Was able to decrypt with a bad ciphertext")
+	}
+	_, err = DecryptBytes(key, ciphertext, iv, 1+len(ciphertext))
+	if err == nil {
+		t.Fatal("Was able to decrypt using bad padding")
+	}
+	_, err = DecryptBytes(key, ciphertext, iv, -1)
+	if err == nil {
+		t.Fatal("Was able to decrypt using bad padding")
 	}
 }
 
