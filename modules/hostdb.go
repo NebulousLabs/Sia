@@ -9,12 +9,22 @@ const (
 	HostAnnouncementPrefix = 1
 )
 
-// the Host struct is kept in the client package because it's what the client
-// uses to weigh hosts and pick them out when storing files.
+// A HostEntry contains information about a host on the network. The HostDB
+// uses this information to select an optimal host.
 type HostEntry struct {
-	HostAnnouncement
-	ID     string
-	Freeze consensus.Currency
+	IPAddress    network.Address
+	TotalStorage int64 // Can go negative.
+	MinFilesize  uint64
+	MaxFilesize  uint64
+	MinDuration  consensus.BlockHeight
+	MaxDuration  consensus.BlockHeight
+	MinWindow    consensus.BlockHeight
+	Price        consensus.Currency
+	Burn         consensus.Currency
+	Freeze       consensus.Currency
+	CoinAddress  consensus.CoinAddress // Host may want to give different addresses to each client.
+
+	SpendConditions consensus.SpendConditions
 }
 
 type HostDB interface {
@@ -22,15 +32,15 @@ type HostDB interface {
 	// HostDB may decide to remove the host, or just reduce the weight, or it
 	// may decide to ignore the flagging. If the flagging is ignored, an error
 	// will be returned explaining why.
-	FlagHost(id string) error
+	FlagHost(network.Address) error
 
-	// Insert puts a host entry into the host database.
+	// Insert adds a host to the database.
 	InsertHost(HostEntry) error
 
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
 	RandomHost() (HostEntry, error)
 
-	// Remove pulls a host entry from the host database.
-	RemoveHost(id string) error
+	// Remove deletes the host with the given address from the database.
+	RemoveHost(network.Address) error
 }

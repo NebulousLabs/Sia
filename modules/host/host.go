@@ -28,11 +28,12 @@ type contractObligation struct {
 
 type Host struct {
 	state       *consensus.State
+	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	// embed HostEntry fields for convenience
-	modules.HostAnnouncement
+	// our HostEntry settings, embedded for convenience
+	modules.HostEntry
 
 	hostDir        string
 	spaceRemaining int64
@@ -54,7 +55,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		return
 	}
 
-	// addr, _, err := wallet.CoinAddress()
+	addr, _, err := wallet.CoinAddress()
 	if err != nil {
 		return
 	}
@@ -62,7 +63,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		state:  state,
 		wallet: wallet,
 
-		HostAnnouncement: modules.HostAnnouncement{
+		HostEntry: modules.HostEntry{
 			MaxFilesize: 4 * 1000 * 1000,
 			MaxDuration: 1008, // One week.
 			MinWindow:   20,
@@ -118,16 +119,16 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	return
 }
 
-// SetAnnouncement updates the host's internal announcement object. To modify
+// SetConfig updates the host's internal HostEntry object. To modify
 // a specific field, use a combination of Info and SetAnnouncement.
-func (h *Host) SetAnnouncement(ha modules.HostAnnouncement) {
+func (h *Host) SetConfig(entry modules.HostEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.HostAnnouncement = ha
+	h.HostEntry = entry
 }
 
 type HostInfo struct {
-	modules.HostAnnouncement
+	modules.HostEntry
 
 	StorageRemaining int64
 	ContractCount    int
@@ -138,7 +139,7 @@ func (h *Host) Info() HostInfo {
 	defer h.mu.RUnlock()
 
 	info := HostInfo{
-		HostAnnouncement: h.HostAnnouncement,
+		HostEntry: h.HostEntry,
 
 		StorageRemaining: h.spaceRemaining,
 		ContractCount:    len(h.contracts),

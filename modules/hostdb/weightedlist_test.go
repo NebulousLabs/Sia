@@ -8,6 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // uniformTreeVerification checks that everything makes sense in the tree given
@@ -35,14 +36,14 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	if !testing.Short() {
 		// Pull a bunch of random hosts and count how many times we pull each
 		// host.
-		selectionMap := make(map[string]int)
+		selectionMap := make(map[network.Address]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
 			entry, err := hdb.RandomHost()
 			if err != nil {
 				t.Fatal(err)
 			}
-			selectionMap[entry.ID] = selectionMap[entry.ID] + 1
+			selectionMap[entry.IPAddress] = selectionMap[entry.IPAddress] + 1
 		}
 
 		// See if each host was selected enough times.
@@ -71,7 +72,7 @@ func TestWeightedList(t *testing.T) {
 		entry.Burn = 10
 		entry.Price = 10
 		entry.Freeze = 10
-		entry.ID = strconv.Itoa(i)
+		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions, t)
@@ -96,7 +97,7 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdb.Remove(strconv.Itoa(randInt))
+		err := hdb.Remove(network.Address(strconv.Itoa(randInt)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +112,7 @@ func TestWeightedList(t *testing.T) {
 		entry.Burn = 10
 		entry.Price = 10
 		entry.Freeze = 10
-		entry.ID = strconv.Itoa(i)
+		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)

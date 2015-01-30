@@ -119,7 +119,7 @@ func (r *Renter) Download(nickname, filename string) (err error) {
 			return
 		} else {
 			fmt.Println("Renter got error:", err)
-			r.hostDB.FlagHost(piece.Host.ID)
+			r.hostDB.FlagHost(piece.Host.IPAddress)
 		}
 	}
 

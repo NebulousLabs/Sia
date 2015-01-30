@@ -296,7 +296,7 @@ func (r *Renter) proposeSmallContract(fullFile []byte, duration consensus.BlockH
 		}
 
 		fmt.Println("Problem from NegotiateContract:", err)
-		err = r.hostDB.FlagHost(host.ID)
+		err = r.hostDB.FlagHost(host.IPAddress)
 		if err != nil {
 			return
 		}

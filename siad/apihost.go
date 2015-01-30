@@ -6,18 +6,18 @@ import (
 )
 
 func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
-	// load current announcement
-	ha := d.host.Info().HostAnnouncement
+	// load current settings
+	config := d.host.Info().HostEntry
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
-		"totalstorage": &ha.TotalStorage,
-		"minfilesize":  &ha.MinFilesize,
-		"maxfilesize":  &ha.MaxFilesize,
-		"minduration":  &ha.MinDuration,
-		"maxduration":  &ha.MaxDuration,
-		"price":        &ha.Price,
-		"burn":         &ha.Burn,
+		"totalstorage": &config.TotalStorage,
+		"minfilesize":  &config.MinFilesize,
+		"maxfilesize":  &config.MaxFilesize,
+		"minduration":  &config.MinDuration,
+		"maxduration":  &config.MaxDuration,
+		"price":        &config.Price,
+		"burn":         &config.Burn,
 	}
 
 	for qs := range qsVars {
@@ -31,7 +31,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	d.host.SetAnnouncement(ha)
+	d.host.SetConfig(config)
 	writeSuccess(w)
 }
 

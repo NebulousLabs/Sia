@@ -2,17 +2,17 @@ package host
 
 import (
 	"errors"
-	// "fmt"
-	// "io"
+	"fmt"
+	"io"
 	"net"
-	// "os"
-	// "path/filepath"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	// "github.com/NebulousLabs/Sia/encoding"
-	// "github.com/NebulousLabs/Sia/hash"
-	// "github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -246,7 +246,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	//fmt.Println("Accepted contract")
 
 	// Submit the transaction.
-	h.state.AcceptTransaction(txn)
+	h.tpool.AcceptTransaction(txn)
 
 	return
 }

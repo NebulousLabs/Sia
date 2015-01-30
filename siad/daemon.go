@@ -89,7 +89,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	err = d.network.RegisterRPC("AcceptTransaction", d.state.AcceptTransaction)
+	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
 	if err != nil {
 		return
 	}
