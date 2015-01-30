@@ -85,6 +85,25 @@ func testEmptyBlock(t *testing.T, s *State) {
 	}
 }
 
+// testLargeBlock creates a block that is too large to be accepted by the state
+// and checks that it actually gets rejected.
+func testLargeBlock(t *testing.T, s *State) {
+	txns := make([]Transaction, 1)
+	bigData := string(make([]byte, BlockSizeLimit)) // TODO: test all the way down to one byte over the limit.
+	txns[0] = Transaction{
+		ArbitraryData: []string{bigData},
+	}
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), CoinAddress{}, txns, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.AcceptBlock(b)
+	if err != LargeBlockErr {
+		t.Fatal(err)
+	}
+}
+
 // testRepeatBlock submits a block to the state, and then submits the same
 // block to the state. If anything in the state has changed, an error is noted.
 func testRepeatBlock(t *testing.T, s *State) {
@@ -129,6 +148,12 @@ func testRepeatBlock(t *testing.T, s *State) {
 func TestEmptyBlock(t *testing.T) {
 	s := CreateGenesisState()
 	testEmptyBlock(t, s)
+}
+
+// TestLargeBlock creates a new state and uses it to call testLargeBlock.
+func TestLargeBlock(t *testing.T) {
+	s := CreateGenesisState()
+	testLargeBlock(t, s)
 }
 
 // TestRepeatBlock creates a new state and uses it to call testRepeatBlock.

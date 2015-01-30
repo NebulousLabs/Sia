@@ -29,6 +29,7 @@ var (
 	BlockKnownErr    = errors.New("block exists in block map.")
 	FutureBlockErr   = errors.New("timestamp too far in future, will try again later.")
 	KnownOrphanErr   = errors.New("block is a known orphan")
+	LargeBlockErr    = errors.New("block is too large to be accepted")
 	UnknownOrphanErr = errors.New("block is an unknown orphan")
 )
 
@@ -107,7 +108,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is the correct size.
 	encodedBlock := encoding.Marshal(b)
 	if len(encodedBlock) > BlockSizeLimit {
-		err = errors.New("Block is too large, will not be accepted.")
+		err = LargeBlockErr
 		return
 	}
 
