@@ -9,10 +9,6 @@ import (
 // mineTestingBlock accepts a bunch of parameters for a block and then grinds
 // blocks until a block with the appropriate target is found.
 func mineTestingBlock(parent BlockID, timestamp Timestamp, minerAddress CoinAddress, txns []Transaction, target Target) (b Block, err error) {
-	if RootTarget[0] != 64 {
-		panic("using wrong constant during testing!")
-	}
-
 	b = Block{
 		ParentBlockID: parent,
 		Timestamp:     timestamp,
@@ -20,7 +16,7 @@ func mineTestingBlock(parent BlockID, timestamp Timestamp, minerAddress CoinAddr
 		Transactions:  txns,
 	}
 
-	for !b.CheckTarget(target) && b.Nonce < 1000*1000*1000 {
+	for !b.CheckTarget(target) && b.Nonce < 1000*1000 {
 		b.Nonce++
 	}
 	if !b.CheckTarget(target) {
@@ -121,6 +117,26 @@ func testLargeBlock(t *testing.T, s *State) {
 	err = s.AcceptBlock(b)
 	if err != LargeBlockErr {
 		t.Error(err)
+	}
+}
+
+// testMissedTarget tries to submit a block that does not meet the target for the next block.
+func testMissedTarget(t *testing.T, s *State) {
+	// Mine a block that doesn't meet the target.
+	b := Block{
+		ParentBlockID: s.CurrentBlock().ID(),
+		Timestamp:     Timestamp(time.Now().Unix()),
+	}
+	for b.CheckTarget(s.CurrentTarget()) && b.Nonce < 1000*1000 {
+		b.Nonce++
+	}
+	if b.CheckTarget(s.CurrentTarget()) {
+		panic("unable to mine a block with a failing target (lol)")
+	}
+
+	err := s.AcceptBlock(b)
+	if err != MissedTargetErr {
+		t.Error("Block with low target is not being rejected")
 	}
 }
 
@@ -336,6 +352,17 @@ func testRepeatBlock(t *testing.T, s *State) {
 	}
 }
 
+// TestConstants makes sure that the testing constants are being used instead
+// of the developer constants or the release constants.
+func TestConstants(t *testing.T) {
+	if RootTarget[0] != 64 {
+		panic("using wrong constant during testing!")
+	}
+	if !DEBUG {
+		panic("using wrong constant during testing, DEBUG flag needs to be set")
+	}
+}
+
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
 	s := CreateGenesisState()
@@ -349,6 +376,12 @@ func TestLargeBlock(t *testing.T) {
 	}
 	s := CreateGenesisState()
 	testLargeBlock(t, s)
+}
+
+// TestMissedTarge creates a new state and uses it to call testMissedTarget.
+func TestMissedTarget(t *testing.T) {
+	s := CreateGenesisState()
+	testMissedTarget(t, s)
 }
 
 // TestDoubleOrphanBlock creates a new state and used it to call
@@ -369,3 +402,16 @@ func TestRepeatBlock(t *testing.T) {
 	s := CreateGenesisState()
 	testRepeatBlock(t, s)
 }
+
+// TODO: Complex transaction building => Financial transactions, contract
+// transactions, and invalid forms of each. Bad outputs, many outputs, many
+// inputs, many fees, bad fees, overflows, bad proofs, early proofs, arbitrary
+// datas, bad signatures, too many signatures, repeat signatures.
+
+// TODO: Build those transaction building functions as separate things, because
+// you want to be able to probe complex transactions that have lots of juicy
+// stuff.
+
+// TODO: Fork probing. Fork between complex sets of blocks and see that the
+// state hashes always end up at the same point, make sure long forking works
+// well and that reversing when a transaction fails also works well.

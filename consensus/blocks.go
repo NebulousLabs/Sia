@@ -30,6 +30,7 @@ var (
 	FutureBlockErr   = errors.New("timestamp too far in future, will try again later.")
 	KnownOrphanErr   = errors.New("block is a known orphan")
 	LargeBlockErr    = errors.New("block is too large to be accepted")
+	MissedTargetErr  = errors.New("block does not meet target")
 	UnknownOrphanErr = errors.New("block is an unknown orphan")
 )
 
@@ -88,7 +89,7 @@ func (s *State) validHeader(b Block) (err error) {
 	parent := s.blockMap[b.ParentBlockID]
 	// Check the id meets the target.
 	if !b.CheckTarget(parent.target) {
-		err = errors.New("block does not meet target")
+		err = MissedTargetErr
 		return
 	}
 
