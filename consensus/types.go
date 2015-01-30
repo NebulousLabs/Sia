@@ -8,6 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
+const (
+	BlockHeaderSize = 32 + 8 + 8 + 32 + 32
+)
+
 type (
 	Timestamp   int64
 	BlockHeight uint64
