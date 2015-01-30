@@ -13,30 +13,30 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
 	if !exists {
 		return
 	}
-	b = bn.Block
+	b = bn.block
 	return
 }
 
 // currentBlockNode returns the node of the most recent block in the
 // longest fork.
-func (s *State) currentBlockNode() *BlockNode {
+func (s *State) currentBlockNode() *blockNode {
 	return s.blockMap[s.currentBlockID]
 }
 
 // CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
 func (s *State) currentBlockWeight() BlockWeight {
-	return s.currentBlockNode().Target.Inverse()
+	return s.currentBlockNode().target.Inverse()
 }
 
 // depth returns the depth of the current block of the state.
 func (s *State) depth() Target {
-	return s.currentBlockNode().Depth
+	return s.currentBlockNode().depth
 }
 
 // height returns the current height of the state.
 func (s *State) height() BlockHeight {
-	return s.blockMap[s.currentBlockID].Height
+	return s.blockMap[s.currentBlockID].height
 }
 
 // State.Output returns the Output associated with the id provided for input,
@@ -83,10 +83,10 @@ func (s *State) stateHash() hash.Hash {
 	leaves := []hash.Hash{
 		hash.Hash(s.currentBlockID),
 		hash.HashObject(s.height()),
-		hash.HashObject(s.currentBlockNode().Target),
-		hash.HashObject(s.currentBlockNode().Depth),
+		hash.HashObject(s.currentBlockNode().target),
+		hash.HashObject(s.currentBlockNode().depth),
 		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-		hash.Hash(s.blockRoot.Block.ID()),
+		hash.Hash(s.blockRoot.block.ID()),
 	}
 
 	// Add all the blocks in the current path.
@@ -128,7 +128,7 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 	if !exists {
 		return
 	}
-	b = node.Block
+	b = node.block
 	return
 }
 
@@ -141,7 +141,7 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
 	if !exists {
 		return
 	}
-	b = bn.Block
+	b = bn.block
 	return
 }
 
@@ -162,7 +162,7 @@ func (s *State) Contract(id ContractID) (fc FileContract, exists bool) {
 func (s *State) CurrentBlock() Block {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.currentBlockNode().Block
+	return s.currentBlockNode().block
 }
 
 // CurrentTarget returns the target of the next block that needs to be
@@ -170,7 +170,7 @@ func (s *State) CurrentBlock() Block {
 func (s *State) CurrentTarget() Target {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.currentBlockNode().Target
+	return s.currentBlockNode().target
 }
 
 // EarliestLegalTimestamp returns the earliest legal timestamp of the next
@@ -197,7 +197,7 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 	if !exists {
 		return
 	}
-	height = bn.Height
+	height = bn.height
 	return
 }
 

@@ -92,7 +92,7 @@ func testEmptyBlock(t *testing.T, s *State) {
 
 	// Check that the diffs have been generated, and that they represent the
 	// actual changes to the state.
-	if !bn.DiffsGenerated {
+	if !bn.diffsGenerated {
 		t.Error("diffs were not generated on the new block")
 	}
 	s.invertRecentBlock()

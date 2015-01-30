@@ -19,18 +19,18 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 
 	// Get all the ids from going backwards to the blockchain.
 	reversedNodes := s.backtrackToBlockchain(node)
-	height := reversedNodes[len(reversedNodes)-1].Height
+	height := reversedNodes[len(reversedNodes)-1].height
 	// Eliminate the last node, which is the pivot node, whose diffs are already
 	// known.
 	reversedNodes = reversedNodes[:len(reversedNodes)-1]
 	for _, reversedNode := range reversedNodes {
-		removedBlocks = append(removedBlocks, reversedNode.Block.ID())
+		removedBlocks = append(removedBlocks, reversedNode.block.ID())
 	}
 
 	// Get all the ids going forward from the pivot node.
 	for _, exists := s.currentPath[height]; exists; height++ {
 		node := s.blockMap[s.currentPath[height]]
-		addedBlocks = append(addedBlocks, node.Block.ID())
+		addedBlocks = append(addedBlocks, node.block.ID())
 		_, exists = s.currentPath[height+1]
 	}
 

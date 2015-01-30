@@ -19,7 +19,7 @@ type StateInfo struct {
 type State struct {
 	// The block root operates like a linked list of blocks, forming the
 	// blocktree.
-	blockRoot *BlockNode
+	blockRoot *blockNode
 
 	// TODO: explain bad blocks.
 	//
@@ -29,7 +29,7 @@ type State struct {
 	// the parent. The second is necessary for checking if a new block is a
 	// known orphan.
 	badBlocks      map[BlockID]struct{}          // A list of blocks that don't verify.
-	blockMap       map[BlockID]*BlockNode        // A list of all blocks in the blocktree.
+	blockMap       map[BlockID]*blockNode        // A list of all blocks in the blocktree.
 	missingParents map[BlockID]map[BlockID]Block // A list of all missing parents and their known children.
 
 	// Consensus Variables - the current state of consensus according to the
@@ -48,7 +48,7 @@ func CreateGenesisState() (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
 		badBlocks:      make(map[BlockID]struct{}),
-		blockMap:       make(map[BlockID]*BlockNode),
+		blockMap:       make(map[BlockID]*blockNode),
 		missingParents: make(map[BlockID]map[BlockID]Block),
 		currentPath:    make(map[BlockHeight]BlockID),
 		openContracts:  make(map[ContractID]FileContract),
@@ -60,10 +60,10 @@ func CreateGenesisState() (s *State) {
 		Timestamp:    GenesisTimestamp,
 		MinerAddress: GenesisAddress,
 	}
-	s.blockRoot = &BlockNode{
-		Block:  genesisBlock,
-		Target: RootTarget,
-		Depth:  RootDepth,
+	s.blockRoot = &blockNode{
+		block:  genesisBlock,
+		target: RootTarget,
+		depth:  RootDepth,
 	}
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 

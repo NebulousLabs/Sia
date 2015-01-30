@@ -66,14 +66,14 @@ func (s *State) handleOrphanBlock(b Block) error {
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-func (bn *BlockNode) earliestChildTimestamp() Timestamp {
+func (bn *blockNode) earliestChildTimestamp() Timestamp {
 	// Get the previous `MedianTimestampWindow` timestamps.
 	var intTimestamps []int
 	referenceNode := bn
 	for i := 0; i < MedianTimestampWindow; i++ {
-		intTimestamps = append(intTimestamps, int(referenceNode.Block.Timestamp))
-		if referenceNode.Parent != nil {
-			referenceNode = referenceNode.Parent
+		intTimestamps = append(intTimestamps, int(referenceNode.block.Timestamp))
+		if referenceNode.parent != nil {
+			referenceNode = referenceNode.parent
 		}
 	}
 	sort.Ints(intTimestamps)
@@ -87,7 +87,7 @@ func (bn *BlockNode) earliestChildTimestamp() Timestamp {
 func (s *State) validHeader(b Block) (err error) {
 	parent := s.blockMap[b.ParentBlockID]
 	// Check the id meets the target.
-	if !b.CheckTarget(parent.Target) {
+	if !b.CheckTarget(parent.target) {
 		err = errors.New("block does not meet target")
 		return
 	}

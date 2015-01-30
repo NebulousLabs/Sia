@@ -8,20 +8,20 @@ import (
 
 // State.heavierFork() returns true if the input node is 5% heavier than the
 // current node of the ConsensusState.
-func (s *State) heavierFork(newNode *BlockNode) bool {
+func (s *State) heavierFork(newNode *blockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
 	currentCumDiff := s.depth().Inverse()
 	requiredCumDiff := new(big.Rat).Add(currentCumDiff, threshold)
-	newNodeCumDiff := newNode.Depth.Inverse()
+	newNodeCumDiff := newNode.depth.Inverse()
 	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
 }
 
 // backtrackToBlockchain returns a list of nodes that go from the current node
 // to the first parent that is in the current blockchain.
-func (s *State) backtrackToBlockchain(bn *BlockNode) (nodes []*BlockNode) {
+func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
 	nodes = append(nodes, bn)
-	for s.currentPath[bn.Height] != bn.Block.ID() {
-		bn = bn.Parent
+	for s.currentPath[bn.height] != bn.block.ID() {
+		bn = bn.parent
 		nodes = append(nodes, bn)
 	}
 	return
@@ -32,30 +32,30 @@ func (s *State) invertRecentBlock() {
 
 	// Invert all of the diffs.
 	direction := false // blockchain is inverting, set direction flag to false.
-	for _, od := range bn.OutputDiffs {
+	for _, od := range bn.outputDiffs {
 		s.commitOutputDiff(od, direction)
 	}
-	for _, cd := range bn.ContractDiffs {
+	for _, cd := range bn.contractDiffs {
 		s.commitContractDiff(cd, direction)
 	}
 
 	// Update the current path and currentBlockID
-	delete(s.currentPath, bn.Height)
-	s.currentBlockID = bn.Parent.Block.ID()
+	delete(s.currentPath, bn.height)
+	s.currentBlockID = bn.parent.block.ID()
 }
 
 // rewindToNode will rewind blocks until `bn` is the highest block.
-func (s *State) rewindToNode(bn *BlockNode) (rewoundNodes []*BlockNode) {
+func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
 	// Sanity check  - make sure that bn is in the currentPath.
 	if DEBUG {
-		if bn.Block.ID() != s.currentPath[bn.Height] {
+		if bn.block.ID() != s.currentPath[bn.height] {
 			panic("bad use of rewindToNode")
 		}
 	}
 
 	// Remove blocks from the ConsensusState until we get to the
 	// same parent that we are forking from.
-	for s.currentBlockID != bn.Block.ID() {
+	for s.currentBlockID != bn.block.ID() {
 		rewoundNodes = append(rewoundNodes, s.currentBlockNode())
 		s.invertRecentBlock()
 	}
@@ -64,27 +64,27 @@ func (s *State) rewindToNode(bn *BlockNode) (rewoundNodes []*BlockNode) {
 
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
-func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
+func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Sanity check - generate should only be called if the diffs have not yet
 	// been generated.
 	if DEBUG {
-		if bn.DiffsGenerated {
+		if bn.diffsGenerated {
 			panic("misuse of generateAndApplyDiff")
 		}
 	}
 	// Sanity check - current node must be the input node's parent.
 	if DEBUG {
-		if bn.Parent.Block.ID() != s.currentBlockID {
+		if bn.parent.block.ID() != s.currentBlockID {
 			panic("applying a block node when it's not a valid successor")
 		}
 	}
 
 	// Update the current block and current path.
-	s.currentBlockID = bn.Block.ID()
-	s.currentPath[bn.Height] = bn.Block.ID()
+	s.currentBlockID = bn.block.ID()
+	s.currentPath[bn.height] = bn.block.ID()
 
 	minerSubsidy := CalculateCoinbase(s.height())
-	for _, txn := range bn.Block.Transactions {
+	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
 			break
@@ -92,8 +92,8 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 
 		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
 		outputDiffs, contractDiffs := s.applyTransaction(txn)
-		bn.OutputDiffs = append(bn.OutputDiffs, outputDiffs...)
-		bn.ContractDiffs = append(bn.ContractDiffs, contractDiffs...)
+		bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
+		bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
@@ -107,55 +107,55 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 
 	// Perform maintanence on all open contracts.
 	outputDiffs, contractDiffs := s.applyContractMaintenance()
-	bn.OutputDiffs = append(bn.OutputDiffs, outputDiffs...)
-	bn.ContractDiffs = append(bn.ContractDiffs, contractDiffs...)
+	bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
+	bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
 
 	// Add output contianing miner subsidy.
 	subsidyOutput := Output{
 		Value:     minerSubsidy,
-		SpendHash: bn.Block.MinerAddress,
+		SpendHash: bn.block.MinerAddress,
 	}
 	subsidyDiff := OutputDiff{
 		New:    true,
-		ID:     bn.Block.SubsidyID(),
+		ID:     bn.block.SubsidyID(),
 		Output: subsidyOutput,
 	}
-	s.unspentOutputs[bn.Block.SubsidyID()] = subsidyOutput
-	bn.OutputDiffs = append(bn.OutputDiffs, subsidyDiff)
+	s.unspentOutputs[bn.block.SubsidyID()] = subsidyOutput
+	bn.outputDiffs = append(bn.outputDiffs, subsidyDiff)
 
-	bn.DiffsGenerated = true
+	bn.diffsGenerated = true
 	return
 }
 
 // invalidateNode() is a recursive function that deletes all of the
 // children of a block and puts them on the bad blocks list.
-func (s *State) invalidateNode(node *BlockNode) {
-	for i := range node.Children {
-		s.invalidateNode(node.Children[i])
+func (s *State) invalidateNode(node *blockNode) {
+	for i := range node.children {
+		s.invalidateNode(node.children[i])
 	}
 
-	delete(s.blockMap, node.Block.ID())
-	s.badBlocks[node.Block.ID()] = struct{}{}
+	delete(s.blockMap, node.block.ID())
+	s.badBlocks[node.block.ID()] = struct{}{}
 }
 
-func (s *State) applyBlockNode(bn *BlockNode) {
+func (s *State) applyBlockNode(bn *blockNode) {
 	// Sanity check - current node must be the input node's parent.
 	if DEBUG {
-		if bn.Parent.Block.ID() != s.currentBlockID {
+		if bn.parent.block.ID() != s.currentBlockID {
 			panic("applying a block node when it's not a valid successor")
 		}
 	}
 
 	// Update current id and current path.
-	s.currentBlockID = bn.Block.ID()
-	s.currentPath[bn.Height] = bn.Block.ID()
+	s.currentBlockID = bn.block.ID()
+	s.currentPath[bn.height] = bn.block.ID()
 
 	// Apply all of the diffs.
 	direction := true // blockchain is going forward, set direction flag to true.
-	for _, od := range bn.OutputDiffs {
+	for _, od := range bn.outputDiffs {
 		s.commitOutputDiff(od, direction)
 	}
-	for _, cd := range bn.ContractDiffs {
+	for _, cd := range bn.contractDiffs {
 		s.commitContractDiff(cd, direction)
 	}
 }
@@ -163,7 +163,7 @@ func (s *State) applyBlockNode(bn *BlockNode) {
 // forkBlockchain() will go from the current block over to a block on a
 // different fork, rewinding and integrating blocks as needed. forkBlockchain()
 // will return an error if any of the blocks in the new fork are invalid.
-func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
+func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// Get the state hash before attempting a fork.
 	var stateHash hash.Hash
 	if DEBUG {
@@ -183,13 +183,13 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 	// again.
 	//
 	// The final block in backtrackNodes has already been applied.
-	var appliedNodes []*BlockNode
+	var appliedNodes []*blockNode
 	for i := len(backtrackNodes) - 2; i >= 0; i-- {
 		appliedNodes = append(appliedNodes, backtrackNodes[i])
 
 		// If the diffs for this node have already been generated, apply them
 		// directly instead of generating them.
-		if backtrackNodes[i].DiffsGenerated {
+		if backtrackNodes[i].diffsGenerated {
 			s.applyBlockNode(backtrackNodes[i])
 			continue
 		}
