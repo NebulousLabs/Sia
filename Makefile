@@ -8,7 +8,7 @@ install: fmt
 
 clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
-		sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload
+		sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload cover
 
 # Touching a file in the consensus folder forces the build tag files to be
 # rebuilt. This can also be achieved with 'go test -a', however using the '-a'
@@ -16,13 +16,22 @@ clean:
 # out both the touch and the '-a' means that sometimes the tests will be run
 # using the developer constants, which is very, very slow.
 test: clean fmt
-	touch consensus/blocknode.go
+	@touch consensus/blocknode.go
 	go test -short -tags=test ./...
 
 
 test-long: clean fmt
 	go test -a -v -race -short -tags=test ./...
 	go test -a -v -race -tags=test ./...
+
+coverpackages = consensus crypto encoding hash network siad
+cover: clean
+	@mkdir -p cover
+	@for package in $(coverpackages); do \
+		go test -a -v -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
+		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
+		rm cover/$$package.out ; \
+	done
 
 # run twice to ensure references are updated properly
 whitepaper:
@@ -32,13 +41,14 @@ whitepaper:
 dependencies:
 	go install -race std
 	go get -u code.google.com/p/gcfg
+	go get -u github.com/agl/ed25519
+	go get -u github.com/inconshreveable/go-update
+	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
-	go get -u github.com/inconshreveable/go-update
-	go get -u github.com/agl/ed25519
-	go get -u golang.org/x/crypto/twofish
 	go get -u github.com/stretchr/graceful
-	go get -u github.com/laher/goxc
+	go get -u golang.org/x/crypto/twofish
+	go get -u golang.org/x/tools/cmd/cover
 
 release: dependencies test-long
 	go install -a ./...
@@ -50,4 +60,4 @@ xc: dependencies test-long
 		-tasks-=deb,deb-dev,deb-source,go-test
 	# Need some command here to make sure that the release constants got used.
 
-.PHONY: all fmt install clean test test-long whitepaper dependencies release xc
+.PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc

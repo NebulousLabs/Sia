@@ -221,10 +221,5 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 		}
 	}
 
-	// Sanity check - make sure the currentPath makes sense.
-	if DEBUG {
-		s.currentPathCheck()
-	}
-
 	return
 }
