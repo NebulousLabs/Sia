@@ -10,10 +10,18 @@ clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
 		sia.wallet sia/test.wallet sia/hostdir* sia/renterDownload
 
+# Touching a file in the consensus folder forces the build tag files to be
+# rebuilt. This can also be achieved with 'go test -a', however using the '-a'
+# flag results in a multi-second compile time, which is undesirable. Leaving
+# out both the touch and the '-a' means that sometimes the tests will be run
+# using the developer constants, which is very, very slow.
 test: clean fmt
-	go test -a -short -tags=test ./...
+	touch consensus/blocknode.go
+	go test -short -tags=test ./...
 
-test-long: test
+
+test-long: clean fmt
+	go test -a -v -race -short -tags=test ./...
 	go test -a -v -race -tags=test ./...
 
 # run twice to ensure references are updated properly
