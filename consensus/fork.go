@@ -117,6 +117,7 @@ func (s *State) generateAndApplyDiff(bn *BlockNode) (err error) {
 	s.unspentOutputs[bn.Block.SubsidyID()] = subsidyOutput
 	bn.OutputDiffs = append(bn.OutputDiffs, subsidyDiff)
 
+	bn.DiffsGenerated = true
 	return
 }
 
@@ -181,12 +182,7 @@ func (s *State) forkBlockchain(newNode *BlockNode) (err error) {
 		// If the diffs for this node have already been generated, apply them
 		// directly instead of generating them.
 		if backtrackNodes[i].DiffsGenerated {
-			for _, outputDiff := range backtrackNodes[i].OutputDiffs {
-				s.commitOutputDiff(outputDiff, true)
-			}
-			for _, contractDiff := range backtrackNodes[i].ContractDiffs {
-				s.commitContractDiff(contractDiff, true)
-			}
+			s.applyBlockNode(backtrackNodes[i])
 			continue
 		}
 

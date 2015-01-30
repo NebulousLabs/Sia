@@ -43,6 +43,7 @@ func testEmptyBlock(t *testing.T, s *State) {
 	cpLen := len(s.currentPath)
 	uoLen := len(s.unspentOutputs)
 	ocLen := len(s.openContracts)
+	beforeStateHash := s.StateHash()
 
 	// Mine and submit a block
 	b, err := mineValidBlock(s)
@@ -52,6 +53,10 @@ func testEmptyBlock(t *testing.T, s *State) {
 	err = s.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
+	}
+	afterStateHash := s.StateHash()
+	if afterStateHash == beforeStateHash {
+		t.Error("StateHash is unchanged after applying an empty block")
 	}
 
 	// Check that the state has updated as expected:
@@ -75,13 +80,27 @@ func testEmptyBlock(t *testing.T, s *State) {
 	if s.currentPath[s.Height()] != b.ID() {
 		t.Error("the state's current path didn't update correctly after accepting a new block")
 	}
-	_, exists := s.blockMap[b.ID()]
+	bn, exists := s.blockMap[b.ID()]
 	if !exists {
 		t.Error("the state's block map did not update correctly after getting an empty block")
 	}
 	_, exists = s.unspentOutputs[b.SubsidyID()]
 	if !exists {
 		t.Error("the blocks subsidy output did not get added to the set of unspent outputs")
+	}
+
+	// Check that the diffs have been generated, and that they represent the
+	// actual changes to the state.
+	if !bn.DiffsGenerated {
+		t.Error("diffs were not generated on the new block")
+	}
+	s.invertRecentBlock()
+	if beforeStateHash != s.StateHash() {
+		t.Error("state is different after applying and removing diffs")
+	}
+	s.applyBlockNode(bn)
+	if afterStateHash != s.StateHash() {
+		t.Error("state is different after generateApply, remove, and applying diffs")
 	}
 }
 
@@ -164,3 +183,5 @@ func TestRepeatBlock(t *testing.T) {
 	s := CreateGenesisState()
 	testRepeatBlock(t, s)
 }
+
+// TODO: Test orphan block stuff.
