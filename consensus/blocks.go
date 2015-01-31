@@ -26,12 +26,13 @@ var (
 
 // Exported Errors
 var (
-	BlockKnownErr    = errors.New("block exists in block map.")
-	FutureBlockErr   = errors.New("timestamp too far in future, will try again later.")
-	KnownOrphanErr   = errors.New("block is a known orphan")
-	LargeBlockErr    = errors.New("block is too large to be accepted")
-	MissedTargetErr  = errors.New("block does not meet target")
-	UnknownOrphanErr = errors.New("block is an unknown orphan")
+	BlockKnownErr     = errors.New("block exists in block map.")
+	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
+	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
+	KnownOrphanErr    = errors.New("block is a known orphan")
+	LargeBlockErr     = errors.New("block is too large to be accepted")
+	MissedTargetErr   = errors.New("block does not meet target")
+	UnknownOrphanErr  = errors.New("block is an unknown orphan")
 )
 
 // handleOrphanBlock adds a block to the list of orphans, returning an error
@@ -95,7 +96,7 @@ func (s *State) validHeader(b Block) (err error) {
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestChildTimestamp() > b.Timestamp {
-		err = errors.New("timestamp invalid for being in the past")
+		err = EarlyTimestampErr
 		return
 	}
 

@@ -31,6 +31,31 @@ func mineValidBlock(s *State) (b Block, err error) {
 	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, s.CurrentTarget())
 }
 
+// testBlockTimestamps submits a block to the state with a timestamp that is
+// too early and a timestamp that is too late, and verifies that each get
+// rejected.
+func testBlockTimestamps(t *testing.T, s *State) {
+	// Create a block with a timestamp that is too early.
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, CoinAddress{}, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != EarlyTimestampErr {
+		t.Error("unexpected error when submitting a too-early timestamp:", err)
+	}
+
+	// Create a block with a timestamp that is too late.
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix())+10+FutureThreshold, CoinAddress{}, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != FutureBlockErr {
+		t.Error("unexpected error when submitting a too-early timestamp:", err)
+	}
+}
+
 // testEmptyBlock adds an empty block to the state and checks for errors.
 func testEmptyBlock(t *testing.T, s *State) {
 	// Get prior stats about the state.
@@ -352,6 +377,13 @@ func testRepeatBlock(t *testing.T, s *State) {
 	}
 }
 
+// TestBlockTimestamps creates a new state and uses it to call
+// testBlockTimestamps.
+func TestBlockTimestamps(t *testing.T) {
+	s := CreateGenesisState()
+	testBlockTimestamps(t, s)
+}
+
 // TestConstants makes sure that the testing constants are being used instead
 // of the developer constants or the release constants.
 func TestConstants(t *testing.T) {
@@ -415,3 +447,9 @@ func TestRepeatBlock(t *testing.T) {
 // TODO: Fork probing. Fork between complex sets of blocks and see that the
 // state hashes always end up at the same point, make sure long forking works
 // well and that reversing when a transaction fails also works well.
+
+// TODO: Test the actually method which is used to calculated the earliest
+// legal timestamp for the next block. Like have some examples that should work
+// out algebraically and make sure that earliest timestamp follows the rules
+// layed out by the protocol. This should be done after we decide that the
+// algorithm for calculating the earliest allowed timestamp is sufficient.
