@@ -114,13 +114,6 @@ func (s *State) validHeader(b Block) (err error) {
 		return
 	}
 
-	// Check that the transaction merkle root matches the transactions
-	// included into the block.
-	if b.MerkleRoot != b.TransactionMerkleRoot() {
-		err = errors.New("merkle root does not match transactions sent.")
-		return
-	}
-
 	return
 }
 

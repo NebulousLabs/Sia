@@ -30,7 +30,6 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 		// of randomly generated arbitrary data. This will provide entropy to
 		// the block even though the timestamp isn't changing at all.
 	}
-	b.MerkleRoot = b.TransactionMerkleRoot()
 
 	return
 }

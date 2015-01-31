@@ -25,7 +25,6 @@ type Block struct {
 	Timestamp     Timestamp
 	Nonce         uint64
 	MinerAddress  CoinAddress
-	MerkleRoot    hash.Hash
 	Transactions  []Transaction
 }
 
@@ -120,10 +119,8 @@ func CalculateCoinbase(height BlockHeight) Currency {
 func (b Block) ID() BlockID {
 	return BlockID(hash.HashBytes(encoding.MarshalAll(
 		b.ParentBlockID,
-		b.Timestamp,
 		b.Nonce,
-		b.MinerAddress,
-		b.MerkleRoot,
+		b.MerkleRoot(),
 	)))
 }
 
@@ -135,12 +132,14 @@ func (b Block) CheckTarget(target Target) bool {
 
 // ExpectedTransactionMerkleRoot() returns the expected transaction
 // merkle root of the block.
-func (b Block) TransactionMerkleRoot() hash.Hash {
-	var transactionHashes []hash.Hash
-	for _, transaction := range b.Transactions {
-		transactionHashes = append(transactionHashes, hash.HashBytes(encoding.Marshal(transaction)))
+func (b Block) MerkleRoot() hash.Hash {
+	var hashes []hash.Hash
+	hashes = append(hashes, hash.HashObject(b.Timestamp))
+	hashes = append(hashes, hash.HashObject(b.MinerAddress))
+	for _, txn := range b.Transactions {
+		hashes = append(hashes, hash.HashObject(txn))
 	}
-	return hash.MerkleRoot(transactionHashes)
+	return hash.MerkleRoot(hashes)
 }
 
 // SubisdyID() returns the id of the output created by the block subsidy.
