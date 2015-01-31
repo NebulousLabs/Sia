@@ -8,19 +8,44 @@ itself. If you are looking for a more precise understanding of the consensus
 rules, a good place to start is consensus/types.go, and another good starting
 place is the function AcceptBlock, which can be found in consensus/blocks.go.
 
+This document will be more understandable if you have a general understanding
+of proof of work blockchains, and does not try to build up from first
+priciples.
+
 TODO: Write the formal specification for encoding things.
 
-TODO: Write the formal specification for deriving the block id.
+TODO: Write the formal specification for deriving the block id, contract id,
+siacoin output id, siafund output id, siafund claim output id.
 
-TODO: How to derive contract id, output id
-
-TODO: Siafund inputs, siafund outputs, siafund claims
-
-TODO: Document which type of hash is used
+TODO: Document which crypto is used in consensus. (Hash algorithm, signature
+algorithm)
 
 TODO: Document genesis information such as root depth and root target.
 
-TODO: Document picking a fork
+Currency
+--------
+
+The Sia cryptosystem has two types of currency. The first is the Siacoin.
+Siacoins are generated every block and distributed to the miners. These miners
+can then use the siacoins to fund file contracts, or can send the siacoins to
+other parties (presumably in a trade for out-of-band goods and services, or
+simply other currencies.). The siacoin is represented by a 128 bit unsigned
+integer.
+
+The second currency in the Sia cryptosystem is the Siafund, which is a special
+asset limited to 10,000 indivisible units. Each time a contract is created,
+3.9% of the payout is put into the siafund pool. The number of siacoins in the
+siafund pool must always be divisible by 10,000; the number of coins taken from
+the payout is rounded down to the nearest 10,000.
+
+Siafund owners can collect the siacoins in the siafund pool. For every 10,000
+siacoins added to the siafund pool, a siafund owner can withdraw 1 siacoin.
+Approx. 8750 siafunds are owned by Nebulous Inc. The remaining siafunds are
+owned by early backers of the Sia project.
+
+There are future plans to enable sidechain compatibility with Sia. This would
+allow other currencies such as Bitcoin to be spent in all the same places that
+the Siacoin can be spent.
 
 Block Size
 ----------
@@ -97,7 +122,6 @@ A Transaction is composed of the following:
 - Storage Proofs
 - Siafund Inputs
 - Siafund Outputs
-- Siafund Claims
 - Arbitrary Data
 - Signatures
 
@@ -164,13 +188,11 @@ All contracts must have a non-zero payout.
 Storage Proofs
 --------------
 
-A storage proof transaction is any transaction containing a storage proof. Such
-transactions are not allowed to have outputs or contracts. All outputs created
-by storage proofs cannot be spent for 100 blocks.
+A storage proof transaction is any transaction containing a storage proof. 
 
-These limits are in place because, just like with block subsidies, a simple
-reorg can change the validity of a proof and invalidate the outputs, making
-double spend attacks and false spend attacks much easier for these outputs.
+Storage proof transactions are not allowed to have siacoin or siafund outputs,
+and are not allowed to have file contracts. All outputs created by storage
+proofs cannot be spent for 100 blocks.
 
 When creating a storage proof, you only prove that you have a single 64 byte
 segment of the file. The piece that you must prove you have is chosen
@@ -191,14 +213,49 @@ hashes required to fill out the remaining tree. The total size of the proof
 will be 64 bytes + 32 bytes * log(num segments), and can be verified by anybody
 who knows the root hash and the file size.
 
+Storage proof transactions are not allowed to have siacoin outputs, siafund
+outputs, or contracts. All outputs created by the storage proofs cannot be
+spent for 100 blocks.
+
+These limits are in place because a simple blockchain reorganization can change
+the trigger block, which will invalidate the storage proof and therefore the
+entire transaction. This makes double spend attacks and false spend attacks
+significantly easier to execute.
+
 Siafund Inputs
 --------------
+
+A siafund input works similar to a siacoin input. It contains the id of a
+siafund output being spent, and the spend conditions required to spend the
+output. These spend conditions must be signed.
+
+A special output is created when a siafund is used as input. All of the
+siacoins that have accrued in the siafund since its last spend are sent to the
+'Claim Destination' found in the siafund output, which is a normal siacoin
+address. The number of accrued siacoins is counted by taking the size of the
+siacoin pool when the output was created and comparing it to the current size
+of the siacoin pool. The equation is:
+
+	(Current Pool Size - Previous Pool Size) / 10,000 * siafund quantity
+
+Like the miner outputs and the storage proof outputs, the siafund output cannot
+be spent for 100 blocks because the value of the output can change if the
+blockchain reorganizes. Reorganizations will not however cause the transaction
+to be invalidated, so the ban on contracts and outputs does not need to be in
+place.
 
 Siafund Outputs
 ---------------
 
-Siafund Claims
---------------
+Sia outputs contain:
+- A Value, which is the quanity of siafunds controlled by the output.
+- A Spend Hash, which is the hash of the spend conditions required to spend the
+  siafund output.
+- A Claim Destination, which is a siacoin address to which siacoins will be
+  sent when the siafund output is spent.
+- A Claim Start, which indicates how many siacoins were in the siafund pool at
+  the moment the siafund output got created. This is used when the output is
+  spent to determine how many siacoins go to the new output.
 
 Arbitrary Data
 --------------
@@ -212,7 +269,8 @@ Signatures
 ----------
 
 Each signature points to a single public key index in a single input. No two
-signatures can point to the same public key index for the same input.
+signatures can point to the same public key index for the same input. The
+signature can point to either a siacoin input or a siafund input.
 
 Each signature also contains a timelock, and is not valid until the blockchain
 has reached a height equal to the timelock height.

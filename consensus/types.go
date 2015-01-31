@@ -45,7 +45,6 @@ type Transaction struct {
 	StorageProofs []StorageProof
 	// SiafundInputs  []SiafundInput
 	// SiafundOutputs []SiafundOutput
-	// SiafundClaims  []SiafundClaim
 	ArbitraryData []string
 	Signatures    []TransactionSignature
 }
@@ -109,17 +108,10 @@ type SiafundInput struct {
 
 // TODO: Docstring
 type SiafundOutput struct {
-	Value        Siafund
-	TransferHash CoinAddress
-	ClaimHash    CoinAddress
-}
-
-// TODO: Docstring
-type SiafundClaim struct {
-	OutputID         OutputID
+	Value            Siafund
+	SpendHash     CoinAddress
 	ClaimDestination CoinAddress
-	NewTransferHash  CoinAddress
-	NewClaimHash     CoinAddress
+	ClaimStart       Currency
 }
 
 // A TransactionSignature signs a single input to a transaction to help fulfill
@@ -151,7 +143,6 @@ type CoveredFields struct {
 	StorageProofs    []uint64
 	// SiafundInputs []uint64
 	// SiafundOutputs  []unit64
-	// SiafundClaims []unit64
 	ArbitraryData []uint64
 	Signatures    []uint64
 }
