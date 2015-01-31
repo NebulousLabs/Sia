@@ -39,7 +39,7 @@ test-long: clean fmt
 # have been hit during testing and how many times each line has been hit.
 coverpackages = consensus crypto encoding hash modules/hostdb network siad
 cover: clean
-	@mkdir -p cover
+	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \
 		go test -a -v -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \

@@ -453,3 +453,7 @@ func TestRepeatBlock(t *testing.T) {
 // out algebraically and make sure that earliest timestamp follows the rules
 // layed out by the protocol. This should be done after we decide that the
 // algorithm for calculating the earliest allowed timestamp is sufficient.
+
+// TODO: Probe the difficulty adjustments, make sure that they are happening
+// according to specification, moving as much as they should and that the
+// clamps are being effective.
