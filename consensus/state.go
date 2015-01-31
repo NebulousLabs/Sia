@@ -58,7 +58,6 @@ func CreateGenesisState() (s *State) {
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := Block{
 		Timestamp:    GenesisTimestamp,
-		MinerAddress: GenesisAddress,
 	}
 	s.blockRoot = &blockNode{
 		block:  genesisBlock,
@@ -74,7 +73,6 @@ func CreateGenesisState() (s *State) {
 	// Create the genesis subsidy output.
 	genesisSubsidyOutput := Output{
 		Value:     CalculateCoinbase(0),
-		SpendHash: GenesisAddress,
 	}
 	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
 

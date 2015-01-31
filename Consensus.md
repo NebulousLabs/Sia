@@ -17,10 +17,13 @@ TODO: Write the formal specification for encoding things.
 TODO: Write the formal specification for deriving the block id, contract id,
 siacoin output id, siafund output id, siafund claim output id.
 
+TODO: block id + merkle root, miner output ids, siacoin output ids, contract
+ids, storage proof ids, siafund output ids, siafund claim output ids.
+
 TODO: Document which crypto is used in consensus. (Hash algorithm, signature
 algorithm)
 
-TODO: Document genesis information such as root depth and root target.
+TODO: Pick a timestamp for the genesis block.
 
 Currency
 --------
@@ -95,12 +98,12 @@ to 10,000x for Bitcoin.
 Block Subsidy
 -------------
 
-The coinbase for a block is 300,000 - (1 * height), with a minimum of
-30,000. Any miner fees get added to the coinbase, which creates the block
-subsidy. The block subsidy is then given to multiple outputs, called the miner
-outputs. The total value of the miner outputs must equal the block subsidy.
-Having multiple outputs allows the block reward to be sent to multiple people,
-enabling systems like p2pool.
+The coinbase for a block is (300,000 - (1 * height)) * 2^80, with a minimum of
+30,000 * 2^80. Any miner fees get added to the coinbase, which creates the
+block subsidy. The block subsidy is then given to multiple outputs, called the
+miner outputs. The total value of the miner outputs must equal the block
+subsidy.  Having multiple outputs allows the block reward to be sent to
+multiple people, enabling systems like p2pool.
 
 The outputs created by the block subsidy cannot be spent for 100 blocks, and
 are not considered a part of the utxo set until 100 blocks have transpired.
@@ -300,3 +303,13 @@ The blockchain is used to achieve consensus around 3 objects. The first is
 unspent financial outputs. The second is unfulfilled storage contracts. The
 third is siafund ownership and claims. All transaction componenets have some
 effect on the three sets of information.
+
+Genesis Set
+-----------
+
+The genesis block will be a block with a timestamp of TODO:TBD. All other
+fields will be empty. The required target for the next block shall be [0, 0, 0,
+8, 0...], where each value is a byte.
+
+The genesis block does not need to meet a particular target, and indeed it does
+not.

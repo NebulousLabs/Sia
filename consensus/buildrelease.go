@@ -22,11 +22,9 @@ const (
 )
 
 var (
-	RootTarget = Target{0, 0, 0, 64}
+	RootTarget = Target{0, 0, 0, 8}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
-
-	GenesisAddress = CoinAddress{} // TODO: get a hardcoded premine address
 )

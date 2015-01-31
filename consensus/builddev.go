@@ -27,6 +27,4 @@ var (
 
 	MaxAdjustmentUp   = big.NewRat(103, 100)
 	MaxAdjustmentDown = big.NewRat(97, 100)
-
-	GenesisAddress = CoinAddress{}
 )
