@@ -12,6 +12,7 @@ type (
 	Timestamp   int64
 	BlockHeight uint64
 	Currency    uint64
+	Siafund     uint64
 
 	BlockID     hash.Hash
 	OutputID    hash.Hash
@@ -20,22 +21,31 @@ type (
 	Target      hash.Hash
 )
 
+// TODO: Swtich MinerAddress to a MinerPayout, and add rules to consensus that
+// enforce the Value sum of the miner payout outputs is exactly equal to the
+// block subsidy.
 type Block struct {
 	ParentBlockID BlockID
-	Timestamp     Timestamp
 	Nonce         uint64
+	Timestamp     Timestamp
 	MinerAddress  CoinAddress
-	Transactions  []Transaction
+	// MinerPayout []Output
+	Transactions []Transaction
 }
 
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
+//
+// TODO: Enable siafund stuff
 type Transaction struct {
 	Inputs        []Input
 	MinerFees     []Currency
 	Outputs       []Output
 	FileContracts []FileContract
 	StorageProofs []StorageProof
+	// SiafundInputs  []SiafundInput
+	// SiafundOutputs []SiafundOutput
+	// SiafundClaims  []SiafundClaim
 	ArbitraryData []string
 	Signatures    []TransactionSignature
 }
@@ -49,10 +59,19 @@ type Input struct {
 
 // SpendConditions is a timelock and a set of public keys that are used to
 // unlock ouptuts.
+//
+// The public keys come first so that when producing the CoinAddress, the
+// TimeLock and the NumSignatures can be padded for privacy. If all of the
+// public keys are known, it is more or less trivial to grind the TimeLock and
+// the NumSignatures because each field has a low amount of entropy. You can
+// protect the fields with privacy however, by using the scheme [Timelock]
+// [Random Data] [Actual Public Keys...] [Random Data] [NumSignatures]. This
+// allows one to reveal all or many of the public keys without being required
+// to expose the TimeLock and NumSigantures.
 type SpendConditions struct {
 	TimeLock      BlockHeight
-	NumSignatures uint64
 	PublicKeys    []crypto.PublicKey
+	NumSignatures uint64
 }
 
 // An Output contains a volume of currency and a 'CoinAddress', which is just a
@@ -73,13 +92,34 @@ type FileContract struct {
 	MissedProofAddress CoinAddress
 }
 
-// A StorageProof contains the fields needed for a host to prove that they are
-// still storing a file. Though WindowIndex is of type BlockHeight, it refers
-// to the index of the window, and not the height at which the window starts.
+// A storage proof contains a segment and the HashSet required to prove that
+// the segment is a part of the data in the FileMerkleRoot of the FileContract
+// that the storage proof fulfills.
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [hash.SegmentSize]byte
 	HashSet    []hash.Hash
+}
+
+// TODO: Docstring
+type SiafundInput struct {
+	OutputID        OutputID
+	SpendConditions SpendConditions
+}
+
+// TODO: Docstring
+type SiafundOutput struct {
+	Value        Siafund
+	TransferHash CoinAddress
+	ClaimHash    CoinAddress
+}
+
+// TODO: Docstring
+type SiafundClaim struct {
+	OutputID         OutputID
+	ClaimDestination CoinAddress
+	NewTransferHash  CoinAddress
+	NewClaimHash     CoinAddress
 }
 
 // A TransactionSignature signs a single input to a transaction to help fulfill
@@ -87,13 +127,21 @@ type StorageProof struct {
 // particular public key, has a timelock, and also indicates which parts of the
 // transaction have been signed.
 type TransactionSignature struct {
-	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+	InputID        OutputID // the OutputID of the Input that this signature is addressing.
 	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
 	Signature      crypto.Signature
 }
 
+// TODO: If `WholeTransaction` is set to true, then all other fields except for
+// Signatures should be empty, this should be a consensus rule.
+//
+// TODO: Signature can include each element at most once. If there are repeat
+// elements, everything is invalid.
+//
+// TODO: We might, for speed reasons, want to also force the fields to be
+// sorted already.
 type CoveredFields struct {
 	WholeTransaction bool
 	Inputs           []uint64 // each element indicates an index which is signed.
@@ -101,11 +149,17 @@ type CoveredFields struct {
 	Outputs          []uint64
 	Contracts        []uint64
 	StorageProofs    []uint64
-	ArbitraryData    []uint64
-	Signatures       []uint64
+	// SiafundInputs []uint64
+	// SiafundOutputs  []unit64
+	// SiafundClaims []unit64
+	ArbitraryData []uint64
+	Signatures    []uint64
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
+//
+// TODO: Switch to a different constant because of using 128 bit values for the
+// currency.
 func CalculateCoinbase(height BlockHeight) Currency {
 	if Currency(height) >= InitialCoinbase-MinimumCoinbase {
 		return MinimumCoinbase * 100000
@@ -114,8 +168,9 @@ func CalculateCoinbase(height BlockHeight) Currency {
 	}
 }
 
-// Block.ID() returns a hash of the block, which is used as the block
-// identifier. Transactions are not included in the hash.
+// ID returns the id of a block, which is calculated by concatenating the
+// parent block id, the block nonce, and the block merkle root and taking the
+// hash.
 func (b Block) ID() BlockID {
 	return BlockID(hash.HashBytes(encoding.MarshalAll(
 		b.ParentBlockID,
@@ -124,25 +179,32 @@ func (b Block) ID() BlockID {
 	)))
 }
 
-// CheckTarget() returns true if the block id is lower than the target.
+// CheckTarget returns true if the block id is lower than the target.
 func (b Block) CheckTarget(target Target) bool {
 	blockHash := b.ID()
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
-// ExpectedTransactionMerkleRoot() returns the expected transaction
-// merkle root of the block.
+// MerkleRoot calculates the merkle root of the block. The leaves of the merkle
+// tree are composed of the Timestamp, the set of miner outputs (one leaf), and
+// all of the transactions (many leaves).
+//
+// TODO: change the miner address to the miner outputs.
 func (b Block) MerkleRoot() hash.Hash {
-	var hashes []hash.Hash
-	hashes = append(hashes, hash.HashObject(b.Timestamp))
-	hashes = append(hashes, hash.HashObject(b.MinerAddress))
-	for _, txn := range b.Transactions {
-		hashes = append(hashes, hash.HashObject(txn))
+	leaves := []hash.Hash{
+		hash.HashObject(b.Timestamp),
+		hash.HashObject(b.MinerAddress),
 	}
-	return hash.MerkleRoot(hashes)
+	for _, txn := range b.Transactions {
+		leaves = append(leaves, hash.HashObject(txn))
+	}
+	return hash.MerkleRoot(leaves)
 }
 
-// SubisdyID() returns the id of the output created by the block subsidy.
+// SubisdyID returns the id of the output created by the block subsidy.
+//
+// TODO: Adjust so that it returns the id of the miner outputs. Also reconsider
+// how output ids are created.
 func (b Block) SubsidyID() OutputID {
 	bid := b.ID()
 	return OutputID(hash.HashBytes(append(bid[:], "blockreward"...)))
@@ -193,22 +255,32 @@ func (t Transaction) OutputSum() (sum Currency) {
 	return
 }
 
-// SigHash returns the hash of a transaction for a specific index.  The index
-// determines which TransactionSignature is included in the hash.
+// SigHash returns the hash of a transaction for a specific signature. `i` is
+// the index of the signature for which the hash is being returned. If
+// `WholeTransaction` is set to true for the siganture, then all of the
+// transaction fields except the signatures are included in the transactions.
+// If `WholeTransaction` is set to false, then the fees, inputs, ect. are all
+// added individually. The signatures are added individually regardless of the
+// value of `WholeTransaction`.
+//
+// TODO: add loops for the siafunds stuff
 func (t Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if t.Signatures[i].CoveredFields.WholeTransaction {
-		signedData = append(signedData, encoding.MarshalAll(
+		signedData = encoding.MarshalAll(
 			t.Inputs,
 			t.MinerFees,
 			t.Outputs,
 			t.FileContracts,
 			t.StorageProofs,
+			// Siafunds
+			// Stuff
+			// Here
 			t.ArbitraryData,
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
-		)...)
+		)
 	} else {
 		for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
@@ -225,6 +297,9 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
 			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
 		}
+		// Siafunds
+		// Stuff
+		// Here
 		for _, arbData := range t.Signatures[i].CoveredFields.ArbitraryData {
 			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
 		}
@@ -239,6 +314,8 @@ func (t Transaction) SigHash(i int) hash.Hash {
 
 // StorageProofOutputID returns the OutputID of the output created during the
 // window index that was active at height 'height'.
+//
+// TODO: Reconsider how the StorageProofOutputID is determined.
 func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
 	proofString := proofString(proofValid)
 	outputID = OutputID(hash.HashAll(
@@ -249,16 +326,16 @@ func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID)
 }
 
 // CoinAddress calculates the root hash of a merkle tree of the SpendConditions
-// object, using the timelock, number of signatures required, and each public
-// key as leaves.
+// object. The leaves of this tree are formed by taking the [TimeLock]
+// [Pubkeys...] [NumSignatures].
 func (sc SpendConditions) CoinAddress() CoinAddress {
-	tlHash := hash.HashObject(sc.TimeLock)
-	nsHash := hash.HashObject(sc.NumSignatures)
-	pkHashes := make([]hash.Hash, len(sc.PublicKeys))
-	for i := range sc.PublicKeys {
-		pkHashes[i] = hash.HashObject(sc.PublicKeys[i])
+	leaves := []hash.Hash{
+		hash.HashObject(sc.TimeLock),
 	}
-	leaves := append([]hash.Hash{tlHash, nsHash}, pkHashes...)
+	for i := range sc.PublicKeys {
+		leaves = append(leaves, hash.HashObject(sc.PublicKeys[i]))
+	}
+	leaves = append(leaves, hash.HashObject(sc.NumSignatures))
 	return CoinAddress(hash.MerkleRoot(leaves))
 }
 

@@ -2,7 +2,11 @@ Consensus Rules
 ===============
 
 Sia is a cryptosystem that uses a Bitcoin style Proof of Work blockchain to
-achieve network consensus.
+achieve network consensus. The rules of consensus are detailed in this
+document. The most detailed and accurate explanation however is the codebase
+itself. If you are looking for a more precise understanding of the consensus
+rules, a good place to start is consensus/types.go, and another good starting
+place is the function AcceptBlock, which can be found in consensus/blocks.go.
 
 TODO: Write the formal specification for encoding things.
 

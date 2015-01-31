@@ -1,5 +1,9 @@
 package consensus
 
+import (
+	"testing"
+)
+
 // TestConstants makes sure that the testing constants are being used instead
 // of the developer constants or the release constants.
 func TestConstants(t *testing.T) {
