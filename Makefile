@@ -6,9 +6,15 @@ all: install
 fmt:
 	go fmt ./...
 
+# REBUILD touches all of the build-dependent source files, forcing them to be
+# rebuilt. This is necessary because the go tool is not smart enough to trigger
+# a rebuild when build tags have been changed.
+REBUILD:
+	@touch consensus/build*.go
+
 # install builds and installs developer binaries.
-install: fmt
-	go install -a -tags=dev ./...
+install: fmt REBUILD
+	go install -tags=dev ./...
 
 # clean removes all directories that get automatically created during
 # development.
@@ -24,24 +30,23 @@ clean:
 # flag results in a multi-second compile time, which is undesirable. Leaving
 # out both the touch and the '-a' means that sometimes the tests will be run
 # using the developer constants, which is very slow.
-test: clean fmt
-	@touch consensus/blocknode.go
+test: clean fmt REBUILD
 	go test -short -tags=test ./...
 
 #  test-long does a forced rebuild of all packages, and then runs both the
 #  short and long tests with the race libraries enabled. test-long aims to be
 #  thorough.
-test-long: clean fmt
-	go test -a -v -race -short -tags=test ./...
-	go test -a -v -race -tags=test ./...
+test-long: clean fmt REBUILD
+	go test -v -race -short -tags=test ./...
+	go test -v -race -tags=test ./...
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
 coverpackages = consensus crypto encoding hash modules/hostdb network siad
-cover: clean
+cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \
-		go test -a -v -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
+		go test -v -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
 		rm cover/$$package.out ; \
 	done
@@ -68,7 +73,7 @@ dependencies:
 
 # release builds and installs release binaries.
 release: dependencies test-long
-	go install -a ./...
+	go install ./...
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
@@ -76,6 +81,5 @@ xc: dependencies test-long
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.2.0          \
 		-br=release -pr=beta -include=example-config,LICENSE*,README*           \
 		-tasks-=deb,deb-dev,deb-source,go-test
-	# Need some command here to make sure that the release constants got used.
 
 .PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc

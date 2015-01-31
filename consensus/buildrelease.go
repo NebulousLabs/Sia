@@ -21,6 +21,8 @@ const (
 	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
+// Though these are variables, they should never be changed during runtime.
+// They get altered during testing.
 var (
 	RootTarget = Target{0, 0, 0, 8}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
