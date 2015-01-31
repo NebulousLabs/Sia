@@ -66,27 +66,36 @@ previous blocks, the genesis timestamp is used repeatedly.
 Blocks will be rejected if they are timestamped more than three hours in the
 future, but can be accepted again once enough time has passed.
 
+Block ID
+--------
+
+The ID of a block is derived using:
+	Hash(Parent Block ID + 64 bit Nonce + Block Merkle Root)
+
+The block merkle root is obtained by creating a merkle tree whose leaves are
+the hash of the timestamp, the hashes of the miner outputs (one leaf per miner
+output), and the hashes of the transactions (one leaf per transaction).
+
 Block Target
 ------------
 
-Each block has a target, which is a value that the hash of the block must be
-lower than in order for the block to be valid. A new target is set every block.
-The target is set by comparing the timestamp of the current block with the
-timestamp of the block added 2000 blocks prior. The expected difference in time
-is 20,000 minutes. If less time has passed, the target is lowered. If more time
-has passed, the target is increased.
+For a block to be valid, the id of the block must be below a certain target.  A
+new target is set every block by by comparing the timestamp of the current
+block with the timestamp of the block added 2000 blocks prior. The expected
+difference in time is 20,000 minutes. If less time has passed, the target is
+lowered. If more time has passed, the target is increased.
 
 The target is changed in proportion to the difference in time (If the time was
 half of what was expected, the new target is 1/2 the old target). There is a
 clamp on the adjustment. In one block, the target cannot adjust upwards by more
 more than 1001/1000, and cannot adjust downwards by more than 999/1000.
 
-If there are not 2000 blocks, the genesis timestamp is used for comparison.
-The expected time is (10 minutes * block height).
-
 The new target is calculated using (expected time passed in seconds) / (actual
 time passed in seconds) * (current target). The division and multiplication
 should be done using infinite precision, and the result should be truncated.
+
+If there are not 2000 blocks, the genesis timestamp is used for comparison.
+The expected time is (10 minutes * block height).
 
 The difficulty clamp means that the target can shift by at most 7.5x in 2016
 blocks, which can be compared to the 4x clamp of Bitcoin. The amount of work

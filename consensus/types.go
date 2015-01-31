@@ -76,7 +76,7 @@ type SpendConditions struct {
 // An Output contains a volume of currency and a 'CoinAddress', which is just a
 // hash of the spend conditions which unlock the output.
 type Output struct {
-	Value     Currency // how many coins are in the output
+	Value     Currency
 	SpendHash CoinAddress
 }
 
@@ -100,16 +100,21 @@ type StorageProof struct {
 	HashSet    []hash.Hash
 }
 
-// TODO: Docstring
+// A SiafundInput is close to a SiacoinInput, except that the asset being spent
+// is a SiaFund.
 type SiafundInput struct {
 	OutputID        OutputID
 	SpendConditions SpendConditions
 }
 
-// TODO: Docstring
+// A SiafundOutput contains a value and a spend hash like the SiacoinOutput,
+// but it also contians a ClaimDestination and a ClaimStart. The
+// ClaimDestination is the address that will receive siacoins when the siafund
+// output is spent. The ClaimStart will be comapred to the SiafundPool to
+// figure out how many siacoins the ClaimDestination will receive.
 type SiafundOutput struct {
 	Value            Siafund
-	SpendHash     CoinAddress
+	SpendHash        CoinAddress
 	ClaimDestination CoinAddress
 	ClaimStart       Currency
 }
