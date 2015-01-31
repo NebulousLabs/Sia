@@ -384,17 +384,6 @@ func TestBlockTimestamps(t *testing.T) {
 	testBlockTimestamps(t, s)
 }
 
-// TestConstants makes sure that the testing constants are being used instead
-// of the developer constants or the release constants.
-func TestConstants(t *testing.T) {
-	if RootTarget[0] != 64 {
-		panic("using wrong constant during testing!")
-	}
-	if !DEBUG {
-		panic("using wrong constant during testing, DEBUG flag needs to be set")
-	}
-}
-
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
 	s := CreateGenesisState()
@@ -410,7 +399,7 @@ func TestLargeBlock(t *testing.T) {
 	testLargeBlock(t, s)
 }
 
-// TestMissedTarge creates a new state and uses it to call testMissedTarget.
+// TestMissedTarget creates a new state and uses it to call testMissedTarget.
 func TestMissedTarget(t *testing.T) {
 	s := CreateGenesisState()
 	testMissedTarget(t, s)

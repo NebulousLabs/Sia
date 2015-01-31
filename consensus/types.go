@@ -47,6 +47,14 @@ type Input struct {
 	SpendConditions SpendConditions
 }
 
+// SpendConditions is a timelock and a set of public keys that are used to
+// unlock ouptuts.
+type SpendConditions struct {
+	TimeLock      BlockHeight
+	NumSignatures uint64
+	PublicKeys    []crypto.PublicKey
+}
+
 // An Output contains a volume of currency and a 'CoinAddress', which is just a
 // hash of the spend conditions which unlock the output.
 type Output struct {
@@ -54,12 +62,15 @@ type Output struct {
 	SpendHash CoinAddress
 }
 
-// SpendConditions is a timelock and a set of public keys that are used to
-// unlock ouptuts.
-type SpendConditions struct {
-	TimeLock      BlockHeight
-	NumSignatures uint64
-	PublicKeys    []crypto.PublicKey
+// A FileContract contains the information necessary to enforce that a host
+// stores a file.
+type FileContract struct {
+	FileMerkleRoot     hash.Hash
+	FileSize           uint64 // in bytes
+	Start, End         BlockHeight
+	Payout             Currency
+	ValidProofAddress  CoinAddress
+	MissedProofAddress CoinAddress
 }
 
 // A StorageProof contains the fields needed for a host to prove that they are
@@ -71,33 +82,22 @@ type StorageProof struct {
 	HashSet    []hash.Hash
 }
 
-// A FileContract contains the information necessary to enforce that a host
-// stores a file.
-type FileContract struct {
-	FileMerkleRoot     hash.Hash
-	FileSize           uint64 // probably in bytes, which means the last element in the merkle tree may not be exactly 64 bytes.
-	Start, End         BlockHeight
-	Payout             Currency
-	ValidProofAddress  CoinAddress
-	MissedProofAddress CoinAddress
-}
-
 // A TransactionSignature signs a single input to a transaction to help fulfill
 // the unlock conditions of the transaction. It points to an input, a
 // particular public key, has a timelock, and also indicates which parts of the
 // transaction have been signed.
 type TransactionSignature struct {
 	InputID        OutputID // the OutputID of the Input that this signature is addressing. Using the index has also been considered.
+	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
-	PublicKeyIndex uint64
 	Signature      crypto.Signature
 }
 
 type CoveredFields struct {
 	WholeTransaction bool
-	MinerFees        []uint64 // each element indicates an index which is signed.
-	Inputs           []uint64
+	Inputs           []uint64 // each element indicates an index which is signed.
+	MinerFees        []uint64
 	Outputs          []uint64
 	Contracts        []uint64
 	StorageProofs    []uint64
@@ -148,7 +148,9 @@ func (b Block) SubsidyID() OutputID {
 	return OutputID(hash.HashBytes(append(bid[:], "blockreward"...)))
 }
 
-// Transaction.fileContractID returns the id of a file contract given the index of the contract.
+// FileContractID returns the id of a file contract given the index of the contract.
+//
+// TODO: Reconsider how file contract ids are derived
 func (t Transaction) FileContractID(index int) ContractID {
 	return ContractID(hash.HashAll(
 		encoding.Marshal(t.Outputs[0]),
@@ -159,6 +161,8 @@ func (t Transaction) FileContractID(index int) ContractID {
 }
 
 // OuptutID takes the index of the output and returns the output's ID.
+//
+// TODO: ID should not include the signatures.
 func (t Transaction) OutputID(index int) OutputID {
 	return OutputID(hash.HashAll(
 		encoding.Marshal(t),
