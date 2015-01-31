@@ -69,8 +69,8 @@ func (d *daemon) blockHistory() (blockIDs [32]consensus.BlockID) {
 	}
 
 	// always include the genesis block
-	genesis, err := d.state.BlockAtHeight(0)
-	if err != nil {
+	genesis, exists := d.state.BlockAtHeight(0)
+	if !exists {
 		// this should never happen
 		return
 	}

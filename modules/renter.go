@@ -15,10 +15,8 @@ type UploadParams struct {
 	MerkleRoot hash.Hash
 
 	// these fields are not seen by the host
-	Nickname       string
-	TotalPieces    int
-	RequiredPieces int
-	OptimalPieces  int
+	Nickname string
+	Pieces   int
 }
 
 type RentInfo struct {

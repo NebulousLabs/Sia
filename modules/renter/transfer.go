@@ -67,7 +67,7 @@ func (r *Renter) Upload(up modules.UploadParams) (err error) {
 		return errors.New("file with that nickname already exists")
 	}
 
-	pieces := make([]FilePiece, up.TotalPieces)
+	pieces := make([]FilePiece, up.Pieces)
 	for i := range pieces {
 		// upload the piece to a host. The host is chosen by uploadPiece.
 		// TODO: what happens if we can't upload to all the hosts?

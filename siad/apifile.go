@@ -50,8 +50,8 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 		Duration: duration,
 		Delay:    delay,
 
-		Nickname:    req.FormValue("nickname"),
-		TotalPieces: pieces,
+		Nickname: req.FormValue("nickname"),
+		Pieces:   pieces,
 	})
 	if err != nil {
 		http.Error(w, "Upload failed: "+err.Error(), 500)
@@ -99,8 +99,8 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 		Duration: duration,
 		Delay:    delay,
 
-		Nickname:    req.FormValue("nickname"),
-		TotalPieces: pieces,
+		Nickname: req.FormValue("nickname"),
+		Pieces:   pieces,
 	})
 	if err != nil {
 		http.Error(w, "Upload failed: "+err.Error(), 500)
