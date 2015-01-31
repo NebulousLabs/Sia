@@ -9,10 +9,10 @@ import (
 const (
 	DEBUG = true
 
-	BlockSizeLimit        = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
+	BlockSizeLimit        = 1024 * 1024            // Blocks cannot be more than 1MB.
 	BlockFrequency        = Timestamp(1)           // In seconds.
 	TargetWindow          = BlockHeight(1000)      // Number of blocks to use when calculating the target.
-	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid.
+	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid - should be an odd number.
 	FutureThreshold       = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 
 	InitialCoinbase = Currency(300000)

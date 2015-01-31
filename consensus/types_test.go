@@ -42,6 +42,9 @@ func randomHash(t *testing.T) (h hash.Hash) {
 // TestTypeMarshalling tries to marshal and unmarshal all types, verifying that
 // the marshalling is consistent with the unmarshalling. Right now block is the
 // only type implemented, more may be added later.
+//
+// TODO: there are no transactions that we test the marshalling of, need to add
+// transactions.
 func TestTypeMarshalling(t *testing.T) {
 	// Create a block full of random values.
 	originalBlock := Block{
@@ -49,8 +52,6 @@ func TestTypeMarshalling(t *testing.T) {
 		Timestamp:     Timestamp(randomInt64(t)),
 		Nonce:         randomUint64(t),
 		MinerAddress:  CoinAddress(randomHash(t)),
-		MerkleRoot:    randomHash(t),
-		// Transactions to be added from... input?
 	}
 
 	marshalledBlock := encoding.Marshal(originalBlock)
@@ -71,8 +72,5 @@ func TestTypeMarshalling(t *testing.T) {
 	}
 	if a.MinerAddress != b.MinerAddress {
 		t.Error("MinerAddress marshalling problems.")
-	}
-	if a.MerkleRoot != b.MerkleRoot {
-		t.Error("MerkleRoot marshalling problems.")
 	}
 }

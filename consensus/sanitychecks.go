@@ -18,15 +18,15 @@ func (s *State) currentPathCheck() {
 		}
 
 		// Check that the CurrentPath entry contains the correct block id.
-		if currentNode.Block.ID() != id {
-			currentNodeID := currentNode.Block.ID()
+		if currentNode.block.ID() != id {
+			currentNodeID := currentNode.block.ID()
 			println(i)
 			fmt.Println(id[:])
 			fmt.Println(currentNodeID[:])
 			panic("current path does not have correct id!")
 		}
 
-		currentNode = s.blockMap[currentNode.Block.ParentBlockID]
+		currentNode = s.blockMap[currentNode.block.ParentBlockID]
 
 		// Have to do an awkward break beacuse i is unsigned.
 		if i == 0 {

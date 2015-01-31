@@ -7,42 +7,42 @@ import (
 // A BlockNode contains a block and the list of children to the block. Also
 // contains some consensus information like which contracts have terminated and
 // where there were missed storage proofs.
-type BlockNode struct {
-	Block    Block
-	Parent   *BlockNode
-	Children []*BlockNode
+type blockNode struct {
+	block    Block
+	parent   *blockNode
+	children []*blockNode
 
-	Height BlockHeight
-	Depth  Target // Cumulative weight of all parents.
-	Target Target // Target for next block.
+	height BlockHeight
+	depth  Target // Cumulative weight of all parents.
+	target Target // Target for next block.
 
-	DiffsGenerated bool
-	OutputDiffs    []OutputDiff
-	ContractDiffs  []ContractDiff
+	diffsGenerated bool
+	outputDiffs    []OutputDiff
+	contractDiffs  []ContractDiff
 }
 
 // childDepth returns the depth that any child node would have.
 // childDepth := (1/parentTarget + 1/parentDepth)^-1
-func (bn *BlockNode) childDepth() (depth Target) {
-	cumulativeDifficulty := new(big.Rat).Add(bn.Target.Inverse(), bn.Depth.Inverse())
+func (bn *blockNode) childDepth() (depth Target) {
+	cumulativeDifficulty := new(big.Rat).Add(bn.target.Inverse(), bn.depth.Inverse())
 	return RatToTarget(new(big.Rat).Inv(cumulativeDifficulty))
 }
 
 // setTarget calculates the target for a node and sets the node's target equal
 // to the calculated value.
-func (node *BlockNode) setTarget() {
+func (node *blockNode) setTarget() {
 	// To calculate the target, we need to compare our timestamp with the
 	// timestamp of the reference node, which is `TargetWindow` blocks earlier,
 	// or if the height is less than `TargetWindow`, it's the genesis block.
 	var i BlockHeight
 	referenceNode := node
-	for i = 0; i < TargetWindow && referenceNode.Parent != nil; i++ {
-		referenceNode = referenceNode.Parent
+	for i = 0; i < TargetWindow && referenceNode.parent != nil; i++ {
+		referenceNode = referenceNode.parent
 	}
 
 	// Calculate the amount to adjust the target by dividing the amount of time
 	// passed by the expected amount of time passed.
-	timePassed := node.Block.Timestamp - referenceNode.Block.Timestamp
+	timePassed := node.block.Timestamp - referenceNode.block.Timestamp
 	expectedTimePassed := BlockFrequency * Timestamp(i)
 	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
 
@@ -54,33 +54,28 @@ func (node *BlockNode) setTarget() {
 	}
 
 	// Multiply the previous target by the adjustment to get the new target.
-	parentTarget := node.Parent.Target
+	parentTarget := node.parent.target
 	newRatTarget := new(big.Rat).Mul(parentTarget.Rat(), targetAdjustment)
-	node.Target = RatToTarget(newRatTarget)
+	node.target = RatToTarget(newRatTarget)
 }
 
-// State.addBlockToTree() takes a block and a parent node, and adds a child
-// node to the parent containing the block. No validation is done.
+// addBlockToTree takes a block and a parent node, and adds a child node to the
+// parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (err error) {
-	err = s.validHeader(b)
-	if err != nil {
-		return
-	}
-
 	parentNode := s.blockMap[b.ParentBlockID]
-	newNode := &BlockNode{
-		Block:  b,
-		Parent: parentNode,
+	newNode := &blockNode{
+		block:  b,
+		parent: parentNode,
 
-		Height: parentNode.Height + 1,
-		Depth:  parentNode.childDepth(),
+		height: parentNode.height + 1,
+		depth:  parentNode.childDepth(),
 	}
 	newNode.setTarget()
 
 	// Add the node to the block map and update the list of its parents
 	// children.
 	s.blockMap[b.ID()] = newNode
-	parentNode.Children = append(parentNode.Children, newNode)
+	parentNode.children = append(parentNode.children, newNode)
 
 	if s.heavierFork(newNode) {
 		err = s.forkBlockchain(newNode)

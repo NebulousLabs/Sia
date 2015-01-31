@@ -97,10 +97,10 @@ func (s *State) BlockOutputDiffs(id BlockID) (diffs []OutputDiff, err error) {
 		err = errors.New("requested an unknown block")
 		return
 	}
-	if !node.DiffsGenerated {
+	if !node.diffsGenerated {
 		err = errors.New("diffs have not been generated for the requested block.")
 		return
 	}
-	diffs = node.OutputDiffs
+	diffs = node.outputDiffs
 	return
 }

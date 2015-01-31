@@ -9,12 +9,12 @@ import (
 // Though these are variables, they should never be changed during runtime.
 // They get altered during testing.
 const (
-	DEBUG = false
+	DEBUG = true // This is a temporary setting, will stay during beta.
 
-	BlockSizeLimit        = 1024 * 1024 * 1024     // Blocks cannot be more than 1MB.
+	BlockSizeLimit        = 1024 * 1024            // Blocks cannot be more than 1MB.
 	BlockFrequency        = Timestamp(600)         // In seconds.
 	TargetWindow          = BlockHeight(2000)      // Number of blocks to use when calculating the target.
-	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid.
+	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid - should be an odd number.
 	FutureThreshold       = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
 
 	InitialCoinbase = Currency(300000)
@@ -30,5 +30,5 @@ var (
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
 
-	GenesisAddress = CoinAddress{} // TODO: NEED TO CREATE A HARDCODED ADDRESS.
+	GenesisAddress = CoinAddress{} // TODO: get a hardcoded premine address
 )

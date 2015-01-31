@@ -26,10 +26,13 @@ var (
 
 // Exported Errors
 var (
-	BlockKnownErr    = errors.New("block exists in block map.")
-	FutureBlockErr   = errors.New("timestamp too far in future, will try again later.")
-	KnownOrphanErr   = errors.New("block is a known orphan")
-	UnknownOrphanErr = errors.New("block is an unknown orphan")
+	BlockKnownErr     = errors.New("block exists in block map.")
+	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
+	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
+	KnownOrphanErr    = errors.New("block is a known orphan")
+	LargeBlockErr     = errors.New("block is too large to be accepted")
+	MissedTargetErr   = errors.New("block does not meet target")
+	UnknownOrphanErr  = errors.New("block is an unknown orphan")
 )
 
 // handleOrphanBlock adds a block to the list of orphans, returning an error
@@ -65,14 +68,14 @@ func (s *State) handleOrphanBlock(b Block) error {
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-func (bn *BlockNode) earliestChildTimestamp() Timestamp {
+func (bn *blockNode) earliestChildTimestamp() Timestamp {
 	// Get the previous `MedianTimestampWindow` timestamps.
 	var intTimestamps []int
 	referenceNode := bn
 	for i := 0; i < MedianTimestampWindow; i++ {
-		intTimestamps = append(intTimestamps, int(referenceNode.Block.Timestamp))
-		if referenceNode.Parent != nil {
-			referenceNode = referenceNode.Parent
+		intTimestamps = append(intTimestamps, int(referenceNode.block.Timestamp))
+		if referenceNode.parent != nil {
+			referenceNode = referenceNode.parent
 		}
 	}
 	sort.Ints(intTimestamps)
@@ -86,14 +89,14 @@ func (bn *BlockNode) earliestChildTimestamp() Timestamp {
 func (s *State) validHeader(b Block) (err error) {
 	parent := s.blockMap[b.ParentBlockID]
 	// Check the id meets the target.
-	if !b.CheckTarget(parent.Target) {
-		err = errors.New("block does not meet target")
+	if !b.CheckTarget(parent.target) {
+		err = MissedTargetErr
 		return
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestChildTimestamp() > b.Timestamp {
-		err = errors.New("timestamp invalid for being in the past")
+		err = EarlyTimestampErr
 		return
 	}
 
@@ -107,14 +110,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is the correct size.
 	encodedBlock := encoding.Marshal(b)
 	if len(encodedBlock) > BlockSizeLimit {
-		err = errors.New("Block is too large, will not be accepted.")
-		return
-	}
-
-	// Check that the transaction merkle root matches the transactions
-	// included into the block.
-	if b.MerkleRoot != b.TransactionMerkleRoot() {
-		err = errors.New("merkle root does not match transactions sent.")
+		err = LargeBlockErr
 		return
 	}
 
@@ -145,6 +141,11 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	_, exists = s.blockMap[b.ParentBlockID]
 	if !exists {
 		err = s.handleOrphanBlock(b)
+		return
+	}
+
+	err = s.validHeader(b)
+	if err != nil {
 		return
 	}
 

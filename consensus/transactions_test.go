@@ -8,7 +8,7 @@ import (
 func TestApplyTransaction(t *testing.T) {
 	// Create a state to which transactions can be applied.
 	s := CreateGenesisState()
-	genesisSubsidyID := s.currentBlockNode().Block.SubsidyID()
+	genesisSubsidyID := s.currentBlockNode().block.SubsidyID()
 
 	// Check that the genesis subsidy exists.
 	_, exists := s.unspentOutputs[genesisSubsidyID]
