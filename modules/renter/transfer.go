@@ -28,27 +28,17 @@ func (r *Renter) uploadPiece(up modules.UploadParams) (piece FilePiece, err erro
 			return
 		}
 
-		// Create file contract using this host's parameters. An error here is
-		// unrecoverable.
-		t, fileContract, txnErr := r.createContractTransaction(host, up)
-		if txnErr != nil {
-			err = errors.New("unable to create contract transaction: " + txnErr.Error())
-			return
-		}
-
 		// Negotiate the contract with the host. If the negotiation is
-		// successful, the file will be uploaded.
-		err = negotiateContract(host, t, up)
-		if err != nil {
-			// If there was a problem, we need to try again with a new host.
-			r.hostDB.FlagHost(host.IPAddress)
+		// unsuccessful, we need to try again with a new host. Otherwise, the
+		// file will be uploaded and we'll be done.
+		contract, contractErr := r.negotiateContract(host, up)
+		if contractErr != nil {
 			continue
 		}
 
-		// Otherwise, we're done.
 		piece = FilePiece{
 			Host:     host,
-			Contract: fileContract,
+			Contract: contract,
 		}
 		return
 	}

@@ -11,6 +11,26 @@ const (
 	AcceptContractResponse = "accept"
 )
 
+// ContractTerms are the parameters agreed upon by a client and a host when
+// forming a FileContract.
+type ContractTerms struct {
+	FileSize           uint64
+	StartHeight        consensus.BlockHeight
+	WindowSize         consensus.BlockHeight // how many blocks a host has to submit each proof
+	NumWindows         uint64
+	ClientPayout       consensus.Currency // client contribution towards payout each window
+	HostPayout         consensus.Currency // host contribution towards payout each window
+	ValidProofAddress  consensus.CoinAddress
+	MissedProofAddress consensus.CoinAddress
+}
+
+type HostInfo struct {
+	HostSettings
+
+	StorageRemaining int64
+	NumContracts     int
+}
+
 type Host interface {
 	// Announce announces the host on the blockchain. A host announcement
 	// requires two things: the host's address, and a volume of "frozen"

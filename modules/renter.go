@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
+// TODO: embed ContractTerms?
 type UploadParams struct {
 	Data       io.ReadSeeker
 	Duration   consensus.BlockHeight

@@ -2,7 +2,6 @@ package host
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -19,174 +18,157 @@ var (
 	HostCapacityErr = errors.New("host is at capacity and can not take more files")
 )
 
-// ContractEntry houses a single contract with its id - you cannot derive the
-// id of a contract without having the transaction. Rather than keep the whole
-// transaction, we store only the id.
-type ContractEntry struct {
-	ID       consensus.ContractID
-	Contract consensus.FileContract
-}
-
-func (h *Host) nextFilename() string {
+// allocate allocates space for a file and creates it on disk.
+func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error) {
+	h.spaceRemaining -= int64(filesize)
 	h.fileCounter++
-	return strconv.Itoa(h.fileCounter)
+	path = filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
+	file, err = os.Create(path)
+	return
 }
 
-// considerContract takes a contract and verifies that the terms such as price
-// are all valid within the host settings. If so, inputs are added to fund the
-// burn part of the contract fund, then the updated contract is signed and
-// returned.
-//
-// TODO: Make the host able to parse multiple contracts at once.
-func (h *Host) considerContract(t consensus.Transaction, startBlock consensus.BlockHeight) (updatedTransaction consensus.Transaction, err error) {
-	// Check that there is exactly one file contract.
-	if len(t.FileContracts) != 1 {
-		err = errors.New("transaction must have exactly one contract")
-		return
-	}
-	if startBlock > h.state.Height()+20 {
-		err = errors.New("startBlock is too far in the future")
-		return
+// deallocate deletes a file and restores its allocated space.
+func (h *Host) deallocate(filesize uint64, path string) {
+	os.Remove(path)
+	h.spaceRemaining += int64(filesize)
+	h.fileCounter--
+}
+
+// considerTerms checks that the terms of a potential file contract fall
+// within acceptable bounds, as defined by the host.
+func (h *Host) considerTerms(terms modules.ContractTerms) error {
+	h.state.RLock()
+	maxheight := h.state.Height() + 20
+	h.state.RUnlock()
+
+	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
+	requiredFund := (h.Price + h.Burn) * consensus.Currency(duration) * consensus.Currency(terms.FileSize)
+
+	switch {
+	case terms.StartHeight > maxheight:
+		return errors.New("startBlock is too far in the future")
+
+	case terms.FileSize < h.MinFilesize || terms.FileSize > h.MaxFilesize:
+		return errors.New("file is of incorrect size")
+
+	case terms.FileSize > uint64(h.spaceRemaining):
+		return HostCapacityErr
+
+	case duration < h.MinDuration || duration > h.MaxDuration:
+		return errors.New("duration is out of bounds")
+
+	case terms.WindowSize < h.MinWindow:
+		return errors.New("challenge window is not large enough")
+
+	case terms.ValidProofAddress != h.CoinAddress:
+		return errors.New("coins are not paying out to correct address")
+
+	case terms.MissedProofAddress != consensus.ZeroAddress:
+		return errors.New("burn payout needs to go to the zero address")
+
+	case terms.HostPayout+terms.ClientPayout != requiredFund:
+		return errors.New("ContractFund does not match the terms of service.")
 	}
 
-	// These variables are here for convenience.
-	contract := t.FileContracts[0]
-	window := contract.End - contract.Start
-	duration := contract.End - startBlock
-	fileSize := contract.FileSize
+	return nil
+}
 
-	// Check that the file size listed in the contract is in bounds.
-	if fileSize < h.MinFilesize || fileSize > h.MaxFilesize {
-		err = fmt.Errorf("file is of incorrect size - filesize %v, min %v, max %v", fileSize, h.MinFilesize, h.MaxFilesize)
-		return
-	}
-	// Check that there is space for the file.
-	if fileSize > uint64(h.spaceRemaining) {
-		err = HostCapacityErr
-		return
-	}
-	// Check that the duration of the contract is in bounds.
-	if duration < h.MinDuration || duration > h.MaxDuration {
-		err = errors.New("contract duration is out of bounds")
-		return
-	}
-	// Check that the window is large enough.
-	if window < h.MinWindow {
-		err = errors.New("challenge window is not large enough")
-		return
-	}
-	// Outputs for successful proofs need to go to the correct address.
-	if contract.ValidProofAddress != h.CoinAddress {
-		err = errors.New("coins are not paying out to correct address")
-		return
-	}
-	// Output for failed proofs needs to be the 0 address.
-	emptyAddress := consensus.CoinAddress{}
-	if contract.MissedProofAddress != emptyAddress {
-		err = errors.New("burn payout needs to go to the empty address")
-		return
-	}
+// verifyContract verifies that the values in the FileContract match the
+// ContractTerms agreed upon.
+// TODO: could this just return a bool (i.e. "contract does not match terms"?)
+func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot hash.Hash) error {
+	switch {
+	case contract.FileSize != terms.FileSize:
+		return errors.New("bad FileSize")
 
-	// Verify that the contract fund covers the payout and burn for the whole
-	// duration.
-	requiredFund := (h.Price + h.Burn) * consensus.Currency(duration) * consensus.Currency(fileSize)
-	if contract.Payout != requiredFund {
-		err = errors.New("ContractFund does not match the terms of service.")
-		return
-	}
+	case contract.Start != terms.StartHeight:
+		return errors.New("bad Start")
 
-	// Add enough funds to the transaction to cover the penalty half of the
-	// agreement. If we encounter an error here, we return a HostCapacityError to hide the fact that we're experience internal problems.
-	penalty := h.Burn * consensus.Currency(fileSize) * consensus.Currency(duration)
-	id, err := h.wallet.RegisterTransaction(t)
+	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
+		return errors.New("bad End")
+
+	case contract.Payout != terms.HostPayout+terms.ClientPayout:
+		return errors.New("bad Payout")
+
+	case contract.ValidProofAddress != terms.ValidProofAddress:
+		return errors.New("bad ValidProofAddress")
+
+	case contract.MissedProofAddress != terms.MissedProofAddress:
+		return errors.New("bad MissedProofAddress")
+
+	case contract.FileMerkleRoot != merkleRoot:
+		return errors.New("bad FileMerkleRoot")
+	}
+	return nil
+}
+
+// acceptContract adds the host's funds to the contract transaction and
+// submits it to the transaction pool. If we encounter an error here, we
+// return a HostCapacityError to hide the fact that we're experiencing
+// internal problems.
+func (h *Host) acceptContract(txn consensus.Transaction) error {
+	contract := txn.FileContracts[0]
+	duration := contract.End - contract.Start
+	penalty := h.Burn * consensus.Currency(contract.FileSize) * consensus.Currency(duration)
+
+	id, err := h.wallet.RegisterTransaction(txn)
 	if err != nil {
-		err = HostCapacityErr
-		return
+		return HostCapacityErr
 	}
+
 	err = h.wallet.FundTransaction(id, penalty)
 	if err != nil {
-		err = HostCapacityErr
-		return
-	}
-	updatedTransaction, err = h.wallet.SignTransaction(id, true)
-	if err != nil {
-		err = HostCapacityErr
-		return
+		return HostCapacityErr
 	}
 
-	return
+	signedTxn, err := h.wallet.SignTransaction(id, true)
+	if err != nil {
+		return HostCapacityErr
+	}
+
+	err = h.tpool.AcceptTransaction(signedTxn)
+	if err != nil {
+		return HostCapacityErr
+	}
+	return nil
 }
 
 // NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
 //
-// Care is taken not to have any locks in place when network communication is
-// happening, nor while any intensive file operations are happening. For this
-// reason, all of the locking in this function is done manually. Edit with
-// caution, review with caution.
-//
 // Order of events:
-//		1. Contract is sent over without signatures, and doesn't need an
-//		acurate Merkle hash of the file. It's just for the host and client
-//		to confirm that the terms of the contract are correct and make
-//		sense.
+//      1. Renter proposes contract terms
+//      2. Host accepts or rejects terms
+//      3. If host accepts, renter sends file contents
+//      4. Renter funds, signs, and sends transaction containing file contract
+//      5. Host verifies transaction matches terms
+//      6. Host funds, signs, and submits transaction
 //
-//		2. Host sends a confirmation, along with an indication of how much
-//		the client should contribute for payment, and how much is available
-//		for burn.
-//
-//		3. File is sent over and loaded onto the host's disk. Eventually,
-//		micropayments will be worked into this situation to pay the host
-//		for bandwidth and whatever storage time.
-//
-//		4. Client sends over the final client version of the contract
-//		containing the appropriate price and burn, with signatures and the
-//		correct Merkle root hash.
-//
-//		5. Host compares the contract with the earlier negotiations and
-//		confirms that everything is still the same. Host then verifies that
-//		the file which was uploaded has a matching hash to the file in the
-//		contract. Host will add burn coins and submit the contract to the
-//		blockchain.
-//
-//		6. If the client double-spends, the host will remove the file. If
-//		the host holds the transaction hostage and does not submit it to
-//		the blockchain, it will become void.
-//
-// TODO: This function's error handling isn't safe; reveals too much info to the
-// other party.
+// TODO: This function's error handling isn't safe; reveals too much info to
+// the other party.
 func (h *Host) NegotiateContract(conn net.Conn) (err error) {
-	// Read the transaction from the connection.
-	var txn consensus.Transaction
-	err = encoding.ReadObject(conn, &txn, maxContractLen)
+	// Read the contract terms.
+	var terms modules.ContractTerms
+	err = encoding.ReadObject(conn, &terms, maxContractLen)
 	if err != nil {
 		return
 	}
-	var startBlock consensus.BlockHeight
-	err = encoding.ReadObject(conn, &startBlock, 8) // consensus.BlockHeight is a uint64
-	if err != nil {
-		return
-	}
-	contract := txn.FileContracts[0]
 
-	// Check that the contained FileContract fits host criteria for taking
-	// files, replying with the error if there's a problem.
-	h.mu.Lock()
-	txn, err = h.considerContract(txn, startBlock)
-	h.mu.Unlock()
+	// Consider the contract terms. If they are unnacceptable, return an error
+	// describing why.
+	h.mu.RLock()
+	err = h.considerTerms(terms)
+	h.mu.RUnlock()
 	if err != nil {
 		_, err = encoding.WriteObject(conn, err.Error())
 		return
 	}
 
-	// Create file.
+	// terms are acceptable; allocate space for file
 	h.mu.Lock()
-	h.spaceRemaining -= int64(contract.FileSize)
-	filename := h.nextFilename()
-	path := filepath.Join(h.hostDir, filename)
+	file, path, err := h.allocate(terms.FileSize)
 	h.mu.Unlock()
-	file, err := os.Create(path)
 	if err != nil {
 		return
 	}
@@ -195,12 +177,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// rollback everything if something goes wrong
 	defer func() {
 		if err != nil {
-			_, err = encoding.WriteObject(conn, err.Error())
-			os.Remove(path)
-			h.mu.Lock()
-			h.fileCounter--
-			h.spaceRemaining -= int64(contract.FileSize)
-			h.mu.Unlock()
+			h.deallocate(terms.FileSize, path)
 		}
 	}()
 
@@ -211,42 +188,61 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// Download file contents.
-	_, err = io.CopyN(file, conn, int64(contract.FileSize))
+	// TODO: calculate Merkle root simultaneously
+	_, err = io.CopyN(file, conn, int64(terms.FileSize))
 	if err != nil {
 		return
 	}
 
-	// Check that the file matches the Merkle root in the contract.
+	// Calculate Merkle root.
 	_, err = file.Seek(0, 0)
 	if err != nil {
 		return
 	}
-	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(contract.FileSize))
-	if err != nil {
-		return
-	}
-	if merkleRoot != contract.FileMerkleRoot {
-		err = errors.New("uploaded file has wrong Merkle root")
-		return
-	}
-
-	// Download file contents.
-	_, err = io.CopyN(file, conn, int64(contract.FileSize))
+	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(terms.FileSize))
 	if err != nil {
 		return
 	}
 
-	// Put the contract in a list where the host will be performing proofs of
-	// storage.
+	// Read contract transaction.
+	var txn consensus.Transaction
+	err = encoding.ReadObject(conn, &txn, maxContractLen)
+	if err != nil {
+		return
+	}
+
+	// Ensure transaction contains a file contract
+	if len(txn.FileContracts) != 1 {
+		err = errors.New("transaction must contain exactly one file contract")
+		encoding.WriteObject(conn, err.Error())
+		return
+	}
+	contract := txn.FileContracts[0]
+
+	// Verify that the contract in the transaction matches the agreed upon
+	// terms, and that the Merkle root in the contract matches our
+	// independently calculated Merkle root.
+	err = verifyContract(contract, terms, merkleRoot)
+	if err != nil {
+		err = errors.New("contract does not satisfy terms: " + err.Error())
+		encoding.WriteObject(conn, err.Error())
+		return
+	}
+
+	// Fund and submit the transaction.
+	err = h.acceptContract(txn)
+	if err != nil {
+		encoding.WriteObject(conn, err.Error())
+		return
+	}
+
+	// Add this contract to the host's list of obligations.
+	id := txn.FileContractID(0)
 	h.mu.Lock()
-	h.contracts[txn.FileContractID(0)] = contractObligation{
-		filename: filename,
+	h.contracts[id] = contractObligation{
+		path: path,
 	}
 	h.mu.Unlock()
-	//fmt.Println("Accepted contract")
-
-	// Submit the transaction.
-	h.tpool.AcceptTransaction(txn)
 
 	return
 }

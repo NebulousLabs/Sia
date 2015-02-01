@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -66,7 +66,7 @@ func hostannouncecmd(freezeVolume, freezeDuration string) {
 }
 
 func hoststatuscmd() {
-	config := new(host.HostInfo)
+	config := new(modules.HostInfo)
 	err := getAPI("/host/config", config)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)

@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -23,7 +22,7 @@ const (
 )
 
 type contractObligation struct {
-	filename string // Where on disk the file is stored.
+	path string // Where on disk the file is stored.
 }
 
 type Host struct {
@@ -104,8 +103,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	}
 
 	// Open the file.
-	fullname := filepath.Join(h.hostDir, contractObligation.filename)
-	file, err := os.Open(fullname)
+	file, err := os.Open(contractObligation.path)
 	if err != nil {
 		return
 	}
@@ -134,22 +132,15 @@ func (h *Host) Settings() (modules.HostSettings, error) {
 	return h.HostSettings, nil
 }
 
-type HostInfo struct {
-	modules.HostSettings
-
-	StorageRemaining int64
-	ContractCount    int
-}
-
-func (h *Host) Info() HostInfo {
+func (h *Host) Info() modules.HostInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	info := HostInfo{
+	info := modules.HostInfo{
 		HostSettings: h.HostSettings,
 
 		StorageRemaining: h.spaceRemaining,
-		ContractCount:    len(h.contracts),
+		NumContracts:     len(h.contracts),
 	}
 	return info
 }
