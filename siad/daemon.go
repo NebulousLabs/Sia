@@ -106,6 +106,10 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
+	err = d.network.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
+	if err != nil {
+		return
+	}
 
 	return
 }
