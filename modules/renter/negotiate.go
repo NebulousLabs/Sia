@@ -15,6 +15,8 @@ import (
 const (
 	// TODO: ask wallet
 	minerFee = 10
+
+	defaultWindowSize = 100
 )
 
 func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot hash.Hash) (txn consensus.Transaction, err error) {
@@ -71,10 +73,10 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	terms := modules.ContractTerms{
 		FileSize:           filesize,
 		StartHeight:        height + up.Delay,
-		WindowSize:         0,          // ??
-		NumWindows:         0,          // ?? duration/windowsize + 1?
-		ClientPayout:       0,          // ??
-		HostPayout:         host.Price, // ??
+		WindowSize:         defaultWindowSize,
+		NumWindows:         (uint64(up.Duration) / defaultWindowSize) + 1,
+		Price:              host.Price,      // ??
+		Collateral:         host.Collateral, // ??
 		ValidProofAddress:  host.CoinAddress,
 		MissedProofAddress: consensus.ZeroAddress,
 	}

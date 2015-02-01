@@ -1,12 +1,11 @@
 package host
 
 import (
-	//"errors"
-	//"os"
-	//"path/filepath"
+	"errors"
+	"os"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	//"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 // ContractEntry houses a single contract with its id - you cannot derive the
@@ -132,33 +131,27 @@ func (h *Host) threadedConsensusListen(updateChan chan struct{}) {
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
 func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.BlockHeight) (sp consensus.StorageProof, err error) {
-	/*
-		// Get the file associated with the contract.
-		contractObligation, exists := h.contracts[entry.ID]
-		if !exists {
-			err = errors.New("no record of that file")
-			return
-		}
-		fullname := filepath.Join(h.hostDir, contractObligation.filename)
+	contractObligation, exists := h.contracts[entry.ID]
+	if !exists {
+		err = errors.New("no record of that file")
+		return
+	}
 
-		// Open the file.
-		file, err := os.Open(fullname)
-		if err != nil {
-			return
-		}
-		defer file.Close()
+	file, err := os.Open(contractObligation.path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
 
-		// Build the proof using the hash library.
-		numSegments := hash.CalculateSegments(entry.Contract.FileSize)
-		segmentIndex, err := h.state.StorageProofSegment(entry.ID)
-		if err != nil {
-			return
-		}
-		base, hashSet, err := hash.BuildReaderProof(file, numSegments, segmentIndex)
-		if err != nil {
-			return
-		}
-		sp = consensus.StorageProof{entry.ID, base, hashSet}
-	*/
+	segmentIndex, err := h.state.StorageProofSegment(entry.ID)
+	if err != nil {
+		return
+	}
+	numSegments := hash.CalculateSegments(entry.Contract.FileSize)
+	base, hashSet, err := hash.BuildReaderProof(file, numSegments, segmentIndex)
+	if err != nil {
+		return
+	}
+	sp = consensus.StorageProof{entry.ID, base, hashSet}
 	return
 }

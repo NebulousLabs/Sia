@@ -80,7 +80,6 @@ func (r *Renter) downloadPiece(piece FilePiece, path string) error {
 		if _, err = encoding.WriteObject(conn, piece.ContractID); err != nil {
 			return
 		}
-		// TODO: read error
 
 		// create file
 		file, err := os.Create(path)
@@ -93,6 +92,7 @@ func (r *Renter) downloadPiece(piece FilePiece, path string) error {
 		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
 		if err != nil {
 			os.Remove(path)
+			r.hostDB.FlagHost(piece.Host.IPAddress)
 			return
 		}
 		return

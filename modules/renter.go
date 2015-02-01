@@ -4,16 +4,14 @@ import (
 	"io"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 // TODO: embed ContractTerms?
 type UploadParams struct {
-	Data       io.ReadSeeker
-	Duration   consensus.BlockHeight
-	Delay      consensus.BlockHeight
-	FileSize   uint64
-	MerkleRoot hash.Hash
+	Data     io.ReadSeeker
+	Duration consensus.BlockHeight
+	Delay    consensus.BlockHeight
+	FileSize uint64
 
 	// these fields are not seen by the host
 	Nickname string
