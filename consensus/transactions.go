@@ -1,5 +1,9 @@
 package consensus
 
+// TODO: when testing the covered fields stuff, antagonistically try to cause
+// seg faults by throwing covered fields objects at the state which point to
+// nonexistent objects in the transaction.
+
 import (
 	"errors"
 
@@ -16,35 +20,119 @@ type InputSignatures struct {
 	Index               int
 }
 
-// OutputSum returns the sum of all the outputs in the transaction, which must
-// match the sum of all the inputs. Outputs created by storage proofs are not
-// considered, as they were already considered when the contract was created.
-func (t Transaction) OutputSum() (sum Currency) {
-	// Add the miner fees.
-	for _, fee := range t.MinerFees {
-		sum += fee
-	}
+// validCoveredFields makes sure that all covered fields objects in the
+// signatures follow the rules. This means that if `WholeTransaction` is set to
+// true, all fields except for `Signatures` must be empty. All fields must be
+// sorted numerically, and there can be no repeats.
+//
+// TODO: Enable the siafund stuff.
+func (t Transaction) validCoveredFields() (err error) {
+	for _, sig := range t.Signatures {
+		// Check that all fields are empty if `WholeTransaction` is set.
+		cf := sig.CoveredFields
+		if cf.WholeTransaction {
+			if len(cf.Inputs) != 0 ||
+				len(cf.MinerFees) != 0 ||
+				len(cf.Outputs) != 0 ||
+				len(cf.FileContracts) != 0 ||
+				len(cf.StorageProofs) != 0 ||
+				// len(cf.SiafundInputs) != 0 ||
+				// len(cf.SiafundOutputs) != 0 ||
+				len(cf.ArbitraryData) != 0 {
+				err = errors.New("whole transaction is set but not all fields besides signatures are empty")
+				return
+			}
+		}
 
-	// Add the contract payouts
-	for _, contract := range t.FileContracts {
-		sum += contract.Payout
-	}
-
-	// Add the outputs
-	for _, output := range t.Outputs {
-		sum += output.Value
+		// Check that all fields are sorted, and without repeat values, and
+		// that all elements point to objects that exists within the
+		// transaction.
+		biggest := -1
+		for _, elem := range cf.Inputs {
+			if int(elem) <= biggest || int(elem) >= len(cf.Inputs) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.MinerFees {
+			if int(elem) <= biggest || int(elem) >= len(cf.MinerFees) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.Outputs {
+			if int(elem) <= biggest || int(elem) >= len(cf.Outputs) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.FileContracts {
+			if int(elem) <= biggest || int(elem) >= len(cf.FileContracts) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.StorageProofs {
+			if int(elem) <= biggest || int(elem) >= len(cf.StorageProofs) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		/*
+			biggest = -1
+			for _, elem := range cf.SiafundInputs {
+				if int(elem) <= biggest || int(elem) >= len(cf.SiafundInputs) {
+					err = errors.New("covered fields violation")
+					return
+				}
+				biggest = int(elem)
+			}
+			biggest = -1
+			for _, elem := range cf.SiafundOutputs {
+				if int(elem) <= biggest || int(elem) >= len(cf.SiafundOutputs) {
+					err = errors.New("covered fields violation")
+					return
+				}
+				biggest = int(elem)
+			}
+		*/
+		biggest = -1
+		for _, elem := range cf.ArbitraryData {
+			if int(elem) <= biggest || int(elem) >= len(cf.ArbitraryData) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.Signatures {
+			if int(elem) <= biggest || int(elem) >= len(cf.Signatures) {
+				err = errors.New("covered fields violation")
+				return
+			}
+			biggest = int(elem)
+		}
 	}
 
 	return
 }
 
-func (s *State) ValidSignatures(t Transaction) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.validSignatures(t)
-}
+func (s *State) validSignatures(t Transaction) (err error) {
+	// Check that all covered fields objects follow the rules.
+	err = t.validCoveredFields()
+	if err != nil {
+		return
+	}
 
-func (s *State) validSignatures(t Transaction) error {
 	// Create the InputSignatures object for each input.
 	sigMap := make(map[OutputID]*InputSignatures)
 	for i, input := range t.Inputs {
@@ -223,6 +311,34 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 		contractDiffs = append(contractDiffs, contractDiff)
 	}
 	return
+}
+
+// OutputSum returns the sum of all the outputs in the transaction, which must
+// match the sum of all the inputs. Outputs created by storage proofs are not
+// considered, as they were already considered when the contract was created.
+func (t Transaction) OutputSum() (sum Currency) {
+	// Add the miner fees.
+	for _, fee := range t.MinerFees {
+		sum += fee
+	}
+
+	// Add the contract payouts
+	for _, contract := range t.FileContracts {
+		sum += contract.Payout
+	}
+
+	// Add the outputs
+	for _, output := range t.Outputs {
+		sum += output.Value
+	}
+
+	return
+}
+
+func (s *State) ValidSignatures(t Transaction) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validSignatures(t)
 }
 
 func (s *State) ValidTransaction(t Transaction) (err error) {

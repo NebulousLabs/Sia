@@ -14,8 +14,7 @@ principles.
 
 TODO: Write the formal specification for encoding things.
 
-TODO: contract ids, storage proof ids, siafund output ids, siafund claim output
-ids.
+TODO: siafund output ids, siafund claim output ids.
 
 TODO: Document which crypto is used in consensus. (Hash algorithm, signature
 algorithm)
@@ -178,8 +177,9 @@ Outputs contain a value and a spend hash (also called a coin address). The
 spend hash is a hash of the spend conditions that must be met to spend the
 output.
 
-The id of an output is obtained by marshalling and hashing all of the fields in
-the transaction that contained the output, except for the signatures.
+The id of a contract is determined by marshalling all of the transaction fields
+except for the signatures and then appending the string "siacoin output" and
+the index of the output within the transaction, and then taking the hash.
 
 File Contracts
 --------------
@@ -201,6 +201,10 @@ payout goes to 'ValidProofAddress'. If no proof is submitted by block height
 All contracts must have a non-zero payout, 'Start' must be before 'End', and
 'Start' must be greater than the current height of the state. A storage proof
 is acceptible if it is submitted in the block of height 'End'.
+
+The id of a contract is determined by marshalling all of the transaction fields
+except for the signatures and then appending the string "file contract" and the
+index of the contract within the transaction, and then taking the hash.
 
 Storage Proofs
 --------------
@@ -228,6 +232,10 @@ The proof is formed by providing the 64 byte segment, and then the missing
 hashes required to fill out the remaining tree. The total size of the proof
 will be 64 bytes + 32 bytes * log(num segments), and can be verified by anybody
 who knows the root hash and the file size.
+
+The id for a storage proof output is found by taking the id of the contract and
+concatenating a bool set to 'true' if the proof was submitted and valid, and
+set to 'false' if a valid proof was not submitted by the end of the contract.
 
 Storage proof transactions are not allowed to have siacoin outputs, siafund
 outputs, or contracts. All outputs created by the storage proofs cannot be

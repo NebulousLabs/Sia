@@ -1,7 +1,5 @@
 package consensus
 
-// TODO: Convert all string literals to byte arrays, or get rid of them entirely.
-
 // TODO: Swtich to 128 bit Currency, which is overflow-safe. Then update
 // CalculateCoinbase.
 
@@ -142,20 +140,18 @@ type TransactionSignature struct {
 	Signature      crypto.Signature
 }
 
-// TODO: If `WholeTransaction` is set to true, then all other fields except for
-// Signatures should be empty, this should be a consensus rule.
-//
-// TODO: Signature can include each element at most once. If there are repeat
-// elements, everything is invalid.
-//
-// TODO: We might, for speed reasons, want to also force the fields to be
-// sorted already.
+// The CoveredFields portion of a signature indicates which fields in the
+// transaction have been covered by the signature. Each slice of elements in a
+// transaction is represented by a slice of indices. The indicies must be
+// sorted, must not repeat, and must point to elements that exist within the
+// transaction. If 'WholeTransaction' is set to true, all other fields must be
+// empty except for the Signatures field.
 type CoveredFields struct {
 	WholeTransaction bool
-	Inputs           []uint64 // each element indicates an index which is signed.
+	Inputs           []uint64
 	MinerFees        []uint64
 	Outputs          []uint64
-	Contracts        []uint64
+	FileContracts    []uint64
 	StorageProofs    []uint64
 	// SiafundInputs []uint64
 	// SiafundOutputs  []unit64
@@ -207,21 +203,28 @@ func (b Block) MinerPayoutID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(b.ID(), i)))
 }
 
-// FileContractID returns the id of a file contract given the index of the contract.
-//
-// TODO: Reconsider how file contract ids are derived
+// FileContractID returns the id of a file contract given the index of the
+// contract. The id is derived by marshalling all of the fields in the
+// transaction except for the signatures and then appending the string "file
+// contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) ContractID {
 	return ContractID(hash.HashBytes(encoding.MarshalAll(
-		t.Outputs[0],
-		t.FileContracts[i],
-		"contract",
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		// t.SiafundInputs,
+		// t.SiafundOutputs,
+		t.ArbitraryData,
+		"file contract",
 		i,
 	)))
 }
 
 // OutputID gets the id of an output in the transaction, which is derived from
 // marshalling all of the fields in the transaction except for the signatures
-// and then appending the index of the output.
+// and then appending the string "siacoin output" and the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
 		t.Inputs,
@@ -232,6 +235,7 @@ func (t Transaction) OutputID(i int) OutputID {
 		// t.SiafundInputs,
 		// t.SiafundOutputs,
 		t.ArbitraryData,
+		"siacoin output",
 		i,
 	)))
 }
@@ -272,7 +276,7 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		for _, output := range t.Signatures[i].CoveredFields.Outputs {
 			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
 		}
-		for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+		for _, contract := range t.Signatures[i].CoveredFields.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
 		}
 		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
@@ -295,13 +299,10 @@ func (t Transaction) SigHash(i int) hash.Hash {
 
 // StorageProofOutputID returns the OutputID of the output created during the
 // window index that was active at height 'height'.
-//
-// TODO: Reconsider how the StorageProofOutputID is determined.
 func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	proofString := proofString(proofValid)
 	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
 		fcID,
-		proofString,
+		proofValid,
 	)))
 	return
 }
@@ -318,15 +319,4 @@ func (sc SpendConditions) CoinAddress() CoinAddress {
 	}
 	leaves = append(leaves, hash.HashObject(sc.NumSignatures))
 	return CoinAddress(hash.MerkleRoot(leaves))
-}
-
-// proofString returns the string to be used when generating the output id of a
-// valid proof if bool is set to true, and it returns the string to be used in
-// a missed proof if the bool is set to false.
-func proofString(proofValid bool) string {
-	if proofValid {
-		return "validproof"
-	} else {
-		return "missedproof"
-	}
 }

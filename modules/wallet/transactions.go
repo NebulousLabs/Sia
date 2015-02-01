@@ -182,7 +182,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 			coveredFields.Outputs = append(coveredFields.Outputs, uint64(i))
 		}
 		for i := range txn.FileContracts {
-			coveredFields.Contracts = append(coveredFields.Contracts, uint64(i))
+			coveredFields.FileContracts = append(coveredFields.FileContracts, uint64(i))
 		}
 		for i := range txn.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
