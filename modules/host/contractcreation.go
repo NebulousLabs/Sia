@@ -32,7 +32,6 @@ func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error)
 func (h *Host) deallocate(filesize uint64, path string) {
 	os.Remove(path)
 	h.spaceRemaining += int64(filesize)
-	h.fileCounter--
 }
 
 // considerTerms checks that the terms of a potential file contract fall
