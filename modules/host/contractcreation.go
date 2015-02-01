@@ -43,11 +43,11 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	h.state.RUnlock()
 
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
-	requiredFund := (h.Price + h.Burn) * consensus.Currency(duration) * consensus.Currency(terms.FileSize)
 
 	switch {
+	// TODO: check for minheight too?
 	case terms.StartHeight > maxheight:
-		return errors.New("startBlock is too far in the future")
+		return errors.New("first window is too far in the future")
 
 	case terms.FileSize < h.MinFilesize || terms.FileSize > h.MaxFilesize:
 		return errors.New("file is of incorrect size")
@@ -66,9 +66,12 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 	case terms.MissedProofAddress != consensus.ZeroAddress:
 		return errors.New("burn payout needs to go to the zero address")
-
-	case terms.HostPayout+terms.ClientPayout != requiredFund:
-		return errors.New("ContractFund does not match the terms of service.")
+	// TODO: should this be <= ?
+	case terms.Price != h.Price:
+		return errors.New("price does not match host settings")
+	// TODO: should this be >= ?
+	case terms.Collateral != h.Collateral:
+		return errors.New("collateral does not match host settings")
 	}
 
 	return nil
@@ -88,7 +91,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
-	case contract.Payout != terms.HostPayout+terms.ClientPayout:
+	case contract.Payout != terms.Price+terms.Collateral:
 		return errors.New("bad Payout")
 
 	case contract.ValidProofAddress != terms.ValidProofAddress:
@@ -110,7 +113,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
 	duration := contract.End - contract.Start
-	penalty := h.Burn * consensus.Currency(contract.FileSize) * consensus.Currency(duration)
+	penalty := h.Collateral * consensus.Currency(contract.FileSize) * consensus.Currency(duration)
 
 	id, err := h.wallet.RegisterTransaction(txn)
 	if err != nil {

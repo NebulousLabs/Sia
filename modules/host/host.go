@@ -69,7 +69,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 			MaxDuration: 1008, // One week.
 			MinWindow:   20,
 			Price:       1,
-			Burn:        1,
+			Collateral:  1,
 			CoinAddress: addr,
 		},
 

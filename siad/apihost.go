@@ -19,7 +19,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		"minduration":  &config.MinDuration,
 		"maxduration":  &config.MaxDuration,
 		"price":        &config.Price,
-		"burn":         &config.Burn,
+		"collateral":   &config.Collateral,
 	}
 
 	for qs := range qsVars {

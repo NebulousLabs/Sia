@@ -34,7 +34,7 @@ type HostSettings struct {
 	MaxDuration  consensus.BlockHeight
 	MinWindow    consensus.BlockHeight
 	Price        consensus.Currency
-	Burn         consensus.Currency
+	Collateral   consensus.Currency
 	CoinAddress  consensus.CoinAddress
 }
 

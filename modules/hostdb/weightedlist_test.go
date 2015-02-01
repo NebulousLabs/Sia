@@ -69,7 +69,7 @@ func TestWeightedList(t *testing.T) {
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		var entry modules.HostEntry
-		entry.Burn = 10
+		entry.Collateral = 10
 		entry.Price = 10
 		entry.Freeze = 10
 		entry.IPAddress = network.Address(strconv.Itoa(i))
@@ -109,7 +109,7 @@ func TestWeightedList(t *testing.T) {
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
 		var entry modules.HostEntry
-		entry.Burn = 10
+		entry.Collateral = 10
 		entry.Price = 10
 		entry.Freeze = 10
 		entry.IPAddress = network.Address(strconv.Itoa(i))

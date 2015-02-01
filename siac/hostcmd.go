@@ -26,7 +26,7 @@ Available settings:
 	mintolerance
 	maxduration
 	price
-	burn`,
+	collateral`,
 		Run: wrap(hostsetcmd),
 	}
 
@@ -75,8 +75,8 @@ func hoststatuscmd() {
 	fmt.Printf(`Host settings:
 Storage:      %v bytes (%v remaining)
 Price:        %v coins
+Collateral:   %v
 Max Filesize: %v
 Max Duration: %v
-Burn:         %v
-`, config.TotalStorage, config.StorageRemaining, config.Price, config.MaxFilesize, config.MaxDuration, config.Burn)
+`, config.TotalStorage, config.StorageRemaining, config.Price, config.Collateral, config.MaxFilesize, config.MaxDuration)
 }

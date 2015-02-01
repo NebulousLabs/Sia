@@ -18,8 +18,8 @@ type ContractTerms struct {
 	StartHeight        consensus.BlockHeight
 	WindowSize         consensus.BlockHeight // how many blocks a host has to submit each proof
 	NumWindows         uint64
-	ClientPayout       consensus.Currency // client contribution towards payout each window
-	HostPayout         consensus.Currency // host contribution towards payout each window
+	Price              consensus.Currency // client contribution towards payout each window
+	Collateral         consensus.Currency // host contribution towards payout each window
 	ValidProofAddress  consensus.CoinAddress
 	MissedProofAddress consensus.CoinAddress
 }
