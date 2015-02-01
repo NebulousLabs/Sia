@@ -187,11 +187,13 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		for i := range txn.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
 		}
+		// TODO: Siafund stuff here.
 		for i := range txn.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
-
-		// TODO: Should we also sign all of the known signatures?
+		for i := range txn.Signatures {
+			coveredFields.Signatures = append(coveredFields.Signatures, uint64(i))
+		}
 	}
 
 	// For each input in the transaction that we added, provide a signature.

@@ -25,10 +25,13 @@ func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Output
 	return
 }
 
-func nullMinerPayouts(s *State) []Output {
+// nullMinerPayouts returns an []Output for the miner payouts field of a block
+// so that the block can be valid. It assumes the block will be at whatever
+// height you use as input.
+func nullMinerPayouts(height BlockHeight) []Output {
 	return []Output{
 		Output{
-			Value: CalculateCoinbase(s.Height() + 1),
+			Value: CalculateCoinbase(height),
 		},
 	}
 }
@@ -36,7 +39,7 @@ func nullMinerPayouts(s *State) []Output {
 // mineValidBlock picks valid/legal parameters for a block and then uses them
 // to call mineTestingBlock.
 func mineValidBlock(s *State) (b Block, err error) {
-	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, s.CurrentTarget())
+	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
 }
 
 // testBlockTimestamps submits a block to the state with a timestamp that is
@@ -44,7 +47,7 @@ func mineValidBlock(s *State) (b Block, err error) {
 // rejected.
 func testBlockTimestamps(t *testing.T, s *State) {
 	// Create a block with a timestamp that is too early.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, nullMinerPayouts(s), nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +57,7 @@ func testBlockTimestamps(t *testing.T, s *State) {
 	}
 
 	// Create a block with a timestamp that is too late.
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix())+10+FutureThreshold, nullMinerPayouts(s), nil, s.CurrentTarget())
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix())+10+FutureThreshold, nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +145,7 @@ func testLargeBlock(t *testing.T, s *State) {
 	txns[0] = Transaction{
 		ArbitraryData: []string{bigData},
 	}
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), txns, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), txns, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,19 +364,19 @@ func testMultiOrphanBlock(t *testing.T, s *State) {
 	//
 	// The timestamp gets incremented each time so that we don't accidentally
 	// mine the same block twice or end up with a too early block.
-	orphanA, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, orphanTarget)
+	orphanA, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+2), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphanB, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+1), nullMinerPayouts(s), nil, orphanTarget)
+	orphanB, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+1), nullMinerPayouts(s.Height()+2), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphanC, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+2), nullMinerPayouts(s), nil, orphanTarget)
+	orphanC, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+2), nullMinerPayouts(s.Height()+2), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphan2, err := mineTestingBlock(orphanA.ID(), Timestamp(time.Now().Unix()+3), nullMinerPayouts(s), nil, orphan2Target)
+	orphan2, err := mineTestingBlock(orphanB.ID(), Timestamp(time.Now().Unix()+3), nullMinerPayouts(s.Height()+3), nil, orphan2Target)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +455,7 @@ func testOrphanBlock(t *testing.T, s *State) {
 	parentTarget := s.CurrentTarget()
 	orphanRat := new(big.Rat).Mul(parentTarget.Rat(), MaxAdjustmentDown)
 	orphanTarget := RatToTarget(orphanRat)
-	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, orphanTarget)
+	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+2), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,9 +569,6 @@ func TestEmptyBlock(t *testing.T) {
 
 // TestLargeBlock creates a new state and uses it to call testLargeBlock.
 func TestLargeBlock(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
 	s := CreateGenesisState()
 	testLargeBlock(t, s)
 }
@@ -588,14 +588,22 @@ func TestMissedTarget(t *testing.T) {
 // TestDoubleOrphanBlock creates a new state and used it to call
 // testDoubleOrphanBlock.
 func TestMultiOrphanBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	s := CreateGenesisState()
 	testMultiOrphanBlock(t, s)
+	consistencyChecks(t, s)
 }
 
 // TestOrphanBlock creates a new state and uses it to call testOrphanBlock.
 func TestOrphanBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	s := CreateGenesisState()
 	testOrphanBlock(t, s)
+	consistencyChecks(t, s)
 }
 
 // TestRepeatBlock creates a new state and uses it to call testRepeatBlock.
@@ -613,11 +621,7 @@ func TestRepeatBlock(t *testing.T) {
 // you want to be able to probe complex transactions that have lots of juicy
 // stuff.
 
-// TODO: Fork probing. Fork between complex sets of blocks and see that the
-// state hashes always end up at the same point, make sure long forking works
-// well and that reversing when a transaction fails also works well.
-
-// TODO: Test the actual method which is used to calculated the earliest legal
+// TODO: Test the actual method which is used to calculate the earliest legal
 // timestamp for the next block. Like have some examples that should work out
 // algebraically and make sure that earliest timestamp follows the rules layed
 // out by the protocol. This should be done after we decide that the algorithm
@@ -626,8 +630,3 @@ func TestRepeatBlock(t *testing.T) {
 // TODO: Probe the target adjustments, make sure that they are happening
 // according to specification, moving as much as they should and that the
 // clamps are being effective.
-
-// TODO: Write tests for CalculateCoinbase to make sure that it's behaving
-// correctly. I guess this doesn't help us if the state stops using
-// CalculateCoinbase, but I'm not sure what other good alternative ways there
-// are for testing this.

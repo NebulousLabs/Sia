@@ -3,14 +3,12 @@ package consensus
 // TODO: Swtich to 128 bit Currency, which is overflow-safe. Then update
 // CalculateCoinbase.
 
-// TODO: Enable siafund stuff
-
 // TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
 // payouts, storage proof outputs, siafund claims.
 
-// TODO: Enforce restrictions on CoveredFields
-
 // TODO: Enforce restrictions on which storage proof transactions are legal
+
+// TODO: Enforce siafund rules in consensus.
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
@@ -59,7 +57,7 @@ type Transaction struct {
 // An Input contains the ID of the output it's trying to spend, and the spend
 // conditions that unlock the output.
 type Input struct {
-	OutputID        OutputID // the source of coins for the input
+	OutputID        OutputID
 	SpendConditions SpendConditions
 }
 
