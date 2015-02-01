@@ -32,19 +32,20 @@ func ReaderMerkleRoot(r io.Reader, size uint64) (Hash, error) {
 	return readerMerkleRoot(r, CalculateSegments(size))
 }
 
-func readerMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err error) {
+func readerMerkleRoot(r io.Reader, numSegments uint64) (hash Hash, err error) {
 	if numSegments == 0 {
 		err = errors.New("no data")
 		return
 	}
 	if numSegments == 1 {
 		data := make([]byte, SegmentSize)
-		n, _ := reader.Read(data)
-		if n == 0 {
-			err = errors.New("no data")
-		} else {
-			hash = HashBytes(data)
+		_, err = io.ReadFull(r, data)
+		// early EOF is an acceptable error. Actually, it's guaranteed to
+		// occur unless the filesize is an exact multiple of SegmentSize.
+		if err == io.ErrUnexpectedEOF {
+			err = nil
 		}
+		hash = HashBytes(data)
 		return
 	}
 
@@ -55,8 +56,11 @@ func readerMerkleRoot(reader io.Reader, numSegments uint64) (hash Hash, err erro
 	}
 
 	// since we always read "left to right", no extra Seeking is necessary
-	left, err := readerMerkleRoot(reader, mid)
-	right, err := readerMerkleRoot(reader, numSegments-mid)
+	left, err := readerMerkleRoot(r, mid)
+	if err != nil {
+		return
+	}
+	right, err := readerMerkleRoot(r, numSegments-mid)
 	hash = JoinHash(left, right)
 	return
 }
@@ -75,7 +79,7 @@ func BuildReaderProof(rs io.ReadSeeker, numSegments, proofIndex uint64) (baseSeg
 	if _, err = rs.Seek(int64(proofIndex)*int64(SegmentSize), 0); err != nil {
 		return
 	}
-	if _, err = rs.Read(baseSegment[:]); err != nil {
+	if _, err = io.ReadFull(rs, baseSegment[:]); err != nil && err != io.ErrUnexpectedEOF {
 		return
 	}
 
