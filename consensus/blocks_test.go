@@ -8,12 +8,12 @@ import (
 
 // mineTestingBlock accepts a bunch of parameters for a block and then grinds
 // blocks until a block with the appropriate target is found.
-func mineTestingBlock(parent BlockID, timestamp Timestamp, minerAddress CoinAddress, txns []Transaction, target Target) (b Block, err error) {
+func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Output, txns []Transaction, target Target) (b Block, err error) {
 	b = Block{
-		ParentBlockID: parent,
-		Timestamp:     timestamp,
-		MinerAddress:  minerAddress,
-		Transactions:  txns,
+		ParentID:     parent,
+		Timestamp:    timestamp,
+		MinerPayouts: minerPayouts,
+		Transactions: txns,
 	}
 
 	for !b.CheckTarget(target) && b.Nonce < 1000*1000 {
@@ -25,10 +25,18 @@ func mineTestingBlock(parent BlockID, timestamp Timestamp, minerAddress CoinAddr
 	return
 }
 
+func nullMinerPayouts(s *State) []Output {
+	return []Output{
+		Output{
+			Value: CalculateCoinbase(s.Height() + 1),
+		},
+	}
+}
+
 // mineValidBlock picks valid/legal parameters for a block and then uses them
 // to call mineTestingBlock.
 func mineValidBlock(s *State) (b Block, err error) {
-	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, s.CurrentTarget())
+	return mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, s.CurrentTarget())
 }
 
 // testBlockTimestamps submits a block to the state with a timestamp that is
@@ -36,7 +44,7 @@ func mineValidBlock(s *State) (b Block, err error) {
 // rejected.
 func testBlockTimestamps(t *testing.T, s *State) {
 	// Create a block with a timestamp that is too early.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, CoinAddress{}, nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, nullMinerPayouts(s), nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +54,7 @@ func testBlockTimestamps(t *testing.T, s *State) {
 	}
 
 	// Create a block with a timestamp that is too late.
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix())+10+FutureThreshold, CoinAddress{}, nil, s.CurrentTarget())
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix())+10+FutureThreshold, nullMinerPayouts(s), nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +114,7 @@ func testEmptyBlock(t *testing.T, s *State) {
 	if !exists {
 		t.Error("the state's block map did not update correctly after getting an empty block")
 	}
-	_, exists = s.unspentOutputs[b.SubsidyID()]
+	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
 	if !exists {
 		t.Error("the blocks subsidy output did not get added to the set of unspent outputs")
 	}
@@ -134,7 +142,7 @@ func testLargeBlock(t *testing.T, s *State) {
 	txns[0] = Transaction{
 		ArbitraryData: []string{bigData},
 	}
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), CoinAddress{}, txns, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), txns, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,8 +157,8 @@ func testLargeBlock(t *testing.T, s *State) {
 func testMissedTarget(t *testing.T, s *State) {
 	// Mine a block that doesn't meet the target.
 	b := Block{
-		ParentBlockID: s.CurrentBlock().ID(),
-		Timestamp:     Timestamp(time.Now().Unix()),
+		ParentID:  s.CurrentBlock().ID(),
+		Timestamp: Timestamp(time.Now().Unix()),
 	}
 	for b.CheckTarget(s.CurrentTarget()) && b.Nonce < 1000*1000 {
 		b.Nonce++
@@ -187,19 +195,19 @@ func testMultiOrphanBlock(t *testing.T, s *State) {
 	//
 	// The timestamp gets incremented each time so that we don't accidentally
 	// mine the same block twice or end up with a too early block.
-	orphanA, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, orphanTarget)
+	orphanA, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphanB, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+1), CoinAddress{}, nil, orphanTarget)
+	orphanB, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+1), nullMinerPayouts(s), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphanC, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+2), CoinAddress{}, nil, orphanTarget)
+	orphanC, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()+2), nullMinerPayouts(s), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
-	orphan2, err := mineTestingBlock(orphanA.ID(), Timestamp(time.Now().Unix()+3), CoinAddress{}, nil, orphan2Target)
+	orphan2, err := mineTestingBlock(orphanA.ID(), Timestamp(time.Now().Unix()+3), nullMinerPayouts(s), nil, orphan2Target)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +286,7 @@ func testOrphanBlock(t *testing.T, s *State) {
 	parentTarget := s.CurrentTarget()
 	orphanRat := new(big.Rat).Mul(parentTarget.Rat(), MaxAdjustmentDown)
 	orphanTarget := RatToTarget(orphanRat)
-	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), CoinAddress{}, nil, orphanTarget)
+	orphan, err := mineTestingBlock(parent.ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s), nil, orphanTarget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,17 +392,6 @@ func TestBlockTimestamps(t *testing.T) {
 	testBlockTimestamps(t, s)
 }
 
-// TestConstants makes sure that the testing constants are being used instead
-// of the developer constants or the release constants.
-func TestConstants(t *testing.T) {
-	if RootTarget[0] != 64 {
-		panic("using wrong constant during testing!")
-	}
-	if !DEBUG {
-		panic("using wrong constant during testing, DEBUG flag needs to be set")
-	}
-}
-
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
 	s := CreateGenesisState()
@@ -410,7 +407,7 @@ func TestLargeBlock(t *testing.T) {
 	testLargeBlock(t, s)
 }
 
-// TestMissedTarge creates a new state and uses it to call testMissedTarget.
+// TestMissedTarget creates a new state and uses it to call testMissedTarget.
 func TestMissedTarget(t *testing.T) {
 	s := CreateGenesisState()
 	testMissedTarget(t, s)

@@ -45,13 +45,14 @@ func randomHash(t *testing.T) (h hash.Hash) {
 //
 // TODO: there are no transactions that we test the marshalling of, need to add
 // transactions.
+//
+// TODO: We don't test the marshalling of the MinerPayouts.
 func TestTypeMarshalling(t *testing.T) {
 	// Create a block full of random values.
 	originalBlock := Block{
-		ParentBlockID: BlockID(randomHash(t)),
-		Timestamp:     Timestamp(randomInt64(t)),
-		Nonce:         randomUint64(t),
-		MinerAddress:  CoinAddress(randomHash(t)),
+		ParentID:  BlockID(randomHash(t)),
+		Timestamp: Timestamp(randomInt64(t)),
+		Nonce:     randomUint64(t),
 	}
 
 	marshalledBlock := encoding.Marshal(originalBlock)
@@ -61,7 +62,7 @@ func TestTypeMarshalling(t *testing.T) {
 	// Check for equality across all fields.
 	a := originalBlock
 	b := unmarshalledBlock
-	if a.ParentBlockID != b.ParentBlockID {
+	if a.ParentID != b.ParentID {
 		t.Error("ParentBlockID marshalling problems.")
 	}
 	if a.Timestamp != b.Timestamp {
@@ -69,8 +70,5 @@ func TestTypeMarshalling(t *testing.T) {
 	}
 	if a.Nonce != b.Nonce {
 		t.Error("Nonce marshalling problems.")
-	}
-	if a.MinerAddress != b.MinerAddress {
-		t.Error("MinerAddress marshalling problems.")
 	}
 }
