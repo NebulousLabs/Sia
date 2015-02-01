@@ -24,8 +24,6 @@ type InputSignatures struct {
 // signatures follow the rules. This means that if `WholeTransaction` is set to
 // true, all fields except for `Signatures` must be empty. All fields must be
 // sorted numerically, and there can be no repeats.
-//
-// TODO: Enable the siafund stuff.
 func (t Transaction) validCoveredFields() (err error) {
 	for _, sig := range t.Signatures {
 		// Check that all fields are empty if `WholeTransaction` is set.
@@ -36,8 +34,8 @@ func (t Transaction) validCoveredFields() (err error) {
 				len(cf.Outputs) != 0 ||
 				len(cf.FileContracts) != 0 ||
 				len(cf.StorageProofs) != 0 ||
-				// len(cf.SiafundInputs) != 0 ||
-				// len(cf.SiafundOutputs) != 0 ||
+				len(cf.SiafundInputs) != 0 ||
+				len(cf.SiafundOutputs) != 0 ||
 				len(cf.ArbitraryData) != 0 {
 				err = errors.New("whole transaction is set but not all fields besides signatures are empty")
 				return
@@ -87,24 +85,22 @@ func (t Transaction) validCoveredFields() (err error) {
 			}
 			biggest = int(elem)
 		}
-		/*
-			biggest = -1
-			for _, elem := range cf.SiafundInputs {
-				if int(elem) <= biggest || int(elem) >= len(cf.SiafundInputs) {
-					err = errors.New("covered fields violation")
-					return
-				}
-				biggest = int(elem)
+		biggest = -1
+		for _, elem := range cf.SiafundInputs {
+			if int(elem) <= biggest || int(elem) >= len(cf.SiafundInputs) {
+				err = errors.New("covered fields violation")
+				return
 			}
-			biggest = -1
-			for _, elem := range cf.SiafundOutputs {
-				if int(elem) <= biggest || int(elem) >= len(cf.SiafundOutputs) {
-					err = errors.New("covered fields violation")
-					return
-				}
-				biggest = int(elem)
+			biggest = int(elem)
+		}
+		biggest = -1
+		for _, elem := range cf.SiafundOutputs {
+			if int(elem) <= biggest || int(elem) >= len(cf.SiafundOutputs) {
+				err = errors.New("covered fields violation")
+				return
 			}
-		*/
+			biggest = int(elem)
+		}
 		biggest = -1
 		for _, elem := range cf.ArbitraryData {
 			if int(elem) <= biggest || int(elem) >= len(cf.ArbitraryData) {

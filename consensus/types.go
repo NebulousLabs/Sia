@@ -27,7 +27,7 @@ type (
 	BlockID     hash.Hash
 	OutputID    hash.Hash
 	ContractID  hash.Hash
-	CoinAddress hash.Hash // The hash of the spend conditions of an output.
+	CoinAddress hash.Hash
 	Target      hash.Hash
 )
 
@@ -44,18 +44,16 @@ type Block struct {
 
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
-//
-// TODO: Enable siafund stuff
 type Transaction struct {
-	Inputs        []Input
-	MinerFees     []Currency
-	Outputs       []Output
-	FileContracts []FileContract
-	StorageProofs []StorageProof
-	// SiafundInputs  []SiafundInput
-	// SiafundOutputs []SiafundOutput
-	ArbitraryData []string
-	Signatures    []TransactionSignature
+	Inputs         []Input
+	MinerFees      []Currency
+	Outputs        []Output
+	FileContracts  []FileContract
+	StorageProofs  []StorageProof
+	SiafundInputs  []SiafundInput
+	SiafundOutputs []SiafundOutput
+	ArbitraryData  []string
+	Signatures     []TransactionSignature
 }
 
 // An Input contains the ID of the output it's trying to spend, and the spend
@@ -153,10 +151,10 @@ type CoveredFields struct {
 	Outputs          []uint64
 	FileContracts    []uint64
 	StorageProofs    []uint64
-	// SiafundInputs []uint64
-	// SiafundOutputs  []unit64
-	ArbitraryData []uint64
-	Signatures    []uint64
+	SiafundInputs    []uint64
+	SiafundOutputs   []uint64
+	ArbitraryData    []uint64
+	Signatures       []uint64
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
@@ -214,8 +212,8 @@ func (t Transaction) FileContractID(i int) ContractID {
 		t.Outputs,
 		t.FileContracts,
 		t.StorageProofs,
-		// t.SiafundInputs,
-		// t.SiafundOutputs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
 		t.ArbitraryData,
 		"file contract",
 		i,
@@ -232,8 +230,8 @@ func (t Transaction) OutputID(i int) OutputID {
 		t.Outputs,
 		t.FileContracts,
 		t.StorageProofs,
-		// t.SiafundInputs,
-		// t.SiafundOutputs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
 		t.ArbitraryData,
 		"siacoin output",
 		i,
@@ -247,50 +245,51 @@ func (t Transaction) OutputID(i int) OutputID {
 // If `WholeTransaction` is set to false, then the fees, inputs, ect. are all
 // added individually. The signatures are added individually regardless of the
 // value of `WholeTransaction`.
-//
-// TODO: add loops for the siafunds stuff
 func (t Transaction) SigHash(i int) hash.Hash {
+	cf := t.Signatures[i].CoveredFields
 	var signedData []byte
-	if t.Signatures[i].CoveredFields.WholeTransaction {
+	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
 			t.Inputs,
 			t.MinerFees,
 			t.Outputs,
 			t.FileContracts,
 			t.StorageProofs,
-			// Siafunds
-			// Stuff
-			// Here
+			t.SiafundInputs,
+			t.SiafundOutputs,
 			t.ArbitraryData,
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
 		)
 	} else {
-		for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+		for _, minerFee := range cf.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
-		for _, input := range t.Signatures[i].CoveredFields.Inputs {
+		for _, input := range cf.Inputs {
 			signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
 		}
-		for _, output := range t.Signatures[i].CoveredFields.Outputs {
+		for _, output := range cf.Outputs {
 			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
 		}
-		for _, contract := range t.Signatures[i].CoveredFields.FileContracts {
+		for _, contract := range cf.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
 		}
-		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
+		for _, storageProof := range cf.StorageProofs {
 			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
 		}
-		// Siafunds
-		// Stuff
-		// Here
-		for _, arbData := range t.Signatures[i].CoveredFields.ArbitraryData {
+		for _, siafundInput := range cf.SiafundInputs {
+			signedData = append(signedData, encoding.Marshal(t.SiafundInputs[siafundInput])...)
+		}
+		for _, siafundOutput := range cf.SiafundOutputs {
+			signedData = append(signedData, encoding.Marshal(t.SiafundOutputs[siafundOutput])...)
+		}
+		for _, arbData := range cf.ArbitraryData {
 			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
 		}
 	}
 
-	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
+	for _, sig := range cf.Signatures {
 		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
 	}
 
