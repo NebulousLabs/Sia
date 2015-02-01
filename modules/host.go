@@ -48,8 +48,10 @@ type Host interface {
 	// file from a host.
 	RetrieveFile(net.Conn) error
 
-	// Returns the number of contracts being managed by the host.
-	//
-	// TODO: Switch all of this to a status struct.
-	NumContracts() int
+	// SetConfig sets the hosting parameters of the host.
+	SetConfig(HostSettings)
+
+	// Info returns info about the host, including its hosting parameters, the
+	// amount of storage remaining, and the number of active contracts.
+	Info() HostInfo
 }
