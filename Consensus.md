@@ -10,14 +10,14 @@ place is the function AcceptBlock, which can be found in consensus/blocks.go.
 
 This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first
-priciples.
+principles.
 
 TODO: Write the formal specification for encoding things.
 
 TODO: Write the formal specification for deriving the block id, contract id,
 siacoin output id, siafund output id, siafund claim output id.
 
-TODO: block id + merkle root, miner output ids, siacoin output ids, contract
+TODO: block id + Merkle root, miner output ids, siacoin output ids, contract
 ids, storage proof ids, siafund output ids, siafund claim output ids.
 
 TODO: Document which crypto is used in consensus. (Hash algorithm, signature
@@ -72,7 +72,7 @@ Block ID
 The ID of a block is derived using:
 	Hash(Parent Block ID + 64 bit Nonce + Block Merkle Root)
 
-The block merkle root is obtained by creating a merkle tree whose leaves are
+The block Merkle root is obtained by creating a Merkle tree whose leaves are
 the hash of the timestamp, the hashes of the miner outputs (one leaf per miner
 output), and the hashes of the transactions (one leaf per transaction).
 
@@ -107,7 +107,7 @@ to 10,000x for Bitcoin.
 Block Subsidy
 -------------
 
-The coinbase for a block is (300,000 - (1 * height)) * 2^80, with a minimum of
+The coinbase for a block is (300,000 - (height)) * 2^80, with a minimum of
 30,000 * 2^80. Any miner fees get added to the coinbase, which creates the
 block subsidy. The block subsidy is then given to multiple outputs, called the
 miner payouts. The total value of the miner payouts must equal the block
@@ -131,9 +131,9 @@ contracts, storage proofs, arbitrary data, and signatures. The sum of the
 inputs must equal the sum of the miner fees, outputs, and contract payouts.
 
 A Transaction is composed of the following:
-- Inputs
+- Siacoin Inputs
 - Miner Fees
-- Outputs
+- Siacoin Outputs
 - File Contracts
 - Storage Proofs
 - Siafund Inputs
@@ -141,11 +141,10 @@ A Transaction is composed of the following:
 - Arbitrary Data
 - Signatures
 
-The financial sum of all the inputs must equal the financial sum of all the
-miner fees, outputs, and contract payouts. There can be no leftovers.
+The sum of all the siacoin inputs must equal the sum of all the miner fees,
+siacoin outputs, and contract payouts. There can be no leftovers.
 
-The financial sum of all siafund inputs must equal the financial sum of all
-siafund outputs.
+The sum of all siafund inputs must equal the sum of all siafund outputs.
 
 Inputs
 ------
@@ -186,11 +185,11 @@ File Contracts
 --------------
 
 A file contract is an agreement by some party to prove they have a file at a
-given point in time. The contract contains the merkle root of the data being
+given point in time. The contract contains the Merkle root of the data being
 stored, and the size in bytes of the data being stored.
 
-The merkle root is formed by breaking the file into 64 byte segments and
-hashing each segment to form the leaves of the merkle tree. The final segment
+The Merkle root is formed by breaking the file into 64 byte segments and
+hashing each segment to form the leaves of the Merkle tree. The final segment
 is not padded out.
 
 The storage proof must be submitted between the 'Start' and 'End' fields of the
@@ -217,8 +216,8 @@ trigger block is the block at height 'Start' - 1, where 'Start' is the value
 'Start' in the contract that the storage proof is fulfilling.
 
 The file is composed of 64 byte segments whose hashes compose the leaves of a
-merkle tree. When proving you have the file, you must prove you have one of the
-leaves. To determine which leave, take the hash of the contract id concatenated
+Merkle tree. When proving you have the file, you must prove you have one of the
+leaves. To determine which leaf, take the hash of the contract id concatenated
 to the trigger block id, then take the numerical value of the result modulus
 the number of segments:
 
@@ -252,7 +251,7 @@ address. The number of accrued siacoins is counted by taking the size of the
 siacoin pool when the output was created and comparing it to the current size
 of the siacoin pool. The equation is:
 
-	(Current Pool Size - Previous Pool Size) / 10,000 * siafund quantity
+	((Current Pool Size - Previous Pool Size) / 10,000) * siafund quantity
 
 Like the miner outputs and the storage proof outputs, the siafund output cannot
 be spent for 100 blocks because the value of the output can change if the
@@ -324,5 +323,4 @@ The genesis block will be a block with a timestamp of TODO:TBD. All other
 fields will be empty. The required target for the next block shall be [0, 0, 0,
 8, 0...], where each value is a byte.
 
-The genesis block does not need to meet a particular target, and indeed it does
-not.
+The genesis block does not need to meet a particular target.

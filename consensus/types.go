@@ -1,6 +1,6 @@
 package consensus
 
-// TODO: Convert all string literals to byte arrays.
+// TODO: Convert all string literals to byte arrays, or get rid of them entirely.
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
@@ -21,9 +21,9 @@ type (
 	Target      hash.Hash
 )
 
-// TODO: Swtich MinerAddress to a MinerPayout, and add rules to consensus that
-// enforce the Value sum of the miner payout outputs is exactly equal to the
-// block subsidy.
+// A Block contains all of the changes to the state that have occurred since
+// the previous block. There are constraints that make it difficult and
+// rewarding to find a block.
 type Block struct {
 	ParentID     BlockID
 	Nonce        uint64
