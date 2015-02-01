@@ -84,6 +84,40 @@ func (bn *blockNode) earliestChildTimestamp() Timestamp {
 	return Timestamp(intTimestamps[MedianTimestampWindow/2])
 }
 
+// checkMinerPayouts verifies that the sum of all the miner payouts is equal to
+// the block subsidy (which is the coinbase + miner fees).
+func (s *State) checkMinerPayouts(b Block) (err error) {
+	// Sanity check - the block's parent needs to exist and be known.
+	parentNode, exists := s.blockMap[b.ParentID]
+	if DEBUG {
+		if !exists {
+			panic("parent node doesn't exist in block map when calling checkMinerPayouts")
+		}
+	}
+
+	// Find the allowed miner subsidy.
+	subsidy := CalculateCoinbase(parentNode.height + 1)
+	for _, txn := range b.Transactions {
+		for _, fee := range txn.MinerFees {
+			subsidy += fee
+		}
+	}
+
+	// Find the sum of the miner payouts.
+	var payoutSum Currency
+	for _, payout := range b.MinerPayouts {
+		payoutSum += payout.Value
+	}
+
+	// Return an error if the subsidy isn't equal to the payouts.
+	if subsidy != payoutSum {
+		err = errors.New("block miner payouts do not equal the block subsidy")
+		return
+	}
+
+	return
+}
+
 // validHeader returns err = nil if the header information in the block is
 // valid, and returns an error otherwise.
 func (s *State) validHeader(b Block) (err error) {
@@ -104,6 +138,12 @@ func (s *State) validHeader(b Block) (err error) {
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
 	if skew > FutureThreshold {
 		err = FutureBlockErr
+		return
+	}
+
+	// Check the miner payouts.
+	err = s.checkMinerPayouts(b)
+	if err != nil {
 		return
 	}
 
