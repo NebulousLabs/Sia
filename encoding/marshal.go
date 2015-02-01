@@ -5,16 +5,18 @@ import (
 	"reflect"
 )
 
-// A Marshaler can be encoded as a byte slice.
-// Marshaler and Unmarshaler are separate interfaces because Unmarshaler must
-// have a pointer receiver, while Marshaler does not.
+// A Marshaler can be encoded as a byte slice. Marshaler and Unmarshaler are
+// separate interfaces because Unmarshaler must have a pointer receiver, while
+// Marshaler does not.
 type SiaMarshaler interface {
 	MarshalSia() []byte
 }
 
-// An Unmarshaler can be decoded from a byte slice.
-// UnmarshalSia may be passed a byte slice containing more than one encoded type.
-// It should return the number of bytes used to decode itself.
+// An Unmarshaler can be decoded from a byte slice. UnmarshalSia may be passed
+// a byte slice containing more than one encoded type. It should return the
+// number of bytes used to decode itself. UnmarshalSia can panic; the panic
+// will be caught by Unmarshal. Alternatively, if UnmarshalSia returns a
+// negative value, Unmarshal will always fail.
 type SiaUnmarshaler interface {
 	UnmarshalSia([]byte) int
 }
@@ -31,7 +33,7 @@ type SiaUnmarshaler interface {
 //
 // Valid pointers are prefaced by a non-zero, followed by the dereferenced value.
 //
-// Variable-length types, such as strings and slices, are prefaced by 4 bytes containing their length.
+// Variable-length types, such as strings and slices, are prefaced by 8 bytes containing their length.
 //
 // Slices and structs are simply the concatenation of their encoded elements.
 // Byte slices are not subject to the 8-byte integer rule; they are encoded as
