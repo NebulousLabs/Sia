@@ -2,6 +2,18 @@ package consensus
 
 // TODO: Convert all string literals to byte arrays, or get rid of them entirely.
 
+// TODO: Swtich to 128 bit Currency, which is overflow-safe. Then update
+// CalculateCoinbase.
+
+// TODO: Enable siafund stuff
+
+// TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
+// payouts, storage proof outputs, siafund claims.
+
+// TODO: Enforce restrictions on CoveredFields
+
+// TODO: Enforce restrictions on which storage proof transactions are legal
+
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -207,13 +219,19 @@ func (t Transaction) FileContractID(i int) ContractID {
 	)))
 }
 
-// OuptutID takes the index of the output and returns the output's ID.
-//
-// TODO: ID should not include the signatures.
+// OutputID gets the id of an output in the transaction, which is derived from
+// marshalling all of the fields in the transaction except for the signatures
+// and then appending the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
-		t,
-		"coinsend",
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		// t.SiafundInputs,
+		// t.SiafundOutputs,
+		t.ArbitraryData,
 		i,
 	)))
 }

@@ -153,6 +153,172 @@ func testLargeBlock(t *testing.T, s *State) {
 	}
 }
 
+// testMinerPayouts tries to submit miner payouts in various legal and illegal
+// forms and verifies that the state handles the payouts correctly each time.
+//
+// CONTRIBUTE: Increased testing would be nice. We need to test across multiple
+// payouts, multiple fees, payouts that are too high, payouts that are too low,
+// and several other potential ways that someone might slip illegal payouts
+// through.
+func testMinerPayouts(t *testing.T, s *State) {
+	// Create a block with a single legal payout, no miner fees. The payout
+	// goes to the hash of the empty spend conditions.
+	var sc SpendConditions
+	payout := []Output{Output{Value: CalculateCoinbase(s.Height() + 1), SpendHash: sc.CoinAddress()}}
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
+	}
+	// Check that the payout made it into the output list.
+	_, exists := s.unspentOutputs[b.MinerPayoutID(0)]
+	if !exists {
+		t.Error("miner payout not found in the list of unspent outputs")
+	}
+
+	// Create a block with multiple miner payouts.
+	payout = []Output{
+		Output{Value: CalculateCoinbase(s.Height()+1) - 750, SpendHash: sc.CoinAddress()},
+		Output{Value: 250, SpendHash: sc.CoinAddress()},
+		Output{Value: 500, SpendHash: sc.CoinAddress()},
+	}
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
+	}
+	// Check that all three payouts made it into the output list.
+	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	if !exists {
+		t.Error("miner payout not found in the list of unspent outputs")
+	}
+	_, exists = s.unspentOutputs[b.MinerPayoutID(1)]
+	output250 := b.MinerPayoutID(1)
+	if !exists {
+		t.Error("miner payout not found in the list of unspent outputs")
+	}
+	_, exists = s.unspentOutputs[b.MinerPayoutID(2)]
+	output500 := b.MinerPayoutID(2)
+	if !exists {
+		t.Error("miner payout not found in the list of unspent outputs")
+	}
+
+	// Create a block with a too large payout.
+	payout = []Output{Output{Value: CalculateCoinbase(s.Height()), SpendHash: sc.CoinAddress()}}
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != MinerPayoutErr {
+		t.Error("Unexpected Error:", err)
+	}
+	// Check that the payout did not make it into the output list.
+	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	if exists {
+		t.Error("miner payout made it into state despite being invalid.")
+	}
+
+	// Create a block with a too small payout.
+	payout = []Output{Output{Value: CalculateCoinbase(s.Height() + 2), SpendHash: sc.CoinAddress()}}
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != MinerPayoutErr {
+		t.Error("Unexpected Error:", err)
+	}
+	// Check that the payout did not make it into the output list.
+	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	if exists {
+		t.Error("miner payout made it into state despite being invalid.")
+	}
+
+	// Test legal multiple payouts when there are multiple miner fees.
+	txn1 := Transaction{
+		Inputs: []Input{
+			Input{OutputID: output250},
+		},
+		MinerFees: []Currency{
+			Currency(50),
+			Currency(75),
+			Currency(125),
+		},
+	}
+	txn2 := Transaction{
+		Inputs: []Input{
+			Input{OutputID: output500},
+		},
+		MinerFees: []Currency{
+			Currency(100),
+			Currency(150),
+			Currency(250),
+		},
+	}
+	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
+	}
+	// Check that the payout outputs made it into the state.
+	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	if !exists {
+		t.Error("miner payout did not make it into the state")
+	}
+	_, exists = s.unspentOutputs[b.MinerPayoutID(1)]
+	output650 := b.MinerPayoutID(1)
+	if !exists {
+		t.Error("miner payout did not make it into the state")
+	}
+	_, exists = s.unspentOutputs[b.MinerPayoutID(2)]
+	output75 := b.MinerPayoutID(2)
+	if !exists {
+		t.Error("miner payout did not make it into the state")
+	}
+
+	// Test too large multiple payouts when there are multiple miner fees.
+	txn1 = Transaction{
+		Inputs: []Input{
+			Input{OutputID: output650},
+		},
+		MinerFees: []Currency{
+			Currency(100),
+			Currency(50),
+			Currency(500),
+		},
+	}
+	txn2 = Transaction{
+		Inputs: []Input{
+			Input{OutputID: output75},
+		},
+		MinerFees: []Currency{
+			Currency(10),
+			Currency(15),
+			Currency(50),
+		},
+	}
+	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != MinerPayoutErr {
+		t.Error("Expecting different error:", err)
+	}
+}
+
 // testMissedTarget tries to submit a block that does not meet the target for the next block.
 func testMissedTarget(t *testing.T, s *State) {
 	// Mine a block that doesn't meet the target.
@@ -407,6 +573,12 @@ func TestLargeBlock(t *testing.T) {
 	testLargeBlock(t, s)
 }
 
+// TestMinerPayouts creates a new state and uses it to call testMinerPayouts.
+func TestMinerPayouts(t *testing.T) {
+	s := CreateGenesisState()
+	testMinerPayouts(t, s)
+}
+
 // TestMissedTarget creates a new state and uses it to call testMissedTarget.
 func TestMissedTarget(t *testing.T) {
 	s := CreateGenesisState()
@@ -436,8 +608,8 @@ func TestRepeatBlock(t *testing.T) {
 // transactions, and invalid forms of each. Bad outputs, many outputs, many
 // inputs, many fees, bad fees, overflows, bad proofs, early proofs, arbitrary
 // datas, bad signatures, too many signatures, repeat signatures.
-
-// TODO: Build those transaction building functions as separate things, because
+//
+// Build those transaction building functions as separate things, because
 // you want to be able to probe complex transactions that have lots of juicy
 // stuff.
 
@@ -445,12 +617,17 @@ func TestRepeatBlock(t *testing.T) {
 // state hashes always end up at the same point, make sure long forking works
 // well and that reversing when a transaction fails also works well.
 
-// TODO: Test the actually method which is used to calculated the earliest
-// legal timestamp for the next block. Like have some examples that should work
-// out algebraically and make sure that earliest timestamp follows the rules
-// layed out by the protocol. This should be done after we decide that the
-// algorithm for calculating the earliest allowed timestamp is sufficient.
+// TODO: Test the actual method which is used to calculated the earliest legal
+// timestamp for the next block. Like have some examples that should work out
+// algebraically and make sure that earliest timestamp follows the rules layed
+// out by the protocol. This should be done after we decide that the algorithm
+// for calculating the earliest allowed timestamp is sufficient.
 
-// TODO: Probe the difficulty adjustments, make sure that they are happening
+// TODO: Probe the target adjustments, make sure that they are happening
 // according to specification, moving as much as they should and that the
 // clamps are being effective.
+
+// TODO: Write tests for CalculateCoinbase to make sure that it's behaving
+// correctly. I guess this doesn't help us if the state stops using
+// CalculateCoinbase, but I'm not sure what other good alternative ways there
+// are for testing this.

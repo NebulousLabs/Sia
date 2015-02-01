@@ -31,6 +31,7 @@ var (
 	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
 	KnownOrphanErr    = errors.New("block is a known orphan")
 	LargeBlockErr     = errors.New("block is too large to be accepted")
+	MinerPayoutErr    = errors.New("miner payout sum does not equal block subsidy")
 	MissedTargetErr   = errors.New("block does not meet target")
 	UnknownOrphanErr  = errors.New("block is an unknown orphan")
 )
@@ -111,7 +112,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 
 	// Return an error if the subsidy isn't equal to the payouts.
 	if subsidy != payoutSum {
-		err = errors.New("block miner payouts do not equal the block subsidy")
+		err = MinerPayoutErr
 		return
 	}
 

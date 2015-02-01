@@ -41,7 +41,10 @@ func (t Transaction) OutputSum() (sum Currency) {
 func (s *State) ValidSignatures(t Transaction) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.validSignatures(t)
+}
 
+func (s *State) validSignatures(t Transaction) error {
 	// Create the InputSignatures object for each input.
 	sigMap := make(map[OutputID]*InputSignatures)
 	for i, input := range t.Inputs {
@@ -156,7 +159,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	}
 
 	// Check all of the signatures for validity.
-	err = s.ValidSignatures(t)
+	err = s.validSignatures(t)
 	if err != nil {
 		return
 	}

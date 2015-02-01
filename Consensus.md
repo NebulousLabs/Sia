@@ -14,11 +14,8 @@ principles.
 
 TODO: Write the formal specification for encoding things.
 
-TODO: Write the formal specification for deriving the block id, contract id,
-siacoin output id, siafund output id, siafund claim output id.
-
-TODO: block id + Merkle root, miner output ids, siacoin output ids, contract
-ids, storage proof ids, siafund output ids, siafund claim output ids.
+TODO: contract ids, storage proof ids, siafund output ids, siafund claim output
+ids.
 
 TODO: Document which crypto is used in consensus. (Hash algorithm, signature
 algorithm)
@@ -146,10 +143,10 @@ siacoin outputs, and contract payouts. There can be no leftovers.
 
 The sum of all siafund inputs must equal the sum of all siafund outputs.
 
-Inputs
-------
+Siacoin Inputs
+--------------
 
-Each input spends an output.  The output being spent must already exist in the
+Each input spends an output. The output being spent must already exist in the
 state. An output has a value, and a spend hash (or address), which is the hash
 of the 'spend conditions' object of the output. The spend conditions contain a
 timelock, a number of required signatures, and a set of public keys that can be
@@ -174,12 +171,15 @@ Miner Fees
 
 A miner fee is an output that gets added directly to the block subsidy.
 
-Outputs
--------
+Siacoin Outputs
+---------------
 
 Outputs contain a value and a spend hash (also called a coin address). The
 spend hash is a hash of the spend conditions that must be met to spend the
 output.
+
+The id of an output is obtained by marshalling and hashing all of the fields in
+the transaction that contained the output, except for the signatures.
 
 File Contracts
 --------------
@@ -198,7 +198,9 @@ when the storage proof is provided. If the storage proof is provides, the
 payout goes to 'ValidProofAddress'. If no proof is submitted by block height
 'End', then the payout goes to 'MissedProofAddress'.
 
-All contracts must have a non-zero payout.
+All contracts must have a non-zero payout, 'Start' must be before 'End', and
+'Start' must be greater than the current height of the state. A storage proof
+is acceptible if it is submitted in the block of height 'End'.
 
 Storage Proofs
 --------------
@@ -206,8 +208,7 @@ Storage Proofs
 A storage proof transaction is any transaction containing a storage proof. 
 
 Storage proof transactions are not allowed to have siacoin or siafund outputs,
-and are not allowed to have file contracts. All outputs created by storage
-proofs cannot be spent for 100 blocks.
+and are not allowed to have file contracts.
 
 When creating a storage proof, you only prove that you have a single 64 byte
 segment of the file. The piece that you must prove you have is chosen
@@ -302,6 +303,10 @@ and additional parties can add new fields, meaning the transaction will be
 malleable. This does however allow other parites to add additional inputs,
 fees, etc. after you have signed the transaction without invalidating your
 signature.
+
+The 'Covered Fields' struct contains a slice of indexes for each element of the
+transaction (siacoin inputs, miner fees, etc.). The slice must be sorted, and
+there can be no repeated elements.
 
 Entirely nonmalleable transactions can be achieved by setting the 'whole
 transaction' flag and then providing the last signature, including every other
