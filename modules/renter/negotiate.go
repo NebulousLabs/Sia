@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -93,6 +94,11 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		if response != modules.AcceptContractResponse {
 			return errors.New(response)
 		}
+
+		// file transfer is going to take a while, so extend the timeout.
+		// This assumes a minimum transfer rate of ~1 Mbps
+		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 8 * time.Microsecond))
+
 		// simultaneously transmit file data and calculate Merkle root
 		tee := io.TeeReader(up.Data, conn)
 		merkleRoot, err := hash.ReaderMerkleRoot(tee, filesize)

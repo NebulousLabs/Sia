@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -186,6 +187,11 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
+
+	// file transfer is going to take a while, so extend the timeout.
+	// This assumes a minimum transfer rate of ~1 Mbps
+	conn.SetDeadline(time.Now().Add(time.Duration(terms.FileSize) * 8 * time.Microsecond))
+
 	// simultaneously download file and calculate its Merkle root.
 	tee := io.TeeReader(
 		// use a LimitedReader to ensure we don't read indefinitely

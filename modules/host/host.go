@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -108,6 +109,9 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 		return
 	}
 	defer file.Close()
+	info, _ := file.Stat()
+
+	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 8 * time.Microsecond))
 
 	// Transmit the file.
 	_, err = io.Copy(conn, file)
