@@ -56,6 +56,14 @@ func (c *Currency) Div(y Currency) *Currency {
 	return c.SetBig(new(big.Int).Div(c.Big(), y.Big()))
 }
 
+func (c *Currency) Sign() int {
+	return c.Big().Sign()
+}
+
+func (c *Currency) Cmp(y Currency) int {
+	return c.Big().Cmp(y.Big())
+}
+
 // Overflow returns whether an overflow has ever occurred while setting the
 // value of c. The overflow is never cleared, even if the bits of c are reset.
 func (c *Currency) Overflow() bool {
