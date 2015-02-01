@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -29,22 +28,8 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	defer file.Close()
 
-	// calculate filesize (via Seek; 2 means "relative to the end")
-	n, _ := file.Seek(0, 2)
-	filesize := uint64(n)
-	file.Seek(0, 0) // reset
-
-	// calculate Merkle root
-	merkle, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(filesize))
-	if err != nil {
-		http.Error(w, "Couldn't calculate Merkle root: "+err.Error(), 500)
-		return
-	}
-
 	err = d.renter.Upload(modules.UploadParams{
-		Data:       file,
-		FileSize:   filesize,
-		MerkleRoot: merkle,
+		Data: file,
 
 		// TODO: the user should probably supply these
 		Duration: duration,
@@ -75,25 +60,8 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// calculate filesize
-	info, err := file.Stat()
-	if err != nil {
-		http.Error(w, "Couldn't stat file: "+err.Error(), 400)
-		return
-	}
-	filesize := uint64(info.Size())
-
-	// calculate Merkle root
-	merkle, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(uint64(info.Size())))
-	if err != nil {
-		http.Error(w, "Couldn't calculate Merkle root: "+err.Error(), 500)
-		return
-	}
-
 	err = d.renter.Upload(modules.UploadParams{
-		Data:       file,
-		FileSize:   filesize,
-		MerkleRoot: merkle,
+		Data: file,
 
 		// TODO: the user should probably supply these
 		Duration: duration,

@@ -60,7 +60,7 @@ func (s *State) validProof(sp StorageProof) error {
 	if err != nil {
 		return err
 	}
-	verified := hash.VerifyReaderProof(
+	verified := hash.VerifySegment(
 		sp.Segment,
 		sp.HashSet,
 		hash.CalculateSegments(contract.FileSize),

@@ -64,7 +64,7 @@ func TestStorageProof(t *testing.T) {
 	numSegments := uint64(7)
 	data := make([]byte, numSegments*SegmentSize)
 	rand.Read(data)
-	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data), numSegments)
+	rootHash, err := BytesMerkleRoot(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestStorageProof(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		if !VerifyReaderProof(baseSegment, hashSet, numSegments, i, rootHash) {
+		if !VerifySegment(baseSegment, hashSet, numSegments, i, rootHash) {
 			t.Error("Proof", i, "did not pass verification")
 		}
 	}

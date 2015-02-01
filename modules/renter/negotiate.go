@@ -60,19 +60,25 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	height := r.state.Height()
 	r.state.RUnlock()
 
+	// get filesize via Seek
+	// (these Seeks are guaranteed not to return errors)
+	n, _ := up.Data.Seek(0, 2)
+	filesize := uint64(n)
+	up.Data.Seek(0, 0) // seek back to beginning
+
 	// create ContractTerms
 	terms := modules.ContractTerms{
-		FileSize:           up.FileSize,
+		FileSize:           filesize,
 		StartHeight:        height + up.Delay,
-		WindowSize:         0, // ??
-		NumWindows:         0, // ?? duration/windowsize + 1?
-		ClientPayout:       0, // ??
-		HostPayout:         0, // ??
+		WindowSize:         0,          // ??
+		NumWindows:         0,          // ?? duration/windowsize + 1?
+		ClientPayout:       0,          // ??
+		HostPayout:         host.Price, // ??
 		ValidProofAddress:  host.CoinAddress,
 		MissedProofAddress: consensus.ZeroAddress,
 	}
 
-	// TODO: call r.hostDB.FlagHost(host.IPAddress) if negotiation unnecessful
+	// TODO: call r.hostDB.FlagHost(host.IPAddress) if negotiation is unsuccessful
 	// (and it isn't our fault)
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {
 		// send ContractTerms
@@ -87,15 +93,14 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		if response != modules.AcceptContractResponse {
 			return errors.New(response)
 		}
-		// host accepted, so transmit file data
-		_, err = io.CopyN(conn, up.Data, int64(up.FileSize))
-		// reset seek position
-		up.Data.Seek(0, 0)
+		// simultaneously transmit file data and calculate Merkle root
+		tee := io.TeeReader(up.Data, conn)
+		merkleRoot, err := hash.ReaderMerkleRoot(tee, filesize)
 		if err != nil {
 			return
 		}
 		// create and transmit transaction containing file contract
-		txn, err := r.createContractTransaction(host, terms, up.MerkleRoot)
+		txn, err := r.createContractTransaction(host, terms, merkleRoot)
 		if err != nil {
 			return
 		}

@@ -186,20 +186,15 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
+	// simultaneously download file and calculate its Merkle root.
+	tee := io.TeeReader(
+		// use a LimitedReader to ensure we don't read indefinitely
+		io.LimitReader(conn, int64(terms.FileSize)),
+		// each byte we read from tee will also be written to file
+		file,
+	)
 
-	// Download file contents.
-	// TODO: calculate Merkle root simultaneously
-	_, err = io.CopyN(file, conn, int64(terms.FileSize))
-	if err != nil {
-		return
-	}
-
-	// Calculate Merkle root.
-	_, err = file.Seek(0, 0)
-	if err != nil {
-		return
-	}
-	merkleRoot, err := hash.ReaderMerkleRoot(file, hash.CalculateSegments(terms.FileSize))
+	merkleRoot, err := hash.ReaderMerkleRoot(tee, terms.FileSize)
 	if err != nil {
 		return
 	}
