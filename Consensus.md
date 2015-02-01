@@ -110,9 +110,13 @@ Block Subsidy
 The coinbase for a block is (300,000 - (1 * height)) * 2^80, with a minimum of
 30,000 * 2^80. Any miner fees get added to the coinbase, which creates the
 block subsidy. The block subsidy is then given to multiple outputs, called the
-miner outputs. The total value of the miner outputs must equal the block
+miner payouts. The total value of the miner payouts must equal the block
 subsidy.  Having multiple outputs allows the block reward to be sent to
 multiple people, enabling systems like p2pool.
+
+The ids of the outputs created by the miner payouts is determined by taking the
+block id and concatenating the index of the payout that the output corresponds
+to.
 
 The outputs created by the block subsidy cannot be spent for 100 blocks, and
 are not considered a part of the utxo set until 100 blocks have transpired.

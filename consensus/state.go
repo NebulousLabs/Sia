@@ -70,12 +70,6 @@ func CreateGenesisState() (s *State) {
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 
-	// Create the genesis subsidy output.
-	genesisSubsidyOutput := Output{
-		Value: CalculateCoinbase(0),
-	}
-	s.unspentOutputs[genesisBlock.SubsidyID()] = genesisSubsidyOutput
-
 	return
 }
 

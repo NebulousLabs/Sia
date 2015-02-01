@@ -1,10 +1,17 @@
 package consensus
 
 import (
+	"bytes"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/hash"
 )
+
+// CheckTarget returns true if the block id is lower than the target.
+func (b Block) CheckTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
 
 // Int returns a Target as a big.Int.
 func (t Target) Int() *big.Int {

@@ -62,6 +62,21 @@ func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
 	return
 }
 
+// applyMinerSubsidy adds all of the outputs recorded in the MinerPayouts to
+// the state, and returns the corresponding set of diffs.
+func (s *State) applyMinerSubsidy(bn *blockNode) (diffs []OutputDiff) {
+	for i, payout := range bn.block.MinerPayouts {
+		diff := OutputDiff{
+			New:    true,
+			ID:     bn.block.MinerPayoutID(i),
+			Output: payout,
+		}
+		s.unspentOutputs[diff.ID] = payout
+		diffs = append(diffs, diff)
+	}
+	return
+}
+
 // s.integrateBlock() will verify the block and then integrate it into the
 // consensus state.
 func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
@@ -110,18 +125,9 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
 	bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
 
-	// Add output contianing miner subsidy.
-	subsidyOutput := Output{
-		Value:     minerSubsidy,
-		SpendHash: bn.block.MinerAddress,
-	}
-	subsidyDiff := OutputDiff{
-		New:    true,
-		ID:     bn.block.SubsidyID(),
-		Output: subsidyOutput,
-	}
-	s.unspentOutputs[bn.block.SubsidyID()] = subsidyOutput
-	bn.outputDiffs = append(bn.outputDiffs, subsidyDiff)
+	// Add the miner payouts.
+	subsidyDiffs := s.applyMinerSubsidy(bn)
+	bn.outputDiffs = append(bn.outputDiffs, subsidyDiffs...)
 
 	bn.diffsGenerated = true
 	return

@@ -1,5 +1,7 @@
 package consensus
 
+// TODO: Move this to a different file, perhaps testing.
+
 import (
 	"fmt"
 )
@@ -26,7 +28,7 @@ func (s *State) currentPathCheck() {
 			panic("current path does not have correct id!")
 		}
 
-		currentNode = s.blockMap[currentNode.block.ParentBlockID]
+		currentNode = s.blockMap[currentNode.block.ParentID]
 
 		// Have to do an awkward break beacuse i is unsigned.
 		if i == 0 {

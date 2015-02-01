@@ -62,7 +62,7 @@ func (node *blockNode) setTarget() {
 // addBlockToTree takes a block and a parent node, and adds a child node to the
 // parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (err error) {
-	parentNode := s.blockMap[b.ParentBlockID]
+	parentNode := s.blockMap[b.ParentID]
 	newNode := &blockNode{
 		block:  b,
 		parent: parentNode,

@@ -1,8 +1,8 @@
 package consensus
 
-import (
-	"bytes"
+// TODO: Convert all string literals to byte arrays.
 
+import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
@@ -25,11 +25,10 @@ type (
 // enforce the Value sum of the miner payout outputs is exactly equal to the
 // block subsidy.
 type Block struct {
-	ParentBlockID BlockID
-	Nonce         uint64
-	Timestamp     Timestamp
-	MinerAddress  CoinAddress
-	// MinerPayout []Output
+	ParentID     BlockID
+	Nonce        uint64
+	Timestamp    Timestamp
+	MinerPayouts []Output
 	Transactions []Transaction
 }
 
@@ -169,27 +168,21 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // hash.
 func (b Block) ID() BlockID {
 	return BlockID(hash.HashBytes(encoding.MarshalAll(
-		b.ParentBlockID,
+		b.ParentID,
 		b.Nonce,
 		b.MerkleRoot(),
 	)))
 }
 
-// CheckTarget returns true if the block id is lower than the target.
-func (b Block) CheckTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
-}
-
 // MerkleRoot calculates the merkle root of the block. The leaves of the merkle
 // tree are composed of the Timestamp, the set of miner outputs (one leaf), and
 // all of the transactions (many leaves).
-//
-// TODO: change the miner address to the miner outputs.
 func (b Block) MerkleRoot() hash.Hash {
 	leaves := []hash.Hash{
 		hash.HashObject(b.Timestamp),
-		hash.HashObject(b.MinerAddress),
+	}
+	for _, payout := range b.MinerPayouts {
+		leaves = append(leaves, hash.HashObject(payout))
 	}
 	for _, txn := range b.Transactions {
 		leaves = append(leaves, hash.HashObject(txn))
@@ -197,58 +190,32 @@ func (b Block) MerkleRoot() hash.Hash {
 	return hash.MerkleRoot(leaves)
 }
 
-// SubisdyID returns the id of the output created by the block subsidy.
-//
-// TODO: Adjust so that it returns the id of the miner outputs. Also reconsider
-// how output ids are created.
-func (b Block) SubsidyID() OutputID {
-	bid := b.ID()
-	return OutputID(hash.HashBytes(append(bid[:], "blockreward"...)))
+// MinerPayoutID returns the ID of the payout at the given index.
+func (b Block) MinerPayoutID(i int) OutputID {
+	return OutputID(hash.HashBytes(encoding.MarshalAll(b.ID(), i)))
 }
 
 // FileContractID returns the id of a file contract given the index of the contract.
 //
 // TODO: Reconsider how file contract ids are derived
-func (t Transaction) FileContractID(index int) ContractID {
-	return ContractID(hash.HashAll(
-		encoding.Marshal(t.Outputs[0]),
-		encoding.Marshal(t.FileContracts[index]),
-		[]byte("contract"),
-		encoding.Marshal(index),
-	))
+func (t Transaction) FileContractID(i int) ContractID {
+	return ContractID(hash.HashBytes(encoding.MarshalAll(
+		t.Outputs[0],
+		t.FileContracts[i],
+		"contract",
+		i,
+	)))
 }
 
 // OuptutID takes the index of the output and returns the output's ID.
 //
 // TODO: ID should not include the signatures.
-func (t Transaction) OutputID(index int) OutputID {
-	return OutputID(hash.HashAll(
-		encoding.Marshal(t),
-		[]byte("coinsend"),
-		encoding.Marshal(index),
-	))
-}
-
-// OutputSum returns the sum of all the outputs in the transaction, which must
-// match the sum of all the inputs. Outputs created by storage proofs are not
-// considered, as they were already considered when the contract was created.
-func (t Transaction) OutputSum() (sum Currency) {
-	// Add the miner fees.
-	for _, fee := range t.MinerFees {
-		sum += fee
-	}
-
-	// Add the contract payouts
-	for _, contract := range t.FileContracts {
-		sum += contract.Payout
-	}
-
-	// Add the outputs
-	for _, output := range t.Outputs {
-		sum += output.Value
-	}
-
-	return
+func (t Transaction) OutputID(i int) OutputID {
+	return OutputID(hash.HashBytes(encoding.MarshalAll(
+		t,
+		"coinsend",
+		i,
+	)))
 }
 
 // SigHash returns the hash of a transaction for a specific signature. `i` is
@@ -314,10 +281,10 @@ func (t Transaction) SigHash(i int) hash.Hash {
 // TODO: Reconsider how the StorageProofOutputID is determined.
 func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
 	proofString := proofString(proofValid)
-	outputID = OutputID(hash.HashAll(
-		fcID[:],
+	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
+		fcID,
 		proofString,
-	))
+	)))
 	return
 }
 
@@ -338,10 +305,10 @@ func (sc SpendConditions) CoinAddress() CoinAddress {
 // proofString returns the string to be used when generating the output id of a
 // valid proof if bool is set to true, and it returns the string to be used in
 // a missed proof if the bool is set to false.
-func proofString(proofValid bool) []byte {
+func proofString(proofValid bool) string {
 	if proofValid {
-		return []byte("validproof")
+		return "validproof"
 	} else {
-		return []byte("missedproof")
+		return "missedproof"
 	}
 }

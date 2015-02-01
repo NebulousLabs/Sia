@@ -41,18 +41,18 @@ var (
 func (s *State) handleOrphanBlock(b Block) error {
 	// Sanity check - block must be an orphan!
 	if DEBUG {
-		_, exists := s.blockMap[b.ParentBlockID]
+		_, exists := s.blockMap[b.ParentID]
 		if exists {
 			panic("Incorrect use of handleOrphanBlock")
 		}
 	}
 
 	// Check if the missing parent is unknown
-	missingParent, exists := s.missingParents[b.ParentBlockID]
+	missingParent, exists := s.missingParents[b.ParentID]
 	if !exists {
 		// Add an entry for the parent and add the orphan block to the entry.
-		s.missingParents[b.ParentBlockID] = make(map[BlockID]Block)
-		s.missingParents[b.ParentBlockID][b.ID()] = b
+		s.missingParents[b.ParentID] = make(map[BlockID]Block)
+		s.missingParents[b.ParentID][b.ID()] = b
 		return UnknownOrphanErr
 	}
 
@@ -87,7 +87,7 @@ func (bn *blockNode) earliestChildTimestamp() Timestamp {
 // validHeader returns err = nil if the header information in the block is
 // valid, and returns an error otherwise.
 func (s *State) validHeader(b Block) (err error) {
-	parent := s.blockMap[b.ParentBlockID]
+	parent := s.blockMap[b.ParentID]
 	// Check the id meets the target.
 	if !b.CheckTarget(parent.target) {
 		err = MissedTargetErr
@@ -138,7 +138,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	}
 
 	// See if the block is an orphan.
-	_, exists = s.blockMap[b.ParentBlockID]
+	_, exists = s.blockMap[b.ParentID]
 	if !exists {
 		err = s.handleOrphanBlock(b)
 		return

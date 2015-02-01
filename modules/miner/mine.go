@@ -14,12 +14,28 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 
 	// Fill out the block with potentially ready values.
 	b = consensus.Block{
-		ParentBlockID: m.parent,
-		Timestamp:     consensus.Timestamp(time.Now().Unix()),
-		Nonce:         uint64(rand.Int()),
-		MinerAddress:  m.address,
-		Transactions:  m.transactions,
+		ParentID:     m.parent,
+		Timestamp:    consensus.Timestamp(time.Now().Unix()),
+		Nonce:        uint64(rand.Int()),
+		Transactions: m.transactions,
 	}
+
+	// Calculate the subsidy and create the miner payout.
+	height, exists := m.state.HeightOfBlock(m.parent)
+	if !exists {
+		if consensus.DEBUG {
+			panic("parent is not in state?")
+		}
+		return
+	}
+	subsidy := consensus.CalculateCoinbase(height + 1)
+	for _, txn := range m.transactions {
+		for _, fee := range txn.MinerFees {
+			subsidy += fee
+		}
+	}
+	output := consensus.Output{Value: subsidy, SpendHash: m.address}
+	b.MinerPayouts = []consensus.Output{output}
 
 	// If we've got a time earlier than the earliest legal timestamp, set the
 	// timestamp equal to the earliest legal timestamp.
@@ -29,6 +45,10 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 		// TODO: Add a single transaction that's just arbitrary data - a bunch
 		// of randomly generated arbitrary data. This will provide entropy to
 		// the block even though the timestamp isn't changing at all.
+		//
+		// This is going to require a transaction pool that can dump a smart
+		// number of bytes. Having a transaction pool that dumps a requested
+		// number of bytes is good anyway.
 	}
 
 	return

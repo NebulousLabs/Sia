@@ -16,6 +16,28 @@ type InputSignatures struct {
 	Index               int
 }
 
+// OutputSum returns the sum of all the outputs in the transaction, which must
+// match the sum of all the inputs. Outputs created by storage proofs are not
+// considered, as they were already considered when the contract was created.
+func (t Transaction) OutputSum() (sum Currency) {
+	// Add the miner fees.
+	for _, fee := range t.MinerFees {
+		sum += fee
+	}
+
+	// Add the contract payouts
+	for _, contract := range t.FileContracts {
+		sum += contract.Payout
+	}
+
+	// Add the outputs
+	for _, output := range t.Outputs {
+		sum += output.Value
+	}
+
+	return
+}
+
 func (s *State) ValidSignatures(t Transaction) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
