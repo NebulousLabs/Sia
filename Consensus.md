@@ -31,31 +31,37 @@ For signing, our primary goal is verification speed. A secondary goal is an
 algorithm that supports HD keys. A tertiary goal is an algorithm that supports
 threshold signatures.
 
-Hashing: blake2b
+#### Hashing: blake2b
 
-	blake2b has been chosen as a hashing algorithm because it is fast, it has
-	had substantial review, and it has invulnerability to length extension
-	attacks.  Another particularly important feature of BLAKE2b is that it is
-	not SHA-2. We wish to avoid merge mining with Bitcoin, because that may
-	result in many apathetic Bitcoin miners mining on our blockchain, which may
-	make soft forks harder to coordinate.
+  blake2b has been chosen as a hashing algorithm because it is fast, it has had
+  substantial review, and it has invulnerability to length extension attacks.
+  Another particularly important feature of BLAKE2b is that it is not SHA-2. We
+  wish to avoid merge mining with Bitcoin, because that may result in many
+  apathetic Bitcoin miners mining on our blockchain, which may make soft forks
+  harder to coordinate.
 
-	Alternative modes of blake2 have been considered, particularly blake2bp,
-	blake2sp, and and tree mode variants. At this time, we are uncertain about
-	all of the tradeoffs involved, and additionally uncertain about which
-	tradeoffs are worth making, therefore the typically default of blake2b has
-	been chosen.
+  Alternative modes of blake2 have been considered, particularly blake2bp,
+  blake2sp, and and tree mode variants. At this time, we are uncertain about
+  all of the tradeoffs involved, and additionally uncertain about which
+  tradeoffs are worth making, therefore the typically default of blake2b has
+  been chosen.
 
-Signatures: secp256k1 Schnorr Signatures
+#### Signatures: variable type signatures
 
-	secp256k1 has been chosen because of verification speed, and because it is
-	the curve used by Bitcoin. Additionally, there is less controversy aboout
-	the constants compared to NIST curves.
+  Each public key will have an identifier (a 16 byte array) and a byte slice
+  containing an encoding of the public key. The identifier will tell the
+  signature verification which signing algorithm to use when verifiying a
+  signature. Each signature will be a byte slice, the encoding can be
+  determined by looking at the identifier of the corresponding public key.
 
-	Schnorr Signatures have been chosen over ECDSA because of threshold
-	signature support, and because of the simpler implementation. Additionally,
-	Bitcoin developers have expressed several times that they would have
-	preferred Bitcoin to use Schnorr Signatures.
+  This method allows new signature types to be easily added to the currency in
+  a way that does not invalidate existing outputs and keys. Adding a new
+  signature type requires a hardfork, but allows easy protection against
+  cryptographic breaks, and easy migration to new cryptography if there are any
+  breakthroughs in areas like verification speed, ring signatures, etc.
+  
+  Currently, the only allowed algorithm is ed25519. There are plans to also add
+  ECDSA secp256k1 and Schnorr secp256k1.
 
 Currency
 --------
