@@ -18,15 +18,14 @@ type Currency struct {
 	of bool // has an overflow ever occurred?
 }
 
-func NewCurrency(x uint64) *Currency {
+func NewCurrency(x uint64) Currency {
 	return BigToCurrency(new(big.Int).SetUint64(x))
 }
 
-func BigToCurrency(b *big.Int) *Currency {
-	c := new(Currency)
+func BigToCurrency(b *big.Int) (c Currency) {
 	copy(c.b[:], b.Bytes())
 	c.of = b.BitLen() > 128
-	return c
+	return
 }
 
 func (c *Currency) SetBig(b *big.Int) *Currency {
