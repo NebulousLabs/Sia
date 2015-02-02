@@ -182,11 +182,18 @@ Siacoin Inputs
 --------------
 
 Each input spends an output. The output being spent must already exist in the
-state. An output has a value, and a spend hash (or address), which is the hash
-of the 'spend conditions' object of the output. The spend conditions contain a
+state. An output has a value, and a spend hash (or address), which relates to
+the 'spend conditions' object of the output. The spend conditions contain a
 timelock, a number of required signatures, and a set of public keys that can be
 used during signing. The input is invalid if hash of the spend conditions do
 not match the spend hash of the output being spent.
+
+The spend hash is derived by getting the merkle root of a tree whose leaves are
+the hashes of the timelock, the public keys (one leaf per key), and the number
+of signatures. This ordering is chosen specifically because the timelock and
+the number of signatures are low entropy. By using random data as the first and
+last public key, you can make it safe to reveal any of the public keys without
+revealing the low entropy items.
 
 The timelock is a block height, and for the input to be valid, the current
 height of the blockchain must be at least the height stated in the timelock.
@@ -213,9 +220,10 @@ Outputs contain a value and a spend hash (also called a coin address). The
 spend hash is a hash of the spend conditions that must be met to spend the
 output.
 
-The id of a contract is determined by marshalling all of the transaction fields
-except for the signatures and then appending the byte array "scoinout" and the
-index of the output within the transaction, and then taking the hash.
+The id of a contract is determined by marhsalling an identifier with the string
+"siacoin output" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'OutputID' in consensus/types.go
 
 File Contracts
 --------------
@@ -238,9 +246,10 @@ All contracts must have a non-zero payout, 'Start' must be before 'End', and
 'Start' must be greater than the current height of the state. A storage proof
 is acceptible if it is submitted in the block of height 'End'.
 
-The id of a contract is determined by marshalling all of the transaction fields
-except for the signatures and then appending the byte array "filecout" and the
-index of the contract within the transaction, and then taking the hash.
+The id of a contract is determined by marhsalling an identifier with the string
+"file contract" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'FileContractID' in consensus/types.go
 
 Storage Proofs
 --------------
@@ -317,9 +326,10 @@ Sia outputs contain:
   the moment the siafund output got created. This is used when the output is
   spent to determine how many siacoins go to the new output.
 
-The siafund output id is determied by mashalling all of the transaction fields
-except for the signatures and then appending the byte array "sfundout" and the
-index of the output within the transaction.
+The id of a contract is determined by marhsalling an identifier with the string
+"siafund output" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'SiafundOutputID' in consensus/types.go
 
 The id of the siacoin output that gets created when the siafund output is spent
 (the claim id) is derived by hashing the id of the siafund output.

@@ -8,7 +8,7 @@ package consensus
 
 // TODO: Enforce siafund rules in consensus.
 
-// TODO: Switch signature library to libsecpk2561
+// TODO: Switch to typed public keys, with typed verification.
 
 // TODO: Complete non-adversarial test coverage, partial adversarial test
 // coverage.
@@ -25,6 +25,7 @@ type (
 	Currency    uint64
 	Siafund     uint64
 
+	Identifier  [16]byte
 	BlockID     hash.Hash
 	OutputID    hash.Hash
 	ContractID  hash.Hash
@@ -210,6 +211,7 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) ContractID {
 	return ContractID(hash.HashBytes(encoding.MarshalAll(
+		Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'},
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
@@ -218,7 +220,6 @@ func (t Transaction) FileContractID(i int) ContractID {
 		t.SiafundInputs,
 		t.SiafundOutputs,
 		t.ArbitraryData,
-		[8]byte{'f', 'i', 'l', 'e', 'c', 'o', 'u', 't'},
 		i,
 	)))
 }
@@ -228,6 +229,7 @@ func (t Transaction) FileContractID(i int) ContractID {
 // and then appending the string "siacoin output" and the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
+		Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'},
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
@@ -236,7 +238,6 @@ func (t Transaction) OutputID(i int) OutputID {
 		t.SiafundInputs,
 		t.SiafundOutputs,
 		t.ArbitraryData,
-		[8]byte{'s', 'c', 'o', 'i', 'n', 'o', 'u', 't'},
 		i,
 	)))
 }
@@ -255,6 +256,7 @@ func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID)
 // index `i` in the transaction.
 func (t Transaction) SiafundOutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
+		Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'},
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
@@ -263,7 +265,6 @@ func (t Transaction) SiafundOutputID(i int) OutputID {
 		t.SiafundInputs,
 		t.SiafundOutputs,
 		t.ArbitraryData,
-		[8]byte{'s', 'f', 'u', 'n', 'd', 'o', 'u', 't'},
 		i,
 	)))
 }
