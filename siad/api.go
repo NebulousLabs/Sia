@@ -9,16 +9,13 @@ import (
 
 const apiTimeout = 5e9 // 5 seconds
 
-// TODO: timeouts?
-func (d *daemon) handle(addr string) {
+func (d *daemon) listen(addr string) {
 	mux := http.NewServeMux()
 
 	// Host API Calls
-	//
-	// TODO: SetConfig also calls announce(), there should be smarter ways to
-	// handle this.
 	mux.HandleFunc("/host/config", d.hostConfigHandler)
-	mux.HandleFunc("/host/setconfig", d.hostSetConfigHandler)
+	mux.HandleFunc("/host/announce", d.hostAnnounceHandler)
+	mux.HandleFunc("/host/status", d.hostStatusHandler)
 
 	// Miner API Calls
 	mux.HandleFunc("/miner/start", d.minerStartHandler)
@@ -59,6 +56,10 @@ func (d *daemon) handle(addr string) {
 
 	// graceful will run until it catches a signal.
 	// it can also be stopped manually by stopHandler.
+	//
+	// TODO: this fails silently. The error should be checked, but then it
+	// will print an error even if interrupted normally. Need a better
+	// solution.
 	d.apiServer.ListenAndServe()
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // uniformTreeVerification checks that everything makes sense in the tree given
@@ -35,14 +36,14 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	if !testing.Short() {
 		// Pull a bunch of random hosts and count how many times we pull each
 		// host.
-		selectionMap := make(map[string]int)
+		selectionMap := make(map[network.Address]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
 			entry, err := hdb.RandomHost()
 			if err != nil {
 				t.Fatal(err)
 			}
-			selectionMap[entry.ID] = selectionMap[entry.ID] + 1
+			selectionMap[entry.IPAddress] = selectionMap[entry.IPAddress] + 1
 		}
 
 		// See if each host was selected enough times.
@@ -59,7 +60,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
-	hdb, err := New()
+	hdb, err := New(consensus.CreateGenesisState())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,12 +68,11 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		entry := modules.HostEntry{
-			ID:     strconv.Itoa(i),
-			Burn:   10,
-			Freeze: 10,
-			Price:  10,
-		}
+		var entry modules.HostEntry
+		entry.Collateral = 10
+		entry.Price = 10
+		entry.Freeze = 10
+		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions, t)
@@ -97,7 +97,7 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdb.Remove(strconv.Itoa(randInt))
+		err := hdb.Remove(network.Address(strconv.Itoa(randInt)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,12 +108,11 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := modules.HostEntry{
-			ID:     strconv.Itoa(i),
-			Burn:   10,
-			Freeze: 10,
-			Price:  10,
-		}
+		var entry modules.HostEntry
+		entry.Collateral = 10
+		entry.Price = 10
+		entry.Freeze = 10
+		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)

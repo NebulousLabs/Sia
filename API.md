@@ -7,7 +7,7 @@ Errors are sent as plaintext, accompanied by an appropriate status code.
 | Path              | Params                           | Response                     |
 |:------------------|:---------------------------------|:-----------------------------|
 | /host/config      |                                  | See HostInfo                 |
-| /host/setconfig   | See HostInfo                     |                              |
+| /host/setconfig   | See HostSettings                 |                              |
 | /miner/start      | `threads`                        |                              |
 | /miner/status     |                                  | See MinerInfo                |
 | /miner/stop       |                                  |                              |
@@ -27,21 +27,32 @@ Errors are sent as plaintext, accompanied by an appropriate status code.
 | /stop             |                                  |                              |
 | /sync             |                                  |                              |
 
-HostInfo comprises the following values:
+HostInfo is a JSON object containing the following values:
 ```
-totalstorage 
-minfile 
-maxfile 
-mintolerance 
-minduration 
-maxduration 
-minwin 
-maxwin 
-freezeduration 
-price 
-penalty 
-freezevolume
+    TotalStorage"
+    "Minfilesize"
+    "Maxfilesize"
+    "Minwindow"
+    "Minduration"
+    "Maxduration"
+    "Price"
+    "Collateral"
+    "StorageRemaining"
+    "NumContracts"
+``
+
+HostSettings: the following parameters can be set via `/host/setconfig`:
 ```
+totalstorage
+minfilesize
+maxfilesize
+minwindow
+minduration
+maxduration
+price
+collateral
+```
+Only the values specified in the call will be updated.
 
 WalletInfo is a JSON object containing the following fields:
 ```

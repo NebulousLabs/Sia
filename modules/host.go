@@ -4,29 +4,54 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
 	AcceptContractResponse = "accept"
 )
 
+// ContractTerms are the parameters agreed upon by a client and a host when
+// forming a FileContract.
+type ContractTerms struct {
+	FileSize           uint64
+	StartHeight        consensus.BlockHeight
+	WindowSize         consensus.BlockHeight // how many blocks a host has to submit each proof
+	NumWindows         uint64
+	Price              consensus.Currency // client contribution towards payout each window
+	Collateral         consensus.Currency // host contribution towards payout each window
+	ValidProofAddress  consensus.CoinAddress
+	MissedProofAddress consensus.CoinAddress
+}
+
+type HostInfo struct {
+	HostSettings
+
+	StorageRemaining int64
+	NumContracts     int
+}
+
 type Host interface {
-	// Announce puts an annoucement out so that clients can find the host.
-	AnnounceHost(freezeVolume consensus.Currency, freezeUnlockHeight consensus.BlockHeight) (consensus.Transaction, error)
+	// Announce announces the host on the blockchain. A host announcement
+	// requires two things: the host's address, and a volume of "frozen"
+	// (time-locked) coins, used to mitigate Sybil attacks.
+	Announce(addr network.Address, freezeValue consensus.Currency, freezeDuration consensus.BlockHeight) error
 
 	// NegotiateContract is a strict function that enables a client to
 	// communicate with the host to propose a contract.
 	//
 	// TODO: enhance this documentataion. For now, see the host package for a
 	// reference implementation.
-	NegotiateContract(conn net.Conn) error
+	NegotiateContract(net.Conn) error
 
 	// RetrieveFile is a strict function that enables a client to download a
 	// file from a host.
-	RetrieveFile(conn net.Conn) error
+	RetrieveFile(net.Conn) error
 
-	// Returns the number of contracts being managed by the host.
-	//
-	// TODO: Switch all of this to a status struct.
-	NumContracts() int
+	// SetConfig sets the hosting parameters of the host.
+	SetConfig(HostSettings)
+
+	// Info returns info about the host, including its hosting parameters, the
+	// amount of storage remaining, and the number of active contracts.
+	Info() HostInfo
 }

@@ -5,8 +5,8 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -23,20 +23,23 @@ const (
 )
 
 type contractObligation struct {
-	filename string // Where on disk the file is stored.
+	path string // Where on disk the file is stored.
 }
 
 type Host struct {
 	state       *consensus.State
+	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	hostDir string
-	// announcement   modules.HostAnnouncement
+	// our HostSettings, embedded for convenience
+	modules.HostSettings
+
+	hostDir        string
 	spaceRemaining int64
 	fileCounter    int
 
-	contracts map[consensus.ContractID]contractObligation // The string is filepath of the file being stored.
+	contracts map[consensus.ContractID]contractObligation
 
 	mu sync.RWMutex
 }
@@ -52,7 +55,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		return
 	}
 
-	// addr, _, err := wallet.CoinAddress()
+	addr, _, err := wallet.CoinAddress()
 	if err != nil {
 		return
 	}
@@ -60,16 +63,15 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 		state:  state,
 		wallet: wallet,
 
-		/*
-			announcement: modules.HostAnnouncement{
-				MaxFilesize: 4 * 1000 * 1000,
-				MaxDuration: 1008, // One week.
-				MinWindow:   20,
-				Price:       1,
-				Burn:        1,
-				CoinAddress: addr,
-			},
-		*/
+		// default host settings
+		HostSettings: modules.HostSettings{
+			MaxFilesize: 4 * 1000 * 1000,
+			MaxDuration: 1008, // One week.
+			MinWindow:   20,
+			Price:       1,
+			Collateral:  1,
+			CoinAddress: addr,
+		},
 
 		contracts: make(map[consensus.ContractID]contractObligation),
 	}
@@ -96,19 +98,20 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Verify the file exists, using a mutex while reading the host.
 	h.mu.RLock()
 	contractObligation, exists := h.contracts[contractID]
+	h.mu.RUnlock()
 	if !exists {
-		h.mu.RUnlock()
 		return errors.New("no record of that file")
 	}
-	h.mu.RUnlock()
 
 	// Open the file.
-	fullname := filepath.Join(h.hostDir, contractObligation.filename)
-	file, err := os.Open(fullname)
+	file, err := os.Open(contractObligation.path)
 	if err != nil {
 		return
 	}
 	defer file.Close()
+	info, _ := file.Stat()
+
+	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 8 * time.Microsecond))
 
 	// Transmit the file.
 	_, err = io.Copy(conn, file)
@@ -119,9 +122,29 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	return
 }
 
-// TODO: Deprecate this function.
-func (h *Host) NumContracts() int {
+// SetConfig updates the host's internal HostSettings object. To modify
+// a specific field, use a combination of Info and SetConfig
+func (h *Host) SetConfig(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return len(h.contracts)
+	h.HostSettings = settings
+}
+
+// Settings is an RPC used to request the settings of a host.
+func (h *Host) Settings() (modules.HostSettings, error) {
+	// TODO: return an error if we haven't announced yet
+	return h.HostSettings, nil
+}
+
+func (h *Host) Info() modules.HostInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	info := modules.HostInfo{
+		HostSettings: h.HostSettings,
+
+		StorageRemaining: h.spaceRemaining,
+		NumContracts:     len(h.contracts),
+	}
+	return info
 }

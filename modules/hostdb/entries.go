@@ -13,14 +13,15 @@ import (
 
 // host.Weight() determines the weight of a specific host, which is:
 //
-//		Freeze * Burn / square(Price).
+//		Freeze * Collateral / square(Price).
 //
 // Freeze has to be linear, because any non-linear freeze will invite sybil
 // attacks.
 //
-// For now, Burn is also linear because an increased burn means increased risk
-// for the host (Freeze on the other hand has no risk). It might be better to
-// make burn grow sublinearly, such as taking sqrt(Burn) or burn^(4/5).
+// For now, Collateral is also linear because an increased burn means
+// increased risk for the host (Freeze on the other hand has no risk). It
+// might be better to make burn grow sublinearly, such as taking
+// sqrt(Collateral) or burn^(4/5).
 //
 // We take the square of the price to heavily emphasize hosts that have a low
 // price. This is also a bit simplistic however, because we're not sure what
@@ -32,17 +33,17 @@ func entryWeight(entry modules.HostEntry) consensus.Currency {
 	if entry.Price == 0 {
 		entry.Price = 1
 	}
-	if entry.Burn == 0 {
-		entry.Burn = 1
+	if entry.Collateral == 0 {
+		entry.Collateral = 1
 	}
 	if entry.Freeze == 0 {
 		entry.Freeze = 1
 	}
 
-	adjustedBurn := float64(entry.Burn)
+	adjustedCollateral := float64(entry.Collateral)
 	adjustedFreeze := float64(entry.Freeze)
 	adjustedPrice := math.Sqrt(float64(entry.Price))
 
-	weight := adjustedFreeze * adjustedBurn / adjustedPrice
+	weight := adjustedFreeze * adjustedCollateral / adjustedPrice
 	return consensus.Currency(weight)
 }

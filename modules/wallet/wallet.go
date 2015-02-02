@@ -106,7 +106,7 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddres
 	if err != nil {
 		return
 	}
-	err = w.AddOutput(id, output)
+	_, err = w.AddOutput(id, output)
 	if err != nil {
 		return
 	}

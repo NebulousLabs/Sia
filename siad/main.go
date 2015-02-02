@@ -83,9 +83,8 @@ func init() {
 
 func startEnvironment(*cobra.Command, []string) {
 	daemonConfig := DaemonConfig{
-		APIAddr:     config.Siad.APIaddr,
-		RPCAddr:     config.Siacore.RPCaddr,
-		NoBootstrap: config.Siacore.NoBootstrap,
+		APIAddr: config.Siad.APIaddr,
+		RPCAddr: config.Siacore.RPCaddr,
 
 		HostDir: config.Siacore.HostDirectory,
 
@@ -98,14 +97,19 @@ func startEnvironment(*cobra.Command, []string) {
 	err := config.expand()
 	if err != nil {
 		fmt.Println("Bad config value:", err)
+		return
 	}
 	d, err := newDaemon(daemonConfig)
 	if err != nil {
 		fmt.Println("Failed to start daemon:", err)
 		return
 	}
-
-	d.handle(daemonConfig.APIAddr)
+	// join the network
+	if !config.Siacore.NoBootstrap {
+		go d.bootstrap()
+	}
+	// listen for API requests
+	d.listen(daemonConfig.APIAddr)
 }
 
 func version(*cobra.Command, []string) {
