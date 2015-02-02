@@ -19,34 +19,43 @@ Cryptographic Algorithms
 
 Sia uses cryptographic hashing and cryptographic signing, each of which has
 many potentially secure algorithms that can be used. We acknoledge our
-inexperience, and acknoledge that if we have picked the optimal algorithms for
-each, it will have been by accident. In particular, there is low confidence
-that ed25519 is the correct choice for a signature algorithm.
+inexperience, and that we have chosen these algorithms not because of our own
+confidence in their properties, but because other people seem confident in
+their properties.
 
 For hashing, our primary goal is to use an algorithm that cannot be merge mined
-with Bitcoin, even partially. A secondary goal is hashing speed.
+with Bitcoin, even partially. A secondary goal is hashing speed on consumer
+hardware, including phones and other low power devices.
 
 For signing, our primary goal is verification speed. A secondary goal is an
 algorithm that supports HD keys. A tertiary goal is an algorithm that supports
-threshold signatures, such as Schorr Signatures.
+threshold signatures.
 
-Hashing: BLAKE2b
+Hashing: blake2b
 
-BLAKE2b has been chosen as a hashing algorithm because it is fast, it has had
-substantial review, and it has invulnerability to length extension attacks.
-Another particularly important feature of BLAKE2b is that it is not SHA-2. We
-wish to avoid merge mining with Bitcoin, because that may result in many
-apathetic Bitcoin miners mining on our blockchain, which may make soft forks
-harder to coordinate.
+	blake2b has been chosen as a hashing algorithm because it is fast, it has
+	had substantial review, and it has invulnerability to length extension
+	attacks.  Another particularly important feature of BLAKE2b is that it is
+	not SHA-2. We wish to avoid merge mining with Bitcoin, because that may
+	result in many apathetic Bitcoin miners mining on our blockchain, which may
+	make soft forks harder to coordinate.
 
-Signatures: ed25519
+	Alternative modes of blake2 have been considered, particularly blake2bp,
+	blake2sp, and and tree mode variants. At this time, we are uncertain about
+	all of the tradeoffs involved, and additionally uncertain about which
+	tradeoffs are worth making, therefore the typically default of blake2b has
+	been chosen.
 
-ed25519 has been chosen for signing because of the fast verification time, and
-the general support that it receives from the crypto community.
+Signatures: secp256k1 Schnorr Signatures
 
-secp256k1 has also been considered. Unlike for mining, there is no inherent
-problem with using the same algorithm as Bitcoin. It is however known to be
-slower than ed25519 and curve25519.
+	secp256k1 has been chosen because of verification speed, and because it is
+	the curve used by Bitcoin. Additionally, there is less controversy aboout
+	the constants compared to NIST curves.
+
+	Schnorr Signatures have been chosen over ECDSA because of threshold
+	signature support, and because of the simpler implementation. Additionally,
+	Bitcoin developers have expressed several times that they would have
+	preferred Bitcoin to use Schnorr Signatures.
 
 Currency
 --------
