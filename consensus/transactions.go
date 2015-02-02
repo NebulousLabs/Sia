@@ -40,6 +40,24 @@ func (t Transaction) validStorageProofs() bool {
 	return true
 }
 
+// sortedUnique checks that all of the elements in a []unit64 are sorted and
+// without repeates, and also checks that the largest element is less than or
+// equal to the biggest allowed element.
+func sortedUnique(elems []uint64, biggestAllowed int) (err error) {
+	biggest := elems[0]
+	for _, elem := range elems[1:] {
+		if elem <= biggest {
+			err = errors.New("covered fields sorting violation")
+			return
+		}
+	}
+	if int(biggest) > biggestAllowed {
+		err = errors.New("covered fields indexing violation")
+		return
+	}
+	return
+}
+
 // validCoveredFields makes sure that all covered fields objects in the
 // signatures follow the rules. This means that if `WholeTransaction` is set to
 // true, all fields except for `Signatures` must be empty. All fields must be
@@ -65,77 +83,41 @@ func (t Transaction) validCoveredFields() (err error) {
 		// Check that all fields are sorted, and without repeat values, and
 		// that all elements point to objects that exists within the
 		// transaction.
-		biggest := -1
-		for _, elem := range cf.Inputs {
-			if int(elem) <= biggest || int(elem) >= len(cf.Inputs) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.Inputs, len(cf.Inputs)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.MinerFees {
-			if int(elem) <= biggest || int(elem) >= len(cf.MinerFees) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.MinerFees, len(cf.MinerFees)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.Outputs {
-			if int(elem) <= biggest || int(elem) >= len(cf.Outputs) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.Outputs, len(cf.Outputs)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.FileContracts {
-			if int(elem) <= biggest || int(elem) >= len(cf.FileContracts) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.FileContracts, len(cf.FileContracts)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.StorageProofs {
-			if int(elem) <= biggest || int(elem) >= len(cf.StorageProofs) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.StorageProofs, len(cf.StorageProofs)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.SiafundInputs {
-			if int(elem) <= biggest || int(elem) >= len(cf.SiafundInputs) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.SiafundInputs, len(cf.SiafundInputs)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.SiafundOutputs {
-			if int(elem) <= biggest || int(elem) >= len(cf.SiafundOutputs) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.SiafundOutputs, len(cf.SiafundOutputs)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.ArbitraryData {
-			if int(elem) <= biggest || int(elem) >= len(cf.ArbitraryData) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.ArbitraryData, len(cf.ArbitraryData)-1)
+		if err != nil {
+			return
 		}
-		biggest = -1
-		for _, elem := range cf.Signatures {
-			if int(elem) <= biggest || int(elem) >= len(cf.Signatures) {
-				err = errors.New("covered fields violation")
-				return
-			}
-			biggest = int(elem)
+		err = sortedUnique(cf.Signatures, len(cf.Signatures)-1)
+		if err != nil {
+			return
 		}
 	}
 

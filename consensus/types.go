@@ -8,6 +8,11 @@ package consensus
 
 // TODO: Enforce siafund rules in consensus.
 
+// TODO: Switch signature library to libsecpk2561
+
+// TODO: Complete non-adversarial test coverage, partial adversarial test
+// coverage.
+
 import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
