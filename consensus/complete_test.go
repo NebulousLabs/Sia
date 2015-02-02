@@ -48,12 +48,44 @@ func rewindApplyCheck(t *testing.T, s *State) {
 	}
 }
 
+// currencyCheck uses the height to determine the total amount of currency that
+// should be in the system, and then tallys up the outputs to see if that is
+// the case.
+func currencyCheck(t *testing.T, s *State) {
+	siafunds := Currency(0)
+	for _, siafundOutput := range s.unspentSiafundOutputs {
+		siafunds += siafundOutput.Value
+	}
+	if siafunds != SiafundCount {
+		t.Error("siafunds inconsistency")
+	}
+
+	expectedSiacoins := Currency(0)
+	for i := BlockHeight(0); i <= s.Height(); i++ {
+		expectedSiacoins += CalculateCoinbase(i)
+	}
+	siacoins := Currency(0)
+	for _, output := range s.unspentOutputs {
+		siacoins += output.Value
+	}
+	for _, contract := range s.openContracts {
+		siacoins += contract.Payout
+	}
+	siacoins += s.siafundPool
+	if siacoins != expectedSiacoins {
+		t.Error(siacoins)
+		t.Error(expectedSiacoins)
+		t.Error("siacoins inconsistency")
+	}
+}
+
 // consistencyChecks calls all of the consistency functions on each of the
 // states.
 func consistencyChecks(t *testing.T, states ...*State) {
 	for _, s := range states {
 		currentPathCheck(t, s)
 		rewindApplyCheck(t, s)
+		currencyCheck(t, s)
 	}
 }
 

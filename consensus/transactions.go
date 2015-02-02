@@ -20,6 +20,26 @@ type InputSignatures struct {
 	Index               int
 }
 
+// validStorageProofs checks that a transaction follows the limitations placed
+// on transactions with storage proofs.
+func (t Transaction) validStorageProofs() bool {
+	if len(t.StorageProofs) == 0 {
+		return true
+	}
+
+	if len(t.Outputs) != 0 {
+		return false
+	}
+	if len(t.FileContracts) != 0 {
+		return false
+	}
+	if len(t.SiafundOutputs) != 0 {
+		return false
+	}
+
+	return true
+}
+
 // validCoveredFields makes sure that all covered fields objects in the
 // signatures follow the rules. This means that if `WholeTransaction` is set to
 // true, all fields except for `Signatures` must be empty. All fields must be
@@ -207,6 +227,12 @@ func (s *State) validInput(input Input) (err error) {
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
 func (s *State) validTransaction(t Transaction) (err error) {
+	// Check that the storage proof guidelines are followed.
+	if !t.validStorageProofs() {
+		err = errors.New("transaction contains storage proofs and conflicts")
+		return
+	}
+
 	// Validate each input and get the total amount of Currency.
 	inputSum := Currency(0)
 	for _, input := range t.Inputs {

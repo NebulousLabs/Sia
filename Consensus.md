@@ -20,7 +20,8 @@ Cryptographic Algorithms
 Sia uses cryptographic hashing and cryptographic signing, each of which has
 many potentially secure algorithms that can be used. We acknoledge our
 inexperience, and acknoledge that if we have picked the optimal algorithms for
-each, it will have been by accident.
+each, it will have been by accident. In particular, there is low confidence
+that ed25519 is the correct choice for a signature algorithm.
 
 For hashing, our primary goal is to use an algorithm that cannot be merge mined
 with Bitcoin, even partially. A secondary goal is hashing speed.
@@ -371,3 +372,7 @@ The required target for the next block shall be [0, 0, 0, 1, 0...], where each
 value is a byte.
 
 The genesis block does not need to meet a particular target.
+
+The genesis state needs to have an output to the zero address from the genesis
+block, and a siafund output to the Nebulous Genesis Address for 10,000
+siafunds (both the spend hash and the claim destination), having the zero id.

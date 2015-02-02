@@ -6,8 +6,6 @@ package consensus
 // TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
 // payouts, storage proof outputs, siafund claims.
 
-// TODO: Enforce restrictions on which storage proof transactions are legal
-
 // TODO: Enforce siafund rules in consensus.
 
 import (
@@ -120,7 +118,7 @@ type SiafundInput struct {
 // output is spent. The ClaimStart will be comapred to the SiafundPool to
 // figure out how many siacoins the ClaimDestination will receive.
 type SiafundOutput struct {
-	Value            Siafund
+	Value            Currency
 	SpendHash        CoinAddress
 	ClaimDestination CoinAddress
 	ClaimStart       Currency

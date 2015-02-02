@@ -33,10 +33,12 @@ type State struct {
 
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
-	currentBlockID BlockID
-	currentPath    map[BlockHeight]BlockID
-	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]FileContract
+	currentBlockID        BlockID
+	currentPath           map[BlockHeight]BlockID
+	siafundPool           Currency
+	unspentSiafundOutputs map[OutputID]SiafundOutput
+	unspentOutputs        map[OutputID]Output
+	openContracts         map[ContractID]FileContract
 
 	mu sync.RWMutex
 }
@@ -47,11 +49,12 @@ type State struct {
 func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		badBlocks:      make(map[BlockID]struct{}),
-		blockMap:       make(map[BlockID]*blockNode),
-		currentPath:    make(map[BlockHeight]BlockID),
-		openContracts:  make(map[ContractID]FileContract),
-		unspentOutputs: make(map[OutputID]Output),
+		badBlocks:             make(map[BlockID]struct{}),
+		blockMap:              make(map[BlockID]*blockNode),
+		currentPath:           make(map[BlockHeight]BlockID),
+		openContracts:         make(map[ContractID]FileContract),
+		unspentOutputs:        make(map[OutputID]Output),
+		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
@@ -68,6 +71,15 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Fill out the consensus informaiton for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
+	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = Output{
+		Value:     CalculateCoinbase(0),
+		SpendHash: ZeroAddress,
+	}
+	s.unspentSiafundOutputs[OutputID{}] = SiafundOutput{
+		Value:            10 * 1000,
+		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Address
+		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis Address
+	}
 
 	return
 }
