@@ -72,14 +72,14 @@ dependencies:
 	go get -u golang.org/x/tools/cmd/cover
 
 # release builds and installs release binaries.
-release: dependencies test-long
+release: dependencies test-long REBUILD
 	go install ./...
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
-xc: dependencies test-long
+xc: dependencies test-long REBUILD
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.2.0          \
 		-br=release -pr=beta -include=example-config,LICENSE*,README*           \
 		-tasks-=deb,deb-dev,deb-source,go-test
 
-.PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc
+.PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc REBUILD

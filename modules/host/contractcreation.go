@@ -65,11 +65,11 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 	case terms.MissedProofAddress != consensus.ZeroAddress:
 		return errors.New("burn payout needs to go to the zero address")
-	// TODO: should this be <= ?
-	case terms.Price != h.Price:
+
+	case terms.Price < h.Price:
 		return errors.New("price does not match host settings")
-	// TODO: should this be >= ?
-	case terms.Collateral != h.Collateral:
+
+	case terms.Collateral > h.Collateral:
 		return errors.New("collateral does not match host settings")
 	}
 
@@ -78,7 +78,6 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
-// TODO: could this just return a bool (i.e. "contract does not match terms"?)
 func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot hash.Hash) error {
 	switch {
 	case contract.FileSize != terms.FileSize:

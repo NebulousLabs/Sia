@@ -6,12 +6,12 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// TODO: embed ContractTerms?
+// UploadParams contains the information used by the Renter to upload a file,
+// including the file contents and the duration for which it is to be stored.
 type UploadParams struct {
 	Data     io.ReadSeeker
 	Duration consensus.BlockHeight
 	Delay    consensus.BlockHeight
-	FileSize uint64
 
 	// these fields are not seen by the host
 	Nickname string
