@@ -1,9 +1,9 @@
 package hash
 
 import (
-	"crypto/sha256"
-
 	"github.com/NebulousLabs/Sia/encoding"
+
+	"github.com/codahale/blake2"
 )
 
 const (
@@ -14,8 +14,12 @@ type (
 	Hash [HashSize]byte
 )
 
-func HashBytes(data []byte) Hash {
-	return sha256.Sum256(data)
+func HashBytes(data []byte) (hash Hash) {
+	hasher := blake2.New(&blake2.Config{Size: HashSize})
+	hasher.Write(data)
+	sum := hasher.Sum(nil)
+	copy(hash[:], sum)
+	return
 }
 
 func HashObject(obj interface{}) Hash {
