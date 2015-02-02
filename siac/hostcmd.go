@@ -1,12 +1,11 @@
 package main
 
-/*
 import (
 	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -14,26 +13,60 @@ var (
 		Use:   "host",
 		Short: "Perform host actions",
 		Long:  "View or modify host settings. Modifying host settings also announces the host to the network.",
-		Run:   wrap(hostconfigcmd),
+		Run:   wrap(hoststatuscmd),
 	}
 
-	hostConfigCmd = &cobra.Command{
-		Use:   "config",
+	hostSetCmd = &cobra.Command{
+		Use:   "set [setting] [value]",
+		Short: "Modify host settings",
+		Long: `Modify host settings.
+Available settings:
+	totalstorage
+	maxfilesize
+	mintolerance
+	maxduration
+	price
+	collateral`,
+		Run: wrap(hostsetcmd),
+	}
+
+	hostAnnounceCmd = &cobra.Command{
+		Use:   "announce [freezeVolume] [freezeDuration]",
+		Short: "Announce yourself as a host",
+		Long: `Announce yourself as a host on the network.
+An announcement requires 'freezing' a volume of coins for a number of blocks,
+as a defense against Sybil attacks. Before announcing, you should set your
+hosting parameters via 'host setconfig'.`,
+		Run: wrap(hostannouncecmd)}
+
+	hostStatusCmd = &cobra.Command{
+		Use:   "status",
 		Short: "View host settings",
 		Long:  "View host settings, including available storage, price, and more.",
-		Run:   wrap(hostconfigcmd),
-	}
-
-	hostSetConfigCmd = &cobra.Command{
-		Use:   "setconfig [totalstorage] [maxfilesize] [mintolerance] [maxduration] [price] [burn]",
-		Short: "Modify host settings",
-		Long:  "Modify host settings, including available storage, price, and more. The new settings will be be announced to the network.",
-		Run:   wrap(hostsetconfigcmd),
+		Run:   wrap(hoststatuscmd),
 	}
 )
 
-func hostconfigcmd() {
-	config := new(host.HostInfo)
+func hostsetcmd(param, value string) {
+	err := callAPI(fmt.Sprintf("/host/setconfig?%s=%s", param, value))
+	if err != nil {
+		fmt.Println("Could not update host settings:", err)
+		return
+	}
+	fmt.Println("Host settings updated.")
+}
+
+func hostannouncecmd(freezeVolume, freezeDuration string) {
+	err := callAPI(fmt.Sprintf("/host/announce?freezeVolume=%s&freezeDuration=%s", freezeVolume, freezeDuration))
+	if err != nil {
+		fmt.Println("Could not announce host:", err)
+		return
+	}
+	fmt.Println("Host announcement submitted to network.")
+}
+
+func hoststatuscmd() {
+	config := new(modules.HostInfo)
 	err := getAPI("/host/config", config)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)
@@ -42,22 +75,8 @@ func hostconfigcmd() {
 	fmt.Printf(`Host settings:
 Storage:      %v bytes (%v remaining)
 Price:        %v coins
+Collateral:   %v
 Max Filesize: %v
 Max Duration: %v
-Burn:         %v
-`, config.Announcement.TotalStorage, config.StorageRemaining, config.Announcement.Price, config.Announcement.MaxFilesize,
-		config.Announcement.MaxDuration, config.Announcement.Burn)
+`, config.TotalStorage, config.StorageRemaining, config.Price, config.Collateral, config.MaxFilesize, config.MaxDuration)
 }
-
-// TODO: settings should be updated individually, then submitted together in a
-// separate API call.
-func hostsetconfigcmd(totalstorage, maxfilesize, mintolerance, maxduration, price, burn string) {
-	err := callAPI(fmt.Sprintf("/host/setconfig?totalstorage=%s&maxfilesize=%s&mintolerance=%s"+
-		"&maxduration=%s&price=%s&burn=%s", totalstorage, maxfilesize, mintolerance, maxduration, price, burn))
-	if err != nil {
-		fmt.Println("Could not update host settings:", err)
-		return
-	}
-	fmt.Println("Host settings updated. You have been announced as a host on the network.")
-}
-*/

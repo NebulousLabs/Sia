@@ -7,8 +7,7 @@ import (
 )
 
 const (
-	HashSize    = 32
-	SegmentSize = 64 // Size of smallest piece of a file which gets hashed when building the Merkle tree.
+	HashSize = 32
 )
 
 type (

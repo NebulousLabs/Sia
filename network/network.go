@@ -39,6 +39,8 @@ type TCPServer struct {
 
 // Address returns the Address of the server.
 func (tcps *TCPServer) Address() Address {
+	tcps.RLock()
+	defer tcps.RUnlock()
 	return tcps.myAddr
 }
 
@@ -63,7 +65,9 @@ func (tcps *TCPServer) setHostname(host string) bool {
 	if !Ping(newAddr) {
 		return false
 	}
+	tcps.Lock()
 	tcps.myAddr = newAddr
+	tcps.Unlock()
 	return true
 }
 

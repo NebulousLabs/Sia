@@ -29,6 +29,8 @@ type (
 	Target      hash.Hash
 )
 
+var ZeroAddress = CoinAddress{0}
+
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and
 // rewarding to find a block.
@@ -89,7 +91,7 @@ type Output struct {
 // stores a file.
 type FileContract struct {
 	FileMerkleRoot     hash.Hash
-	FileSize           uint64 // in bytes
+	FileSize           uint64
 	Start, End         BlockHeight
 	Payout             Currency
 	ValidProofAddress  CoinAddress

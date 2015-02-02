@@ -3,11 +3,19 @@ package host
 import (
 	"errors"
 	"os"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/hash"
 )
+
+// ContractEntry houses a single contract with its id - you cannot derive the
+// id of a contract without having the transaction. Rather than keep the whole
+// transaction, we store only the id.
+// TODO: is this needed?
+type ContractEntry struct {
+	ID       consensus.ContractID
+	Contract consensus.FileContract
+}
 
 // TODO: Hold off on both storage proofs and deleting files for a few blocks
 // after the first possible opportunity to reduce risk of loss due to
@@ -123,27 +131,23 @@ func (h *Host) threadedConsensusListen(updateChan chan struct{}) {
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
 func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.BlockHeight) (sp consensus.StorageProof, err error) {
-	// Get the file associated with the contract.
 	contractObligation, exists := h.contracts[entry.ID]
 	if !exists {
 		err = errors.New("no record of that file")
 		return
 	}
-	fullname := filepath.Join(h.hostDir, contractObligation.filename)
 
-	// Open the file.
-	file, err := os.Open(fullname)
+	file, err := os.Open(contractObligation.path)
 	if err != nil {
 		return
 	}
 	defer file.Close()
 
-	// Build the proof using the hash library.
-	numSegments := hash.CalculateSegments(entry.Contract.FileSize)
 	segmentIndex, err := h.state.StorageProofSegment(entry.ID)
 	if err != nil {
 		return
 	}
+	numSegments := hash.CalculateSegments(entry.Contract.FileSize)
 	base, hashSet, err := hash.BuildReaderProof(file, numSegments, segmentIndex)
 	if err != nil {
 		return

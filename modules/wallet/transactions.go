@@ -99,17 +99,20 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
 }
 
 // AddOutput adds an output to the transaction, but will not add any inputs.
-func (w *Wallet) AddOutput(id string, output consensus.Output) error {
+// It returns the index of the output in the transaction.
+func (w *Wallet) AddOutput(id string, output consensus.Output) (index uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction found for given id")
+		err = errors.New("no transaction found for given id")
+		return
 	}
 
 	openTxn.transaction.Outputs = append(openTxn.transaction.Outputs, output)
-	return nil
+	index = uint64(len(openTxn.transaction.Outputs) - 1)
+	return
 }
 
 // AddFileContract implements the core.Wallet interface.

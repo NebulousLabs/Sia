@@ -104,12 +104,11 @@ func main() {
 		Run:   version,
 	})
 
-	// TODO: Bring these back
-	// root.AddCommand(hostCmd)
-	// hostCmd.AddCommand(hostConfigCmd, hostSetConfigCmd)
+	root.AddCommand(hostCmd)
+	hostCmd.AddCommand(hostSetCmd, hostAnnounceCmd, hostStatusCmd)
 
 	root.AddCommand(minerCmd)
-	minerCmd.AddCommand(minerStartCmd, minerStatusCmd, minerStopCmd)
+	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)

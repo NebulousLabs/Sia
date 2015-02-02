@@ -37,8 +37,9 @@ type Wallet interface {
 	// AddMinerFee adds a single miner fee of value `fee`.
 	AddMinerFee(id string, fee consensus.Currency) error
 
-	// AddOutput adds an output to a transaction.
-	AddOutput(id string, output consensus.Output) error
+	// AddOutput adds an output to a transaction. It returns the index of the
+	// output in the transaction.
+	AddOutput(id string, output consensus.Output) (uint64, error)
 
 	// AddFileContract adds a file contract to a transaction.
 	AddFileContract(id string, fc consensus.FileContract) error
