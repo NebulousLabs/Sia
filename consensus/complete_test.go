@@ -67,8 +67,6 @@ func orderedTestBattery(t *testing.T, states ...*State) {
 		testLargeBlock(t, s)
 		testMinerPayouts(t, s)
 		testMissedTarget(t, s)
-		testMultiOrphanBlock(t, s)
-		testOrphanBlock(t, s)
 		testRepeatBlock(t, s)
 	}
 }

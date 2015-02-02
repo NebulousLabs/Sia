@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/big"
 )
 
@@ -84,36 +83,6 @@ func (s *State) addBlockToTree(b Block) (err error) {
 			return
 		}
 	}
-
-	// Reconnect all orphans that now have a parent.
-	childMap := s.missingParents[b.ID()]
-	for _, child := range childMap {
-		// This is a recursive call, which means someone could make it take
-		// a long time by giving us a bunch of false orphan blocks with the
-		// same parent. We have to check them all anyway though, it just
-		// allows them to cluster the processing. Utimately I think
-		// bandwidth will be the bigger issue, we'll reject bad orphans
-		// before we verify signatures.
-		err = s.validHeader(child)
-		if err != nil {
-			// TODO: There's nothing we can really do about the error that gets
-			// returned, because it doesn't reflect a problem with the current
-			// block. It means that someone managed to give us orphans with
-			// errors.
-			fmt.Println(err)
-			continue
-		}
-		err = s.addBlockToTree(child)
-		if err != nil {
-			// TODO: There's nothing we can really do about the error that gets
-			// returned, because it doesn't reflect a problem with the current
-			// block. It means that someone managed to give us orphans with
-			// errors.
-			fmt.Println(err)
-		}
-
-	}
-	delete(s.missingParents, b.ID())
 
 	return
 }

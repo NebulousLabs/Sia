@@ -29,42 +29,11 @@ var (
 	BlockKnownErr     = errors.New("block exists in block map.")
 	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
 	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
-	KnownOrphanErr    = errors.New("block is a known orphan")
+	OrphanErr         = errors.New("block has no known parent")
 	LargeBlockErr     = errors.New("block is too large to be accepted")
 	MinerPayoutErr    = errors.New("miner payout sum does not equal block subsidy")
 	MissedTargetErr   = errors.New("block does not meet target")
-	UnknownOrphanErr  = errors.New("block is an unknown orphan")
 )
-
-// handleOrphanBlock adds a block to the list of orphans, returning an error
-// indicating whether the orphan existed previously or not. handleOrphanBlock
-// always returns an error.
-func (s *State) handleOrphanBlock(b Block) error {
-	// Sanity check - block must be an orphan!
-	if DEBUG {
-		_, exists := s.blockMap[b.ParentID]
-		if exists {
-			panic("Incorrect use of handleOrphanBlock")
-		}
-	}
-
-	// Check if the missing parent is unknown
-	missingParent, exists := s.missingParents[b.ParentID]
-	if !exists {
-		// Add an entry for the parent and add the orphan block to the entry.
-		s.missingParents[b.ParentID] = make(map[BlockID]Block)
-		s.missingParents[b.ParentID][b.ID()] = b
-		return UnknownOrphanErr
-	}
-
-	// Check if the orphan is already known, and add the orphan if not.
-	_, exists = missingParent[b.ID()]
-	if exists {
-		return KnownOrphanErr
-	}
-	missingParent[b.ID()] = b
-	return UnknownOrphanErr
-}
 
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
@@ -181,7 +150,7 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// See if the block is an orphan.
 	_, exists = s.blockMap[b.ParentID]
 	if !exists {
-		err = s.handleOrphanBlock(b)
+		err = OrphanErr
 		return
 	}
 
