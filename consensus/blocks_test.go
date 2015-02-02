@@ -380,37 +380,37 @@ func testRepeatBlock(t *testing.T, s *State) {
 // TestBlockTimestamps creates a new state and uses it to call
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testBlockTimestamps(t, s)
 }
 
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testEmptyBlock(t, s)
 }
 
 // TestLargeBlock creates a new state and uses it to call testLargeBlock.
 func TestLargeBlock(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testLargeBlock(t, s)
 }
 
 // TestMinerPayouts creates a new state and uses it to call testMinerPayouts.
 func TestMinerPayouts(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testMinerPayouts(t, s)
 }
 
 // TestMissedTarget creates a new state and uses it to call testMissedTarget.
 func TestMissedTarget(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testMissedTarget(t, s)
 }
 
 // TestRepeatBlock creates a new state and uses it to call testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
-	s := CreateGenesisState()
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testRepeatBlock(t, s)
 }
 

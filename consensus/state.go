@@ -42,8 +42,9 @@ type State struct {
 }
 
 // CreateGenesisState will create the state that contains the genesis block and
-// nothing else.
-func CreateGenesisState() (s *State) {
+// nothing else. genesisTime is taken as an input instead of the constant being
+// used directly because it makes certain parts of testing a lot easier.
+func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
 		badBlocks:      make(map[BlockID]struct{}),
@@ -55,7 +56,7 @@ func CreateGenesisState() (s *State) {
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := Block{
-		Timestamp: GenesisTimestamp,
+		Timestamp: genesisTime,
 	}
 	s.blockRoot = &blockNode{
 		block:  genesisBlock,

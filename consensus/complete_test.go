@@ -86,8 +86,9 @@ func TestEverything(t *testing.T) {
 	// ahead of the other. We'll show all of the blocks to the other state,
 	// which will cause it to fork and rewind the entire diverse set of blocks
 	// and then apply an entirely different diverse set of blocks.
-	s0 := CreateGenesisState()
-	s1 := CreateGenesisState()
+	genesisTime := Timestamp(time.Now().Unix() - 1)
+	s0 := CreateGenesisState(genesisTime)
+	s1 := CreateGenesisState(genesisTime)
 
 	// Verify that the genesis state creation is consistent.
 	if s0.stateHash() != s1.stateHash() {
