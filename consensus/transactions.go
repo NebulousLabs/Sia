@@ -4,6 +4,26 @@ import (
 	"errors"
 )
 
+// validStorageProofs checks that a transaction follows the limitations placed
+// on transactions with storage proofs.
+func (t Transaction) validStorageProofs() bool {
+	if len(t.StorageProofs) == 0 {
+		return true
+	}
+
+	if len(t.Outputs) != 0 {
+		return false
+	}
+	if len(t.FileContracts) != 0 {
+		return false
+	}
+	if len(t.SiafundOutputs) != 0 {
+		return false
+	}
+
+	return true
+}
+
 // validInput returns err = nil if the input is valid within the current state,
 // otherwise returns an error explaining what wasn't valid.
 func (s *State) validInput(input Input) (err error) {

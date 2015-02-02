@@ -15,29 +15,9 @@ import (
 // more signatures are needed.
 type InputSignatures struct {
 	RemainingSignatures uint64
-	PossibleKeys        []PublicKey
+	PossibleKeys        []SiaPublicKey
 	UsedKeys            map[uint64]struct{}
 	Index               int
-}
-
-// validStorageProofs checks that a transaction follows the limitations placed
-// on transactions with storage proofs.
-func (t Transaction) validStorageProofs() bool {
-	if len(t.StorageProofs) == 0 {
-		return true
-	}
-
-	if len(t.Outputs) != 0 {
-		return false
-	}
-	if len(t.FileContracts) != 0 {
-		return false
-	}
-	if len(t.SiafundOutputs) != 0 {
-		return false
-	}
-
-	return true
 }
 
 // sortedUnique checks that all of the elements in a []unit64 are sorted and
@@ -124,6 +104,8 @@ func (t Transaction) validCoveredFields() (err error) {
 	return
 }
 
+// validSignatures takes a transaction and returns an error if the signatures
+// are not all valid.
 func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all covered fields objects follow the rules.
 	err = t.validCoveredFields()
@@ -138,6 +120,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		if exists {
 			return errors.New("output spent twice in the same transaction.")
 		}
+
 		inSig := &InputSignatures{
 			RemainingSignatures: input.SpendConditions.NumSignatures,
 			PossibleKeys:        input.SpendConditions.PublicKeys,
@@ -157,14 +140,38 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
+
+		// Check that the timelock has expired.
 		if sig.TimeLock > s.height() {
 			return errors.New("signature used before timelock expiration")
 		}
 
-		// Check that the signature matches the public key + data.
-		sigHash := t.SigHash(i)
-		if !crypto.VerifyBytes(sigHash[:], sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
-			return errors.New("signature is invalid")
+		// Check that the signature verifies. Sia is built to support multiple
+		// types of signature algorithms, this is handled by the switch
+		// statement.
+		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
+		switch publicKey.Algorithm {
+		case ED25519Identifier:
+			// Check that the public key is a legal length.
+			if len(publicKey.Key) != crypto.PublicKeySize {
+				return errors.New("public key is invalid")
+			}
+			if len(sig.Signature) != crypto.SignatureSize {
+				return errors.New("signature is invalid")
+			}
+
+			// Decode the public key and signature from the data types.
+			var decodedPK crypto.PublicKey
+			var decodedSig crypto.Signature
+			copy(decodedPK[:], publicKey.Key)
+			copy(decodedSig[:], sig.Signature)
+
+			sigHash := t.SigHash(i)
+			if !crypto.VerifyBytes(sigHash[:], decodedPK, decodedSig) {
+				return errors.New("signature is invalid")
+			}
+		default:
+			return errors.New("public key algorithm not recognized")
 		}
 
 		// Subtract the number of signatures remaining for this input.
@@ -181,6 +188,9 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	return nil
 }
 
+// ValidSignatures takes a transaction and determines whether the transaction
+// contains a legal set of signatures, including checking the timelocks against
+// the current state height.
 func (s *State) ValidSignatures(t Transaction) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

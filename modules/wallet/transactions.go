@@ -209,16 +209,19 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		}
 		txn.Signatures = append(txn.Signatures, sig)
 
-		// Hash the transaction according to the covered fields and produce the
-		// cryptographic signature.
+		// Hash the transaction according to the covered fields.
 		coinAddress := input.SpendConditions.CoinAddress()
 		sigIndex := len(txn.Signatures) - 1
 		secKey := w.keys[coinAddress].secretKey
 		sigHash := txn.SigHash(sigIndex)
-		txn.Signatures[sigIndex].Signature, err = crypto.SignBytes(sigHash[:], secKey)
+
+		// Get the signature.
+		var encodedSig crypto.Signature
+		encodedSig, err = crypto.SignBytes(sigHash[:], secKey)
 		if err != nil {
 			return
 		}
+		copy(txn.Signatures[sigIndex].Signature, encodedSig[:])
 	}
 
 	// Delete the open transaction.

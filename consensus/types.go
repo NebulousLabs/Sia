@@ -14,7 +14,6 @@ package consensus
 // coverage.
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
@@ -25,7 +24,9 @@ type (
 	Currency    uint64
 	Siafund     uint64
 
-	Identifier  [16]byte
+	Identifier [16]byte
+	Signature  []byte
+
 	BlockID     hash.Hash
 	OutputID    hash.Hash
 	ContractID  hash.Hash
@@ -34,6 +35,12 @@ type (
 )
 
 var ZeroAddress = CoinAddress{0}
+
+var FileContractIdentifier = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+var SiacoinOutputIdentifier = Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+var SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+
+var ED25519Identifier = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and
@@ -80,7 +87,7 @@ type Input struct {
 // to expose the TimeLock and NumSigantures.
 type SpendConditions struct {
 	TimeLock      BlockHeight
-	PublicKeys    []crypto.PublicKey
+	PublicKeys    []SiaPublicKey
 	NumSignatures uint64
 }
 
@@ -102,9 +109,9 @@ type FileContract struct {
 	MissedProofAddress CoinAddress
 }
 
-// A storage proof contains a segment and the HashSet required to prove that
-// the segment is a part of the data in the FileMerkleRoot of the FileContract
-// that the storage proof fulfills.
+// A StorageProof contains a segment and the HashSet required to prove that the
+// segment is a part of the data in the FileMerkleRoot of the FileContract that
+// the storage proof fulfills.
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [hash.SegmentSize]byte
@@ -130,6 +137,16 @@ type SiafundOutput struct {
 	ClaimStart       Currency
 }
 
+// A SiaPublicKey is a public key prefixed by an identifier. The identifier
+// details the algorithm used for sigining and verification, and the byte slice
+// contains the actual public key. Doing things this way makes it easy to
+// support multiple types of sigantures, and makes it easier to hardfork new
+// signatures into the codebase.
+type SiaPublicKey struct {
+	Algorithm Identifier
+	Key       []byte
+}
+
 // A TransactionSignature signs a single input to a transaction to help fulfill
 // the unlock conditions of the transaction. It points to an input, a
 // particular public key, has a timelock, and also indicates which parts of the
@@ -139,7 +156,7 @@ type TransactionSignature struct {
 	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
-	Signature      crypto.Signature
+	Signature      Signature
 }
 
 // The CoveredFields portion of a signature indicates which fields in the
@@ -211,7 +228,7 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) ContractID {
 	return ContractID(hash.HashBytes(encoding.MarshalAll(
-		Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'},
+		FileContractIdentifier,
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
@@ -229,7 +246,7 @@ func (t Transaction) FileContractID(i int) ContractID {
 // and then appending the string "siacoin output" and the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
-		Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'},
+		SiacoinOutputIdentifier,
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
@@ -256,7 +273,7 @@ func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID)
 // index `i` in the transaction.
 func (t Transaction) SiafundOutputID(i int) OutputID {
 	return OutputID(hash.HashBytes(encoding.MarshalAll(
-		Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'},
+		SiafundOutputIdentifier,
 		t.Inputs,
 		t.MinerFees,
 		t.Outputs,
