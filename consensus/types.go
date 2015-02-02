@@ -213,7 +213,7 @@ func (t Transaction) FileContractID(i int) ContractID {
 		t.SiafundInputs,
 		t.SiafundOutputs,
 		t.ArbitraryData,
-		"file contract",
+		[8]byte{'f', 'i', 'l', 'e', 'c', 'o', 'u', 't'},
 		i,
 	)))
 }
@@ -231,8 +231,43 @@ func (t Transaction) OutputID(i int) OutputID {
 		t.SiafundInputs,
 		t.SiafundOutputs,
 		t.ArbitraryData,
-		"siacoin output",
+		[8]byte{'s', 'c', 'o', 'i', 'n', 'o', 'u', 't'},
 		i,
+	)))
+}
+
+// StorageProofOutputID returns the OutputID of the output created during the
+// window index that was active at height 'height'.
+func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
+	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
+		fcID,
+		proofValid,
+	)))
+	return
+}
+
+// SiafundOutputID returns the id of the siafund output that was specified and
+// index `i` in the transaction.
+func (t Transaction) SiafundOutputID(i int) OutputID {
+	return OutputID(hash.HashBytes(encoding.MarshalAll(
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
+		t.ArbitraryData,
+		[8]byte{'s', 'f', 'u', 'n', 'd', 'o', 'u', 't'},
+		i,
+	)))
+}
+
+// SiaClaimOutputID returns the id of the siacoin output that is created when
+// the siafund output gets spent.
+func (id OutputID) SiaClaimOutputID(i int) OutputID {
+	return OutputID(hash.HashBytes(encoding.MarshalAll(
+		id,
 	)))
 }
 
@@ -292,16 +327,6 @@ func (t Transaction) SigHash(i int) hash.Hash {
 	}
 
 	return hash.HashBytes(signedData)
-}
-
-// StorageProofOutputID returns the OutputID of the output created during the
-// window index that was active at height 'height'.
-func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
-		fcID,
-		proofValid,
-	)))
-	return
 }
 
 // CoinAddress calculates the root hash of a merkle tree of the SpendConditions

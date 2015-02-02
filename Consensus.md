@@ -14,12 +14,38 @@ principles.
 
 TODO: Write the formal specification for encoding things.
 
-TODO: siafund output ids, siafund claim output ids.
+Cryptographic Algorithms
+------------------------
 
-TODO: Document which crypto is used in consensus. (Hash algorithm, signature
-algorithm)
+Sia uses cryptographic hashing and cryptographic signing, each of which has
+many potentially secure algorithms that can be used. We acknoledge our
+inexperience, and acknoledge that if we have picked the optimal algorithms for
+each, it will have been by accident.
 
-TODO: Pick a timestamp for the genesis block.
+For hashing, our primary goal is to use an algorithm that cannot be merge mined
+with Bitcoin, even partially. A secondary goal is hashing speed.
+
+For signing, our primary goal is verification speed. A secondary goal is an
+algorithm that supports HD keys. A tertiary goal is an algorithm that supports
+threshold signatures, such as Schorr Signatures.
+
+Hashing: BLAKE2b
+
+BLAKE2b has been chosen as a hashing algorithm because it is fast, it has had
+substantial review, and it has invulnerability to length extension attacks.
+Another particularly important feature of BLAKE2b is that it is not SHA-2. We
+wish to avoid merge mining with Bitcoin, because that may result in many
+apathetic Bitcoin miners mining on our blockchain, which may make soft forks
+harder to coordinate.
+
+Signatures: ed25519
+
+ed25519 has been chosen for signing because of the fast verification time, and
+the general support that it receives from the crypto community.
+
+secp256k1 has also been considered. Unlike for mining, there is no inherent
+problem with using the same algorithm as Bitcoin. It is however known to be
+slower than ed25519 and curve25519.
 
 Currency
 --------
@@ -178,8 +204,8 @@ spend hash is a hash of the spend conditions that must be met to spend the
 output.
 
 The id of a contract is determined by marshalling all of the transaction fields
-except for the signatures and then appending the string "siacoin output" and
-the index of the output within the transaction, and then taking the hash.
+except for the signatures and then appending the byte array "scoinout" and the
+index of the output within the transaction, and then taking the hash.
 
 File Contracts
 --------------
@@ -203,7 +229,7 @@ All contracts must have a non-zero payout, 'Start' must be before 'End', and
 is acceptible if it is submitted in the block of height 'End'.
 
 The id of a contract is determined by marshalling all of the transaction fields
-except for the signatures and then appending the string "file contract" and the
+except for the signatures and then appending the byte array "filecout" and the
 index of the contract within the transaction, and then taking the hash.
 
 Storage Proofs
@@ -281,6 +307,13 @@ Sia outputs contain:
   the moment the siafund output got created. This is used when the output is
   spent to determine how many siacoins go to the new output.
 
+The siafund output id is determied by mashalling all of the transaction fields
+except for the signatures and then appending the byte array "sfundout" and the
+index of the output within the transaction.
+
+The id of the siacoin output that gets created when the siafund output is spent
+(the claim id) is derived by hashing the id of the siafund output.
+
 Arbitrary Data
 --------------
 
@@ -332,8 +365,9 @@ effect on the three sets of information.
 Genesis Set
 -----------
 
-The genesis block will be a block with a timestamp of TODO:TBD. All other
-fields will be empty. The required target for the next block shall be [0, 0, 0,
-8, 0...], where each value is a byte.
+The genesis block will have a unix timestamp set to 1427760000, which
+corresponds to March 31st, 2015 at midnight.  All other fields will be empty.
+The required target for the next block shall be [0, 0, 0, 1, 0...], where each
+value is a byte.
 
 The genesis block does not need to meet a particular target.
