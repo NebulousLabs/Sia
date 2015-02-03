@@ -194,11 +194,11 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // parent block id, the block nonce, and the block merkle root and taking the
 // hash.
 func (b Block) ID() BlockID {
-	return BlockID(hash.HashBytes(encoding.MarshalAll(
+	return BlockID(hash.HashAll(
 		b.ParentID,
 		b.Nonce,
 		b.MerkleRoot(),
-	)))
+	))
 }
 
 // MerkleRoot calculates the merkle root of the block. The leaves of the merkle
@@ -219,7 +219,7 @@ func (b Block) MerkleRoot() hash.Hash {
 
 // MinerPayoutID returns the ID of the payout at the given index.
 func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(b.ID(), i)))
+	return OutputID(hash.HashAll(b.ID(), i))
 }
 
 // FileContractID returns the id of a file contract given the index of the
@@ -227,7 +227,7 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // transaction except for the signatures and then appending the string "file
 // contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) ContractID {
-	return ContractID(hash.HashBytes(encoding.MarshalAll(
+	return ContractID(hash.HashAll(
 		FileContractIdentifier,
 		t.Inputs,
 		t.MinerFees,
@@ -238,14 +238,14 @@ func (t Transaction) FileContractID(i int) ContractID {
 		t.SiafundOutputs,
 		t.ArbitraryData,
 		i,
-	)))
+	))
 }
 
 // OutputID gets the id of an output in the transaction, which is derived from
 // marshalling all of the fields in the transaction except for the signatures
 // and then appending the string "siacoin output" and the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(
+	return OutputID(hash.HashAll(
 		SiacoinOutputIdentifier,
 		t.Inputs,
 		t.MinerFees,
@@ -256,23 +256,23 @@ func (t Transaction) OutputID(i int) OutputID {
 		t.SiafundOutputs,
 		t.ArbitraryData,
 		i,
-	)))
+	))
 }
 
 // StorageProofOutputID returns the OutputID of the output created during the
 // window index that was active at height 'height'.
 func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
+	outputID = OutputID(hash.HashAll(
 		fcID,
 		proofValid,
-	)))
+	))
 	return
 }
 
 // SiafundOutputID returns the id of the siafund output that was specified and
 // index `i` in the transaction.
 func (t Transaction) SiafundOutputID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(
+	return OutputID(hash.HashAll(
 		SiafundOutputIdentifier,
 		t.Inputs,
 		t.MinerFees,
@@ -283,15 +283,15 @@ func (t Transaction) SiafundOutputID(i int) OutputID {
 		t.SiafundOutputs,
 		t.ArbitraryData,
 		i,
-	)))
+	))
 }
 
 // SiaClaimOutputID returns the id of the siacoin output that is created when
 // the siafund output gets spent.
-func (id OutputID) SiaClaimOutputID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(
+func (id OutputID) SiaClaimOutputID() OutputID {
+	return OutputID(hash.HashAll(
 		id,
-	)))
+	))
 }
 
 // SigHash returns the hash of a transaction for a specific signature. `i` is
