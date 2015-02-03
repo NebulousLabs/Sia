@@ -185,16 +185,18 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 			coveredFields.Outputs = append(coveredFields.Outputs, uint64(i))
 		}
 		for i := range txn.FileContracts {
-			coveredFields.Contracts = append(coveredFields.Contracts, uint64(i))
+			coveredFields.FileContracts = append(coveredFields.FileContracts, uint64(i))
 		}
 		for i := range txn.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
 		}
+		// TODO: Siafund stuff here.
 		for i := range txn.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
-
-		// TODO: Should we also sign all of the known signatures?
+		for i := range txn.Signatures {
+			coveredFields.Signatures = append(coveredFields.Signatures, uint64(i))
+		}
 	}
 
 	// For each input in the transaction that we added, provide a signature.
@@ -207,16 +209,19 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		}
 		txn.Signatures = append(txn.Signatures, sig)
 
-		// Hash the transaction according to the covered fields and produce the
-		// cryptographic signature.
+		// Hash the transaction according to the covered fields.
 		coinAddress := input.SpendConditions.CoinAddress()
 		sigIndex := len(txn.Signatures) - 1
 		secKey := w.keys[coinAddress].secretKey
 		sigHash := txn.SigHash(sigIndex)
-		txn.Signatures[sigIndex].Signature, err = crypto.SignBytes(sigHash[:], secKey)
+
+		// Get the signature.
+		var encodedSig crypto.Signature
+		encodedSig, err = crypto.SignBytes(sigHash[:], secKey)
 		if err != nil {
 			return
 		}
+		copy(txn.Signatures[sigIndex].Signature, encodedSig[:])
 	}
 
 	// Delete the open transaction.

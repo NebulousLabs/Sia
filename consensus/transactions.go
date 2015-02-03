@@ -2,94 +2,26 @@ package consensus
 
 import (
 	"errors"
-
-	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// Each input has a list of public keys and a required number of signatures.
-// InputSignatures keeps track of which public keys have been used and how many
-// more signatures are needed.
-type InputSignatures struct {
-	RemainingSignatures uint64
-	PossibleKeys        []crypto.PublicKey
-	UsedKeys            map[uint64]struct{}
-	Index               int
-}
-
-// OutputSum returns the sum of all the outputs in the transaction, which must
-// match the sum of all the inputs. Outputs created by storage proofs are not
-// considered, as they were already considered when the contract was created.
-func (t Transaction) OutputSum() (sum Currency) {
-	// Add the miner fees.
-	for _, fee := range t.MinerFees {
-		sum += fee
+// validStorageProofs checks that a transaction follows the limitations placed
+// on transactions with storage proofs.
+func (t Transaction) validStorageProofs() bool {
+	if len(t.StorageProofs) == 0 {
+		return true
 	}
 
-	// Add the contract payouts
-	for _, contract := range t.FileContracts {
-		sum += contract.Payout
+	if len(t.Outputs) != 0 {
+		return false
+	}
+	if len(t.FileContracts) != 0 {
+		return false
+	}
+	if len(t.SiafundOutputs) != 0 {
+		return false
 	}
 
-	// Add the outputs
-	for _, output := range t.Outputs {
-		sum += output.Value
-	}
-
-	return
-}
-
-func (s *State) ValidSignatures(t Transaction) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// Create the InputSignatures object for each input.
-	sigMap := make(map[OutputID]*InputSignatures)
-	for i, input := range t.Inputs {
-		_, exists := sigMap[input.OutputID]
-		if exists {
-			return errors.New("output spent twice in the same transaction.")
-		}
-		inSig := &InputSignatures{
-			RemainingSignatures: input.SpendConditions.NumSignatures,
-			PossibleKeys:        input.SpendConditions.PublicKeys,
-			Index:               i,
-		}
-		sigMap[input.OutputID] = inSig
-	}
-
-	// Check all of the signatures for validity.
-	for i, sig := range t.Signatures {
-		// Check that each signature signs a unique pubkey where
-		// RemainingSignatures > 0.
-		if sigMap[sig.InputID].RemainingSignatures == 0 {
-			return errors.New("frivolous signature in transaction")
-		}
-		_, exists := sigMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
-		if exists {
-			return errors.New("one public key was used twice while signing an input")
-		}
-		if sig.TimeLock > s.height() {
-			return errors.New("signature used before timelock expiration")
-		}
-
-		// Check that the signature matches the public key + data.
-		sigHash := t.SigHash(i)
-		if !crypto.VerifyBytes(sigHash[:], sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex], sig.Signature) {
-			return errors.New("signature is invalid")
-		}
-
-		// Subtract the number of signatures remaining for this input.
-		sigMap[sig.InputID].RemainingSignatures -= 1
-	}
-
-	// Check that all inputs have been sufficiently signed.
-	for _, reqSigs := range sigMap {
-		if reqSigs.RemainingSignatures != 0 {
-			return errors.New("some inputs are missing signatures")
-		}
-	}
-
-	return nil
+	return true
 }
 
 // validInput returns err = nil if the input is valid within the current state,
@@ -120,6 +52,12 @@ func (s *State) validInput(input Input) (err error) {
 // ValidTransaction returns err = nil if the transaction is valid, otherwise
 // returns an error explaining what wasn't valid.
 func (s *State) validTransaction(t Transaction) (err error) {
+	// Check that the storage proof guidelines are followed.
+	if !t.validStorageProofs() {
+		err = errors.New("transaction contains storage proofs and conflicts")
+		return
+	}
+
 	// Validate each input and get the total amount of Currency.
 	inputSum := Currency(0)
 	for _, input := range t.Inputs {
@@ -156,7 +94,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	}
 
 	// Check all of the signatures for validity.
-	err = s.ValidSignatures(t)
+	err = s.validSignatures(t)
 	if err != nil {
 		return
 	}
@@ -219,6 +157,28 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 		contractDiff := s.applyContract(contract, t.FileContractID(i))
 		contractDiffs = append(contractDiffs, contractDiff)
 	}
+	return
+}
+
+// OutputSum returns the sum of all the outputs in the transaction, which must
+// match the sum of all the inputs. Outputs created by storage proofs are not
+// considered, as they were already considered when the contract was created.
+func (t Transaction) OutputSum() (sum Currency) {
+	// Add the miner fees.
+	for _, fee := range t.MinerFees {
+		sum += fee
+	}
+
+	// Add the contract payouts
+	for _, contract := range t.FileContracts {
+		sum += contract.Payout
+	}
+
+	// Add the outputs
+	for _, output := range t.Outputs {
+		sum += output.Value
+	}
+
 	return
 }
 

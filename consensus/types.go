@@ -1,9 +1,19 @@
 package consensus
 
-// TODO: Convert all string literals to byte arrays, or get rid of them entirely.
+// TODO: Swtich to 128 bit Currency, which is overflow-safe. Then update
+// CalculateCoinbase.
+
+// TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
+// payouts, storage proof outputs, siafund claims.
+
+// TODO: Enforce siafund rules in consensus.
+
+// TODO: Switch to typed public keys, with typed verification.
+
+// TODO: Complete non-adversarial test coverage, partial adversarial test
+// coverage.
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
@@ -14,14 +24,23 @@ type (
 	Currency    uint64
 	Siafund     uint64
 
+	Identifier [16]byte
+	Signature  []byte
+
 	BlockID     hash.Hash
 	OutputID    hash.Hash
 	ContractID  hash.Hash
-	CoinAddress hash.Hash // The hash of the spend conditions of an output.
+	CoinAddress hash.Hash
 	Target      hash.Hash
 )
 
 var ZeroAddress = CoinAddress{0}
+
+var FileContractIdentifier = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+var SiacoinOutputIdentifier = Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+var SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+
+var ED25519Identifier = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and
@@ -36,24 +55,22 @@ type Block struct {
 
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
-//
-// TODO: Enable siafund stuff
 type Transaction struct {
-	Inputs        []Input
-	MinerFees     []Currency
-	Outputs       []Output
-	FileContracts []FileContract
-	StorageProofs []StorageProof
-	// SiafundInputs  []SiafundInput
-	// SiafundOutputs []SiafundOutput
-	ArbitraryData []string
-	Signatures    []TransactionSignature
+	Inputs         []Input
+	MinerFees      []Currency
+	Outputs        []Output
+	FileContracts  []FileContract
+	StorageProofs  []StorageProof
+	SiafundInputs  []SiafundInput
+	SiafundOutputs []SiafundOutput
+	ArbitraryData  []string
+	Signatures     []TransactionSignature
 }
 
 // An Input contains the ID of the output it's trying to spend, and the spend
 // conditions that unlock the output.
 type Input struct {
-	OutputID        OutputID // the source of coins for the input
+	OutputID        OutputID
 	SpendConditions SpendConditions
 }
 
@@ -70,7 +87,7 @@ type Input struct {
 // to expose the TimeLock and NumSigantures.
 type SpendConditions struct {
 	TimeLock      BlockHeight
-	PublicKeys    []crypto.PublicKey
+	PublicKeys    []SiaPublicKey
 	NumSignatures uint64
 }
 
@@ -92,9 +109,9 @@ type FileContract struct {
 	MissedProofAddress CoinAddress
 }
 
-// A storage proof contains a segment and the HashSet required to prove that
-// the segment is a part of the data in the FileMerkleRoot of the FileContract
-// that the storage proof fulfills.
+// A StorageProof contains a segment and the HashSet required to prove that the
+// segment is a part of the data in the FileMerkleRoot of the FileContract that
+// the storage proof fulfills.
 type StorageProof struct {
 	ContractID ContractID
 	Segment    [hash.SegmentSize]byte
@@ -114,10 +131,20 @@ type SiafundInput struct {
 // output is spent. The ClaimStart will be comapred to the SiafundPool to
 // figure out how many siacoins the ClaimDestination will receive.
 type SiafundOutput struct {
-	Value            Siafund
+	Value            Currency
 	SpendHash        CoinAddress
 	ClaimDestination CoinAddress
 	ClaimStart       Currency
+}
+
+// A SiaPublicKey is a public key prefixed by an identifier. The identifier
+// details the algorithm used for sigining and verification, and the byte slice
+// contains the actual public key. Doing things this way makes it easy to
+// support multiple types of sigantures, and makes it easier to hardfork new
+// signatures into the codebase.
+type SiaPublicKey struct {
+	Algorithm Identifier
+	Key       []byte
 }
 
 // A TransactionSignature signs a single input to a transaction to help fulfill
@@ -129,28 +156,26 @@ type TransactionSignature struct {
 	PublicKeyIndex uint64
 	TimeLock       BlockHeight
 	CoveredFields  CoveredFields
-	Signature      crypto.Signature
+	Signature      Signature
 }
 
-// TODO: If `WholeTransaction` is set to true, then all other fields except for
-// Signatures should be empty, this should be a consensus rule.
-//
-// TODO: Signature can include each element at most once. If there are repeat
-// elements, everything is invalid.
-//
-// TODO: We might, for speed reasons, want to also force the fields to be
-// sorted already.
+// The CoveredFields portion of a signature indicates which fields in the
+// transaction have been covered by the signature. Each slice of elements in a
+// transaction is represented by a slice of indices. The indicies must be
+// sorted, must not repeat, and must point to elements that exist within the
+// transaction. If 'WholeTransaction' is set to true, all other fields must be
+// empty except for the Signatures field.
 type CoveredFields struct {
 	WholeTransaction bool
-	Inputs           []uint64 // each element indicates an index which is signed.
+	Inputs           []uint64
 	MinerFees        []uint64
 	Outputs          []uint64
-	Contracts        []uint64
+	FileContracts    []uint64
 	StorageProofs    []uint64
-	// SiafundInputs []uint64
-	// SiafundOutputs  []unit64
-	ArbitraryData []uint64
-	Signatures    []uint64
+	SiafundInputs    []uint64
+	SiafundOutputs   []uint64
+	ArbitraryData    []uint64
+	Signatures       []uint64
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
@@ -169,11 +194,11 @@ func CalculateCoinbase(height BlockHeight) Currency {
 // parent block id, the block nonce, and the block merkle root and taking the
 // hash.
 func (b Block) ID() BlockID {
-	return BlockID(hash.HashBytes(encoding.MarshalAll(
+	return BlockID(hash.HashAll(
 		b.ParentID,
 		b.Nonce,
 		b.MerkleRoot(),
-	)))
+	))
 }
 
 // MerkleRoot calculates the merkle root of the block. The leaves of the merkle
@@ -194,30 +219,79 @@ func (b Block) MerkleRoot() hash.Hash {
 
 // MinerPayoutID returns the ID of the payout at the given index.
 func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(b.ID(), i)))
+	return OutputID(hash.HashAll(b.ID(), i))
 }
 
-// FileContractID returns the id of a file contract given the index of the contract.
-//
-// TODO: Reconsider how file contract ids are derived
+// FileContractID returns the id of a file contract given the index of the
+// contract. The id is derived by marshalling all of the fields in the
+// transaction except for the signatures and then appending the string "file
+// contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) ContractID {
-	return ContractID(hash.HashBytes(encoding.MarshalAll(
-		t.Outputs[0],
-		t.FileContracts[i],
-		"contract",
+	return ContractID(hash.HashAll(
+		FileContractIdentifier,
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
+		t.ArbitraryData,
 		i,
-	)))
+	))
 }
 
-// OuptutID takes the index of the output and returns the output's ID.
-//
-// TODO: ID should not include the signatures.
+// OutputID gets the id of an output in the transaction, which is derived from
+// marshalling all of the fields in the transaction except for the signatures
+// and then appending the string "siacoin output" and the index of the output.
 func (t Transaction) OutputID(i int) OutputID {
-	return OutputID(hash.HashBytes(encoding.MarshalAll(
-		t,
-		"coinsend",
+	return OutputID(hash.HashAll(
+		SiacoinOutputIdentifier,
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
+		t.ArbitraryData,
 		i,
-	)))
+	))
+}
+
+// StorageProofOutputID returns the OutputID of the output created during the
+// window index that was active at height 'height'.
+func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
+	outputID = OutputID(hash.HashAll(
+		fcID,
+		proofValid,
+	))
+	return
+}
+
+// SiafundOutputID returns the id of the siafund output that was specified and
+// index `i` in the transaction.
+func (t Transaction) SiafundOutputID(i int) OutputID {
+	return OutputID(hash.HashAll(
+		SiafundOutputIdentifier,
+		t.Inputs,
+		t.MinerFees,
+		t.Outputs,
+		t.FileContracts,
+		t.StorageProofs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
+		t.ArbitraryData,
+		i,
+	))
+}
+
+// SiaClaimOutputID returns the id of the siacoin output that is created when
+// the siafund output gets spent.
+func (id OutputID) SiaClaimOutputID() OutputID {
+	return OutputID(hash.HashAll(
+		id,
+	))
 }
 
 // SigHash returns the hash of a transaction for a specific signature. `i` is
@@ -227,67 +301,55 @@ func (t Transaction) OutputID(i int) OutputID {
 // If `WholeTransaction` is set to false, then the fees, inputs, ect. are all
 // added individually. The signatures are added individually regardless of the
 // value of `WholeTransaction`.
-//
-// TODO: add loops for the siafunds stuff
 func (t Transaction) SigHash(i int) hash.Hash {
+	cf := t.Signatures[i].CoveredFields
 	var signedData []byte
-	if t.Signatures[i].CoveredFields.WholeTransaction {
+	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
 			t.Inputs,
 			t.MinerFees,
 			t.Outputs,
 			t.FileContracts,
 			t.StorageProofs,
-			// Siafunds
-			// Stuff
-			// Here
+			t.SiafundInputs,
+			t.SiafundOutputs,
 			t.ArbitraryData,
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
 		)
 	} else {
-		for _, minerFee := range t.Signatures[i].CoveredFields.MinerFees {
+		for _, minerFee := range cf.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
-		for _, input := range t.Signatures[i].CoveredFields.Inputs {
+		for _, input := range cf.Inputs {
 			signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
 		}
-		for _, output := range t.Signatures[i].CoveredFields.Outputs {
+		for _, output := range cf.Outputs {
 			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
 		}
-		for _, contract := range t.Signatures[i].CoveredFields.Contracts {
+		for _, contract := range cf.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
 		}
-		for _, storageProof := range t.Signatures[i].CoveredFields.StorageProofs {
+		for _, storageProof := range cf.StorageProofs {
 			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
 		}
-		// Siafunds
-		// Stuff
-		// Here
-		for _, arbData := range t.Signatures[i].CoveredFields.ArbitraryData {
+		for _, siafundInput := range cf.SiafundInputs {
+			signedData = append(signedData, encoding.Marshal(t.SiafundInputs[siafundInput])...)
+		}
+		for _, siafundOutput := range cf.SiafundOutputs {
+			signedData = append(signedData, encoding.Marshal(t.SiafundOutputs[siafundOutput])...)
+		}
+		for _, arbData := range cf.ArbitraryData {
 			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
 		}
 	}
 
-	for _, sig := range t.Signatures[i].CoveredFields.Signatures {
+	for _, sig := range cf.Signatures {
 		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
 	}
 
 	return hash.HashBytes(signedData)
-}
-
-// StorageProofOutputID returns the OutputID of the output created during the
-// window index that was active at height 'height'.
-//
-// TODO: Reconsider how the StorageProofOutputID is determined.
-func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	proofString := proofString(proofValid)
-	outputID = OutputID(hash.HashBytes(encoding.MarshalAll(
-		fcID,
-		proofString,
-	)))
-	return
 }
 
 // CoinAddress calculates the root hash of a merkle tree of the SpendConditions
@@ -302,15 +364,4 @@ func (sc SpendConditions) CoinAddress() CoinAddress {
 	}
 	leaves = append(leaves, hash.HashObject(sc.NumSignatures))
 	return CoinAddress(hash.MerkleRoot(leaves))
-}
-
-// proofString returns the string to be used when generating the output id of a
-// valid proof if bool is set to true, and it returns the string to be used in
-// a missed proof if the bool is set to false.
-func proofString(proofValid bool) string {
-	if proofValid {
-		return "validproof"
-	} else {
-		return "missedproof"
-	}
 }

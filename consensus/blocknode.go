@@ -84,21 +84,5 @@ func (s *State) addBlockToTree(b Block) (err error) {
 		}
 	}
 
-	// Reconnect all orphans that now have a parent.
-	childMap := s.missingParents[b.ID()]
-	for _, child := range childMap {
-		// This is a recursive call, which means someone could make it take
-		// a long time by giving us a bunch of false orphan blocks with the
-		// same parent. We have to check them all anyway though, it just
-		// allows them to cluster the processing. Utimately I think
-		// bandwidth will be the bigger issue, we'll reject bad orphans
-		// before we verify signatures.
-		_ = s.addBlockToTree(child)
-		// There's nothing we can really do about this error, because it
-		// doesn't reflect a problem with the current block. It means that
-		// someone managed to give us orphans with errors.
-	}
-	delete(s.missingParents, b.ID())
-
 	return
 }

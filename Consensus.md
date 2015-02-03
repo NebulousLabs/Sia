@@ -14,16 +14,54 @@ principles.
 
 TODO: Write the formal specification for encoding things.
 
-TODO: Write the formal specification for deriving the block id, contract id,
-siacoin output id, siafund output id, siafund claim output id.
+Cryptographic Algorithms
+------------------------
 
-TODO: block id + Merkle root, miner output ids, siacoin output ids, contract
-ids, storage proof ids, siafund output ids, siafund claim output ids.
+Sia uses cryptographic hashing and cryptographic signing, each of which has
+many potentially secure algorithms that can be used. We acknoledge our
+inexperience, and that we have chosen these algorithms not because of our own
+confidence in their properties, but because other people seem confident in
+their properties.
 
-TODO: Document which crypto is used in consensus. (Hash algorithm, signature
-algorithm)
+For hashing, our primary goal is to use an algorithm that cannot be merge mined
+with Bitcoin, even partially. A secondary goal is hashing speed on consumer
+hardware, including phones and other low power devices.
 
-TODO: Pick a timestamp for the genesis block.
+For signing, our primary goal is verification speed. A secondary goal is an
+algorithm that supports HD keys. A tertiary goal is an algorithm that supports
+threshold signatures.
+
+#### Hashing: blake2b
+
+  blake2b has been chosen as a hashing algorithm because it is fast, it has had
+  substantial review, and it has invulnerability to length extension attacks.
+  Another particularly important feature of BLAKE2b is that it is not SHA-2. We
+  wish to avoid merge mining with Bitcoin, because that may result in many
+  apathetic Bitcoin miners mining on our blockchain, which may make soft forks
+  harder to coordinate.
+
+  Alternative modes of blake2 have been considered, particularly blake2bp,
+  blake2sp, and and tree mode variants. At this time, we are uncertain about
+  all of the tradeoffs involved, and additionally uncertain about which
+  tradeoffs are worth making, therefore the typically default of blake2b has
+  been chosen.
+
+#### Signatures: variable type signatures
+
+  Each public key will have an identifier (a 16 byte array) and a byte slice
+  containing an encoding of the public key. The identifier will tell the
+  signature verification which signing algorithm to use when verifiying a
+  signature. Each signature will be a byte slice, the encoding can be
+  determined by looking at the identifier of the corresponding public key.
+
+  This method allows new signature types to be easily added to the currency in
+  a way that does not invalidate existing outputs and keys. Adding a new
+  signature type requires a hardfork, but allows easy protection against
+  cryptographic breaks, and easy migration to new cryptography if there are any
+  breakthroughs in areas like verification speed, ring signatures, etc.
+  
+  Currently, the only allowed algorithm is ed25519. There are plans to also add
+  ECDSA secp256k1 and Schnorr secp256k1.
 
 Currency
 --------
@@ -146,15 +184,22 @@ siacoin outputs, and contract payouts. There can be no leftovers.
 
 The sum of all siafund inputs must equal the sum of all siafund outputs.
 
-Inputs
-------
+Siacoin Inputs
+--------------
 
-Each input spends an output.  The output being spent must already exist in the
-state. An output has a value, and a spend hash (or address), which is the hash
-of the 'spend conditions' object of the output. The spend conditions contain a
+Each input spends an output. The output being spent must already exist in the
+state. An output has a value, and a spend hash (or address), which relates to
+the 'spend conditions' object of the output. The spend conditions contain a
 timelock, a number of required signatures, and a set of public keys that can be
 used during signing. The input is invalid if hash of the spend conditions do
 not match the spend hash of the output being spent.
+
+The spend hash is derived by getting the merkle root of a tree whose leaves are
+the hashes of the timelock, the public keys (one leaf per key), and the number
+of signatures. This ordering is chosen specifically because the timelock and
+the number of signatures are low entropy. By using random data as the first and
+last public key, you can make it safe to reveal any of the public keys without
+revealing the low entropy items.
 
 The timelock is a block height, and for the input to be valid, the current
 height of the blockchain must be at least the height stated in the timelock.
@@ -174,12 +219,17 @@ Miner Fees
 
 A miner fee is an output that gets added directly to the block subsidy.
 
-Outputs
--------
+Siacoin Outputs
+---------------
 
 Outputs contain a value and a spend hash (also called a coin address). The
 spend hash is a hash of the spend conditions that must be met to spend the
 output.
+
+The id of a contract is determined by marhsalling an identifier with the string
+"siacoin output" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'OutputID' in consensus/types.go
 
 File Contracts
 --------------
@@ -198,7 +248,14 @@ when the storage proof is provided. If the storage proof is provides, the
 payout goes to 'ValidProofAddress'. If no proof is submitted by block height
 'End', then the payout goes to 'MissedProofAddress'.
 
-All contracts must have a non-zero payout.
+All contracts must have a non-zero payout, 'Start' must be before 'End', and
+'Start' must be greater than the current height of the state. A storage proof
+is acceptible if it is submitted in the block of height 'End'.
+
+The id of a contract is determined by marhsalling an identifier with the string
+"file contract" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'FileContractID' in consensus/types.go
 
 Storage Proofs
 --------------
@@ -206,8 +263,7 @@ Storage Proofs
 A storage proof transaction is any transaction containing a storage proof. 
 
 Storage proof transactions are not allowed to have siacoin or siafund outputs,
-and are not allowed to have file contracts. All outputs created by storage
-proofs cannot be spent for 100 blocks.
+and are not allowed to have file contracts.
 
 When creating a storage proof, you only prove that you have a single 64 byte
 segment of the file. The piece that you must prove you have is chosen
@@ -227,6 +283,10 @@ The proof is formed by providing the 64 byte segment, and then the missing
 hashes required to fill out the remaining tree. The total size of the proof
 will be 64 bytes + 32 bytes * log(num segments), and can be verified by anybody
 who knows the root hash and the file size.
+
+The id for a storage proof output is found by taking the id of the contract and
+concatenating a bool set to 'true' if the proof was submitted and valid, and
+set to 'false' if a valid proof was not submitted by the end of the contract.
 
 Storage proof transactions are not allowed to have siacoin outputs, siafund
 outputs, or contracts. All outputs created by the storage proofs cannot be
@@ -272,6 +332,14 @@ Sia outputs contain:
   the moment the siafund output got created. This is used when the output is
   spent to determine how many siacoins go to the new output.
 
+The id of a contract is determined by marhsalling an identifier with the string
+"siafund output" and appending that to the marshalling of the transaction
+(excluding the signatures). This is easiest understood by looking at the
+function 'SiafundOutputID' in consensus/types.go
+
+The id of the siacoin output that gets created when the siafund output is spent
+(the claim id) is derived by hashing the id of the siafund output.
+
 Arbitrary Data
 --------------
 
@@ -303,6 +371,10 @@ malleable. This does however allow other parites to add additional inputs,
 fees, etc. after you have signed the transaction without invalidating your
 signature.
 
+The 'Covered Fields' struct contains a slice of indexes for each element of the
+transaction (siacoin inputs, miner fees, etc.). The slice must be sorted, and
+there can be no repeated elements.
+
 Entirely nonmalleable transactions can be achieved by setting the 'whole
 transaction' flag and then providing the last signature, including every other
 signature in your signature. Because no frivilous signatures are allowed, the
@@ -319,8 +391,13 @@ effect on the three sets of information.
 Genesis Set
 -----------
 
-The genesis block will be a block with a timestamp of TODO:TBD. All other
-fields will be empty. The required target for the next block shall be [0, 0, 0,
-8, 0...], where each value is a byte.
+The genesis block will have a unix timestamp set to 1427760000, which
+corresponds to March 31st, 2015 at midnight.  All other fields will be empty.
+The required target for the next block shall be [0, 0, 0, 1, 0...], where each
+value is a byte.
 
 The genesis block does not need to meet a particular target.
+
+The genesis state needs to have an output to the zero address from the genesis
+block, and a siafund output to the Nebulous Genesis Address for 10,000
+siafunds (both the spend hash and the claim destination), having the zero id.

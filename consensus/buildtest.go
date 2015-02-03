@@ -14,6 +14,7 @@ const (
 	TargetWindow          = BlockHeight(1000)      // Number of blocks to use when calculating the target.
 	MedianTimestampWindow = 11                     // Number of blocks that get considered when determining if a timestamp is valid - should be an odd number.
 	FutureThreshold       = Timestamp(3 * 60 * 60) // Seconds into the future block timestamps are valid.
+	SiafundCount          = Currency(10 * 1000)    // The total (static) number of siafunds.
 
 	InitialCoinbase = Currency(300 * 1000)
 	MinimumCoinbase = Currency(30 * 1000)

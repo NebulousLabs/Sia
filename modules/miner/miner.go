@@ -54,7 +54,6 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		iterationsPerAttempt: 256 * 1024,
 	}
 
-	// Subscribe to the state and tpool.
 	addr, _, err := m.wallet.CoinAddress()
 	if err != nil {
 		return

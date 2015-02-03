@@ -16,8 +16,13 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 	spendConditions = consensus.SpendConditions{
 		TimeLock:      unlockHeight,
 		NumSignatures: 1,
-		PublicKeys:    []crypto.PublicKey{pk},
+		PublicKeys: []consensus.SiaPublicKey{
+			consensus.SiaPublicKey{
+				Algorithm: consensus.ED25519Identifier,
+			},
+		},
 	}
+	copy(spendConditions.PublicKeys[0].Key, pk[:])
 	coinAddress = spendConditions.CoinAddress()
 
 	// Create a spendableAddress for the keys and add it to the
@@ -60,8 +65,13 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 	}
 	spendConditions = consensus.SpendConditions{
 		NumSignatures: 1,
-		PublicKeys:    []crypto.PublicKey{pk},
+		PublicKeys: []consensus.SiaPublicKey{
+			consensus.SiaPublicKey{
+				Algorithm: consensus.ED25519Identifier,
+			},
+		},
 	}
+	copy(spendConditions.PublicKeys[0].Key, pk[:])
 	coinAddress = spendConditions.CoinAddress()
 
 	// Add the address to the set of spendable addresses.

@@ -63,6 +63,7 @@ dependencies:
 	go install -race std
 	go get -u code.google.com/p/gcfg
 	go get -u github.com/agl/ed25519
+	go get -u github.com/dchest/blake2b
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir

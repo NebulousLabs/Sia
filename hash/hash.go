@@ -1,9 +1,9 @@
 package hash
 
 import (
-	"crypto/sha256"
-
 	"github.com/NebulousLabs/Sia/encoding"
+
+	"github.com/dchest/blake2b"
 )
 
 const (
@@ -14,8 +14,16 @@ type (
 	Hash [HashSize]byte
 )
 
-func HashBytes(data []byte) Hash {
-	return sha256.Sum256(data)
+func HashAll(objs ...interface{}) Hash {
+	var b []byte
+	for _, obj := range objs {
+		b = append(b, encoding.Marshal(obj)...)
+	}
+	return HashBytes(b)
+}
+
+func HashBytes(data []byte) (hash Hash) {
+	return Hash(blake2b.Sum256(data))
 }
 
 func HashObject(obj interface{}) Hash {

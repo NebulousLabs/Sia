@@ -28,36 +28,38 @@ type State struct {
 	// necessary so that if a parent is found, all the children can be added to
 	// the parent. The second is necessary for checking if a new block is a
 	// known orphan.
-	badBlocks      map[BlockID]struct{}          // A list of blocks that don't verify.
-	blockMap       map[BlockID]*blockNode        // A list of all blocks in the blocktree.
-	missingParents map[BlockID]map[BlockID]Block // A list of all missing parents and their known children.
+	badBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
+	blockMap  map[BlockID]*blockNode // A list of all blocks in the blocktree.
 
 	// Consensus Variables - the current state of consensus according to the
 	// longest fork.
-	currentBlockID BlockID
-	currentPath    map[BlockHeight]BlockID
-	unspentOutputs map[OutputID]Output
-	openContracts  map[ContractID]FileContract
+	currentBlockID        BlockID
+	currentPath           map[BlockHeight]BlockID
+	siafundPool           Currency
+	unspentSiafundOutputs map[OutputID]SiafundOutput
+	unspentOutputs        map[OutputID]Output
+	openContracts         map[ContractID]FileContract
 
 	mu sync.RWMutex
 }
 
 // CreateGenesisState will create the state that contains the genesis block and
-// nothing else.
-func CreateGenesisState() (s *State) {
+// nothing else. genesisTime is taken as an input instead of the constant being
+// used directly because it makes certain parts of testing a lot easier.
+func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		badBlocks:      make(map[BlockID]struct{}),
-		blockMap:       make(map[BlockID]*blockNode),
-		missingParents: make(map[BlockID]map[BlockID]Block),
-		currentPath:    make(map[BlockHeight]BlockID),
-		openContracts:  make(map[ContractID]FileContract),
-		unspentOutputs: make(map[OutputID]Output),
+		badBlocks:             make(map[BlockID]struct{}),
+		blockMap:              make(map[BlockID]*blockNode),
+		currentPath:           make(map[BlockHeight]BlockID),
+		openContracts:         make(map[ContractID]FileContract),
+		unspentOutputs:        make(map[OutputID]Output),
+		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := Block{
-		Timestamp: GenesisTimestamp,
+		Timestamp: genesisTime,
 	}
 	s.blockRoot = &blockNode{
 		block:  genesisBlock,
@@ -69,6 +71,15 @@ func CreateGenesisState() (s *State) {
 	// Fill out the consensus informaiton for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
+	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = Output{
+		Value:     CalculateCoinbase(0),
+		SpendHash: ZeroAddress,
+	}
+	s.unspentSiafundOutputs[OutputID{}] = SiafundOutput{
+		Value:            10 * 1000,
+		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Address
+		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis Address
+	}
 
 	return
 }
