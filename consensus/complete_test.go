@@ -109,6 +109,7 @@ func orderedTestBattery(t *testing.T, states ...*State) {
 
 		// contracts_test.go tests
 		testContractCreation(t, s)
+		testStorageProofSubmit(t, s)
 	}
 }
 
