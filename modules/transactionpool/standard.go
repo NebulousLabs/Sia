@@ -21,6 +21,9 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 		return
 	}
 
+	// TODO: Check that the public keys in every transaction use only
+	// algorithms that are recognized by the consensus package.
+
 	// TODO: Check that the arbitrary data is either prefixed with 'NonSia' or
 	// is prefixed with 'HostAnnouncement' plus follows rules for making a host
 	// announcement.

@@ -1,17 +1,18 @@
+Standard Transaction Rules
+==========================
+
 Some transactions will not be accepted by miners unless they appear in a block.
 This is equivalent to the 'IsStandard' function in Bitcoin. This file dictates
 the rules for standard Sia transactions.
 
-----------------------
--- Transaction Size --
-----------------------
+Transaction Size
+----------------
 
 Consensus rules limit the size of a block, but not the size of a transaction.
-Standard rules however limit the size of a single transaction to 64kb.
+Standard rules however limit the size of a single transaction to 16kb.
 
-------------------------
--- Double Spend Rules --
-------------------------
+Double Spend Rules
+------------------
 
 When two conflicting transactions are seen, the first transaction is the only
 one that is kept. If the blockchain reorganizes, the transaction that is kept
@@ -25,32 +26,21 @@ certain minimum. For the near future, there are no plans to prioritize
 transactions with substantially higher fees. Other mining software may take
 alternative approaches.
 
--------------------------
--- Storage Proof Rules --
--------------------------
+Storage Proof Rule
+------------------
 
-Storage Proof transactions should not have dependent transactions.  Meaning,
-any outputs created in a storage proof transaction should not be spent until
-the storage proof is confirmed by the blockchain.
+Transaction pools will track multiple conflicting storage proofs. If there are
+two competing reorgs, it is in the best interest of the network to keep storage
+proofs for each reorg, because proofs may only be valid on a subset of reorgs.
 
-These restrictions are in place because storage proofs can be easily
-invalidated by a blockchain reorg - if the trigger block changes, the proof
-will be invalidated. Storage proofs can by any reorg, where standard
-transactions can only be invalidated by a doublespend (which requires a
-signature from the double spender).
+Signature Algorithms
+--------------------
 
-This also means that transaction pools will track multiple conflicting storage
-proofs. If there are two competing reorgs, it is in the best interest of the
-network to keep storage proofs for each reorg, because each proof will only be
-valid on one reorg.
+Miners will reject transactions that have public keys using algorithms that the
+miner does not understand.
 
-Storage proofs are prioritized by the transaction pool. Because of their
-priority, they are ignored if there is any aribtrary data, or if there is more
-than one input, one output, one miner fee, and a collection of storage proofs.
-
---------------------------
--- Arbitrary Data Usage --
---------------------------
+Arbitrary Data Usage
+--------------------
 
 Arbitrary data can be used to make verifiable announcements, or to have other
 protocols sit on top of Sia. The arbitrary data can also be used for soft
