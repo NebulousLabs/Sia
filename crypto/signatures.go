@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"errors"
 
 	"github.com/agl/ed25519"
 )
@@ -17,6 +18,32 @@ type (
 	SecretKey *[ed25519.PrivateKeySize]byte
 	Signature *[ed25519.SignatureSize]byte
 )
+
+// DecodePublicKey takes a bytes slice and returns the corresponding public
+// key. An error is returned if the byte slice is the wrong length.
+func DecodePublicKey(encodedPK []byte) (pk PublicKey, err error) {
+	if len(encodedPK) != PublicKeySize {
+		err = errors.New("public key is invalid size")
+		return
+	}
+
+	var epk [PublicKeySize]byte
+	copy(epk[:], encodedPK)
+	pk = PublicKey(&epk)
+	return
+}
+
+func DecodeSignature(encodedSig []byte) (sig Signature, err error) {
+	if len(encodedSig) != SignatureSize {
+		err = errors.New("Signature is invalid size")
+		return
+	}
+
+	var esig [SignatureSize]byte
+	copy(esig[:], encodedSig)
+	sig = Signature(&esig)
+	return
+}
 
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.

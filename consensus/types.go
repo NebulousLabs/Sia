@@ -219,7 +219,10 @@ func (b Block) MerkleRoot() hash.Hash {
 
 // MinerPayoutID returns the ID of the payout at the given index.
 func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(hash.HashAll(b.ID(), i))
+	return OutputID(hash.HashAll(
+		b.ID(),
+		i,
+	))
 }
 
 // FileContractID returns the id of a file contract given the index of the

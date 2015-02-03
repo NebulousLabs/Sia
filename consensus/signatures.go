@@ -24,6 +24,10 @@ type InputSignatures struct {
 // without repeates, and also checks that the largest element is less than or
 // equal to the biggest allowed element.
 func sortedUnique(elems []uint64, biggestAllowed int) (err error) {
+	if len(elems) == 0 {
+		return
+	}
+
 	biggest := elems[0]
 	for _, elem := range elems[1:] {
 		if elem <= biggest {
@@ -152,23 +156,19 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case ED25519Identifier:
-			// Check that the public key is a legal length.
-			if len(publicKey.Key) != crypto.PublicKeySize {
-				return errors.New("public key is invalid")
+			// Decode the public key and signature.
+			decodedPK, err := crypto.DecodePublicKey(publicKey.Key)
+			if err != nil {
+				return err
 			}
-			if len(sig.Signature) != crypto.SignatureSize {
-				return errors.New("signature is invalid")
+			decodedSig, err := crypto.DecodeSignature(sig.Signature)
+			if err != nil {
+				return err
 			}
-
-			// Decode the public key and signature from the data types.
-			var decodedPK crypto.PublicKey
-			var decodedSig crypto.Signature
-			copy(decodedPK[:], publicKey.Key)
-			copy(decodedSig[:], sig.Signature)
 
 			sigHash := t.SigHash(i)
 			if !crypto.VerifyBytes(sigHash[:], decodedPK, decodedSig) {
-				return errors.New("signature is invalid")
+				return errors.New("signature did not verify")
 			}
 		default:
 			return errors.New("public key algorithm not recognized")
