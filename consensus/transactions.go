@@ -130,7 +130,7 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 		// Sanity check - the output must not exist within the state, should
 		// have already been verified.
 		if DEBUG {
-			_, exists := s.unspentOutputs[t.OutputID(i)]
+			_, exists := s.unspentOutputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("applying a  transaction with an invalid new output")
 			}
@@ -138,10 +138,10 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 
 		diff := OutputDiff{
 			New:    true,
-			ID:     t.OutputID(i),
+			ID:     t.SiacoinOutputID(i),
 			Output: output,
 		}
-		s.unspentOutputs[t.OutputID(i)] = output
+		s.unspentOutputs[t.SiacoinOutputID(i)] = output
 		outputDiffs = append(outputDiffs, diff)
 	}
 

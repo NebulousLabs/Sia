@@ -131,18 +131,18 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 		// Sanity check - this output should not already exist in newOutputs or
 		// outputs.
 		if consensus.DEBUG {
-			_, exists := tp.newOutputs[t.OutputID(i)]
+			_, exists := tp.newOutputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
-			_, exists = tp.outputs[t.OutputID(i)]
+			_, exists = tp.outputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
 		}
 
-		tp.outputs[t.OutputID(i)] = output
-		tp.newOutputs[t.OutputID(i)] = ut
+		tp.outputs[t.SiacoinOutputID(i)] = output
+		tp.newOutputs[t.SiacoinOutputID(i)] = ut
 	}
 
 	tp.addTransactionToTail(ut)

@@ -244,10 +244,11 @@ func (t Transaction) FileContractID(i int) ContractID {
 	))
 }
 
-// OutputID gets the id of an output in the transaction, which is derived from
-// marshalling all of the fields in the transaction except for the signatures
-// and then appending the string "siacoin output" and the index of the output.
-func (t Transaction) OutputID(i int) OutputID {
+// SiacoinOutputID gets the id of an output in the transaction, which is
+// derived from marshalling all of the fields in the transaction except for the
+// signatures and then appending the string "siacoin output" and the index of
+// the output.
+func (t Transaction) SiacoinOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiacoinOutputIdentifier,
 		t.SiacoinInputs,

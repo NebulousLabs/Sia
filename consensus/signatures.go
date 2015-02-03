@@ -10,6 +10,11 @@ import (
 // seg faults by throwing covered fields objects at the state which point to
 // nonexistent objects in the transaction.
 
+var (
+	InvalidSignatureErr  = errors.New("signature is invalid")
+	MissingSignaturesErr = errors.New("transaction has inputs with missing signatures")
+)
+
 // Each input has a list of public keys and a required number of signatures.
 // InputSignatures keeps track of which public keys have been used and how many
 // more signatures are needed.
@@ -168,10 +173,12 @@ func (s *State) validSignatures(t Transaction) (err error) {
 
 			sigHash := t.SigHash(i)
 			if !crypto.VerifyBytes(sigHash[:], decodedPK, decodedSig) {
-				return errors.New("signature did not verify")
+				return InvalidSignatureErr
 			}
 		default:
-			return errors.New("public key algorithm not recognized")
+			// If we don't recognize the identifier, assume that the signature
+			// is valid; do nothing. This allows more signature types to be
+			// added through soft forking.
 		}
 
 		// Subtract the number of signatures remaining for this input.
@@ -181,7 +188,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
 		if reqSigs.RemainingSignatures != 0 {
-			return errors.New("some inputs are missing signatures")
+			return MissingSignaturesErr
 		}
 	}
 

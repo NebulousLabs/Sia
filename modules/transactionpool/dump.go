@@ -98,7 +98,7 @@ func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 		for i, output := range txn.SiacoinOutputs {
 			diff := consensus.OutputDiff{
 				New:    true,
-				ID:     txn.OutputID(i),
+				ID:     txn.SiacoinOutputID(i),
 				Output: output,
 			}
 			diffs = append(diffs, diff)

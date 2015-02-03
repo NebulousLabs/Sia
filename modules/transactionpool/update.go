@@ -67,7 +67,7 @@ func (tp *TransactionPool) update() {
 			// Find any transactions in our set that are dependent on this
 			// transaction.
 			for i := range txn.SiacoinOutputs {
-				dependent, exists := tp.usedOutputs[txn.OutputID(i)]
+				dependent, exists := tp.usedOutputs[txn.SiacoinOutputID(i)]
 				if exists {
 					ut.dependents[dependent] = struct{}{}
 					dependent.requirements[ut] = struct{}{}
