@@ -47,9 +47,9 @@ func (t Transaction) validCoveredFields() (err error) {
 		// Check that all fields are empty if `WholeTransaction` is set.
 		cf := sig.CoveredFields
 		if cf.WholeTransaction {
-			if len(cf.Inputs) != 0 ||
+			if len(cf.SiacoinInputs) != 0 ||
 				len(cf.MinerFees) != 0 ||
-				len(cf.Outputs) != 0 ||
+				len(cf.SiacoinOutputs) != 0 ||
 				len(cf.FileContracts) != 0 ||
 				len(cf.StorageProofs) != 0 ||
 				len(cf.SiafundInputs) != 0 ||
@@ -63,7 +63,7 @@ func (t Transaction) validCoveredFields() (err error) {
 		// Check that all fields are sorted, and without repeat values, and
 		// that all elements point to objects that exists within the
 		// transaction.
-		err = sortedUnique(cf.Inputs, len(cf.Inputs)-1)
+		err = sortedUnique(cf.SiacoinInputs, len(cf.SiacoinInputs)-1)
 		if err != nil {
 			return
 		}
@@ -71,7 +71,7 @@ func (t Transaction) validCoveredFields() (err error) {
 		if err != nil {
 			return
 		}
-		err = sortedUnique(cf.Outputs, len(cf.Outputs)-1)
+		err = sortedUnique(cf.SiacoinOutputs, len(cf.SiacoinOutputs)-1)
 		if err != nil {
 			return
 		}
@@ -115,7 +115,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 
 	// Create the InputSignatures object for each input.
 	sigMap := make(map[OutputID]*InputSignatures)
-	for i, input := range t.Inputs {
+	for i, input := range t.SiacoinInputs {
 		_, exists := sigMap[input.OutputID]
 		if exists {
 			return errors.New("output spent twice in the same transaction.")

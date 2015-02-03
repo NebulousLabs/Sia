@@ -7,7 +7,7 @@ import (
 
 // mineTestingBlock accepts a bunch of parameters for a block and then grinds
 // blocks until a block with the appropriate target is found.
-func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Output, txns []Transaction, target Target) (b Block, err error) {
+func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []SiacoinOutput, txns []Transaction, target Target) (b Block, err error) {
 	b = Block{
 		ParentID:     parent,
 		Timestamp:    timestamp,
@@ -27,9 +27,9 @@ func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Output
 // nullMinerPayouts returns an []Output for the miner payouts field of a block
 // so that the block can be valid. It assumes the block will be at whatever
 // height you use as input.
-func nullMinerPayouts(height BlockHeight) []Output {
-	return []Output{
-		Output{
+func nullMinerPayouts(height BlockHeight) []SiacoinOutput {
+	return []SiacoinOutput{
+		SiacoinOutput{
 			Value: CalculateCoinbase(height),
 		},
 	}
@@ -164,7 +164,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	// Create a block with a single legal payout, no miner fees. The payout
 	// goes to the hash of the empty spend conditions.
 	var sc SpendConditions
-	payout := []Output{Output{Value: CalculateCoinbase(s.Height() + 1), SpendHash: sc.CoinAddress()}}
+	payout := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(s.Height() + 1), SpendHash: sc.CoinAddress()}}
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -180,10 +180,10 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 
 	// Create a block with multiple miner payouts.
-	payout = []Output{
-		Output{Value: CalculateCoinbase(s.Height()+1) - 750, SpendHash: sc.CoinAddress()},
-		Output{Value: 250, SpendHash: sc.CoinAddress()},
-		Output{Value: 500, SpendHash: sc.CoinAddress()},
+	payout = []SiacoinOutput{
+		SiacoinOutput{Value: CalculateCoinbase(s.Height()+1) - 750, SpendHash: sc.CoinAddress()},
+		SiacoinOutput{Value: 250, SpendHash: sc.CoinAddress()},
+		SiacoinOutput{Value: 500, SpendHash: sc.CoinAddress()},
 	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
 	if err != nil {
@@ -210,7 +210,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 
 	// Create a block with a too large payout.
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height()), SpendHash: sc.CoinAddress()}}
+	payout = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(s.Height()), SpendHash: sc.CoinAddress()}}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +226,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 
 	// Create a block with a too small payout.
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height() + 2), SpendHash: sc.CoinAddress()}}
+	payout = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(s.Height() + 2), SpendHash: sc.CoinAddress()}}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -243,8 +243,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 
 	// Test legal multiple payouts when there are multiple miner fees.
 	txn1 := Transaction{
-		Inputs: []Input{
-			Input{OutputID: output250},
+		SiacoinInputs: []SiacoinInput{
+			SiacoinInput{OutputID: output250},
 		},
 		MinerFees: []Currency{
 			Currency(50),
@@ -253,8 +253,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 		},
 	}
 	txn2 := Transaction{
-		Inputs: []Input{
-			Input{OutputID: output500},
+		SiacoinInputs: []SiacoinInput{
+			SiacoinInput{OutputID: output500},
 		},
 		MinerFees: []Currency{
 			Currency(100),
@@ -262,7 +262,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Currency(250),
 		},
 	}
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	payout = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(s.Height()+1) + 25}, SiacoinOutput{Value: 650, SpendHash: sc.CoinAddress()}, SiacoinOutput{Value: 75, SpendHash: sc.CoinAddress()}}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -289,8 +289,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 
 	// Test too large multiple payouts when there are multiple miner fees.
 	txn1 = Transaction{
-		Inputs: []Input{
-			Input{OutputID: output650},
+		SiacoinInputs: []SiacoinInput{
+			SiacoinInput{OutputID: output650},
 		},
 		MinerFees: []Currency{
 			Currency(100),
@@ -299,8 +299,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 		},
 	}
 	txn2 = Transaction{
-		Inputs: []Input{
-			Input{OutputID: output75},
+		SiacoinInputs: []SiacoinInput{
+			SiacoinInput{OutputID: output75},
 		},
 		MinerFees: []Currency{
 			Currency(10),
@@ -308,7 +308,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Currency(50),
 		},
 	}
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	payout = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(s.Height()+1) + 25}, SiacoinOutput{Value: 650, SpendHash: sc.CoinAddress()}, SiacoinOutput{Value: 75, SpendHash: sc.CoinAddress()}}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)

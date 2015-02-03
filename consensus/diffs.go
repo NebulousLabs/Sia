@@ -20,7 +20,7 @@ import (
 type OutputDiff struct {
 	New    bool
 	ID     OutputID
-	Output Output
+	Output SiacoinOutput
 }
 
 type ContractDiff struct {

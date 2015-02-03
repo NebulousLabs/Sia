@@ -54,12 +54,12 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	// Create and add all of the inputs.
 	for _, knownOutput := range knownOutputs {
 		key := w.keys[knownOutput.output.SpendHash]
-		newInput := consensus.Input{
+		newInput := consensus.SiacoinInput{
 			OutputID:        knownOutput.id,
 			SpendConditions: key.spendConditions,
 		}
-		openTxn.inputs = append(openTxn.inputs, len(txn.Inputs))
-		txn.Inputs = append(txn.Inputs, newInput)
+		openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
+		txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
 
 		// Set the age of the knownOutput to prevent accidental double spends.
 		knownOutput.age = w.age
@@ -72,9 +72,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 			return err
 		}
 
-		txn.Outputs = append(
-			txn.Outputs,
-			consensus.Output{
+		txn.SiacoinOutputs = append(
+			txn.SiacoinOutputs,
+			consensus.SiacoinOutput{
 				Value:     total - amount,
 				SpendHash: coinAddress,
 			},
@@ -100,7 +100,7 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
 
 // AddOutput adds an output to the transaction, but will not add any inputs.
 // It returns the index of the output in the transaction.
-func (w *Wallet) AddOutput(id string, output consensus.Output) (index uint64, err error) {
+func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (index uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -110,8 +110,8 @@ func (w *Wallet) AddOutput(id string, output consensus.Output) (index uint64, er
 		return
 	}
 
-	openTxn.transaction.Outputs = append(openTxn.transaction.Outputs, output)
-	index = uint64(len(openTxn.transaction.Outputs) - 1)
+	openTxn.transaction.SiacoinOutputs = append(openTxn.transaction.SiacoinOutputs, output)
+	index = uint64(len(openTxn.transaction.SiacoinOutputs) - 1)
 	return
 }
 
@@ -178,11 +178,11 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		for i := range txn.MinerFees {
 			coveredFields.MinerFees = append(coveredFields.MinerFees, uint64(i))
 		}
-		for i := range txn.Inputs {
-			coveredFields.Inputs = append(coveredFields.Inputs, uint64(i))
+		for i := range txn.SiacoinInputs {
+			coveredFields.SiacoinInputs = append(coveredFields.SiacoinInputs, uint64(i))
 		}
-		for i := range txn.Outputs {
-			coveredFields.Outputs = append(coveredFields.Outputs, uint64(i))
+		for i := range txn.SiacoinOutputs {
+			coveredFields.SiacoinOutputs = append(coveredFields.SiacoinOutputs, uint64(i))
 		}
 		for i := range txn.FileContracts {
 			coveredFields.FileContracts = append(coveredFields.FileContracts, uint64(i))
@@ -201,7 +201,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 
 	// For each input in the transaction that we added, provide a signature.
 	for _, inputIndex := range openTxn.inputs {
-		input := txn.Inputs[inputIndex]
+		input := txn.SiacoinInputs[inputIndex]
 		sig := consensus.TransactionSignature{
 			InputID:        input.OutputID,
 			CoveredFields:  coveredFields,

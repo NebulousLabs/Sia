@@ -41,14 +41,14 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (output Output, exists bool) {
+func (s *State) output(id OutputID) (output SiacoinOutput, exists bool) {
 	output, exists = s.unspentOutputs[id]
 	return
 }
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) sortedUtxoSet() (sortedOutputs []Output) {
+func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var unspentOutputStrings []string
 	for outputID := range s.unspentOutputs {
@@ -203,7 +203,7 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 
 // Output returns the output associated with an OutputID, returning an error if
 // the output is not found.
-func (s *State) Output(id OutputID) (output Output, exists bool) {
+func (s *State) Output(id OutputID) (output SiacoinOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.output(id)
@@ -211,7 +211,7 @@ func (s *State) Output(id OutputID) (output Output, exists bool) {
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) SortedUtxoSet() []Output {
+func (s *State) SortedUtxoSet() []SiacoinOutput {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.sortedUtxoSet()

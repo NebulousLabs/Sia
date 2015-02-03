@@ -37,7 +37,7 @@ type State struct {
 	currentPath           map[BlockHeight]BlockID
 	siafundPool           Currency
 	unspentSiafundOutputs map[OutputID]SiafundOutput
-	unspentOutputs        map[OutputID]Output
+	unspentOutputs        map[OutputID]SiacoinOutput
 	openContracts         map[ContractID]FileContract
 
 	mu sync.RWMutex
@@ -53,7 +53,7 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		blockMap:              make(map[BlockID]*blockNode),
 		currentPath:           make(map[BlockHeight]BlockID),
 		openContracts:         make(map[ContractID]FileContract),
-		unspentOutputs:        make(map[OutputID]Output),
+		unspentOutputs:        make(map[OutputID]SiacoinOutput),
 		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
 	}
 
@@ -71,7 +71,7 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Fill out the consensus informaiton for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
-	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = Output{
+	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:     CalculateCoinbase(0),
 		SpendHash: ZeroAddress,
 	}

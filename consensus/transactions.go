@@ -11,7 +11,7 @@ func (t Transaction) validStorageProofs() bool {
 		return true
 	}
 
-	if len(t.Outputs) != 0 {
+	if len(t.SiacoinOutputs) != 0 {
 		return false
 	}
 	if len(t.FileContracts) != 0 {
@@ -26,7 +26,7 @@ func (t Transaction) validStorageProofs() bool {
 
 // validInput returns err = nil if the input is valid within the current state,
 // otherwise returns an error explaining what wasn't valid.
-func (s *State) validInput(input Input) (err error) {
+func (s *State) validInput(input SiacoinInput) (err error) {
 	// Check the input spends an existing and valid output.
 	_, exists := s.unspentOutputs[input.OutputID]
 	if !exists {
@@ -60,7 +60,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 
 	// Validate each input and get the total amount of Currency.
 	inputSum := Currency(0)
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Check that the input is valid.
 		err = s.validInput(input)
 		if err != nil {
@@ -106,7 +106,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 // ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
 	// Remove all inputs from the unspent outputs list.
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Sanity check - the input must exist within the blockchain, should
 		// have already been verified.
 		if DEBUG {
@@ -126,7 +126,7 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
-	for i, output := range t.Outputs {
+	for i, output := range t.SiacoinOutputs {
 		// Sanity check - the output must not exist within the state, should
 		// have already been verified.
 		if DEBUG {
@@ -175,7 +175,7 @@ func (t Transaction) OutputSum() (sum Currency) {
 	}
 
 	// Add the outputs
-	for _, output := range t.Outputs {
+	for _, output := range t.SiacoinOutputs {
 		sum += output.Value
 	}
 

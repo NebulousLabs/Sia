@@ -73,7 +73,7 @@ func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 	currentTxn := tp.head
 	for currentTxn != nil {
 		txn := currentTxn.transaction
-		for _, input := range txn.Inputs {
+		for _, input := range txn.SiacoinInputs {
 			diff := consensus.OutputDiff{
 				New: false,
 				ID:  input.OutputID,
@@ -95,7 +95,7 @@ func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 			diffs = append(diffs, diff)
 		}
 
-		for i, output := range txn.Outputs {
+		for i, output := range txn.SiacoinOutputs {
 			diff := consensus.OutputDiff{
 				New:    true,
 				ID:     txn.OutputID(i),

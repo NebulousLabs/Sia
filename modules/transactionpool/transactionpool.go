@@ -40,7 +40,7 @@ type TransactionPool struct {
 	// Outputs contains a list of outputs that have been created by unconfirmed
 	// transactions. This list will not include outputs created by storage
 	// proofs.
-	outputs map[consensus.OutputID]consensus.Output
+	outputs map[consensus.OutputID]consensus.SiacoinOutput
 
 	// newOutputs is a mapping from an OutputID to the unconfirmed transaction
 	// that created the output. usedOutputs is a mapping to the unconfirmed
@@ -70,7 +70,7 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 		state:       state,
 		recentBlock: state.CurrentBlock().ID(),
 
-		outputs: make(map[consensus.OutputID]consensus.Output),
+		outputs: make(map[consensus.OutputID]consensus.SiacoinOutput),
 
 		newOutputs:  make(map[consensus.OutputID]*unconfirmedTransaction),
 		usedOutputs: make(map[consensus.OutputID]*unconfirmedTransaction),

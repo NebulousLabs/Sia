@@ -49,16 +49,16 @@ type Block struct {
 	ParentID     BlockID
 	Nonce        uint64
 	Timestamp    Timestamp
-	MinerPayouts []Output
+	MinerPayouts []SiacoinOutput
 	Transactions []Transaction
 }
 
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
 type Transaction struct {
-	Inputs         []Input
+	SiacoinInputs  []SiacoinInput
 	MinerFees      []Currency
-	Outputs        []Output
+	SiacoinOutputs []SiacoinOutput
 	FileContracts  []FileContract
 	StorageProofs  []StorageProof
 	SiafundInputs  []SiafundInput
@@ -69,7 +69,7 @@ type Transaction struct {
 
 // An Input contains the ID of the output it's trying to spend, and the spend
 // conditions that unlock the output.
-type Input struct {
+type SiacoinInput struct {
 	OutputID        OutputID
 	SpendConditions SpendConditions
 }
@@ -93,7 +93,7 @@ type SpendConditions struct {
 
 // An Output contains a volume of currency and a 'CoinAddress', which is just a
 // hash of the spend conditions which unlock the output.
-type Output struct {
+type SiacoinOutput struct {
 	Value     Currency
 	SpendHash CoinAddress
 }
@@ -167,9 +167,9 @@ type TransactionSignature struct {
 // empty except for the Signatures field.
 type CoveredFields struct {
 	WholeTransaction bool
-	Inputs           []uint64
+	SiacoinInputs    []uint64
 	MinerFees        []uint64
-	Outputs          []uint64
+	SiacoinOutputs   []uint64
 	FileContracts    []uint64
 	StorageProofs    []uint64
 	SiafundInputs    []uint64
@@ -229,9 +229,9 @@ func (b Block) MinerPayoutID(i int) OutputID {
 func (t Transaction) FileContractID(i int) ContractID {
 	return ContractID(hash.HashAll(
 		FileContractIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -247,9 +247,9 @@ func (t Transaction) FileContractID(i int) ContractID {
 func (t Transaction) OutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiacoinOutputIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -274,9 +274,9 @@ func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID)
 func (t Transaction) SiafundOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiafundOutputIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -306,9 +306,9 @@ func (t Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
-			t.Inputs,
+			t.SiacoinInputs,
 			t.MinerFees,
-			t.Outputs,
+			t.SiacoinOutputs,
 			t.FileContracts,
 			t.StorageProofs,
 			t.SiafundInputs,
@@ -322,11 +322,11 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		for _, minerFee := range cf.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
-		for _, input := range cf.Inputs {
-			signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
+		for _, input := range cf.SiacoinInputs {
+			signedData = append(signedData, encoding.Marshal(t.SiacoinInputs[input])...)
 		}
-		for _, output := range cf.Outputs {
-			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
+		for _, output := range cf.SiacoinOutputs {
+			signedData = append(signedData, encoding.Marshal(t.SiacoinOutputs[output])...)
 		}
 		for _, contract := range cf.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)

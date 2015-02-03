@@ -10,7 +10,7 @@ import (
 // the confirmed set of outputs or in the unconfirmed set of outputs.
 // checkInputs also returns the sum of all the inputs in the transaction.
 func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consensus.Currency, err error) {
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Check that this output has not already been spent by an unconfirmed
 		// transaction.
 		_, exists := tp.outputs[input.OutputID]
@@ -108,7 +108,7 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 
 	// Go through the inputs and them to the used outputs list, updating the
 	// requirements and dependents as necessary.
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Sanity check - this input should not already be in the usedOutputs
 		// list.
 		if consensus.DEBUG {
@@ -127,7 +127,7 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 	}
 
 	// Add each new output to the list of outputs and newOutputs.
-	for i, output := range t.Outputs {
+	for i, output := range t.SiacoinOutputs {
 		// Sanity check - this output should not already exist in newOutputs or
 		// outputs.
 		if consensus.DEBUG {
