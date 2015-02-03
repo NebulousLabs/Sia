@@ -58,11 +58,11 @@ func TestSigning(t *testing.T) {
 	if testing.Short() {
 		iterations = 5
 	} else {
-		iterations = 5000
+		iterations = 500
 	}
 
 	// Try a bunch of signatures because at one point there was a library that
-	// worked around 98% of the time. Tests would usually pass, but 5000
+	// worked around 98% of the time. Tests would usually pass, but 500
 	// iterations would always cause a failure.
 	for i := 0; i < iterations; i++ {
 		// Generate the keys.

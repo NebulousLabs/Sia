@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
 
@@ -22,7 +23,7 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: ED25519Identifier,
-				Key:       pk[:],
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}
@@ -77,11 +78,11 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	encodedSig, err := crypto.SignBytes(sigHash[:], sk)
+	rawSig, err := crypto.SignBytes(sigHash[:], sk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.Signatures[0].Signature = encodedSig[:]
+	txn.Signatures[0].Signature = encoding.Marshal(rawSig)
 	return
 }
 
@@ -98,7 +99,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: ED25519Identifier,
-				Key:       pk[:],
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}
@@ -158,11 +159,11 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	encodedSig, err := crypto.SignBytes(sigHash[:], sk)
+	rawSig, err := crypto.SignBytes(sigHash[:], sk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.Signatures[0].Signature = encodedSig[:]
+	txn.Signatures[0].Signature = encoding.Marshal(rawSig)
 
 	// Put the transaction into a block.
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // signedOutputTxn funds itself by mining a block, and then uses the funds to
@@ -20,7 +21,7 @@ func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transact
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: algorithm,
-				Key:       pk[:],
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}
@@ -64,11 +65,11 @@ func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transact
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	encodedSig, err := crypto.SignBytes(sigHash[:], sk)
+	rawSig, err := crypto.SignBytes(sigHash[:], sk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.Signatures[0].Signature = encodedSig[:]
+	txn.Signatures[0].Signature = encoding.Marshal(rawSig)
 	return
 }
 
@@ -100,7 +101,7 @@ func testForeignSignature(t *testing.T, s *State) {
 // testInvalidSignature submits a transaction with a falsified signature.
 func testInvalidSignature(t *testing.T, s *State) {
 	txn := signedOutputTxn(t, s, ED25519Identifier)
-	txn.Signatures[0].Signature[0]++
+	txn.Signatures[0].Signature[1]++
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)

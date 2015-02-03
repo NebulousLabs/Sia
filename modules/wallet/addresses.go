@@ -3,6 +3,7 @@ package wallet
 import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TimelockedCoinAddress returns an address that can only be spent after block
@@ -19,7 +20,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
 				Algorithm: consensus.ED25519Identifier,
-				Key:       pk[:],
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}
@@ -68,7 +69,7 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
 				Algorithm: consensus.ED25519Identifier,
-				Key:       pk[:],
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}

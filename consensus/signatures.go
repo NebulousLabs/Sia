@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TODO: when testing the covered fields stuff, antagonistically try to cause
@@ -162,11 +163,13 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		switch publicKey.Algorithm {
 		case ED25519Identifier:
 			// Decode the public key and signature.
-			decodedPK, err := crypto.DecodePublicKey(publicKey.Key)
+			var decodedPK crypto.PublicKey
+			err := encoding.Unmarshal(publicKey.Key, &decodedPK)
 			if err != nil {
 				return err
 			}
-			decodedSig, err := crypto.DecodeSignature(sig.Signature)
+			var decodedSig crypto.Signature
+			err = encoding.Unmarshal(sig.Signature, &decodedSig)
 			if err != nil {
 				return err
 			}
