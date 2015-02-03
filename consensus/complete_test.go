@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// TODO: Add a consistency check for the number of coins in the state, and the
-// subsidies at each block.
+// TODO: Add the 100block waiting outputs to the currency tallying.
 
 // currentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
@@ -94,12 +93,19 @@ func consistencyChecks(t *testing.T, states ...*State) {
 // blocks to more effectively test things like diffs and forking.
 func orderedTestBattery(t *testing.T, states ...*State) {
 	for _, s := range states {
+		// blocks_test.go tests
 		testBlockTimestamps(t, s)
 		testEmptyBlock(t, s)
 		testLargeBlock(t, s)
 		testMinerPayouts(t, s)
 		testMissedTarget(t, s)
 		testRepeatBlock(t, s)
+
+		// transactions_test.go tests
+		testForeignSignature(t, s)
+		testInvalidSignature(t, s)
+		testSingleOutput(t, s)
+		testUnsignedTransaction(t, s)
 	}
 }
 

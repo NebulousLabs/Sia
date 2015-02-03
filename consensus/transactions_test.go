@@ -9,7 +9,7 @@ import (
 
 // signedOutputTxn funds itself by mining a block, and then uses the funds to
 // create a signed output that is valid.
-func signedOutputTxn(t *testing.T, s *State) (txn Transaction) {
+func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transaction) {
 	// Create the keys and a siacoin output that adds coins to the keys.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
@@ -19,7 +19,7 @@ func signedOutputTxn(t *testing.T, s *State) (txn Transaction) {
 		NumSignatures: 1,
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
-				Algorithm: ED25519Identifier,
+				Algorithm: algorithm,
 				Key:       pk[:],
 			},
 		},
@@ -72,10 +72,15 @@ func signedOutputTxn(t *testing.T, s *State) (txn Transaction) {
 	return
 }
 
-// testSingleOutput creates a block with one transaction that has inputs and
-// outputs, and verifies that the output is accepted into the state.
-func testSingleOutput(t *testing.T, s *State) {
-	txn := signedOutputTxn(t, s)
+// testForeignSignature adds a transaction that is signed by an unrecogmized
+// identifier. This should be considered a valid signature by consensus.
+func testForeignSignature(t *testing.T, s *State) {
+	// Grab a transaction, create an invalid signature, but then change the
+	// algorithm to an unknown algorithm. This should not trigger an error.
+	nonAlgorithm := ED25519Identifier
+	nonAlgorithm[0] = ' '
+	txn := signedOutputTxn(t, s, nonAlgorithm)
+	txn.Signatures[0].Signature[0]++
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -84,10 +89,86 @@ func testSingleOutput(t *testing.T, s *State) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Check that that the output made it into the state.
+	_, exists := s.unspentOutputs[txn.SiacoinOutputID(0)]
+	if !exists {
+		t.Error("single output did not make it into the state unspent outputs list")
+	}
+}
+
+// testInvalidSignature submits a transaction with a falsified signature.
+func testInvalidSignature(t *testing.T, s *State) {
+	txn := signedOutputTxn(t, s, ED25519Identifier)
+	txn.Signatures[0].Signature[0]++
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != InvalidSignatureErr {
+		t.Fatal(err)
+	}
+}
+
+// testSingleOutput creates a block with one transaction that has inputs and
+// outputs, and verifies that the output is accepted into the state.
+func testSingleOutput(t *testing.T, s *State) {
+	txn := signedOutputTxn(t, s, ED25519Identifier)
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that that the output made it into the state.
+	_, exists := s.unspentOutputs[txn.SiacoinOutputID(0)]
+	if !exists {
+		t.Error("single output did not make it into the state unspent outputs list")
+	}
+}
+
+// testUnsignedTransaction creates a valid transaction but then removes the
+// signature.
+func testUnsignedTransaction(t *testing.T, s *State) {
+	txn := signedOutputTxn(t, s, ED25519Identifier)
+	txn.Signatures = nil
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != MissingSignaturesErr {
+		t.Fatal(err)
+	}
+}
+
+// TestForeignSignature creates a new state and uses it to call
+// testForeignSignature.
+func TestForeignSignature(t *testing.T) {
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	testForeignSignature(t, s)
+}
+
+// TestInvalidSignature creates a new state and uses it to call
+// testInvalidSignature.
+func TestInvalidSignature(t *testing.T) {
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	testInvalidSignature(t, s)
 }
 
 // TestSingleOutput creates a new state and uses it to call testSingleOutput.
 func TestSingleOutput(t *testing.T) {
 	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testSingleOutput(t, s)
+}
+
+// TestUnsignedTransaction creates a new state and uses it to call
+// testUnsignedTransaction.
+func TestUnsignedTransaction(t *testing.T) {
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	testUnsignedTransaction(t, s)
 }
