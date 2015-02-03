@@ -30,22 +30,23 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Create a signature using the secret key.
-	signedData := []byte{1, 21, 31, 41, 51}
+	signedData := make([]byte, 32)
+	rand.Read(signedData)
 	sig, err := SignBytes(signedData, sk)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Marshal and unmarshal the signature.
-	marSig := encoding.Marshal(sig)
-	var unmarSig Signature
-	err = encoding.Unmarshal(marSig, &unmarSig)
+	marshalledSig := encoding.Marshal(sig)
+	var unmarshalledSig Signature
+	err = encoding.Unmarshal(marshalledSig, &unmarshalledSig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test signatures for equality.
-	if *sig != *unmarSig {
+	if *sig != *unmarshalledSig {
 		t.Error("signature not same after marshalling and unmarshalling")
 	}
 }
@@ -57,9 +58,12 @@ func TestSigning(t *testing.T) {
 	if testing.Short() {
 		iterations = 5
 	} else {
-		iterations = 500
+		iterations = 5000
 	}
 
+	// Try a bunch of signatures because at one point there was a library that
+	// worked around 98% of the time. Tests would usually pass, but 5000
+	// iterations would always cause a failure.
 	for i := 0; i < iterations; i++ {
 		// Generate the keys.
 		sk, pk, err := GenerateSignatureKeys()
@@ -68,7 +72,7 @@ func TestSigning(t *testing.T) {
 		}
 
 		// Generate and sign the data.
-		randData := make([]byte, 64)
+		randData := make([]byte, 32)
 		rand.Read(randData)
 		sig, err := SignBytes(randData, sk)
 		if err != nil {
@@ -93,4 +97,17 @@ func TestSigning(t *testing.T) {
 			t.Fatal("Signature verified after the signature was altered")
 		}
 	}
+
+	// Try to trigger a panic with nil data. Also here to get maximal test
+	// coverage.
+	_, pk, err := GenerateSignatureKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := make([]byte, 32)
+	SignBytes(nil, nil)
+	SignBytes(data, nil)
+	VerifyBytes(nil, nil, nil)
+	VerifyBytes(data, nil, nil)
+	VerifyBytes(data, pk, nil)
 }

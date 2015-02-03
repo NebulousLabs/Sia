@@ -78,36 +78,12 @@ func TestEncryption(t *testing.T) {
 	if err == nil {
 		t.Fatal("Was able to decrypt using bad padding")
 	}
-}
 
-// TestPadding encrypts and decrypts a byte slice that invokes every possible
-// padding length.
-func TestPadding(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
+	// Try to trigger a panic with nil values.
+	EncryptBytes(key, nil)
+	DecryptBytes(key, nil, iv, padding)
+	DecryptBytes(key, ciphertext, nil, padding)
 
-	// Encrypt and decrypt for all of the potential padded values and see that
-	// padding is handled correctly.
-	for i := 256; i < 256+BlockSize; i++ {
-		key, err := GenerateEncryptionKey()
-		if err != nil {
-			t.Fatal(err)
-		}
-		plaintext := make([]byte, i)
-		rand.Read(plaintext)
-		ciphertext, iv, padding, err := EncryptBytes(key, plaintext)
-		if err != nil {
-			t.Fatal(err)
-		}
-		decryptedPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
-			t.Fatal("Encrypted and decrypted zero plaintext do not match for i = ", i)
-		}
-	}
 }
 
 // TestEntropy encrypts and then decrypts a zero plaintext, checking that the
@@ -140,5 +116,35 @@ func TestEntropy(t *testing.T) {
 	zip.Close()
 	if b.Len() < cipherSize {
 		t.Error("supposedly high entropy ciphertext has been compressed!")
+	}
+}
+
+// TestPadding encrypts and decrypts a byte slice that invokes every possible
+// padding length.
+func TestPadding(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// Encrypt and decrypt for all of the potential padded values and see that
+	// padding is handled correctly.
+	for i := 256; i < 256+BlockSize; i++ {
+		key, err := GenerateEncryptionKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		plaintext := make([]byte, i)
+		rand.Read(plaintext)
+		ciphertext, iv, padding, err := EncryptBytes(key, plaintext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decryptedPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
+			t.Fatal("Encrypted and decrypted zero plaintext do not match for i = ", i)
+		}
 	}
 }
