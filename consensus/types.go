@@ -21,7 +21,6 @@ import (
 type (
 	Timestamp   int64
 	BlockHeight uint64
-	Currency    [16]byte // 128-bit signed integer
 	Siafund     uint64
 
 	Identifier [16]byte
