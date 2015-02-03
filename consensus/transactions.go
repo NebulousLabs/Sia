@@ -4,6 +4,10 @@ import (
 	"errors"
 )
 
+var (
+	MissingOutputErr = errors.New("transaction spends a nonexisting output")
+)
+
 // validStorageProofs checks that a transaction follows the limitations placed
 // on transactions with storage proofs.
 func (t Transaction) validStorageProofs() bool {
@@ -30,7 +34,7 @@ func (s *State) validInput(input SiacoinInput) (err error) {
 	// Check the input spends an existing and valid output.
 	_, exists := s.unspentOutputs[input.OutputID]
 	if !exists {
-		err = errors.New("transaction spends a nonexisting output")
+		err = MissingOutputErr
 		return
 	}
 

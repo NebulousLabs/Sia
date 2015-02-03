@@ -156,10 +156,9 @@ func testLargeBlock(t *testing.T, s *State) {
 // testMinerPayouts tries to submit miner payouts in various legal and illegal
 // forms and verifies that the state handles the payouts correctly each time.
 //
-// CONTRIBUTE: Increased testing would be nice. We need to test across multiple
-// payouts, multiple fees, payouts that are too high, payouts that are too low,
-// and several other potential ways that someone might slip illegal payouts
-// through.
+// CONTRIBUTE: We need to test across multiple payouts, multiple fees, payouts
+// that are too high, payouts that are too low, and several other potential
+// ways that someone might slip illegal payouts through.
 func testMinerPayouts(t *testing.T, s *State) {
 	// Create a block with a single legal payout, no miner fees. The payout
 	// goes to the hash of the empty spend conditions.

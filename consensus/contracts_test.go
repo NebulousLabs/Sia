@@ -53,11 +53,15 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 		Value:     CalculateCoinbase(s.height()) - 12*1000,
 		SpendHash: ZeroAddress,
 	}
+	successAddress := CoinAddress{1}
+	failAddress := CoinAddress{2}
 	contract := FileContract{
-		FileSize: 4000,
-		Start:    s.height() + delay,
-		End:      s.height() + delay + duration,
-		Payout:   12 * 1000,
+		FileSize:           4000,
+		Start:              s.height() + delay,
+		End:                s.height() + delay + duration,
+		Payout:             12 * 1000,
+		ValidProofAddress:  successAddress,
+		MissedProofAddress: failAddress,
 	}
 	txn = Transaction{
 		SiacoinInputs:  []SiacoinInput{input},
@@ -213,11 +217,63 @@ func testContractCreation(t *testing.T, s *State) {
 	}
 }
 
+// testMissedProof creates a contract but then doesn't submit the storage
+// proof.
+func testMissedProof(t *testing.T, s *State) {
+	// Get the transaction with the contract that will not be fulfilled.
+	txn := contractTxn(t, s, 2, 1)
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Submit 2 blocks, which means the contract will be a missed proof.
+	for i := 0; i < 2; i++ {
+		b, err = mineValidBlock(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = s.AcceptBlock(b)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	// Check that the contract was removed, and that the missed proof output
+	// was added.
+	cid := txn.FileContractID(0)
+	_, exists := s.openContracts[cid]
+	if exists {
+		t.Error("file contract is still in state despite having terminated")
+	}
+	output, exists := s.unspentOutputs[cid.StorageProofOutputID(false)]
+	if !exists {
+		t.Error("missed storage proof output is not in state even though the proof was missed")
+	}
+
+	// Check that the money went to the right place.
+	if output.SpendHash != txn.FileContracts[0].MissedProofAddress {
+		t.Error("missed proof output sent to wrong address!")
+	}
+}
+
 // testStorageProofSubmit adds a block with a valid storage proof to the state
 // and checks that it is accepted, ending the contract supplying an output to
 // the person.
 func testStorageProofSubmit(t *testing.T, s *State) {
 	txn, cid := storageProofTxn(t, s)
+
+	// Get the contract for a later check. (Contract disappears after the block
+	// is accepted).
+	contract, exists := s.openContracts[cid]
+	if !exists {
+		t.Fatal("file contract doesn't exist in state")
+	}
+
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -228,13 +284,18 @@ func testStorageProofSubmit(t *testing.T, s *State) {
 	}
 
 	// Check that the storage proof made it into the state.
-	_, exists := s.openContracts[cid]
+	_, exists = s.openContracts[cid]
 	if exists {
 		t.Error("file contract still in state even though a proof for it has been submitted")
 	}
-	_, exists = s.unspentOutputs[cid.StorageProofOutputID(true)]
+	output, exists := s.unspentOutputs[cid.StorageProofOutputID(true)]
 	if !exists {
-		t.Error("storage proof output not in state after storage proof was submitted")
+		t.Fatal("storage proof output not in state after storage proof was submitted")
+	}
+
+	// Check that the money went to the right place.
+	if output.SpendHash != contract.ValidProofAddress {
+		t.Error("money for valid proof was sent to wrong address")
 	}
 }
 
@@ -243,6 +304,12 @@ func testStorageProofSubmit(t *testing.T, s *State) {
 func TestContractCreation(t *testing.T) {
 	s := CreateGenesisState(Timestamp(time.Now().Unix()))
 	testContractCreation(t, s)
+}
+
+// TestMissedProof creates a new state and uses it to call testMissedProof.
+func TestMissedProof(t *testing.T) {
+	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	testMissedProof(t, s)
 }
 
 // TestStorageProofSubmit creates a new state and uses it to call
