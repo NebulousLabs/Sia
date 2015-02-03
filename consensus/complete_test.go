@@ -106,6 +106,9 @@ func orderedTestBattery(t *testing.T, states ...*State) {
 		testInvalidSignature(t, s)
 		testSingleOutput(t, s)
 		testUnsignedTransaction(t, s)
+
+		// contracts_test.go tests
+		testContractCreation(t, s)
 	}
 }
 
