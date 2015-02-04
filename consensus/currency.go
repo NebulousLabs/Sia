@@ -99,3 +99,17 @@ func (c *Currency) Cmp(y Currency) int {
 func (c *Currency) Overflow() bool {
 	return c.of
 }
+
+func (c Currency) MarshalSia() []byte {
+	b := make([]byte, 16)
+	copy(b, c.i.Bytes())
+	return b
+}
+
+func (c *Currency) UnmarshalSia(b []byte) int {
+	c.i.SetBytes(b[:16])
+	if c.Overflow() {
+		return -1
+	}
+	return 16
+}
