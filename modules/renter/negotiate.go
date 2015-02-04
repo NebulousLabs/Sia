@@ -18,7 +18,7 @@ const (
 
 var (
 	// TODO: ask wallet
-	minerFee = consensus.NewCurrency(10)
+	minerFee = consensus.NewCurrency64(10)
 )
 
 func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot hash.Hash) (txn consensus.Transaction, err error) {
@@ -34,8 +34,8 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	}
 
 	fund := host.Price
-	fund.Mul(consensus.NewCurrency(uint64(duration)))
-	fund.Mul(consensus.NewCurrency(terms.FileSize))
+	fund.Mul(consensus.NewCurrency64(uint64(duration)))
+	fund.Mul(consensus.NewCurrency64(terms.FileSize))
 	err = fund.Add(minerFee)
 	if err != nil {
 		return

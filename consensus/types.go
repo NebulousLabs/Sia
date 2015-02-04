@@ -186,7 +186,7 @@ func CalculateCoinbase(height BlockHeight) Currency {
 	if base < MinimumCoinbase {
 		base = MinimumCoinbase
 	}
-	return NewCurrency(base * 1e5)
+	return NewCurrency64(base * 1e5)
 }
 
 // ID returns the id of a block, which is calculated by concatenating the

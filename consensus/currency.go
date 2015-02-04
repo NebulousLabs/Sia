@@ -23,13 +23,13 @@ type Currency struct {
 	of bool // has an overflow ever occurred?
 }
 
-func NewCurrency(x uint64) Currency {
+func NewCurrency64(x uint64) Currency {
 	// no possibility of error
-	c, _ := BigToCurrency(new(big.Int).SetUint64(x))
+	c, _ := NewCurrency(new(big.Int).SetUint64(x))
 	return c
 }
 
-func BigToCurrency(b *big.Int) (c Currency, err error) {
+func NewCurrency(b *big.Int) (c Currency, err error) {
 	if b.BitLen() > 128 || b.Sign() < 0 {
 		c.of = true
 		err = ErrOverflow
@@ -41,7 +41,7 @@ func BigToCurrency(b *big.Int) (c Currency, err error) {
 
 func (c *Currency) SetBig(b *big.Int) (err error) {
 	oldOF := c.of
-	*c, err = BigToCurrency(b)
+	*c, err = NewCurrency(b)
 	c.of = c.of || oldOF // preserve overflow flag
 	return
 }
@@ -81,7 +81,7 @@ func (c *Currency) Div(y Currency) error {
 func (c *Currency) Sqrt() Currency {
 	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	rat := new(big.Rat).SetFloat64(f)
-	s, _ := BigToCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
+	s, _ := NewCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
 	s.of = c.of // preserve overflow
 	return s
 }
@@ -106,7 +106,7 @@ func (c Currency) MarshalSia() []byte {
 
 func (c *Currency) UnmarshalSia(b []byte) int {
 	var err error
-	*c, err = BigToCurrency(new(big.Int).SetBytes(b[:16]))
+	*c, err = NewCurrency(new(big.Int).SetBytes(b[:16]))
 	if err != nil {
 		return -1
 	}

@@ -173,6 +173,6 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 		return
 	}
 	// no possibility of error
-	randWeight, _ := consensus.BigToCurrency(randInt)
+	randWeight, _ := consensus.NewCurrency(randInt)
 	return hdb.hostTree.entryAtWeight(randWeight)
 }

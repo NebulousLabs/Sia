@@ -20,7 +20,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedWeight := consensus.NewCurrency(uint64(numEntries))
+	expectedWeight := consensus.NewCurrency64(uint64(numEntries))
 	expectedWeight.Mul(entryWeight(randomHost))
 	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		t.Error("Expected weight is incorrect")
@@ -70,9 +70,9 @@ func TestWeightedList(t *testing.T) {
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		var entry modules.HostEntry
-		entry.Collateral = consensus.NewCurrency(10)
-		entry.Price = consensus.NewCurrency(10)
-		entry.Freeze = consensus.NewCurrency(10)
+		entry.Collateral = consensus.NewCurrency64(10)
+		entry.Price = consensus.NewCurrency64(10)
+		entry.Freeze = consensus.NewCurrency64(10)
 		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}
@@ -110,9 +110,9 @@ func TestWeightedList(t *testing.T) {
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
 		var entry modules.HostEntry
-		entry.Collateral = consensus.NewCurrency(10)
-		entry.Price = consensus.NewCurrency(10)
-		entry.Freeze = consensus.NewCurrency(10)
+		entry.Collateral = consensus.NewCurrency64(10)
+		entry.Price = consensus.NewCurrency64(10)
+		entry.Freeze = consensus.NewCurrency64(10)
 		entry.IPAddress = network.Address(strconv.Itoa(i))
 		hdb.Insert(entry)
 	}

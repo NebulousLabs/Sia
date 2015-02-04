@@ -119,8 +119,8 @@ func (h *Host) acceptContract(txn consensus.Transaction) error {
 	duration := uint64(contract.End - contract.Start)
 
 	penalty := h.Collateral
-	penalty.Mul(consensus.NewCurrency(contract.FileSize))
-	err := penalty.Mul(consensus.NewCurrency(duration))
+	penalty.Mul(consensus.NewCurrency64(contract.FileSize))
+	err := penalty.Mul(consensus.NewCurrency64(duration))
 	// TODO: move this check to a different function?
 	if err != nil {
 		return err

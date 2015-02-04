@@ -29,13 +29,13 @@ func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 	//
 	// TODO: Perhaps there's a better way to do this.
 	if entry.Price.IsZero() {
-		entry.Price = consensus.NewCurrency(1)
+		entry.Price = consensus.NewCurrency64(1)
 	}
 	if entry.Collateral.IsZero() {
-		entry.Collateral = consensus.NewCurrency(1)
+		entry.Collateral = consensus.NewCurrency64(1)
 	}
 	if entry.Freeze.IsZero() {
-		entry.Freeze = consensus.NewCurrency(1)
+		entry.Freeze = consensus.NewCurrency64(1)
 	}
 
 	// weight := entry.Freeze * entry.Collateral / sqrt(entry.Price)
