@@ -86,8 +86,8 @@ func (c *Currency) Sqrt() Currency {
 	return s
 }
 
-func (c *Currency) Sign() int {
-	return c.i.Sign()
+func (c *Currency) IsZero() bool {
+	return c.i.Sign() == 0
 }
 
 func (c *Currency) Cmp(y Currency) int {

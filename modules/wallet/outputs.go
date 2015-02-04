@@ -39,8 +39,8 @@ type key struct {
 func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
 	w.update()
 
-	if amount.Sign() == 0 {
-		err = errors.New("cannot fund 0 coins") // should this be an error or nil?
+	if amount.IsZero() {
+		err = errors.New("cannot fund 0 coins")
 		return
 	}
 

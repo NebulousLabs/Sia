@@ -28,13 +28,13 @@ func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 	// Catch a divide by 0 error, and let all hosts have at least some weight.
 	//
 	// TODO: Perhaps there's a better way to do this.
-	if entry.Price.Sign() == 0 {
+	if entry.Price.IsZero() {
 		entry.Price = consensus.NewCurrency(1)
 	}
-	if entry.Collateral.Sign() == 0 {
+	if entry.Collateral.IsZero() {
 		entry.Collateral = consensus.NewCurrency(1)
 	}
-	if entry.Freeze.Sign() == 0 {
+	if entry.Freeze.IsZero() {
 		entry.Freeze = consensus.NewCurrency(1)
 	}
 
