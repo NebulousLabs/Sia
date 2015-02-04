@@ -22,7 +22,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	}
 	expectedWeight := consensus.NewCurrency(uint64(numEntries))
 	expectedWeight.Mul(entryWeight(randomHost))
-	if hdb.hostTree.weight != expectedWeight {
+	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		t.Error("Expected weight is incorrect")
 	}
 

@@ -80,7 +80,7 @@ func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error)
 	}
 
 	// Check that the inputs equal the outputs.
-	if inputSum != t.OutputSum() {
+	if inputSum.Cmp(t.OutputSum()) != 0 {
 		err = errors.New("input sum does not equal output sum")
 		return
 	}

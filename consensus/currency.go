@@ -19,7 +19,7 @@ var (
 // be created. Callers can also manually check for overflow using the Overflow
 // method.
 type Currency struct {
-	i  *big.Int
+	i  big.Int
 	of bool // has an overflow ever occurred?
 }
 
@@ -35,9 +35,7 @@ func BigToCurrency(b *big.Int) (c Currency, err error) {
 		err = ErrOverflow
 		return
 	}
-	// don't reuse b's memory.
-	// this is probably excessive, and could be optimized away later.
-	c.i = new(big.Int).SetBytes(b.Bytes())
+	c.i = *b
 	return
 }
 
@@ -49,39 +47,39 @@ func (c *Currency) SetBig(b *big.Int) (err error) {
 }
 
 func (c *Currency) Big() *big.Int {
-	return c.i
+	return &c.i
 }
 
 func (c *Currency) Add(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(c.i.Add(c.i, y.i))
+	return c.SetBig(c.i.Add(&c.i, &y.i))
 }
 
 func (c *Currency) Sub(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(c.i.Sub(c.i, y.i))
+	return c.SetBig(c.i.Sub(&c.i, &y.i))
 }
 
 func (c *Currency) Mul(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(c.i.Mul(c.i, y.i))
+	return c.SetBig(c.i.Mul(&c.i, &y.i))
 }
 
 func (c *Currency) Div(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(c.i.Div(c.i, y.i))
+	return c.SetBig(c.i.Div(&c.i, &y.i))
 }
 
 func (c *Currency) Sqrt() Currency {
-	f, _ := new(big.Rat).SetInt(c.i).Float64()
+	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	rat := new(big.Rat).SetFloat64(f)
 	s, _ := BigToCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
 	s.of = c.of // preserve overflow
@@ -93,7 +91,7 @@ func (c *Currency) Sign() int {
 }
 
 func (c *Currency) Cmp(y Currency) int {
-	return c.i.Cmp(y.i)
+	return c.i.Cmp(&y.i)
 }
 
 func (c *Currency) Overflow() bool {
@@ -107,8 +105,9 @@ func (c Currency) MarshalSia() []byte {
 }
 
 func (c *Currency) UnmarshalSia(b []byte) int {
-	c.i.SetBytes(b[:16])
-	if c.Overflow() {
+	var err error
+	*c, err = BigToCurrency(new(big.Int).SetBytes(b[:16]))
+	if err != nil {
 		return -1
 	}
 	return 16

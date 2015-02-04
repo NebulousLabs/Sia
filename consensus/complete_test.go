@@ -56,7 +56,7 @@ func currencyCheck(t *testing.T, s *State) {
 	for _, siafundOutput := range s.unspentSiafundOutputs {
 		siafunds.Add(siafundOutput.Value)
 	}
-	if siafunds != NewCurrency(SiafundCount) {
+	if siafunds.Cmp(NewCurrency(SiafundCount)) != 0 {
 		t.Error("siafunds inconsistency")
 	}
 
@@ -72,7 +72,7 @@ func currencyCheck(t *testing.T, s *State) {
 		siacoins.Add(contract.Payout)
 	}
 	siacoins.Add(s.siafundPool)
-	if siacoins != expectedSiacoins {
+	if siacoins.Cmp(expectedSiacoins) != 0 {
 		t.Error(siacoins)
 		t.Error(expectedSiacoins)
 		t.Error("siacoins inconsistency")

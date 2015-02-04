@@ -86,7 +86,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	}
 
 	// Return an error if the subsidy isn't equal to the payouts.
-	if subsidy != payoutSum {
+	if subsidy.Cmp(payoutSum) != 0 {
 		err = MinerPayoutErr
 		return
 	}

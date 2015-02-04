@@ -95,7 +95,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
-	case contract.Payout != payout:
+	case contract.Payout.Cmp(payout) != 0:
 		return errors.New("bad Payout")
 
 	case contract.ValidProofAddress != terms.ValidProofAddress:

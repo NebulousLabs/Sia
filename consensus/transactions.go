@@ -90,7 +90,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	}
 
 	// Check that the inputs equal the outputs.
-	if t.OutputSum() != inputSum {
+	if inputSum.Cmp(t.OutputSum()) != 0 {
 		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
