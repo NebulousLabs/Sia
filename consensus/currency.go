@@ -19,7 +19,7 @@ var (
 // be created. Callers can also manually check for overflow using the Overflow
 // method.
 type Currency struct {
-	b  [16]byte
+	i  *big.Int
 	of bool // has an overflow ever occurred?
 }
 
@@ -35,63 +35,65 @@ func BigToCurrency(b *big.Int) (c Currency, err error) {
 		err = ErrOverflow
 		return
 	}
-	copy(c.b[:], b.Bytes())
+	// don't reuse b's memory.
+	// this is probably excessive, and could be optimized away later.
+	c.i = new(big.Int).SetBytes(b.Bytes())
 	return
 }
 
 func (c *Currency) SetBig(b *big.Int) (err error) {
-	y, err := BigToCurrency(b)
-	c.b = y.b
-	c.of = c.of || y.of
+	oldOF := c.of
+	*c, err = BigToCurrency(b)
+	c.of = c.of || oldOF // preserve overflow flag
 	return
 }
 
 func (c *Currency) Big() *big.Int {
-	return new(big.Int).SetBytes(c.b[:])
+	return c.i
 }
 
 func (c *Currency) Add(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(new(big.Int).Add(c.Big(), y.Big()))
+	return c.SetBig(c.i.Add(c.i, y.i))
 }
 
 func (c *Currency) Sub(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(new(big.Int).Sub(c.Big(), y.Big()))
+	return c.SetBig(c.i.Sub(c.i, y.i))
 }
 
 func (c *Currency) Mul(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(new(big.Int).Mul(c.Big(), y.Big()))
+	return c.SetBig(c.i.Mul(c.i, y.i))
 }
 
 func (c *Currency) Div(y Currency) error {
 	if c.of {
 		return ErrOverflow
 	}
-	return c.SetBig(new(big.Int).Div(c.Big(), y.Big()))
+	return c.SetBig(c.i.Div(c.i, y.i))
 }
 
 func (c *Currency) Sqrt() Currency {
-	f, _ := new(big.Rat).SetInt(c.Big()).Float64()
+	f, _ := new(big.Rat).SetInt(c.i).Float64()
 	rat := new(big.Rat).SetFloat64(f)
-	// no possibility of error
 	s, _ := BigToCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
+	s.of = c.of // preserve overflow
 	return s
 }
 
 func (c *Currency) Sign() int {
-	return c.Big().Sign()
+	return c.i.Sign()
 }
 
 func (c *Currency) Cmp(y Currency) int {
-	return c.Big().Cmp(y.Big())
+	return c.i.Cmp(y.i)
 }
 
 func (c *Currency) Overflow() bool {
