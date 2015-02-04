@@ -6,8 +6,8 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// State.heavierFork() returns true if the input node is 5% heavier than the
-// current node of the ConsensusState.
+// State.heavierFork() returns true if the input node is sufficiently heavier
+// than the current node of the ConsensusState.
 func (s *State) heavierFork(newNode *blockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
 	currentCumDiff := s.depth().Inverse()
@@ -98,6 +98,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	s.currentBlockID = bn.block.ID()
 	s.currentPath[bn.height] = bn.block.ID()
 
+	// TODO: minerSubsidy isn't used anywhere?
 	minerSubsidy := CalculateCoinbase(s.height())
 	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
@@ -112,7 +113,10 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 
 		// Add the miner fees to the miner subsidy.
 		for _, fee := range txn.MinerFees {
-			minerSubsidy += fee
+			err = minerSubsidy.Add(fee)
+			if err != nil {
+				return
+			}
 		}
 	}
 	if err != nil {

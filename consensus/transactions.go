@@ -54,12 +54,11 @@ func (s *State) validInput(input Input) (err error) {
 func (s *State) validTransaction(t Transaction) (err error) {
 	// Check that the storage proof guidelines are followed.
 	if !t.validStorageProofs() {
-		err = errors.New("transaction contains storage proofs and conflicts")
-		return
+		return errors.New("transaction contains storage proofs and conflicts")
 	}
 
 	// Validate each input and get the total amount of Currency.
-	inputSum := Currency(0)
+	var inputSum Currency
 	for _, input := range t.Inputs {
 		// Check that the input is valid.
 		err = s.validInput(input)
@@ -67,8 +66,11 @@ func (s *State) validTransaction(t Transaction) (err error) {
 			return
 		}
 
-		// Add the input value to the coin sum.
-		inputSum += s.unspentOutputs[input.OutputID].Value
+		// Add this input's value
+		err = inputSum.Add(s.unspentOutputs[input.OutputID].Value)
+		if err != nil {
+			return
+		}
 	}
 
 	// Verify the contracts and tally up the expenditures.
@@ -88,9 +90,8 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	}
 
 	// Check that the inputs equal the outputs.
-	if inputSum != t.OutputSum() {
-		err = errors.New("inputs do not equal outputs for transaction.")
-		return
+	if t.OutputSum() != inputSum {
+		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
 	// Check all of the signatures for validity.
@@ -164,19 +165,27 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 // match the sum of all the inputs. Outputs created by storage proofs are not
 // considered, as they were already considered when the contract was created.
 func (t Transaction) OutputSum() (sum Currency) {
+	// NOTE: manual overflow checking is performed here to prevent redundant
+	// checks.
+
 	// Add the miner fees.
 	for _, fee := range t.MinerFees {
-		sum += fee
+		sum.Add(fee)
 	}
 
 	// Add the contract payouts
 	for _, contract := range t.FileContracts {
-		sum += contract.Payout
+		sum.Add(contract.Payout)
 	}
 
 	// Add the outputs
 	for _, output := range t.Outputs {
-		sum += output.Value
+		sum.Add(output.Value)
+	}
+
+	// Check for overflow
+	if sum.Overflow() {
+		// TODO: ???
 	}
 
 	return

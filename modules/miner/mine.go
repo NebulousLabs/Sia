@@ -31,7 +31,10 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	subsidy := consensus.CalculateCoinbase(height + 1)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
-			subsidy += fee
+			err := subsidy.Add(fee)
+			if err != nil {
+				// TODO: ???
+			}
 		}
 	}
 	output := consensus.Output{Value: subsidy, SpendHash: m.address}

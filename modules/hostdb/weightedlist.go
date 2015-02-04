@@ -42,7 +42,7 @@ func createNode(parent *hostNode, entry modules.HostEntry) *hostNode {
 // insert inserts a host entry into the node. insert is recursive. The value
 // returned is the number of nodes added to the tree, always 1 or 0.
 func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *hostNode) {
-	hn.weight += entryWeight(entry)
+	hn.weight.Add(entryWeight(entry))
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
@@ -62,7 +62,7 @@ func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *ho
 		hn.right = createNode(hn, entry)
 		nodesAdded = 1
 		newNode = hn.right
-	} else if hn.left.weight < hn.right.weight {
+	} else if hn.left.weight.Cmp(hn.right.weight) < 0 {
 		nodesAdded, newNode = hn.left.insert(entry)
 	} else {
 		nodesAdded, newNode = hn.right.insert(entry)
@@ -75,11 +75,11 @@ func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *ho
 // remove takes a node and removes it from the tree by climbing through the
 // list of parents. Remove does not delete nodes.
 func (hn *hostNode) remove() {
-	hn.weight -= entryWeight(hn.hostEntry)
+	hn.weight.Sub(entryWeight(hn.hostEntry))
 	hn.taken = false
 	current := hn.parent
 	for current != nil {
-		current.weight -= entryWeight(hn.hostEntry)
+		current.weight.Sub(entryWeight(hn.hostEntry))
 		current = current.parent
 	}
 }
@@ -90,19 +90,19 @@ func (hn *hostNode) remove() {
 // post-ordered way.
 func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.HostEntry, err error) {
 	// Check for an errored weight call.
-	if weight > hn.weight {
+	if weight.Cmp(hn.weight) > 0 {
 		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)
 		return
 	}
 
 	// Check if the left or right child should be returned.
 	if hn.left != nil {
-		if weight < hn.left.weight {
+		if weight.Cmp(hn.left.weight) < 0 {
 			return hn.left.entryAtWeight(weight)
 		}
-		weight -= hn.left.weight // Search from 0th index of right side.
+		weight.Sub(hn.left.weight) // Search from 0th index of right side.
 	}
-	if hn.right != nil && weight < hn.right.weight {
+	if hn.right != nil && weight.Cmp(hn.right.weight) < 0 {
 		return hn.right.entryAtWeight(weight)
 	}
 

@@ -68,8 +68,8 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 			MaxFilesize: 4 * 1000 * 1000,
 			MaxDuration: 1008, // One week.
 			MinWindow:   20,
-			Price:       1,
-			Collateral:  1,
+			Price:       consensus.NewCurrency(1),
+			Collateral:  consensus.NewCurrency(1),
 			CoinAddress: addr,
 		},
 

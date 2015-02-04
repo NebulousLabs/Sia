@@ -39,7 +39,7 @@ type key struct {
 func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
 	w.update()
 
-	if amount == consensus.Currency(0) {
+	if amount.Sign() == 0 {
 		err = errors.New("cannot fund 0 coins") // should this be an error or nil?
 		return
 	}
@@ -53,10 +53,13 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			if !knownOutput.spendable || knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			total += knownOutput.output.Value
+			err = total.Add(knownOutput.output.Value)
+			if err != nil {
+				return
+			}
 			knownOutputs = append(knownOutputs, knownOutput)
 
-			if total >= amount {
+			if total.Cmp(amount) >= 0 {
 				return
 			}
 		}
@@ -90,7 +93,8 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			total += knownOutput.output.Value
+			// TODO: ???
+			total.Add(knownOutput.output.Value)
 		}
 	}
 	return

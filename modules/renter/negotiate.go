@@ -13,10 +13,12 @@ import (
 )
 
 const (
-	// TODO: ask wallet
-	minerFee = 10
-
 	defaultWindowSize = 100
+)
+
+var (
+	// TODO: ask wallet
+	minerFee = consensus.NewCurrency(10)
 )
 
 func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot hash.Hash) (txn consensus.Transaction, err error) {
@@ -31,7 +33,13 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 		MissedProofAddress: consensus.ZeroAddress, // The empty address is the burn address.
 	}
 
-	fund := host.Price*consensus.Currency(duration)*consensus.Currency(terms.FileSize) + minerFee
+	fund := host.Price
+	fund.Mul(consensus.NewCurrency(uint64(duration)))
+	fund.Mul(consensus.NewCurrency(terms.FileSize))
+	err = fund.Add(minerFee)
+	if err != nil {
+		return
+	}
 
 	// Create the transaction.
 	id, err := r.wallet.RegisterTransaction(txn)

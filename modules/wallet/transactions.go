@@ -66,7 +66,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	}
 
 	// Add a refund output if needed.
-	if total-amount > 0 {
+	refund := total
+	err = refund.Sub(amount)
+	if err != nil && refund.Sign() > 0 {
 		coinAddress, _, err := w.coinAddress()
 		if err != nil {
 			return err
@@ -75,7 +77,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		txn.Outputs = append(
 			txn.Outputs,
 			consensus.Output{
-				Value:     total - amount,
+				Value:     refund,
 				SpendHash: coinAddress,
 			},
 		)

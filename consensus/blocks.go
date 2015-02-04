@@ -69,14 +69,20 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	subsidy := CalculateCoinbase(parentNode.height + 1)
 	for _, txn := range b.Transactions {
 		for _, fee := range txn.MinerFees {
-			subsidy += fee
+			err = subsidy.Add(fee)
+			if err != nil {
+				return
+			}
 		}
 	}
 
 	// Find the sum of the miner payouts.
 	var payoutSum Currency
 	for _, payout := range b.MinerPayouts {
-		payoutSum += payout.Value
+		err = payoutSum.Add(payout.Value)
+		if err != nil {
+			return
+		}
 	}
 
 	// Return an error if the subsidy isn't equal to the payouts.
@@ -94,21 +100,18 @@ func (s *State) validHeader(b Block) (err error) {
 	parent := s.blockMap[b.ParentID]
 	// Check the id meets the target.
 	if !b.CheckTarget(parent.target) {
-		err = MissedTargetErr
-		return
+		return MissedTargetErr
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestChildTimestamp() > b.Timestamp {
-		err = EarlyTimestampErr
-		return
+		return EarlyTimestampErr
 	}
 
 	// Check that the block is not too far in the future.
 	skew := b.Timestamp - Timestamp(time.Now().Unix())
 	if skew > FutureThreshold {
-		err = FutureBlockErr
-		return
+		return FutureBlockErr
 	}
 
 	// Check the miner payouts.
@@ -120,8 +123,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is the correct size.
 	encodedBlock := encoding.Marshal(b)
 	if len(encodedBlock) > BlockSizeLimit {
-		err = LargeBlockErr
-		return
+		return LargeBlockErr
 	}
 
 	return

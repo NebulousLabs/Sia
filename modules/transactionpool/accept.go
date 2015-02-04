@@ -33,7 +33,10 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 				return
 			}
 
-			inputSum += output.Value
+			err = inputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
 			continue
 		}
 
@@ -51,7 +54,10 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 				return
 			}
 
-			inputSum += output.Value
+			err = inputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
 			continue
 		}
 
