@@ -9,15 +9,15 @@ import (
 const (
 	DEBUG = true
 
-	BlockSizeLimit        = 1024 * 1024 // Blocks cannot be more than 1MB.
+	BlockSizeLimit        = 1e6         // Blocks cannot be more than 1MB.
 	BlockFrequency        = 1           // In seconds.
-	TargetWindow          = 1000        // Number of blocks to use when calculating the target.
+	TargetWindow          = 1e3         // Number of blocks to use when calculating the target.
 	MedianTimestampWindow = 11          // Number of blocks that get considered when determining if a timestamp is valid - should be an odd number.
 	FutureThreshold       = 3 * 60 * 60 // Seconds into the future block timestamps are valid.
-	SiafundCount          = 1e4         // The total (static) number of siafunds.
+	SiafundCount          = 10e3        // The total (static) number of siafunds.
 
-	InitialCoinbase = 3e5
-	MinimumCoinbase = 3e4
+	InitialCoinbase = 300e3
+	MinimumCoinbase = 30e3
 
 	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
 )

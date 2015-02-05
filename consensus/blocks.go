@@ -87,8 +87,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 
 	// Return an error if the subsidy isn't equal to the payouts.
 	if subsidy.Cmp(payoutSum) != 0 {
-		err = MinerPayoutErr
-		return
+		return MinerPayoutErr
 	}
 
 	return
@@ -138,22 +137,19 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// See if the block is a known invalid block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
-		err = errors.New("block is known to be invalid")
-		return
+		return errors.New("block is known to be invalid")
 	}
 
 	// See if the block is already known and valid.
 	_, exists = s.blockMap[b.ID()]
 	if exists {
-		err = BlockKnownErr
-		return
+		return BlockKnownErr
 	}
 
 	// See if the block is an orphan.
 	_, exists = s.blockMap[b.ParentID]
 	if !exists {
-		err = OrphanErr
-		return
+		return OrphanErr
 	}
 
 	err = s.validHeader(b)

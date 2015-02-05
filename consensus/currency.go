@@ -23,12 +23,6 @@ type Currency struct {
 	of bool // has an overflow ever occurred?
 }
 
-func NewCurrency64(x uint64) Currency {
-	// no possibility of error
-	c, _ := NewCurrency(new(big.Int).SetUint64(x))
-	return c
-}
-
 func NewCurrency(b *big.Int) (c Currency, err error) {
 	if b.BitLen() > 128 || b.Sign() < 0 {
 		c.of = true
@@ -37,6 +31,12 @@ func NewCurrency(b *big.Int) (c Currency, err error) {
 	}
 	c.i = *b
 	return
+}
+
+func NewCurrency64(x uint64) Currency {
+	// no possibility of error
+	c, _ := NewCurrency(new(big.Int).SetUint64(x))
+	return c
 }
 
 func (c *Currency) SetBig(b *big.Int) (err error) {
