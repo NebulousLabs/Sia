@@ -66,10 +66,10 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.MissedProofAddress != consensus.ZeroAddress:
 		return errors.New("burn payout needs to go to the zero address")
 
-	case terms.Price < h.Price:
+	case terms.Price.Cmp(h.Price) < 0:
 		return errors.New("price does not match host settings")
 
-	case terms.Collateral > h.Collateral:
+	case terms.Collateral.Cmp(h.Collateral) > 0:
 		return errors.New("collateral does not match host settings")
 	}
 
@@ -79,6 +79,12 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
 func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot hash.Hash) error {
+	payout := terms.Price
+	err := payout.Add(terms.Collateral)
+	if err != nil {
+		return err
+	}
+
 	switch {
 	case contract.FileSize != terms.FileSize:
 		return errors.New("bad FileSize")
@@ -89,7 +95,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
-	case contract.Payout != terms.Price+terms.Collateral:
+	case contract.Payout.Cmp(payout) != 0:
 		return errors.New("bad Payout")
 
 	case contract.ValidProofAddress != terms.ValidProofAddress:
@@ -110,8 +116,15 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 // internal problems.
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
-	duration := contract.End - contract.Start
-	penalty := h.Collateral * consensus.Currency(contract.FileSize) * consensus.Currency(duration)
+	duration := uint64(contract.End - contract.Start)
+
+	penalty := h.Collateral
+	penalty.Mul(consensus.NewCurrency64(contract.FileSize))
+	err := penalty.Mul(consensus.NewCurrency64(duration))
+	// TODO: move this check to a different function?
+	if err != nil {
+		return err
+	}
 
 	id, err := h.wallet.RegisterTransaction(txn)
 	if err != nil {

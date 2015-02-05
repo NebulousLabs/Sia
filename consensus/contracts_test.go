@@ -50,17 +50,22 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 		OutputID:        b.MinerPayoutID(0),
 		SpendConditions: spendConditions,
 	}
+	outputValue := CalculateCoinbase(s.height())
+	err = outputValue.Sub(NewCurrency64(12e3))
+	if err != nil {
+		t.Fatal(err)
+	}
 	output := SiacoinOutput{
-		Value:     CalculateCoinbase(s.height()) - 12*1000,
+		Value:     outputValue,
 		SpendHash: ZeroAddress,
 	}
 	successAddress := CoinAddress{1}
 	failAddress := CoinAddress{2}
 	contract := FileContract{
-		FileSize:           4000,
+		FileSize:           4e3,
 		Start:              s.height() + delay,
 		End:                s.height() + delay + duration,
-		Payout:             12 * 1000,
+		Payout:             NewCurrency64(12e3),
 		ValidProofAddress:  successAddress,
 		MissedProofAddress: failAddress,
 	}
@@ -130,8 +135,13 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 		OutputID:        b.MinerPayoutID(0),
 		SpendConditions: spendConditions,
 	}
+	outputValue := CalculateCoinbase(s.height())
+	err = outputValue.Sub(NewCurrency64(12e3))
+	if err != nil {
+		t.Fatal(err)
+	}
 	output := SiacoinOutput{
-		Value:     CalculateCoinbase(s.height()) - 12*1000,
+		Value:     outputValue,
 		SpendHash: ZeroAddress,
 	}
 	merkleRoot, err := hash.BytesMerkleRoot(simpleFile)
@@ -143,7 +153,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 		FileSize:       4000,
 		Start:          s.height() + 2,
 		End:            s.height() + 2 + 25*1000,
-		Payout:         12 * 1000,
+		Payout:         NewCurrency64(12e3),
 	}
 	txn = Transaction{
 		SiacoinInputs:  []SiacoinInput{input},

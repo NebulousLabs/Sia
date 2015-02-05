@@ -75,8 +75,8 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		Value:     CalculateCoinbase(0),
 		SpendHash: ZeroAddress,
 	}
-	s.unspentSiafundOutputs[OutputID{}] = SiafundOutput{
-		Value:            10 * 1000,
+	s.unspentSiafundOutputs[OutputID{0}] = SiafundOutput{
+		Value:            NewCurrency64(SiafundCount),
 		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Address
 		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis Address
 	}

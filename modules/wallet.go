@@ -2,6 +2,7 @@ package modules
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/NebulousLabs/Sia/consensus"
 )
@@ -18,7 +19,7 @@ type Wallet interface {
 	// Balance returns the total number of coins accessible to the wallet. If
 	// full == true, the number of coins returned will also include coins that
 	// have been spent in unconfirmed transactions.
-	Balance(full bool) consensus.Currency
+	Balance(full bool) *big.Int
 
 	// CoinAddress return an address into which coins can be paid.
 	CoinAddress() (consensus.CoinAddress, consensus.SpendConditions, error)

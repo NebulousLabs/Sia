@@ -14,6 +14,8 @@ package consensus
 // coverage.
 
 import (
+	"math/big"
+
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
@@ -21,7 +23,6 @@ import (
 type (
 	Timestamp   int64
 	BlockHeight uint64
-	Currency    uint64
 	Siafund     uint64
 
 	Identifier [16]byte
@@ -33,6 +34,20 @@ type (
 	CoinAddress hash.Hash
 	Target      hash.Hash
 )
+
+// A Currency is a 128-bit unsigned integer. Currency operations are performed
+// via math/big.
+//
+// The Currency object also keeps track of whether an overflow has occurred
+// during arithmetic operations. Once the 'overflow' flag has been set to
+// true, all subsequent operations will return an error, and the result of the
+// operation is undefined. This flag can never be reset; a new Currency must
+// be created. Callers can also manually check for overflow using the Overflow
+// method.
+type Currency struct {
+	i  big.Int
+	of bool // has an overflow ever occurred?
+}
 
 var ZeroAddress = CoinAddress{0}
 
@@ -183,11 +198,11 @@ type CoveredFields struct {
 // TODO: Switch to a different constant because of using 128 bit values for the
 // currency.
 func CalculateCoinbase(height BlockHeight) Currency {
-	if Currency(height) >= InitialCoinbase-MinimumCoinbase {
-		return MinimumCoinbase * 100000
-	} else {
-		return (InitialCoinbase - Currency(height)) * 100000
+	base := InitialCoinbase - uint64(height)
+	if base < MinimumCoinbase {
+		base = MinimumCoinbase
 	}
+	return NewCurrency64(base * 1e5)
 }
 
 // ID returns the id of a block, which is calculated by concatenating the
