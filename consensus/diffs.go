@@ -155,11 +155,42 @@ func (s *State) applyDiffSet(bn *blockNode, direction bool) {
 		s.commitSiafundOutputDiff(sfod, direction)
 	}
 
-	// Delete the delated outputs created by the node.
+	// Manage the delayed outputs that have been created by the node.
 	if direction {
 		s.delayedSiacoinOutputs[bn.height] = bn.newDelayedSiacoinOutputs
 	} else {
 		delete(s.delayedSiacoinOutputs, bn.height)
+	}
+
+	// Manage the delayed outputs that have come to maturity.
+	if direction {
+		// Add all of the delayed outputs that have come to maturity.
+		for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
+			// Sanity check - the output should not already be in the
+			// unspentSiacoinOuptuts list.
+			if DEBUG {
+				_, exists := s.unspentSiacoinOutputs[id]
+				if exists {
+					panic("trying to add a delayed output when the output is already there")
+				}
+			}
+
+			s.unspentSiacoinOutputs[id] = sco
+		}
+	} else {
+		// Remove all of the delayed outputs that have come to maturity.
+		for id, _ := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
+			// Sanity check - the output should exist in the
+			// unspentSiacoinOutputs list.
+			if DEBUG {
+				_, exists := s.unspentSiacoinOutputs[id]
+				if !exists {
+					panic("trying to remove a delayed output that doesn't exist")
+				}
+			}
+
+			delete(s.unspentSiacoinOutputs, id)
+		}
 	}
 
 	// Update the current path and currentBlockID

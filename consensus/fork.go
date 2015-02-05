@@ -84,17 +84,19 @@ func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
 
 // applyMinerSubsidy adds all of the outputs recorded in the MinerPayouts to
 // the state, and returns the corresponding set of diffs.
-func (s *State) applyMinerSubsidy(bn *blockNode) (scods []SiacoinOutputDiff) {
+func (s *State) applyMinerSubsidy(bn *blockNode) {
 	for i, payout := range bn.block.MinerPayouts {
-		scod := SiacoinOutputDiff{
-			New:           true,
-			ID:            bn.block.MinerPayoutID(i),
-			SiacoinOutput: payout,
-		}
-		s.unspentSiacoinOutputs[scod.ID] = payout
-		scods = append(scods, scod)
+		id := bn.block.MinerPayoutID(i)
+		s.delayedSiacoinOutputs[s.height()][id] = payout
+		bn.newDelayedSiacoinOutputs[id] = payout
 	}
 	return
+}
+
+func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
+	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
+		s.unspentSiacoinOutputs[id] = sco
+	}
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
@@ -113,10 +115,13 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 
 	// Set diffsGenerated to true.
 	bn.diffsGenerated = true
+	bn.siafundPoolDiff.Previous = s.siafundPool
+	bn.newDelayedSiacoinOutputs = make(map[OutputID]SiacoinOutput)
 
 	// Update the current block and current path.
 	s.currentBlockID = bn.block.ID()
 	s.currentPath[bn.height] = bn.block.ID()
+	s.delayedSiacoinOutputs[s.height()] = make(map[OutputID]SiacoinOutput)
 
 	// Validate and apply each transaction in the block.
 	for _, txn := range bn.block.Transactions {
@@ -126,19 +131,17 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 			return
 		}
 
-		siacoinOutputDiffs, fileContractDiffs := s.applyTransaction(txn)
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, siacoinOutputDiffs...)
-		bn.fileContractDiffs = append(bn.fileContractDiffs, fileContractDiffs...)
+		s.applyTransaction(bn, txn)
 	}
 
 	// Perform maintanence on all open contracts.
-	siacoinOutputDiffs, fileContractDiffs := s.applyContractMaintenance()
-	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, siacoinOutputDiffs...)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fileContractDiffs...)
+	s.applyContractMaintenance(bn)
+	s.applyDelayedSiacoinOutputMaintenance(bn)
+	s.applyMinerSubsidy(bn)
 
-	// Add the miner payouts.
-	subsidyDiffs := s.applyMinerSubsidy(bn)
-	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, subsidyDiffs...)
+	// Update the siafundPoolDiff to reflect the new pool size.
+	bn.siafundPoolDiff.Adjusted = s.siafundPool
+
 	return
 }
 

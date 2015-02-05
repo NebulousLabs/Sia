@@ -41,7 +41,7 @@ type State struct {
 	unspentSiacoinOutputs map[OutputID]SiacoinOutput
 	openFileContracts     map[FileContractID]FileContract
 	unspentSiafundOutputs map[OutputID]SiafundOutput
-	delayedSiacoinOutputs map[BlockHeight][]SiacoinOutput
+	delayedSiacoinOutputs map[BlockHeight]map[OutputID]SiacoinOutput
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -64,7 +64,7 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		unspentSiacoinOutputs: make(map[OutputID]SiacoinOutput),
 		openFileContracts:     make(map[FileContractID]FileContract),
 		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
-		delayedSiacoinOutputs: make(map[BlockHeight][]SiacoinOutput),
+		delayedSiacoinOutputs: make(map[BlockHeight]map[OutputID]SiacoinOutput),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.

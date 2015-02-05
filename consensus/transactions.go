@@ -190,15 +190,15 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	return
 }
 
-// applyTransaction() takes a transaction and adds it to the
-// ConsensusState, updating the list of contracts, outputs, etc.
-func (s *State) applyTransaction(t Transaction) (scods []SiacoinOutputDiff, fcds []FileContractDiff) {
-	// Remove all inputs from the unspent outputs list.
-	for _, input := range t.SiacoinInputs {
+// applySiacoinInputs takes all of the siacoin inputs in a transaction and
+// applies them to the state, updating the diffs in the block node.
+func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
+	// Remove all siacoin inputs from the unspent siacoin outputs list.
+	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input must exist within the blockchain, should
 		// have already been verified.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[input.OutputID]
+			_, exists := s.unspentSiacoinOutputs[sci.OutputID]
 			if !exists {
 				panic("Applying a transaction with an invalid unspent output!")
 			}
@@ -206,15 +206,19 @@ func (s *State) applyTransaction(t Transaction) (scods []SiacoinOutputDiff, fcds
 
 		scod := SiacoinOutputDiff{
 			New:           false,
-			ID:            input.OutputID,
-			SiacoinOutput: s.unspentSiacoinOutputs[input.OutputID],
+			ID:            sci.OutputID,
+			SiacoinOutput: s.unspentSiacoinOutputs[sci.OutputID],
 		}
-		scods = append(scods, scod)
-		delete(s.unspentSiacoinOutputs, input.OutputID)
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		delete(s.unspentSiacoinOutputs, sci.OutputID)
 	}
+}
 
-	// Add all finanacial outputs to the unspent outputs list.
-	for i, output := range t.SiacoinOutputs {
+// applySiacoinOutputs takes all of the siacoin outputs in a transaction and
+// applies them to the state, updating the diffs in the block node.
+func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
+	// Add all siacoin outputs to the unspent siacoin outputs list.
+	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output must not exist within the state, should
 		// have already been verified.
 		if DEBUG {
@@ -227,25 +231,42 @@ func (s *State) applyTransaction(t Transaction) (scods []SiacoinOutputDiff, fcds
 		scod := SiacoinOutputDiff{
 			New:           true,
 			ID:            t.SiacoinOutputID(i),
-			SiacoinOutput: output,
+			SiacoinOutput: sco,
 		}
-		s.unspentSiacoinOutputs[t.SiacoinOutputID(i)] = output
-		scods = append(scods, scod)
+		s.unspentSiacoinOutputs[t.SiacoinOutputID(i)] = sco
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+	}
+}
+
+func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
+}
+
+func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
+}
+
+// applyTransaction takes a transaction and uses the contents to update the
+// state of consensus according to the contents of the transaction. The
+// transaction is assumed to be valid. A set of diffs are returned that
+// represent how the state of consensus has changed. The changes to the
+// siafundPool and the delayedSiacoinOutputs are not recorded, as they are
+// handled externally.
+func (s *State) applyTransaction(bn *blockNode, t Transaction) {
+	// Sanity check - the input transaction should be valid.
+	if DEBUG {
+		err := s.validTransaction(t)
+		if err != nil {
+			panic("applyTransaction called with an invalid transaction!")
+		}
 	}
 
-	// Add all outputs created by storage proofs.
-	for _, sp := range t.StorageProofs {
-		scod, fcd := s.applyStorageProof(sp)
-		scods = append(scods, scod)
-		fcds = append(fcds, fcd)
-	}
-
-	// Add all new contracts to the OpenContracts list.
-	for i, contract := range t.FileContracts {
-		fcd := s.applyContract(contract, t.FileContractID(i))
-		fcds = append(fcds, fcd)
-	}
-	return
+	// Apply each component of the transaction. Miner fees are handled as a
+	// separate process.
+	s.applySiacoinInputs(bn, t)
+	s.applySiacoinOutputs(bn, t)
+	s.applyFileContracts(bn, t)
+	s.applyStorageProofs(bn, t)
+	s.applySiafundInputs(bn, t)
+	s.applySiafundOutputs(bn, t)
 }
 
 // SiacoinOutputSum returns the sum of all the siacoin outputs in the

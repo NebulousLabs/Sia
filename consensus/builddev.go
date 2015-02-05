@@ -15,6 +15,8 @@ const (
 	MedianTimestampWindow = 11          // Number of blocks that get considered when determining if a timestamp is valid. Should be an odd number.
 	FutureThreshold       = 3 * 60 * 60 // Seconds into the future block timestamps are valid.
 	SiafundCount          = 10e3        // The total (static) number of siafunds.
+	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
+	MaturityDelay         = 20          // The number of blocks that need to be waited before certain types of outputs come to maturity.
 
 	InitialCoinbase = 300e3
 	MinimumCoinbase = 30e3

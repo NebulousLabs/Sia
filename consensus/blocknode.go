@@ -21,7 +21,7 @@ type blockNode struct {
 	siacoinOutputDiffs       []SiacoinOutputDiff
 	fileContractDiffs        []FileContractDiff
 	siafundOutputDiffs       []SiafundOutputDiff
-	newDelayedSiacoinOutputs []SiacoinOutput
+	newDelayedSiacoinOutputs map[OutputID]SiacoinOutput
 }
 
 // childDepth returns the depth that any child node would have.

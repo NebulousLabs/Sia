@@ -88,7 +88,7 @@ The second currency in the Sia cryptosystem is the Siafund, which is a special
 asset limited to 10,000 indivisible units. Each time a file contract payout is
 made, 3.9% of the payout is put into the siafund pool. The number of siacoins
 in the siafund pool must always be divisible by 10,000; the number of coins
-taken from the payout is rounded up to the nearest 10,000.
+taken from the payout is rounded down to the nearest 10,000.
 
 Siafund owners can collect the siacoins in the siafund pool. For every 10,000
 siacoins added to the siafund pool, a siafund owner can withdraw 1 siacoin.

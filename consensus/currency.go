@@ -57,6 +57,22 @@ func (c *Currency) Mul(y Currency) error {
 	return c.SetBig(c.i.Mul(&c.i, &y.i))
 }
 
+func (c *Currency) MulFloat(x float64) (err error) {
+	if c.of {
+		return ErrOverflow
+	}
+
+	cBig := c.Big()
+	cRat := new(big.Rat).SetInt(cBig)
+	xRat := new(big.Rat).SetFloat64(x)
+	cRat.Mul(cRat, xRat)
+	*c, err = NewCurrency(c.Big().Div(cRat.Num(), cRat.Denom()))
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (c *Currency) Div(y Currency) error {
 	if c.of {
 		return ErrOverflow
@@ -70,6 +86,16 @@ func (c *Currency) Sqrt() *Currency {
 	s, _ := NewCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
 	s.of = c.of // preserve overflow
 	return &s
+}
+
+func (c *Currency) RoundDown(nearest int64) error {
+	if c.of {
+		return ErrOverflow
+	}
+	round := big.NewInt(nearest)
+	c.i.Div(&c.i, round)
+	c.i.Mul(&c.i, round)
+	return nil
 }
 
 func (c *Currency) IsZero() bool {
