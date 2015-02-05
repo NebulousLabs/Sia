@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -76,12 +77,13 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // Otherwise, all coins that could be spent are counted (including those that
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
-func (w *Wallet) Balance(full bool) (total consensus.Currency) {
+func (w *Wallet) Balance(full bool) (total *big.Int) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	w.update()
 
 	// Iterate through all outputs and tally them up.
+	total = new(big.Int)
 	for _, key := range w.keys {
 		if !key.spendable && !full {
 			continue
@@ -93,8 +95,7 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			// TODO: ???
-			total.Add(knownOutput.output.Value)
+			total.Add(total, knownOutput.output.Value.Big())
 		}
 	}
 	return
