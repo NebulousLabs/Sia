@@ -89,8 +89,14 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		}
 	}
 
+	// Calculate the output sum
+	outputSum, err := t.OutputSum()
+	if err != nil {
+		return
+	}
+
 	// Check that the inputs equal the outputs.
-	if inputSum.Cmp(t.OutputSum()) != 0 {
+	if inputSum.Cmp(outputSum) != 0 {
 		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
@@ -164,7 +170,7 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 // OutputSum returns the sum of all the outputs in the transaction, which must
 // match the sum of all the inputs. Outputs created by storage proofs are not
 // considered, as they were already considered when the contract was created.
-func (t Transaction) OutputSum() (sum Currency) {
+func (t Transaction) OutputSum() (sum Currency, err error) {
 	// NOTE: manual overflow checking is performed here to prevent redundant
 	// checks.
 
@@ -185,7 +191,7 @@ func (t Transaction) OutputSum() (sum Currency) {
 
 	// Check for overflow
 	if sum.Overflow() {
-		// TODO: ???
+		err = ErrOverflow
 	}
 
 	return
