@@ -1,6 +1,8 @@
 package hostdb
 
 import (
+	"math/big"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -24,7 +26,7 @@ import (
 // We take the square of the price to heavily emphasize hosts that have a low
 // price. This is also a bit simplistic however, because we're not sure what
 // the host might be charging for bandwidth.
-func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
+func entryWeight(entry modules.HostEntry) (weight *big.Int) {
 	// Catch a divide by 0 error, and let all hosts have at least some weight.
 	//
 	// TODO: Perhaps there's a better way to do this.
@@ -39,13 +41,9 @@ func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 	}
 
 	// weight := entry.Freeze * entry.Collateral / sqrt(entry.Price)
-	weight.Add(entry.Freeze)
-	// mathematically, overflow can only occur here
-	err := weight.Mul(entry.Collateral)
-	if err != nil {
-		// TODO: ???
-	}
-	weight.Div(entry.Price.Sqrt())
+	weight = new(big.Int).Set(entry.Freeze.Big())
+	weight.Mul(weight, entry.Collateral.Big())
+	weight.Div(weight, entry.Price.Sqrt().Big())
 
 	return
 }

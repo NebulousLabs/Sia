@@ -78,12 +78,12 @@ func (c *Currency) Div(y Currency) error {
 	return c.SetBig(c.i.Div(&c.i, &y.i))
 }
 
-func (c *Currency) Sqrt() Currency {
+func (c *Currency) Sqrt() *Currency {
 	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	rat := new(big.Rat).SetFloat64(f)
 	s, _ := NewCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
 	s.of = c.of // preserve overflow
-	return s
+	return &s
 }
 
 func (c *Currency) IsZero() bool {
