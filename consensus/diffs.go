@@ -134,3 +134,33 @@ func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, forward bool) {
 		s.siafundPool = sfpd.Previous
 	}
 }
+
+func (s *State) applyDiffSet(bn *blockNode, direction bool) {
+	// Apply the siacoin, file contract, and siafund diffs.
+	s.commitSiafundPoolDiff(bn.siafundPoolDiff, direction)
+	for _, scod := range bn.siacoinOutputDiffs {
+		s.commitSiacoinOutputDiff(scod, direction)
+	}
+	for _, fcd := range bn.fileContractDiffs {
+		s.commitFileContractDiff(fcd, direction)
+	}
+	for _, sfod := range bn.siafundOutputDiffs {
+		s.commitSiafundOutputDiff(sfod, direction)
+	}
+
+	// Delete the delated outputs created by the node.
+	if direction {
+		s.delayedSiacoinOutputs[bn.height] = bn.newDelayedSiacoinOutputs
+	} else {
+		delete(s.delayedSiacoinOutputs, bn.height)
+	}
+
+	// Update the current path and currentBlockID
+	if direction {
+		s.currentBlockID = bn.block.ID()
+		s.currentPath[bn.height] = bn.block.ID()
+	} else {
+		delete(s.currentPath, bn.height)
+		s.currentBlockID = bn.parent.block.ID()
+	}
+}

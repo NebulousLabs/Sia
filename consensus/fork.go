@@ -6,9 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// TODO: Make sure that 100 block cooldown + siafunds get properly reversed
-// when reverse is called.
-
 // A non-consensus rule that dictates how much heavier a competing chain has to
 // be before the node will switch to mining on that chain. The percent refers
 // to the percent of the weight of the most recent block on the winning chain,
@@ -63,26 +60,8 @@ func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
 // reversing all of the diffs and deleting it from the currentPath.
 func (s *State) invertRecentBlock() {
 	bn := s.currentBlockNode()
-
-	// Invert all of the diffs.
-	direction := false // blockchain is inverting, set direction flag to false.
-	for _, scod := range bn.siacoinOutputDiffs {
-		s.commitSiacoinOutputDiff(scod, direction)
-	}
-	for _, fcd := range bn.fileContractDiffs {
-		s.commitFileContractDiff(fcd, direction)
-	}
-	for _, sfod := range bn.siafundOutputDiffs {
-		s.commitSiafundOutputDiff(sfod, direction)
-	}
-	s.commitSiafundPoolDiff(bn.siafundPoolDiff, direction)
-
-	// Delete the delated outputs created by the node.
-	delete(s.delayedSiacoinOutputs, bn.height)
-
-	// Update the current path and currentBlockID
-	delete(s.currentPath, bn.height)
-	s.currentBlockID = bn.parent.block.ID()
+	direction := false // direction is set to false because the node is being removed.
+	s.applyDiffSet(bn, direction)
 }
 
 // rewindToNode will rewind blocks until `bn` is the highest block.
@@ -181,18 +160,11 @@ func (s *State) applyBlockNode(bn *blockNode) {
 		}
 	}
 
-	// Update current id and current path.
-	s.currentBlockID = bn.block.ID()
-	s.currentPath[bn.height] = bn.block.ID()
-
 	// Apply all of the diffs.
-	direction := true // blockchain is going forward, set direction flag to true.
-	for _, scod := range bn.siacoinOutputDiffs {
-		s.commitSiacoinOutputDiff(scod, direction)
-	}
-	for _, fcd := range bn.fileContractDiffs {
-		s.commitFileContractDiff(fcd, direction)
-	}
+	direction := true // the blockNode is being applied, direction is set to true.
+	s.applyDiffSet(bn, direction)
+
+	// Update current id and current path.
 }
 
 // forkBlockchain will take the consensus of the State from whatever node it's

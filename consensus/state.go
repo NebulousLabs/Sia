@@ -56,9 +56,10 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		badBlocks:             make(map[BlockID]struct{}),
 		blockMap:              make(map[BlockID]*blockNode),
 		currentPath:           make(map[BlockHeight]BlockID),
-		openFileContracts:     make(map[FileContractID]FileContract),
 		unspentSiacoinOutputs: make(map[OutputID]SiacoinOutput),
+		openFileContracts:     make(map[FileContractID]FileContract),
 		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
+		delayedSiacoinOutputs: make(map[BlockHeight][]SiacoinOutput),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
