@@ -77,8 +77,8 @@ func testEmptyBlock(t *testing.T, s *State) {
 	bbLen := len(s.badBlocks)
 	bmLen := len(s.blockMap)
 	cpLen := len(s.currentPath)
-	uoLen := len(s.unspentOutputs)
-	ocLen := len(s.openContracts)
+	uoLen := len(s.unspentSiacoinOutputs)
+	ocLen := len(s.openFileContracts)
 	beforeStateHash := s.StateHash()
 
 	// Mine and submit a block
@@ -105,8 +105,8 @@ func testEmptyBlock(t *testing.T, s *State) {
 	if bbLen != len(s.badBlocks) ||
 		bmLen != len(s.blockMap)-1 ||
 		cpLen != len(s.currentPath)-1 ||
-		uoLen > len(s.unspentOutputs)-1 ||
-		ocLen < len(s.openContracts) {
+		uoLen > len(s.unspentSiacoinOutputs)-1 ||
+		ocLen < len(s.openFileContracts) {
 		t.Error("state changed unexpectedly after accepting an empty block")
 	}
 	if s.currentBlockID != b.ID() {
@@ -119,7 +119,7 @@ func testEmptyBlock(t *testing.T, s *State) {
 	if !exists {
 		t.Error("the state's block map did not update correctly after getting an empty block")
 	}
-	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if !exists {
 		t.Error("the blocks subsidy output did not get added to the set of unspent outputs")
 	}
@@ -178,7 +178,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 		t.Error(err)
 	}
 	// Check that the payout made it into the output list.
-	_, exists := s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists := s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if !exists {
 		t.Error("miner payout not found in the list of unspent outputs")
 	}
@@ -200,16 +200,16 @@ func testMinerPayouts(t *testing.T, s *State) {
 		t.Error(err)
 	}
 	// Check that all three payouts made it into the output list.
-	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if !exists {
 		t.Error("miner payout not found in the list of unspent outputs")
 	}
-	_, exists = s.unspentOutputs[b.MinerPayoutID(1)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(1)]
 	output250 := b.MinerPayoutID(1)
 	if !exists {
 		t.Error("miner payout not found in the list of unspent outputs")
 	}
-	_, exists = s.unspentOutputs[b.MinerPayoutID(2)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(2)]
 	output500 := b.MinerPayoutID(2)
 	if !exists {
 		t.Error("miner payout not found in the list of unspent outputs")
@@ -226,7 +226,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 		t.Error("Unexpected Error:", err)
 	}
 	// Check that the payout did not make it into the output list.
-	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if exists {
 		t.Error("miner payout made it into state despite being invalid.")
 	}
@@ -242,7 +242,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 		t.Error("Unexpected Error:", err)
 	}
 	// Check that the payout did not make it into the output list.
-	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if exists {
 		t.Error("miner payout made it into state despite being invalid.")
 	}
@@ -284,16 +284,16 @@ func testMinerPayouts(t *testing.T, s *State) {
 		t.Error(err)
 	}
 	// Check that the payout outputs made it into the state.
-	_, exists = s.unspentOutputs[b.MinerPayoutID(0)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
 	if !exists {
 		t.Error("miner payout did not make it into the state")
 	}
-	_, exists = s.unspentOutputs[b.MinerPayoutID(1)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(1)]
 	output650 := b.MinerPayoutID(1)
 	if !exists {
 		t.Error("miner payout did not make it into the state")
 	}
-	_, exists = s.unspentOutputs[b.MinerPayoutID(2)]
+	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(2)]
 	output75 := b.MinerPayoutID(2)
 	if !exists {
 		t.Error("miner payout did not make it into the state")
@@ -374,8 +374,8 @@ func testRepeatBlock(t *testing.T, s *State) {
 	bbLen := len(s.badBlocks)
 	bmLen := len(s.blockMap)
 	cpLen := len(s.currentPath)
-	uoLen := len(s.unspentOutputs)
-	ocLen := len(s.openContracts)
+	uoLen := len(s.unspentSiacoinOutputs)
+	ocLen := len(s.openFileContracts)
 	stateHash := s.StateHash()
 
 	// Submit the repeat block.
@@ -388,8 +388,8 @@ func testRepeatBlock(t *testing.T, s *State) {
 	if bbLen != len(s.badBlocks) ||
 		bmLen != len(s.blockMap) ||
 		cpLen != len(s.currentPath) ||
-		uoLen != len(s.unspentOutputs) ||
-		ocLen != len(s.openContracts) ||
+		uoLen != len(s.unspentSiacoinOutputs) ||
+		ocLen != len(s.openFileContracts) ||
 		stateHash != s.StateHash() {
 		t.Error("state changed after getting a repeat block.")
 	}

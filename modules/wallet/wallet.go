@@ -24,7 +24,7 @@ type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
 	recentBlock      consensus.BlockID
-	unconfirmedDiffs []consensus.OutputDiff
+	unconfirmedDiffs []consensus.SiacoinOutputDiff
 
 	// Location of the wallet's file, for saving and loading keys.
 	filename string

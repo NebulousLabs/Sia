@@ -164,7 +164,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			if len(publicKey.Key) != 32 {
 				return InvalidSignatureErr
 			}
-		case SignatureED25519:
+		case SignatureEd25519:
 			// Decode the public key and signature.
 			var decodedPK crypto.PublicKey
 			err := encoding.Unmarshal(publicKey.Key, &decodedPK)

@@ -19,7 +19,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 		NumSignatures: 1,
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
-				Algorithm: consensus.ED25519Identifier,
+				Algorithm: consensus.SignatureEd25519,
 				Key:       encoding.Marshal(pk),
 			},
 		},
@@ -68,7 +68,7 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 		NumSignatures: 1,
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
-				Algorithm: consensus.ED25519Identifier,
+				Algorithm: consensus.SignatureEd25519,
 				Key:       encoding.Marshal(pk),
 			},
 		},

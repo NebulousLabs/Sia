@@ -63,7 +63,7 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 // Returns the set of diffs that would be applied to the state if all of the
 // transactions in the transaction pool (excluding storage proofs) got
 // accepted.
-func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
+func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
 	tp.update()
@@ -74,7 +74,7 @@ func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 	for currentTxn != nil {
 		txn := currentTxn.transaction
 		for _, input := range txn.SiacoinInputs {
-			diff := consensus.OutputDiff{
+			scod := consensus.SiacoinOutputDiff{
 				New: false,
 				ID:  input.OutputID,
 			}
@@ -90,18 +90,18 @@ func (tp *TransactionPool) OutputDiffs() (diffs []consensus.OutputDiff) {
 					}
 				}
 			}
-			diff.Output = output
+			scod.SiacoinOutput = output
 
-			diffs = append(diffs, diff)
+			scods = append(scods, scod)
 		}
 
 		for i, output := range txn.SiacoinOutputs {
-			diff := consensus.OutputDiff{
-				New:    true,
-				ID:     txn.SiacoinOutputID(i),
-				Output: output,
+			scod := consensus.SiacoinOutputDiff{
+				New:           true,
+				ID:            txn.SiacoinOutputID(i),
+				SiacoinOutput: output,
 			}
-			diffs = append(diffs, diff)
+			scods = append(scods, scod)
 		}
 	}
 

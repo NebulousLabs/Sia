@@ -68,10 +68,10 @@ func currencyCheck(t *testing.T, s *State) {
 		expectedSiacoins.Add(CalculateCoinbase(i))
 	}
 	siacoins := NewCurrency64(0)
-	for _, output := range s.unspentOutputs {
+	for _, output := range s.unspentSiacoinOutputs {
 		siacoins.Add(output.Value)
 	}
-	for _, contract := range s.openContracts {
+	for _, contract := range s.openFileContracts {
 		siacoins.Add(contract.Payout)
 	}
 	siacoins.Add(s.siafundPool)

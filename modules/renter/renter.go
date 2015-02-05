@@ -9,9 +9,9 @@ import (
 )
 
 type FilePiece struct {
-	Host       modules.HostEntry      // Where to find the file.
-	Contract   consensus.FileContract // The contract being enforced.
-	ContractID consensus.ContractID   // The ID of the contract.
+	Host       modules.HostEntry        // Where to find the file.
+	Contract   consensus.FileContract   // The contract being enforced.
+	ContractID consensus.FileContractID // The ID of the contract.
 }
 
 type Renter struct {

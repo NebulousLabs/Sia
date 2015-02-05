@@ -55,7 +55,7 @@ var SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ',
 //
 // TODO: Document encodings and such for each type of signature.
 var SignatureEntropy = Identifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
-var SignatureED25519 = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
+var SignatureEd25519 = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and

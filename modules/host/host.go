@@ -39,7 +39,7 @@ type Host struct {
 	spaceRemaining int64
 	fileCounter    int
 
-	contracts map[consensus.ContractID]contractObligation
+	contracts map[consensus.FileContractID]contractObligation
 
 	mu sync.RWMutex
 }
@@ -73,7 +73,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 			CoinAddress: addr,
 		},
 
-		contracts: make(map[consensus.ContractID]contractObligation),
+		contracts: make(map[consensus.FileContractID]contractObligation),
 	}
 
 	return
@@ -89,7 +89,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 // TODO: Move this function to a different file in the package?
 func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
-	var contractID consensus.ContractID
+	var contractID consensus.FileContractID
 	err = encoding.ReadObject(conn, &contractID, hash.HashSize)
 	if err != nil {
 		return

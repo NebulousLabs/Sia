@@ -13,7 +13,7 @@ import (
 // transaction, we store only the id.
 // TODO: is this needed?
 type ContractEntry struct {
-	ID       consensus.ContractID
+	ID       consensus.FileContractID
 	Contract consensus.FileContract
 }
 
