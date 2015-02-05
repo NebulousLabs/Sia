@@ -20,7 +20,7 @@ func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Siacoi
 		Transactions: txns,
 	}
 
-	for !b.CheckTarget(target) && b.Nonce < 1000*1000 {
+	for !b.CheckTarget(target) && b.Nonce < 1e6 {
 		b.Nonce++
 	}
 	if !b.CheckTarget(target) {

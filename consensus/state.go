@@ -9,37 +9,41 @@ type (
 	BlockWeight *big.Rat
 )
 
-// Contains basic information about the state, but does not go into depth.
-type StateInfo struct {
-	CurrentBlock BlockID
-	Height       BlockHeight
-	Target       Target
-}
-
+// The State is the object responsible for tracking the current status of the
+// blockchain. It accepts blocks and maintains an understanding of competing
+// forks. The State object is responsible for maintaining consensus.
 type State struct {
-	// The block root operates like a linked list of blocks, forming the
-	// blocktree.
+	// The blockRoot is the block node that contains the genesis block, which
+	// is the foundation for all other blocks. blockNodes form a tree, each
+	// having many children and pointing back to the parent.
 	blockRoot *blockNode
 
-	// TODO: explain bad blocks.
-	//
-	// Missing parents is a double map, the first a map of missing parents, and
-	// the second is a map of the known children to the parent. The first is
-	// necessary so that if a parent is found, all the children can be added to
-	// the parent. The second is necessary for checking if a new block is a
-	// known orphan.
-	badBlocks map[BlockID]struct{}   // A list of blocks that don't verify.
-	blockMap  map[BlockID]*blockNode // A list of all blocks in the blocktree.
+	// Maps tracking blocks that have been seen. badBlocks is a list of blocks
+	// that are somehow invalid (such as containing invalid transactions). The
+	// second is a list of valid blocks which have nodes in the State.
+	badBlocks map[BlockID]struct{}
+	blockMap  map[BlockID]*blockNode
 
-	// Consensus Variables - the current state of consensus according to the
-	// longest fork.
-	currentBlockID        BlockID
-	currentPath           map[BlockHeight]BlockID
+	// currentPath and currentBlockID track which blocks are currently accepted
+	// as the longest known blockchain.
+	currentBlockID BlockID
+	currentPath    map[BlockHeight]BlockID
+
+	// These are the consensus variables. All nodes on the network which have
+	// the same path will have the same exact consensus variables, anything
+	// else is a software bug.
 	siafundPool           Currency
 	unspentSiafundOutputs map[OutputID]SiafundOutput
 	unspentOutputs        map[OutputID]SiacoinOutput
+	delayedOutputs        map[BlockHeight]SiacoinOutput
 	openContracts         map[ContractID]FileContract
 
+	// Per convention, all exported functions in the consensus package can be
+	// called concurrently. The state mutex helps to orchestrate thread safety.
+	// To keep things simple, the entire state was chosen to have a single
+	// mutex, as opposed to putting frequently accessed fields under separate
+	// mutexes. The performance advantage was decided to be not worth the
+	// complexity tradeoff.
 	mu sync.RWMutex
 }
 
@@ -73,21 +77,29 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:     CalculateCoinbase(0),
-		SpendHash: ZeroAddress,
+		SpendHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
 	}
 	s.unspentSiafundOutputs[OutputID{0}] = SiafundOutput{
 		Value:            NewCurrency64(SiafundCount),
-		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Address
-		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis Address
+		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Siafund SpendHash Address
+		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis ClaimDestination Address
 	}
 
 	return
 }
 
+// RLock will readlock the state.
+//
+// TODO: Add a safety timer which will auto-unlock if the readlock is held for
+// more than a second. (panic in debug mode)
 func (s *State) RLock() {
 	s.mu.RLock()
 }
 
+// RUnlock will readunlock the state.
+//
+// TODO: when the safety timer is added to RLock, add a timer disabler to
+// RUnlock to prevent too many unlocks from being called.
 func (s *State) RUnlock() {
 	s.mu.RUnlock()
 }

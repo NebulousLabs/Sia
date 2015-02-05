@@ -6,6 +6,11 @@ import (
 
 // TODO: Add the 100block waiting outputs to the currency tallying.
 
+// TODO: Split some of these tests off into fork_test.go.
+
+// TODO: in fork_test.go (which doesn't exist yet), try calling fork() on a
+// node that's already in the current consensus set.
+
 // currentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
 // currentPath.

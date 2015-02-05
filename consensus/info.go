@@ -6,6 +6,13 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
+// Contains basic information about the state, but does not go into depth.
+type StateInfo struct {
+	CurrentBlock BlockID
+	Height       BlockHeight
+	Target       Target
+}
+
 // BlockAtHeight() returns the block from the current history at the
 // input height.
 func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {

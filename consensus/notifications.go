@@ -13,7 +13,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 
 	node, exists := s.blockMap[id]
 	if !exists {
-		err = errors.New("block is not known to the state or is an orphan")
+		err = errors.New("block is unknown")
 		return
 	}
 
