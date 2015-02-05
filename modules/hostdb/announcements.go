@@ -31,11 +31,10 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ann
 				continue
 			}
 
-			// calculate freeze
-			freeze := uint64(ha.SpendConditions.TimeLock-height) * uint64(t.Outputs[ha.FreezeIndex].Value)
-
-			// check for sane freeze value
-			if freeze <= 0 {
+			// calculate freeze and check for sane value
+			freeze := consensus.NewCurrency64(uint64(ha.SpendConditions.TimeLock - height))
+			err = freeze.Mul(t.Outputs[ha.FreezeIndex].Value)
+			if err != nil || freeze.IsZero() {
 				continue
 			}
 

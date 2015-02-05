@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -39,8 +40,8 @@ type key struct {
 func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
 	w.update()
 
-	if amount == consensus.Currency(0) {
-		err = errors.New("cannot fund 0 coins") // should this be an error or nil?
+	if amount.IsZero() {
+		err = errors.New("cannot fund 0 coins")
 		return
 	}
 
@@ -53,10 +54,13 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			if !knownOutput.spendable || knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			total += knownOutput.output.Value
+			err = total.Add(knownOutput.output.Value)
+			if err != nil {
+				return
+			}
 			knownOutputs = append(knownOutputs, knownOutput)
 
-			if total >= amount {
+			if total.Cmp(amount) >= 0 {
 				return
 			}
 		}
@@ -73,12 +77,13 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // Otherwise, all coins that could be spent are counted (including those that
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
-func (w *Wallet) Balance(full bool) (total consensus.Currency) {
+func (w *Wallet) Balance(full bool) (total *big.Int) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	w.update()
 
 	// Iterate through all outputs and tally them up.
+	total = new(big.Int)
 	for _, key := range w.keys {
 		if !key.spendable && !full {
 			continue
@@ -90,7 +95,7 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			total += knownOutput.output.Value
+			total.Add(total, knownOutput.output.Value.Big())
 		}
 	}
 	return

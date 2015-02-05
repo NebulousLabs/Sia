@@ -33,7 +33,10 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 				return
 			}
 
-			inputSum += output.Value
+			err = inputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
 			continue
 		}
 
@@ -51,7 +54,10 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 				return
 			}
 
-			inputSum += output.Value
+			err = inputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
 			continue
 		}
 
@@ -73,8 +79,14 @@ func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error)
 		return
 	}
 
+	// Get the output sum.
+	outputSum, err := t.OutputSum()
+	if err != nil {
+		return
+	}
+
 	// Check that the inputs equal the outputs.
-	if inputSum != t.OutputSum() {
+	if inputSum.Cmp(outputSum) != 0 {
 		err = errors.New("input sum does not equal output sum")
 		return
 	}

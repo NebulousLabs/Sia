@@ -31,7 +31,12 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	subsidy := consensus.CalculateCoinbase(height + 1)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
-			subsidy += fee
+			subsidy.Add(fee)
+		}
+	}
+	if consensus.DEBUG {
+		if subsidy.Overflow() {
+			panic("miner received overflowing transaction set from transaction pool")
 		}
 	}
 	output := consensus.Output{Value: subsidy, SpendHash: m.address}

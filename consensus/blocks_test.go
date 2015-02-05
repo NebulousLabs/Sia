@@ -180,10 +180,12 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 
 	// Create a block with multiple miner payouts.
+	coinbasePayout := CalculateCoinbase(s.Height() + 1)
+	coinbasePayout.Sub(NewCurrency64(750))
 	payout = []Output{
-		Output{Value: CalculateCoinbase(s.Height()+1) - 750, SpendHash: sc.CoinAddress()},
-		Output{Value: 250, SpendHash: sc.CoinAddress()},
-		Output{Value: 500, SpendHash: sc.CoinAddress()},
+		Output{Value: coinbasePayout, SpendHash: sc.CoinAddress()},
+		Output{Value: NewCurrency64(250), SpendHash: sc.CoinAddress()},
+		Output{Value: NewCurrency64(500), SpendHash: sc.CoinAddress()},
 	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, nil, s.CurrentTarget())
 	if err != nil {
@@ -247,9 +249,9 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Input{OutputID: output250},
 		},
 		MinerFees: []Currency{
-			Currency(50),
-			Currency(75),
-			Currency(125),
+			NewCurrency64(50),
+			NewCurrency64(75),
+			NewCurrency64(125),
 		},
 	}
 	txn2 := Transaction{
@@ -257,12 +259,18 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Input{OutputID: output500},
 		},
 		MinerFees: []Currency{
-			Currency(100),
-			Currency(150),
-			Currency(250),
+			NewCurrency64(100),
+			NewCurrency64(150),
+			NewCurrency64(250),
 		},
 	}
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	coinbasePayout = CalculateCoinbase(s.Height() + 1)
+	coinbasePayout.Add(NewCurrency64(25))
+	payout = []Output{
+		Output{Value: coinbasePayout},
+		Output{Value: NewCurrency64(650), SpendHash: sc.CoinAddress()},
+		Output{Value: NewCurrency64(75), SpendHash: sc.CoinAddress()},
+	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
@@ -293,9 +301,9 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Input{OutputID: output650},
 		},
 		MinerFees: []Currency{
-			Currency(100),
-			Currency(50),
-			Currency(500),
+			NewCurrency64(100),
+			NewCurrency64(50),
+			NewCurrency64(500),
 		},
 	}
 	txn2 = Transaction{
@@ -303,12 +311,18 @@ func testMinerPayouts(t *testing.T, s *State) {
 			Input{OutputID: output75},
 		},
 		MinerFees: []Currency{
-			Currency(10),
-			Currency(15),
-			Currency(50),
+			NewCurrency64(10),
+			NewCurrency64(15),
+			NewCurrency64(50),
 		},
 	}
-	payout = []Output{Output{Value: CalculateCoinbase(s.Height()+1) + 25}, Output{Value: 650, SpendHash: sc.CoinAddress()}, Output{Value: 75, SpendHash: sc.CoinAddress()}}
+	coinbasePayout = CalculateCoinbase(s.Height() + 1)
+	coinbasePayout.Add(NewCurrency64(25))
+	payout = []Output{
+		Output{Value: coinbasePayout},
+		Output{Value: NewCurrency64(650), SpendHash: sc.CoinAddress()},
+		Output{Value: NewCurrency64(75), SpendHash: sc.CoinAddress()},
+	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)

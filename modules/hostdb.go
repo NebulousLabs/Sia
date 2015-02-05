@@ -44,7 +44,7 @@ type HostSettings struct {
 type HostEntry struct {
 	HostSettings
 	IPAddress network.Address
-	Freeze    uint64 // actual units are Currency * BlockHeight: "CoinBlocks"
+	Freeze    consensus.Currency // actual units are Currency * BlockHeight: "CoinBlocks"
 }
 
 type HostDB interface {

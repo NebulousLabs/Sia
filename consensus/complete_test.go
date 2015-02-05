@@ -52,27 +52,27 @@ func rewindApplyCheck(t *testing.T, s *State) {
 // should be in the system, and then tallys up the outputs to see if that is
 // the case.
 func currencyCheck(t *testing.T, s *State) {
-	siafunds := Currency(0)
+	siafunds := NewCurrency64(0)
 	for _, siafundOutput := range s.unspentSiafundOutputs {
-		siafunds += siafundOutput.Value
+		siafunds.Add(siafundOutput.Value)
 	}
-	if siafunds != SiafundCount {
+	if siafunds.Cmp(NewCurrency64(SiafundCount)) != 0 {
 		t.Error("siafunds inconsistency")
 	}
 
-	expectedSiacoins := Currency(0)
+	expectedSiacoins := NewCurrency64(0)
 	for i := BlockHeight(0); i <= s.Height(); i++ {
-		expectedSiacoins += CalculateCoinbase(i)
+		expectedSiacoins.Add(CalculateCoinbase(i))
 	}
-	siacoins := Currency(0)
+	siacoins := NewCurrency64(0)
 	for _, output := range s.unspentOutputs {
-		siacoins += output.Value
+		siacoins.Add(output.Value)
 	}
 	for _, contract := range s.openContracts {
-		siacoins += contract.Payout
+		siacoins.Add(contract.Payout)
 	}
-	siacoins += s.siafundPool
-	if siacoins != expectedSiacoins {
+	siacoins.Add(s.siafundPool)
+	if siacoins.Cmp(expectedSiacoins) != 0 {
 		t.Error(siacoins)
 		t.Error(expectedSiacoins)
 		t.Error("siacoins inconsistency")

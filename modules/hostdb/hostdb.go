@@ -3,7 +3,6 @@ package hostdb
 import (
 	"crypto/rand"
 	"errors"
-	"math/big"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -169,10 +168,10 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 
 	// Get a random number between 0 and state.TotalWeight and then scroll
 	// through state.HostList until at least that much weight has been passed.
-	randInt, err := rand.Int(rand.Reader, big.NewInt(int64(hdb.hostTree.weight)))
+	randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight)
 	if err != nil {
 		return
 	}
-	randWeight := consensus.Currency(randInt.Int64())
+	// no possibility of error
 	return hdb.hostTree.entryAtWeight(randWeight)
 }

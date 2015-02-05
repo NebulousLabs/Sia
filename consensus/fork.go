@@ -6,8 +6,8 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// State.heavierFork() returns true if the input node is 5% heavier than the
-// current node of the ConsensusState.
+// State.heavierFork() returns true if the input node is sufficiently heavier
+// than the current node of the ConsensusState.
 func (s *State) heavierFork(newNode *blockNode) bool {
 	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
 	currentCumDiff := s.depth().Inverse()
@@ -77,7 +77,7 @@ func (s *State) applyMinerSubsidy(bn *blockNode) (diffs []OutputDiff) {
 	return
 }
 
-// s.integrateBlock() will verify the block and then integrate it into the
+// generateAndApplyDiff will verify the block and then integrate it into the
 // consensus state.
 func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Sanity check - generate should only be called if the diffs have not yet
@@ -98,26 +98,17 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	s.currentBlockID = bn.block.ID()
 	s.currentPath[bn.height] = bn.block.ID()
 
-	minerSubsidy := CalculateCoinbase(s.height())
+	// Validate and apply each transaction in the block.
 	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
-			break
+			s.invertRecentBlock()
+			return
 		}
 
-		// Apply the transaction to the ConsensusState, adding it to the list of applied transactions.
 		outputDiffs, contractDiffs := s.applyTransaction(txn)
 		bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
 		bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
-
-		// Add the miner fees to the miner subsidy.
-		for _, fee := range txn.MinerFees {
-			minerSubsidy += fee
-		}
-	}
-	if err != nil {
-		s.invertRecentBlock()
-		return
 	}
 
 	// Perform maintanence on all open contracts.
