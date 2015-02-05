@@ -1,10 +1,5 @@
 package consensus
 
-// TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
-// payouts, storage proof outputs, siafund claims.
-
-// TODO: Enforce siafund rules in consensus.
-
 // TODO: Complete non-adversarial test coverage, partial adversarial test
 // coverage.
 
@@ -44,18 +39,20 @@ type Currency struct {
 	of bool // has an overflow ever occurred?
 }
 
-var ZeroAddress = CoinAddress{0}
+// Identifiers that get used when determining the IDs of various elements in
+// the consensus state.
+var (
+	FileContractIdentifier  = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	SiacoinOutputIdentifier = Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+	SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+)
 
-var FileContractIdentifier = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
-var SiacoinOutputIdentifier = Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-var SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-
-// Each of these variables identifies a type of signature that is recognized
-// when verifying public keys.
-//
-// TODO: Document encodings and such for each type of signature.
-var SignatureEntropy = Identifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
-var SignatureEd25519 = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
+// Identifiers for the types of signatures that are recognized during signature
+// validation.
+var (
+	SignatureEntropy = Identifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
+	SignatureEd25519 = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
+)
 
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and
@@ -141,15 +138,17 @@ type SiafundInput struct {
 }
 
 // A SiafundOutput contains a value and a spend hash like the SiacoinOutput,
-// but it also contians a ClaimDestination and a ClaimStart. The
+// but it also contians a ClaimDestination and a claimStart. The
 // ClaimDestination is the address that will receive siacoins when the siafund
-// output is spent. The ClaimStart will be comapred to the SiafundPool to
-// figure out how many siacoins the ClaimDestination will receive.
+// output is spent. The claimStart will be comapred to the SiafundPool to
+// figure out how many siacoins the ClaimDestination will receive. The
+// claimStart is always set internally, and therefore is not an exported field.
+// Upon input, it must always equal zero.
 type SiafundOutput struct {
 	Value            Currency
 	SpendHash        CoinAddress
 	ClaimDestination CoinAddress
-	ClaimStart       Currency
+	claimStart       Currency
 }
 
 // A SiaPublicKey is a public key prefixed by an identifier. The identifier
@@ -194,9 +193,6 @@ type CoveredFields struct {
 }
 
 // CalculateCoinbase takes a height and from that derives the coinbase.
-//
-// TODO: Switch to a different constant because of using 128 bit values for the
-// currency.
 func CalculateCoinbase(height BlockHeight) (c Currency) {
 	base := InitialCoinbase - uint64(height)
 	if base < MinimumCoinbase {

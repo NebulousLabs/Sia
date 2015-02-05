@@ -59,9 +59,20 @@ threshold signatures.
   signature type requires a hardfork, but allows easy protection against
   cryptographic breaks, and easy migration to new cryptography if there are any
   breakthroughs in areas like verification speed, ring signatures, etc.
+
+  Allowed algorithms:
+	ed25519: The identifier must match the string "ed25519". The public key
+	must be encoded into 32 bytes. Signatures and public keys will need to
+	follow the ed25519 specification. More information can be found at
+	ed25519.cr.yp.to
+
+	entropy: The identifier must match the string "entropy". The signature will
+	always be invalid. This provides a way to add entropy buffers to
+	SpendCondition objects to protect low entropy information, while being able
+	to prove that the entropy buffers are invalid public keys.
   
-  Currently, the only allowed algorithm is ed25519. There are plans to also add
-  ECDSA secp256k1 and Schnorr secp256k1.
+  There are plans to also add ECDSA secp256k1 and Schnorr secp256k1. New
+  signing algorithms can be added to Sia through a soft fork.
 
 Currency
 --------
@@ -74,10 +85,10 @@ simply other currencies.). The siacoin is represented by a 128 bit unsigned
 integer.
 
 The second currency in the Sia cryptosystem is the Siafund, which is a special
-asset limited to 10,000 indivisible units. Each time a contract is created,
-3.9% of the payout is put into the siafund pool. The number of siacoins in the
-siafund pool must always be divisible by 10,000; the number of coins taken from
-the payout is rounded down to the nearest 10,000.
+asset limited to 10,000 indivisible units. Each time a file contract payout is
+made, 3.9% of the payout is put into the siafund pool. The number of siacoins
+in the siafund pool must always be divisible by 10,000; the number of coins
+taken from the payout is rounded up to the nearest 10,000.
 
 Siafund owners can collect the siacoins in the siafund pool. For every 10,000
 siacoins added to the siafund pool, a siafund owner can withdraw 1 siacoin.
@@ -330,7 +341,8 @@ Sia outputs contain:
   sent when the siafund output is spent.
 - A Claim Start, which indicates how many siacoins were in the siafund pool at
   the moment the siafund output got created. This is used when the output is
-  spent to determine how many siacoins go to the new output.
+  spent to determine how many siacoins go to the new output. This field is set
+  internally by consensus, and should not be encoded into blocks.
 
 The id of a contract is determined by marhsalling an identifier with the string
 "siafund output" and appending that to the marshalling of the transaction

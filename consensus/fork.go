@@ -111,6 +111,9 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 		}
 	}
 
+	// Set diffsGenerated to true.
+	bn.diffsGenerated = true
+
 	// Update the current block and current path.
 	s.currentBlockID = bn.block.ID()
 	s.currentPath[bn.height] = bn.block.ID()
@@ -136,13 +139,11 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Add the miner payouts.
 	subsidyDiffs := s.applyMinerSubsidy(bn)
 	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, subsidyDiffs...)
-
-	bn.diffsGenerated = true
 	return
 }
 
-// invalidateNode() is a recursive function that deletes all of the
-// children of a block and puts them on the bad blocks list.
+// invalidateNode recursively deletes all the generational children of a block
+// and puts them all on the bad blocks list.
 func (s *State) invalidateNode(node *blockNode) {
 	for i := range node.children {
 		s.invalidateNode(node.children[i])
@@ -152,6 +153,7 @@ func (s *State) invalidateNode(node *blockNode) {
 	s.badBlocks[node.block.ID()] = struct{}{}
 }
 
+// applyBlockNode takes a block
 func (s *State) applyBlockNode(bn *blockNode) {
 	// Sanity check - current node must be the input node's parent.
 	if DEBUG {
@@ -163,8 +165,6 @@ func (s *State) applyBlockNode(bn *blockNode) {
 	// Apply all of the diffs.
 	direction := true // the blockNode is being applied, direction is set to true.
 	s.applyDiffSet(bn, direction)
-
-	// Update current id and current path.
 }
 
 // forkBlockchain will take the consensus of the State from whatever node it's

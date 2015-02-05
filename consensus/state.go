@@ -5,6 +5,11 @@ import (
 	"sync"
 )
 
+var (
+	ZeroAddress  = CoinAddress{0}
+	ZeroCurrency = NewCurrency64(0)
+)
+
 type (
 	BlockWeight *big.Rat
 )

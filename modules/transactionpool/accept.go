@@ -80,7 +80,7 @@ func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error)
 	}
 
 	// Get the output sum.
-	outputSum, err := t.OutputSum()
+	outputSum, err := t.SiacoinOutputSum()
 	if err != nil {
 		return
 	}

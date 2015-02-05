@@ -8,13 +8,16 @@ var (
 	MissingOutputErr = errors.New("transaction spends a nonexisting output")
 )
 
-// validStorageProofs checks that a transaction follows the limitations placed
-// on transactions with storage proofs.
-func (t Transaction) validStorageProofs() bool {
+// followsStorageProofRule checks that a transaction follows the limitations
+// placed on transactions with storage proofs.
+func (t Transaction) followsStorageProofRules() bool {
+	// No storage proofs, no problems.
 	if len(t.StorageProofs) == 0 {
 		return true
 	}
 
+	// If there are storage proofs, there can be no siacoin outputs, siafund
+	// outputs, or new file contracts.
 	if len(t.SiacoinOutputs) != 0 {
 		return false
 	}
@@ -28,24 +31,24 @@ func (t Transaction) validStorageProofs() bool {
 	return true
 }
 
-// validInput returns err = nil if the input is valid within the current state,
-// otherwise returns an error explaining what wasn't valid.
-func (s *State) validInput(input SiacoinInput) (err error) {
+// validSiacoinInput checks that the given input is valid within the current
+// consensus state. If not, an error is returned.
+func (s *State) validSiacoinInput(sci SiacoinInput) (sco SiacoinOutput, err error) {
 	// Check the input spends an existing and valid output.
-	_, exists := s.unspentSiacoinOutputs[input.OutputID]
+	sco, exists := s.unspentSiacoinOutputs[sci.OutputID]
 	if !exists {
 		err = MissingOutputErr
 		return
 	}
 
 	// Check that the spend conditions match the hash listed in the output.
-	if input.SpendConditions.CoinAddress() != s.unspentSiacoinOutputs[input.OutputID].SpendHash {
+	if sci.SpendConditions.CoinAddress() != s.unspentSiacoinOutputs[sci.OutputID].SpendHash {
 		err = errors.New("spend conditions do not match hash")
 		return
 	}
 
 	// Check the timelock on the spend conditions is expired.
-	if input.SpendConditions.TimeLock > s.height() {
+	if sci.SpendConditions.TimeLock > s.height() {
 		err = errors.New("output spent before timelock expiry.")
 		return
 	}
@@ -53,39 +56,108 @@ func (s *State) validInput(input SiacoinInput) (err error) {
 	return
 }
 
-// ValidTransaction returns err = nil if the transaction is valid, otherwise
-// returns an error explaining what wasn't valid.
-func (s *State) validTransaction(t Transaction) (err error) {
-	// Check that the storage proof guidelines are followed.
-	if !t.validStorageProofs() {
-		return errors.New("transaction contains storage proofs and conflicts")
+// validSiafundInput checks that the given input is valid within the current
+// consensus state. If not, an error is returned.
+func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err error) {
+	// Check the input spends an existing and valid output.
+	sfo, exists := s.unspentSiafundOutputs[sfi.OutputID]
+	if !exists {
+		err = MissingOutputErr
+		return
 	}
 
-	// Validate each input and get the total amount of Currency.
-	var inputSum Currency
-	for _, input := range t.SiacoinInputs {
+	// Check that the spend conditions match the hash listed in the output.
+	if sfi.SpendConditions.CoinAddress() != s.unspentSiafundOutputs[sfi.OutputID].SpendHash {
+		err = errors.New("spend conditions do not match hash")
+		return
+	}
+
+	// Check the timelock on the spend conditions is expired.
+	if sfi.SpendConditions.TimeLock > s.height() {
+		err = errors.New("output spent before timelock expiry.")
+		return
+	}
+
+	return
+}
+
+// validSiafunds checks that the transaction has valid siafund inputs and
+// outputs, and that the sum of the inputs matches the sum of the outputs.
+func (s *State) validSiafunds(t Transaction) (err error) {
+	// Check that all siafund inputs are valid, and get the total number of
+	// input siafunds.
+	var siafundInputSum Currency
+	for _, sfi := range t.SiafundInputs {
 		// Check that the input is valid.
-		err = s.validInput(input)
+		var sfo SiafundOutput
+		sfo, err = s.validSiafundInput(sfi)
 		if err != nil {
 			return
 		}
 
 		// Add this input's value
-		err = inputSum.Add(s.unspentSiacoinOutputs[input.OutputID].Value)
+		err = siafundInputSum.Add(sfo.Value)
 		if err != nil {
 			return
 		}
 	}
 
-	// Verify the contracts and tally up the expenditures.
+	// Check that all siafund outputs are valid and that the siafund output sum
+	// is equal to the siafund input sum.
+	var siafundOutputSum Currency
+	for _, sfo := range t.SiafundOutputs {
+		// Check that the claimStart is set to 0. Type safety should enforce
+		// this, but check anyway.
+		if sfo.claimStart.Cmp(ZeroCurrency) != 0 {
+			return errors.New("invalid siafund output presented")
+		}
+
+		// Add this output's value.
+		err = siafundOutputSum.Add(sfo.Value)
+		if err != nil {
+			return
+		}
+	}
+	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
+		return errors.New("siafund inputs do not equal siafund outpus within transaction")
+	}
+
+	return
+}
+
+// validTransaction checks that all fields are valid within the current
+// consensus state. If not an error is returned.
+func (s *State) validTransaction(t Transaction) (err error) {
+	// Check that the storage proof rules are followed.
+	if !t.followsStorageProofRules() {
+		return errors.New("transaction contains storage proofs and conflicts")
+	}
+
+	// Check that all siacoin inputs are valid, and get the total number of
+	// input siacoins.
+	var siacoinInputSum Currency
+	for _, sci := range t.SiacoinInputs {
+		// Check that the input is valid.
+		var sco SiacoinOutput
+		sco, err = s.validSiacoinInput(sci)
+		if err != nil {
+			return
+		}
+
+		// Add this input's value
+		err = siacoinInputSum.Add(sco.Value)
+		if err != nil {
+			return
+		}
+	}
+
+	// Check that all contracts and storage proofs are valid.
 	for _, contract := range t.FileContracts {
 		err = s.validContract(contract)
 		if err != nil {
 			return
 		}
 	}
-
-	// Check that all provided proofs are valid.
 	for _, proof := range t.StorageProofs {
 		err = s.validProof(proof)
 		if err != nil {
@@ -93,14 +165,19 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		}
 	}
 
-	// Calculate the output sum
-	outputSum, err := t.OutputSum()
+	// Check that the siafund parts of the transaction are valid.
+	err = s.validSiafunds(t)
 	if err != nil {
 		return
 	}
 
-	// Check that the inputs equal the outputs.
-	if inputSum.Cmp(outputSum) != 0 {
+	// Calculate the sum of the siacoin outputs and check that it matches the
+	// sum of the siacoin inputs.
+	siacoinOutputSum, err := t.SiacoinOutputSum()
+	if err != nil {
+		return
+	}
+	if siacoinInputSum.Cmp(siacoinOutputSum) != 0 {
 		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
@@ -171,10 +248,14 @@ func (s *State) applyTransaction(t Transaction) (scods []SiacoinOutputDiff, fcds
 	return
 }
 
-// OutputSum returns the sum of all the outputs in the transaction, which must
-// match the sum of all the inputs. Outputs created by storage proofs are not
-// considered, as they were already considered when the contract was created.
-func (t Transaction) OutputSum() (sum Currency, err error) {
+// SiacoinOutputSum returns the sum of all the siacoin outputs in the
+// transaction, which must match the sum of all the siacoin inputs. Siacoin
+// outputs created by storage proofs and siafund outputs are not considered, as
+// they were considered when the contract responsible for funding them was
+// created.
+//
+// TODO: There might be a better place for this.
+func (t Transaction) SiacoinOutputSum() (sum Currency, err error) {
 	// NOTE: manual overflow checking is performed here to prevent redundant
 	// checks.
 

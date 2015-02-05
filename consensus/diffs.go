@@ -136,6 +136,13 @@ func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, forward bool) {
 }
 
 func (s *State) applyDiffSet(bn *blockNode, direction bool) {
+	// Sanity check - diffs should have already been generated for this node.
+	if DEBUG {
+		if !bn.diffsGenerated {
+			panic("misuse of applyDiffSet - diffs have not been generated!")
+		}
+	}
+
 	// Apply the siacoin, file contract, and siafund diffs.
 	s.commitSiafundPoolDiff(bn.siafundPoolDiff, direction)
 	for _, scod := range bn.siacoinOutputDiffs {
