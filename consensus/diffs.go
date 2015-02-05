@@ -1,9 +1,5 @@
 package consensus
 
-import (
-	"errors"
-)
-
 // A block is composed of many transactions. Blocks that have transactions that
 // depend on other transactions, but the transactions must all be applied in a
 // deterministic order. Transactions cannot have inter-dependencies, meaning
@@ -102,16 +98,39 @@ func (s *State) commitFileContractDiff(fcd FileContractDiff, forward bool) {
 	}
 }
 
-func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
-	node, exists := s.blockMap[id]
-	if !exists {
-		err = errors.New("requested an unknown block")
-		return
+func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, forward bool) {
+	add := sfod.New
+	if !forward {
+		add = !add
 	}
-	if !node.diffsGenerated {
-		err = errors.New("diffs have not been generated for the requested block.")
-		return
+
+	if add {
+		// Sanity check - output should not already exist.
+		if DEBUG {
+			_, exists := s.unspentSiafundOutputs[sfod.ID]
+			if exists {
+				panic("rogue new output in applyOutputDiff")
+			}
+		}
+
+		s.unspentSiafundOutputs[sfod.ID] = sfod.SiafundOutput
+	} else {
+		// Sanity check - output should exist.
+		if DEBUG {
+			_, exists := s.unspentSiafundOutputs[sfod.ID]
+			if !exists {
+				panic("rogue non-new output in applyOutputDiff")
+			}
+		}
+
+		delete(s.unspentSiafundOutputs, sfod.ID)
 	}
-	scods = node.siacoinOutputDiffs
-	return
+}
+
+func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, forward bool) {
+	if forward {
+		s.siafundPool = sfpd.Adjusted
+	} else {
+		s.siafundPool = sfpd.Previous
+	}
 }

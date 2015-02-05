@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"errors"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/hash"
@@ -149,6 +150,20 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
 		return
 	}
 	b = bn.block
+	return
+}
+
+func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
+	node, exists := s.blockMap[id]
+	if !exists {
+		err = errors.New("requested an unknown block")
+		return
+	}
+	if !node.diffsGenerated {
+		err = errors.New("diffs have not been generated for the requested block.")
+		return
+	}
+	scods = node.siacoinOutputDiffs
 	return
 }
 

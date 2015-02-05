@@ -75,7 +75,7 @@ func (s *State) invertRecentBlock() {
 	for _, sfod := range bn.siafundOutputDiffs {
 		s.commitSiafundOutputDiff(sfod, direction)
 	}
-	s.commitSiafundPoolDuff(bn.siafundPoolDiff, direction)
+	s.commitSiafundPoolDiff(bn.siafundPoolDiff, direction)
 
 	// Delete the delated outputs created by the node.
 	delete(s.delayedSiacoinOutputs, bn.height)
