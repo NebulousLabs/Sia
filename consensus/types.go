@@ -1,14 +1,9 @@
 package consensus
 
-// TODO: Swtich to 128 bit Currency, which is overflow-safe. Then update
-// CalculateCoinbase.
-
 // TODO: Enforce the 100 block spending hold on certain types of outputs: Miner
 // payouts, storage proof outputs, siafund claims.
 
 // TODO: Enforce siafund rules in consensus.
-
-// TODO: Switch to typed public keys, with typed verification.
 
 // TODO: Complete non-adversarial test coverage, partial adversarial test
 // coverage.
@@ -28,11 +23,11 @@ type (
 	Identifier [16]byte
 	Signature  []byte
 
-	BlockID     hash.Hash
-	OutputID    hash.Hash
-	ContractID  hash.Hash
-	CoinAddress hash.Hash
-	Target      hash.Hash
+	BlockID        hash.Hash
+	OutputID       hash.Hash
+	FileContractID hash.Hash
+	CoinAddress    hash.Hash
+	Target         hash.Hash
 )
 
 // A Currency is a 128-bit unsigned integer. Currency operations are performed
@@ -55,7 +50,12 @@ var FileContractIdentifier = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 
 var SiacoinOutputIdentifier = Identifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 var SiafundOutputIdentifier = Identifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 
-var ED25519Identifier = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
+// Each of these variables identifies a type of signature that is recognized
+// when verifying public keys.
+//
+// TODO: Document encodings and such for each type of signature.
+var SignatureEntropy = Identifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
+var SignatureED25519 = Identifier{'e', 'd', '2', '5', '5', '1', '9'}
 
 // A Block contains all of the changes to the state that have occurred since
 // the previous block. There are constraints that make it difficult and
@@ -72,12 +72,12 @@ type Block struct {
 // around, make contracts, etc.
 type Transaction struct {
 	SiacoinInputs  []SiacoinInput
-	MinerFees      []Currency
 	SiacoinOutputs []SiacoinOutput
 	FileContracts  []FileContract
 	StorageProofs  []StorageProof
 	SiafundInputs  []SiafundInput
 	SiafundOutputs []SiafundOutput
+	MinerFees      []Currency
 	ArbitraryData  []string
 	Signatures     []TransactionSignature
 }
@@ -128,9 +128,9 @@ type FileContract struct {
 // segment is a part of the data in the FileMerkleRoot of the FileContract that
 // the storage proof fulfills.
 type StorageProof struct {
-	ContractID ContractID
-	Segment    [hash.SegmentSize]byte
-	HashSet    []hash.Hash
+	FileContractID FileContractID
+	Segment        [hash.SegmentSize]byte
+	HashSet        []hash.Hash
 }
 
 // A SiafundInput is close to a SiacoinInput, except that the asset being spent
@@ -183,12 +183,12 @@ type TransactionSignature struct {
 type CoveredFields struct {
 	WholeTransaction bool
 	SiacoinInputs    []uint64
-	MinerFees        []uint64
 	SiacoinOutputs   []uint64
 	FileContracts    []uint64
 	StorageProofs    []uint64
 	SiafundInputs    []uint64
 	SiafundOutputs   []uint64
+	MinerFees        []uint64
 	ArbitraryData    []uint64
 	Signatures       []uint64
 }
@@ -197,12 +197,20 @@ type CoveredFields struct {
 //
 // TODO: Switch to a different constant because of using 128 bit values for the
 // currency.
-func CalculateCoinbase(height BlockHeight) Currency {
+func CalculateCoinbase(height BlockHeight) (c Currency) {
 	base := InitialCoinbase - uint64(height)
 	if base < MinimumCoinbase {
 		base = MinimumCoinbase
 	}
-	return NewCurrency64(base * 1e5)
+
+	// Have to do error checking on NewCurrency, unfortunately.
+	c, err := NewCurrency(new(big.Int).Mul(big.NewInt(int64(base)), CoinbaseAugment))
+	if err != nil {
+		if DEBUG {
+			panic("err during CaluculateCoinbase???")
+		}
+	}
+	return
 }
 
 // ID returns the id of a block, which is calculated by concatenating the
@@ -244,16 +252,16 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // contract. The id is derived by marshalling all of the fields in the
 // transaction except for the signatures and then appending the string "file
 // contract" and the index of the contract.
-func (t Transaction) FileContractID(i int) ContractID {
-	return ContractID(hash.HashAll(
+func (t Transaction) FileContractID(i int) FileContractID {
+	return FileContractID(hash.HashAll(
 		FileContractIdentifier,
 		t.SiacoinInputs,
-		t.MinerFees,
 		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
+		t.MinerFees,
 		t.ArbitraryData,
 		i,
 	))
@@ -267,12 +275,12 @@ func (t Transaction) SiacoinOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiacoinOutputIdentifier,
 		t.SiacoinInputs,
-		t.MinerFees,
 		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
+		t.MinerFees,
 		t.ArbitraryData,
 		i,
 	))
@@ -280,9 +288,9 @@ func (t Transaction) SiacoinOutputID(i int) OutputID {
 
 // StorageProofOutputID returns the OutputID of the output created during the
 // window index that was active at height 'height'.
-func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
+func (fcid FileContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
 	outputID = OutputID(hash.HashAll(
-		fcID,
+		fcid,
 		proofValid,
 	))
 	return
@@ -294,12 +302,12 @@ func (t Transaction) SiafundOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiafundOutputIdentifier,
 		t.SiacoinInputs,
-		t.MinerFees,
 		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
+		t.MinerFees,
 		t.ArbitraryData,
 		i,
 	))
@@ -326,21 +334,18 @@ func (t Transaction) SigHash(i int) hash.Hash {
 	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
 			t.SiacoinInputs,
-			t.MinerFees,
 			t.SiacoinOutputs,
 			t.FileContracts,
 			t.StorageProofs,
 			t.SiafundInputs,
 			t.SiafundOutputs,
+			t.MinerFees,
 			t.ArbitraryData,
 			t.Signatures[i].InputID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].TimeLock,
 		)
 	} else {
-		for _, minerFee := range cf.MinerFees {
-			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
-		}
 		for _, input := range cf.SiacoinInputs {
 			signedData = append(signedData, encoding.Marshal(t.SiacoinInputs[input])...)
 		}
@@ -358,6 +363,9 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		}
 		for _, siafundOutput := range cf.SiafundOutputs {
 			signedData = append(signedData, encoding.Marshal(t.SiafundOutputs[siafundOutput])...)
+		}
+		for _, minerFee := range cf.MinerFees {
+			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
 		for _, arbData := range cf.ArbitraryData {
 			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)

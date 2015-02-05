@@ -48,8 +48,8 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (output SiacoinOutput, exists bool) {
-	output, exists = s.unspentOutputs[id]
+func (s *State) output(id OutputID) (sco SiacoinOutput, exists bool) {
+	sco, exists = s.unspentSiacoinOutputs[id]
 	return
 }
 
@@ -58,7 +58,7 @@ func (s *State) output(id OutputID) (output SiacoinOutput, exists bool) {
 func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var unspentOutputStrings []string
-	for outputID := range s.unspentOutputs {
+	for outputID := range s.unspentSiacoinOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
 	}
 	sort.Strings(unspentOutputStrings)
@@ -111,16 +111,16 @@ func (s *State) stateHash() hash.Hash {
 
 	// Sort the open contracts by the string value of their ID.
 	var openContractStrings []string
-	for contractID := range s.openContracts {
+	for contractID := range s.openFileContracts {
 		openContractStrings = append(openContractStrings, string(contractID[:]))
 	}
 	sort.Strings(openContractStrings)
 
 	// Add the open contracts in sorted order.
 	for _, stringContractID := range openContractStrings {
-		var contractID ContractID
+		var contractID FileContractID
 		copy(contractID[:], stringContractID)
-		leaves = append(leaves, hash.HashObject(s.openContracts[contractID]))
+		leaves = append(leaves, hash.HashObject(s.openFileContracts[contractID]))
 	}
 
 	return hash.MerkleRoot(leaves)
@@ -154,11 +154,11 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
 
 // Contract returns a the contract associated with the input id, and whether
 // the contract exists.
-func (s *State) Contract(id ContractID) (fc FileContract, exists bool) {
+func (s *State) Contract(id FileContractID) (fc FileContract, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	fc, exists = s.openContracts[id]
+	fc, exists = s.openFileContracts[id]
 	if !exists {
 		return
 	}

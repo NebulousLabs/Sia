@@ -160,7 +160,11 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		// statement.
 		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
-		case ED25519Identifier:
+		case SignatureEntropy:
+			if len(publicKey.Key) != 32 {
+				return InvalidSignatureErr
+			}
+		case SignatureED25519:
 			// Decode the public key and signature.
 			var decodedPK crypto.PublicKey
 			err := encoding.Unmarshal(publicKey.Key, &decodedPK)

@@ -33,10 +33,10 @@ type State struct {
 	// the same path will have the same exact consensus variables, anything
 	// else is a software bug.
 	siafundPool           Currency
+	unspentSiacoinOutputs map[OutputID]SiacoinOutput
+	openFileContracts     map[FileContractID]FileContract
 	unspentSiafundOutputs map[OutputID]SiafundOutput
-	unspentOutputs        map[OutputID]SiacoinOutput
-	delayedOutputs        map[BlockHeight]SiacoinOutput
-	openContracts         map[ContractID]FileContract
+	delayedSiacoinOutputs map[BlockHeight][]SiacoinOutput
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -56,8 +56,8 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		badBlocks:             make(map[BlockID]struct{}),
 		blockMap:              make(map[BlockID]*blockNode),
 		currentPath:           make(map[BlockHeight]BlockID),
-		openContracts:         make(map[ContractID]FileContract),
-		unspentOutputs:        make(map[OutputID]SiacoinOutput),
+		openFileContracts:     make(map[FileContractID]FileContract),
+		unspentSiacoinOutputs: make(map[OutputID]SiacoinOutput),
 		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
 	}
 
@@ -75,7 +75,7 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Fill out the consensus informaiton for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
-	s.unspentOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
+	s.unspentSiacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:     CalculateCoinbase(0),
 		SpendHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
 	}

@@ -28,4 +28,7 @@ var (
 
 	MaxAdjustmentUp   = big.NewRat(103, 100)
 	MaxAdjustmentDown = big.NewRat(97, 100)
+
+	// The CoinbaseAugment should be a big.Int equal to 1 << 80.
+	CoinbaseAugment = new(big.Int).Mul(big.NewInt(1<<40), big.NewInt(1<<40))
 )

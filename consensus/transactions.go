@@ -32,14 +32,14 @@ func (t Transaction) validStorageProofs() bool {
 // otherwise returns an error explaining what wasn't valid.
 func (s *State) validInput(input SiacoinInput) (err error) {
 	// Check the input spends an existing and valid output.
-	_, exists := s.unspentOutputs[input.OutputID]
+	_, exists := s.unspentSiacoinOutputs[input.OutputID]
 	if !exists {
 		err = MissingOutputErr
 		return
 	}
 
 	// Check that the spend conditions match the hash listed in the output.
-	if input.SpendConditions.CoinAddress() != s.unspentOutputs[input.OutputID].SpendHash {
+	if input.SpendConditions.CoinAddress() != s.unspentSiacoinOutputs[input.OutputID].SpendHash {
 		err = errors.New("spend conditions do not match hash")
 		return
 	}
@@ -71,7 +71,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		}
 
 		// Add this input's value
-		err = inputSum.Add(s.unspentOutputs[input.OutputID].Value)
+		err = inputSum.Add(s.unspentSiacoinOutputs[input.OutputID].Value)
 		if err != nil {
 			return
 		}
@@ -115,25 +115,25 @@ func (s *State) validTransaction(t Transaction) (err error) {
 
 // applyTransaction() takes a transaction and adds it to the
 // ConsensusState, updating the list of contracts, outputs, etc.
-func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
+func (s *State) applyTransaction(t Transaction) (scods []SiacoinOutputDiff, fcds []FileContractDiff) {
 	// Remove all inputs from the unspent outputs list.
 	for _, input := range t.SiacoinInputs {
 		// Sanity check - the input must exist within the blockchain, should
 		// have already been verified.
 		if DEBUG {
-			_, exists := s.unspentOutputs[input.OutputID]
+			_, exists := s.unspentSiacoinOutputs[input.OutputID]
 			if !exists {
 				panic("Applying a transaction with an invalid unspent output!")
 			}
 		}
 
-		outputDiff := OutputDiff{
-			New:    false,
-			ID:     input.OutputID,
-			Output: s.unspentOutputs[input.OutputID],
+		scod := SiacoinOutputDiff{
+			New:           false,
+			ID:            input.OutputID,
+			SiacoinOutput: s.unspentSiacoinOutputs[input.OutputID],
 		}
-		outputDiffs = append(outputDiffs, outputDiff)
-		delete(s.unspentOutputs, input.OutputID)
+		scods = append(scods, scod)
+		delete(s.unspentSiacoinOutputs, input.OutputID)
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
@@ -141,32 +141,32 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 		// Sanity check - the output must not exist within the state, should
 		// have already been verified.
 		if DEBUG {
-			_, exists := s.unspentOutputs[t.SiacoinOutputID(i)]
+			_, exists := s.unspentSiacoinOutputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("applying a  transaction with an invalid new output")
 			}
 		}
 
-		diff := OutputDiff{
-			New:    true,
-			ID:     t.SiacoinOutputID(i),
-			Output: output,
+		scod := SiacoinOutputDiff{
+			New:           true,
+			ID:            t.SiacoinOutputID(i),
+			SiacoinOutput: output,
 		}
-		s.unspentOutputs[t.SiacoinOutputID(i)] = output
-		outputDiffs = append(outputDiffs, diff)
+		s.unspentSiacoinOutputs[t.SiacoinOutputID(i)] = output
+		scods = append(scods, scod)
 	}
 
 	// Add all outputs created by storage proofs.
 	for _, sp := range t.StorageProofs {
-		outputDiff, contractDiff := s.applyStorageProof(sp)
-		outputDiffs = append(outputDiffs, outputDiff)
-		contractDiffs = append(contractDiffs, contractDiff)
+		scod, fcd := s.applyStorageProof(sp)
+		scods = append(scods, scod)
+		fcds = append(fcds, fcd)
 	}
 
 	// Add all new contracts to the OpenContracts list.
 	for i, contract := range t.FileContracts {
-		contractDiff := s.applyContract(contract, t.FileContractID(i))
-		contractDiffs = append(contractDiffs, contractDiff)
+		fcd := s.applyContract(contract, t.FileContractID(i))
+		fcds = append(fcds, fcd)
 	}
 	return
 }

@@ -7,16 +7,13 @@ import (
 	"github.com/NebulousLabs/Sia/hash"
 )
 
-// storageProofSegment takes a contractID and a windowIndex and calculates the
-// index of the segment that should be proven on when doing a proof of storage.
-func (s *State) storageProofSegment(contractID ContractID) (index uint64, err error) {
-	contract, exists := s.openContracts[contractID]
+func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
+	contract, exists := s.openFileContracts[fcid]
 	if !exists {
-		err = errors.New("unrecognized contractID")
+		err = errors.New("unrecognized file contract id")
 		return
 	}
 
-	// Get the id of the block used as the seed.
 	triggerHeight := contract.Start - 1
 	triggerBlock, exists := s.blockAtHeight(triggerHeight)
 	if !exists {
@@ -25,9 +22,7 @@ func (s *State) storageProofSegment(contractID ContractID) (index uint64, err er
 	}
 	triggerID := triggerBlock.ID()
 
-	// Combine the contractID and triggerID, convert to an int, then take the
-	// mod to get the segment.
-	seed := hash.HashBytes(append(triggerID[:], contractID[:]...))
+	seed := hash.HashBytes(append(triggerID[:], fcid[:]...))
 	numSegments := int64(hash.CalculateSegments(contract.FileSize))
 	seedInt := new(big.Int).SetBytes(seed[:])
 	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
@@ -50,13 +45,13 @@ func (s *State) validContract(fc FileContract) error {
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
 func (s *State) validProof(sp StorageProof) error {
-	contract, exists := s.openContracts[sp.ContractID]
+	contract, exists := s.openFileContracts[sp.FileContractID]
 	if !exists {
 		return errors.New("unrecognized contract id in storage proof")
 	}
 
 	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.storageProofSegment(sp.ContractID)
+	segmentIndex, err := s.storageProofSegment(sp.FileContractID)
 	if err != nil {
 		return err
 	}
@@ -76,78 +71,79 @@ func (s *State) validProof(sp StorageProof) error {
 
 // addContract takes a FileContract and its corresponding ContractID and adds
 // it to the state.
-func (s *State) applyContract(contract FileContract, id ContractID) (cd ContractDiff) {
-	s.openContracts[id] = contract
-	cd = ContractDiff{
-		New:      true,
-		ID:       id,
-		Contract: contract,
+func (s *State) applyContract(fc FileContract, fcid FileContractID) (fcd FileContractDiff) {
+	s.openFileContracts[fcid] = fc
+	fcd = FileContractDiff{
+		New:          true,
+		ID:           fcid,
+		FileContract: fc,
 	}
 	return
 }
 
 // applyStorageProof takes a storage proof and adds any outputs created by it
 // to the consensus state.
-func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDiff) {
+func (s *State) applyStorageProof(sp StorageProof) (scod SiacoinOutputDiff, fcd FileContractDiff) {
 	// Calculate the new output and its id.
-	contract := s.openContracts[sp.ContractID]
-	output := SiacoinOutput{
+	contract := s.openFileContracts[sp.FileContractID]
+	sco := SiacoinOutput{
 		Value:     contract.Payout,
 		SpendHash: contract.ValidProofAddress,
 	}
-	outputID := sp.ContractID.StorageProofOutputID(true)
+	outputID := sp.FileContractID.StorageProofOutputID(true)
 
 	// Update the state.
-	s.unspentOutputs[outputID] = output
-	delete(s.openContracts, sp.ContractID)
+	s.unspentSiacoinOutputs[outputID] = sco
+	delete(s.openFileContracts, sp.FileContractID)
 
-	od = OutputDiff{
-		New:    true,
-		ID:     outputID,
-		Output: output,
+	scod = SiacoinOutputDiff{
+		New:           true,
+		ID:            outputID,
+		SiacoinOutput: sco,
 	}
-	cd = ContractDiff{
-		New:      false,
-		ID:       sp.ContractID,
-		Contract: contract,
+	fcd = FileContractDiff{
+		New:          false,
+		ID:           sp.FileContractID,
+		FileContract: contract,
 	}
 	return
 }
 
 // applyMissedProof adds outputs to the State to manage a missed storage proof
 // on a file contract.
-func (s *State) applyMissedProof(contract FileContract, id ContractID) (od OutputDiff, cd ContractDiff) {
+func (s *State) applyMissedProof(fc FileContract, fcid FileContractID) (scod SiacoinOutputDiff, fcd FileContractDiff) {
 	// Create the output for the missed proof.
-	output := SiacoinOutput{
-		Value:     contract.Payout,
-		SpendHash: contract.MissedProofAddress,
+	sco := SiacoinOutput{
+		Value:     fc.Payout,
+		SpendHash: fc.MissedProofAddress,
 	}
-	outputID := id.StorageProofOutputID(false)
+	outputID := fcid.StorageProofOutputID(false)
 
 	// Update the state.
-	s.unspentOutputs[outputID] = output
-	delete(s.openContracts, id)
+	s.unspentSiacoinOutputs[outputID] = sco
+	delete(s.openFileContracts, fcid)
 
-	cd = ContractDiff{
-		New:      false,
-		ID:       id,
-		Contract: contract,
+	// Create the diffs.
+	fcd = FileContractDiff{
+		New:          false,
+		ID:           fcid,
+		FileContract: fc,
 	}
-	od = OutputDiff{
-		New:    true,
-		ID:     outputID,
-		Output: output,
+	scod = SiacoinOutputDiff{
+		New:           true,
+		ID:            outputID,
+		SiacoinOutput: sco,
 	}
 	return
 }
 
-func (s *State) applyContractMaintenance() (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
+func (s *State) applyContractMaintenance() (scods []SiacoinOutputDiff, fcds []FileContractDiff) {
 	// Iterate through all contracts and figure out which ones have expired.
 	// Expiring a contract deletes it from the map we are iterating through, so
 	// we need to store it and deleted once we're done iterating through the
 	// map.
-	var expiredContracts []ContractID
-	for id, contract := range s.openContracts {
+	var expiredContracts []FileContractID
+	for id, contract := range s.openFileContracts {
 		if s.height() == contract.End {
 			expiredContracts = append(expiredContracts, id)
 		}
@@ -155,10 +151,10 @@ func (s *State) applyContractMaintenance() (outputDiffs []OutputDiff, contractDi
 
 	// Delete all of the contracts that terminated.
 	for _, id := range expiredContracts {
-		contract := s.openContracts[id]
-		outputDiff, contractDiff := s.applyMissedProof(contract, id)
-		outputDiffs = append(outputDiffs, outputDiff)
-		contractDiffs = append(contractDiffs, contractDiff)
+		contract := s.openFileContracts[id]
+		scod, fcd := s.applyMissedProof(contract, id)
+		scods = append(scods, scod)
+		fcds = append(fcds, fcd)
 	}
 
 	return
@@ -167,10 +163,10 @@ func (s *State) applyContractMaintenance() (outputDiffs []OutputDiff, contractDi
 // StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
 // the index of the segment that should be proven on when doing a proof of
 // storage.
-func (s *State) StorageProofSegment(id ContractID) (index uint64, err error) {
+func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.storageProofSegment(id)
+	return s.storageProofSegment(fcid)
 }
 
 func (s *State) ValidContract(fc FileContract) error {

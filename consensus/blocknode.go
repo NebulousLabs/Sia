@@ -16,9 +16,12 @@ type blockNode struct {
 	depth  Target // Cumulative weight of all parents.
 	target Target // Target for next block.
 
-	diffsGenerated bool
-	outputDiffs    []OutputDiff
-	contractDiffs  []ContractDiff
+	diffsGenerated           bool
+	siafundPoolDiff          SiafundPoolDiff
+	siacoinOutputDiffs       []SiacoinOutputDiff
+	fileContractDiffs        []FileContractDiff
+	siafundOutputDiffs       []SiafundOutputDiff
+	newDelayedSiacoinOutputs []SiacoinOutput
 }
 
 // childDepth returns the depth that any child node would have.

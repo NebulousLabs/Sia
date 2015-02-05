@@ -66,12 +66,19 @@ func (s *State) invertRecentBlock() {
 
 	// Invert all of the diffs.
 	direction := false // blockchain is inverting, set direction flag to false.
-	for _, diff := range bn.outputDiffs {
-		s.commitOutputDiff(diff, direction)
+	for _, scod := range bn.siacoinOutputDiffs {
+		s.commitSiacoinOutputDiff(scod, direction)
 	}
-	for _, diff := range bn.contractDiffs {
-		s.commitContractDiff(diff, direction)
+	for _, fcd := range bn.fileContractDiffs {
+		s.commitFileContractDiff(fcd, direction)
 	}
+	for _, sfod := range bn.siafundOutputDiffs {
+		s.commitSiafundOutputDiff(sfod, direction)
+	}
+	s.commitSiafundPoolDuff(bn.siafundPoolDiff, direction)
+
+	// Delete the delated outputs created by the node.
+	delete(s.delayedSiacoinOutputs, bn.height)
 
 	// Update the current path and currentBlockID
 	delete(s.currentPath, bn.height)
@@ -98,15 +105,15 @@ func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
 
 // applyMinerSubsidy adds all of the outputs recorded in the MinerPayouts to
 // the state, and returns the corresponding set of diffs.
-func (s *State) applyMinerSubsidy(bn *blockNode) (diffs []OutputDiff) {
+func (s *State) applyMinerSubsidy(bn *blockNode) (scods []SiacoinOutputDiff) {
 	for i, payout := range bn.block.MinerPayouts {
-		diff := OutputDiff{
-			New:    true,
-			ID:     bn.block.MinerPayoutID(i),
-			Output: payout,
+		scod := SiacoinOutputDiff{
+			New:           true,
+			ID:            bn.block.MinerPayoutID(i),
+			SiacoinOutput: payout,
 		}
-		s.unspentOutputs[diff.ID] = payout
-		diffs = append(diffs, diff)
+		s.unspentSiacoinOutputs[scod.ID] = payout
+		scods = append(scods, scod)
 	}
 	return
 }
@@ -115,14 +122,11 @@ func (s *State) applyMinerSubsidy(bn *blockNode) (diffs []OutputDiff) {
 // consensus state.
 func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Sanity check - generate should only be called if the diffs have not yet
-	// been generated.
+	// been generated - current node must be the input node's parent.
 	if DEBUG {
 		if bn.diffsGenerated {
 			panic("misuse of generateAndApplyDiff")
 		}
-	}
-	// Sanity check - current node must be the input node's parent.
-	if DEBUG {
 		if bn.parent.block.ID() != s.currentBlockID {
 			panic("applying a block node when it's not a valid successor")
 		}
@@ -140,19 +144,19 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 			return
 		}
 
-		outputDiffs, contractDiffs := s.applyTransaction(txn)
-		bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
-		bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
+		siacoinOutputDiffs, fileContractDiffs := s.applyTransaction(txn)
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, siacoinOutputDiffs...)
+		bn.fileContractDiffs = append(bn.fileContractDiffs, fileContractDiffs...)
 	}
 
 	// Perform maintanence on all open contracts.
-	outputDiffs, contractDiffs := s.applyContractMaintenance()
-	bn.outputDiffs = append(bn.outputDiffs, outputDiffs...)
-	bn.contractDiffs = append(bn.contractDiffs, contractDiffs...)
+	siacoinOutputDiffs, fileContractDiffs := s.applyContractMaintenance()
+	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, siacoinOutputDiffs...)
+	bn.fileContractDiffs = append(bn.fileContractDiffs, fileContractDiffs...)
 
 	// Add the miner payouts.
 	subsidyDiffs := s.applyMinerSubsidy(bn)
-	bn.outputDiffs = append(bn.outputDiffs, subsidyDiffs...)
+	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, subsidyDiffs...)
 
 	bn.diffsGenerated = true
 	return
@@ -183,11 +187,11 @@ func (s *State) applyBlockNode(bn *blockNode) {
 
 	// Apply all of the diffs.
 	direction := true // blockchain is going forward, set direction flag to true.
-	for _, od := range bn.outputDiffs {
-		s.commitOutputDiff(od, direction)
+	for _, scod := range bn.siacoinOutputDiffs {
+		s.commitSiacoinOutputDiff(scod, direction)
 	}
-	for _, cd := range bn.contractDiffs {
-		s.commitContractDiff(cd, direction)
+	for _, fcd := range bn.fileContractDiffs {
+		s.commitFileContractDiff(fcd, direction)
 	}
 }
 
