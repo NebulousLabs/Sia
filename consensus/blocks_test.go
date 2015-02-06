@@ -2,49 +2,7 @@ package consensus
 
 import (
 	"testing"
-	"time"
 )
-
-// currentTime returns a Timestamp of the current time.
-func currentTime() Timestamp {
-	return Timestamp(time.Now().Unix())
-}
-
-// mineTestingBlock accepts a bunch of parameters for a block and then grinds
-// blocks until a block with the appropriate target is found.
-func mineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []SiacoinOutput, txns []Transaction, target Target) (b Block, err error) {
-	b = Block{
-		ParentID:     parent,
-		Timestamp:    timestamp,
-		MinerPayouts: minerPayouts,
-		Transactions: txns,
-	}
-
-	for !b.CheckTarget(target) && b.Nonce < 1e6 {
-		b.Nonce++
-	}
-	if !b.CheckTarget(target) {
-		panic("mineTestingBlock failed!")
-	}
-	return
-}
-
-// nullMinerPayouts returns an []Output for the miner payouts field of a block
-// so that the block can be valid. It assumes the block will be at whatever
-// height you use as input.
-func nullMinerPayouts(height BlockHeight) []SiacoinOutput {
-	return []SiacoinOutput{
-		SiacoinOutput{
-			Value: CalculateCoinbase(height),
-		},
-	}
-}
-
-// mineValidBlock picks valid/legal parameters for a block and then uses them
-// to call mineTestingBlock.
-func mineValidBlock(s *State) (b Block, err error) {
-	return mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
-}
 
 // testBlockTimestamps submits a block to the state with a timestamp that is
 // too early and a timestamp that is too late, and verifies that each get
