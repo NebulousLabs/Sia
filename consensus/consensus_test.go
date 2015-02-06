@@ -17,8 +17,8 @@ import (
 // together transactions. It's designed to be simple, and it's not very smart
 // or efficient.
 type assistant struct {
-	s *State
-	t *testing.T
+	state  *State
+	tester *testing.T
 
 	spendConditions SpendConditions
 	coinAddress     CoinAddress
@@ -65,8 +65,8 @@ func newAssistant(t *testing.T, s *State) *assistant {
 		},
 	}
 	return &assistant{
-		s:               s,
-		t:               t,
+		state:           s,
+		tester:          t,
 		spendConditions: sc,
 		coinAddress:     sc.CoinAddress(),
 		secretKey:       sk,
@@ -80,7 +80,7 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 	valueRemaining := CalculateCoinbase(height)
 	err := valueRemaining.Add(feeTotal)
 	if err != nil {
-		a.t.Fatal(err)
+		a.tester.Fatal(err)
 	}
 
 	// Create several payouts that the assistant can spend, then append a
@@ -88,7 +88,7 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 	for i := 0; i < 12; i++ {
 		err := valueRemaining.Sub(NewCurrency64(1e6))
 		if err != nil {
-			a.t.Fatal(err)
+			a.tester.Fatal(err)
 		}
 		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), SpendHash: a.coinAddress})
 	}
@@ -102,15 +102,15 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 // outputs to draw on for testing.
 func (a *assistant) mineValidBlock() (block Block) {
 	// Mine the block.
-	block, err := mineTestingBlock(a.s.CurrentBlock().ID(), currentTime(), a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	block, err := mineTestingBlock(a.state.CurrentBlock().ID(), currentTime(), a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
 	if err != nil {
-		a.t.Fatal(err)
+		a.tester.Fatal(err)
 	}
 
 	// Submit the block to the state.
-	err = a.s.AcceptBlock(block)
+	err = a.state.AcceptBlock(block)
 	if err != nil {
-		a.t.Fatal(err)
+		a.tester.Fatal(err)
 	}
 
 	return

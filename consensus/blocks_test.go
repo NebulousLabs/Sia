@@ -9,69 +9,69 @@ import (
 // rejected.
 func (a *assistant) testBlockTimestamps() {
 	// Create a block with a timestamp that is too early.
-	b, err := mineTestingBlock(a.s.CurrentBlock().ID(), a.s.EarliestTimestamp()-1, a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	b, err := mineTestingBlock(a.state.CurrentBlock().ID(), a.state.EarliestTimestamp()-1, a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
 	if err != nil {
-		a.t.Fatal(err)
+		a.tester.Fatal(err)
 	}
-	err = a.s.AcceptBlock(b)
+	err = a.state.AcceptBlock(b)
 	if err != EarlyTimestampErr {
-		a.t.Error("unexpected error when submitting a too early timestamp:", err)
+		a.tester.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
 	// Create a block with a timestamp that is too late.
-	b, err = mineTestingBlock(a.s.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	b, err = mineTestingBlock(a.state.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
 	if err != nil {
-		a.t.Fatal(err)
+		a.tester.Fatal(err)
 	}
-	err = a.s.AcceptBlock(b)
+	err = a.state.AcceptBlock(b)
 	if err != FutureBlockErr {
-		a.t.Error("unexpected error when submitting a too-early timestamp:", err)
+		a.tester.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }
 
 // testEmptyBlock adds an empty block to the state and checks for errors.
 func (a *assistant) testEmptyBlock() {
 	// Get the hash of the state before the block was added.
-	beforeStateHash := a.s.StateHash()
+	beforeStateHash := a.state.StateHash()
 
 	// Mine and submit a block
 	block := a.mineValidBlock()
 
 	// Get the hash of the state after the block was added.
-	afterStateHash := a.s.StateHash()
+	afterStateHash := a.state.StateHash()
 	if afterStateHash == beforeStateHash {
-		a.t.Error("state hash is unchanged after mining a block")
+		a.tester.Error("state hash is unchanged after mining a block")
 	}
 
 	// Check that the newly mined block is recognized as the current block.
-	if a.s.CurrentBlock().ID() != block.ID() {
-		a.t.Error("the state's current block is not reporting as the recently mined block.")
+	if a.state.CurrentBlock().ID() != block.ID() {
+		a.tester.Error("the state's current block is not reporting as the recently mined block.")
 	}
 
 	// TODO: These functions break the convention of only using exported
 	// functions. But they provide useful checks by making sure that the
 	// internals of the state have established in the necessary ways.
-	if a.s.currentPath[a.s.Height()] != block.ID() {
-		a.t.Error("the state's current path didn't update correctly after accepting a new block")
+	if a.state.currentPath[a.state.Height()] != block.ID() {
+		a.tester.Error("the state's current path didn't update correctly after accepting a new block")
 	}
-	bn, exists := a.s.blockMap[block.ID()]
+	bn, exists := a.state.blockMap[block.ID()]
 	if !exists {
-		a.t.Error("the state's block map did not update correctly after getting an empty block")
+		a.tester.Error("the state's block map did not update correctly after getting an empty block")
 	}
 	if !bn.diffsGenerated {
-		a.t.Error("diffs were not generated on the new block")
+		a.tester.Error("diffs were not generated on the new block")
 	}
 
 	// TODO: These functions manipulate the state using unexported functions,
 	// which breaks proposed conventions. However, they provide useful
 	// information about the accuracy of invertRecentBlock and applyBlockNode.
-	a.s.invertRecentBlock()
-	if beforeStateHash != a.s.StateHash() {
-		a.t.Error("state is different after applying and removing diffs")
+	a.state.invertRecentBlock()
+	if beforeStateHash != a.state.StateHash() {
+		a.tester.Error("state is different after applying and removing diffs")
 	}
-	a.s.applyBlockNode(bn)
-	if afterStateHash != a.s.StateHash() {
-		a.t.Error("state is different after generateApply, remove, and applying diffs")
+	a.state.applyBlockNode(bn)
+	if afterStateHash != a.state.StateHash() {
+		a.tester.Error("state is different after generateApply, remove, and applying diffs")
 	}
 }
 
