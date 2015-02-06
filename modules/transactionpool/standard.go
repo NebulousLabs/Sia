@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	TransactionSizeLimit = 64 * 1024
+	TransactionSizeLimit = 16 * 1024
 )
 
 // standard implements the rules outlined in Standard.md, and will return an
@@ -21,18 +21,8 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 		return
 	}
 
-	// Check that transactions with storage proofs follow the storage proof
-	// rules.
-	if len(t.StorageProofs) != 0 {
-		if len(t.Inputs) > 1 ||
-			len(t.MinerFees) > 1 ||
-			len(t.Outputs) > 1 ||
-			len(t.FileContracts) != 0 ||
-			len(t.ArbitraryData) != 0 {
-			err = errors.New("transaction has storage proofs but does not follow the storage proof rules")
-			return
-		}
-	}
+	// TODO: Check that the public keys in every transaction use only
+	// algorithms that are recognized by the consensus package.
 
 	// TODO: Check that the arbitrary data is either prefixed with 'NonSia' or
 	// is prefixed with 'HostAnnouncement' plus follows rules for making a host

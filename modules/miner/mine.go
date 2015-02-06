@@ -39,8 +39,8 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 			panic("miner received overflowing transaction set from transaction pool")
 		}
 	}
-	output := consensus.Output{Value: subsidy, SpendHash: m.address}
-	b.MinerPayouts = []consensus.Output{output}
+	output := consensus.SiacoinOutput{Value: subsidy, SpendHash: m.address}
+	b.MinerPayouts = []consensus.SiacoinOutput{output}
 
 	// If we've got a time earlier than the earliest legal timestamp, set the
 	// timestamp equal to the earliest legal timestamp.

@@ -94,7 +94,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 // is submitted to the miner pool, but is also returned.
 func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
-	output := consensus.Output{
+	output := consensus.SiacoinOutput{
 		Value:     amount,
 		SpendHash: dest,
 	}

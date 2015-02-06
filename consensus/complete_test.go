@@ -2,11 +2,9 @@ package consensus
 
 import (
 	"testing"
-	"time"
 )
 
-// TODO: Add a consistency check for the number of coins in the state, and the
-// subsidies at each block.
+// TODO: Add the 100block waiting outputs to the currency tallying.
 
 // currentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
@@ -94,12 +92,24 @@ func consistencyChecks(t *testing.T, states ...*State) {
 // blocks to more effectively test things like diffs and forking.
 func orderedTestBattery(t *testing.T, states ...*State) {
 	for _, s := range states {
+		// blocks_test.go tests
 		testBlockTimestamps(t, s)
 		testEmptyBlock(t, s)
 		testLargeBlock(t, s)
 		testMinerPayouts(t, s)
 		testMissedTarget(t, s)
 		testRepeatBlock(t, s)
+
+		// transactions_test.go tests
+		testForeignSignature(t, s)
+		testInvalidSignature(t, s)
+		testSingleOutput(t, s)
+		testUnsignedTransaction(t, s)
+
+		// contracts_test.go tests
+		testContractCreation(t, s)
+		testMissedProof(t, s)
+		testStorageProofSubmit(t, s)
 	}
 }
 
@@ -118,7 +128,7 @@ func TestEverything(t *testing.T) {
 	// ahead of the other. We'll show all of the blocks to the other state,
 	// which will cause it to fork and rewind the entire diverse set of blocks
 	// and then apply an entirely different diverse set of blocks.
-	genesisTime := Timestamp(time.Now().Unix() - 1)
+	genesisTime := currentTime() - 1
 	s0 := CreateGenesisState(genesisTime)
 	s1 := CreateGenesisState(genesisTime)
 
@@ -128,7 +138,7 @@ func TestEverything(t *testing.T) {
 	}
 
 	// Get each on a separate fork.
-	b0, err := mineTestingBlock(s0.CurrentBlock().ID(), Timestamp(time.Now().Unix()-1), nullMinerPayouts(s0.Height()+1), nil, s0.CurrentTarget())
+	b0, err := mineTestingBlock(s0.CurrentBlock().ID(), currentTime()-1, nullMinerPayouts(s0.Height()+1), nil, s0.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +146,7 @@ func TestEverything(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b1, err := mineTestingBlock(s1.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s1.Height()+1), nil, s1.CurrentTarget())
+	b1, err := mineTestingBlock(s1.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s1.Height()+1), nil, s1.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,26 +171,69 @@ func TestEverything(t *testing.T) {
 	// Now perform consistency checks on each state.
 	consistencyChecks(t, s0, s1)
 
-	// Get s0 ahead of s1
-	for i := 0; i < 2; i++ {
-		b, err := mineValidBlock(s0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s0.AcceptBlock(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Show all s0 blocks to s1, which should trigger a fork in s1. Start from
-	// height 1 since the genesis block is shared.
+	// Show all s0 blocks to s1, which should not trigger a fork.
 	for i := BlockHeight(1); i <= s0.Height(); i++ {
 		blockID := s0.currentPath[i]
 		err = s1.AcceptBlock(s0.blockMap[blockID].block)
 		if err != nil {
 			t.Error(i, "::", blockID, "::", err)
 		}
+	}
+
+	// Verify that each state is still on a separate fork.
+	if s0.stateHash() == s1.stateHash() {
+		t.Fatal("states have the same hash when they need to be in different places")
+	}
+
+	// Mine a block on s0 which spends a siacoin output which doesn't exist,
+	// then show that block to s1. This should cause an error, but should also
+	// result in the state verifying all of the s0 blocks and then
+	// backtracking. Make sure the hash didn't shift during the backtracking.
+	s1Hash := s1.stateHash()
+	badID := OutputID{1, 2, 3}
+	input := SiacoinInput{
+		OutputID:        badID,
+		SpendConditions: SpendConditions{},
+	}
+	badTxn := Transaction{
+		SiacoinInputs:  []SiacoinInput{input},
+		SiacoinOutputs: []SiacoinOutput{SiacoinOutput{}},
+	}
+	b, err := mineTestingBlock(s0.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s0.Height()+1), []Transaction{badTxn}, s0.CurrentTarget())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s1.AcceptBlock(b)
+	if err != MissingOutputErr {
+		t.Error(err)
+	}
+
+	// Verify that after rejecting the block, the state hash hasn't changed.
+	if s1.stateHash() != s1Hash {
+		t.Error("s1 hash changed after rejecting a block")
+	}
+
+	// Verify that the diffs for the s0 current block were generated, meaning
+	// that s1 did actually try to fork.
+	bn := s0.blockMap[s0.CurrentBlock().ID()]
+	if !bn.diffsGenerated {
+		t.Error("s0 current block diffs not generated after attempting a fork")
+	}
+
+	// Create valid block on s0 and show it to both s0 and s1. This should
+	// cause each to switch to that block as the most recent block, meaning
+	// each has the same state hash.
+	b, err = mineValidBlock(s0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s0.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
+	}
+	err = s1.AcceptBlock(b)
+	if err != nil {
+		t.Error(err)
 	}
 
 	// Check that s0 and s1 now have the same state hash

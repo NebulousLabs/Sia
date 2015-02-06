@@ -17,7 +17,7 @@ import (
 // wallet's spent counter, then it has been spent since the previous reset.
 type knownOutput struct {
 	id     consensus.OutputID
-	output consensus.Output
+	output consensus.SiacoinOutput
 
 	spendable bool
 	age       int

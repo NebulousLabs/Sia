@@ -33,7 +33,7 @@ func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, f
 	if err != nil {
 		return
 	}
-	output := consensus.Output{
+	output := consensus.SiacoinOutput{
 		Value:     freezeVolume,
 		SpendHash: spendHash,
 	}

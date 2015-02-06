@@ -191,14 +191,14 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 			continue
 		}
 
-		// If the diffs have not been generated, call generateAndApply.
+		// If the diffs have not been generated, call generateAndApplyDiff.
 		err = s.generateAndApplyDiff(backtrackNodes[i])
 		if err != nil {
 			// Invalidate and delete all of the nodes after the bad block.
 			s.invalidateNode(backtrackNodes[i])
 
 			// Rewind the validated blocks
-			for j := 0; j < i; j++ { // reverse all the blocks we applied.
+			for j := 0; j < len(appliedNodes)-1; j++ { // reverse all the blocks we applied.
 				s.invertRecentBlock()
 			}
 

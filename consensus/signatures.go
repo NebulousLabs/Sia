@@ -4,11 +4,16 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TODO: when testing the covered fields stuff, antagonistically try to cause
 // seg faults by throwing covered fields objects at the state which point to
 // nonexistent objects in the transaction.
+
+var (
+	MissingSignaturesErr = errors.New("transaction has inputs with missing signatures")
+)
 
 // Each input has a list of public keys and a required number of signatures.
 // InputSignatures keeps track of which public keys have been used and how many
@@ -24,6 +29,10 @@ type InputSignatures struct {
 // without repeates, and also checks that the largest element is less than or
 // equal to the biggest allowed element.
 func sortedUnique(elems []uint64, biggestAllowed int) (err error) {
+	if len(elems) == 0 {
+		return
+	}
+
 	biggest := elems[0]
 	for _, elem := range elems[1:] {
 		if elem <= biggest {
@@ -47,9 +56,9 @@ func (t Transaction) validCoveredFields() (err error) {
 		// Check that all fields are empty if `WholeTransaction` is set.
 		cf := sig.CoveredFields
 		if cf.WholeTransaction {
-			if len(cf.Inputs) != 0 ||
+			if len(cf.SiacoinInputs) != 0 ||
 				len(cf.MinerFees) != 0 ||
-				len(cf.Outputs) != 0 ||
+				len(cf.SiacoinOutputs) != 0 ||
 				len(cf.FileContracts) != 0 ||
 				len(cf.StorageProofs) != 0 ||
 				len(cf.SiafundInputs) != 0 ||
@@ -63,7 +72,7 @@ func (t Transaction) validCoveredFields() (err error) {
 		// Check that all fields are sorted, and without repeat values, and
 		// that all elements point to objects that exists within the
 		// transaction.
-		err = sortedUnique(cf.Inputs, len(cf.Inputs)-1)
+		err = sortedUnique(cf.SiacoinInputs, len(cf.SiacoinInputs)-1)
 		if err != nil {
 			return
 		}
@@ -71,7 +80,7 @@ func (t Transaction) validCoveredFields() (err error) {
 		if err != nil {
 			return
 		}
-		err = sortedUnique(cf.Outputs, len(cf.Outputs)-1)
+		err = sortedUnique(cf.SiacoinOutputs, len(cf.SiacoinOutputs)-1)
 		if err != nil {
 			return
 		}
@@ -115,7 +124,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 
 	// Create the InputSignatures object for each input.
 	sigMap := make(map[OutputID]*InputSignatures)
-	for i, input := range t.Inputs {
+	for i, input := range t.SiacoinInputs {
 		_, exists := sigMap[input.OutputID]
 		if exists {
 			return errors.New("output spent twice in the same transaction.")
@@ -152,26 +161,27 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case ED25519Identifier:
-			// Check that the public key is a legal length.
-			if len(publicKey.Key) != crypto.PublicKeySize {
-				return errors.New("public key is invalid")
-			}
-			if len(sig.Signature) != crypto.SignatureSize {
-				return errors.New("signature is invalid")
-			}
-
-			// Decode the public key and signature from the data types.
+			// Decode the public key and signature.
 			var decodedPK crypto.PublicKey
+			err := encoding.Unmarshal(publicKey.Key, &decodedPK)
+			if err != nil {
+				return err
+			}
 			var decodedSig crypto.Signature
-			copy(decodedPK[:], publicKey.Key)
-			copy(decodedSig[:], sig.Signature)
+			err = encoding.Unmarshal(sig.Signature, &decodedSig)
+			if err != nil {
+				return err
+			}
 
 			sigHash := t.SigHash(i)
-			if !crypto.VerifyBytes(sigHash[:], decodedPK, decodedSig) {
-				return errors.New("signature is invalid")
+			err = crypto.VerifyHash(sigHash, decodedPK, decodedSig)
+			if err != nil {
+				return err
 			}
 		default:
-			return errors.New("public key algorithm not recognized")
+			// If we don't recognize the identifier, assume that the signature
+			// is valid; do nothing. This allows more signature types to be
+			// added through soft forking.
 		}
 
 		// Subtract the number of signatures remaining for this input.
@@ -181,7 +191,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
 		if reqSigs.RemainingSignatures != 0 {
-			return errors.New("some inputs are missing signatures")
+			return MissingSignaturesErr
 		}
 	}
 

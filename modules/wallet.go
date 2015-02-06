@@ -40,7 +40,7 @@ type Wallet interface {
 
 	// AddOutput adds an output to a transaction. It returns the index of the
 	// output in the transaction.
-	AddOutput(id string, output consensus.Output) (uint64, error)
+	AddOutput(id string, output consensus.SiacoinOutput) (uint64, error)
 
 	// AddFileContract adds a file contract to a transaction.
 	AddFileContract(id string, fc consensus.FileContract) error

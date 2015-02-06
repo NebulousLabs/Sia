@@ -4,6 +4,10 @@ import (
 	"errors"
 )
 
+var (
+	MissingOutputErr = errors.New("transaction spends a nonexisting output")
+)
+
 // validStorageProofs checks that a transaction follows the limitations placed
 // on transactions with storage proofs.
 func (t Transaction) validStorageProofs() bool {
@@ -11,7 +15,7 @@ func (t Transaction) validStorageProofs() bool {
 		return true
 	}
 
-	if len(t.Outputs) != 0 {
+	if len(t.SiacoinOutputs) != 0 {
 		return false
 	}
 	if len(t.FileContracts) != 0 {
@@ -26,11 +30,11 @@ func (t Transaction) validStorageProofs() bool {
 
 // validInput returns err = nil if the input is valid within the current state,
 // otherwise returns an error explaining what wasn't valid.
-func (s *State) validInput(input Input) (err error) {
+func (s *State) validInput(input SiacoinInput) (err error) {
 	// Check the input spends an existing and valid output.
 	_, exists := s.unspentOutputs[input.OutputID]
 	if !exists {
-		err = errors.New("transaction spends a nonexisting output")
+		err = MissingOutputErr
 		return
 	}
 
@@ -59,7 +63,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 
 	// Validate each input and get the total amount of Currency.
 	var inputSum Currency
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Check that the input is valid.
 		err = s.validInput(input)
 		if err != nil {
@@ -113,7 +117,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 // ConsensusState, updating the list of contracts, outputs, etc.
 func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contractDiffs []ContractDiff) {
 	// Remove all inputs from the unspent outputs list.
-	for _, input := range t.Inputs {
+	for _, input := range t.SiacoinInputs {
 		// Sanity check - the input must exist within the blockchain, should
 		// have already been verified.
 		if DEBUG {
@@ -133,11 +137,11 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 	}
 
 	// Add all finanacial outputs to the unspent outputs list.
-	for i, output := range t.Outputs {
+	for i, output := range t.SiacoinOutputs {
 		// Sanity check - the output must not exist within the state, should
 		// have already been verified.
 		if DEBUG {
-			_, exists := s.unspentOutputs[t.OutputID(i)]
+			_, exists := s.unspentOutputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("applying a  transaction with an invalid new output")
 			}
@@ -145,10 +149,10 @@ func (s *State) applyTransaction(t Transaction) (outputDiffs []OutputDiff, contr
 
 		diff := OutputDiff{
 			New:    true,
-			ID:     t.OutputID(i),
+			ID:     t.SiacoinOutputID(i),
 			Output: output,
 		}
-		s.unspentOutputs[t.OutputID(i)] = output
+		s.unspentOutputs[t.SiacoinOutputID(i)] = output
 		outputDiffs = append(outputDiffs, diff)
 	}
 
@@ -185,13 +189,14 @@ func (t Transaction) OutputSum() (sum Currency, err error) {
 	}
 
 	// Add the outputs
-	for _, output := range t.Outputs {
+	for _, output := range t.SiacoinOutputs {
 		sum.Add(output.Value)
 	}
 
 	// Check for overflow
 	if sum.Overflow() {
 		err = ErrOverflow
+		return
 	}
 
 	return

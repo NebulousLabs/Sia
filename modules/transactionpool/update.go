@@ -66,8 +66,8 @@ func (tp *TransactionPool) update() {
 
 			// Find any transactions in our set that are dependent on this
 			// transaction.
-			for i := range txn.Outputs {
-				dependent, exists := tp.usedOutputs[txn.OutputID(i)]
+			for i := range txn.SiacoinOutputs {
+				dependent, exists := tp.usedOutputs[txn.SiacoinOutputID(i)]
 				if exists {
 					ut.dependents[dependent] = struct{}{}
 					dependent.requirements[ut] = struct{}{}
@@ -92,7 +92,7 @@ func (tp *TransactionPool) update() {
 	// occur with transactions that got accepted.
 	for _, block := range addedBlocks {
 		for _, txn := range block.Transactions {
-			for _, input := range txn.Inputs {
+			for _, input := range txn.SiacoinInputs {
 				conflict, exists := tp.usedOutputs[input.OutputID]
 				if exists {
 					tp.removeTransactionFromPool(conflict)

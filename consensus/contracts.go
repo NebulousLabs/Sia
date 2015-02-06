@@ -91,7 +91,7 @@ func (s *State) applyContract(contract FileContract, id ContractID) (cd Contract
 func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDiff) {
 	// Calculate the new output and its id.
 	contract := s.openContracts[sp.ContractID]
-	output := Output{
+	output := SiacoinOutput{
 		Value:     contract.Payout,
 		SpendHash: contract.ValidProofAddress,
 	}
@@ -118,7 +118,7 @@ func (s *State) applyStorageProof(sp StorageProof) (od OutputDiff, cd ContractDi
 // on a file contract.
 func (s *State) applyMissedProof(contract FileContract, id ContractID) (od OutputDiff, cd ContractDiff) {
 	// Create the output for the missed proof.
-	output := Output{
+	output := SiacoinOutput{
 		Value:     contract.Payout,
 		SpendHash: contract.MissedProofAddress,
 	}

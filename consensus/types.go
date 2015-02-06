@@ -14,6 +14,8 @@ package consensus
 // coverage.
 
 import (
+	"math/big"
+
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/hash"
 )
@@ -33,6 +35,20 @@ type (
 	Target      hash.Hash
 )
 
+// A Currency is a 128-bit unsigned integer. Currency operations are performed
+// via math/big.
+//
+// The Currency object also keeps track of whether an overflow has occurred
+// during arithmetic operations. Once the 'overflow' flag has been set to
+// true, all subsequent operations will return an error, and the result of the
+// operation is undefined. This flag can never be reset; a new Currency must
+// be created. Callers can also manually check for overflow using the Overflow
+// method.
+type Currency struct {
+	i  big.Int
+	of bool // has an overflow ever occurred?
+}
+
 var ZeroAddress = CoinAddress{0}
 
 var FileContractIdentifier = Identifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
@@ -48,16 +64,16 @@ type Block struct {
 	ParentID     BlockID
 	Nonce        uint64
 	Timestamp    Timestamp
-	MinerPayouts []Output
+	MinerPayouts []SiacoinOutput
 	Transactions []Transaction
 }
 
 // A Transaction is an update to the state of the network, can move money
 // around, make contracts, etc.
 type Transaction struct {
-	Inputs         []Input
+	SiacoinInputs  []SiacoinInput
 	MinerFees      []Currency
-	Outputs        []Output
+	SiacoinOutputs []SiacoinOutput
 	FileContracts  []FileContract
 	StorageProofs  []StorageProof
 	SiafundInputs  []SiafundInput
@@ -68,7 +84,7 @@ type Transaction struct {
 
 // An Input contains the ID of the output it's trying to spend, and the spend
 // conditions that unlock the output.
-type Input struct {
+type SiacoinInput struct {
 	OutputID        OutputID
 	SpendConditions SpendConditions
 }
@@ -92,7 +108,7 @@ type SpendConditions struct {
 
 // An Output contains a volume of currency and a 'CoinAddress', which is just a
 // hash of the spend conditions which unlock the output.
-type Output struct {
+type SiacoinOutput struct {
 	Value     Currency
 	SpendHash CoinAddress
 }
@@ -166,9 +182,9 @@ type TransactionSignature struct {
 // empty except for the Signatures field.
 type CoveredFields struct {
 	WholeTransaction bool
-	Inputs           []uint64
+	SiacoinInputs    []uint64
 	MinerFees        []uint64
-	Outputs          []uint64
+	SiacoinOutputs   []uint64
 	FileContracts    []uint64
 	StorageProofs    []uint64
 	SiafundInputs    []uint64
@@ -218,7 +234,10 @@ func (b Block) MerkleRoot() hash.Hash {
 
 // MinerPayoutID returns the ID of the payout at the given index.
 func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(hash.HashAll(b.ID(), i))
+	return OutputID(hash.HashAll(
+		b.ID(),
+		i,
+	))
 }
 
 // FileContractID returns the id of a file contract given the index of the
@@ -228,9 +247,9 @@ func (b Block) MinerPayoutID(i int) OutputID {
 func (t Transaction) FileContractID(i int) ContractID {
 	return ContractID(hash.HashAll(
 		FileContractIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -240,15 +259,16 @@ func (t Transaction) FileContractID(i int) ContractID {
 	))
 }
 
-// OutputID gets the id of an output in the transaction, which is derived from
-// marshalling all of the fields in the transaction except for the signatures
-// and then appending the string "siacoin output" and the index of the output.
-func (t Transaction) OutputID(i int) OutputID {
+// SiacoinOutputID gets the id of an output in the transaction, which is
+// derived from marshalling all of the fields in the transaction except for the
+// signatures and then appending the string "siacoin output" and the index of
+// the output.
+func (t Transaction) SiacoinOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiacoinOutputIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -273,9 +293,9 @@ func (fcID ContractID) StorageProofOutputID(proofValid bool) (outputID OutputID)
 func (t Transaction) SiafundOutputID(i int) OutputID {
 	return OutputID(hash.HashAll(
 		SiafundOutputIdentifier,
-		t.Inputs,
+		t.SiacoinInputs,
 		t.MinerFees,
-		t.Outputs,
+		t.SiacoinOutputs,
 		t.FileContracts,
 		t.StorageProofs,
 		t.SiafundInputs,
@@ -305,9 +325,9 @@ func (t Transaction) SigHash(i int) hash.Hash {
 	var signedData []byte
 	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
-			t.Inputs,
+			t.SiacoinInputs,
 			t.MinerFees,
-			t.Outputs,
+			t.SiacoinOutputs,
 			t.FileContracts,
 			t.StorageProofs,
 			t.SiafundInputs,
@@ -321,11 +341,11 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		for _, minerFee := range cf.MinerFees {
 			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
 		}
-		for _, input := range cf.Inputs {
-			signedData = append(signedData, encoding.Marshal(t.Inputs[input])...)
+		for _, input := range cf.SiacoinInputs {
+			signedData = append(signedData, encoding.Marshal(t.SiacoinInputs[input])...)
 		}
-		for _, output := range cf.Outputs {
-			signedData = append(signedData, encoding.Marshal(t.Outputs[output])...)
+		for _, output := range cf.SiacoinOutputs {
+			signedData = append(signedData, encoding.Marshal(t.SiacoinOutputs[output])...)
 		}
 		for _, contract := range cf.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)

@@ -9,20 +9,6 @@ var (
 	ErrOverflow = errors.New("Currency overflowed 128 bits")
 )
 
-// A Currency is a 128-bit unsigned integer. Currency operations are performed
-// via math/big.
-//
-// The Currency object also keeps track of whether an overflow has occurred
-// during arithmetic operations. Once the 'overflow' flag has been set to
-// true, all subsequent operations will return an error, and the result of the
-// operation is undefined. This flag can never be reset; a new Currency must
-// be created. Callers can also manually check for overflow using the Overflow
-// method.
-type Currency struct {
-	i  big.Int
-	of bool // has an overflow ever occurred?
-}
-
 func NewCurrency(b *big.Int) (c Currency, err error) {
 	if b.BitLen() > 128 || b.Sign() < 0 {
 		c.of = true
