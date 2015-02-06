@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/hash"
 )
 
 // Creates and encodes a public key, and verifies that it decodes correctly,
@@ -30,8 +31,8 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Create a signature using the secret key.
-	signedData := make([]byte, 32)
-	rand.Read(signedData)
+	var signedData hash.Hash
+	rand.Read(signedData[:])
 	sig, err := SignBytes(signedData, sk)
 	if err != nil {
 		t.Fatal(err)
@@ -72,8 +73,8 @@ func TestSigning(t *testing.T) {
 		}
 
 		// Generate and sign the data.
-		randData := make([]byte, 32)
-		rand.Read(randData)
+		var randData hash.Hash
+		rand.Read(randData[:])
 		sig, err := SignBytes(randData, sk)
 		if err != nil {
 			t.Fatal(err)
@@ -104,10 +105,10 @@ func TestSigning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := make([]byte, 32)
-	SignBytes(nil, nil)
+	var data hash.Hash
 	SignBytes(data, nil)
-	VerifyBytes(nil, nil, nil)
+	SignBytes(data, nil)
+	VerifyBytes(data, nil, nil)
 	VerifyBytes(data, nil, nil)
 	VerifyBytes(data, pk, nil)
 }

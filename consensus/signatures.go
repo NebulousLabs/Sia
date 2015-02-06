@@ -175,7 +175,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			}
 
 			sigHash := t.SigHash(i)
-			if !crypto.VerifyBytes(sigHash[:], decodedPK, decodedSig) {
+			if !crypto.VerifyBytes(sigHash, decodedPK, decodedSig) {
 				return InvalidSignatureErr
 			}
 		default:
