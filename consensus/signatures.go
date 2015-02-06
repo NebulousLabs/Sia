@@ -12,7 +12,6 @@ import (
 // nonexistent objects in the transaction.
 
 var (
-	InvalidSignatureErr  = errors.New("signature is invalid")
 	MissingSignaturesErr = errors.New("transaction has inputs with missing signatures")
 )
 
@@ -175,8 +174,9 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			}
 
 			sigHash := t.SigHash(i)
-			if !crypto.VerifyBytes(sigHash, decodedPK, decodedSig) {
-				return InvalidSignatureErr
+			err = crypto.VerifyHash(sigHash, decodedPK, decodedSig)
+			if err != nil {
+				return err
 			}
 		default:
 			// If we don't recognize the identifier, assume that the signature

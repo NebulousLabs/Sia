@@ -64,7 +64,7 @@ func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transact
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	rawSig, err := crypto.SignBytes(sigHash, sk)
+	rawSig, err := crypto.SignHash(sigHash, sk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func testInvalidSignature(t *testing.T, s *State) {
 		t.Fatal(err)
 	}
 	err = s.AcceptBlock(b)
-	if err != InvalidSignatureErr {
+	if err != crypto.ErrInvalidSignature {
 		t.Fatal(err)
 	}
 }

@@ -21,6 +21,11 @@ type (
 	Signature *[ed25519.SignatureSize]byte
 )
 
+var (
+	ErrNilInput         = errors.New("cannot use nil input")
+	ErrInvalidSignature = errors.New("invalid signature")
+)
+
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
 func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
@@ -31,25 +36,33 @@ func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
 	return
 }
 
-// SignBytes signs a message using a secret key.
-func SignBytes(data hash.Hash, sk SecretKey) (sig Signature, err error) {
+// SignHAsh signs a message using a secret key. An error is returned if the
+// secret key is nil.
+func SignHash(data hash.Hash, sk SecretKey) (sig Signature, err error) {
 	if sk == nil {
-		err = errors.New("cannot sign with nil key")
+		err = ErrNilInput
 		return
 	}
 	sig = ed25519.Sign(sk, data[:])
 	return
 }
 
-// VerifyBytes uses a public key and input data to verify a signature.
-//
-// TODO: Switch VerifyBytes to also returning an error.
-func VerifyBytes(data hash.Hash, pk PublicKey, sig Signature) bool {
+// VerifyHash uses a public key and input data to verify a signature. And error
+// is returned if the public key or signature is nil.
+func VerifyHash(data hash.Hash, pk PublicKey, sig Signature) (err error) {
 	if pk == nil {
-		return false
+		err = ErrNilInput
+		return
 	}
 	if sig == nil {
-		return false
+		err = ErrNilInput
+		return
 	}
-	return ed25519.Verify(pk, data[:], sig)
+	verifies := ed25519.Verify(pk, data[:], sig)
+	if !verifies {
+		err = ErrInvalidSignature
+		return
+	}
+
+	return
 }

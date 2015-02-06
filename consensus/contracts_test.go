@@ -82,7 +82,7 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	rawSig, err := crypto.SignBytes(sigHash, sk)
+	rawSig, err := crypto.SignHash(sigHash, sk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	}
 	txn.Signatures = append(txn.Signatures, sig)
 	sigHash := txn.SigHash(0)
-	rawSig, err := crypto.SignBytes(sigHash, sk)
+	rawSig, err := crypto.SignHash(sigHash, sk)
 	if err != nil {
 		t.Fatal(err)
 	}

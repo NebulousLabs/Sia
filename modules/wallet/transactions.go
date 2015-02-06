@@ -222,7 +222,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 
 		// Get the signature.
 		var encodedSig crypto.Signature
-		encodedSig, err = crypto.SignBytes(sigHash, secKey)
+		encodedSig, err = crypto.SignHash(sigHash, secKey)
 		if err != nil {
 			return
 		}
