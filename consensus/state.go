@@ -23,9 +23,10 @@ type State struct {
 	// having many children and pointing back to the parent.
 	blockRoot *blockNode
 
-	// Maps tracking blocks that have been seen. badBlocks is a list of blocks
-	// that are somehow invalid (such as containing invalid transactions). The
-	// second is a list of valid blocks which have nodes in the State.
+	// badBlocks and blockMap keep track of known blocks. badBlocks keeps track
+	// of invalid blocks and is used exclusively for DoS prevention. blockMap
+	// points only to blocks that exist in some competing fork within the
+	// blockchain.
 	badBlocks map[BlockID]struct{}
 	blockMap  map[BlockID]*blockNode
 
@@ -34,9 +35,10 @@ type State struct {
 	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID
 
-	// These are the consensus variables. All nodes on the network which have
-	// the same path will have the same exact consensus variables, anything
-	// else is a software bug.
+	// These are the consensus variables, refered to as the 'consensus set'.
+	// All nodes on the network which have the same set of blocks (the same
+	// currentPath) will have an identical consensus set. Anything else is a
+	// software bug.
 	siafundPool           Currency
 	unspentSiacoinOutputs map[OutputID]SiacoinOutput
 	openFileContracts     map[FileContractID]FileContract
@@ -54,7 +56,7 @@ type State struct {
 
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else. genesisTime is taken as an input instead of the constant being
-// used directly because it makes certain parts of testing a lot easier.
+// used directly because it makes certain parts of testing easier.
 func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{

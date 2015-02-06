@@ -9,7 +9,7 @@ import (
 // rejected.
 func (a *assistant) testBlockTimestamps() {
 	// Create a block with a timestamp that is too early.
-	b, err := mineTestingBlock(a.s.CurrentBlock().ID(), a.s.EarliestTimestamp()-1, a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	b, err := mineTestingBlock(a.s.CurrentBlock().ID(), a.s.EarliestTimestamp()-1, a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func (a *assistant) testBlockTimestamps() {
 	}
 
 	// Create a block with a timestamp that is too late.
-	b, err = mineTestingBlock(a.s.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	b, err = mineTestingBlock(a.s.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
 	if err != nil {
 		a.t.Fatal(err)
 	}
@@ -30,70 +30,48 @@ func (a *assistant) testBlockTimestamps() {
 }
 
 // testEmptyBlock adds an empty block to the state and checks for errors.
-func testEmptyBlock(t *testing.T, s *State) {
-	// Get prior stats about the state.
-	bbLen := len(s.badBlocks)
-	bmLen := len(s.blockMap)
-	cpLen := len(s.currentPath)
-	uoLen := len(s.unspentSiacoinOutputs)
-	ocLen := len(s.openFileContracts)
-	beforeStateHash := s.StateHash()
+func (a *assistant) testEmptyBlock() {
+	// Get the hash of the state before the block was added.
+	beforeStateHash := a.s.StateHash()
 
 	// Mine and submit a block
-	b, err := mineValidBlock(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.AcceptBlock(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	afterStateHash := s.StateHash()
+	block := a.mineValidBlock()
+
+	// Get the hash of the state after the block was added.
+	afterStateHash := a.s.StateHash()
 	if afterStateHash == beforeStateHash {
-		t.Error("StateHash is unchanged after applying an empty block")
+		a.t.Error("state hash is unchanged after mining a block")
 	}
 
-	// Check that the state has updated as expected:
-	//		bad blocks should not change
-	//		blockMap should get 1 new member
-	//		missingParents should not change
-	//		currentPath should get 1 new member
-	//		unspentOutputs should grow by at least 1 (missedProofs can make it grow by more)
-	//		openContracts should not grow (contracts may close during the block though)
-	if bbLen != len(s.badBlocks) ||
-		bmLen != len(s.blockMap)-1 ||
-		cpLen != len(s.currentPath)-1 ||
-		uoLen > len(s.unspentSiacoinOutputs)-1 ||
-		ocLen < len(s.openFileContracts) {
-		t.Error("state changed unexpectedly after accepting an empty block")
-	}
-	if s.currentBlockID != b.ID() {
-		t.Error("the state's current block id did not change after getting a new block")
-	}
-	if s.currentPath[s.Height()] != b.ID() {
-		t.Error("the state's current path didn't update correctly after accepting a new block")
-	}
-	bn, exists := s.blockMap[b.ID()]
-	if !exists {
-		t.Error("the state's block map did not update correctly after getting an empty block")
-	}
-	_, exists = s.unspentSiacoinOutputs[b.MinerPayoutID(0)]
-	if !exists {
-		t.Error("the blocks subsidy output did not get added to the set of unspent outputs")
+	// Check that the newly mined block is recognized as the current block.
+	if a.s.CurrentBlock().ID() != block.ID() {
+		a.t.Error("the state's current block is not reporting as the recently mined block.")
 	}
 
-	// Check that the diffs have been generated, and that they represent the
-	// actual changes to the state.
+	// TODO: These functions break the convention of only using exported
+	// functions. But they provide useful checks by making sure that the
+	// internals of the state have established in the necessary ways.
+	if a.s.currentPath[a.s.Height()] != block.ID() {
+		a.t.Error("the state's current path didn't update correctly after accepting a new block")
+	}
+	bn, exists := a.s.blockMap[block.ID()]
+	if !exists {
+		a.t.Error("the state's block map did not update correctly after getting an empty block")
+	}
 	if !bn.diffsGenerated {
-		t.Error("diffs were not generated on the new block")
+		a.t.Error("diffs were not generated on the new block")
 	}
-	s.invertRecentBlock()
-	if beforeStateHash != s.StateHash() {
-		t.Error("state is different after applying and removing diffs")
+
+	// TODO: These functions manipulate the state using unexported functions,
+	// which breaks proposed conventions. However, they provide useful
+	// information about the accuracy of invertRecentBlock and applyBlockNode.
+	a.s.invertRecentBlock()
+	if beforeStateHash != a.s.StateHash() {
+		a.t.Error("state is different after applying and removing diffs")
 	}
-	s.applyBlockNode(bn)
-	if afterStateHash != s.StateHash() {
-		t.Error("state is different after generateApply, remove, and applying diffs")
+	a.s.applyBlockNode(bn)
+	if afterStateHash != a.s.StateHash() {
+		a.t.Error("state is different after generateApply, remove, and applying diffs")
 	}
 }
 
@@ -360,13 +338,13 @@ func TestBlockTimestamps(t *testing.T) {
 	a.testBlockTimestamps()
 }
 
-/*
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
-	s := CreateGenesisState(currentTime())
-	testEmptyBlock(t, s)
+	a := newTestingEnvironment(t)
+	a.testEmptyBlock()
 }
 
+/*
 // TestLargeBlock creates a new state and uses it to call testLargeBlock.
 func TestLargeBlock(t *testing.T) {
 	s := CreateGenesisState(currentTime())

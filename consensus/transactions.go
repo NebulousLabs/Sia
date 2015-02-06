@@ -108,7 +108,7 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 	for _, sfo := range t.SiafundOutputs {
 		// Check that the claimStart is set to 0. Type safety should enforce
 		// this, but check anyway.
-		if sfo.claimStart.Cmp(ZeroCurrency) != 0 {
+		if sfo.ClaimStart.Cmp(ZeroCurrency) != 0 {
 			return errors.New("invalid siafund output presented")
 		}
 
@@ -251,7 +251,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 		// Calculate the volume of siacoins to put in the claim output.
 		claimPortion := s.siafundPool
 		sfo := s.unspentSiafundOutputs[sfi.OutputID]
-		err := claimPortion.Sub(sfo.claimStart)
+		err := claimPortion.Sub(sfo.ClaimStart)
 		if err != nil {
 			if DEBUG {
 				panic("error while handling claim portion")
@@ -294,7 +294,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		// Set the claim start.
-		sfo.claimStart = s.siafundPool
+		sfo.ClaimStart = s.siafundPool
 
 		// Create and apply the diff.
 		sfod := SiafundOutputDiff{

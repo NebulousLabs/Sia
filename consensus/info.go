@@ -54,9 +54,9 @@ func (s *State) output(id OutputID) (sco SiacoinOutput, exists bool) {
 	return
 }
 
-// Sorted UtxoSet returns all of the unspent transaction outputs sorted
+// Sorted UscoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
+func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var unspentOutputStrings []string
 	for outputID := range s.unspentSiacoinOutputs {
@@ -74,27 +74,57 @@ func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
 	return
 }
 
+// Sorted UsfoSet returns all of the unspent siafund outputs sorted according
+// to the numerical value of their id.
+func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
+	// Get all of the outputs in string form and sort the strings.
+	var idStrings []string
+	for outputID := range s.unspentSiafundOutputs {
+		idStrings = append(idStrings, string(outputID[:]))
+	}
+	sort.Strings(idStrings)
+
+	// Get the outputs in order according to their sorted string form.
+	for _, idString := range idStrings {
+		var outputID OutputID
+		copy(outputID[:], idString)
+
+		// Sanity check - the output should exist.
+		output, exists := s.unspentSiafundOutputs[outputID]
+		if DEBUG {
+			if !exists {
+				panic("output doesn't exist")
+			}
+		}
+
+		sortedOutputs = append(sortedOutputs, output)
+	}
+	return
+}
+
 // StateHash returns the markle root of the current state of consensus.
 func (s *State) stateHash() hash.Hash {
 	// Items of interest:
-	// 1. CurrentBlockID
-	// 2. Current Height
-	// 3. Current Target
-	// 4. Current Depth
-	// 5. Earliest Allowed Timestamp of Next Block
-	// 6. Genesis Block
-	// 7. CurrentPath, ordered by height.
-	// 8. UnspentOutputs, sorted by id.
-	// 9. OpenContracts, sorted by id.
+	// 1.	genesis block
+	// 2.	current block id
+	// 3.	current height
+	// 4.	current target
+	// 5.	current depth
+	// 6.	earliest allowed timestamp of next block
+	// 7.	current path, ordered by height.
+	// 8.	unspent siacoin outputs, sorted by id.
+	// 9.	open file contracts, sorted by id.
+	// 10.	unspent siafund outputs, sorted by id.
+	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
 
 	// Create a slice of hashes representing all items of interest.
 	leaves := []hash.Hash{
+		hash.HashObject(s.blockRoot.block),
 		hash.Hash(s.currentBlockID),
 		hash.HashObject(s.height()),
 		hash.HashObject(s.currentBlockNode().target),
 		hash.HashObject(s.currentBlockNode().depth),
 		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-		hash.Hash(s.blockRoot.block.ID()),
 	}
 
 	// Add all the blocks in the current path.
@@ -102,11 +132,9 @@ func (s *State) stateHash() hash.Hash {
 		leaves = append(leaves, hash.Hash(s.currentPath[BlockHeight(i)]))
 	}
 
-	// Sort the unspent outputs by the string value of their ID.
-	sortedUtxos := s.sortedUtxoSet()
-
-	// Add the unspent outputs in sorted order.
-	for _, output := range sortedUtxos {
+	// Get the set of siacoin outputs in sorted order and add them.
+	sortedUscos := s.sortedUscoSet()
+	for _, output := range sortedUscos {
 		leaves = append(leaves, hash.HashObject(output))
 	}
 
@@ -123,6 +151,30 @@ func (s *State) stateHash() hash.Hash {
 		copy(contractID[:], stringContractID)
 		leaves = append(leaves, hash.HashObject(s.openFileContracts[contractID]))
 	}
+
+	// Get the set of siafund outputs in sorted order and add them.
+	sortedUsfos := s.sortedUsfoSet()
+	for _, output := range sortedUsfos {
+		leaves = append(leaves, hash.HashObject(output))
+	}
+
+	/*
+		// Get the set of delayed siacoin outputs, sorted by maturity height then
+		// sorted by id and add them.
+		for _, delayedOutputs := range s.delayedSiacoinOutputs {
+			var delayedStrings []string
+			for id := range delayedOutputs {
+				delayedStrings = append(delayedStrings, string(id[:]))
+			}
+			sort.Strings(delayedStrings)
+
+			for _, delayedString := range delayedStrings {
+				var id OutputID
+				copy(id[:], delayedString)
+				leaves = append(leaves, hash.HashObject(delayedOutputs[id]))
+			}
+		}
+	*/
 
 	return hash.MerkleRoot(leaves)
 }
@@ -236,7 +288,7 @@ func (s *State) Output(id OutputID) (output SiacoinOutput, exists bool) {
 func (s *State) SortedUtxoSet() []SiacoinOutput {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.sortedUtxoSet()
+	return s.sortedUscoSet()
 }
 
 // StateHash returns the markle root of the current state of consensus.

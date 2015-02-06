@@ -100,15 +100,20 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 // mineValidBlock mines a block and sets a handful of payouts to addresses that
 // the assistant can spend, which will give the assistant a good volume of
 // outputs to draw on for testing.
-func (a *assistant) mineValidBlock() {
+func (a *assistant) mineValidBlock() (block Block) {
 	// Mine the block.
-	block, err := mineTestingBlock(a.s.CurrentBlock().ID(), currentTime(), a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	block, err := mineTestingBlock(a.s.CurrentBlock().ID(), currentTime(), a.payouts(a.s.Height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
+	if err != nil {
+		a.t.Fatal(err)
+	}
 
 	// Submit the block to the state.
 	err = a.s.AcceptBlock(block)
 	if err != nil {
 		a.t.Fatal(err)
 	}
+
+	return
 }
 
 // newTestingEnvironment creates a state and an assistant that wraps around the
