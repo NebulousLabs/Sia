@@ -126,7 +126,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	}
 
 	// Create the file that the storage proof happens over.
-	simpleFile := make([]byte, 4000)
+	simpleFile := make([]byte, 4e3)
 	rand.Read(simpleFile)
 
 	// Create the transaction that spends the output.
@@ -149,9 +149,9 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	}
 	contract := FileContract{
 		FileMerkleRoot: merkleRoot,
-		FileSize:       4000,
+		FileSize:       4e3,
 		Start:          s.height() + 2,
-		End:            s.height() + 2 + 25*1000,
+		End:            s.height() + 2 + 25e3,
 		Payout:         NewCurrency64(12e3),
 	}
 	txn = Transaction{
@@ -190,7 +190,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	numSegments := hash.CalculateSegments(4000)
+	numSegments := hash.CalculateSegments(4e3)
 	segment, hashes, err := hash.BuildReaderProof(bytes.NewReader(simpleFile), numSegments, segmentIndex)
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 // testContractCreation adds a block with a file contract to the state and
 // checks that the contract is accepted.
 func testContractCreation(t *testing.T, s *State) {
-	txn := contractTxn(t, s, 2, 25*1000)
+	txn := contractTxn(t, s, 2, 25e3)
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
