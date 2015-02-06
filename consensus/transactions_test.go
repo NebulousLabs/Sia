@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -34,7 +33,7 @@ func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transact
 	}
 
 	// Mine the block that creates the output.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), minerPayouts, nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), minerPayouts, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +81,7 @@ func testForeignSignature(t *testing.T, s *State) {
 	nonAlgorithm[0] = ' '
 	txn := signedOutputTxn(t, s, nonAlgorithm)
 	txn.Signatures[0].Signature[0]++
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +101,7 @@ func testForeignSignature(t *testing.T, s *State) {
 func testInvalidSignature(t *testing.T, s *State) {
 	txn := signedOutputTxn(t, s, ED25519Identifier)
 	txn.Signatures[0].Signature[1]++
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +115,7 @@ func testInvalidSignature(t *testing.T, s *State) {
 // outputs, and verifies that the output is accepted into the state.
 func testSingleOutput(t *testing.T, s *State) {
 	txn := signedOutputTxn(t, s, ED25519Identifier)
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +136,7 @@ func testSingleOutput(t *testing.T, s *State) {
 func testUnsignedTransaction(t *testing.T, s *State) {
 	txn := signedOutputTxn(t, s, ED25519Identifier)
 	txn.Signatures = nil
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,26 +149,26 @@ func testUnsignedTransaction(t *testing.T, s *State) {
 // TestForeignSignature creates a new state and uses it to call
 // testForeignSignature.
 func TestForeignSignature(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testForeignSignature(t, s)
 }
 
 // TestInvalidSignature creates a new state and uses it to call
 // testInvalidSignature.
 func TestInvalidSignature(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testInvalidSignature(t, s)
 }
 
 // TestSingleOutput creates a new state and uses it to call testSingleOutput.
 func TestSingleOutput(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testSingleOutput(t, s)
 }
 
 // TestUnsignedTransaction creates a new state and uses it to call
 // testUnsignedTransaction.
 func TestUnsignedTransaction(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testUnsignedTransaction(t, s)
 }

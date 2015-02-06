@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"testing"
-	"time"
 )
 
 // TODO: Add the 100block waiting outputs to the currency tallying.
@@ -129,7 +128,7 @@ func TestEverything(t *testing.T) {
 	// ahead of the other. We'll show all of the blocks to the other state,
 	// which will cause it to fork and rewind the entire diverse set of blocks
 	// and then apply an entirely different diverse set of blocks.
-	genesisTime := Timestamp(time.Now().Unix() - 1)
+	genesisTime := currentTime() - 1
 	s0 := CreateGenesisState(genesisTime)
 	s1 := CreateGenesisState(genesisTime)
 
@@ -139,7 +138,7 @@ func TestEverything(t *testing.T) {
 	}
 
 	// Get each on a separate fork.
-	b0, err := mineTestingBlock(s0.CurrentBlock().ID(), Timestamp(time.Now().Unix()-1), nullMinerPayouts(s0.Height()+1), nil, s0.CurrentTarget())
+	b0, err := mineTestingBlock(s0.CurrentBlock().ID(), currentTime()-1, nullMinerPayouts(s0.Height()+1), nil, s0.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +146,7 @@ func TestEverything(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b1, err := mineTestingBlock(s1.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s1.Height()+1), nil, s1.CurrentTarget())
+	b1, err := mineTestingBlock(s1.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s1.Height()+1), nil, s1.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +199,7 @@ func TestEverything(t *testing.T) {
 		SiacoinInputs:  []SiacoinInput{input},
 		SiacoinOutputs: []SiacoinOutput{SiacoinOutput{}},
 	}
-	b, err := mineTestingBlock(s0.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s0.Height()+1), []Transaction{badTxn}, s0.CurrentTarget())
+	b, err := mineTestingBlock(s0.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s0.Height()+1), []Transaction{badTxn}, s0.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}

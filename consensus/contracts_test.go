@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -36,7 +35,7 @@ func contractTxn(t *testing.T, s *State, delay BlockHeight, duration BlockHeight
 	}
 
 	// Mine the block that creates the output.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), minerPayouts, nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), minerPayouts, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	}
 
 	// Mine the block that creates the output.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), minerPayouts, nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), minerPayouts, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +175,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 	txn.Signatures[0].Signature = encoding.Marshal(rawSig)
 
 	// Put the transaction into a block.
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +211,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid ContractID) {
 // checks that the contract is accepted.
 func testContractCreation(t *testing.T, s *State) {
 	txn := contractTxn(t, s, 2, 25*1000)
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +232,7 @@ func testContractCreation(t *testing.T, s *State) {
 func testMissedProof(t *testing.T, s *State) {
 	// Get the transaction with the contract that will not be fulfilled.
 	txn := contractTxn(t, s, 2, 1)
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +284,7 @@ func testStorageProofSubmit(t *testing.T, s *State) {
 		t.Fatal("file contract doesn't exist in state")
 	}
 
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), Timestamp(time.Now().Unix()), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s.Height()+1), []Transaction{txn}, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,19 +312,19 @@ func testStorageProofSubmit(t *testing.T, s *State) {
 // TestContractCreation creates a new state and uses it to call
 // testContractCreation.
 func TestContractCreation(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testContractCreation(t, s)
 }
 
 // TestMissedProof creates a new state and uses it to call testMissedProof.
 func TestMissedProof(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testMissedProof(t, s)
 }
 
 // TestStorageProofSubmit creates a new state and uses it to call
 // testStorageProofSubmit.
 func TestStorageProofSubmit(t *testing.T) {
-	s := CreateGenesisState(Timestamp(time.Now().Unix()))
+	s := CreateGenesisState(currentTime())
 	testStorageProofSubmit(t, s)
 }
