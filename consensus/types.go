@@ -148,7 +148,7 @@ type SiafundOutput struct {
 	Value            Currency
 	SpendHash        CoinAddress
 	ClaimDestination CoinAddress
-	ClaimStart       Currency // TODO: Update marshalling to ignore this unexported field.
+	ClaimStart       Currency
 }
 
 // A SiaPublicKey is a public key prefixed by an identifier. The identifier

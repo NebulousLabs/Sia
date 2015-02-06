@@ -73,6 +73,12 @@ func newAssistant(t *testing.T, s *State) *assistant {
 	}
 }
 
+// mineCurrentBlock is a shortcut function that calls mineTestingBlock using
+// variables that satisfy the current state.
+func (a *assistant) mineCurrentBlock(minerPayouts []SiacoinOutput, txns []Transaction) (b Block, err error) {
+	return mineTestingBlock(a.state.CurrentBlock().ID(), currentTime(), minerPayouts, txns, a.state.CurrentTarget())
+}
+
 // payouts returns a list of payouts that are valid for the given height and
 // miner fee total.
 func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []SiacoinOutput) {
@@ -100,7 +106,7 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 // mineValidBlock mines a block and sets a handful of payouts to addresses that
 // the assistant can spend, which will give the assistant a good volume of
 // outputs to draw on for testing.
-func (a *assistant) mineValidBlock() (block Block) {
+func (a *assistant) mineAndApplyValidBlock() (block Block) {
 	// Mine the block.
 	block, err := mineTestingBlock(a.state.CurrentBlock().ID(), currentTime(), a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
 	if err != nil {
@@ -127,7 +133,7 @@ func newTestingEnvironment(t *testing.T) (a *assistant) {
 	// Mine enough blocks that the first miner payouts come to maturity. The
 	// assistent will then be ready to spend at least a few outputs.
 	for i := 0; i <= MaturityDelay; i++ {
-		a.mineValidBlock()
+		a.mineAndApplyValidBlock()
 	}
 
 	return
