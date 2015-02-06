@@ -274,8 +274,8 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 			SpendHash: sfo.ClaimDestination,
 		}
 		scoid := sfi.OutputID.SiaClaimOutputID()
-		bn.newDelayedSiacoinOutputs[scoid] = sco
 		s.delayedSiacoinOutputs[s.height()][scoid] = sco
+		bn.delayedSiacoinOutputs[scoid] = sco
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.

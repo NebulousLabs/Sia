@@ -157,7 +157,7 @@ func (s *State) applyDiffSet(bn *blockNode, direction bool) {
 
 	// Manage the delayed outputs that have been created by the node.
 	if direction {
-		s.delayedSiacoinOutputs[bn.height] = bn.newDelayedSiacoinOutputs
+		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
 		delete(s.delayedSiacoinOutputs, bn.height)
 	}

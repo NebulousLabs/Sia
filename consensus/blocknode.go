@@ -16,12 +16,12 @@ type blockNode struct {
 	depth  Target // Cumulative weight of all parents.
 	target Target // Target for next block.
 
-	diffsGenerated           bool
-	siafundPoolDiff          SiafundPoolDiff
-	siacoinOutputDiffs       []SiacoinOutputDiff
-	fileContractDiffs        []FileContractDiff
-	siafundOutputDiffs       []SiafundOutputDiff
-	newDelayedSiacoinOutputs map[OutputID]SiacoinOutput
+	diffsGenerated        bool
+	siafundPoolDiff       SiafundPoolDiff
+	siacoinOutputDiffs    []SiacoinOutputDiff
+	fileContractDiffs     []FileContractDiff
+	siafundOutputDiffs    []SiafundOutputDiff
+	delayedSiacoinOutputs map[OutputID]SiacoinOutput
 }
 
 // childDepth returns the depth that any child node would have.
@@ -72,6 +72,8 @@ func (s *State) addBlockToTree(b Block) (err error) {
 
 		height: parentNode.height + 1,
 		depth:  parentNode.childDepth(),
+
+		delayedSiacoinOutputs: make(map[OutputID]SiacoinOutput),
 	}
 	newNode.setTarget()
 

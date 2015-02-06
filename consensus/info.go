@@ -158,23 +158,22 @@ func (s *State) stateHash() crypto.Hash {
 		leaves = append(leaves, crypto.HashObject(output))
 	}
 
-	/*
-		// Get the set of delayed siacoin outputs, sorted by maturity height then
-		// sorted by id and add them.
-		for _, delayedOutputs := range s.delayedSiacoinOutputs {
-			var delayedStrings []string
-			for id := range delayedOutputs {
-				delayedStrings = append(delayedStrings, string(id[:]))
-			}
-			sort.Strings(delayedStrings)
-
-			for _, delayedString := range delayedStrings {
-				var id OutputID
-				copy(id[:], delayedString)
-				leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
-			}
+	// Get the set of delayed siacoin outputs, sorted by maturity height then
+	// sorted by id and add them.
+	for i := BlockHeight(0); i <= s.height(); i++ {
+		delayedOutputs := s.delayedSiacoinOutputs[i]
+		var delayedStrings []string
+		for id := range delayedOutputs {
+			delayedStrings = append(delayedStrings, string(id[:]))
 		}
-	*/
+		sort.Strings(delayedStrings)
+
+		for _, delayedString := range delayedStrings {
+			var id OutputID
+			copy(id[:], delayedString)
+			leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
+		}
+	}
 
 	return crypto.MerkleRoot(leaves)
 }

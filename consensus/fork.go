@@ -88,11 +88,13 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 	for i, payout := range bn.block.MinerPayouts {
 		id := bn.block.MinerPayoutID(i)
 		s.delayedSiacoinOutputs[s.height()][id] = payout
-		bn.newDelayedSiacoinOutputs[id] = payout
+		bn.delayedSiacoinOutputs[id] = payout
 	}
 	return
 }
 
+// applyDelayedSiacoinOutputMaintenance goes through all of the outputs that
+// have matured and adds them to the list of unspentSiacoinOutputs.
 func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
 		s.unspentSiacoinOutputs[id] = sco
@@ -116,7 +118,6 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Set diffsGenerated to true.
 	bn.diffsGenerated = true
 	bn.siafundPoolDiff.Previous = s.siafundPool
-	bn.newDelayedSiacoinOutputs = make(map[OutputID]SiacoinOutput)
 
 	// Update the current block and current path.
 	s.currentBlockID = bn.block.ID()
