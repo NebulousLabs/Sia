@@ -73,13 +73,18 @@ func newAssistant(t *testing.T, s *State) *assistant {
 	}
 }
 
-// mineValidBlock mines a block and sets a handful of payouts to addresses that
-// the assistant can spend, which will give the assistant a good volume of
-// outputs to draw on for testing.
-func (a *assistant) mineValidBlock() {
-	// Create the patouts
-	var payouts []SiacoinOutput
-	valueRemaining := CalculateCoinbase(a.s.height())
+// payouts returns a list of payouts that are valid for the given height and
+// miner fee total.
+func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []SiacoinOutput) {
+	// Get the total miner subsidy.
+	valueRemaining := CalculateCoinbase(height)
+	err := valueRemaining.Add(feeTotal)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+
+	// Create several payouts that the assistant can spend, then append a
+	// 'remainder' payout.
 	for i := 0; i < 12; i++ {
 		err := valueRemaining.Sub(NewCurrency64(1e6))
 		if err != nil {
@@ -89,8 +94,15 @@ func (a *assistant) mineValidBlock() {
 	}
 	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, SpendHash: a.coinAddress})
 
+	return
+}
+
+// mineValidBlock mines a block and sets a handful of payouts to addresses that
+// the assistant can spend, which will give the assistant a good volume of
+// outputs to draw on for testing.
+func (a *assistant) mineValidBlock() {
 	// Mine the block.
-	block, err := mineTestingBlock(a.s.CurrentBlock().ID(), currentTime(), payouts, nil, a.s.CurrentTarget())
+	block, err := mineTestingBlock(a.s.CurrentBlock().ID(), currentTime(), a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
 
 	// Submit the block to the state.
 	err = a.s.AcceptBlock(block)

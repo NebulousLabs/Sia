@@ -309,6 +309,7 @@ func testStorageProofSubmit(t *testing.T, s *State) {
 	}
 }
 
+/*
 // TestContractCreation creates a new state and uses it to call
 // testContractCreation.
 func TestContractCreation(t *testing.T) {
@@ -328,3 +329,4 @@ func TestStorageProofSubmit(t *testing.T) {
 	s := CreateGenesisState(currentTime())
 	testStorageProofSubmit(t, s)
 }
+*/

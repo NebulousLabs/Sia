@@ -7,25 +7,25 @@ import (
 // testBlockTimestamps submits a block to the state with a timestamp that is
 // too early and a timestamp that is too late, and verifies that each get
 // rejected.
-func testBlockTimestamps(t *testing.T, s *State) {
+func (a *assistant) testBlockTimestamps() {
 	// Create a block with a timestamp that is too early.
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), s.EarliestTimestamp()-1, nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
+	b, err := mineTestingBlock(a.s.CurrentBlock().ID(), a.s.EarliestTimestamp()-1, a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
 	if err != nil {
-		t.Fatal(err)
+		a.t.Fatal(err)
 	}
-	err = s.AcceptBlock(b)
+	err = a.s.AcceptBlock(b)
 	if err != EarlyTimestampErr {
-		t.Error("unexpected error when submitting a too-early timestamp:", err)
+		a.t.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
 	// Create a block with a timestamp that is too late.
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime()+10+FutureThreshold, nullMinerPayouts(s.Height()+1), nil, s.CurrentTarget())
+	b, err = mineTestingBlock(a.s.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.s.height()+1, ZeroCurrency), nil, a.s.CurrentTarget())
 	if err != nil {
-		t.Fatal(err)
+		a.t.Fatal(err)
 	}
-	err = s.AcceptBlock(b)
+	err = a.s.AcceptBlock(b)
 	if err != FutureBlockErr {
-		t.Error("unexpected error when submitting a too-early timestamp:", err)
+		a.t.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }
 
@@ -356,10 +356,11 @@ func testRepeatBlock(t *testing.T, s *State) {
 // TestBlockTimestamps creates a new state and uses it to call
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
-	s := CreateGenesisState(currentTime())
-	testBlockTimestamps(t, s)
+	a := newTestingEnvironment(t)
+	a.testBlockTimestamps()
 }
 
+/*
 // TestEmptyBlock creates a new state and uses it to call testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
 	s := CreateGenesisState(currentTime())
@@ -389,6 +390,7 @@ func TestRepeatBlock(t *testing.T) {
 	s := CreateGenesisState(currentTime())
 	testRepeatBlock(t, s)
 }
+*/
 
 // TODO: Complex transaction building => Financial transactions, contract
 // transactions, and invalid forms of each. Bad outputs, many outputs, many

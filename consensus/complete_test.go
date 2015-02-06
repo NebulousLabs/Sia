@@ -92,6 +92,7 @@ func consistencyChecks(t *testing.T, states ...*State) {
 	}
 }
 
+/*
 // orderedTestBattery calls all of the individual tests on each of the input
 // states. The goal is to produce state with consistent but diverse sets of
 // blocks to more effectively test things like diffs and forking.
@@ -117,7 +118,9 @@ func orderedTestBattery(t *testing.T, states ...*State) {
 		testStorageProofSubmit(t, s)
 	}
 }
+*/
 
+/*
 // TestEverything creates a state and uses that one state to perform all of the
 // individual tests, building a sizeable state with a lot of diverse
 // transactions. Then it performs consistency checks and other stress testing.
@@ -250,3 +253,4 @@ func TestEverything(t *testing.T) {
 	currentPathCheck(t, s1)
 	rewindApplyCheck(t, s1)
 }
+*/
