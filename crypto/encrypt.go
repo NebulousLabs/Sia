@@ -8,13 +8,8 @@ import (
 	"golang.org/x/crypto/twofish"
 )
 
-const (
-	BlockSize = twofish.BlockSize
-	KeySize   = 32
-)
-
 type (
-	EncryptionKey [KeySize]byte
+	TwofishKey [32]byte
 )
 
 // Encryption and decryption of []bytes is supported, but requires keeping some
@@ -26,22 +21,18 @@ type (
 
 // GenerateEncryptionKey produces a key that can be used for encrypting and
 // decrypting files.
-func GenerateEncryptionKey() (key EncryptionKey, err error) {
+func GenerateTwofishKey() (key TwofishKey, err error) {
 	_, err = rand.Read(key[:])
-	if err != nil {
-		return
-	}
-
 	return
 }
 
-// EncryptBytes encrypts a []byte using a key. The padded ciphertext, iv, and
+// EncryptBytes encrypts a []byte using the key. The padded ciphertext, iv, and
 // amount of padding used are returned. `plaintext` is not overwritten.
-func EncryptBytes(key EncryptionKey, plaintext []byte) (ciphertext []byte, iv []byte, padding int, err error) {
+func (key TwofishKey) EncryptBytes(plaintext []byte) (ciphertext []byte, iv []byte, padding int, err error) {
 	// Determine the length needed for padding. The ciphertext must be padded
-	// to a multiple of BlockSize.
-	padding = BlockSize - (len(plaintext) % BlockSize)
-	if padding == BlockSize {
+	// to a multiple of twofish.BlockSize.
+	padding = twofish.BlockSize - (len(plaintext) % twofish.BlockSize)
+	if padding == twofish.BlockSize {
 		padding = 0
 	}
 
@@ -50,7 +41,7 @@ func EncryptBytes(key EncryptionKey, plaintext []byte) (ciphertext []byte, iv []
 	copy(ciphertext, plaintext)
 
 	// Create the iv.
-	iv = make([]byte, BlockSize)
+	iv = make([]byte, twofish.BlockSize)
 	_, err = rand.Read(iv)
 	if err != nil {
 		return
@@ -67,15 +58,15 @@ func EncryptBytes(key EncryptionKey, plaintext []byte) (ciphertext []byte, iv []
 	return
 }
 
-// DecryptBytes decrypts a ciphertext using a key, an iv, and a volume of
+// DecryptBytes decrypts a ciphertext using the key, an iv, and a volume of
 // padding. `ciphertext` is not overwritten. The plaintext is returned.
-func DecryptBytes(key EncryptionKey, ciphertext []byte, iv []byte, padding int) (plaintext []byte, err error) {
+func (key TwofishKey) DecryptBytes(ciphertext []byte, iv []byte, padding int) (plaintext []byte, err error) {
 	// Verify the iv is the correct length.
-	if len(iv) != BlockSize {
+	if len(iv) != twofish.BlockSize {
 		err = errors.New("iv is not correct size")
 		return
 	}
-	if len(ciphertext)%BlockSize != 0 {
+	if len(ciphertext)%twofish.BlockSize != 0 {
 		err = errors.New("ciphertext is not correct size")
 		return
 	}
