@@ -195,8 +195,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
-		// Sanity check - the input must exist within the blockchain, should
-		// have already been verified.
+		// Sanity check - the input should exist within the blockchain.
 		if DEBUG {
 			_, exists := s.unspentSiacoinOutputs[sci.OutputID]
 			if !exists {
@@ -219,8 +218,7 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
-		// Sanity check - the output must not exist within the state, should
-		// have already been verified.
+		// Sanity check - the output should not exist within the state.
 		if DEBUG {
 			_, exists := s.unspentSiacoinOutputs[t.SiacoinOutputID(i)]
 			if exists {
@@ -238,10 +236,75 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 	}
 }
 
+// applySiafundInputs takes all of the siafund inputs in a transaction and
+// applies them to the state, updating the diffs in the block node.
 func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
+	for _, sfi := range t.SiafundInputs {
+		// Sanity check - the input should exist within the blockchain.
+		if DEBUG {
+			_, exists := s.unspentSiafundOutputs[sfi.OutputID]
+			if !exists {
+				panic("applying a transaction with an invalid unspent siafund output")
+			}
+		}
+
+		// Calculate the volume of siacoins to put in the claim output.
+		claimPortion := s.siafundPool
+		sfo := s.unspentSiafundOutputs[sfi.OutputID]
+		err := claimPortion.Sub(sfo.claimStart)
+		if err != nil {
+			if DEBUG {
+				panic("error while handling claim portion")
+			} else {
+				continue
+			}
+		}
+		err = claimPortion.Div(NewCurrency64(SiafundCount))
+		if err != nil {
+			if DEBUG {
+				panic("error while handling claim portion")
+			} else {
+				continue
+			}
+		}
+
+		// Add the claim output to the delayed set of outputs.
+		sco := SiacoinOutput{
+			Value:     claimPortion,
+			SpendHash: sfo.ClaimDestination,
+		}
+		scoid := sfi.OutputID.SiaClaimOutputID()
+		bn.newDelayedSiacoinOutputs[scoid] = sco
+		s.delayedSiacoinOutputs[s.height()][scoid] = sco
+
+		// Create the siafund output diff and remove the output from the
+		// consensus set.
+		sfod := SiafundOutputDiff{
+			New:           false,
+			ID:            sfi.OutputID,
+			SiafundOutput: s.unspentSiafundOutputs[sfi.OutputID],
+		}
+		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
+		delete(s.unspentSiafundOutputs, sfi.OutputID)
+	}
 }
 
+// applySiafundOutputs takes all of the siafund outputs in a transaction and
+// applies them to the state, updating the diffs in the block node.
 func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
+	for i, sfo := range t.SiafundOutputs {
+		// Set the claim start.
+		sfo.claimStart = s.siafundPool
+
+		// Create and apply the diff.
+		sfod := SiafundOutputDiff{
+			New:           true,
+			ID:            t.SiafundOutputID(i),
+			SiafundOutput: sfo,
+		}
+		s.unspentSiafundOutputs[t.SiafundOutputID(i)] = sfo
+		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
+	}
 }
 
 // applyTransaction takes a transaction and uses the contents to update the
