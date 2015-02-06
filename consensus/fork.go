@@ -3,7 +3,7 @@ package consensus
 import (
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // A non-consensus rule that dictates how much heavier a competing chain has to
@@ -177,7 +177,7 @@ func (s *State) applyBlockNode(bn *blockNode) {
 // how they were before the call was made.
 func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// Get the state hash before attempting a fork.
-	var stateHash hash.Hash
+	var stateHash crypto.Hash
 	if DEBUG {
 		stateHash = s.stateHash()
 	}

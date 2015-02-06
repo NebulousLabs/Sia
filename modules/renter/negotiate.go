@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -21,7 +21,7 @@ var (
 	minerFee = consensus.NewCurrency64(10)
 )
 
-func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot hash.Hash) (txn consensus.Transaction, err error) {
+func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
 	// Fill out the contract according to the whims of the host.
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
 	contract := consensus.FileContract{
@@ -111,7 +111,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 
 		// simultaneously transmit file data and calculate Merkle root
 		tee := io.TeeReader(up.Data, conn)
-		merkleRoot, err := hash.ReaderMerkleRoot(tee, filesize)
+		merkleRoot, err := crypto.ReaderMerkleRoot(tee, filesize)
 		if err != nil {
 			return
 		}

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // An unconfirmedTransaction contains a transaction that hasn't been confirmed
@@ -55,7 +55,7 @@ type TransactionPool struct {
 	// is useful for determining which storage proof transactions should be put
 	// into the transaction pool dump depending on the current organization of
 	// the blockchain.
-	storageProofs map[consensus.BlockHeight]map[hash.Hash]consensus.Transaction
+	storageProofs map[consensus.BlockHeight]map[crypto.Hash]consensus.Transaction
 
 	mu sync.RWMutex
 }
@@ -75,7 +75,7 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 		newOutputs:  make(map[consensus.OutputID]*unconfirmedTransaction),
 		usedOutputs: make(map[consensus.OutputID]*unconfirmedTransaction),
 
-		storageProofs: make(map[consensus.BlockHeight]map[hash.Hash]consensus.Transaction),
+		storageProofs: make(map[consensus.BlockHeight]map[crypto.Hash]consensus.Transaction),
 	}
 
 	return

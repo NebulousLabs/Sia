@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // CheckTarget returns true if the block id is lower than the target.
@@ -38,7 +38,7 @@ func IntToTarget(i *big.Int) (t Target) {
 	}
 	b := i.Bytes()
 	// need to preserve big-endianness
-	offset := hash.HashSize - len(b)
+	offset := crypto.HashSize - len(b)
 	copy(t[offset:], b)
 	return
 }

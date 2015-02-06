@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -90,7 +90,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
 	var contractID consensus.FileContractID
-	err = encoding.ReadObject(conn, &contractID, hash.HashSize)
+	err = encoding.ReadObject(conn, &contractID, crypto.HashSize)
 	if err != nil {
 		return
 	}

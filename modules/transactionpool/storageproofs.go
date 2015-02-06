@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction) (err error) {
@@ -37,15 +37,15 @@ func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction
 	// Put the transaction in the proof map.
 	heightMap, exists := tp.storageProofs[greatestHeight]
 	if !exists {
-		tp.storageProofs[greatestHeight] = make(map[hash.Hash]consensus.Transaction)
+		tp.storageProofs[greatestHeight] = make(map[crypto.Hash]consensus.Transaction)
 		heightMap = tp.storageProofs[greatestHeight]
 	}
-	_, exists = heightMap[hash.HashObject(t)]
+	_, exists = heightMap[crypto.HashObject(t)]
 	if exists {
 		err = errors.New("transaction already known")
 		return
 	}
-	heightMap[hash.HashObject(t)] = t
+	heightMap[crypto.HashObject(t)] = t
 	return
 }
 

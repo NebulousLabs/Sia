@@ -1,4 +1,4 @@
-package hash
+package crypto
 
 const (
 	SegmentSize = 64 // number of bytes that are hashed to form each base leaf of the Merkle tree

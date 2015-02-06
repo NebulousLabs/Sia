@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // Contains basic information about the state, but does not go into depth.
@@ -103,7 +103,7 @@ func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
 }
 
 // StateHash returns the markle root of the current state of consensus.
-func (s *State) stateHash() hash.Hash {
+func (s *State) stateHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
 	// 2.	current block id
@@ -117,25 +117,25 @@ func (s *State) stateHash() hash.Hash {
 	// 10.	unspent siafund outputs, sorted by id.
 	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
 
-	// Create a slice of hashes representing all items of interest.
-	leaves := []hash.Hash{
-		hash.HashObject(s.blockRoot.block),
-		hash.Hash(s.currentBlockID),
-		hash.HashObject(s.height()),
-		hash.HashObject(s.currentBlockNode().target),
-		hash.HashObject(s.currentBlockNode().depth),
-		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
+	// Create a slice of cryptoes representing all items of interest.
+	leaves := []crypto.Hash{
+		crypto.HashObject(s.blockRoot.block),
+		crypto.Hash(s.currentBlockID),
+		crypto.HashObject(s.height()),
+		crypto.HashObject(s.currentBlockNode().target),
+		crypto.HashObject(s.currentBlockNode().depth),
+		crypto.HashObject(s.currentBlockNode().earliestChildTimestamp()),
 	}
 
 	// Add all the blocks in the current path.
 	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, hash.Hash(s.currentPath[BlockHeight(i)]))
+		leaves = append(leaves, crypto.Hash(s.currentPath[BlockHeight(i)]))
 	}
 
 	// Get the set of siacoin outputs in sorted order and add them.
 	sortedUscos := s.sortedUscoSet()
 	for _, output := range sortedUscos {
-		leaves = append(leaves, hash.HashObject(output))
+		leaves = append(leaves, crypto.HashObject(output))
 	}
 
 	// Sort the open contracts by the string value of their ID.
@@ -149,13 +149,13 @@ func (s *State) stateHash() hash.Hash {
 	for _, stringContractID := range openContractStrings {
 		var contractID FileContractID
 		copy(contractID[:], stringContractID)
-		leaves = append(leaves, hash.HashObject(s.openFileContracts[contractID]))
+		leaves = append(leaves, crypto.HashObject(s.openFileContracts[contractID]))
 	}
 
 	// Get the set of siafund outputs in sorted order and add them.
 	sortedUsfos := s.sortedUsfoSet()
 	for _, output := range sortedUsfos {
-		leaves = append(leaves, hash.HashObject(output))
+		leaves = append(leaves, crypto.HashObject(output))
 	}
 
 	/*
@@ -171,12 +171,12 @@ func (s *State) stateHash() hash.Hash {
 			for _, delayedString := range delayedStrings {
 				var id OutputID
 				copy(id[:], delayedString)
-				leaves = append(leaves, hash.HashObject(delayedOutputs[id]))
+				leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
 			}
 		}
 	*/
 
-	return hash.MerkleRoot(leaves)
+	return crypto.MerkleRoot(leaves)
 }
 
 // Block returns the block associated with the given id.
@@ -292,7 +292,7 @@ func (s *State) SortedUtxoSet() []SiacoinOutput {
 }
 
 // StateHash returns the markle root of the current state of consensus.
-func (s *State) StateHash() hash.Hash {
+func (s *State) StateHash() crypto.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.stateHash()

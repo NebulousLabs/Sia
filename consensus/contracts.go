@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
@@ -22,8 +22,8 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 	}
 	triggerID := triggerBlock.ID()
 
-	seed := hash.HashBytes(append(triggerID[:], fcid[:]...))
-	numSegments := int64(hash.CalculateSegments(contract.FileSize))
+	seed := crypto.HashBytes(append(triggerID[:], fcid[:]...))
+	numSegments := int64(crypto.CalculateSegments(contract.FileSize))
 	seedInt := new(big.Int).SetBytes(seed[:])
 	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
 	return
@@ -55,10 +55,10 @@ func (s *State) validProof(sp StorageProof) error {
 	if err != nil {
 		return err
 	}
-	verified := hash.VerifySegment(
+	verified := crypto.VerifySegment(
 		sp.Segment,
 		sp.HashSet,
-		hash.CalculateSegments(contract.FileSize),
+		crypto.CalculateSegments(contract.FileSize),
 		segmentIndex,
 		contract.FileMerkleRoot,
 	)

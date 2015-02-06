@@ -6,8 +6,8 @@ package consensus
 import (
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 type (
@@ -18,11 +18,11 @@ type (
 	Identifier [16]byte
 	Signature  []byte
 
-	BlockID        hash.Hash
-	OutputID       hash.Hash
-	FileContractID hash.Hash
-	CoinAddress    hash.Hash
-	Target         hash.Hash
+	BlockID        crypto.Hash
+	OutputID       crypto.Hash
+	FileContractID crypto.Hash
+	CoinAddress    crypto.Hash
+	Target         crypto.Hash
 )
 
 // A Currency is a 128-bit unsigned integer. Currency operations are performed
@@ -113,7 +113,7 @@ type SiacoinOutput struct {
 // A FileContract contains the information necessary to enforce that a host
 // stores a file.
 type FileContract struct {
-	FileMerkleRoot     hash.Hash
+	FileMerkleRoot     crypto.Hash
 	FileSize           uint64
 	Start, End         BlockHeight
 	Payout             Currency
@@ -126,8 +126,8 @@ type FileContract struct {
 // the storage proof fulfills.
 type StorageProof struct {
 	FileContractID FileContractID
-	Segment        [hash.SegmentSize]byte
-	HashSet        []hash.Hash
+	Segment        [crypto.SegmentSize]byte
+	HashSet        []crypto.Hash
 }
 
 // A SiafundInput is close to a SiacoinInput, except that the asset being spent
@@ -213,7 +213,7 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 // parent block id, the block nonce, and the block merkle root and taking the
 // hash.
 func (b Block) ID() BlockID {
-	return BlockID(hash.HashAll(
+	return BlockID(crypto.HashAll(
 		b.ParentID,
 		b.Nonce,
 		b.MerkleRoot(),
@@ -223,22 +223,22 @@ func (b Block) ID() BlockID {
 // MerkleRoot calculates the merkle root of the block. The leaves of the merkle
 // tree are composed of the Timestamp, the set of miner outputs (one leaf), and
 // all of the transactions (many leaves).
-func (b Block) MerkleRoot() hash.Hash {
-	leaves := []hash.Hash{
-		hash.HashObject(b.Timestamp),
+func (b Block) MerkleRoot() crypto.Hash {
+	leaves := []crypto.Hash{
+		crypto.HashObject(b.Timestamp),
 	}
 	for _, payout := range b.MinerPayouts {
-		leaves = append(leaves, hash.HashObject(payout))
+		leaves = append(leaves, crypto.HashObject(payout))
 	}
 	for _, txn := range b.Transactions {
-		leaves = append(leaves, hash.HashObject(txn))
+		leaves = append(leaves, crypto.HashObject(txn))
 	}
-	return hash.MerkleRoot(leaves)
+	return crypto.MerkleRoot(leaves)
 }
 
 // MinerPayoutID returns the ID of the payout at the given index.
 func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(hash.HashAll(
+	return OutputID(crypto.HashAll(
 		b.ID(),
 		i,
 	))
@@ -249,7 +249,7 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // transaction except for the signatures and then appending the string "file
 // contract" and the index of the contract.
 func (t Transaction) FileContractID(i int) FileContractID {
-	return FileContractID(hash.HashAll(
+	return FileContractID(crypto.HashAll(
 		FileContractIdentifier,
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
@@ -268,7 +268,7 @@ func (t Transaction) FileContractID(i int) FileContractID {
 // signatures and then appending the string "siacoin output" and the index of
 // the output.
 func (t Transaction) SiacoinOutputID(i int) OutputID {
-	return OutputID(hash.HashAll(
+	return OutputID(crypto.HashAll(
 		SiacoinOutputIdentifier,
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
@@ -285,7 +285,7 @@ func (t Transaction) SiacoinOutputID(i int) OutputID {
 // StorageProofOutputID returns the OutputID of the output created during the
 // window index that was active at height 'height'.
 func (fcid FileContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	outputID = OutputID(hash.HashAll(
+	outputID = OutputID(crypto.HashAll(
 		fcid,
 		proofValid,
 	))
@@ -295,7 +295,7 @@ func (fcid FileContractID) StorageProofOutputID(proofValid bool) (outputID Outpu
 // SiafundOutputID returns the id of the siafund output that was specified and
 // index `i` in the transaction.
 func (t Transaction) SiafundOutputID(i int) OutputID {
-	return OutputID(hash.HashAll(
+	return OutputID(crypto.HashAll(
 		SiafundOutputIdentifier,
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
@@ -312,7 +312,7 @@ func (t Transaction) SiafundOutputID(i int) OutputID {
 // SiaClaimOutputID returns the id of the siacoin output that is created when
 // the siafund output gets spent.
 func (id OutputID) SiaClaimOutputID() OutputID {
-	return OutputID(hash.HashAll(
+	return OutputID(crypto.HashAll(
 		id,
 	))
 }
@@ -324,7 +324,7 @@ func (id OutputID) SiaClaimOutputID() OutputID {
 // If `WholeTransaction` is set to false, then the fees, inputs, ect. are all
 // added individually. The signatures are added individually regardless of the
 // value of `WholeTransaction`.
-func (t Transaction) SigHash(i int) hash.Hash {
+func (t Transaction) SigHash(i int) crypto.Hash {
 	cf := t.Signatures[i].CoveredFields
 	var signedData []byte
 	if cf.WholeTransaction {
@@ -372,19 +372,19 @@ func (t Transaction) SigHash(i int) hash.Hash {
 		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
 	}
 
-	return hash.HashBytes(signedData)
+	return crypto.HashBytes(signedData)
 }
 
 // CoinAddress calculates the root hash of a merkle tree of the SpendConditions
 // object. The leaves of this tree are formed by taking the [TimeLock]
 // [Pubkeys...] [NumSignatures].
 func (sc SpendConditions) CoinAddress() CoinAddress {
-	leaves := []hash.Hash{
-		hash.HashObject(sc.TimeLock),
+	leaves := []crypto.Hash{
+		crypto.HashObject(sc.TimeLock),
 	}
 	for i := range sc.PublicKeys {
-		leaves = append(leaves, hash.HashObject(sc.PublicKeys[i]))
+		leaves = append(leaves, crypto.HashObject(sc.PublicKeys[i]))
 	}
-	leaves = append(leaves, hash.HashObject(sc.NumSignatures))
-	return CoinAddress(hash.MerkleRoot(leaves))
+	leaves = append(leaves, crypto.HashObject(sc.NumSignatures))
+	return CoinAddress(crypto.MerkleRoot(leaves))
 }

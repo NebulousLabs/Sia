@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -78,7 +78,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
-func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot hash.Hash) error {
+func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
 	payout := terms.Price
 	err := payout.Add(terms.Collateral)
 	if err != nil {
@@ -214,7 +214,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		file,
 	)
 
-	merkleRoot, err := hash.ReaderMerkleRoot(tee, terms.FileSize)
+	merkleRoot, err := crypto.ReaderMerkleRoot(tee, terms.FileSize)
 	if err != nil {
 		return
 	}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 // contractTxn funds and returns a transaction with a file contract.
@@ -143,7 +142,7 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid FileContractI
 		Value:     outputValue,
 		SpendHash: ZeroAddress,
 	}
-	merkleRoot, err := hash.BytesMerkleRoot(simpleFile)
+	merkleRoot, err := crypto.BytesMerkleRoot(simpleFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,8 +189,8 @@ func storageProofTxn(t *testing.T, s *State) (txn Transaction, cid FileContractI
 	if err != nil {
 		t.Fatal(err)
 	}
-	numSegments := hash.CalculateSegments(4e3)
-	segment, hashes, err := hash.BuildReaderProof(bytes.NewReader(simpleFile), numSegments, segmentIndex)
+	numSegments := crypto.CalculateSegments(4e3)
+	segment, hashes, err := crypto.BuildReaderProof(bytes.NewReader(simpleFile), numSegments, segmentIndex)
 	if err != nil {
 		t.Fatal(err)
 	}
