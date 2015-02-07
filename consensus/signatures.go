@@ -123,11 +123,12 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	}
 
 	// Create the InputSignatures object for each input.
-	sigMap := make(map[OutputID]*InputSignatures)
+	sigMap := make(map[string]*InputSignatures)
 	for i, input := range t.SiacoinInputs {
-		_, exists := sigMap[input.OutputID]
+		stringID := string(input.OutputID[:])
+		_, exists := sigMap[stringID]
 		if exists {
-			return errors.New("output spent twice in the same transaction.")
+			return errors.New("siacoin output spent twice in the same transaction.")
 		}
 
 		inSig := &InputSignatures{
@@ -135,17 +136,33 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			PossibleKeys:        input.SpendConditions.PublicKeys,
 			Index:               i,
 		}
-		sigMap[input.OutputID] = inSig
+		sigMap[stringID] = inSig
+	}
+	for i, input := range t.SiafundInputs {
+		stringID := string(input.OutputID[:])
+		_, exists := sigMap[stringID]
+		if exists {
+			return errors.New("siafund output spent twice in the same transaction.")
+		}
+
+		inSig := &InputSignatures{
+			RemainingSignatures: input.SpendConditions.NumSignatures,
+			PossibleKeys:        input.SpendConditions.PublicKeys,
+			Index:               i,
+		}
+		sigMap[stringID] = inSig
 	}
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
+		stringID := string(sig.InputID[:])
+
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
-		if sigMap[sig.InputID].RemainingSignatures == 0 {
+		if sigMap[stringID].RemainingSignatures == 0 {
 			return errors.New("frivolous signature in transaction")
 		}
-		_, exists := sigMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
+		_, exists := sigMap[stringID].UsedKeys[sig.PublicKeyIndex]
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
@@ -158,7 +175,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		// Check that the signature verifies. Sia is built to support multiple
 		// types of signature algorithms, this is handled by the switch
 		// statement.
-		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
+		publicKey := sigMap[stringID].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case SignatureEntropy:
 			return crypto.ErrInvalidSignature
@@ -187,7 +204,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 
 		// Subtract the number of signatures remaining for this input.
-		sigMap[sig.InputID].RemainingSignatures -= 1
+		sigMap[stringID].RemainingSignatures -= 1
 	}
 
 	// Check that all inputs have been sufficiently signed.
