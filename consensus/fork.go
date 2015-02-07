@@ -94,10 +94,10 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 }
 
 // applyDelayedSiacoinOutputMaintenance goes through all of the outputs that
-// have matured and adds them to the list of unspentSiacoinOutputs.
+// have matured and adds them to the list of siacoinOutputs.
 func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
-		s.unspentSiacoinOutputs[id] = sco
+		s.siacoinOutputs[id] = sco
 	}
 }
 

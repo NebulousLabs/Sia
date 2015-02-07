@@ -14,6 +14,8 @@ principles.
 
 TODO: Write the formal specification for encoding things.
 
+TODO: Proofread and make sure that all terminology is correct.
+
 Cryptographic Algorithms
 ------------------------
 
@@ -267,6 +269,14 @@ The id of a contract is determined by marhsalling an identifier with the string
 "file contract" and appending that to the marshalling of the transaction
 (excluding the signatures). This is easiest understood by looking at the
 function 'FileContractID' in consensus/types.go
+
+TODO TODO TODO: Explain file contract terminations, and the unlockHash of the file
+contracts.
+
+File Contract Terminations
+--------------------------
+
+TODO TODO TODO
 
 Storage Proofs
 --------------

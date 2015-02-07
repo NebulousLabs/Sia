@@ -40,9 +40,9 @@ type State struct {
 	// currentPath) will have an identical consensus set. Anything else is a
 	// software bug.
 	siafundPool           Currency
-	unspentSiacoinOutputs map[SiacoinOutputID]SiacoinOutput
-	openFileContracts     map[FileContractID]FileContract
-	unspentSiafundOutputs map[SiafundOutputID]SiafundOutput
+	siacoinOutputs        map[SiacoinOutputID]SiacoinOutput
+	fileContracts         map[FileContractID]FileContract
+	siafundOutputs        map[SiafundOutputID]SiafundOutput
 	delayedSiacoinOutputs map[BlockHeight]map[SiacoinOutputID]SiacoinOutput
 
 	// Per convention, all exported functions in the consensus package can be
@@ -63,9 +63,9 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		badBlocks:             make(map[BlockID]struct{}),
 		blockMap:              make(map[BlockID]*blockNode),
 		currentPath:           make(map[BlockHeight]BlockID),
-		unspentSiacoinOutputs: make(map[SiacoinOutputID]SiacoinOutput),
-		openFileContracts:     make(map[FileContractID]FileContract),
-		unspentSiafundOutputs: make(map[SiafundOutputID]SiafundOutput),
+		siacoinOutputs:        make(map[SiacoinOutputID]SiacoinOutput),
+		fileContracts:         make(map[FileContractID]FileContract),
+		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 	}
 
@@ -83,11 +83,11 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Fill out the consensus informaiton for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
-	s.unspentSiacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
+	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:      CalculateCoinbase(0),
 		UnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
 	}
-	s.unspentSiafundOutputs[SiafundOutputID{0}] = SiafundOutput{
+	s.siafundOutputs[SiafundOutputID{0}] = SiafundOutput{
 		Value:           NewCurrency64(SiafundCount),
 		UnlockHash:      ZeroAddress, // TODO: change to Nebulous Genesis Siafund SpendHash Address
 		ClaimUnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis ClaimDestination Address

@@ -47,23 +47,23 @@ func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, forward bool) {
 	if add {
 		// Sanity check - output should not already exist.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[scod.ID]
+			_, exists := s.siacoinOutputs[scod.ID]
 			if exists {
 				panic("rogue new output in applyOutputDiff")
 			}
 		}
 
-		s.unspentSiacoinOutputs[scod.ID] = scod.SiacoinOutput
+		s.siacoinOutputs[scod.ID] = scod.SiacoinOutput
 	} else {
 		// Sanity check - output should exist.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[scod.ID]
+			_, exists := s.siacoinOutputs[scod.ID]
 			if !exists {
 				panic("rogue non-new output in applyOutputDiff")
 			}
 		}
 
-		delete(s.unspentSiacoinOutputs, scod.ID)
+		delete(s.siacoinOutputs, scod.ID)
 	}
 }
 
@@ -78,23 +78,23 @@ func (s *State) commitFileContractDiff(fcd FileContractDiff, forward bool) {
 	if add {
 		// Sanity check - contract should not already exist.
 		if DEBUG {
-			_, exists := s.openFileContracts[fcd.ID]
+			_, exists := s.fileContracts[fcd.ID]
 			if exists {
 				panic("rogue new contract in applyContractDiff")
 			}
 		}
 
-		s.openFileContracts[fcd.ID] = fcd.FileContract
+		s.fileContracts[fcd.ID] = fcd.FileContract
 	} else {
 		// Sanity check - contract should exist.
 		if DEBUG {
-			_, exists := s.openFileContracts[fcd.ID]
+			_, exists := s.fileContracts[fcd.ID]
 			if !exists {
 				panic("rogue non-new contract in applyContractDiff")
 			}
 		}
 
-		delete(s.openFileContracts, fcd.ID)
+		delete(s.fileContracts, fcd.ID)
 	}
 }
 
@@ -107,23 +107,23 @@ func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, forward bool) {
 	if add {
 		// Sanity check - output should not already exist.
 		if DEBUG {
-			_, exists := s.unspentSiafundOutputs[sfod.ID]
+			_, exists := s.siafundOutputs[sfod.ID]
 			if exists {
 				panic("rogue new output in applyOutputDiff")
 			}
 		}
 
-		s.unspentSiafundOutputs[sfod.ID] = sfod.SiafundOutput
+		s.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 	} else {
 		// Sanity check - output should exist.
 		if DEBUG {
-			_, exists := s.unspentSiafundOutputs[sfod.ID]
+			_, exists := s.siafundOutputs[sfod.ID]
 			if !exists {
 				panic("rogue non-new output in applyOutputDiff")
 			}
 		}
 
-		delete(s.unspentSiafundOutputs, sfod.ID)
+		delete(s.siafundOutputs, sfod.ID)
 	}
 }
 
@@ -169,27 +169,27 @@ func (s *State) applyDiffSet(bn *blockNode, direction bool) {
 			// Sanity check - the output should not already be in the
 			// unspentSiacoinOuptuts list.
 			if DEBUG {
-				_, exists := s.unspentSiacoinOutputs[id]
+				_, exists := s.siacoinOutputs[id]
 				if exists {
 					panic("trying to add a delayed output when the output is already there")
 				}
 			}
 
-			s.unspentSiacoinOutputs[id] = sco
+			s.siacoinOutputs[id] = sco
 		}
 	} else {
 		// Remove all of the delayed outputs that have come to maturity.
 		for id, _ := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
 			// Sanity check - the output should exist in the
-			// unspentSiacoinOutputs list.
+			// siacoinOutputs list.
 			if DEBUG {
-				_, exists := s.unspentSiacoinOutputs[id]
+				_, exists := s.siacoinOutputs[id]
 				if !exists {
 					panic("trying to remove a delayed output that doesn't exist")
 				}
 			}
 
-			delete(s.unspentSiacoinOutputs, id)
+			delete(s.siacoinOutputs, id)
 		}
 	}
 

@@ -50,7 +50,7 @@ func (s *State) height() BlockHeight {
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
 func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
-	sco, exists = s.unspentSiacoinOutputs[id]
+	sco, exists = s.siacoinOutputs[id]
 	return
 }
 
@@ -59,7 +59,7 @@ func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
 func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var unspentOutputStrings []string
-	for outputID := range s.unspentSiacoinOutputs {
+	for outputID := range s.siacoinOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
 	}
 	sort.Strings(unspentOutputStrings)
@@ -79,7 +79,7 @@ func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
 func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var idStrings []string
-	for outputID := range s.unspentSiafundOutputs {
+	for outputID := range s.siafundOutputs {
 		idStrings = append(idStrings, string(outputID[:]))
 	}
 	sort.Strings(idStrings)
@@ -90,7 +90,7 @@ func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
 		copy(outputID[:], idString)
 
 		// Sanity check - the output should exist.
-		output, exists := s.unspentSiafundOutputs[outputID]
+		output, exists := s.siafundOutputs[outputID]
 		if DEBUG {
 			if !exists {
 				panic("output doesn't exist")
@@ -140,7 +140,7 @@ func (s *State) stateHash() crypto.Hash {
 
 	// Sort the open contracts by the string value of their ID.
 	var openContractStrings []string
-	for contractID := range s.openFileContracts {
+	for contractID := range s.fileContracts {
 		openContractStrings = append(openContractStrings, string(contractID[:]))
 	}
 	sort.Strings(openContractStrings)
@@ -149,7 +149,7 @@ func (s *State) stateHash() crypto.Hash {
 	for _, stringContractID := range openContractStrings {
 		var contractID FileContractID
 		copy(contractID[:], stringContractID)
-		leaves = append(leaves, crypto.HashObject(s.openFileContracts[contractID]))
+		leaves = append(leaves, crypto.HashObject(s.fileContracts[contractID]))
 	}
 
 	// Get the set of siafund outputs in sorted order and add them.
@@ -224,7 +224,7 @@ func (s *State) Contract(id FileContractID) (fc FileContract, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	fc, exists = s.openFileContracts[id]
+	fc, exists = s.fileContracts[id]
 	if !exists {
 		return
 	}

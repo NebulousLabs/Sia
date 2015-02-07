@@ -37,7 +37,7 @@ func (t Transaction) followsStorageProofRules() bool {
 // consensus state. If not, an error is returned.
 func (s *State) validSiacoinInput(sci SiacoinInput) (sco SiacoinOutput, err error) {
 	// Check the input spends an existing and valid output.
-	sco, exists := s.unspentSiacoinOutputs[sci.ParentID]
+	sco, exists := s.siacoinOutputs[sci.ParentID]
 	if !exists {
 		err = ErrMissingSiacoinOutput
 		return
@@ -62,7 +62,7 @@ func (s *State) validSiacoinInput(sci SiacoinInput) (sco SiacoinOutput, err erro
 // consensus state. If not, an error is returned.
 func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err error) {
 	// Check the input spends an existing and valid output.
-	sfo, exists := s.unspentSiafundOutputs[sfi.ParentID]
+	sfo, exists := s.siafundOutputs[sfi.ParentID]
 	if !exists {
 		err = ErrMissingSiafundOutput
 		return
@@ -86,7 +86,7 @@ func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err erro
 func (s *State) validFileContractTermination(fct FileContractTermination) (err error) {
 	// Check that the FileContractTermination terminates an existing
 	// FileContract.
-	fc, exists := s.openFileContracts[fct.ParentID]
+	fc, exists := s.fileContracts[fct.ParentID]
 	if !exists {
 		err = ErrMissingFileContract
 		return
@@ -243,7 +243,7 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[sci.ParentID]
+			_, exists := s.siacoinOutputs[sci.ParentID]
 			if !exists {
 				panic("Applying a transaction with an invalid unspent output!")
 			}
@@ -252,10 +252,10 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 		scod := SiacoinOutputDiff{
 			New:           false,
 			ID:            sci.ParentID,
-			SiacoinOutput: s.unspentSiacoinOutputs[sci.ParentID],
+			SiacoinOutput: s.siacoinOutputs[sci.ParentID],
 		}
 		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
-		delete(s.unspentSiacoinOutputs, sci.ParentID)
+		delete(s.siacoinOutputs, sci.ParentID)
 	}
 }
 
@@ -266,7 +266,7 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[t.SiacoinOutputID(i)]
+			_, exists := s.siacoinOutputs[t.SiacoinOutputID(i)]
 			if exists {
 				panic("applying a  transaction with an invalid new output")
 			}
@@ -277,7 +277,7 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 			ID:            t.SiacoinOutputID(i),
 			SiacoinOutput: sco,
 		}
-		s.unspentSiacoinOutputs[t.SiacoinOutputID(i)] = sco
+		s.siacoinOutputs[t.SiacoinOutputID(i)] = sco
 		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
@@ -288,7 +288,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if DEBUG {
-			_, exists := s.unspentSiafundOutputs[sfi.ParentID]
+			_, exists := s.siafundOutputs[sfi.ParentID]
 			if !exists {
 				panic("applying a transaction with an invalid unspent siafund output")
 			}
@@ -296,7 +296,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 
 		// Calculate the volume of siacoins to put in the claim output.
 		claimPortion := s.siafundPool
-		sfo := s.unspentSiafundOutputs[sfi.ParentID]
+		sfo := s.siafundOutputs[sfi.ParentID]
 		err := claimPortion.Sub(sfo.ClaimStart)
 		if err != nil {
 			if DEBUG {
@@ -328,10 +328,10 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 		sfod := SiafundOutputDiff{
 			New:           false,
 			ID:            sfi.ParentID,
-			SiafundOutput: s.unspentSiafundOutputs[sfi.ParentID],
+			SiafundOutput: s.siafundOutputs[sfi.ParentID],
 		}
 		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
-		delete(s.unspentSiafundOutputs, sfi.ParentID)
+		delete(s.siafundOutputs, sfi.ParentID)
 	}
 }
 
@@ -348,7 +348,7 @@ func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
 			ID:            t.SiafundOutputID(i),
 			SiafundOutput: sfo,
 		}
-		s.unspentSiafundOutputs[t.SiafundOutputID(i)] = sfo
+		s.siafundOutputs[t.SiafundOutputID(i)] = sfo
 		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 	}
 }

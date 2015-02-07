@@ -8,7 +8,7 @@ import (
 )
 
 func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
-	contract, exists := s.openFileContracts[fcid]
+	contract, exists := s.fileContracts[fcid]
 	if !exists {
 		err = errors.New("unrecognized file contract id")
 		return
@@ -45,7 +45,7 @@ func (s *State) validContract(fc FileContract) error {
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
 func (s *State) validProof(sp StorageProof) error {
-	contract, exists := s.openFileContracts[sp.ParentID]
+	contract, exists := s.fileContracts[sp.ParentID]
 	if !exists {
 		return errors.New("unrecognized contract id in storage proof")
 	}
@@ -76,7 +76,7 @@ func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
 		// TODO: Sanity check.
 		// Apply the contract.
 		fcid := t.FileContractID(i)
-		s.openFileContracts[fcid] = fc
+		s.fileContracts[fcid] = fc
 
 		// Add the diff to the block node.
 		fcd := FileContractDiff{
@@ -92,7 +92,7 @@ func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
 func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
 	for _, fct := range t.FileContractTerminations {
 		// Delete the contract.
-		fc, exists := s.openFileContracts[fct.ParentID]
+		fc, exists := s.fileContracts[fct.ParentID]
 		// Sanity check - termination should be terminating an existing
 		// contract.
 		if !exists {
@@ -102,7 +102,7 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
 				return
 			}
 		}
-		delete(s.openFileContracts, fct.ParentID)
+		delete(s.fileContracts, fct.ParentID)
 
 		// Add the diff for the deletion to the block node.
 		fcd := FileContractDiff{
@@ -180,11 +180,11 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		}
 
 		// Get the id of the file contract and the siacoin output it creates.
-		fileContract := s.openFileContracts[sp.ParentID]
+		fileContract := s.fileContracts[sp.ParentID]
 		outputID := sp.ParentID.StorageProofOutputID(true)
 		// Sanity check - output should not already exist.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[outputID]
+			_, exists := s.siacoinOutputs[outputID]
 			if exists {
 				panic("storage proof output already exists")
 			}
@@ -204,7 +204,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		// Add the output to the list of delayed outputs, delete the
 		// contract from the state, and add the poolPortion to the siafundPool.
 		s.delayedSiacoinOutputs[s.height()][outputID] = sco
-		delete(s.openFileContracts, sp.ParentID)
+		delete(s.fileContracts, sp.ParentID)
 		err := s.siafundPool.Add(poolPortion)
 		if DEBUG {
 			if err != nil {
@@ -241,7 +241,7 @@ func (s *State) applyMissedProof(bn *blockNode, fc FileContract, fcid FileContra
 	// Update the state to include the storage proof output (which goes into
 	// the delayed set) and the siafund pool.
 	s.delayedSiacoinOutputs[s.height()][outputID] = sco
-	delete(s.openFileContracts, fcid)
+	delete(s.fileContracts, fcid)
 	err := s.siafundPool.Add(poolPortion)
 	if DEBUG {
 		if err != nil {
@@ -266,7 +266,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	// we need to store it and deleted once we're done iterating through the
 	// map.
 	var expiredContracts []FileContractID
-	for id, contract := range s.openFileContracts {
+	for id, contract := range s.fileContracts {
 		if s.height() == contract.End {
 			expiredContracts = append(expiredContracts, id)
 		}
@@ -274,7 +274,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 
 	// Delete all of the contracts that terminated.
 	for _, id := range expiredContracts {
-		contract := s.openFileContracts[id]
+		contract := s.fileContracts[id]
 		s.applyMissedProof(bn, contract, id)
 	}
 
