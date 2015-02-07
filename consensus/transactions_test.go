@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 
 // signedOutputTxn funds itself by mining a block, and then uses the funds to
 // create a signed output that is valid.
-func signedOutputTxn(t *testing.T, s *State, algorithm Identifier) (txn Transaction) {
+func signedOutputTxn(t *testing.T, s *State, algorithm Specifier) (txn Transaction) {
 	// Create the keys and a siacoin output that adds coins to the keys.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
@@ -146,7 +147,6 @@ func testUnsignedTransaction(t *testing.T, s *State) {
 	}
 }
 
-/*
 // TestForeignSignature creates a new state and uses it to call
 // testForeignSignature.
 func TestForeignSignature(t *testing.T) {

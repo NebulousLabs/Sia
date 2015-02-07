@@ -102,7 +102,7 @@ func (a *assistant) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and an incorrect payout. Compare the
 	// before and after state hashes to see that they match.
 	beforeHash := a.state.StateHash()
-	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height()), SpendHash: ZeroAddress}}
+	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height()), UnlockHash: ZeroAddress}}
 	block, err := a.mineCurrentBlock(payouts, nil)
 	if err != nil {
 		a.tester.Fatal(err)
@@ -118,7 +118,7 @@ func (a *assistant) testSingleNoFeePayout() {
 
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
-	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height() + 1), SpendHash: ZeroAddress}}
+	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height() + 1), UnlockHash: ZeroAddress}}
 	block, err = a.mineCurrentBlock(payouts, nil)
 	if err != nil {
 		a.tester.Fatal(err)
@@ -146,13 +146,13 @@ func (a *assistant) testSingleNoFeePayout() {
 // ways that someone might slip illegal payouts through.
 func testMinerPayouts(t *testing.T, s *State) {
 	// Create a block with multiple miner payouts.
-	var sc SpendConditions
+	var sc UnlockConditions
 	coinbasePayout := CalculateCoinbase(s.Height() + 1)
 	coinbasePayout.Sub(NewCurrency64(750))
 	payout := []SiacoinOutput{
-		SiacoinOutput{Value: coinbasePayout, SpendHash: sc.CoinAddress()},
-		SiacoinOutput{Value: NewCurrency64(250), SpendHash: sc.CoinAddress()},
-		SiacoinOutput{Value: NewCurrency64(500), SpendHash: sc.CoinAddress()},
+		SiacoinOutput{Value: coinbasePayout, UnlockHash: sc.UnlockHash()},
+		SiacoinOutput{Value: NewCurrency64(250), UnlockHash: sc.UnlockHash()},
+		SiacoinOutput{Value: NewCurrency64(500), UnlockHash: sc.UnlockHash()},
 	}
 	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, nil, s.CurrentTarget())
 	if err != nil {
@@ -181,7 +181,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	// Test legal multiple payouts when there are multiple miner fees.
 	txn1 := Transaction{
 		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{OutputID: output250},
+			SiacoinInput{ParentID: output250},
 		},
 		MinerFees: []Currency{
 			NewCurrency64(50),
@@ -191,7 +191,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 	txn2 := Transaction{
 		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{OutputID: output500},
+			SiacoinInput{ParentID: output500},
 		},
 		MinerFees: []Currency{
 			NewCurrency64(100),
@@ -203,8 +203,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 	coinbasePayout.Add(NewCurrency64(25))
 	payout = []SiacoinOutput{
 		SiacoinOutput{Value: coinbasePayout},
-		SiacoinOutput{Value: NewCurrency64(650), SpendHash: sc.CoinAddress()},
-		SiacoinOutput{Value: NewCurrency64(75), SpendHash: sc.CoinAddress()},
+		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},
+		SiacoinOutput{Value: NewCurrency64(75), UnlockHash: sc.UnlockHash()},
 	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {
@@ -233,7 +233,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	// Test too large multiple payouts when there are multiple miner fees.
 	txn1 = Transaction{
 		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{OutputID: output650},
+			SiacoinInput{ParentID: output650},
 		},
 		MinerFees: []Currency{
 			NewCurrency64(100),
@@ -243,7 +243,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 	}
 	txn2 = Transaction{
 		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{OutputID: output75},
+			SiacoinInput{ParentID: output75},
 		},
 		MinerFees: []Currency{
 			NewCurrency64(10),
@@ -255,8 +255,8 @@ func testMinerPayouts(t *testing.T, s *State) {
 	coinbasePayout.Add(NewCurrency64(25))
 	payout = []SiacoinOutput{
 		SiacoinOutput{Value: coinbasePayout},
-		SiacoinOutput{Value: NewCurrency64(650), SpendHash: sc.CoinAddress()},
-		SiacoinOutput{Value: NewCurrency64(75), SpendHash: sc.CoinAddress()},
+		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},
+		SiacoinOutput{Value: NewCurrency64(75), UnlockHash: sc.UnlockHash()},
 	}
 	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
 	if err != nil {

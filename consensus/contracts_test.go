@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"bytes"
 	"crypto/rand"

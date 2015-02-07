@@ -20,9 +20,9 @@ type assistant struct {
 	state  *State
 	tester *testing.T
 
-	spendConditions SpendConditions
-	coinAddress     CoinAddress
-	secretKey       crypto.SecretKey
+	unlockConditions UnlockConditions
+	unlockHash       UnlockHash
+	secretKey        crypto.SecretKey
 }
 
 // currentTime returns a Timestamp of the current time.
@@ -55,7 +55,7 @@ func newAssistant(t *testing.T, s *State) *assistant {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc := SpendConditions{
+	uc := UnlockConditions{
 		NumSignatures: 1,
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
@@ -65,11 +65,11 @@ func newAssistant(t *testing.T, s *State) *assistant {
 		},
 	}
 	return &assistant{
-		state:           s,
-		tester:          t,
-		spendConditions: sc,
-		coinAddress:     sc.CoinAddress(),
-		secretKey:       sk,
+		state:            s,
+		tester:           t,
+		unlockConditions: uc,
+		unlockHash:       uc.UnlockHash(),
+		secretKey:        sk,
 	}
 }
 
@@ -96,9 +96,9 @@ func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []Si
 		if err != nil {
 			a.tester.Fatal(err)
 		}
-		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), SpendHash: a.coinAddress})
+		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), UnlockHash: a.unlockHash})
 	}
-	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, SpendHash: a.coinAddress})
+	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, UnlockHash: a.unlockHash})
 
 	return
 }

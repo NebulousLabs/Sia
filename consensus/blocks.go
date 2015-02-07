@@ -13,7 +13,7 @@ var (
 	BadBlockErr       = errors.New("block is known to be invalid.")
 	BlockKnownErr     = errors.New("block exists in block map.")
 	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
-	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
+	FutureBlockErr    = errors.New("block timestamp too far in future")
 	OrphanErr         = errors.New("block has no known parent")
 	LargeBlockErr     = errors.New("block is too large to be accepted")
 	MinerPayoutErr    = errors.New("miner payout sum does not equal block subsidy")
@@ -103,7 +103,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
-	skew := b.Timestamp - Timestamp(time.Now().Unix())
+	skew := int(b.Timestamp) - int(Timestamp(time.Now().Unix()))
 	if skew > FutureThreshold {
 		return FutureBlockErr
 	}
