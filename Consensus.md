@@ -12,10 +12,6 @@ This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first
 principles.
 
-TODO: Write the formal specification for encoding things.
-
-TODO: Proofread and make sure that all terminology is correct.
-
 Cryptographic Algorithms
 ------------------------
 
@@ -45,8 +41,8 @@ threshold signatures.
   Alternative modes of blake2 have been considered, particularly blake2bp,
   blake2sp, and and tree mode variants. At this time, we are uncertain about
   all of the tradeoffs involved, and additionally uncertain about which
-  tradeoffs are worth making, therefore the typically default of blake2b has
-  been chosen.
+  tradeoffs are worth making, therefore the typical default of blake2b has been
+  chosen.
 
 #### Signatures: variable type signatures
 
@@ -74,7 +70,8 @@ threshold signatures.
 	to prove that the entropy buffers are invalid public keys.
   
   There are plans to also add ECDSA secp256k1 and Schnorr secp256k1. New
-  signing algorithms can be added to Sia through a soft fork.
+  signing algorithms can be added to Sia through a soft fork, because
+  unrecognized algorithm types are always considered to have valid signatures.
 
 Currency
 --------
@@ -82,15 +79,15 @@ Currency
 The Sia cryptosystem has two types of currency. The first is the Siacoin.
 Siacoins are generated every block and distributed to the miners. These miners
 can then use the siacoins to fund file contracts, or can send the siacoins to
-other parties (presumably in a trade for out-of-band goods and services, or
-simply other currencies.). The siacoin is represented by a 128 bit unsigned
-integer.
+other parties. The siacoin is represented by a 128 bit unsigned integer.
 
 The second currency in the Sia cryptosystem is the Siafund, which is a special
 asset limited to 10,000 indivisible units. Each time a file contract payout is
 made, 3.9% of the payout is put into the siafund pool. The number of siacoins
 in the siafund pool must always be divisible by 10,000; the number of coins
-taken from the payout is rounded down to the nearest 10,000.
+taken from the payout is rounded down to the nearest 10,000. The siafund is
+also represented by a 128 bit unsigned integer, even though only 16 bits of
+resolution are required.
 
 Siafund owners can collect the siacoins in the siafund pool. For every 10,000
 siacoins added to the siafund pool, a siafund owner can withdraw 1 siacoin.
@@ -100,6 +97,22 @@ owned by early backers of the Sia project.
 There are future plans to enable sidechain compatibility with Sia. This would
 allow other currencies such as Bitcoin to be spent in all the same places that
 the Siacoin can be spent.
+
+Marshalling
+-----------
+
+Many of the Sia types need to be hashed at some point, which requires having a
+consistent algorithm for marshalling types into a set of bytes that can be
+hashed. The following rules are used for hashing:
+
+ - Integers are little-endian, and are always encoded as 8 bytes.
+ - Bools are encoded as one byte, where zero is false and one is true.
+ - Variable length types such as strings are prefaced by 8 bytes containing
+   their length.
+ - Arrays and structs are encoded as their individual elements concatenated
+   together. The ordering of the struct is determined by the struct definition.
+   There is only one way to encode each type.
+ - The Currency type is encoded as a 16 byte unsigned integer.
 
 Block Size
 ----------
@@ -132,8 +145,8 @@ Block Target
 
 For a block to be valid, the id of the block must be below a certain target.  A
 new target is set every block by by comparing the timestamp of the current
-block with the timestamp of the block added 2000 blocks prior. The expected
-difference in time is 20,000 minutes. If less time has passed, the target is
+block with the timestamp of the block added 1000 blocks prior. The expected
+difference in time is 10,000 minutes. If less time has passed, the target is
 lowered. If more time has passed, the target is increased.
 
 The target is changed in proportion to the difference in time (If the time was
@@ -145,47 +158,46 @@ The new target is calculated using (expected time passed in seconds) / (actual
 time passed in seconds) * (current target). The division and multiplication
 should be done using infinite precision, and the result should be truncated.
 
-If there are not 2000 blocks, the genesis timestamp is used for comparison.
+If there are not 1000 blocks, the genesis timestamp is used for comparison.
 The expected time is (10 minutes * block height).
 
 The difficulty clamp means that the target can shift by at most 7.5x in 2016
 blocks, which can be compared to the 4x clamp of Bitcoin. The amount of work
 required to quadruple the difficulty in Sia is 3000x the starting difficulty,
-which can be compared to 2016x for Bitcoin. The amount of work required to 16x
+which can be compared to 2000x for Bitcoin. The amount of work required to 16x
 the difficulty in Sia is 15,000x the original difficulty, which can be compared
 to 10,000x for Bitcoin.
 
 Block Subsidy
 -------------
 
-The coinbase for a block is (300,000 - (height)) * 2^80, with a minimum of
-30,000 * 2^80. Any miner fees get added to the coinbase, which creates the
-block subsidy. The block subsidy is then given to multiple outputs, called the
-miner payouts. The total value of the miner payouts must equal the block
-subsidy.  Having multiple outputs allows the block reward to be sent to
-multiple people, enabling systems like p2pool.
+The coinbase for a block is (300,000 - height) * 2^80, with a minimum of 30,000
+* 2^80. Any miner fees get added to the coinbase to create the block subsidy.
+The block subsidy is then given to multiple outputs, called the miner payouts.
+The total value of the miner payouts must equal the block subsidy. Having
+multiple outputs allows the block reward to be sent to multiple people,
+enabling systems like p2pool.
 
 The ids of the outputs created by the miner payouts is determined by taking the
 block id and concatenating the index of the payout that the output corresponds
 to.
 
-The outputs created by the block subsidy cannot be spent for 100 blocks, and
-are not considered a part of the utxo set until 100 blocks have transpired.
-This limitation is in place because a simple reorg is enough to invalidate the
-output; double spend attacks and false spend attacks are much easier.
+The outputs created by the block subsidy cannot be spent for 50 blocks, and are
+not considered a part of the consensus set until 50 blocks have transpired.
+This limitation is in place because a simple blockchain reorganization is
+enough to invalidate the output; double spend attacks and false spend attacks
+are much easier to execute.
 
 Transactions
 ------------
 
-A Transaction is composed of a set of inputs, miner fees, outputs, file
-contracts, storage proofs, arbitrary data, and signatures. The sum of the
-inputs must equal the sum of the miner fees, outputs, and contract payouts.
-
 A Transaction is composed of the following:
+
 - Siacoin Inputs
 - Miner Fees
 - Siacoin Outputs
 - File Contracts
+- File Contract Terminations
 - Storage Proofs
 - Siafund Inputs
 - Siafund Outputs
@@ -193,56 +205,54 @@ A Transaction is composed of the following:
 - Signatures
 
 The sum of all the siacoin inputs must equal the sum of all the miner fees,
-siacoin outputs, and contract payouts. There can be no leftovers.
+siacoin outputs, and contract payouts. There can be no leftovers. The sum of
+all siafund inputs must equal the sum of all siafund outputs.
 
-The sum of all siafund inputs must equal the sum of all siafund outputs.
+Several objects have unlock hashes. An unlock hash is the Merkle root of the
+'unlock conditions' object. The unlock conditions contain a timelock, a number
+of required signatures, and a set of public keys that can be used during
+signing.
+
+The Merkle root of the unlock condition objects is formed by taking the Merkle
+root of a tree whose leaves are the timelock, the public keys (one leaf per
+key), and the number of signatures. This ordering is chosen specifically
+because the timelock and the number of signatures are low entropy. By using
+random data as the first and last public key, you can make it safe to reveal
+any of the public keys without revealing the low entropy items.
+
+The unlock conditions cannot be satisfied until enough signatures have
+provided, and until the height of the blockchain is at least equal to the value
+of the timelock.
+
+The unlock conditions contains a set of public keys which can each be used only
+once when providing signatures. The same public key can be listed twice, which
+means that it can be used twice. The number of required signatures indicates
+how many public keys must be used to validate the input. If required signatures
+is '0', the input is effectively 'anyone can spend'. If the required signature
+count is greater than the number of public keys, the input is unspendable.
+There must be exactly enough signatures. For example, if there are 3 public
+keys and only two required signatures, then only two signatures can be included
+into the transaction.
 
 Siacoin Inputs
 --------------
 
-Each input spends an output. The output being spent must already exist in the
-state. An output has a value, and a spend hash (or address), which relates to
-the 'spend conditions' object of the output. The spend conditions contain a
-timelock, a number of required signatures, and a set of public keys that can be
-used during signing. The input is invalid if hash of the spend conditions do
-not match the spend hash of the output being spent.
-
-The spend hash is derived by getting the merkle root of a tree whose leaves are
-the hashes of the timelock, the public keys (one leaf per key), and the number
-of signatures. This ordering is chosen specifically because the timelock and
-the number of signatures are low entropy. By using random data as the first and
-last public key, you can make it safe to reveal any of the public keys without
-revealing the low entropy items.
-
-The timelock is a block height, and for the input to be valid, the current
-height of the blockchain must be at least the height stated in the timelock.
-
-There is a list of public keys which can each be used at most once when signing
-a transaction. The same public key can be listed twice, which means that it can
-be used twice. The number of required signatures indicates how many public keys
-must be used to validate the input. If required signatures is '0', the input is
-effectively 'anyone can spend'. If the required signature count is greater than
-the number of public keys, the input is unspendable.
-
-An input must have exactly the right number of signatures. Extra signatures are
-not allowed.
+Each input spends an output. The output being spent must exist in the consensus
+set. The 'value' field of the output indicates how many siacoins must be used
+in the outputs of the transaction. Valid outputs are miner fees, siacoin
+outputs, and contract payouts.
 
 Miner Fees
 ----------
 
-A miner fee is an output that gets added directly to the block subsidy.
+A miner fee is a volume of siacoins that get added to the block subsidy.
 
 Siacoin Outputs
 ---------------
 
-Outputs contain a value and a spend hash (also called a coin address). The
-spend hash is a hash of the spend conditions that must be met to spend the
-output.
-
-The id of a contract is determined by marhsalling an identifier with the string
-"siacoin output" and appending that to the marshalling of the transaction
-(excluding the signatures). This is easiest understood by looking at the
-function 'OutputID' in consensus/types.go
+Siacoin outputs contain a value and an unlock hash (also called a coin
+address). The unlock hash is the Merkle root of the spend conditions that must
+be met to spend the output.
 
 File Contracts
 --------------
@@ -255,40 +265,44 @@ The Merkle root is formed by breaking the file into 64 byte segments and
 hashing each segment to form the leaves of the Merkle tree. The final segment
 is not padded out.
 
-The storage proof must be submitted between the 'Start' and 'End' fields of the
-contract. There is a 'Payout', which indicates how many coins are given out
-when the storage proof is provided. If the storage proof is provides, the
-payout goes to 'ValidProofAddress'. If no proof is submitted by block height
-'End', then the payout goes to 'MissedProofAddress'.
+The storage proof must be submitted between the 'start' and 'end' fields of the
+contract. There is a 'payout', which indicates how many siacoins are given out
+when the storage proof is provided. 3.9% of this payout (rounded down to the
+nearest 10,000) is put aside for the owners of siafunds. If the storage proof
+is provided and is valid, the remaining payout is put in an output spendable by
+the 'valid proof spend hash', and if a valid storage proof is not provided to
+the blockchain by 'end', the remaining payout is put in an output spendable by
+the 'missed proof spend hash'.
 
-All contracts must have a non-zero payout, 'Start' must be before 'End', and
-'Start' must be greater than the current height of the state. A storage proof
-is acceptible if it is submitted in the block of height 'End'.
+All contracts must have a non-zero payout, 'start' must be before 'end', and
+'start' must be greater than the current height of the blockchain. A storage
+proof is acceptible if it is submitted in the block of height 'end'.
 
-The id of a contract is determined by marhsalling an identifier with the string
-"file contract" and appending that to the marshalling of the transaction
-(excluding the signatures). This is easiest understood by looking at the
-function 'FileContractID' in consensus/types.go
-
-TODO TODO TODO: Explain file contract terminations, and the unlockHash of the file
-contracts.
+File contracts are created with a 'Termination Hash', which is the Merkle root
+of an unlock conditions object. A 'file contract termination' can be submitted
+which fulfills the unlock conditions object, resulting in the contract payout
+being distributed according to the fields of the termination object, as opposed
+to being distributed according to whether a valid storage proof was submitted
+or not. This provides flexibility to edit an resubmit file contracts.
 
 File Contract Terminations
 --------------------------
 
-TODO TODO TODO
+A file contract termination voids a file contract, recovering the payout and
+distributing it to a set of siacoin outputs that are specified in the
+termination. The sum of the termination payouts must equal the value of the
+original contract payout.
 
 Storage Proofs
 --------------
 
-A storage proof transaction is any transaction containing a storage proof. 
-
+A storage proof transaction is any transaction containing a storage proof.
 Storage proof transactions are not allowed to have siacoin or siafund outputs,
 and are not allowed to have file contracts.
 
 When creating a storage proof, you only prove that you have a single 64 byte
 segment of the file. The piece that you must prove you have is chosen
-psuedorandomly using the contract id and the id of the 'trigger block'.  The
+randomly using the contract id and the id of the 'trigger block'.  The
 trigger block is the block at height 'Start' - 1, where 'Start' is the value
 'Start' in the contract that the storage proof is fulfilling.
 
@@ -305,13 +319,9 @@ hashes required to fill out the remaining tree. The total size of the proof
 will be 64 bytes + 32 bytes * log(num segments), and can be verified by anybody
 who knows the root hash and the file size.
 
-The id for a storage proof output is found by taking the id of the contract and
-concatenating a bool set to 'true' if the proof was submitted and valid, and
-set to 'false' if a valid proof was not submitted by the end of the contract.
-
 Storage proof transactions are not allowed to have siacoin outputs, siafund
 outputs, or contracts. All outputs created by the storage proofs cannot be
-spent for 100 blocks.
+spent for 50 blocks.
 
 These limits are in place because a simple blockchain reorganization can change
 the trigger block, which will invalidate the storage proof and therefore the
@@ -322,20 +332,20 @@ Siafund Inputs
 --------------
 
 A siafund input works similar to a siacoin input. It contains the id of a
-siafund output being spent, and the spend conditions required to spend the
-output. These spend conditions must be signed.
+siafund output being spent, and the unlock conditions required to spend the
+output.
 
-A special output is created when a siafund is used as input. All of the
+A special output is created when a siafund output is used as input. All of the
 siacoins that have accrued in the siafund since its last spend are sent to the
-'Claim Destination' found in the siafund output, which is a normal siacoin
-address. The number of accrued siacoins is counted by taking the size of the
-siacoin pool when the output was created and comparing it to the current size
-of the siacoin pool. The equation is:
+'claim spend hash' found in the siafund output, which is a normal siacoin
+address. The value of the siacoin output is determined by taking the size of
+the siacoin pool when the output was created and comparing it to the current
+size of the siacoin pool. The equation is:
 
 	((Current Pool Size - Previous Pool Size) / 10,000) * siafund quantity
 
 Like the miner outputs and the storage proof outputs, the siafund output cannot
-be spent for 100 blocks because the value of the output can change if the
+be spent for 50 blocks because the value of the output can change if the
 blockchain reorganizes. Reorganizations will not however cause the transaction
 to be invalidated, so the ban on contracts and outputs does not need to be in
 place.
@@ -343,24 +353,17 @@ place.
 Siafund Outputs
 ---------------
 
-Sia outputs contain:
-- A Value, which is the quanity of siafunds controlled by the output.
-- A Spend Hash, which is the hash of the spend conditions required to spend the
-  siafund output.
-- A Claim Destination, which is a siacoin address to which siacoins will be
-  sent when the siafund output is spent.
-- A Claim Start, which indicates how many siacoins were in the siafund pool at
-  the moment the siafund output got created. This is used when the output is
-  spent to determine how many siacoins go to the new output. This field is set
-  internally by consensus, and should not be encoded into blocks.
+Like siacoin outputs, siafund outputs contain a value and an unlock hash. The
+value indicates the number of siafunds that are put into the output, and the
+unlock hash is the Merkle root of the unlock conditions object which allows the
+output to be spent.
 
-The id of a contract is determined by marhsalling an identifier with the string
-"siafund output" and appending that to the marshalling of the transaction
-(excluding the signatures). This is easiest understood by looking at the
-function 'SiafundOutputID' in consensus/types.go
-
-The id of the siacoin output that gets created when the siafund output is spent
-(the claim id) is derived by hashing the id of the siafund output.
+Siafund outputs also contain a claim unlock hash field, which indiactes the
+unlock hash of the siacoin output that is created when the siafund output is
+spent. The value of the output that gets created will depend on the growth of
+the siacoin pool between the creation and the spending of the output. This
+growth is measured by storing a 'claim start', which indicates the size of the
+siafund pool at the moment the siafund output was created.
 
 Arbitrary Data
 --------------
@@ -368,19 +371,19 @@ Arbitrary Data
 Arbitrary data is a set of data that is ignored by consensus. In the future, it
 may be used for soft forks, paired with 'anyone can spend' transactions. In the
 meantime, it is an easy way for third party applications to make use of the
-siacoin blockchain. Bloat and spam is combatted using fee requirements.
+siacoin blockchain.
 
 Signatures
 ----------
 
-Each signature points to a single public key index in a single input. No two
-signatures can point to the same public key index for the same input. The
-signature can point to either a siacoin input or a siafund input.
+Each signature points to a single public key index in a single unlock
+conditions object. No two signatures can point to the same public key index for
+the same set of unlock conditions.
 
 Each signature also contains a timelock, and is not valid until the blockchain
 has reached a height equal to the timelock height.
 
-Signatures also have a 'Covered Fields' struct, which indicates which parts of
+Signatures also have a 'covered fields' object, which indicates which parts of
 the transaction get included in the signature. There is a 'whole transaction'
 flag, which indicates that every part of the transaction except for the
 signatures gets included, which eliminates any malleability outside of the
@@ -391,9 +394,10 @@ If the 'whole transaction' is not set, all fields need to be added manually,
 and additional parties can add new fields, meaning the transaction will be
 malleable. This does however allow other parites to add additional inputs,
 fees, etc. after you have signed the transaction without invalidating your
-signature.
+signature. If the whole transaction flag is set, all other elements in the
+covered fields object must be empty except for the siagnatures field.
 
-The 'Covered Fields' struct contains a slice of indexes for each element of the
+The covered fields object contains a slice of indexes for each element of the
 transaction (siacoin inputs, miner fees, etc.). The slice must be sorted, and
 there can be no repeated elements.
 
@@ -408,7 +412,7 @@ Consensus Set
 The blockchain is used to achieve consensus around 3 objects. The first is
 unspent financial outputs. The second is unfulfilled storage contracts. The
 third is siafund ownership and claims. All transaction componenets have some
-effect on the three sets of information.
+effect on this set of information.
 
 Genesis Set
 -----------
