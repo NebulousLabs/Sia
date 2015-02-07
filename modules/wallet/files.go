@@ -11,7 +11,7 @@ import (
 
 // Key is how we serialize and store spendable addresses on disk.
 type Key struct {
-	SpendConditions consensus.SpendConditions
+	SpendConditions consensus.UnlockConditions
 	SecretKey       crypto.SecretKey
 }
 

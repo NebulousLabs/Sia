@@ -76,14 +76,14 @@ func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 		for _, input := range txn.SiacoinInputs {
 			scod := consensus.SiacoinOutputDiff{
 				New: false,
-				ID:  input.OutputID,
+				ID:  input.ParentID,
 			}
 
 			// Get the output from tpool if it's a new output, and from the
 			// state if it already existed.
-			output, exists := tp.outputs[input.OutputID]
+			output, exists := tp.outputs[input.ParentID]
 			if !exists {
-				output, exists = tp.state.Output(input.OutputID)
+				output, exists = tp.state.Output(input.ParentID)
 				if consensus.DEBUG {
 					if !exists {
 						panic("output in tpool txn that's neither in the state or in the tpool")

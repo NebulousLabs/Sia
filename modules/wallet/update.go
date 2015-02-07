@@ -15,7 +15,7 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, adding bool) {
 	}
 
 	// See if the output in the diff is known to the wallet.
-	key, exists := w.keys[scod.SiacoinOutput.SpendHash]
+	key, exists := w.keys[scod.SiacoinOutput.UnlockHash]
 	if !exists {
 		return
 	}

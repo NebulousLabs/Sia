@@ -8,14 +8,14 @@ import (
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.UnlockHash, spendConditions consensus.UnlockConditions, err error) {
 	// Create the address + spend conditions.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
-	spendConditions = consensus.SpendConditions{
-		TimeLock:      unlockHeight,
+	spendConditions = consensus.UnlockConditions{
+		Timelock:      unlockHeight,
 		NumSignatures: 1,
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
@@ -24,10 +24,10 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 			},
 		},
 	}
-	coinAddress = spendConditions.CoinAddress()
+	coinAddress = spendConditions.UnlockHash()
 
 	// Create a spendableAddress for the keys and add it to the
-	// timelockedSpendableAddresses map. If the address has already been
+	// timelockedUnlockableAddresses map. If the address has already been
 	// unlocked, also add it to the list of currently spendable addresses. It
 	// needs to go in both though in case there is a reorganization of the
 	// blockchain.
@@ -35,7 +35,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 		spendConditions: spendConditions,
 		secretKey:       sk,
 
-		outputs: make(map[consensus.OutputID]*knownOutput),
+		outputs: make(map[consensus.SiacoinOutputID]*knownOutput),
 	}
 	if unlockHeight <= w.state.Height() {
 		newKey.spendable = true
@@ -58,13 +58,13 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 }
 
 // coinAddress returns a new address for receiving coins.
-func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+func (w *Wallet) coinAddress() (coinAddress consensus.UnlockHash, spendConditions consensus.UnlockConditions, err error) {
 	// Create the keys and address.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
-	spendConditions = consensus.SpendConditions{
+	spendConditions = consensus.UnlockConditions{
 		NumSignatures: 1,
 		PublicKeys: []consensus.SiaPublicKey{
 			consensus.SiaPublicKey{
@@ -73,7 +73,7 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 			},
 		},
 	}
-	coinAddress = spendConditions.CoinAddress()
+	coinAddress = spendConditions.UnlockHash()
 
 	// Add the address to the set of spendable addresses.
 	newKey := &key{
@@ -81,7 +81,7 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 		spendConditions: spendConditions,
 		secretKey:       sk,
 
-		outputs: make(map[consensus.OutputID]*knownOutput),
+		outputs: make(map[consensus.SiacoinOutputID]*knownOutput),
 	}
 	w.keys[coinAddress] = newKey
 
@@ -96,14 +96,14 @@ func (w *Wallet) coinAddress() (coinAddress consensus.CoinAddress, spendConditio
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+func (w *Wallet) TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.UnlockHash, spendConditions consensus.UnlockConditions, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.timelockedCoinAddress(unlockHeight)
 }
 
 // CoinAddress implements the core.Wallet interface.
-func (w *Wallet) CoinAddress() (coinAddress consensus.CoinAddress, spendConditions consensus.SpendConditions, err error) {
+func (w *Wallet) CoinAddress() (coinAddress consensus.UnlockHash, spendConditions consensus.UnlockConditions, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.coinAddress()

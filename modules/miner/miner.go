@@ -18,7 +18,7 @@ type Miner struct {
 	transactions      []consensus.Transaction
 	target            consensus.Target
 	earliestTimestamp consensus.Timestamp
-	address           consensus.CoinAddress
+	address           consensus.UnlockHash
 
 	threads              int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads       int // 0 if not mining.

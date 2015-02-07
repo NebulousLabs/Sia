@@ -34,8 +34,8 @@ func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, f
 		return
 	}
 	output := consensus.SiacoinOutput{
-		Value:     freezeVolume,
-		SpendHash: spendHash,
+		Value:      freezeVolume,
+		UnlockHash: spendHash,
 	}
 	freezeIndex, err := h.wallet.AddOutput(id, output)
 	if err != nil {

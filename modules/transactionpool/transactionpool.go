@@ -40,15 +40,15 @@ type TransactionPool struct {
 	// Outputs contains a list of outputs that have been created by unconfirmed
 	// transactions. This list will not include outputs created by storage
 	// proofs.
-	outputs map[consensus.OutputID]consensus.SiacoinOutput
+	outputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
 
 	// newOutputs is a mapping from an OutputID to the unconfirmed transaction
 	// that created the output. usedOutputs is a mapping to the unconfirmed
 	// transaction that used the output. These mappings are useful for
 	// determining dependencies and properly reorganizing the transaction pool
 	// in the even that a double spend makes it into the blockchain.
-	newOutputs  map[consensus.OutputID]*unconfirmedTransaction
-	usedOutputs map[consensus.OutputID]*unconfirmedTransaction
+	newOutputs  map[consensus.SiacoinOutputID]*unconfirmedTransaction
+	usedOutputs map[consensus.SiacoinOutputID]*unconfirmedTransaction
 
 	// storageProofs is a list of transactions that contain storage proofs
 	// sorted by the height of the highest start point of a storage proof. This
@@ -70,10 +70,10 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 		state:       state,
 		recentBlock: state.CurrentBlock().ID(),
 
-		outputs: make(map[consensus.OutputID]consensus.SiacoinOutput),
+		outputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
 
-		newOutputs:  make(map[consensus.OutputID]*unconfirmedTransaction),
-		usedOutputs: make(map[consensus.OutputID]*unconfirmedTransaction),
+		newOutputs:  make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
+		usedOutputs: make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
 
 		storageProofs: make(map[consensus.BlockHeight]map[crypto.Hash]consensus.Transaction),
 	}

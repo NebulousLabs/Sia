@@ -21,7 +21,7 @@ func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction
 	var greatestHeight consensus.BlockHeight
 	for _, sp := range t.StorageProofs {
 		var contract consensus.FileContract
-		_, exists := tp.state.Contract(sp.FileContractID)
+		_, exists := tp.state.Contract(sp.ParentID)
 		if !exists {
 			err = errors.New("storage proof is for a nonexistant contract")
 			return
@@ -65,13 +65,13 @@ func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transa
 			}
 
 			for _, proof := range txn.StorageProofs {
-				_, exists := contractsSatisfied[proof.FileContractID]
+				_, exists := contractsSatisfied[proof.ParentID]
 				if exists {
 					continue TxnLoop
 				}
 			}
 			for _, proof := range txn.StorageProofs {
-				contractsSatisfied[proof.FileContractID] = struct{}{}
+				contractsSatisfied[proof.ParentID] = struct{}{}
 			}
 
 			// Check for size requirements.

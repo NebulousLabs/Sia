@@ -26,7 +26,7 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
-	var dest consensus.CoinAddress
+	var dest consensus.UnlockHash
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		http.Error(w, "Malformed amount", 400)

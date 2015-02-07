@@ -98,10 +98,10 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.Payout.Cmp(payout) != 0:
 		return errors.New("bad Payout")
 
-	case contract.ValidProofAddress != terms.ValidProofAddress:
+	case contract.ValidProofUnlockHash != terms.ValidProofAddress:
 		return errors.New("bad ValidProofAddress")
 
-	case contract.MissedProofAddress != terms.MissedProofAddress:
+	case contract.MissedProofUnlockHash != terms.MissedProofAddress:
 		return errors.New("bad MissedProofAddress")
 
 	case contract.FileMerkleRoot != merkleRoot:

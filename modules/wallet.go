@@ -22,10 +22,10 @@ type Wallet interface {
 	Balance(full bool) *big.Int
 
 	// CoinAddress return an address into which coins can be paid.
-	CoinAddress() (consensus.CoinAddress, consensus.SpendConditions, error)
+	CoinAddress() (consensus.UnlockHash, consensus.UnlockConditions, error)
 
 	// TimelockedCoinAddress returns an address that can only be spent after block `unlockHeight`.
-	TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (consensus.CoinAddress, consensus.SpendConditions, error)
+	TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (consensus.UnlockHash, consensus.UnlockConditions, error)
 
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to

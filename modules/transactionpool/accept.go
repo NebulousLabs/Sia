@@ -13,22 +13,22 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 	for _, input := range t.SiacoinInputs {
 		// Check that this output has not already been spent by an unconfirmed
 		// transaction.
-		_, exists := tp.outputs[input.OutputID]
+		_, exists := tp.outputs[input.ParentID]
 		if exists {
 			err = errors.New("transaction contains a double-spend")
 			return
 		}
 
 		// See if the output is in the confirmed set.
-		output, exists := tp.state.Output(input.OutputID)
+		output, exists := tp.state.Output(input.ParentID)
 		if exists {
 			// Check that the spend conditions of the input match the spend
 			// hash of the output, and that the timelock has expired.
-			if input.SpendConditions.CoinAddress() != output.SpendHash {
+			if input.UnlockConditions.UnlockHash() != output.UnlockHash {
 				err = errors.New("invalid input in transaction")
 				return
 			}
-			if input.SpendConditions.TimeLock > tp.state.Height() {
+			if input.UnlockConditions.Timelock > tp.state.Height() {
 				err = errors.New("invalid input")
 				return
 			}
@@ -41,15 +41,15 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 		}
 
 		// See if the output is in the unconfirmed set.
-		output, exists = tp.outputs[input.OutputID]
+		output, exists = tp.outputs[input.ParentID]
 		if exists {
 			// Check that the spend conditions of the input match the spend
 			// hash of the output, and that the timelock has expired.
-			if input.SpendConditions.CoinAddress() != output.SpendHash {
+			if input.UnlockConditions.UnlockHash() != output.UnlockHash {
 				err = errors.New("invalid input in transaction")
 				return
 			}
-			if input.SpendConditions.TimeLock > tp.state.Height() {
+			if input.UnlockConditions.Timelock > tp.state.Height() {
 				err = errors.New("invalid input")
 				return
 			}
@@ -124,18 +124,18 @@ func (tp *TransactionPool) addTransaction(t consensus.Transaction) {
 		// Sanity check - this input should not already be in the usedOutputs
 		// list.
 		if consensus.DEBUG {
-			_, exists := tp.usedOutputs[input.OutputID]
+			_, exists := tp.usedOutputs[input.ParentID]
 			if exists {
 				panic("addTransaction called on invalid transaction")
 			}
 		}
 
-		unconfirmedTxn, exists := tp.newOutputs[input.OutputID]
+		unconfirmedTxn, exists := tp.newOutputs[input.ParentID]
 		if exists {
 			unconfirmedTxn.dependents[ut] = struct{}{}
 			ut.requirements[unconfirmedTxn] = struct{}{}
 		}
-		tp.usedOutputs[input.OutputID] = ut
+		tp.usedOutputs[input.ParentID] = ut
 	}
 
 	// Add each new output to the list of outputs and newOutputs.

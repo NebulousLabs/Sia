@@ -25,12 +25,12 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	// Fill out the contract according to the whims of the host.
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
 	contract := consensus.FileContract{
-		FileMerkleRoot:     merkleRoot,
-		FileSize:           terms.FileSize,
-		Start:              terms.StartHeight,
-		End:                terms.StartHeight + duration,
-		ValidProofAddress:  host.CoinAddress,
-		MissedProofAddress: consensus.ZeroAddress, // The empty address is the burn address.
+		FileMerkleRoot:        merkleRoot,
+		FileSize:              terms.FileSize,
+		Start:                 terms.StartHeight,
+		End:                   terms.StartHeight + duration,
+		ValidProofUnlockHash:  host.CoinAddress,
+		MissedProofUnlockHash: consensus.ZeroAddress, // The empty address is the burn address.
 	}
 
 	fund := host.Price

@@ -10,7 +10,7 @@ type MinerInfo struct {
 	State          string
 	Threads        int
 	RunningThreads int
-	Address        consensus.CoinAddress
+	Address        consensus.UnlockHash
 }
 
 // Info() returns a MinerInfo struct which can be converted to JSON to be
