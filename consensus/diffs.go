@@ -162,37 +162,6 @@ func (s *State) applyDiffSet(bn *blockNode, direction bool) {
 		delete(s.delayedSiacoinOutputs, bn.height)
 	}
 
-	// Manage the delayed outputs that have come to maturity.
-	if direction {
-		// Add all of the delayed outputs that have come to maturity.
-		for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
-			// Sanity check - the output should not already be in the
-			// unspentSiacoinOuptuts list.
-			if DEBUG {
-				_, exists := s.siacoinOutputs[id]
-				if exists {
-					panic("trying to add a delayed output when the output is already there")
-				}
-			}
-
-			s.siacoinOutputs[id] = sco
-		}
-	} else {
-		// Remove all of the delayed outputs that have come to maturity.
-		for id, _ := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
-			// Sanity check - the output should exist in the
-			// siacoinOutputs list.
-			if DEBUG {
-				_, exists := s.siacoinOutputs[id]
-				if !exists {
-					panic("trying to remove a delayed output that doesn't exist")
-				}
-			}
-
-			delete(s.siacoinOutputs, id)
-		}
-	}
-
 	// Update the current path and currentBlockID
 	if direction {
 		s.currentBlockID = bn.block.ID()

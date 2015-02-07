@@ -97,7 +97,23 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 // have matured and adds them to the list of siacoinOutputs.
 func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
+		// Sanity check - the output should not already be in the
+		// siacoinOuptuts list.
+		if DEBUG {
+			_, exists := s.siacoinOutputs[id]
+			if exists {
+				panic("trying to add a delayed output when the output is already there")
+			}
+		}
 		s.siacoinOutputs[id] = sco
+
+		// Create and add the diff.
+		scod := SiacoinOutputDiff{
+			New:           true,
+			ID:            id,
+			SiacoinOutput: sco,
+		}
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
 
