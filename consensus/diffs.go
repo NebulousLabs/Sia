@@ -15,7 +15,7 @@ package consensus
 // the block was applied.
 type SiacoinOutputDiff struct {
 	New           bool
-	ID            OutputID
+	ID            SiacoinOutputID
 	SiacoinOutput SiacoinOutput
 }
 
@@ -27,7 +27,7 @@ type FileContractDiff struct {
 
 type SiafundOutputDiff struct {
 	New           bool
-	ID            OutputID
+	ID            SiafundOutputID
 	SiafundOutput SiafundOutput
 }
 

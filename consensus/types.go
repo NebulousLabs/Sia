@@ -316,13 +316,13 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 // number of signatures.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
 	leaves := []crypto.Hash{
-		crypto.HashObject(sc.Timelock),
+		crypto.HashObject(uc.Timelock),
 	}
-	for i := range sc.PublicKeys {
-		leaves = append(leaves, crypto.HashObject(sc.PublicKeys[i]))
+	for i := range uc.PublicKeys {
+		leaves = append(leaves, crypto.HashObject(uc.PublicKeys[i]))
 	}
-	leaves = append(leaves, crypto.HashObject(sc.NumSignatures))
-	return CoinAddress(crypto.MerkleRoot(leaves))
+	leaves = append(leaves, crypto.HashObject(uc.NumSignatures))
+	return UnlockHash(crypto.MerkleRoot(leaves))
 }
 
 // ID returns the id of a block, which is calculated by concatenating the
@@ -355,8 +355,8 @@ func (b Block) MerkleRoot() crypto.Hash {
 // MinerPayoutID returns the ID of the miner payout at the given index, which
 // is derived by appending the index of the miner payout to the id of the
 // block.
-func (b Block) MinerPayoutID(i int) OutputID {
-	return OutputID(crypto.HashAll(
+func (b Block) MinerPayoutID(i int) SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashAll(
 		b.ID(),
 		i,
 	))
@@ -366,8 +366,8 @@ func (b Block) MinerPayoutID(i int) OutputID {
 // output. The id is derived by taking SpecifierSiacoinOutput, appending all of
 // the fields in the transaction except the signatures, and then appending the
 // index of the SiacoinOutput in the transaction and taking the hash.
-func (t Transaction) SiacoinOutputID(i int) OutputID {
-	return OutputID(crypto.HashAll(
+func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashAll(
 		SpecifierSiacoinOutput,
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
@@ -407,8 +407,8 @@ func (t Transaction) FileContractID(i int) FileContractID {
 // is derived by taking SpecifierFileContractTerminationPayout, appending the
 // id of the file contract that is being terminated, and then appending the
 // index of the payout in the termination and taking the hash.
-func (fcid FileContractID) FileContractTerminationPayoutID(i int) FileContractID {
-	return FileContractID(crypto.HashAll(
+func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashAll(
 		SpecifierFileContractTerminationPayout,
 		fcid,
 		i,
@@ -420,22 +420,21 @@ func (fcid FileContractID) FileContractTerminationPayoutID(i int) FileContractID
 // SpecifierStorageProofOutput, appending the id of the file contract that the
 // proof is for, and then appending a bool indicating whether the proof was
 // valid or missed (true is valid, false is missed), then taking the hash.
-func (fcid FileContractID) StorageProofOutputID(proofValid bool) (outputID OutputID) {
-	outputID = OutputID(crypto.HashAll(
+func (fcid FileContractID) StorageProofOutputID(proofValid bool) SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashAll(
 		SpecifierStorageProofOutput,
 		fcid,
 		proofValid,
 	))
-	return
 }
 
 // SiafundOutputID returns the id of a SiafundOutput given the index of the
 // output. The id is derived by taking SpecifierSiafundOutput, appending all of
 // the fields in the transaction except the signatures, and then appending the
 // index of the SiafundOutput in the transaction and taking the hash.
-func (t Transaction) SiafundOutputID(i int) OutputID {
-	return OutputID(crypto.HashAll(
-		SiafundOutputSpecifier,
+func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
+	return SiafundOutputID(crypto.HashAll(
+		SpecifierSiafundOutput,
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
@@ -452,8 +451,8 @@ func (t Transaction) SiafundOutputID(i int) OutputID {
 // SiaClaimOutputID returns the id of the SiacoinOutput that is created when
 // the siafund output gets spent. The id is calculated by taking the hash of
 // the id of the SiafundOutput.
-func (id SiafundOutputID) SiaClaimOutputID() OutputID {
-	return OutputID(crypto.HashAll(
+func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashAll(
 		id,
 	))
 }

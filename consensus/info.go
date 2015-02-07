@@ -49,7 +49,7 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (sco SiacoinOutput, exists bool) {
+func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
 	sco, exists = s.unspentSiacoinOutputs[id]
 	return
 }
@@ -66,7 +66,7 @@ func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
 
 	// Get the outputs in order according to their sorted string form.
 	for _, utxoString := range unspentOutputStrings {
-		var outputID OutputID
+		var outputID SiacoinOutputID
 		copy(outputID[:], utxoString)
 		output, _ := s.output(outputID)
 		sortedOutputs = append(sortedOutputs, output)
@@ -86,7 +86,7 @@ func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
 
 	// Get the outputs in order according to their sorted string form.
 	for _, idString := range idStrings {
-		var outputID OutputID
+		var outputID SiafundOutputID
 		copy(outputID[:], idString)
 
 		// Sanity check - the output should exist.
@@ -169,7 +169,7 @@ func (s *State) stateHash() crypto.Hash {
 		sort.Strings(delayedStrings)
 
 		for _, delayedString := range delayedStrings {
-			var id OutputID
+			var id SiacoinOutputID
 			copy(id[:], delayedString)
 			leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
 		}
@@ -276,7 +276,7 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 
 // Output returns the output associated with an OutputID, returning an error if
 // the output is not found.
-func (s *State) Output(id OutputID) (output SiacoinOutput, exists bool) {
+func (s *State) Output(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.output(id)

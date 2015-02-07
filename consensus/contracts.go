@@ -45,13 +45,13 @@ func (s *State) validContract(fc FileContract) error {
 // validProof returns err = nil if the storage proof provided is valid given
 // the state context, otherwise returning an error to indicate what is invalid.
 func (s *State) validProof(sp StorageProof) error {
-	contract, exists := s.openFileContracts[sp.FileContractID]
+	contract, exists := s.openFileContracts[sp.ParentID]
 	if !exists {
 		return errors.New("unrecognized contract id in storage proof")
 	}
 
 	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.storageProofSegment(sp.FileContractID)
+	segmentIndex, err := s.storageProofSegment(sp.ParentID)
 	if err != nil {
 		return err
 	}
@@ -147,8 +147,8 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		}
 
 		// Get the id of the file contract and the siacoin output it creates.
-		fileContract := s.openFileContracts[sp.FileContractID]
-		outputID := sp.FileContractID.StorageProofOutputID(true)
+		fileContract := s.openFileContracts[sp.ParentID]
+		outputID := sp.ParentID.StorageProofOutputID(true)
 		// Sanity check - output should not already exist.
 		if DEBUG {
 			_, exists := s.unspentSiacoinOutputs[outputID]
@@ -164,14 +164,14 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 
 		// Create the siacoin output resulting from the storage proof.
 		sco := SiacoinOutput{
-			Value:     outputPortion,
-			SpendHash: fileContract.ValidProofAddress,
+			Value:      outputPortion,
+			UnlockHash: fileContract.ValidProofUnlockHash,
 		}
 
 		// Add the output to the list of delayed outputs, delete the
 		// contract from the state, and add the poolPortion to the siafundPool.
 		s.delayedSiacoinOutputs[s.height()][outputID] = sco
-		delete(s.openFileContracts, sp.FileContractID)
+		delete(s.openFileContracts, sp.ParentID)
 		err := s.siafundPool.Add(poolPortion)
 		if DEBUG {
 			if err != nil {
@@ -182,7 +182,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		// update the block node diffs.
 		fcd := FileContractDiff{
 			New:          false,
-			ID:           sp.FileContractID,
+			ID:           sp.ParentID,
 			FileContract: fileContract,
 		}
 		bn.delayedSiacoinOutputs[outputID] = sco
@@ -200,8 +200,8 @@ func (s *State) applyMissedProof(bn *blockNode, fc FileContract, fcid FileContra
 
 	// Create the output for the missed proof.
 	sco := SiacoinOutput{
-		Value:     outputPortion,
-		SpendHash: fc.MissedProofAddress,
+		Value:      outputPortion,
+		UnlockHash: fc.MissedProofUnlockHash,
 	}
 	outputID := fcid.StorageProofOutputID(false)
 

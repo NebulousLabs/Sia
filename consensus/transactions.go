@@ -5,7 +5,9 @@ import (
 )
 
 var (
-	MissingOutputErr = errors.New("transaction spends a nonexisting output")
+	ErrMissingSiacoinOutput = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
+	ErrMissingFileContract  = errors.New("transaction terminates a nonexisting file contract")
 )
 
 // followsStorageProofRule checks that a transaction follows the limitations
@@ -35,20 +37,20 @@ func (t Transaction) followsStorageProofRules() bool {
 // consensus state. If not, an error is returned.
 func (s *State) validSiacoinInput(sci SiacoinInput) (sco SiacoinOutput, err error) {
 	// Check the input spends an existing and valid output.
-	sco, exists := s.unspentSiacoinOutputs[sci.OutputID]
+	sco, exists := s.unspentSiacoinOutputs[sci.ParentID]
 	if !exists {
-		err = MissingOutputErr
+		err = ErrMissingSiacoinOutput
 		return
 	}
 
 	// Check that the spend conditions match the hash listed in the output.
-	if sci.SpendConditions.CoinAddress() != s.unspentSiacoinOutputs[sci.OutputID].SpendHash {
+	if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
 		err = errors.New("spend conditions do not match hash")
 		return
 	}
 
 	// Check the timelock on the spend conditions is expired.
-	if sci.SpendConditions.TimeLock > s.height() {
+	if sci.UnlockConditions.Timelock > s.height() {
 		err = errors.New("output spent before timelock expiry.")
 		return
 	}
@@ -60,20 +62,20 @@ func (s *State) validSiacoinInput(sci SiacoinInput) (sco SiacoinOutput, err erro
 // consensus state. If not, an error is returned.
 func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err error) {
 	// Check the input spends an existing and valid output.
-	sfo, exists := s.unspentSiafundOutputs[sfi.OutputID]
+	sfo, exists := s.unspentSiafundOutputs[sfi.ParentID]
 	if !exists {
-		err = MissingOutputErr
+		err = ErrMissingSiafundOutput
 		return
 	}
 
 	// Check that the spend conditions match the hash listed in the output.
-	if sfi.SpendConditions.CoinAddress() != s.unspentSiafundOutputs[sfi.OutputID].SpendHash {
+	if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
 		err = errors.New("spend conditions do not match hash")
 		return
 	}
 
 	// Check the timelock on the spend conditions is expired.
-	if sfi.SpendConditions.TimeLock > s.height() {
+	if sfi.UnlockConditions.Timelock > s.height() {
 		err = errors.New("output spent before timelock expiry.")
 		return
 	}
@@ -199,7 +201,7 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if DEBUG {
-			_, exists := s.unspentSiacoinOutputs[sci.OutputID]
+			_, exists := s.unspentSiacoinOutputs[sci.ParentID]
 			if !exists {
 				panic("Applying a transaction with an invalid unspent output!")
 			}
@@ -207,11 +209,11 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 
 		scod := SiacoinOutputDiff{
 			New:           false,
-			ID:            sci.OutputID,
-			SiacoinOutput: s.unspentSiacoinOutputs[sci.OutputID],
+			ID:            sci.ParentID,
+			SiacoinOutput: s.unspentSiacoinOutputs[sci.ParentID],
 		}
 		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
-		delete(s.unspentSiacoinOutputs, sci.OutputID)
+		delete(s.unspentSiacoinOutputs, sci.ParentID)
 	}
 }
 
@@ -244,7 +246,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if DEBUG {
-			_, exists := s.unspentSiafundOutputs[sfi.OutputID]
+			_, exists := s.unspentSiafundOutputs[sfi.ParentID]
 			if !exists {
 				panic("applying a transaction with an invalid unspent siafund output")
 			}
@@ -252,7 +254,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 
 		// Calculate the volume of siacoins to put in the claim output.
 		claimPortion := s.siafundPool
-		sfo := s.unspentSiafundOutputs[sfi.OutputID]
+		sfo := s.unspentSiafundOutputs[sfi.ParentID]
 		err := claimPortion.Sub(sfo.ClaimStart)
 		if err != nil {
 			if DEBUG {
@@ -272,10 +274,10 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 
 		// Add the claim output to the delayed set of outputs.
 		sco := SiacoinOutput{
-			Value:     claimPortion,
-			SpendHash: sfo.ClaimDestination,
+			Value:      claimPortion,
+			UnlockHash: sfo.ClaimUnlockHash,
 		}
-		scoid := sfi.OutputID.SiaClaimOutputID()
+		scoid := sfi.ParentID.SiaClaimOutputID()
 		s.delayedSiacoinOutputs[s.height()][scoid] = sco
 		bn.delayedSiacoinOutputs[scoid] = sco
 
@@ -283,11 +285,11 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 		// consensus set.
 		sfod := SiafundOutputDiff{
 			New:           false,
-			ID:            sfi.OutputID,
-			SiafundOutput: s.unspentSiafundOutputs[sfi.OutputID],
+			ID:            sfi.ParentID,
+			SiafundOutput: s.unspentSiafundOutputs[sfi.ParentID],
 		}
 		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
-		delete(s.unspentSiafundOutputs, sfi.OutputID)
+		delete(s.unspentSiafundOutputs, sfi.ParentID)
 	}
 }
 

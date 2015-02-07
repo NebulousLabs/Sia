@@ -21,7 +21,7 @@ type blockNode struct {
 	siacoinOutputDiffs    []SiacoinOutputDiff
 	fileContractDiffs     []FileContractDiff
 	siafundOutputDiffs    []SiafundOutputDiff
-	delayedSiacoinOutputs map[OutputID]SiacoinOutput
+	delayedSiacoinOutputs map[SiacoinOutputID]SiacoinOutput
 }
 
 // childDepth returns the depth that any child node would have.
@@ -73,7 +73,7 @@ func (s *State) addBlockToTree(b Block) (err error) {
 		height: parentNode.height + 1,
 		depth:  parentNode.childDepth(),
 
-		delayedSiacoinOutputs: make(map[OutputID]SiacoinOutput),
+		delayedSiacoinOutputs: make(map[SiacoinOutputID]SiacoinOutput),
 	}
 	newNode.setTarget()
 

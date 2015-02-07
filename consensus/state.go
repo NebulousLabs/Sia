@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ZeroAddress  = CoinAddress{0}
+	ZeroAddress  = UnlockHash{0}
 	ZeroCurrency = NewCurrency64(0)
 )
 
@@ -40,10 +40,10 @@ type State struct {
 	// currentPath) will have an identical consensus set. Anything else is a
 	// software bug.
 	siafundPool           Currency
-	unspentSiacoinOutputs map[OutputID]SiacoinOutput
+	unspentSiacoinOutputs map[SiacoinOutputID]SiacoinOutput
 	openFileContracts     map[FileContractID]FileContract
-	unspentSiafundOutputs map[OutputID]SiafundOutput
-	delayedSiacoinOutputs map[BlockHeight]map[OutputID]SiacoinOutput
+	unspentSiafundOutputs map[SiafundOutputID]SiafundOutput
+	delayedSiacoinOutputs map[BlockHeight]map[SiacoinOutputID]SiacoinOutput
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -63,10 +63,10 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 		badBlocks:             make(map[BlockID]struct{}),
 		blockMap:              make(map[BlockID]*blockNode),
 		currentPath:           make(map[BlockHeight]BlockID),
-		unspentSiacoinOutputs: make(map[OutputID]SiacoinOutput),
+		unspentSiacoinOutputs: make(map[SiacoinOutputID]SiacoinOutput),
 		openFileContracts:     make(map[FileContractID]FileContract),
-		unspentSiafundOutputs: make(map[OutputID]SiafundOutput),
-		delayedSiacoinOutputs: make(map[BlockHeight]map[OutputID]SiacoinOutput),
+		unspentSiafundOutputs: make(map[SiafundOutputID]SiafundOutput),
+		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
@@ -84,13 +84,13 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 	s.unspentSiacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
-		Value:     CalculateCoinbase(0),
-		SpendHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
+		Value:      CalculateCoinbase(0),
+		UnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
 	}
-	s.unspentSiafundOutputs[OutputID{0}] = SiafundOutput{
-		Value:            NewCurrency64(SiafundCount),
-		SpendHash:        ZeroAddress, // TODO: change to Nebulous Genesis Siafund SpendHash Address
-		ClaimDestination: ZeroAddress, // TODO: change to Nebulous Genesis ClaimDestination Address
+	s.unspentSiafundOutputs[SiafundOutputID{0}] = SiafundOutput{
+		Value:           NewCurrency64(SiafundCount),
+		UnlockHash:      ZeroAddress, // TODO: change to Nebulous Genesis Siafund SpendHash Address
+		ClaimUnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis ClaimDestination Address
 	}
 
 	return

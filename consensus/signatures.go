@@ -7,12 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// TODO: when testing the covered fields stuff, antagonistically try to cause
-// seg faults by throwing covered fields objects at the state which point to
-// nonexistent objects in the transaction.
-
 var (
-	MissingSignaturesErr = errors.New("transaction has inputs with missing signatures")
+	ErrMissingSignatures = errors.New("transaction has inputs with missing signatures")
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -168,7 +164,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 
 		// Check that the timelock has expired.
-		if sig.TimeLock > s.height() {
+		if sig.Timelock > s.height() {
 			return errors.New("signature used before timelock expiration")
 		}
 
@@ -187,7 +183,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 				return err
 			}
 			var decodedSig crypto.Signature
-			err = encoding.Unmarshal(sig.Signature, &decodedSig)
+			err = encoding.Unmarshal([]byte(sig.Signature), &decodedSig)
 			if err != nil {
 				return err
 			}
@@ -210,7 +206,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
 		if reqSigs.RemainingSignatures != 0 {
-			return MissingSignaturesErr
+			return ErrMissingSignatures
 		}
 	}
 

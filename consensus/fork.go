@@ -122,7 +122,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Update the current block and current path.
 	s.currentBlockID = bn.block.ID()
 	s.currentPath[bn.height] = bn.block.ID()
-	s.delayedSiacoinOutputs[s.height()] = make(map[OutputID]SiacoinOutput)
+	s.delayedSiacoinOutputs[s.height()] = make(map[SiacoinOutputID]SiacoinOutput)
 
 	// Validate and apply each transaction in the block.
 	for _, txn := range bn.block.Transactions {
