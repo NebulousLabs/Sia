@@ -73,6 +73,7 @@ func (s *State) validProof(sp StorageProof) error {
 // it to the state.
 func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
 	for i, fc := range t.FileContracts {
+		// TODO: Sanity check.
 		// Apply the contract.
 		fcid := t.FileContractID(i)
 		s.openFileContracts[fcid] = fc
@@ -86,6 +87,38 @@ func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
 		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
 	return
+}
+
+func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
+	for _, fct := range t.FileContractTerminations {
+		// Delete the contract.
+		fc, exists := s.openFileContracts[fct.ParentID]
+		// Sanity check - termination should be terminating an existing
+		// contract.
+		if !exists {
+			if DEBUG {
+				panic("file contract termination terminates a nonexisting contract")
+			} else {
+				return
+			}
+		}
+		delete(s.openFileContracts, fct.ParentID)
+
+		// Add the diff for the deletion to the block node.
+		fcd := FileContractDiff{
+			New:          false,
+			ID:           fct.ParentID,
+			FileContract: fc,
+		}
+		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+
+		// Add all of the payouts and diffs.
+		for i, payout := range fct.Payouts {
+			id := fct.ParentID.FileContractTerminationPayoutID(i)
+			s.delayedSiacoinOutputs[s.height()][id] = payout
+			bn.delayedSiacoinOutputs[id] = payout
+		}
+	}
 }
 
 // splitContractPayout takes a contract payout as input and returns the portion

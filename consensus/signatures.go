@@ -121,29 +121,43 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	// Create the InputSignatures object for each input.
 	sigMap := make(map[string]*InputSignatures)
 	for i, input := range t.SiacoinInputs {
-		stringID := string(input.OutputID[:])
+		stringID := string(input.ParentID[:])
 		_, exists := sigMap[stringID]
 		if exists {
 			return errors.New("siacoin output spent twice in the same transaction.")
 		}
 
 		inSig := &InputSignatures{
-			RemainingSignatures: input.SpendConditions.NumSignatures,
-			PossibleKeys:        input.SpendConditions.PublicKeys,
+			RemainingSignatures: input.UnlockConditions.NumSignatures,
+			PossibleKeys:        input.UnlockConditions.PublicKeys,
 			Index:               i,
 		}
 		sigMap[stringID] = inSig
 	}
 	for i, input := range t.SiafundInputs {
-		stringID := string(input.OutputID[:])
+		stringID := string(input.ParentID[:])
 		_, exists := sigMap[stringID]
 		if exists {
 			return errors.New("siafund output spent twice in the same transaction.")
 		}
 
 		inSig := &InputSignatures{
-			RemainingSignatures: input.SpendConditions.NumSignatures,
-			PossibleKeys:        input.SpendConditions.PublicKeys,
+			RemainingSignatures: input.UnlockConditions.NumSignatures,
+			PossibleKeys:        input.UnlockConditions.PublicKeys,
+			Index:               i,
+		}
+		sigMap[stringID] = inSig
+	}
+	for i, termination := range t.FileContractTerminations {
+		stringID := string(termination.ParentID[:])
+		_, exists := sigMap[stringID]
+		if exists {
+			return errors.New("file contract terminated twice in the same transaction.")
+		}
+
+		inSig := &InputSignatures{
+			RemainingSignatures: termination.TerminationConditions.NumSignatures,
+			PossibleKeys:        termination.TerminationConditions.PublicKeys,
 			Index:               i,
 		}
 		sigMap[stringID] = inSig

@@ -83,7 +83,43 @@ func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err erro
 	return
 }
 
-// TODO: Add validFileContractTermination
+func (s *State) validFileContractTermination(fct FileContractTermination) (err error) {
+	// Check that the FileContractTermination terminates an existing
+	// FileContract.
+	fc, exists := s.openFileContracts[fct.ParentID]
+	if !exists {
+		err = ErrMissingFileContract
+		return
+	}
+
+	// Check that the spend conditions match the hash listed in the output.
+	if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
+		err = errors.New("spend conditions do not match hash")
+		return
+	}
+
+	// Check the timelock on the spend conditions is expired.
+	if fct.TerminationConditions.Timelock > s.height() {
+		err = errors.New("contract terminated before timelock expiry.")
+		return
+	}
+
+	// Check that the payouts in the termination add up to the payout of the
+	// contract.
+	var payoutSum Currency
+	for _, payout := range fct.Payouts {
+		err = payoutSum.Add(payout.Value)
+		if err != nil {
+			return
+		}
+	}
+	if payoutSum.Cmp(fc.Payout) != 0 {
+		err = errors.New("contract termination has incorrect payouts")
+		return
+	}
+
+	return
+}
 
 // validSiafunds checks that the transaction has valid siafund inputs and
 // outputs, and that the sum of the inputs matches the sum of the outputs.
@@ -158,6 +194,12 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	// Check that all contracts and storage proofs are valid.
 	for _, contract := range t.FileContracts {
 		err = s.validContract(contract)
+		if err != nil {
+			return
+		}
+	}
+	for _, termination := range t.FileContractTerminations {
+		err = s.validFileContractTermination(termination)
 		if err != nil {
 			return
 		}
@@ -331,6 +373,7 @@ func (s *State) applyTransaction(bn *blockNode, t Transaction) {
 	s.applySiacoinInputs(bn, t)
 	s.applySiacoinOutputs(bn, t)
 	s.applyFileContracts(bn, t)
+	s.applyFileContractTerminations(bn, t)
 	s.applyStorageProofs(bn, t)
 	s.applySiafundInputs(bn, t)
 	s.applySiafundOutputs(bn, t)
