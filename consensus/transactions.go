@@ -81,6 +81,8 @@ func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err erro
 	return
 }
 
+// TODO: Add validFileContractTermination
+
 // validSiafunds checks that the transaction has valid siafund inputs and
 // outputs, and that the sum of the inputs matches the sum of the outputs.
 func (s *State) validSiafunds(t Transaction) (err error) {
