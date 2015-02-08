@@ -12,14 +12,14 @@ import (
 // to the percent of the weight of the most recent block on the winning chain,
 // not the weight of the entire chain.
 //
-// This rule is in place because the difficulty gets updated every block, and
-// that means that of two competing blocks, one could be very slightly heavier.
-// The slightly heavier one should not be switched to if it was not seen first,
+// This rule is in place because the target gets updated every block, and that
+// means that of two competing blocks, one could be very slightly heavier. The
+// slightly heavier one should not be switched to if it was not seen first,
 // because the amount of extra weight in the chain is inconsequential. The
 // maximum difficulty shift will prevent people from manipulating timestamps
 // enough to produce a block that is substantially heavier.
 var (
-	SurpassThreshold = big.NewRat(50, 100)
+	SurpassThreshold = big.NewRat(20, 100)
 )
 
 // a blockNode is an element of a linked list that contains a block and points
@@ -28,6 +28,15 @@ var (
 // which is useful for verifying the block's children. Finally, the blockNode
 // contains a set of diffs that explain how the consensus set changes when the
 // block is applied or removed. All diffs are fully reversible.
+//
+// Each block has a target, which is the target that all child blocks need to
+// meet. A target is considered 'met' if the numerical representation of the
+// block id is less than the numerical representation of the target. A useful
+// property of the target is that the 'difficulty', or expected amount of work,
+// can be determined by taking the inverse of the target. Furthermore, two
+// difficulties can be added together, and the inverse of the sum produces a
+// new target that would be equally as difficult as finding each of the
+// original targets once.
 type blockNode struct {
 	block    Block
 	parent   *blockNode
@@ -93,7 +102,8 @@ func RatToTarget(r *big.Rat) Target {
 }
 
 // childDepth returns the depth that any child node would have.
-// childDepth := (1/parentTarget + 1/parentDepth)^-1
+//
+// childDepth = (1/parentTarget + 1/parentDepth)^-1
 func (bn *blockNode) childDepth() (depth Target) {
 	cumulativeDifficulty := new(big.Rat).Add(bn.target.Inverse(), bn.depth.Inverse())
 	return RatToTarget(new(big.Rat).Inv(cumulativeDifficulty))

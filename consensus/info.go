@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"math/big"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -33,7 +34,7 @@ func (s *State) currentBlockNode() *blockNode {
 
 // CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
-func (s *State) currentBlockWeight() BlockWeight {
+func (s *State) currentBlockWeight() *big.Rat {
 	return s.currentBlockNode().target.Inverse()
 }
 

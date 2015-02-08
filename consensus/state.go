@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"math/big"
 	"sync"
 )
 
@@ -9,12 +8,6 @@ import (
 var (
 	ZeroAddress  = UnlockHash{0}
 	ZeroCurrency = NewCurrency64(0)
-)
-
-// Block weight is an infinite precision rational number that is the inverse of
-// the block target. A convenient 
-type (
-	BlockWeight *big.Rat
 )
 
 // The State is the object responsible for tracking the current status of the
