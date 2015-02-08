@@ -63,7 +63,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.ValidProofAddress != h.CoinAddress:
 		return errors.New("coins are not paying out to correct address")
 
-	case terms.MissedProofAddress != consensus.ZeroAddress:
+	case terms.MissedProofAddress != consensus.ZeroUnlockHash:
 		return errors.New("burn payout needs to go to the zero address")
 
 	case terms.Price.Cmp(h.Price) < 0:

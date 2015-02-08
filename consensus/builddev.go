@@ -16,21 +16,23 @@ const (
 	FutureThreshold       = 3 * 60 * 60 // Seconds into the future block timestamps are valid.
 	SiafundCount          = 10e3        // The total (static) number of siafunds.
 	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
-	MaturityDelay         = 20          // The number of blocks that need to be waited before certain types of outputs come to maturity.
-
-	InitialCoinbase = 300e3
-	MinimumCoinbase = 30e3
-
-	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
+	MaturityDelay         = 15          // The number of blocks that need to be waited before certain types of outputs come to maturity.
+	InitialCoinbase       = 300e3
+	MinimumCoinbase       = 30e3
 )
 
 var (
 	RootTarget = Target{0, 0, 8}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-	MaxAdjustmentUp   = big.NewRat(103, 100)
-	MaxAdjustmentDown = big.NewRat(97, 100)
+	MaxAdjustmentUp   = big.NewRat(102, 100)
+	MaxAdjustmentDown = big.NewRat(98, 100)
 
 	// The CoinbaseAugment should be a big.Int equal to 1 << 80.
 	CoinbaseAugment = new(big.Int).Mul(big.NewInt(1<<40), big.NewInt(1<<40))
+
+	// TODO: Pick more reasonable values for these constants.
+	GenesisTimestamp         = Timestamp(1417070298) // Approx. 1:47pm EST Nov. 13th, 2014
+	GenesisSiafundUnlockHash = ZeroUnlockHash
+	GenesisClaimUnlockHash   = ZeroUnlockHash
 )

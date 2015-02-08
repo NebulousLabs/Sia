@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"math/big"
+	"time"
 )
 
 const (
@@ -20,8 +21,6 @@ const (
 
 	InitialCoinbase = 300e3
 	MinimumCoinbase = 30e3
-
-	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
 var (
@@ -33,4 +32,9 @@ var (
 
 	// The CoinbaseAugment should be a big.Int equal to 1 << 80.
 	CoinbaseAugment = new(big.Int).Mul(big.NewInt(1<<40), big.NewInt(1<<40))
+
+	// TODO: Pick more reasonable values for these constants.
+	GenesisTimestamp         = Timestamp(time.Now().Unix())
+	GenesisSiafundUnlockHash = ZeroUnlockHash
+	GenesisClaimUnlockHash   = ZeroUnlockHash
 )

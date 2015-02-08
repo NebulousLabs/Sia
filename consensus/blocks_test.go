@@ -105,7 +105,7 @@ func (a *assistant) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and an incorrect payout. Compare the
 	// before and after state hashes to see that they match.
 	beforeHash := a.state.StateHash()
-	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height()), UnlockHash: ZeroAddress}}
+	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height()), UnlockHash: ZeroUnlockHash}}
 	block, err := a.mineCurrentBlock(payouts, nil)
 	if err != nil {
 		a.tester.Fatal(err)
@@ -121,7 +121,7 @@ func (a *assistant) testSingleNoFeePayout() {
 
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
-	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height() + 1), UnlockHash: ZeroAddress}}
+	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height() + 1), UnlockHash: ZeroUnlockHash}}
 	block, err = a.mineCurrentBlock(payouts, nil)
 	if err != nil {
 		a.tester.Fatal(err)

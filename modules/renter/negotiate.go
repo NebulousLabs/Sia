@@ -30,7 +30,7 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 		Start:                 terms.StartHeight,
 		End:                   terms.StartHeight + duration,
 		ValidProofUnlockHash:  host.CoinAddress,
-		MissedProofUnlockHash: consensus.ZeroAddress, // The empty address is the burn address.
+		MissedProofUnlockHash: consensus.ZeroUnlockHash, // The empty address is the burn address.
 	}
 
 	fund := host.Price
@@ -86,7 +86,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		Price:              host.Price,      // ??
 		Collateral:         host.Collateral, // ??
 		ValidProofAddress:  host.CoinAddress,
-		MissedProofAddress: consensus.ZeroAddress,
+		MissedProofAddress: consensus.ZeroUnlockHash,
 	}
 
 	// TODO: call r.hostDB.FlagHost(host.IPAddress) if negotiation is unsuccessful

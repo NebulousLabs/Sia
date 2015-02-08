@@ -6,8 +6,8 @@ import (
 
 // The zero address and the zero currency are convenience variables.
 var (
-	ZeroAddress  = UnlockHash{0}
-	ZeroCurrency = NewCurrency64(0)
+	ZeroUnlockHash = UnlockHash{0}
+	ZeroCurrency   = NewCurrency64(0)
 )
 
 // The State is the object responsible for tracking the current status of the
@@ -67,13 +67,9 @@ type State struct {
 }
 
 // CreateGenesisState will create the state that contains the genesis block and
-// nothing else. genesisTime is taken as an input instead of the constant being
-// used directly because it makes certain parts of testing easier.
-//
-// TODO: Change a few of the constants to go to nebulous controlled accounts,
-// particularly with regards to siafunds. Instead, these things are currently
-// sent to the ZeroAddress.
-func CreateGenesisState(genesisTime Timestamp) (s *State) {
+// nothing else. The unexported version of this function takes a timestamp and
+// some unlock hashes for the siafunds as input, which makes testing easier.
+func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimUnlockHash UnlockHash) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
 		badBlocks:             make(map[BlockID]struct{}),
@@ -101,15 +97,22 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:      CalculateCoinbase(0),
-		UnlockHash: ZeroAddress,
+		UnlockHash: ZeroUnlockHash,
 	}
 	s.siafundOutputs[SiafundOutputID{0}] = SiafundOutput{
 		Value:           NewCurrency64(SiafundCount),
-		UnlockHash:      ZeroAddress,
-		ClaimUnlockHash: ZeroAddress,
+		UnlockHash:      fundUnlockHash,
+		ClaimUnlockHash: claimUnlockHash,
 	}
 
 	return
+}
+
+// CreateGenesisState returns the state that contains the genesis block and
+// nothing else. The exported version of this function uses the genesis
+// constants.
+func CreateGenesisState() (s *State) {
+	return createGenesisState(GenesisTimestamp, GenesisSiafundUnlockHash, GenesisClaimUnlockHash)
 }
 
 // RLock will readlock the state.

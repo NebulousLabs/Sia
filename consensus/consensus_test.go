@@ -127,11 +127,11 @@ func (a *assistant) mineAndApplyValidBlock() (block Block) {
 // spend.
 func newTestingEnvironment(t *testing.T) (a *assistant) {
 	// Get the state and assistant.
-	s := CreateGenesisState(currentTime())
+	s := CreateGenesisState()
 	a = newAssistant(t, s)
 
 	// Mine enough blocks that the first miner payouts come to maturity. The
-	// assistent will then be ready to spend at least a few outputs.
+	// assistant will then be ready to spend at least a few outputs.
 	for i := 0; i <= MaturityDelay; i++ {
 		a.mineAndApplyValidBlock()
 	}
