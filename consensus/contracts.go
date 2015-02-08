@@ -124,6 +124,8 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
 // splitContractPayout takes a contract payout as input and returns the portion
 // of the payout that goes to the pool, as well as the portion that goes to the
 // siacoin output. They should add to the original payout.
+//
+// TODO: move to types.go
 func splitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
 	poolPortion = payout
 	outputPortion = payout
@@ -221,63 +223,6 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		bn.delayedSiacoinOutputs[outputID] = sco
 		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
-	return
-}
-
-// applyMissedProof adds outputs to the State to manage a missed storage proof
-// on a file contract.
-func (s *State) applyMissedProof(bn *blockNode, fc FileContract, fcid FileContractID) {
-	// Get the portion of the payout that goes to the siafundPool, and the
-	// portion of the payout that goes to the missed proof output.
-	poolPortion, outputPortion := splitContractPayout(fc.Payout)
-
-	// Create the output for the missed proof.
-	sco := SiacoinOutput{
-		Value:      outputPortion,
-		UnlockHash: fc.MissedProofUnlockHash,
-	}
-	outputID := fcid.StorageProofOutputID(false)
-
-	// Update the state to include the storage proof output (which goes into
-	// the delayed set) and the siafund pool.
-	s.delayedSiacoinOutputs[s.height()][outputID] = sco
-	delete(s.fileContracts, fcid)
-	err := s.siafundPool.Add(poolPortion)
-	if DEBUG {
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// Create the diffs.
-	fcd := FileContractDiff{
-		New:          false,
-		ID:           fcid,
-		FileContract: fc,
-	}
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
-	bn.delayedSiacoinOutputs[outputID] = sco
-	return
-}
-
-func (s *State) applyContractMaintenance(bn *blockNode) {
-	// Iterate through all contracts and figure out which ones have expired.
-	// Expiring a contract deletes it from the map we are iterating through, so
-	// we need to store it and deleted once we're done iterating through the
-	// map.
-	var expiredContracts []FileContractID
-	for id, contract := range s.fileContracts {
-		if s.height() == contract.End {
-			expiredContracts = append(expiredContracts, id)
-		}
-	}
-
-	// Delete all of the contracts that terminated.
-	for _, id := range expiredContracts {
-		contract := s.fileContracts[id]
-		s.applyMissedProof(bn, contract, id)
-	}
-
 	return
 }
 
