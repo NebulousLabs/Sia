@@ -32,15 +32,25 @@ type State struct {
 	currentPath    map[BlockHeight]BlockID
 
 	// These are the consensus variables, referred to as the 'consensus set'.
-	// All nodes on the network which have the same set of blocks (the same
-	// currentPath) will have an identical consensus set. Anything else is a
-	// software bug.
+	// All nodes on the network which have the same current path will have an
+	// identical consensus set. (Anything else is an error)
 	//
 	// The siafundPool counts how many siacoins have been taken from file
 	// contracts in total. As transactions and blocks are added to the
 	// currentPath, the siafundPool may only increase in size. The Currency
 	// type is not typically allowed to overflow, however in the case of the
 	// siafund pool it is okay.
+	//
+	// siacoinOutputs, fileContracts, and siafundOutputs are all atomic items
+	// within the state. Either they exist or they don't. Two objects with the
+	// same id will always have the same contents. This makes tracking diffs in
+	// the consensus set very easy.
+	//
+	// delayedSiacoinOutputs are siacoin outputs that have been created in a
+	// block but are not yet allowed to be spent. Miner payouts for example are
+	// not allowed to be spent right away. All of the delayed outputs that get
+	// created at a certain height are put into a list. When 'MaturityDelay'
+	// blocks have passed, the outputs are moved into the 'siafundOutputs' map.
 	siafundPool           Currency
 	siacoinOutputs        map[SiacoinOutputID]SiacoinOutput
 	fileContracts         map[FileContractID]FileContract
@@ -59,6 +69,10 @@ type State struct {
 // CreateGenesisState will create the state that contains the genesis block and
 // nothing else. genesisTime is taken as an input instead of the constant being
 // used directly because it makes certain parts of testing easier.
+//
+// TODO: Change a few of the constants to go to nebulous controlled accounts,
+// particularly with regards to siafunds. Instead, these things are currently
+// sent to the ZeroAddress.
 func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
@@ -82,17 +96,17 @@ func CreateGenesisState(genesisTime Timestamp) (s *State) {
 	}
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
-	// Fill out the consensus informaiton for the genesis block.
+	// Fill out the consensus information for the genesis block.
 	s.currentBlockID = genesisBlock.ID()
 	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:      CalculateCoinbase(0),
-		UnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis Siacoin SpendHash Address
+		UnlockHash: ZeroAddress,
 	}
 	s.siafundOutputs[SiafundOutputID{0}] = SiafundOutput{
 		Value:           NewCurrency64(SiafundCount),
-		UnlockHash:      ZeroAddress, // TODO: change to Nebulous Genesis Siafund SpendHash Address
-		ClaimUnlockHash: ZeroAddress, // TODO: change to Nebulous Genesis ClaimDestination Address
+		UnlockHash:      ZeroAddress,
+		ClaimUnlockHash: ZeroAddress,
 	}
 
 	return
