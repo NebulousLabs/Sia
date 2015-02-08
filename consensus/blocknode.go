@@ -4,9 +4,12 @@ import (
 	"math/big"
 )
 
-// A BlockNode contains a block and the list of children to the block. Also
-// contains some consensus information like which contracts have terminated and
-// where there were missed storage proofs.
+// a blockNode is an element of a linked list that contains a block and points
+// to the block's parent and all of the block's children. It also contains
+// context for the block, such as the height, depth, and target of the block,
+// which is useful for verifying the block's children. Finally, the blockNode
+// contains a set of diffs that explain how the consensus set changes when the
+// block is applied or removed. All diffs are fully reversible.
 type blockNode struct {
 	block    Block
 	parent   *blockNode
@@ -16,6 +19,10 @@ type blockNode struct {
 	depth  Target // Cumulative weight of all parents.
 	target Target // Target for next block.
 
+	// Below are the set of diffs for the block, and a bool indicating if the
+	// diffs have been generated yet or not. Diffs are computationally
+	// expensive to generate, and so will only be generated if at some point
+	// the block is a part of the longest fork.
 	diffsGenerated        bool
 	siafundPoolDiff       SiafundPoolDiff
 	siacoinOutputDiffs    []SiacoinOutputDiff
@@ -34,9 +41,26 @@ func (bn *blockNode) childDepth() (depth Target) {
 // setTarget calculates the target for a node and sets the node's target equal
 // to the calculated value.
 func (node *blockNode) setTarget() {
+	// Sanity check - the node should have a parent.
+	if DEBUG {
+		if node.parent == nil {
+			panic("calling setTarget on node with no parent")
+		}
+	}
+
 	// To calculate the target, we need to compare our timestamp with the
 	// timestamp of the reference node, which is `TargetWindow` blocks earlier,
 	// or if the height is less than `TargetWindow`, it's the genesis block.
+	//
+	// There's no easy way to look up the node that is the 'TargetWidow'th
+	// parent of the input node, because we're not sure which fork the parent
+	// is in, it may not be the current fork. This is not a huge performance
+	// concern, becuase 'TargetWindow' is small and blocks are infrequent.
+	// Signature verification of the transactions will still be the bottleneck
+	// for large blocks.
+	//
+	// CONTRIBUTE: find a way to look up the correct parent without scrolling
+	// through 'TargetWindow' elements in a linked list.
 	var i BlockHeight
 	referenceNode := node
 	for i = 0; i < TargetWindow && referenceNode.parent != nil; i++ {
@@ -49,7 +73,7 @@ func (node *blockNode) setTarget() {
 	expectedTimePassed := BlockFrequency * Timestamp(i)
 	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
 
-	// Enforce a maximum targetAdjustment
+	// Enforce a maximum target adjustment.
 	if targetAdjustment.Cmp(MaxAdjustmentUp) == 1 {
 		targetAdjustment = MaxAdjustmentUp
 	} else if targetAdjustment.Cmp(MaxAdjustmentDown) == -1 {
