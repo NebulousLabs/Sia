@@ -39,6 +39,12 @@ type State struct {
 	// All nodes on the network which have the same set of blocks (the same
 	// currentPath) will have an identical consensus set. Anything else is a
 	// software bug.
+	//
+	// The siafundPool counts how many siacoins have been taken from file
+	// contracts in total. As transactions and blocks are added to the
+	// currentPath, the siafundPool may only increase in size. The Currency
+	// type is not typically allowed to overflow, however in the case of the
+	// siafund pool it is okay.
 	siafundPool           Currency
 	siacoinOutputs        map[SiacoinOutputID]SiacoinOutput
 	fileContracts         map[FileContractID]FileContract

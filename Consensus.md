@@ -1,12 +1,13 @@
 Consensus Rules
 ===============
 
-Sia is a cryptosystem that uses a Bitcoin style Proof of Work blockchain to
-achieve network consensus. The rules of consensus are detailed in this
-document. The most detailed and accurate explanation however is the codebase
-itself. If you are looking for a more precise understanding of the consensus
-rules, a good place to start is consensus/types.go, and another good starting
-place is the function AcceptBlock, which can be found in consensus/blocks.go.
+This document is meant to provide a good high level overview of the Sia
+cryptosystem, but does not fully explain all of the small details. The most
+accurate explanation of the consensus rules is the consensus package. If you
+are new to Sia and are looking for a complete understanding of how it works,
+you should start by reading this document, then reading consensus/types.go,
+then reading consensus/state.go, and finally tracing the logic that starts in
+AcceptBlock(), found in consensus/blocks.go.
 
 This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first
@@ -111,7 +112,7 @@ hashed. The following rules are used for hashing:
    their length.
  - Arrays and structs are encoded as their individual elements concatenated
    together. The ordering of the struct is determined by the struct definition.
-   There is only one way to encode each type.
+   There is only one way to encode each struct.
  - The Currency type is encoded as a 16 byte unsigned integer.
 
 Block Size

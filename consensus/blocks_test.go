@@ -65,11 +65,14 @@ func (a *assistant) testEmptyBlock() {
 	// These functions manipulate the state using unexported functions, which
 	// breaks proposed conventions. However, they provide useful information
 	// about the accuracy of invertRecentBlock and applyBlockNode.
-	a.state.invertRecentBlock()
+	cbn := a.state.currentBlockNode()
+	direction := false // false because the node is being removed.
+	a.state.applyDiffSet(cbn, direction)
 	if beforeStateHash != a.state.StateHash() {
 		a.tester.Error("state is different after applying and removing diffs")
 	}
-	a.state.applyBlockNode(bn)
+	direction = true // true because the node is being applied.
+	a.state.applyDiffSet(cbn, direction)
 	if afterStateHash != a.state.StateHash() {
 		a.tester.Error("state is different after generateApply, remove, and applying diffs")
 	}
@@ -138,6 +141,7 @@ func (a *assistant) testSingleNoFeePayout() {
 	}
 }
 
+/*
 // testMinerPayouts tries to submit miner payouts in various legal and illegal
 // forms and verifies that the state handles the payouts correctly each time.
 //
@@ -325,6 +329,7 @@ func testRepeatBlock(t *testing.T, s *State) {
 		t.Error("state changed after getting a repeat block.")
 	}
 }
+*/
 
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // TestBlockTimestamps.

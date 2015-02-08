@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"testing"
 )
@@ -91,6 +92,7 @@ func consistencyChecks(t *testing.T, states ...*State) {
 		currencyCheck(t, s)
 	}
 }
+*/
 
 /*
 // orderedTestBattery calls all of the individual tests on each of the input
