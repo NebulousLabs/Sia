@@ -3,11 +3,7 @@ Consensus Rules
 
 This document is meant to provide a good high level overview of the Sia
 cryptosystem, but does not fully explain all of the small details. The most
-accurate explanation of the consensus rules is the consensus package. If you
-are new to Sia and are looking for a complete understanding of how it works,
-you should start by reading this document, then reading consensus/types.go,
-then reading consensus/state.go, and finally tracing the logic that starts in
-AcceptBlock(), found in consensus/blocks.go.
+accurate explanation of the consensus rules is the consensus package.
 
 This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first

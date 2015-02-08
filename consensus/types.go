@@ -1,9 +1,5 @@
 package consensus
 
-// TODO: Luke should review this file and provide inputs for the variable names
-// in all of the data structures. I tried thinning things out and clearing
-// things up as much as possible.
-
 import (
 	"math/big"
 

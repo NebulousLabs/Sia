@@ -1,7 +1,25 @@
 package consensus
 
 import (
+	"bytes"
 	"math/big"
+
+	"github.com/NebulousLabs/Sia/crypto"
+)
+
+// A non-consensus rule that dictates how much heavier a competing chain has to
+// be before the node will switch to mining on that chain. The percent refers
+// to the percent of the weight of the most recent block on the winning chain,
+// not the weight of the entire chain.
+//
+// This rule is in place because the difficulty gets updated every block, and
+// that means that of two competing blocks, one could be very slightly heavier.
+// The slightly heavier one should not be switched to if it was not seen first,
+// because the amount of extra weight in the chain is inconsequential. The
+// maximum difficulty shift will prevent people from manipulating timestamps
+// enough to produce a block that is substantially heavier.
+var (
+	SurpassThreshold = big.NewRat(50, 100)
 )
 
 // a blockNode is an element of a linked list that contains a block and points
@@ -31,6 +49,49 @@ type blockNode struct {
 	delayedSiacoinOutputs map[SiacoinOutputID]SiacoinOutput
 }
 
+// CheckTarget returns true if the block id is lower than the target.
+func (b Block) CheckTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
+}
+
+// Int returns a Target as a big.Int.
+func (t Target) Int() *big.Int {
+	return new(big.Int).SetBytes(t[:])
+}
+
+// Rat returns a Target as a big.Rat.
+func (t Target) Rat() *big.Rat {
+	return new(big.Rat).SetInt(t.Int())
+}
+
+// Inv returns the inverse of a Target as a big.Rat
+func (t Target) Inverse() *big.Rat {
+	r := t.Rat()
+	return r.Inv(r)
+}
+
+// IntToTarget converts a big.Int to a Target.
+func IntToTarget(i *big.Int) (t Target) {
+	// i may overflow the maximum target.
+	// In the event of overflow, return the maximum.
+	if i.BitLen() > 256 {
+		return RootDepth
+	}
+	b := i.Bytes()
+	// need to preserve big-endianness
+	offset := crypto.HashSize - len(b)
+	copy(t[offset:], b)
+	return
+}
+
+// RatToTarget converts a big.Rat to a Target.
+func RatToTarget(r *big.Rat) Target {
+	// convert to big.Int to truncate decimal
+	i := new(big.Int).Div(r.Num(), r.Denom())
+	return IntToTarget(i)
+}
+
 // childDepth returns the depth that any child node would have.
 // childDepth := (1/parentTarget + 1/parentDepth)^-1
 func (bn *blockNode) childDepth() (depth Target) {
@@ -55,7 +116,7 @@ func (node *blockNode) setTarget() {
 	// There's no easy way to look up the node that is the 'TargetWidow'th
 	// parent of the input node, because we're not sure which fork the parent
 	// is in, it may not be the current fork. This is not a huge performance
-	// concern, becuase 'TargetWindow' is small and blocks are infrequent.
+	// concern, because 'TargetWindow' is small and blocks are infrequent.
 	// Signature verification of the transactions will still be the bottleneck
 	// for large blocks.
 	//
@@ -86,6 +147,18 @@ func (node *blockNode) setTarget() {
 	node.target = RatToTarget(newRatTarget)
 }
 
+// heavierNode compares the depth of `newNode` to the depth of the current
+// block node, and returns true if `newNode` is sufficiently heavier, where
+// sufficiently is defined by the weight of the current block times
+// `SurpassThreshold`.
+func (s *State) heavierNode(newNode *blockNode) bool {
+	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
+	currentCumDiff := s.depth().Inverse()
+	requiredCumDiff := new(big.Rat).Add(currentCumDiff, threshold)
+	newNodeCumDiff := newNode.depth.Inverse()
+	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
+}
+
 // addBlockToTree takes a block and a parent node, and adds a child node to the
 // parent containing the block. No validation is done.
 func (s *State) addBlockToTree(b Block) (err error) {
@@ -106,7 +179,7 @@ func (s *State) addBlockToTree(b Block) (err error) {
 	s.blockMap[b.ID()] = newNode
 	parentNode.children = append(parentNode.children, newNode)
 
-	if s.heavierFork(newNode) {
+	if s.heavierNode(newNode) {
 		err = s.forkBlockchain(newNode)
 		if err != nil {
 			return

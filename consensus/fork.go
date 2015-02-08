@@ -1,37 +1,8 @@
 package consensus
 
 import (
-	"math/big"
-
 	"github.com/NebulousLabs/Sia/crypto"
 )
-
-// A non-consensus rule that dictates how much heavier a competing chain has to
-// be before the node will switch to mining on that chain. The percent refers
-// to the percent of the weight of the most recent block on the winning chain,
-// not the weight of the entire chain.
-//
-// This rule is in place because the difficulty gets updated every block, and
-// that means that of two competing blocks, one could be very slightly heavier.
-// The slightly heavier one should not be switched to if it was not seen first,
-// because the amount of extra weight in the chain is inconsequential. The
-// maximum difficulty shift will prevent people from manipulating timestamps
-// enough to produce a block that is substantially heavier.
-var (
-	SurpassThreshold = big.NewRat(50, 100)
-)
-
-// heavierFork compares the depth of `newNode` to the depth of the current
-// node, and returns true if `newNode` is sufficiently heavier, where
-// sufficiently is defined by the weight of the current block times
-// `SurpassThreshold`.
-func (s *State) heavierFork(newNode *blockNode) bool {
-	threshold := new(big.Rat).Mul(s.currentBlockWeight(), SurpassThreshold)
-	currentCumDiff := s.depth().Inverse()
-	requiredCumDiff := new(big.Rat).Add(currentCumDiff, threshold)
-	newNodeCumDiff := newNode.depth.Inverse()
-	return newNodeCumDiff.Cmp(requiredCumDiff) == 1
-}
 
 // backtrackToBlockchain returns a list of nodes that go from the current node
 // to the first common parent. The common parent will be the final node in the
@@ -43,7 +14,7 @@ func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
 		nodes = append(nodes, bn)
 
 		// Sanity check - all block nodes should have a parent except the
-		// geensis block. This loop should break befre reaching the genesis
+		// genesis block. This loop should break before reaching the genesis
 		// block.
 		if bn == nil {
 			if DEBUG {

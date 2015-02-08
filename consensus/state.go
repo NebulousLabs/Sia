@@ -5,11 +5,14 @@ import (
 	"sync"
 )
 
+// The zero address and the zero currency are convenience variables.
 var (
 	ZeroAddress  = UnlockHash{0}
 	ZeroCurrency = NewCurrency64(0)
 )
 
+// Block weight is an infinite precision rational number that is the inverse of
+// the block target. A convenient 
 type (
 	BlockWeight *big.Rat
 )
@@ -35,7 +38,7 @@ type State struct {
 	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID
 
-	// These are the consensus variables, refered to as the 'consensus set'.
+	// These are the consensus variables, referred to as the 'consensus set'.
 	// All nodes on the network which have the same set of blocks (the same
 	// currentPath) will have an identical consensus set. Anything else is a
 	// software bug.
