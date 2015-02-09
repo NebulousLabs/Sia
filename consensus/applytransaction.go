@@ -18,8 +18,8 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 			ID:            sci.ParentID,
 			SiacoinOutput: s.siacoinOutputs[sci.ParentID],
 		}
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 		delete(s.siacoinOutputs, sci.ParentID)
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
 
@@ -29,21 +29,125 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
+		scoid := t.SiacoinOutputID(i)
 		if DEBUG {
-			_, exists := s.siacoinOutputs[t.SiacoinOutputID(i)]
+			_, exists := s.siacoinOutputs[scoid]
 			if exists {
-				panic("applying a  transaction with an invalid new output")
+				panic("applying a siacoin output when the output already exists")
 			}
 		}
 
 		scod := SiacoinOutputDiff{
 			New:           true,
-			ID:            t.SiacoinOutputID(i),
+			ID:            scoid,
 			SiacoinOutput: sco,
 		}
-		s.siacoinOutputs[t.SiacoinOutputID(i)] = sco
+		s.siacoinOutputs[scoid] = sco
 		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
+}
+
+// applyFileContracts iterates through all of the file contracts in a
+// transaction and applies them to the state, updating the diffs in the block
+// node.
+func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
+	for i, fc := range t.FileContracts {
+		// Sanity check - the file contract should not exists within the state.
+		fcid := t.FileContractID(i)
+		if DEBUG {
+			_, exists := s.fileContracts[fcid]
+			if exists {
+				panic("applying a file contract when the contract already exists")
+			}
+		}
+
+		fcd := FileContractDiff{
+			New:          true,
+			ID:           fcid,
+			FileContract: fc,
+		}
+		s.fileContracts[fcid] = fc
+		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+	}
+	return
+}
+
+// applyFileContractTerminations iterates through all of the file contract
+// terminations in a transaction and applies them to the state, updating the
+// diffs in the block node.
+func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
+	for _, fct := range t.FileContractTerminations {
+		// Sanity check - termination should affect an existing contract.
+		fc, exists := s.fileContracts[fct.ParentID]
+		if !exists {
+			if DEBUG {
+				panic("file contract termination terminates a nonexisting contract")
+			}
+			continue
+		}
+
+		// Add the diff for the deletion to the block node.
+		fcd := FileContractDiff{
+			New:          false,
+			ID:           fct.ParentID,
+			FileContract: fc,
+		}
+		delete(s.fileContracts, fct.ParentID)
+		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+
+		// Add all of the payouts to the consensus set and block node diffs.
+		for i, payout := range fct.Payouts {
+			id := fct.ParentID.FileContractTerminationPayoutID(i)
+			s.delayedSiacoinOutputs[s.height()][id] = payout
+			bn.delayedSiacoinOutputs[id] = payout
+		}
+	}
+}
+
+// applyStorageProofs iterates through all of the storage proofs in a
+// transaction and applies them to the state, updating the diffs in the block
+// node.
+func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
+	for _, sp := range t.StorageProofs {
+		// Sanity check - output should not already exist.
+		outputID := sp.ParentID.StorageProofOutputID(true)
+		if DEBUG {
+			_, exists := s.siacoinOutputs[outputID]
+			if exists {
+				panic("storage proof output already exists")
+			}
+		}
+
+		// Get the portion of the payout that goes into the siafundPool and the
+		// portion that goes into the siacoin output created for the storage
+		// proof, and then create the siacoin output and add the pool portion
+		// to the pool.
+		fc := s.fileContracts[sp.ParentID]
+		poolPortion, outputPortion := splitContractPayout(fc.Payout)
+		sco := SiacoinOutput{
+			Value:      outputPortion,
+			UnlockHash: fc.ValidProofUnlockHash,
+		}
+		err := s.siafundPool.Add(poolPortion)
+		if DEBUG {
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		// Remove the contract from the consensus set, add the output to the
+		// consensus set, and update the diffs to reflect each change.
+		fcd := FileContractDiff{
+			New:          false,
+			ID:           sp.ParentID,
+			FileContract: fc,
+		}
+		delete(s.fileContracts, sp.ParentID)
+		s.delayedSiacoinOutputs[s.height()][outputID] = sco
+		bn.delayedSiacoinOutputs[outputID] = sco
+		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+	}
+	return
 }
 
 // applySiafundInputs takes all of the siafund inputs in a transaction and
@@ -56,6 +160,7 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 			if !exists {
 				panic("applying a transaction with an invalid unspent siafund output")
 			}
+			continue
 		}
 
 		// Calculate the volume of siacoins to put in the claim output.
@@ -65,17 +170,15 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 		if err != nil {
 			if DEBUG {
 				panic("error while handling claim portion")
-			} else {
-				continue
 			}
+			continue
 		}
 		err = claimPortion.Div(NewCurrency64(SiafundCount))
 		if err != nil {
 			if DEBUG {
 				panic("error while handling claim portion")
-			} else {
-				continue
 			}
+			continue
 		}
 
 		// Add the claim output to the delayed set of outputs.
@@ -94,8 +197,8 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 			ID:            sfi.ParentID,
 			SiafundOutput: s.siafundOutputs[sfi.ParentID],
 		}
-		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 		delete(s.siafundOutputs, sfi.ParentID)
+		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 	}
 }
 
@@ -103,16 +206,25 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 // applies them to the state, updating the diffs in the block node.
 func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
 	for i, sfo := range t.SiafundOutputs {
+		// Sanity check - the output should not exist within the blockchain.
+		sfoid := t.SiafundOutputID(i)
+		if DEBUG {
+			_, exists := s.siafundOutputs[sfoid]
+			if exists {
+				panic("siafund being added to consensus set when it is already in the consensus set")
+			}
+		}
+
 		// Set the claim start.
 		sfo.ClaimStart = s.siafundPool
 
 		// Create and apply the diff.
 		sfod := SiafundOutputDiff{
 			New:           true,
-			ID:            t.SiafundOutputID(i),
+			ID:            sfoid,
 			SiafundOutput: sfo,
 		}
-		s.siafundOutputs[t.SiafundOutputID(i)] = sfo
+		s.siafundOutputs[sfoid] = sfo
 		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 	}
 }

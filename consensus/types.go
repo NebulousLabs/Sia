@@ -306,6 +306,48 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 	return
 }
 
+// splitContractPayout takes a contract payout as input and returns the portion
+// of the payout that goes to the siafund pool, as well as the portion that
+// goes to the siacoin outputs. They add to the original payout exactly. The
+// portion that goes to the siafund pool is 3.9% of the contract payout,
+// rounded down to the nearest 10,000 siacoins.
+func splitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
+	poolPortion = payout
+	outputPortion = payout
+	err := poolPortion.MulFloat(SiafundPortion)
+	if err != nil {
+		if DEBUG {
+			panic("error when doing MulFloat")
+		}
+	}
+	err = poolPortion.RoundDown(SiafundCount)
+	if err != nil {
+		if DEBUG {
+			panic("error during RoundDown")
+		}
+	}
+	err = outputPortion.Sub(poolPortion)
+	if err != nil {
+		if DEBUG {
+			panic("error during Sub")
+		}
+	}
+
+	// Sanity check - pool portion plus output portion should equal payout.
+	if DEBUG {
+		tmp := poolPortion
+		err = tmp.Add(outputPortion)
+		if err != nil {
+			panic("err while adding")
+		}
+		if tmp.Cmp(payout) != 0 {
+			panic("siacoins not split correctly during splitContractPayout")
+		}
+	}
+
+	return
+}
+
 // UnlockHash calculates the root hash of a Merkle tree of the UnlockConditions
 // object. The leaves of this tree are formed by taking the hash of the
 // timelock, the hash of the public keys (one leaf each), and the hash of the
