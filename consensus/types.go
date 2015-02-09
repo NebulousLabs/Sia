@@ -256,14 +256,15 @@ type SiaPublicKey struct {
 
 // A TransactionSignature signs a single PublicKey in one of the
 // UnlockConditions of the transaction. Which UnlockConditions is indicated by
-// the ParentID, which is the same as the string representation of the ParentID
-// of the element that presented the UnlockConditions. The PublicKeyIndex
-// indicates which public key of the UnlockConditions is doing the signing. The
-// Timelock prevents the TransactionSignature from being used until a certain
-// block height. CoveredFields indicates which parts of the transaction have
-// been signed, and the Signature contains the actual signature.
+// the ParentID, which is the same as the crypto.Hash representation of the
+// ParentID of the element that presented the UnlockConditions. The
+// PublicKeyIndex indicates which public key of the UnlockConditions is doing
+// the signing. The Timelock prevents the TransactionSignature from being used
+// until a certain block height. CoveredFields indicates which parts of the
+// transaction have been signed, and the Signature contains the actual
+// signature.
 type TransactionSignature struct {
-	InputID        string
+	InputID        crypto.Hash
 	PublicKeyIndex uint64
 	Timelock       BlockHeight
 	CoveredFields  CoveredFields

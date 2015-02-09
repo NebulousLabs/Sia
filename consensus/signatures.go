@@ -124,10 +124,10 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	}
 
 	// Create the InputSignatures object for each input.
-	sigMap := make(map[string]*InputSignatures)
+	sigMap := make(map[crypto.Hash]*InputSignatures)
 	for i, input := range t.SiacoinInputs {
-		stringID := string(input.ParentID[:])
-		_, exists := sigMap[stringID]
+		id := crypto.Hash(input.ParentID)
+		_, exists := sigMap[id]
 		if exists {
 			return errors.New("siacoin output spent twice in the same transaction.")
 		}
@@ -137,11 +137,11 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			PossibleKeys:        input.UnlockConditions.PublicKeys,
 			Index:               i,
 		}
-		sigMap[stringID] = inSig
+		sigMap[id] = inSig
 	}
 	for i, termination := range t.FileContractTerminations {
-		stringID := string(termination.ParentID[:])
-		_, exists := sigMap[stringID]
+		id := crypto.Hash(termination.ParentID)
+		_, exists := sigMap[id]
 		if exists {
 			return errors.New("file contract terminated twice in the same transaction.")
 		}
@@ -151,11 +151,11 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			PossibleKeys:        termination.TerminationConditions.PublicKeys,
 			Index:               i,
 		}
-		sigMap[stringID] = inSig
+		sigMap[id] = inSig
 	}
 	for i, input := range t.SiafundInputs {
-		stringID := string(input.ParentID[:])
-		_, exists := sigMap[stringID]
+		id := crypto.Hash(input.ParentID)
+		_, exists := sigMap[id]
 		if exists {
 			return errors.New("siafund output spent twice in the same transaction.")
 		}
@@ -165,19 +165,19 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			PossibleKeys:        input.UnlockConditions.PublicKeys,
 			Index:               i,
 		}
-		sigMap[stringID] = inSig
+		sigMap[id] = inSig
 	}
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
-		stringID := string(sig.InputID[:])
+		id := crypto.Hash(sig.InputID)
 
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
-		if sigMap[stringID].RemainingSignatures == 0 {
+		if sigMap[id].RemainingSignatures == 0 {
 			return errors.New("frivolous signature in transaction")
 		}
-		_, exists := sigMap[stringID].UsedKeys[sig.PublicKeyIndex]
+		_, exists := sigMap[id].UsedKeys[sig.PublicKeyIndex]
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
@@ -190,7 +190,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		// Check that the signature verifies. Sia is built to support multiple
 		// types of signature algorithms, this is handled by the switch
 		// statement.
-		publicKey := sigMap[stringID].PossibleKeys[sig.PublicKeyIndex]
+		publicKey := sigMap[id].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case SignatureEntropy:
 			return crypto.ErrInvalidSignature
@@ -219,7 +219,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 
 		// Subtract the number of signatures remaining for this input.
-		sigMap[stringID].RemainingSignatures -= 1
+		sigMap[id].RemainingSignatures -= 1
 	}
 
 	// Check that all inputs have been sufficiently signed.
