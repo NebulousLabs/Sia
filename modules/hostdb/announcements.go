@@ -27,12 +27,12 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ann
 			}
 
 			// check that spend conditions are valid
-			if ha.SpendConditions.CoinAddress() != t.SiacoinOutputs[ha.FreezeIndex].SpendHash {
+			if ha.SpendConditions.UnlockHash() != t.SiacoinOutputs[ha.FreezeIndex].UnlockHash {
 				continue
 			}
 
 			// calculate freeze and check for sane value
-			freeze := consensus.NewCurrency64(uint64(ha.SpendConditions.TimeLock - height))
+			freeze := consensus.NewCurrency64(uint64(ha.SpendConditions.Timelock - height))
 			err = freeze.Mul(t.SiacoinOutputs[ha.FreezeIndex].Value)
 			if err != nil || freeze.IsZero() {
 				continue

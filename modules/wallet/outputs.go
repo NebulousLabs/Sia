@@ -16,7 +16,7 @@ import (
 // indicates whether the output has been spent or not. If it's equal to the
 // wallet's spent counter, then it has been spent since the previous reset.
 type knownOutput struct {
-	id     consensus.OutputID
+	id     consensus.SiacoinOutputID
 	output consensus.SiacoinOutput
 
 	spendable bool
@@ -27,10 +27,10 @@ type knownOutput struct {
 // including secret keys.
 type key struct {
 	spendable       bool
-	spendConditions consensus.SpendConditions
+	spendConditions consensus.UnlockConditions
 	secretKey       crypto.SecretKey
 
-	outputs map[consensus.OutputID]*knownOutput
+	outputs map[consensus.SiacoinOutputID]*knownOutput
 }
 
 // findOutputs returns a set of spendable outputs that add up to at least

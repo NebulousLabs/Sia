@@ -20,8 +20,8 @@ type ContractTerms struct {
 	NumWindows         uint64
 	Price              consensus.Currency // client contribution towards payout each window
 	Collateral         consensus.Currency // host contribution towards payout each window
-	ValidProofAddress  consensus.CoinAddress
-	MissedProofAddress consensus.CoinAddress
+	ValidProofAddress  consensus.UnlockHash
+	MissedProofAddress consensus.UnlockHash
 }
 
 type HostInfo struct {

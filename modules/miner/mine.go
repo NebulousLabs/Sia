@@ -39,7 +39,7 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 			panic("miner received overflowing transaction set from transaction pool")
 		}
 	}
-	output := consensus.SiacoinOutput{Value: subsidy, SpendHash: m.address}
+	output := consensus.SiacoinOutput{Value: subsidy, UnlockHash: m.address}
 	b.MinerPayouts = []consensus.SiacoinOutput{output}
 
 	// If we've got a time earlier than the earliest legal timestamp, set the
@@ -123,7 +123,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 
 			// Grab a new address for the miner.
 			m.mu.Lock()
-			var addr consensus.CoinAddress
+			var addr consensus.UnlockHash
 			addr, _, err = m.wallet.CoinAddress()
 			if err == nil { // Special case: we only update the address if there was no error while generating one.
 				m.address = addr

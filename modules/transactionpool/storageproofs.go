@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction) (err error) {
@@ -21,7 +21,7 @@ func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction
 	var greatestHeight consensus.BlockHeight
 	for _, sp := range t.StorageProofs {
 		var contract consensus.FileContract
-		_, exists := tp.state.Contract(sp.ContractID)
+		_, exists := tp.state.Contract(sp.ParentID)
 		if !exists {
 			err = errors.New("storage proof is for a nonexistant contract")
 			return
@@ -37,20 +37,20 @@ func (tp *TransactionPool) acceptStorageProofTransaction(t consensus.Transaction
 	// Put the transaction in the proof map.
 	heightMap, exists := tp.storageProofs[greatestHeight]
 	if !exists {
-		tp.storageProofs[greatestHeight] = make(map[hash.Hash]consensus.Transaction)
+		tp.storageProofs[greatestHeight] = make(map[crypto.Hash]consensus.Transaction)
 		heightMap = tp.storageProofs[greatestHeight]
 	}
-	_, exists = heightMap[hash.HashObject(t)]
+	_, exists = heightMap[crypto.HashObject(t)]
 	if exists {
 		err = errors.New("transaction already known")
 		return
 	}
-	heightMap[hash.HashObject(t)] = t
+	heightMap[crypto.HashObject(t)] = t
 	return
 }
 
 func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transactions []consensus.Transaction, sizeUsed int) {
-	contractsSatisfied := make(map[consensus.ContractID]struct{})
+	contractsSatisfied := make(map[consensus.FileContractID]struct{})
 
 	// Get storage proofs for all heights from 12 earlier to the current
 	// height.
@@ -65,13 +65,13 @@ func (tp *TransactionPool) storageProofTransactionSet(remainingSize int) (transa
 			}
 
 			for _, proof := range txn.StorageProofs {
-				_, exists := contractsSatisfied[proof.ContractID]
+				_, exists := contractsSatisfied[proof.ParentID]
 				if exists {
 					continue TxnLoop
 				}
 			}
 			for _, proof := range txn.StorageProofs {
-				contractsSatisfied[proof.ContractID] = struct{}{}
+				contractsSatisfied[proof.ParentID] = struct{}{}
 			}
 
 			// Check for size requirements.

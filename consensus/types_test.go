@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 // randomInt64() returns a randomly generated int64 from [int64Min, int64Max].
@@ -30,8 +30,8 @@ func randomUint64(t *testing.T) uint64 {
 	return bigInt.Uint64()
 }
 
-// randomHash() returns a hash.Hash filled with entirely random values.
-func randomHash(t *testing.T) (h hash.Hash) {
+// randomHash() returns a crypto.Hash filled with entirely random values.
+func randomHash(t *testing.T) (h crypto.Hash) {
 	n, err := rand.Read(h[:])
 	if err != nil {
 		t.Fatal(n, "::", err)

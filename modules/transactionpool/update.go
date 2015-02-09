@@ -93,7 +93,7 @@ func (tp *TransactionPool) update() {
 	for _, block := range addedBlocks {
 		for _, txn := range block.Transactions {
 			for _, input := range txn.SiacoinInputs {
-				conflict, exists := tp.usedOutputs[input.OutputID]
+				conflict, exists := tp.usedOutputs[input.ParentID]
 				if exists {
 					tp.removeTransactionFromPool(conflict)
 				}

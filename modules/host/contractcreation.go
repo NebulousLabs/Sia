@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -63,7 +63,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.ValidProofAddress != h.CoinAddress:
 		return errors.New("coins are not paying out to correct address")
 
-	case terms.MissedProofAddress != consensus.ZeroAddress:
+	case terms.MissedProofAddress != consensus.ZeroUnlockHash:
 		return errors.New("burn payout needs to go to the zero address")
 
 	case terms.Price.Cmp(h.Price) < 0:
@@ -78,7 +78,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
-func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot hash.Hash) error {
+func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
 	payout := terms.Price
 	err := payout.Add(terms.Collateral)
 	if err != nil {
@@ -92,16 +92,18 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.Start != terms.StartHeight:
 		return errors.New("bad Start")
 
-	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
+	case contract.Expiration != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
 	case contract.Payout.Cmp(payout) != 0:
 		return errors.New("bad Payout")
 
-	case contract.ValidProofAddress != terms.ValidProofAddress:
+	// TODO: reconstruct how the terms work.
+	case len(contract.ValidProofOutputs) != 1 || contract.ValidProofOutputs[0].UnlockHash != terms.ValidProofAddress:
 		return errors.New("bad ValidProofAddress")
 
-	case contract.MissedProofAddress != terms.MissedProofAddress:
+	// TODO: reconsturct how the terms work.
+	case len(contract.MissedProofOutputs) != 1 || contract.MissedProofOutputs[0].UnlockHash != terms.MissedProofAddress:
 		return errors.New("bad MissedProofAddress")
 
 	case contract.FileMerkleRoot != merkleRoot:
@@ -116,7 +118,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 // internal problems.
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
-	duration := uint64(contract.End - contract.Start)
+	duration := uint64(contract.Expiration - contract.Start)
 
 	penalty := h.Collateral
 	penalty.Mul(consensus.NewCurrency64(contract.FileSize))
@@ -214,7 +216,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		file,
 	)
 
-	merkleRoot, err := hash.ReaderMerkleRoot(tee, terms.FileSize)
+	merkleRoot, err := crypto.ReaderMerkleRoot(tee, terms.FileSize)
 	if err != nil {
 		return
 	}

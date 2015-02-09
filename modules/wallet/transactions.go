@@ -53,10 +53,10 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 
 	// Create and add all of the inputs.
 	for _, knownOutput := range knownOutputs {
-		key := w.keys[knownOutput.output.SpendHash]
+		key := w.keys[knownOutput.output.UnlockHash]
 		newInput := consensus.SiacoinInput{
-			OutputID:        knownOutput.id,
-			SpendConditions: key.spendConditions,
+			ParentID:         knownOutput.id,
+			UnlockConditions: key.spendConditions,
 		}
 		openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
 		txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
@@ -80,8 +80,8 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		txn.SiacoinOutputs = append(
 			txn.SiacoinOutputs,
 			consensus.SiacoinOutput{
-				Value:     refund,
-				SpendHash: coinAddress,
+				Value:      refund,
+				UnlockHash: coinAddress,
 			},
 		)
 	}
@@ -208,14 +208,14 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	for _, inputIndex := range openTxn.inputs {
 		input := txn.SiacoinInputs[inputIndex]
 		sig := consensus.TransactionSignature{
-			InputID:        input.OutputID,
+			InputID:        crypto.Hash(input.ParentID),
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
 		}
 		txn.Signatures = append(txn.Signatures, sig)
 
 		// Hash the transaction according to the covered fields.
-		coinAddress := input.SpendConditions.CoinAddress()
+		coinAddress := input.UnlockConditions.UnlockHash()
 		sigIndex := len(txn.Signatures) - 1
 		secKey := w.keys[coinAddress].secretKey
 		sigHash := txn.SigHash(sigIndex)
@@ -226,7 +226,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		if err != nil {
 			return
 		}
-		copy(txn.Signatures[sigIndex].Signature, encodedSig[:])
+		txn.Signatures[sigIndex].Signature = consensus.Signature(encodedSig[:])
 	}
 
 	// Delete the open transaction.

@@ -5,12 +5,14 @@ import (
 	"compress/gzip"
 	"crypto/rand"
 	"testing"
+
+	"golang.org/x/crypto/twofish"
 )
 
-// TestEncryption makes sure that things can be encrypted and decrypted.
-func TestEncryption(t *testing.T) {
+// TestTwofishEncryption checks that encryption and decryption works correctly.
+func TestTwofishEncryption(t *testing.T) {
 	// Get a key for encryption.
-	key, err := GenerateEncryptionKey()
+	key, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,13 +23,13 @@ func TestEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ciphertext, iv, padding, err := EncryptBytes(key, plaintext)
+	ciphertext, iv, padding, err := key.EncryptBytes(plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the decrypted plaintext.
-	decryptedPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
+	decryptedPlaintext, err := key.DecryptBytes(ciphertext, iv, padding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,11 +40,11 @@ func TestEncryption(t *testing.T) {
 	}
 
 	// Try to decrypt using a different key
-	key2, err := GenerateEncryptionKey()
+	key2, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	badtext, err := DecryptBytes(key2, ciphertext, iv, padding)
+	badtext, err := key2.DecryptBytes(ciphertext, iv, padding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +55,7 @@ func TestEncryption(t *testing.T) {
 	// Try to decrypt using a different iv.
 	badIV := iv
 	badIV[0]++
-	badtext, err = DecryptBytes(key, ciphertext, badIV, padding)
+	badtext, err = key.DecryptBytes(ciphertext, badIV, padding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,34 +64,34 @@ func TestEncryption(t *testing.T) {
 	}
 
 	// Try to decrypt using incorrectly sized ivs, ciphertext, and padding.
-	_, err = DecryptBytes(key, ciphertext, iv[1:], padding)
+	_, err = key.DecryptBytes(ciphertext, iv[1:], padding)
 	if err == nil {
 		t.Fatal("Was able to decrypt with a bad iv.")
 	}
-	_, err = DecryptBytes(key, ciphertext[1:], iv, padding)
+	_, err = key.DecryptBytes(ciphertext[1:], iv, padding)
 	if err == nil {
 		t.Fatal("Was able to decrypt with a bad ciphertext")
 	}
-	_, err = DecryptBytes(key, ciphertext, iv, 1+len(ciphertext))
+	_, err = key.DecryptBytes(ciphertext, iv, 1+len(ciphertext))
 	if err == nil {
 		t.Fatal("Was able to decrypt using bad padding")
 	}
-	_, err = DecryptBytes(key, ciphertext, iv, -1)
+	_, err = key.DecryptBytes(ciphertext, iv, -1)
 	if err == nil {
 		t.Fatal("Was able to decrypt using bad padding")
 	}
 
 	// Try to trigger a panic with nil values.
-	EncryptBytes(key, nil)
-	DecryptBytes(key, nil, iv, padding)
-	DecryptBytes(key, ciphertext, nil, padding)
+	key.EncryptBytes(nil)
+	key.DecryptBytes(nil, iv, padding)
+	key.DecryptBytes(ciphertext, nil, padding)
 
 }
 
-// TestEntropy encrypts and then decrypts a zero plaintext, checking that the
-// ciphertext is high entropy. This is simply to check for obvious mistakes and
-// not to guarantee security of the ciphertext.
-func TestEntropy(t *testing.T) {
+// TestTwofishEntropy encrypts and then decrypts a zero plaintext, checking
+// that the ciphertext is high entropy. This is simply to check for obvious
+// mistakes and not to guarantee security of the ciphertext.
+func TestTwofishEntropy(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
@@ -98,13 +100,13 @@ func TestEntropy(t *testing.T) {
 	// entropy. We measure entropy by seeing how much gzip can compress the
 	// ciphertext. 10 * 1000 bytes was chosen because gzip overhead will exceed
 	// compression rate for smaller files, even low entropy files.
-	cipherSize := 10 * 1000
-	key, err := GenerateEncryptionKey()
+	cipherSize := int(10e3) // default is a float? - caused an error in `make([]byte, cipherSize)`
+	key, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	plaintext := make([]byte, cipherSize)
-	ciphertext, _, _, err := EncryptBytes(key, plaintext)
+	ciphertext, _, _, err := key.EncryptBytes(plaintext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,27 +121,27 @@ func TestEntropy(t *testing.T) {
 	}
 }
 
-// TestPadding encrypts and decrypts a byte slice that invokes every possible
-// padding length.
-func TestPadding(t *testing.T) {
+// TestTwofishPadding encrypts and decrypts a byte slice that invokes every
+// possible padding length.
+func TestTwofishPadding(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
 
 	// Encrypt and decrypt for all of the potential padded values and see that
 	// padding is handled correctly.
-	for i := 256; i < 256+BlockSize; i++ {
-		key, err := GenerateEncryptionKey()
+	for i := 256; i < 256+twofish.BlockSize; i++ {
+		key, err := GenerateTwofishKey()
 		if err != nil {
 			t.Fatal(err)
 		}
 		plaintext := make([]byte, i)
 		rand.Read(plaintext)
-		ciphertext, iv, padding, err := EncryptBytes(key, plaintext)
+		ciphertext, iv, padding, err := key.EncryptBytes(plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
-		decryptedPlaintext, err := DecryptBytes(key, ciphertext, iv, padding)
+		decryptedPlaintext, err := key.DecryptBytes(ciphertext, iv, padding)
 		if err != nil {
 			t.Fatal(err)
 		}

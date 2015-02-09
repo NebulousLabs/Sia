@@ -20,7 +20,7 @@ const (
 type HostAnnouncement struct {
 	IPAddress       network.Address
 	FreezeIndex     uint64 // the index of the output that froze coins
-	SpendConditions consensus.SpendConditions
+	SpendConditions consensus.UnlockConditions
 }
 
 // HostSettings are the parameters advertised by the host. These are the
@@ -35,7 +35,7 @@ type HostSettings struct {
 	MinWindow    consensus.BlockHeight
 	Price        consensus.Currency
 	Collateral   consensus.Currency
-	CoinAddress  consensus.CoinAddress
+	CoinAddress  consensus.UnlockHash
 }
 
 // A HostEntry is an entry in the HostDB. It contains the HostSettings, as

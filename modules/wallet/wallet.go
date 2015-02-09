@@ -24,7 +24,7 @@ type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
 	recentBlock      consensus.BlockID
-	unconfirmedDiffs []consensus.OutputDiff
+	unconfirmedDiffs []consensus.SiacoinOutputDiff
 
 	// Location of the wallet's file, for saving and loading keys.
 	filename string
@@ -45,8 +45,8 @@ type Wallet struct {
 	// spent until a certain height. The wallet will use `timelockedKeys` to
 	// mark keys as unspendable until the timelock has lifted.
 	age            int
-	keys           map[consensus.CoinAddress]*key
-	timelockedKeys map[consensus.BlockHeight][]consensus.CoinAddress
+	keys           map[consensus.UnlockHash]*key
+	timelockedKeys map[consensus.BlockHeight][]consensus.UnlockHash
 
 	// transactions is a list of transactions that are currently being built by
 	// the wallet. Each transaction has a unique id, which is enforced by the
@@ -76,8 +76,8 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		filename: filename,
 
 		age:            1,
-		keys:           make(map[consensus.CoinAddress]*key),
-		timelockedKeys: make(map[consensus.BlockHeight][]consensus.CoinAddress),
+		keys:           make(map[consensus.UnlockHash]*key),
+		timelockedKeys: make(map[consensus.BlockHeight][]consensus.UnlockHash),
 
 		transactions: make(map[string]*openTransaction),
 	}
@@ -92,11 +92,11 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the miner pool, but is also returned.
-func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.CoinAddress) (t consensus.Transaction, err error) {
+func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
 	output := consensus.SiacoinOutput{
-		Value:     amount,
-		SpendHash: dest,
+		Value:      amount,
+		UnlockHash: dest,
 	}
 	id, err := w.RegisterTransaction(t)
 	if err != nil {

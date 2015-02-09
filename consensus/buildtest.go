@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"math/big"
+	"time"
 )
 
 const (
@@ -15,11 +16,11 @@ const (
 	MedianTimestampWindow = 11          // Number of blocks that get considered when determining if a timestamp is valid - should be an odd number.
 	FutureThreshold       = 3 * 60 * 60 // Seconds into the future block timestamps are valid.
 	SiafundCount          = 10e3        // The total (static) number of siafunds.
+	MaturityDelay         = 3           // The number of blocks that need to be waited before certain types of outputs come to maturity.
+	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
 
 	InitialCoinbase = 300e3
 	MinimumCoinbase = 30e3
-
-	GenesisTimestamp = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
 )
 
 var (
@@ -28,4 +29,11 @@ var (
 
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
+
+	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
+
+	// TODO: Pick more reasonable values for these constants.
+	GenesisTimestamp         = Timestamp(time.Now().Unix())
+	GenesisSiafundUnlockHash = ZeroUnlockHash
+	GenesisClaimUnlockHash   = ZeroUnlockHash
 )

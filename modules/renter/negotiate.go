@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/hash"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -21,21 +21,50 @@ var (
 	minerFee = consensus.NewCurrency64(10)
 )
 
-func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot hash.Hash) (txn consensus.Transaction, err error) {
-	// Fill out the contract according to the whims of the host.
+// TODO: I'm not sure that this function was working correctly. The payout of
+// the contract was never set, so I added it in. I might be doing the math
+// wrong.
+func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
+	// Determine our portion of the payout.
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
+	fund := host.Price
+	fund.Mul(consensus.NewCurrency64(uint64(duration)))
+	err = fund.Mul(consensus.NewCurrency64(terms.FileSize))
+	if err != nil {
+		return
+	}
+
+	// Determine the host portion of the payout.
+	collateral := host.Collateral
+	collateral.Mul(consensus.NewCurrency64(uint64(duration)))
+	err = collateral.Mul(consensus.NewCurrency64(terms.FileSize))
+	if err != nil {
+		return
+	}
+
+	// Determine the total payout.
+	var payout consensus.Currency
+	payout.Add(fund)
+	err = payout.Add(collateral)
+	if err != nil {
+		return
+	}
+
+	// Determine the valid proof payout sum (payout - siafund fee)
+	_, validPayout := consensus.SplitContractPayout(payout)
+
+	// Fill out the contract according to the whims of the host.
 	contract := consensus.FileContract{
 		FileMerkleRoot:     merkleRoot,
 		FileSize:           terms.FileSize,
 		Start:              terms.StartHeight,
-		End:                terms.StartHeight + duration,
-		ValidProofAddress:  host.CoinAddress,
-		MissedProofAddress: consensus.ZeroAddress, // The empty address is the burn address.
+		Expiration:         terms.StartHeight + duration,
+		Payout:             payout,
+		ValidProofOutputs:  []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: validPayout, UnlockHash: host.CoinAddress}},
+		MissedProofOutputs: []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: payout, UnlockHash: consensus.ZeroUnlockHash}},
 	}
 
-	fund := host.Price
-	fund.Mul(consensus.NewCurrency64(uint64(duration)))
-	fund.Mul(consensus.NewCurrency64(terms.FileSize))
+	// Add a miner fee to the funding.
 	err = fund.Add(minerFee)
 	if err != nil {
 		return
@@ -86,7 +115,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		Price:              host.Price,      // ??
 		Collateral:         host.Collateral, // ??
 		ValidProofAddress:  host.CoinAddress,
-		MissedProofAddress: consensus.ZeroAddress,
+		MissedProofAddress: consensus.ZeroUnlockHash,
 	}
 
 	// TODO: call r.hostDB.FlagHost(host.IPAddress) if negotiation is unsuccessful
@@ -111,7 +140,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 
 		// simultaneously transmit file data and calculate Merkle root
 		tee := io.TeeReader(up.Data, conn)
-		merkleRoot, err := hash.ReaderMerkleRoot(tee, filesize)
+		merkleRoot, err := crypto.ReaderMerkleRoot(tee, filesize)
 		if err != nil {
 			return
 		}

@@ -7,12 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// TODO: when testing the covered fields stuff, antagonistically try to cause
-// seg faults by throwing covered fields objects at the state which point to
-// nonexistent objects in the transaction.
-
 var (
-	MissingSignaturesErr = errors.New("transaction has inputs with missing signatures")
+	ErrMissingSignatures = errors.New("transaction has inputs with missing signatures")
 )
 
 // Each input has a list of public keys and a required number of signatures.
@@ -60,11 +56,12 @@ func (t Transaction) validCoveredFields() (err error) {
 				len(cf.MinerFees) != 0 ||
 				len(cf.SiacoinOutputs) != 0 ||
 				len(cf.FileContracts) != 0 ||
+				len(cf.FileContractTerminations) != 0 ||
 				len(cf.StorageProofs) != 0 ||
 				len(cf.SiafundInputs) != 0 ||
 				len(cf.SiafundOutputs) != 0 ||
 				len(cf.ArbitraryData) != 0 {
-				err = errors.New("whole transaction is set but not all fields besides signatures are empty")
+				err = errors.New("whole transaction flag is set but not all fields besides signatures are empty")
 				return
 			}
 		}
@@ -85,6 +82,10 @@ func (t Transaction) validCoveredFields() (err error) {
 			return
 		}
 		err = sortedUnique(cf.FileContracts, len(cf.FileContracts)-1)
+		if err != nil {
+			return
+		}
+		err = sortedUnique(cf.FileContractTerminations, len(cf.FileContractTerminations)-1)
 		if err != nil {
 			return
 		}
@@ -114,7 +115,7 @@ func (t Transaction) validCoveredFields() (err error) {
 }
 
 // validSignatures takes a transaction and returns an error if the signatures
-// are not all valid.
+// are not all valid, or if any are missing.
 func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all covered fields objects follow the rules.
 	err = t.validCoveredFields()
@@ -123,44 +124,77 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	}
 
 	// Create the InputSignatures object for each input.
-	sigMap := make(map[OutputID]*InputSignatures)
+	sigMap := make(map[crypto.Hash]*InputSignatures)
 	for i, input := range t.SiacoinInputs {
-		_, exists := sigMap[input.OutputID]
+		id := crypto.Hash(input.ParentID)
+		_, exists := sigMap[id]
 		if exists {
-			return errors.New("output spent twice in the same transaction.")
+			return errors.New("siacoin output spent twice in the same transaction.")
 		}
 
 		inSig := &InputSignatures{
-			RemainingSignatures: input.SpendConditions.NumSignatures,
-			PossibleKeys:        input.SpendConditions.PublicKeys,
+			RemainingSignatures: input.UnlockConditions.NumSignatures,
+			PossibleKeys:        input.UnlockConditions.PublicKeys,
 			Index:               i,
 		}
-		sigMap[input.OutputID] = inSig
+		sigMap[id] = inSig
+	}
+	for i, termination := range t.FileContractTerminations {
+		id := crypto.Hash(termination.ParentID)
+		_, exists := sigMap[id]
+		if exists {
+			return errors.New("file contract terminated twice in the same transaction.")
+		}
+
+		inSig := &InputSignatures{
+			RemainingSignatures: termination.TerminationConditions.NumSignatures,
+			PossibleKeys:        termination.TerminationConditions.PublicKeys,
+			Index:               i,
+		}
+		sigMap[id] = inSig
+	}
+	for i, input := range t.SiafundInputs {
+		id := crypto.Hash(input.ParentID)
+		_, exists := sigMap[id]
+		if exists {
+			return errors.New("siafund output spent twice in the same transaction.")
+		}
+
+		inSig := &InputSignatures{
+			RemainingSignatures: input.UnlockConditions.NumSignatures,
+			PossibleKeys:        input.UnlockConditions.PublicKeys,
+			Index:               i,
+		}
+		sigMap[id] = inSig
 	}
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
+		id := crypto.Hash(sig.InputID)
+
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
-		if sigMap[sig.InputID].RemainingSignatures == 0 {
+		if sigMap[id].RemainingSignatures == 0 {
 			return errors.New("frivolous signature in transaction")
 		}
-		_, exists := sigMap[sig.InputID].UsedKeys[sig.PublicKeyIndex]
+		_, exists := sigMap[id].UsedKeys[sig.PublicKeyIndex]
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
 
 		// Check that the timelock has expired.
-		if sig.TimeLock > s.height() {
+		if sig.Timelock > s.height() {
 			return errors.New("signature used before timelock expiration")
 		}
 
 		// Check that the signature verifies. Sia is built to support multiple
 		// types of signature algorithms, this is handled by the switch
 		// statement.
-		publicKey := sigMap[sig.InputID].PossibleKeys[sig.PublicKeyIndex]
+		publicKey := sigMap[id].PossibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
-		case ED25519Identifier:
+		case SignatureEntropy:
+			return crypto.ErrInvalidSignature
+		case SignatureEd25519:
 			// Decode the public key and signature.
 			var decodedPK crypto.PublicKey
 			err := encoding.Unmarshal(publicKey.Key, &decodedPK)
@@ -168,7 +202,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 				return err
 			}
 			var decodedSig crypto.Signature
-			err = encoding.Unmarshal(sig.Signature, &decodedSig)
+			err = encoding.Unmarshal([]byte(sig.Signature), &decodedSig)
 			if err != nil {
 				return err
 			}
@@ -185,24 +219,15 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 
 		// Subtract the number of signatures remaining for this input.
-		sigMap[sig.InputID].RemainingSignatures -= 1
+		sigMap[id].RemainingSignatures -= 1
 	}
 
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
 		if reqSigs.RemainingSignatures != 0 {
-			return MissingSignaturesErr
+			return ErrMissingSignatures
 		}
 	}
 
 	return nil
-}
-
-// ValidSignatures takes a transaction and determines whether the transaction
-// contains a legal set of signatures, including checking the timelocks against
-// the current state height.
-func (s *State) ValidSignatures(t Transaction) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.validSignatures(t)
 }

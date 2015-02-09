@@ -54,7 +54,7 @@ type daemon struct {
 
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
-	d.state = consensus.CreateGenesisState(consensus.GenesisTimestamp)
+	d.state = consensus.CreateGenesisState()
 	d.tpool, err = transactionpool.New(d.state)
 	if err != nil {
 		return

@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // ContractEntry houses a single contract with its id - you cannot derive the
@@ -13,7 +13,7 @@ import (
 // transaction, we store only the id.
 // TODO: is this needed?
 type ContractEntry struct {
-	ID       consensus.ContractID
+	ID       consensus.FileContractID
 	Contract consensus.FileContract
 }
 
@@ -147,8 +147,8 @@ func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.
 	if err != nil {
 		return
 	}
-	numSegments := hash.CalculateSegments(entry.Contract.FileSize)
-	base, hashSet, err := hash.BuildReaderProof(file, numSegments, segmentIndex)
+	numSegments := crypto.CalculateSegments(entry.Contract.FileSize)
+	base, hashSet, err := crypto.BuildReaderProof(file, numSegments, segmentIndex)
 	if err != nil {
 		return
 	}

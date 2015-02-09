@@ -1,4 +1,7 @@
-package hash
+package crypto
+
+// TODO: Give this file a lot more love. And maybe break it into its own
+// package.
 
 import (
 	"bytes"
@@ -6,10 +9,39 @@ import (
 	"io"
 )
 
+const (
+	SegmentSize = 64 // number of bytes that are hashed to form each base leaf of the Merkle tree
+)
+
+// MerkleRoot calculates the "root hash" formed by repeatedly concatenating
+// and hashing a binary tree of hashes. If the number of leaves is not a
+// power of 2, the orphan hash(es) are not rehashed. Examples:
+//
+//       ┌───┴──┐       ┌────┴───┐         ┌─────┴─────┐
+//    ┌──┴──┐   │    ┌──┴──┐     │      ┌──┴──┐     ┌──┴──┐
+//  ┌─┴─┐ ┌─┴─┐ │  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐  ┌─┴─┐ ┌─┴─┐ ┌─┴─┐   │
+//     (5-leaf)         (6-leaf)             (7-leaf)
+func MerkleRoot(leaves []Hash) Hash {
+	switch len(leaves) {
+	case 0:
+		return Hash{}
+	case 1:
+		return leaves[0]
+	case 2:
+		return JoinHash(leaves[0], leaves[1])
+	}
+
+	// locate largest power of 2 < len(leaves)
+	mid := 1
+	for mid < len(leaves)/2+len(leaves)%2 {
+		mid *= 2
+	}
+
+	return JoinHash(MerkleRoot(leaves[:mid]), MerkleRoot(leaves[mid:]))
+}
+
 // Calculates the number of segments in the file when building a Merkle tree.
 // Should probably be renamed to CountLeaves() or something.
-//
-// TODO: Why is this in package hash?
 func CalculateSegments(fileSize uint64) (numSegments uint64) {
 	numSegments = fileSize / SegmentSize
 	if fileSize%SegmentSize != 0 {

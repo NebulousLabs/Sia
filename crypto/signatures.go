@@ -5,8 +5,6 @@ import (
 	"errors"
 
 	"github.com/agl/ed25519"
-
-	"github.com/NebulousLabs/Sia/hash"
 )
 
 const (
@@ -38,7 +36,7 @@ func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
 
 // SignHAsh signs a message using a secret key. An error is returned if the
 // secret key is nil.
-func SignHash(data hash.Hash, sk SecretKey) (sig Signature, err error) {
+func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
 	if sk == nil {
 		err = ErrNilInput
 		return
@@ -49,7 +47,7 @@ func SignHash(data hash.Hash, sk SecretKey) (sig Signature, err error) {
 
 // VerifyHash uses a public key and input data to verify a signature. And error
 // is returned if the public key or signature is nil.
-func VerifyHash(data hash.Hash, pk PublicKey, sig Signature) (err error) {
+func VerifyHash(data Hash, pk PublicKey, sig Signature) (err error) {
 	if pk == nil {
 		err = ErrNilInput
 		return

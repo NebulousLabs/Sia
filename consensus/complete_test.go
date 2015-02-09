@@ -1,10 +1,16 @@
 package consensus
 
+/*
 import (
 	"testing"
 )
 
 // TODO: Add the 100block waiting outputs to the currency tallying.
+
+// TODO: Split some of these tests off into fork_test.go.
+
+// TODO: in fork_test.go (which doesn't exist yet), try calling fork() on a
+// node that's already in the current consensus set.
 
 // currentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
@@ -51,7 +57,7 @@ func rewindApplyCheck(t *testing.T, s *State) {
 // the case.
 func currencyCheck(t *testing.T, s *State) {
 	siafunds := NewCurrency64(0)
-	for _, siafundOutput := range s.unspentSiafundOutputs {
+	for _, siafundOutput := range s.siafundOutputs {
 		siafunds.Add(siafundOutput.Value)
 	}
 	if siafunds.Cmp(NewCurrency64(SiafundCount)) != 0 {
@@ -63,10 +69,10 @@ func currencyCheck(t *testing.T, s *State) {
 		expectedSiacoins.Add(CalculateCoinbase(i))
 	}
 	siacoins := NewCurrency64(0)
-	for _, output := range s.unspentOutputs {
+	for _, output := range s.siacoinOutputs {
 		siacoins.Add(output.Value)
 	}
-	for _, contract := range s.openContracts {
+	for _, contract := range s.fileContracts {
 		siacoins.Add(contract.Payout)
 	}
 	siacoins.Add(s.siafundPool)
@@ -86,7 +92,9 @@ func consistencyChecks(t *testing.T, states ...*State) {
 		currencyCheck(t, s)
 	}
 }
+*/
 
+/*
 // orderedTestBattery calls all of the individual tests on each of the input
 // states. The goal is to produce state with consistent but diverse sets of
 // blocks to more effectively test things like diffs and forking.
@@ -112,7 +120,9 @@ func orderedTestBattery(t *testing.T, states ...*State) {
 		testStorageProofSubmit(t, s)
 	}
 }
+*/
 
+/*
 // TestEverything creates a state and uses that one state to perform all of the
 // individual tests, building a sizeable state with a lot of diverse
 // transactions. Then it performs consistency checks and other stress testing.
@@ -245,3 +255,4 @@ func TestEverything(t *testing.T) {
 	currentPathCheck(t, s1)
 	rewindApplyCheck(t, s1)
 }
+*/

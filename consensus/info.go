@@ -1,10 +1,19 @@
 package consensus
 
 import (
+	"errors"
+	"math/big"
 	"sort"
 
-	"github.com/NebulousLabs/Sia/hash"
+	"github.com/NebulousLabs/Sia/crypto"
 )
+
+// Contains basic information about the state, but does not go into depth.
+type StateInfo struct {
+	CurrentBlock BlockID
+	Height       BlockHeight
+	Target       Target
+}
 
 // BlockAtHeight() returns the block from the current history at the
 // input height.
@@ -25,7 +34,7 @@ func (s *State) currentBlockNode() *blockNode {
 
 // CurrentBlockWeight() returns the weight of the current block in the
 // heaviest fork.
-func (s *State) currentBlockWeight() BlockWeight {
+func (s *State) currentBlockWeight() *big.Rat {
 	return s.currentBlockNode().target.Inverse()
 }
 
@@ -41,24 +50,24 @@ func (s *State) height() BlockHeight {
 
 // State.Output returns the Output associated with the id provided for input,
 // but only if the output is a part of the utxo set.
-func (s *State) output(id OutputID) (output SiacoinOutput, exists bool) {
-	output, exists = s.unspentOutputs[id]
+func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
+	sco, exists = s.siacoinOutputs[id]
 	return
 }
 
-// Sorted UtxoSet returns all of the unspent transaction outputs sorted
+// Sorted UscoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
+func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
 	// Get all of the outputs in string form and sort the strings.
 	var unspentOutputStrings []string
-	for outputID := range s.unspentOutputs {
+	for outputID := range s.siacoinOutputs {
 		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
 	}
 	sort.Strings(unspentOutputStrings)
 
 	// Get the outputs in order according to their sorted string form.
 	for _, utxoString := range unspentOutputStrings {
-		var outputID OutputID
+		var outputID SiacoinOutputID
 		copy(outputID[:], utxoString)
 		output, _ := s.output(outputID)
 		sortedOutputs = append(sortedOutputs, output)
@@ -66,57 +75,108 @@ func (s *State) sortedUtxoSet() (sortedOutputs []SiacoinOutput) {
 	return
 }
 
+// Sorted UsfoSet returns all of the unspent siafund outputs sorted according
+// to the numerical value of their id.
+func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
+	// Get all of the outputs in string form and sort the strings.
+	var idStrings []string
+	for outputID := range s.siafundOutputs {
+		idStrings = append(idStrings, string(outputID[:]))
+	}
+	sort.Strings(idStrings)
+
+	// Get the outputs in order according to their sorted string form.
+	for _, idString := range idStrings {
+		var outputID SiafundOutputID
+		copy(outputID[:], idString)
+
+		// Sanity check - the output should exist.
+		output, exists := s.siafundOutputs[outputID]
+		if DEBUG {
+			if !exists {
+				panic("output doesn't exist")
+			}
+		}
+
+		sortedOutputs = append(sortedOutputs, output)
+	}
+	return
+}
+
 // StateHash returns the markle root of the current state of consensus.
-func (s *State) stateHash() hash.Hash {
+func (s *State) stateHash() crypto.Hash {
 	// Items of interest:
-	// 1. CurrentBlockID
-	// 2. Current Height
-	// 3. Current Target
-	// 4. Current Depth
-	// 5. Earliest Allowed Timestamp of Next Block
-	// 6. Genesis Block
-	// 7. CurrentPath, ordered by height.
-	// 8. UnspentOutputs, sorted by id.
-	// 9. OpenContracts, sorted by id.
+	// 1.	genesis block
+	// 2.	current block id
+	// 3.	current height
+	// 4.	current target
+	// 5.	current depth
+	// 6.	earliest allowed timestamp of next block
+	// 7.	current path, ordered by height.
+	// 8.	unspent siacoin outputs, sorted by id.
+	// 9.	open file contracts, sorted by id.
+	// 10.	unspent siafund outputs, sorted by id.
+	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
 
 	// Create a slice of hashes representing all items of interest.
-	leaves := []hash.Hash{
-		hash.Hash(s.currentBlockID),
-		hash.HashObject(s.height()),
-		hash.HashObject(s.currentBlockNode().target),
-		hash.HashObject(s.currentBlockNode().depth),
-		hash.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-		hash.Hash(s.blockRoot.block.ID()),
+	leaves := []crypto.Hash{
+		crypto.HashObject(s.blockRoot.block),
+		crypto.Hash(s.currentBlockID),
+		crypto.HashObject(s.height()),
+		crypto.HashObject(s.currentBlockNode().target),
+		crypto.HashObject(s.currentBlockNode().depth),
+		crypto.HashObject(s.currentBlockNode().earliestChildTimestamp()),
 	}
 
 	// Add all the blocks in the current path.
 	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, hash.Hash(s.currentPath[BlockHeight(i)]))
+		leaves = append(leaves, crypto.Hash(s.currentPath[BlockHeight(i)]))
 	}
 
-	// Sort the unspent outputs by the string value of their ID.
-	sortedUtxos := s.sortedUtxoSet()
-
-	// Add the unspent outputs in sorted order.
-	for _, output := range sortedUtxos {
-		leaves = append(leaves, hash.HashObject(output))
+	// Get the set of siacoin outputs in sorted order and add them.
+	sortedUscos := s.sortedUscoSet()
+	for _, output := range sortedUscos {
+		leaves = append(leaves, crypto.HashObject(output))
 	}
 
 	// Sort the open contracts by the string value of their ID.
 	var openContractStrings []string
-	for contractID := range s.openContracts {
+	for contractID := range s.fileContracts {
 		openContractStrings = append(openContractStrings, string(contractID[:]))
 	}
 	sort.Strings(openContractStrings)
 
 	// Add the open contracts in sorted order.
 	for _, stringContractID := range openContractStrings {
-		var contractID ContractID
+		var contractID FileContractID
 		copy(contractID[:], stringContractID)
-		leaves = append(leaves, hash.HashObject(s.openContracts[contractID]))
+		leaves = append(leaves, crypto.HashObject(s.fileContracts[contractID]))
 	}
 
-	return hash.MerkleRoot(leaves)
+	// Get the set of siafund outputs in sorted order and add them.
+	sortedUsfos := s.sortedUsfoSet()
+	for _, output := range sortedUsfos {
+		leaves = append(leaves, crypto.HashObject(output))
+	}
+
+	// Get the set of delayed siacoin outputs, sorted by maturity height then
+	// sorted by id and add them.
+	for i := BlockHeight(0); i <= s.height(); i++ {
+		delayedOutputs := s.delayedSiacoinOutputs[i]
+		var delayedStrings []string
+		for id := range delayedOutputs {
+			delayedStrings = append(delayedStrings, string(id[:]))
+		}
+		sort.Strings(delayedStrings)
+
+		for _, delayedString := range delayedStrings {
+			var id SiacoinOutputID
+			copy(id[:], delayedString)
+			leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
+		}
+	}
+
+	return crypto.MerkleRoot(leaves)
 }
 
 // Block returns the block associated with the given id.
@@ -145,13 +205,60 @@ func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
 	return
 }
 
-// Contract returns a the contract associated with the input id, and whether
-// the contract exists.
-func (s *State) Contract(id ContractID) (fc FileContract, exists bool) {
+func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
+	node, exists := s.blockMap[id]
+	if !exists {
+		err = errors.New("requested an unknown block")
+		return
+	}
+	if !node.diffsGenerated {
+		err = errors.New("diffs have not been generated for the requested block.")
+		return
+	}
+	scods = node.siacoinOutputDiffs
+	return
+}
+
+// OutputDiffsSince returns a set of output diffs representing how the state
+// has changed since block `id`. OutputDiffsSince will flip the `new` value for
+// diffs that got reversed.
+func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	fc, exists = s.openContracts[id]
+	node, exists := s.blockMap[id]
+	if !exists {
+		err = errors.New("block is unknown")
+		return
+	}
+
+	// Get all the ids from going backwards to the blockchain.
+	reversedNodes := s.backtrackToBlockchain(node)
+	height := reversedNodes[len(reversedNodes)-1].height
+	// Eliminate the last node, which is the pivot node, whose diffs are already
+	// known.
+	reversedNodes = reversedNodes[:len(reversedNodes)-1]
+	for _, reversedNode := range reversedNodes {
+		removedBlocks = append(removedBlocks, reversedNode.block.ID())
+	}
+
+	// Get all the ids going forward from the pivot node.
+	for _, exists := s.currentPath[height]; exists; height++ {
+		node := s.blockMap[s.currentPath[height]]
+		addedBlocks = append(addedBlocks, node.block.ID())
+		_, exists = s.currentPath[height+1]
+	}
+
+	return
+}
+
+// Contract returns a the contract associated with the input id, and whether
+// the contract exists.
+func (s *State) Contract(id FileContractID) (fc FileContract, exists bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	fc, exists = s.fileContracts[id]
 	if !exists {
 		return
 	}
@@ -203,7 +310,7 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 
 // Output returns the output associated with an OutputID, returning an error if
 // the output is not found.
-func (s *State) Output(id OutputID) (output SiacoinOutput, exists bool) {
+func (s *State) Output(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.output(id)
@@ -214,12 +321,44 @@ func (s *State) Output(id OutputID) (output SiacoinOutput, exists bool) {
 func (s *State) SortedUtxoSet() []SiacoinOutput {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.sortedUtxoSet()
+	return s.sortedUscoSet()
+}
+
+func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.storageProofSegment(fcid)
 }
 
 // StateHash returns the markle root of the current state of consensus.
-func (s *State) StateHash() hash.Hash {
+func (s *State) StateHash() crypto.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.stateHash()
+}
+
+func (s *State) ValidContract(fc FileContract) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Temporary hack to preserve compatibility.
+	t := Transaction{
+		FileContracts: []FileContract{fc},
+	}
+	return s.validFileContracts(t)
+}
+
+// ValidSignatures takes a transaction and determines whether the transaction
+// contains a legal set of signatures, including checking the timelocks against
+// the current state height.
+func (s *State) ValidSignatures(t Transaction) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validSignatures(t)
+}
+
+func (s *State) ValidTransaction(t Transaction) (err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validTransaction(t)
 }

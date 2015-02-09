@@ -1,4 +1,7 @@
-package hash
+package crypto
+
+// TODO: Give this file a lot more love. And maybe break it into its own
+// package.
 
 import (
 	"bytes"

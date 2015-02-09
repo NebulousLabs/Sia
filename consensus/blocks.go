@@ -2,33 +2,18 @@ package consensus
 
 import (
 	"errors"
-	"math/big"
 	"sort"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// A non-consensus rule that dictates how much heavier a competing chain has to
-// be before the node will switch to mining on that chain. The percent refers
-// to the percent of the weight of the most recent block on the winning chain,
-// not the weight of the entire chain.
-//
-// This rule is in place because the difficulty gets updated every block, and
-// that means that of two competing blocks, one could be very slightly heavier.
-// The slightly heavier one should not be switched to if it was not seen first,
-// because the amount of extra weight in the chain is inconsequential. The
-// maximum difficulty shift will prevent people from manipulating timestamps
-// enough to produce a block that is substantially heavier.
-var (
-	SurpassThreshold = big.NewRat(50, 100)
-)
-
 // Exported Errors
 var (
+	BadBlockErr       = errors.New("block is known to be invalid.")
 	BlockKnownErr     = errors.New("block exists in block map.")
 	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
-	FutureBlockErr    = errors.New("timestamp too far in future, will try again later.")
+	FutureBlockErr    = errors.New("block timestamp too far in future")
 	OrphanErr         = errors.New("block has no known parent")
 	LargeBlockErr     = errors.New("block is too large to be accepted")
 	MinerPayoutErr    = errors.New("miner payout sum does not equal block subsidy")
@@ -59,13 +44,15 @@ func (bn *blockNode) earliestChildTimestamp() Timestamp {
 func (s *State) checkMinerPayouts(b Block) (err error) {
 	// Sanity check - the block's parent needs to exist and be known.
 	parentNode, exists := s.blockMap[b.ParentID]
-	if DEBUG {
-		if !exists {
-			panic("parent node doesn't exist in block map when calling checkMinerPayouts")
+	if !exists {
+		if DEBUG {
+			panic("misuse of checkMinerPayouts - block has no known parent")
+		} else {
+			return OrphanErr
 		}
 	}
 
-	// Find the allowed miner subsidy.
+	// Find the total subsidy for the miners: coinbase + fees.
 	subsidy := CalculateCoinbase(parentNode.height + 1)
 	for _, txn := range b.Transactions {
 		for _, fee := range txn.MinerFees {
@@ -93,11 +80,17 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	return
 }
 
-// validHeader returns err = nil if the header information in the block is
-// valid, and returns an error otherwise.
+// validHeader does some early, low computation verification on the block.
 func (s *State) validHeader(b Block) (err error) {
-	parent := s.blockMap[b.ParentID]
-	// Check the id meets the target.
+	// Grab the parent of the block.
+	parent, exists := s.blockMap[b.ParentID]
+	if !exists {
+		return OrphanErr
+	}
+
+	// Check the id meets the target. This is one of the earliest checks to
+	// enforce that blocks need to have committed to a large amount of work
+	// before being verified - a DoS protection.
 	if !b.CheckTarget(parent.target) {
 		return MissedTargetErr
 	}
@@ -107,13 +100,16 @@ func (s *State) validHeader(b Block) (err error) {
 		return EarlyTimestampErr
 	}
 
-	// Check that the block is not too far in the future.
-	skew := b.Timestamp - Timestamp(time.Now().Unix())
-	if skew > FutureThreshold {
+	// Check that the block is not too far in the future. An external process
+	// will need to be responsible for resubmitting the block once it is no
+	// longer in the future.
+	largestTimeAllowed := Timestamp(time.Now().Unix()) + FutureThreshold
+	if b.Timestamp > largestTimeAllowed {
 		return FutureBlockErr
 	}
 
-	// Check the miner payouts.
+	// Verify that the miner payouts sum to the total amount of fees allowed to
+	// be collected by the miners.
 	err = s.checkMinerPayouts(b)
 	if err != nil {
 		return
@@ -134,22 +130,14 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// See if the block is a known invalid block.
+	// Check maps for information about the block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
-		return errors.New("block is known to be invalid")
+		return BadBlockErr
 	}
-
-	// See if the block is already known and valid.
 	_, exists = s.blockMap[b.ID()]
 	if exists {
 		return BlockKnownErr
-	}
-
-	// See if the block is an orphan.
-	_, exists = s.blockMap[b.ParentID]
-	if !exists {
-		return OrphanErr
 	}
 
 	err = s.validHeader(b)
