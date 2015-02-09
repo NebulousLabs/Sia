@@ -109,25 +109,18 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
 // node.
 func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 	for _, sp := range t.StorageProofs {
-		// Sanity check - output should not already exist.
-		outputID := sp.ParentID.StorageProofOutputID(true)
-		if DEBUG {
-			_, exists := s.siacoinOutputs[outputID]
-			if exists {
-				panic("storage proof output already exists")
+		// Sanity check - the file contract of the storage proof should exist.
+		fc, exists := s.fileContracts[sp.ParentID]
+		if !exists {
+			if DEBUG {
+				panic("storage proof submitted for a file contract that doesn't exist?")
 			}
+			continue
 		}
 
-		// Get the portion of the payout that goes into the siafundPool and the
-		// portion that goes into the siacoin output created for the storage
-		// proof, and then create the siacoin output and add the pool portion
-		// to the pool.
-		fc := s.fileContracts[sp.ParentID]
-		poolPortion, outputPortion := splitContractPayout(fc.Payout)
-		sco := SiacoinOutput{
-			Value:      outputPortion,
-			UnlockHash: fc.ValidProofUnlockHash,
-		}
+		// Get the portion of the contract that goes into the siafund pool and
+		// add it to the siafund pool.
+		poolPortion, _ := SplitContractPayout(fc.Payout)
 		err := s.siafundPool.Add(poolPortion)
 		if DEBUG {
 			if err != nil {
@@ -135,16 +128,27 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 			}
 		}
 
-		// Remove the contract from the consensus set, add the output to the
-		// consensus set, and update the diffs to reflect each change.
+		// Add all of the outputs in the ValidProofOutputs of the contract.
+		for i, output := range fc.ValidProofOutputs {
+			// Sanity check - output should not already exist.
+			id := sp.ParentID.StorageProofOutputID(true, i)
+			if DEBUG {
+				_, exists := s.siacoinOutputs[id]
+				if exists {
+					panic("storage proof output already exists")
+				}
+			}
+
+			s.delayedSiacoinOutputs[s.height()][id] = output
+			bn.delayedSiacoinOutputs[id] = output
+		}
+
 		fcd := FileContractDiff{
 			New:          false,
 			ID:           sp.ParentID,
 			FileContract: fc,
 		}
 		delete(s.fileContracts, sp.ParentID)
-		s.delayedSiacoinOutputs[s.height()][outputID] = sco
-		bn.delayedSiacoinOutputs[outputID] = sco
 		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
 	return

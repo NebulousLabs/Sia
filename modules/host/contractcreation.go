@@ -92,16 +92,18 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.Start != terms.StartHeight:
 		return errors.New("bad Start")
 
-	case contract.End != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
+	case contract.Expiration != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
 	case contract.Payout.Cmp(payout) != 0:
 		return errors.New("bad Payout")
 
-	case contract.ValidProofUnlockHash != terms.ValidProofAddress:
+	// TODO: reconstruct how the terms work.
+	case len(contract.ValidProofOutputs) != 1 || contract.ValidProofOutputs[0].UnlockHash != terms.ValidProofAddress:
 		return errors.New("bad ValidProofAddress")
 
-	case contract.MissedProofUnlockHash != terms.MissedProofAddress:
+	// TODO: reconsturct how the terms work.
+	case len(contract.MissedProofOutputs) != 1 || contract.MissedProofOutputs[0].UnlockHash != terms.MissedProofAddress:
 		return errors.New("bad MissedProofAddress")
 
 	case contract.FileMerkleRoot != merkleRoot:
@@ -116,7 +118,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 // internal problems.
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
-	duration := uint64(contract.End - contract.Start)
+	duration := uint64(contract.Expiration - contract.Start)
 
 	penalty := h.Collateral
 	penalty.Mul(consensus.NewCurrency64(contract.FileSize))

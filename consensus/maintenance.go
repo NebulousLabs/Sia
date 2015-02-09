@@ -58,38 +58,33 @@ func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
 		return
 	}
 
-	// Get the portion of the payout that goes to the siafundPool, and the
-	// portion of the payout that goes to the missed proof output.
-	poolPortion, outputPortion := splitContractPayout(fc.Payout)
-
-	// Add the poolPortion of the payout to the siafund pool.
-	err := s.siafundPool.Add(poolPortion)
-	if err != nil {
+	// Add all of the outputs in the missed proof outputs to the consensus set.
+	for i, output := range fc.MissedProofOutputs {
+		// Sanity check - output should not already exist.
+		outputID := fcid.StorageProofOutputID(false, i)
 		if DEBUG {
-			panic(err)
+			_, exists := s.delayedSiacoinOutputs[s.height()][outputID]
+			if exists {
+				panic("missed proof output already exists in the delayed outputs set")
+			}
+			_, exists = s.siacoinOutputs[outputID]
+			if exists {
+				panic("missed proof output already exists in the siacoin outputs set")
+			}
 		}
-		return
+
+		bn.delayedSiacoinOutputs[outputID] = output
+		s.delayedSiacoinOutputs[s.height()][outputID] = output
 	}
 
-	// Create the output for the missed proof, and the diff for the expired
-	// contract.
-	sco := SiacoinOutput{
-		Value:      outputPortion,
-		UnlockHash: fc.MissedProofUnlockHash,
-	}
+	// Remove the file contract from the consensus set and update the diffs.
 	fcd := FileContractDiff{
 		New:          false,
 		ID:           fcid,
 		FileContract: fc,
 	}
-
-	// Add the output to the delayedOutputs, and add the diffs to the block
-	// node. Finally delete the expired contract.
-	outputID := fcid.StorageProofOutputID(false)
-	s.delayedSiacoinOutputs[s.height()][outputID] = sco
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
-	bn.delayedSiacoinOutputs[outputID] = sco
 	delete(s.fileContracts, fcid)
+	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 
 	return
 }
@@ -103,7 +98,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	// map.
 	var expiredContracts []FileContractID
 	for id, contract := range s.fileContracts {
-		if s.height() == contract.End {
+		if s.height() == contract.Expiration {
 			expiredContracts = append(expiredContracts, id)
 		}
 	}

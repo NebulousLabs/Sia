@@ -113,17 +113,42 @@ func (s *State) validSiacoinInputs(t Transaction) (inputSum Currency, err error)
 
 // validFileContracts iterates through the file contracts of a transaction and
 // makes sure that each is legal.
-func (s *State) validFileContracts(t Transaction) error {
+func (s *State) validFileContracts(t Transaction) (err error) {
 	for _, fc := range t.FileContracts {
+		// Check that start and expiration are reasonable values.
 		if fc.Start <= s.height() {
 			return errors.New("contract must start in the future.")
 		}
-		if fc.End <= fc.Start {
+		if fc.Expiration <= fc.Start {
 			return errors.New("contract duration must be at least one block.")
+		}
+
+		// Check that the valid proof outputs sum to the payout after the
+		// siafund fee has been applied, and check that the missed proof
+		// outputs sum to the full payout.
+		var validProofOutputSum, missedProofOutputSum Currency
+		_, outputPortion := SplitContractPayout(fc.Payout)
+		for _, output := range fc.ValidProofOutputs {
+			err = validProofOutputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
+		}
+		for _, output := range fc.MissedProofOutputs {
+			err = missedProofOutputSum.Add(output.Value)
+			if err != nil {
+				return
+			}
+		}
+		if validProofOutputSum.Cmp(outputPortion) != 0 {
+			return errors.New("contract valid proof outputs do not sum to the payout minus the siafund fee")
+		}
+		if missedProofOutputSum.Cmp(fc.Payout) != 0 {
+			return errors.New("contract missed proof outputs do not sum to the payout")
 		}
 	}
 
-	return nil
+	return
 }
 
 // validFileContractTerminations checks that each termination in a transaction

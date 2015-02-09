@@ -21,21 +21,50 @@ var (
 	minerFee = consensus.NewCurrency64(10)
 )
 
+// TODO: I'm not sure that this function was working correctly. The payout of
+// the contract was never set, so I added it in. I might be doing the math
+// wrong.
 func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
-	// Fill out the contract according to the whims of the host.
+	// Determine our portion of the payout.
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
-	contract := consensus.FileContract{
-		FileMerkleRoot:        merkleRoot,
-		FileSize:              terms.FileSize,
-		Start:                 terms.StartHeight,
-		End:                   terms.StartHeight + duration,
-		ValidProofUnlockHash:  host.CoinAddress,
-		MissedProofUnlockHash: consensus.ZeroUnlockHash, // The empty address is the burn address.
-	}
-
 	fund := host.Price
 	fund.Mul(consensus.NewCurrency64(uint64(duration)))
-	fund.Mul(consensus.NewCurrency64(terms.FileSize))
+	err = fund.Mul(consensus.NewCurrency64(terms.FileSize))
+	if err != nil {
+		return
+	}
+
+	// Determine the host portion of the payout.
+	collateral := host.Collateral
+	collateral.Mul(consensus.NewCurrency64(uint64(duration)))
+	err = collateral.Mul(consensus.NewCurrency64(terms.FileSize))
+	if err != nil {
+		return
+	}
+
+	// Determine the total payout.
+	var payout consensus.Currency
+	payout.Add(fund)
+	err = payout.Add(collateral)
+	if err != nil {
+		return
+	}
+
+	// Determine the valid proof payout sum (payout - siafund fee)
+	_, validPayout := consensus.SplitContractPayout(payout)
+
+	// Fill out the contract according to the whims of the host.
+	contract := consensus.FileContract{
+		FileMerkleRoot:     merkleRoot,
+		FileSize:           terms.FileSize,
+		Start:              terms.StartHeight,
+		Expiration:         terms.StartHeight + duration,
+		Payout:             payout,
+		ValidProofOutputs:  []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: validPayout, UnlockHash: host.CoinAddress}},
+		MissedProofOutputs: []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: payout, UnlockHash: consensus.ZeroUnlockHash}},
+	}
+
+	// Add a miner fee to the funding.
 	err = fund.Add(minerFee)
 	if err != nil {
 		return
