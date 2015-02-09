@@ -260,7 +260,10 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 		s.applyTransaction(bn, txn)
 	}
 
-	// Perform maintanence on the block.
+	// After all of the transactions have been applied, 'maintenance' is
+	// applied on the block. This includes adding any outputs that have reached
+	// maturity, applying any contracts with missed storage proofs, and adding
+	// the miner payouts to the list of delayed outputs.
 	s.applyMaintenance(bn)
 
 	// The final thing is to update the siafundPoolDiff to indicate where the

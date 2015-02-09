@@ -35,55 +35,67 @@ func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 				panic("trying to add a delayed output when the output is already there")
 			}
 		}
-		s.siacoinOutputs[id] = sco
 
-		// Add the matured outputs as a diff of this block.
 		scod := SiacoinOutputDiff{
 			New:           true,
 			ID:            id,
 			SiacoinOutput: sco,
 		}
+		s.siacoinOutputs[id] = sco
 		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
 
-// applyMissedProof adds outputs to the State to manage a missed storage proof
-// on a file contract.
-func (s *State) applyMissedProof(bn *blockNode, fc FileContract, fcid FileContractID) {
+// applyMissedProof adds the outputs and diffs that result from a contract
+// expiring.
+func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
+	// Sanity check - the id must correspond to an existing contract.
+	fc, exists := s.fileContracts[fcid]
+	if !exists {
+		if DEBUG {
+			panic("misuse of applyMissedProof")
+		}
+		return
+	}
+
 	// Get the portion of the payout that goes to the siafundPool, and the
 	// portion of the payout that goes to the missed proof output.
 	poolPortion, outputPortion := splitContractPayout(fc.Payout)
 
-	// Create the output for the missed proof.
+	// Add the poolPortion of the payout to the siafund pool.
+	err := s.siafundPool.Add(poolPortion)
+	if err != nil {
+		if DEBUG {
+			panic(err)
+		}
+		return
+	}
+
+	// Create the output for the missed proof, and the diff for the expired
+	// contract.
 	sco := SiacoinOutput{
 		Value:      outputPortion,
 		UnlockHash: fc.MissedProofUnlockHash,
 	}
-	outputID := fcid.StorageProofOutputID(false)
-
-	// Update the state to include the storage proof output (which goes into
-	// the delayed set) and the siafund pool.
-	s.delayedSiacoinOutputs[s.height()][outputID] = sco
-	delete(s.fileContracts, fcid)
-	err := s.siafundPool.Add(poolPortion)
-	if DEBUG {
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// Create the diffs.
 	fcd := FileContractDiff{
 		New:          false,
 		ID:           fcid,
 		FileContract: fc,
 	}
+
+	// Add the output to the delayedOutputs, and add the diffs to the block
+	// node. Finally delete the expired contract.
+	outputID := fcid.StorageProofOutputID(false)
+	s.delayedSiacoinOutputs[s.height()][outputID] = sco
 	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	bn.delayedSiacoinOutputs[outputID] = sco
+	delete(s.fileContracts, fcid)
+
 	return
 }
 
-// TODO: check out this whole function.
+// applyContractMaintenance iterates through all of the contracts in the
+// consensus set and calls 'applyMissedProof' on any that have expired.
 func (s *State) applyContractMaintenance(bn *blockNode) {
 	// Iterate through all contracts and figure out which ones have expired.
 	// Expiring a contract deletes it from the map we are iterating through, so
@@ -96,15 +108,18 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 		}
 	}
 
-	// Delete all of the contracts that terminated.
+	// Handle all of the contracts that have expired.
 	for _, id := range expiredContracts {
-		contract := s.fileContracts[id]
-		s.applyMissedProof(bn, contract, id)
+		s.applyMissedProof(bn, id)
 	}
 
 	return
 }
 
+// applyMaintence generates, adds, and applies diffs that are generated after
+// all of the transactions of a block have been processed. This includes adding
+// the miner susidies, adding any matured outputs to the set of siacoin
+// outputs, and dealing with any contracts that have expired.
 func (s *State) applyMaintenance(bn *blockNode) {
 	s.applyMinerSubsidy(bn)
 	s.applyDelayedSiacoinOutputMaintenance(bn)
