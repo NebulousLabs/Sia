@@ -56,11 +56,12 @@ func (t Transaction) validCoveredFields() (err error) {
 				len(cf.MinerFees) != 0 ||
 				len(cf.SiacoinOutputs) != 0 ||
 				len(cf.FileContracts) != 0 ||
+				len(cf.FileContractTerminations) != 0 ||
 				len(cf.StorageProofs) != 0 ||
 				len(cf.SiafundInputs) != 0 ||
 				len(cf.SiafundOutputs) != 0 ||
 				len(cf.ArbitraryData) != 0 {
-				err = errors.New("whole transaction is set but not all fields besides signatures are empty")
+				err = errors.New("whole transaction flag is set but not all fields besides signatures are empty")
 				return
 			}
 		}
@@ -81,6 +82,10 @@ func (t Transaction) validCoveredFields() (err error) {
 			return
 		}
 		err = sortedUnique(cf.FileContracts, len(cf.FileContracts)-1)
+		if err != nil {
+			return
+		}
+		err = sortedUnique(cf.FileContractTerminations, len(cf.FileContractTerminations)-1)
 		if err != nil {
 			return
 		}
@@ -110,7 +115,7 @@ func (t Transaction) validCoveredFields() (err error) {
 }
 
 // validSignatures takes a transaction and returns an error if the signatures
-// are not all valid.
+// are not all valid, or if any are missing.
 func (s *State) validSignatures(t Transaction) (err error) {
 	// Check that all covered fields objects follow the rules.
 	err = t.validCoveredFields()
@@ -134,20 +139,6 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 		sigMap[stringID] = inSig
 	}
-	for i, input := range t.SiafundInputs {
-		stringID := string(input.ParentID[:])
-		_, exists := sigMap[stringID]
-		if exists {
-			return errors.New("siafund output spent twice in the same transaction.")
-		}
-
-		inSig := &InputSignatures{
-			RemainingSignatures: input.UnlockConditions.NumSignatures,
-			PossibleKeys:        input.UnlockConditions.PublicKeys,
-			Index:               i,
-		}
-		sigMap[stringID] = inSig
-	}
 	for i, termination := range t.FileContractTerminations {
 		stringID := string(termination.ParentID[:])
 		_, exists := sigMap[stringID]
@@ -158,6 +149,20 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		inSig := &InputSignatures{
 			RemainingSignatures: termination.TerminationConditions.NumSignatures,
 			PossibleKeys:        termination.TerminationConditions.PublicKeys,
+			Index:               i,
+		}
+		sigMap[stringID] = inSig
+	}
+	for i, input := range t.SiafundInputs {
+		stringID := string(input.ParentID[:])
+		_, exists := sigMap[stringID]
+		if exists {
+			return errors.New("siafund output spent twice in the same transaction.")
+		}
+
+		inSig := &InputSignatures{
+			RemainingSignatures: input.UnlockConditions.NumSignatures,
+			PossibleKeys:        input.UnlockConditions.PublicKeys,
 			Index:               i,
 		}
 		sigMap[stringID] = inSig
@@ -225,13 +230,4 @@ func (s *State) validSignatures(t Transaction) (err error) {
 	}
 
 	return nil
-}
-
-// ValidSignatures takes a transaction and determines whether the transaction
-// contains a legal set of signatures, including checking the timelocks against
-// the current state height.
-func (s *State) ValidSignatures(t Transaction) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.validSignatures(t)
 }

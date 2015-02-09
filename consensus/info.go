@@ -315,6 +315,15 @@ func (s *State) ValidContract(fc FileContract) error {
 	return s.validFileContracts(t)
 }
 
+// ValidSignatures takes a transaction and determines whether the transaction
+// contains a legal set of signatures, including checking the timelocks against
+// the current state height.
+func (s *State) ValidSignatures(t Transaction) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validSignatures(t)
+}
+
 func (s *State) ValidTransaction(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
