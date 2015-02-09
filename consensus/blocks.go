@@ -103,8 +103,8 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
-	skew := int(b.Timestamp) - int(Timestamp(time.Now().Unix()))
-	if skew > FutureThreshold {
+	largestTimeAllowed := Timestamp(time.Now().Unix()) + FutureThreshold
+	if b.Timestamp > largestTimeAllowed {
 		return FutureBlockErr
 	}
 

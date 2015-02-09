@@ -118,7 +118,7 @@ func (s *State) stateHash() crypto.Hash {
 	// 10.	unspent siafund outputs, sorted by id.
 	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
 
-	// Create a slice of cryptoes representing all items of interest.
+	// Create a slice of hashes representing all items of interest.
 	leaves := []crypto.Hash{
 		crypto.HashObject(s.blockRoot.block),
 		crypto.Hash(s.currentBlockID),

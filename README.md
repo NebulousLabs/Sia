@@ -88,16 +88,3 @@ Version History
 v0.2.0: Open beta release.
 
 v0.1.0: Initial (closed) beta release.
-
-Protocol
---------
-
-If you wish to know more about the protocol and the consensus rules, you should
-read the documentation in the following order:
-
-- Consensus.md
-- consensus/types.go
-- consensus/state.go
-
-From there, you can start reading through the logic of the consensus package,
-starting at the function AcceptBlock in consensus/blocks.go

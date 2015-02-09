@@ -30,8 +30,7 @@ var (
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
 
-	// The CoinbaseAugment should be a big.Int equal to 1 << 80.
-	CoinbaseAugment = new(big.Int).Mul(big.NewInt(1<<40), big.NewInt(1<<40))
+	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
 
 	// TODO: Pick more reasonable values for these constants.
 	GenesisTimestamp         = Timestamp(time.Now().Unix())

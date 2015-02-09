@@ -9,6 +9,16 @@ This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first
 principles.
 
+If you wish to know more about the protocol and the consensus rules, you should
+read the documentation in the following order:
+
+- Consensus.md
+- consensus/types.go
+- consensus/state.go
+
+From there, you can start reading through the logic of the consensus package,
+starting at the function AcceptBlock in consensus/blocks.go.
+
 Cryptographic Algorithms
 ------------------------
 
@@ -43,11 +53,11 @@ threshold signatures.
 
 #### Signatures: variable type signatures
 
-  Each public key will have an identifier (a 16 byte array) and a byte slice
-  containing an encoding of the public key. The identifier will tell the
+  Each public key will have an specifier (a 16 byte array) and a byte slice
+  containing an encoding of the public key. The specifier will tell the
   signature verification which signing algorithm to use when verifiying a
   signature. Each signature will be a byte slice, the encoding can be
-  determined by looking at the identifier of the corresponding public key.
+  determined by looking at the specifier of the corresponding public key.
 
   This method allows new signature types to be easily added to the currency in
   a way that does not invalidate existing outputs and keys. Adding a new
@@ -56,12 +66,12 @@ threshold signatures.
   breakthroughs in areas like verification speed, ring signatures, etc.
 
   Allowed algorithms:
-	ed25519: The identifier must match the string "ed25519". The public key
+	ed25519: The specifier must match the string "ed25519". The public key
 	must be encoded into 32 bytes. Signatures and public keys will need to
 	follow the ed25519 specification. More information can be found at
 	ed25519.cr.yp.to
 
-	entropy: The identifier must match the string "entropy". The signature will
+	entropy: The specifier must match the string "entropy". The signature will
 	always be invalid. This provides a way to add entropy buffers to
 	SpendCondition objects to protect low entropy information, while being able
 	to prove that the entropy buffers are invalid public keys.
