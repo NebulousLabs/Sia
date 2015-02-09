@@ -291,9 +291,32 @@ func (s *State) SortedUtxoSet() []SiacoinOutput {
 	return s.sortedUscoSet()
 }
 
+func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.storageProofSegment(fcid)
+}
+
 // StateHash returns the markle root of the current state of consensus.
 func (s *State) StateHash() crypto.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.stateHash()
+}
+
+func (s *State) ValidContract(fc FileContract) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Temporary hack to preserve compatibility.
+	t := Transaction{
+		FileContracts: []FileContract{fc},
+	}
+	return s.validFileContracts(t)
+}
+
+func (s *State) ValidTransaction(t Transaction) (err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validTransaction(t)
 }

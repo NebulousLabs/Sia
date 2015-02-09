@@ -1,74 +1,5 @@
 package consensus
 
-import (
-	"errors"
-	"math/big"
-
-	"github.com/NebulousLabs/Sia/crypto"
-)
-
-func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
-	contract, exists := s.fileContracts[fcid]
-	if !exists {
-		err = errors.New("unrecognized file contract id")
-		return
-	}
-
-	triggerHeight := contract.Start - 1
-	triggerBlock, exists := s.blockAtHeight(triggerHeight)
-	if !exists {
-		err = errors.New("no block found at contract trigger block height")
-		return
-	}
-	triggerID := triggerBlock.ID()
-
-	seed := crypto.HashBytes(append(triggerID[:], fcid[:]...))
-	numSegments := int64(crypto.CalculateSegments(contract.FileSize))
-	seedInt := new(big.Int).SetBytes(seed[:])
-	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
-	return
-}
-
-// validContract returns err = nil if the contract is valid in the current
-// context of the state, and returns an error if something about the contract
-// is invalid.
-func (s *State) validContract(fc FileContract) error {
-	if fc.Start <= s.height() {
-		return errors.New("contract must start in the future.")
-	}
-	if fc.End <= fc.Start {
-		return errors.New("contract duration must be at least one block.")
-	}
-	return nil
-}
-
-// validProof returns err = nil if the storage proof provided is valid given
-// the state context, otherwise returning an error to indicate what is invalid.
-func (s *State) validProof(sp StorageProof) error {
-	contract, exists := s.fileContracts[sp.ParentID]
-	if !exists {
-		return errors.New("unrecognized contract id in storage proof")
-	}
-
-	// Check that the storage proof itself is valid.
-	segmentIndex, err := s.storageProofSegment(sp.ParentID)
-	if err != nil {
-		return err
-	}
-	verified := crypto.VerifySegment(
-		sp.Segment,
-		sp.HashSet,
-		crypto.CalculateSegments(contract.FileSize),
-		segmentIndex,
-		contract.FileMerkleRoot,
-	)
-	if !verified {
-		return errors.New("provided storage proof is invalid")
-	}
-
-	return nil
-}
-
 // addContract takes a FileContract and its corresponding ContractID and adds
 // it to the state.
 func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
@@ -173,14 +104,6 @@ func splitContractPayout(payout Currency) (poolPortion Currency, outputPortion C
 // applies them to the state, updating the diffs in the block node.
 func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 	for _, sp := range t.StorageProofs {
-		// Sanity check - storage proof should be valid.
-		if DEBUG {
-			err := s.validProof(sp)
-			if err != nil {
-				panic(err)
-			}
-		}
-
 		// Get the id of the file contract and the siacoin output it creates.
 		fileContract := s.fileContracts[sp.ParentID]
 		outputID := sp.ParentID.StorageProofOutputID(true)
@@ -224,19 +147,4 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
 	return
-}
-
-// StorageProofSegmentIndex takes a contractID and a windowIndex and calculates
-// the index of the segment that should be proven on when doing a proof of
-// storage.
-func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.storageProofSegment(fcid)
-}
-
-func (s *State) ValidContract(fc FileContract) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.validContract(fc)
 }
