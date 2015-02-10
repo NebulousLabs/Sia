@@ -58,7 +58,7 @@ func rewindApplyCheck(t *testing.T, s *State) {
 func currencyCheck(t *testing.T, s *State) {
 	siafunds := NewCurrency64(0)
 	for _, siafundOutput := range s.siafundOutputs {
-		siafunds.Add(siafundOutput.Value)
+		siafunds = siafunds.Add(siafundOutput.Value)
 	}
 	if siafunds.Cmp(NewCurrency64(SiafundCount)) != 0 {
 		t.Error("siafunds inconsistency")
@@ -66,16 +66,15 @@ func currencyCheck(t *testing.T, s *State) {
 
 	expectedSiacoins := NewCurrency64(0)
 	for i := BlockHeight(0); i <= s.Height(); i++ {
-		expectedSiacoins.Add(CalculateCoinbase(i))
+		expectedSiacoins = expectedSiacoins.Add(CalculateCoinbase(i))
 	}
-	siacoins := NewCurrency64(0)
+	siacoins := s.siafundPool
 	for _, output := range s.siacoinOutputs {
-		siacoins.Add(output.Value)
+		siacoins = siacoins.Add(output.Value)
 	}
 	for _, contract := range s.fileContracts {
-		siacoins.Add(contract.Payout)
+		siacoins = siacoins.Add(contract.Payout)
 	}
-	siacoins.Add(s.siafundPool)
 	if siacoins.Cmp(expectedSiacoins) != 0 {
 		t.Error(siacoins)
 		t.Error(expectedSiacoins)

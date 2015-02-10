@@ -79,12 +79,6 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
 func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
-	payout := terms.Price
-	err := payout.Add(terms.Collateral)
-	if err != nil {
-		return err
-	}
-
 	switch {
 	case contract.FileSize != terms.FileSize:
 		return errors.New("bad FileSize")
@@ -95,7 +89,7 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 	case contract.Expiration != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
 		return errors.New("bad End")
 
-	case contract.Payout.Cmp(payout) != 0:
+	case terms.Price.Add(terms.Collateral).Cmp(contract.Payout) != 0:
 		return errors.New("bad Payout")
 
 	// TODO: reconstruct how the terms work.
@@ -119,14 +113,9 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
 	duration := uint64(contract.Expiration - contract.Start)
-
-	penalty := h.Collateral
-	penalty.Mul(consensus.NewCurrency64(contract.FileSize))
-	err := penalty.Mul(consensus.NewCurrency64(duration))
-	// TODO: move this check to a different function?
-	if err != nil {
-		return err
-	}
+	filesizeCost := consensus.NewCurrency64(contract.FileSize)
+	durationCost := consensus.NewCurrency64(duration)
+	penalty := h.Collateral.Mul(filesizeCost).Mul(durationCost)
 
 	id, err := h.wallet.RegisterTransaction(txn)
 	if err != nil {

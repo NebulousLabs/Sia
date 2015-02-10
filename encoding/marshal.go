@@ -82,19 +82,15 @@ func marshal(val reflect.Value) (b []byte) {
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
 		b = EncUint64(uint64(val.Len()))
-		// special case for byte slices
-		if val.Type().Elem().Kind() == reflect.Uint8 {
-			return append(b, val.Bytes()...)
-		}
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays
 		if val.Type().Elem().Kind() == reflect.Uint8 {
-			b = make([]byte, val.Len())
-			for i := range b {
-				b[i] = byte(val.Index(i).Uint())
-			}
-			return
+			// convert array to slice so we can use Bytes()
+			// can't just use Slice() because array may be unaddressable
+			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
+			reflect.Copy(slice, val)
+			return append(b, slice.Bytes()...)
 		}
 		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
@@ -140,8 +136,8 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	if u, ok := val.Interface().(SiaUnmarshaler); ok {
 		return u.UnmarshalSia(b)
 	} else if val.CanAddr() {
-		if m, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			return m.UnmarshalSia(b)
+		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
+			return u.UnmarshalSia(b)
 		}
 	}
 
@@ -175,31 +171,22 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		var sliceLen int
 		sliceLen, b, consumed = int(DecUint64(b[:8])), b[8:], 8
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
-		// special case for byte slices
-		if val.Type().Elem().Kind() == reflect.Uint8 {
-			val.SetBytes(b[:sliceLen])
-			return consumed + sliceLen
-		}
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays (e.g. hashes)
 		if val.Type().Elem().Kind() == reflect.Uint8 {
-			for i := 0; i < val.Len(); i++ {
-				val.Index(i).SetUint(uint64(b[i]))
-			}
-			return val.Len()
+			slice := reflect.ValueOf(b).Slice(0, val.Len())
+			return consumed + reflect.Copy(val, slice)
 		}
 		// arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
-			elem := val.Index(i)
-			n := unmarshal(b, elem)
+			n := unmarshal(b, val.Index(i))
 			consumed, b = consumed+n, b[n:]
 		}
 		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
-			f := val.Field(i)
-			n := unmarshal(b, f)
+			n := unmarshal(b, val.Field(i))
 			consumed, b = consumed+n, b[n:]
 		}
 		return

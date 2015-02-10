@@ -66,12 +66,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	}
 
 	// Add a refund output if needed.
-	//
-	// TODO: I may be mistaken, but is this code block right? Don't you want to
-	// make the refund IFF err == nil?
-	refund := total
-	err = refund.Sub(amount)
-	if err != nil && !refund.IsZero() {
+	if total.Cmp(amount) > 0 {
 		coinAddress, _, err := w.coinAddress()
 		if err != nil {
 			return err
@@ -80,7 +75,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		txn.SiacoinOutputs = append(
 			txn.SiacoinOutputs,
 			consensus.SiacoinOutput{
-				Value:      refund,
+				Value:      total.Sub(amount),
 				UnlockHash: coinAddress,
 			},
 		)

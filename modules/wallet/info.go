@@ -1,13 +1,13 @@
 package wallet
 
 import (
-	"math/big"
+	"github.com/NebulousLabs/Sia/consensus"
 )
 
 // WalletInfo contains basic information about the wallet.
 type WalletInfo struct {
-	Balance      *big.Int
-	FullBalance  *big.Int
+	Balance      consensus.Currency
+	FullBalance  consensus.Currency
 	NumAddresses int
 }
 

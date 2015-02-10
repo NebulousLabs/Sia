@@ -44,29 +44,20 @@ func (t Transaction) FollowsStorageProofRules() error {
 // outputs created by storage proofs and siafund outputs are not considered, as
 // they were considered when the contract responsible for funding them was
 // created.
-func (t Transaction) SiacoinOutputSum() (sum Currency, err error) {
-	// NOTE: manual overflow checking is performed here to prevent redundant
-	// checks.
-
+func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	// Add the miner fees.
 	for _, fee := range t.MinerFees {
-		sum.Add(fee)
+		sum = sum.Add(fee)
 	}
 
 	// Add the contract payouts
 	for _, contract := range t.FileContracts {
-		sum.Add(contract.Payout)
+		sum = sum.Add(contract.Payout)
 	}
 
 	// Add the outputs
 	for _, output := range t.SiacoinOutputs {
-		sum.Add(output.Value)
-	}
-
-	// Check for overflow
-	if sum.Overflow() {
-		err = ErrOverflow
-		return
+		sum = sum.Add(output.Value)
 	}
 
 	return
@@ -102,10 +93,7 @@ func (s *State) validSiacoinInputs(t Transaction) (inputSum Currency, err error)
 		}
 
 		// Add the input value to the sum.
-		err = inputSum.Add(sco.Value)
-		if err != nil {
-			return
-		}
+		inputSum = inputSum.Add(sco.Value)
 	}
 
 	return
@@ -129,16 +117,10 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 		var validProofOutputSum, missedProofOutputSum Currency
 		_, outputPortion := SplitContractPayout(fc.Payout)
 		for _, output := range fc.ValidProofOutputs {
-			err = validProofOutputSum.Add(output.Value)
-			if err != nil {
-				return
-			}
+			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
 		for _, output := range fc.MissedProofOutputs {
-			err = missedProofOutputSum.Add(output.Value)
-			if err != nil {
-				return
-			}
+			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return errors.New("contract valid proof outputs do not sum to the payout minus the siafund fee")
@@ -170,10 +152,7 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 		// contract.
 		var payoutSum Currency
 		for _, payout := range fct.Payouts {
-			err = payoutSum.Add(payout.Value)
-			if err != nil {
-				return
-			}
+			payoutSum = payoutSum.Add(payout.Value)
 		}
 		if payoutSum.Cmp(fc.Payout) != 0 {
 			return errors.New("contract termination has incorrect payouts")
@@ -278,10 +257,7 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 		}
 
 		// Add this input's value
-		err = siafundInputSum.Add(sfo.Value)
-		if err != nil {
-			return
-		}
+		siafundInputSum = siafundInputSum.Add(sfo.Value)
 	}
 
 	// Check that all siafund outputs are valid and that the siafund output sum
@@ -295,10 +271,7 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 		}
 
 		// Add this output's value.
-		err = siafundOutputSum.Add(sfo.Value)
-		if err != nil {
-			return
-		}
+		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
 	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
 		return errors.New("siafund inputs do not equal siafund outpus within transaction")
@@ -323,11 +296,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	if err != nil {
 		return
 	}
-	siacoinOutputSum, err := t.SiacoinOutputSum()
-	if err != nil {
-		return
-	}
-	if siacoinInputSum.Cmp(siacoinOutputSum) != 0 {
+	if siacoinInputSum.Cmp(t.SiacoinOutputSum()) != 0 {
 		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
