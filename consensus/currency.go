@@ -26,7 +26,7 @@ func NewCurrency64(x uint64) (c Currency) {
 }
 
 func (c Currency) Big() *big.Int {
-	return &c.i
+	return new(big.Int).Set(&c.i)
 }
 
 func (c Currency) Cmp(y Currency) int {
