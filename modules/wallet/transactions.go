@@ -66,8 +66,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 	}
 
 	// Add a refund output if needed.
-	refund := total.Sub(amount)
-	if !refund.IsZero() {
+	if total.Cmp(amount) > 0 {
 		coinAddress, _, err := w.coinAddress()
 		if err != nil {
 			return err
@@ -76,7 +75,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
 		txn.SiacoinOutputs = append(
 			txn.SiacoinOutputs,
 			consensus.SiacoinOutput{
-				Value:      refund,
+				Value:      total.Sub(amount),
 				UnlockHash: coinAddress,
 			},
 		)
