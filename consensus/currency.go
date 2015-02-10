@@ -15,48 +15,61 @@ type Currency struct {
 	i big.Int
 }
 
+// NewCurrency creates a Currency value from a big.Int.
 func NewCurrency(b *big.Int) (c Currency) {
 	c.i = *b
 	return
 }
 
+// NewCurrency64 creates a Currency value from a uint64.
 func NewCurrency64(x uint64) (c Currency) {
 	c.i.SetUint64(x)
 	return
 }
 
+// Big returns the value of c as a *big.Int. Importantly, it does not provide
+// access to the c's internal big.Int object, only a copy. This is in
+// accordance with the immutability constraint described above.
 func (c Currency) Big() *big.Int {
 	return new(big.Int).Set(&c.i)
 }
 
+// Cmp compares two Currency values. The return value follows the convention
+// of the math/big package.
 func (c Currency) Cmp(y Currency) int {
 	return c.i.Cmp(&y.i)
 }
 
+// IsZero returns true if c's value is 0.
 func (c Currency) IsZero() bool {
 	return c.i.Sign() == 0
 }
 
+// Add returns a new Currency value y = c + x.
 func (c Currency) Add(x Currency) (y Currency) {
 	y.i.Add(&c.i, &x.i)
 	return
 }
 
+// Sub returns a new Currency value y = c - x.
 func (c Currency) Sub(x Currency) (y Currency) {
 	y.i.Sub(&c.i, &x.i)
 	return
 }
 
+// Mult returns a new Currency value y = c * x.
 func (c Currency) Mul(x Currency) (y Currency) {
 	y.i.Mul(&c.i, &x.i)
 	return
 }
 
+// Div returns a new Currency value y = c / x.
 func (c Currency) Div(x Currency) (y Currency) {
 	y.i.Div(&c.i, &x.i)
 	return
 }
 
+// MulFloat returns a new Currency value y = c * x, where x is a float64.
 func (c Currency) MulFloat(x float64) (y Currency) {
 	yRat := new(big.Rat).Mul(
 		new(big.Rat).SetInt(&c.i),
@@ -66,6 +79,7 @@ func (c Currency) MulFloat(x float64) (y Currency) {
 	return
 }
 
+// Sqrt returns a new Currency value y = sqrt(c)
 func (c Currency) Sqrt() (y Currency) {
 	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	sqrt := new(big.Rat).SetFloat64(math.Sqrt(f))
@@ -104,10 +118,12 @@ func (c *Currency) UnmarshalSia(b []byte) int {
 	return 1 + n
 }
 
+// MarshalJSON implements the json.Marshaler interface.
 func (c Currency) MarshalJSON() ([]byte, error) {
 	return c.i.MarshalJSON()
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface.
 func (c *Currency) UnmarshalJSON(b []byte) error {
 	return c.i.UnmarshalJSON(b)
 }
