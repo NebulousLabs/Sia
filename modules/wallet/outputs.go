@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"errors"
-	"math/big"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -54,10 +53,7 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			if !knownOutput.spendable || knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			err = total.Add(knownOutput.output.Value)
-			if err != nil {
-				return
-			}
+			total = total.Add(knownOutput.output.Value)
 			knownOutputs = append(knownOutputs, knownOutput)
 
 			if total.Cmp(amount) >= 0 {
@@ -77,13 +73,12 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // Otherwise, all coins that could be spent are counted (including those that
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
-func (w *Wallet) Balance(full bool) (total *big.Int) {
+func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	w.update()
 
 	// Iterate through all outputs and tally them up.
-	total = new(big.Int)
 	for _, key := range w.keys {
 		if !key.spendable && !full {
 			continue
@@ -95,7 +90,7 @@ func (w *Wallet) Balance(full bool) (total *big.Int) {
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
-			total.Add(total, knownOutput.output.Value.Big())
+			total = total.Add(knownOutput.output.Value)
 		}
 	}
 	return

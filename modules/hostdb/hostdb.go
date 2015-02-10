@@ -168,10 +168,10 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 
 	// Get a random number between 0 and state.TotalWeight and then scroll
 	// through state.HostList until at least that much weight has been passed.
-	randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight)
+	randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
 	if err != nil {
 		return
 	}
 	// no possibility of error
-	return hdb.hostTree.entryAtWeight(randWeight)
+	return hdb.hostTree.entryAtWeight(consensus.NewCurrency(randWeight))
 }

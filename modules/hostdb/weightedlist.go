@@ -2,8 +2,8 @@ package hostdb
 
 import (
 	"fmt"
-	"math/big"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -18,8 +18,8 @@ import (
 // not reorganized.
 type hostNode struct {
 	parent *hostNode
-	weight *big.Int // cumulative weight of this node and all children.
-	count  int      // cumulative count of all children.
+	weight consensus.Currency // cumulative weight of this node and all children.
+	count  int                // cumulative count of all children.
 
 	left  *hostNode
 	right *hostNode
@@ -43,7 +43,7 @@ func createNode(parent *hostNode, entry modules.HostEntry) *hostNode {
 // insert inserts a host entry into the node. insert is recursive. The value
 // returned is the number of nodes added to the tree, always 1 or 0.
 func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *hostNode) {
-	hn.weight.Add(hn.weight, entryWeight(entry))
+	hn.weight = hn.weight.Add(entryWeight(entry))
 
 	// If the current node is empty, add the entry but don't increase the
 	// count.
@@ -76,11 +76,11 @@ func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *ho
 // remove takes a node and removes it from the tree by climbing through the
 // list of parents. Remove does not delete nodes.
 func (hn *hostNode) remove() {
-	hn.weight.Sub(hn.weight, entryWeight(hn.hostEntry))
+	hn.weight = hn.weight.Sub(entryWeight(hn.hostEntry))
 	hn.taken = false
 	current := hn.parent
 	for current != nil {
-		current.weight.Sub(current.weight, entryWeight(hn.hostEntry))
+		current.weight = current.weight.Sub(entryWeight(hn.hostEntry))
 		current = current.parent
 	}
 }
@@ -89,7 +89,7 @@ func (hn *hostNode) remove() {
 // weight. Though the tree has an arbitrary sorting, a sufficiently random
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
-func (hn *hostNode) entryAtWeight(weight *big.Int) (entry modules.HostEntry, err error) {
+func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.HostEntry, err error) {
 	// Check for an errored weight call.
 	if weight.Cmp(hn.weight) > 0 {
 		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)
@@ -101,7 +101,7 @@ func (hn *hostNode) entryAtWeight(weight *big.Int) (entry modules.HostEntry, err
 		if weight.Cmp(hn.left.weight) < 0 {
 			return hn.left.entryAtWeight(weight)
 		}
-		weight.Sub(weight, hn.left.weight) // Search from 0th index of right side.
+		weight = weight.Sub(hn.left.weight) // Search from 0th index of right side.
 	}
 	if hn.right != nil && weight.Cmp(hn.right.weight) < 0 {
 		return hn.right.entryAtWeight(weight)

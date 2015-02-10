@@ -25,30 +25,16 @@ var (
 // the contract was never set, so I added it in. I might be doing the math
 // wrong.
 func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
-	// Determine our portion of the payout.
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
-	fund := host.Price
-	fund.Mul(consensus.NewCurrency64(uint64(duration)))
-	err = fund.Mul(consensus.NewCurrency64(terms.FileSize))
-	if err != nil {
-		return
-	}
+
+	// Determine our portion of the payout.
+	fund := host.Price.Mul(consensus.NewCurrency64(uint64(duration))).Mul(consensus.NewCurrency64(terms.FileSize))
 
 	// Determine the host portion of the payout.
-	collateral := host.Collateral
-	collateral.Mul(consensus.NewCurrency64(uint64(duration)))
-	err = collateral.Mul(consensus.NewCurrency64(terms.FileSize))
-	if err != nil {
-		return
-	}
+	collateral := host.Collateral.Mul(consensus.NewCurrency64(uint64(duration))).Mul(consensus.NewCurrency64(terms.FileSize))
 
 	// Determine the total payout.
-	var payout consensus.Currency
-	payout.Add(fund)
-	err = payout.Add(collateral)
-	if err != nil {
-		return
-	}
+	payout := fund.Add(collateral)
 
 	// Determine the valid proof payout sum (payout - siafund fee)
 	_, validPayout := consensus.SplitContractPayout(payout)
@@ -64,11 +50,8 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 		MissedProofOutputs: []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: payout, UnlockHash: consensus.ZeroUnlockHash}},
 	}
 
-	// Add a miner fee to the funding.
-	err = fund.Add(minerFee)
-	if err != nil {
-		return
-	}
+	// Add a miner fee to the fund.
+	fund = fund.Add(minerFee)
 
 	// Create the transaction.
 	id, err := r.wallet.RegisterTransaction(txn)
