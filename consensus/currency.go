@@ -103,3 +103,11 @@ func (c *Currency) UnmarshalSia(b []byte) int {
 	c.i.SetBytes(b[:n])
 	return 1 + n
 }
+
+func (c Currency) MarshalJSON() ([]byte, error) {
+	return c.i.MarshalJSON()
+}
+
+func (c *Currency) UnmarshalJSON(b []byte) error {
+	return c.i.UnmarshalJSON(b)
+}
