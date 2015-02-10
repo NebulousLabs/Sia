@@ -73,11 +73,11 @@ func (c Currency) Sqrt() (y Currency) {
 	return
 }
 
-func (c Currency) RoundDown(nearest int64) error {
-	round := big.NewInt(nearest)
-	c.i.Div(&c.i, round)
-	c.i.Mul(&c.i, round)
-	return nil
+// RoundDown returns the largest multiple of n <= c.
+func (c Currency) RoundDown(n uint64) (y Currency) {
+	diff := new(big.Int).Mod(&c.i, new(big.Int).SetUint64(n))
+	y.i.Sub(&c.i, diff)
+	return
 }
 
 // MarshalSia implements the encoding.SiaMarshaler interface. It returns the
