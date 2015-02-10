@@ -1,50 +1,27 @@
 package consensus
 
 import (
-	"errors"
+	"math"
 	"math/big"
 )
 
-var (
-	ErrOverflow = errors.New("Currency overflowed 128 bits")
-)
-
-// A Currency is a 128-bit unsigned integer. Currency operations are performed
-// via math/big.
-//
-// The Currency object also keeps track of whether an overflow has occurred
-// during arithmetic operations. Once the 'overflow' flag has been set to
-// true, all subsequent operations will return an error, and the result of the
-// operation is undefined. This flag can never be reset; a new Currency must
-// be created. Callers can also manually check for overflow using the Overflow
-// method.
-//
-// TODO: Find better names for the currency variables.
+// A Currency represents a number of siacoins or siafunds. Internally, a
+// Currency value is unbounded; however, Currency values sent over the wire
+// protocol are subject to a maximum size of 255 bytes (approximately 10^614).
+// Unlike the math/big library, whose methods modify their receiver, all
+// arithmetic Currency methods return a new value. This is necessary to
+// preserve the immutability of types containing Currency fields.
 type Currency struct {
-	i  big.Int
-	of bool // has an overflow ever occurred?
+	i big.Int
 }
 
-func NewCurrency(b *big.Int) (c Currency, err error) {
-	if b.BitLen() > 128 || b.Sign() < 0 {
-		c.of = true
-		err = ErrOverflow
-		return
-	}
+func NewCurrency(b *big.Int) (c Currency) {
 	c.i = *b
 	return
 }
 
-func NewCurrency64(x uint64) Currency {
-	// no possibility of error
-	c, _ := NewCurrency(new(big.Int).SetUint64(x))
-	return c
-}
-
-func (c *Currency) SetBig(b *big.Int) (err error) {
-	oldOF := c.of
-	*c, err = NewCurrency(b)
-	c.of = c.of || oldOF // preserve overflow flag
+func NewCurrency64(x uint64) (c Currency) {
+	c.i.SetUint64(x)
 	return
 }
 
@@ -52,91 +29,77 @@ func (c *Currency) Big() *big.Int {
 	return &c.i
 }
 
-func (c *Currency) Add(y Currency) error {
-	if c.of {
-		return ErrOverflow
-	}
-	return c.SetBig(c.i.Add(&c.i, &y.i))
-}
-
-func (c *Currency) Sub(y Currency) error {
-	if c.of {
-		return ErrOverflow
-	}
-	return c.SetBig(c.i.Sub(&c.i, &y.i))
-}
-
-func (c *Currency) Mul(y Currency) error {
-	if c.of {
-		return ErrOverflow
-	}
-	return c.SetBig(c.i.Mul(&c.i, &y.i))
-}
-
-func (c *Currency) MulFloat(x float64) (err error) {
-	if c.of {
-		return ErrOverflow
-	}
-
-	cBig := c.Big()
-	cRat := new(big.Rat).SetInt(cBig)
-	xRat := new(big.Rat).SetFloat64(x)
-	cRat.Mul(cRat, xRat)
-	*c, err = NewCurrency(c.Big().Div(cRat.Num(), cRat.Denom()))
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (c *Currency) Div(y Currency) error {
-	if c.of {
-		return ErrOverflow
-	}
-	return c.SetBig(c.i.Div(&c.i, &y.i))
-}
-
-func (c *Currency) Sqrt() *Currency {
-	f, _ := new(big.Rat).SetInt(&c.i).Float64()
-	rat := new(big.Rat).SetFloat64(f)
-	s, _ := NewCurrency(new(big.Int).Div(rat.Num(), rat.Denom()))
-	s.of = c.of // preserve overflow
-	return &s
-}
-
-func (c *Currency) RoundDown(nearest int64) error {
-	if c.of {
-		return ErrOverflow
-	}
-	round := big.NewInt(nearest)
-	c.i.Div(&c.i, round)
-	c.i.Mul(&c.i, round)
-	return nil
+func (c *Currency) Cmp(y Currency) int {
+	return c.i.Cmp(&y.i)
 }
 
 func (c *Currency) IsZero() bool {
 	return c.i.Sign() == 0
 }
 
-func (c *Currency) Cmp(y Currency) int {
-	return c.i.Cmp(&y.i)
+func (c *Currency) Add(x Currency) (y Currency) {
+	y.i.Add(&c.i, &x.i)
+	return
 }
 
-func (c *Currency) Overflow() bool {
-	return c.of
+func (c *Currency) Sub(x Currency) (y Currency) {
+	y.i.Sub(&c.i, &x.i)
+	return
 }
 
+func (c *Currency) Mul(x Currency) (y Currency) {
+	y.i.Mul(&c.i, &x.i)
+	return
+}
+
+func (c *Currency) Div(x Currency) (y Currency) {
+	y.i.Div(&c.i, &x.i)
+	return
+}
+
+func (c *Currency) MulFloat(x float64) (y Currency) {
+	yRat := new(big.Rat).Mul(
+		new(big.Rat).SetInt(&c.i),
+		new(big.Rat).SetFloat64(x),
+	)
+	y.i.Div(yRat.Num(), yRat.Denom())
+	return
+}
+
+func (c *Currency) Sqrt() (y Currency) {
+	f, _ := new(big.Rat).SetInt(&c.i).Float64()
+	sqrt := new(big.Rat).SetFloat64(math.Sqrt(f))
+	y.i.Div(sqrt.Num(), sqrt.Denom())
+	return
+}
+
+func (c *Currency) RoundDown(nearest int64) error {
+	round := big.NewInt(nearest)
+	c.i.Div(&c.i, round)
+	c.i.Mul(&c.i, round)
+	return nil
+}
+
+// MarshalSia implements the encoding.SiaMarshaler interface. It returns the
+// byte-slice representation of the Currency's internal big.Int, prepended
+// with a single byte indicating the length of the slice. This implies a
+// maximum encodable value of 2^(255 * 8), or approximately 10^614.
+//
+// Note that as the bytes of the big.Int correspond to the absolute value of
+// the integer, there is no way to marshal a negative Currency.
 func (c Currency) MarshalSia() []byte {
-	b := make([]byte, 16)
-	copy(b, c.i.Bytes())
-	return b
+	b := c.i.Bytes()
+	return append(
+		[]byte{byte(len(b))},
+		b...,
+	)
 }
 
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface. See
+// MarshalSia for a description of how Currency values are marshalled.
 func (c *Currency) UnmarshalSia(b []byte) int {
-	var err error
-	*c, err = NewCurrency(new(big.Int).SetBytes(b[:16]))
-	if err != nil {
-		return -1
-	}
-	return 16
+	var n int
+	n, b = int(b[0]), b[1:]
+	c.i.SetBytes(b[:n])
+	return 1 + n
 }
