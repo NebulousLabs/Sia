@@ -113,7 +113,9 @@ func verifyContract(contract consensus.FileContract, terms modules.ContractTerms
 func (h *Host) acceptContract(txn consensus.Transaction) error {
 	contract := txn.FileContracts[0]
 	duration := uint64(contract.Expiration - contract.Start)
-	penalty := h.Collateral.Mul(consensus.NewCurrency64(contract.FileSize)).Mul(consensus.NewCurrency64(duration))
+	filesizeCost := consensus.NewCurrency64(contract.FileSize)
+	durationCost := consensus.NewCurrency64(duration)
+	penalty := h.Collateral.Mul(filesizeCost).Mul(durationCost)
 
 	id, err := h.wallet.RegisterTransaction(txn)
 	if err != nil {

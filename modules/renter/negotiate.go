@@ -28,10 +28,12 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
 
 	// Determine our portion of the payout.
-	fund := host.Price.Mul(consensus.NewCurrency64(uint64(duration))).Mul(consensus.NewCurrency64(terms.FileSize))
+	filesizeCost := consensus.NewCurrency64(terms.FileSize)
+	durationCost := consensus.NewCurrency64(uint64(duration))
+	fund := host.Price.Mul(filesizeCost).Mul(durationCost)
 
 	// Determine the host portion of the payout.
-	collateral := host.Collateral.Mul(consensus.NewCurrency64(uint64(duration))).Mul(consensus.NewCurrency64(terms.FileSize))
+	collateral := host.Collateral.Mul(filesizeCost).Mul(durationCost)
 
 	// Determine the total payout.
 	payout := fund.Add(collateral)

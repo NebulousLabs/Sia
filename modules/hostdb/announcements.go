@@ -32,7 +32,8 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ann
 			}
 
 			// calculate freeze and check for sane value
-			freeze := consensus.NewCurrency64(uint64(ha.SpendConditions.Timelock - height)).Mul(t.SiacoinOutputs[ha.FreezeIndex].Value)
+			timelockCost := consensus.NewCurrency64(uint64(ha.SpendConditions.Timelock - height))
+			freeze := timelockCost.Mul(t.SiacoinOutputs[ha.FreezeIndex].Value)
 			if freeze.IsZero() {
 				continue
 			}
