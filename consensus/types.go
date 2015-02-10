@@ -307,14 +307,6 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 func SplitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
 	poolPortion = payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
 	outputPortion = payout.Sub(poolPortion)
-
-	// Sanity check - pool portion plus output portion should equal payout.
-	if DEBUG {
-		if poolPortion.Add(outputPortion).Cmp(payout) != 0 {
-			panic("siacoins not split correctly during splitContractPayout")
-		}
-	}
-
 	return
 }
 
