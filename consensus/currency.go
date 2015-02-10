@@ -25,39 +25,39 @@ func NewCurrency64(x uint64) (c Currency) {
 	return
 }
 
-func (c *Currency) Big() *big.Int {
+func (c Currency) Big() *big.Int {
 	return &c.i
 }
 
-func (c *Currency) Cmp(y Currency) int {
+func (c Currency) Cmp(y Currency) int {
 	return c.i.Cmp(&y.i)
 }
 
-func (c *Currency) IsZero() bool {
+func (c Currency) IsZero() bool {
 	return c.i.Sign() == 0
 }
 
-func (c *Currency) Add(x Currency) (y Currency) {
+func (c Currency) Add(x Currency) (y Currency) {
 	y.i.Add(&c.i, &x.i)
 	return
 }
 
-func (c *Currency) Sub(x Currency) (y Currency) {
+func (c Currency) Sub(x Currency) (y Currency) {
 	y.i.Sub(&c.i, &x.i)
 	return
 }
 
-func (c *Currency) Mul(x Currency) (y Currency) {
+func (c Currency) Mul(x Currency) (y Currency) {
 	y.i.Mul(&c.i, &x.i)
 	return
 }
 
-func (c *Currency) Div(x Currency) (y Currency) {
+func (c Currency) Div(x Currency) (y Currency) {
 	y.i.Div(&c.i, &x.i)
 	return
 }
 
-func (c *Currency) MulFloat(x float64) (y Currency) {
+func (c Currency) MulFloat(x float64) (y Currency) {
 	yRat := new(big.Rat).Mul(
 		new(big.Rat).SetInt(&c.i),
 		new(big.Rat).SetFloat64(x),
@@ -66,14 +66,14 @@ func (c *Currency) MulFloat(x float64) (y Currency) {
 	return
 }
 
-func (c *Currency) Sqrt() (y Currency) {
+func (c Currency) Sqrt() (y Currency) {
 	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	sqrt := new(big.Rat).SetFloat64(math.Sqrt(f))
 	y.i.Div(sqrt.Num(), sqrt.Denom())
 	return
 }
 
-func (c *Currency) RoundDown(nearest int64) error {
+func (c Currency) RoundDown(nearest int64) error {
 	round := big.NewInt(nearest)
 	c.i.Div(&c.i, round)
 	c.i.Mul(&c.i, round)
