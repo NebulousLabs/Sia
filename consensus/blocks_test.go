@@ -203,8 +203,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 			NewCurrency64(250),
 		},
 	}
-	coinbasePayout = CalculateCoinbase(s.Height() + 1)
-	coinbasePayout.Add(NewCurrency64(25))
+	coinbasePayout = CalculateCoinbase(s.Height() + 1).Add(NewCurrency64(25))
 	payout = []SiacoinOutput{
 		SiacoinOutput{Value: coinbasePayout},
 		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},
@@ -255,8 +254,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 			NewCurrency64(50),
 		},
 	}
-	coinbasePayout = CalculateCoinbase(s.Height() + 1)
-	coinbasePayout.Add(NewCurrency64(25))
+	coinbasePayout = CalculateCoinbase(s.Height() + 1).Add(NewCurrency64(25))
 	payout = []SiacoinOutput{
 		SiacoinOutput{Value: coinbasePayout},
 		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},

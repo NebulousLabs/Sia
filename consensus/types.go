@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"math/big"
-
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -298,13 +296,7 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 		base = MinimumCoinbase
 	}
 
-	c, err := NewCurrency(new(big.Int).Mul(big.NewInt(int64(base)), CoinbaseAugment))
-	if err != nil {
-		if DEBUG {
-			panic("err during CaluculateCoinbase?")
-		}
-	}
-	return
+	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
 }
 
 // splitContractPayout takes a contract payout as input and returns the portion
@@ -313,35 +305,12 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 // portion that goes to the siafund pool is 3.9% of the contract payout,
 // rounded down to the nearest 10,000 siacoins.
 func SplitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
-	poolPortion = payout
-	outputPortion = payout
-	err := poolPortion.MulFloat(SiafundPortion)
-	if err != nil {
-		if DEBUG {
-			panic("error when doing MulFloat")
-		}
-	}
-	err = poolPortion.RoundDown(SiafundCount)
-	if err != nil {
-		if DEBUG {
-			panic("error during RoundDown")
-		}
-	}
-	err = outputPortion.Sub(poolPortion)
-	if err != nil {
-		if DEBUG {
-			panic("error during Sub")
-		}
-	}
+	poolPortion = payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
+	outputPortion = payout.Sub(poolPortion)
 
 	// Sanity check - pool portion plus output portion should equal payout.
 	if DEBUG {
-		tmp := poolPortion
-		err = tmp.Add(outputPortion)
-		if err != nil {
-			panic("err while adding")
-		}
-		if tmp.Cmp(payout) != 0 {
+		if poolPortion.Add(outputPortion).Cmp(payout) != 0 {
 			panic("siacoins not split correctly during splitContractPayout")
 		}
 	}

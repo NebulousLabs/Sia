@@ -83,19 +83,12 @@ func (a *assistant) mineCurrentBlock(minerPayouts []SiacoinOutput, txns []Transa
 // miner fee total.
 func (a *assistant) payouts(height BlockHeight, feeTotal Currency) (payouts []SiacoinOutput) {
 	// Get the total miner subsidy.
-	valueRemaining := CalculateCoinbase(height)
-	err := valueRemaining.Add(feeTotal)
-	if err != nil {
-		a.tester.Fatal(err)
-	}
+	valueRemaining := CalculateCoinbase(height).Add(feeTotal)
 
 	// Create several payouts that the assistant can spend, then append a
 	// 'remainder' payout.
 	for i := 0; i < 12; i++ {
-		err := valueRemaining.Sub(NewCurrency64(1e6))
-		if err != nil {
-			a.tester.Fatal(err)
-		}
+		valueRemaining = valueRemaining.Sub(NewCurrency64(1e6))
 		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), UnlockHash: a.unlockHash})
 	}
 	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, UnlockHash: a.unlockHash})

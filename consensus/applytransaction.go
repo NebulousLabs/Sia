@@ -121,12 +121,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
 		poolPortion, _ := SplitContractPayout(fc.Payout)
-		err := s.siafundPool.Add(poolPortion)
-		if DEBUG {
-			if err != nil {
-				panic(err)
-			}
-		}
+		s.siafundPool = s.siafundPool.Add(poolPortion)
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, output := range fc.ValidProofOutputs {
@@ -168,22 +163,8 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 		}
 
 		// Calculate the volume of siacoins to put in the claim output.
-		claimPortion := s.siafundPool
 		sfo := s.siafundOutputs[sfi.ParentID]
-		err := claimPortion.Sub(sfo.ClaimStart)
-		if err != nil {
-			if DEBUG {
-				panic("error while handling claim portion")
-			}
-			continue
-		}
-		err = claimPortion.Div(NewCurrency64(SiafundCount))
-		if err != nil {
-			if DEBUG {
-				panic("error while handling claim portion")
-			}
-			continue
-		}
+		claimPortion := s.siafundPool.Sub(sfo.ClaimStart).Div(NewCurrency64(SiafundCount))
 
 		// Add the claim output to the delayed set of outputs.
 		sco := SiacoinOutput{

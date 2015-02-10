@@ -56,20 +56,14 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	subsidy := CalculateCoinbase(parentNode.height + 1)
 	for _, txn := range b.Transactions {
 		for _, fee := range txn.MinerFees {
-			err = subsidy.Add(fee)
-			if err != nil {
-				return
-			}
+			subsidy = subsidy.Add(fee)
 		}
 	}
 
 	// Find the sum of the miner payouts.
 	var payoutSum Currency
 	for _, payout := range b.MinerPayouts {
-		err = payoutSum.Add(payout.Value)
-		if err != nil {
-			return
-		}
+		payoutSum = payoutSum.Add(payout.Value)
 	}
 
 	// Return an error if the subsidy isn't equal to the payouts.
@@ -116,8 +110,7 @@ func (s *State) validHeader(b Block) (err error) {
 	}
 
 	// Check that the block is the correct size.
-	encodedBlock := encoding.Marshal(b)
-	if len(encodedBlock) > BlockSizeLimit {
+	if len(encoding.Marshal(b)) > BlockSizeLimit {
 		return LargeBlockErr
 	}
 
