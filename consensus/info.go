@@ -337,28 +337,36 @@ func (s *State) StateHash() crypto.Hash {
 	return s.stateHash()
 }
 
-func (s *State) ValidContract(fc FileContract) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// Temporary hack to preserve compatibility.
-	t := Transaction{
-		FileContracts: []FileContract{fc},
-	}
-	return s.validFileContracts(t)
-}
-
-// ValidSignatures takes a transaction and determines whether the transaction
-// contains a legal set of signatures, including checking the timelocks against
-// the current state height.
-func (s *State) ValidSignatures(t Transaction) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.validSignatures(t)
-}
-
 func (s *State) ValidTransaction(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.validTransaction(t)
+}
+
+// ValidTransactionComponenets checks that a transaction follows basic rules,
+// such as the storage proof rules, and it checks that all of the signatures
+// are valid, but it does not check that all of the inputs, storage proofs, and
+// terminations act on existing outputs and contracts. This function is
+// primarily for the transaction pool, which has access to unconfirmed
+// transactions. ValidTransactionComponents will not return an error simply
+// because there are missing inputs. ValidTransactionComponenets will return an
+// error if the state height is not sufficient to fulfill all of the
+// requirements of the transaction.
+func (s *State) ValidTransactionComponents(t Transaction) (err error) {
+	err = t.FollowsStorageProofRules()
+	if err != nil {
+		return
+	}
+
+	err = s.validFileContracts(t)
+	if err != nil {
+		return
+	}
+
+	err = s.validSignatures(t)
+	if err != nil {
+		return
+	}
+
+	return
 }

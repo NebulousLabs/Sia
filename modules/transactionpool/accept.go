@@ -66,6 +66,12 @@ func (tp *TransactionPool) checkInputs(t consensus.Transaction) (inputSum consen
 // parts of the transaction are legal according to the Standard.md rules and
 // the consensus rules.
 func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error) {
+	// Check that the transaction follows IsStandardTransaction rules.
+	err = tp.IsStandardTransaction(t)
+	if err != nil {
+		return
+	}
+
 	// Get the input sum and verify that all inputs come from a valid source
 	// (confirmed or unconfirmed).
 	inputSum, err := tp.checkInputs(t)
@@ -79,21 +85,9 @@ func (tp *TransactionPool) validTransaction(t consensus.Transaction) (err error)
 		return
 	}
 
-	// Check that the signatures are valid.
-	err = tp.state.ValidSignatures(t)
-	if err != nil {
-		return
-	}
-
-	// Check that all contracts are legal within the existing state. This means
-	// that they have a non-zero payout and that the start date is less than
-	// the current height of the blockchain.
-	for _, contract := range t.FileContracts {
-		err = tp.state.ValidContract(contract)
-		if err != nil {
-			return
-		}
-	}
+	// TODO: check that all storage proofs, etc. are valid on the *current
+	// fork*. The transactionpool will by default reject anything that's not
+	// valid on the currently recognized longest blockchain.
 
 	return
 }

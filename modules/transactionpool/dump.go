@@ -25,16 +25,9 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 
 	currentTxn := tp.head
 	for currentTxn != nil {
-		// Make sure that any contracts created in the transaction are still
-		// valid - if a transaction doesn't make it into the state in time, the
-		// contract inside can become invalid.
-		for _, contract := range currentTxn.transaction.FileContracts {
-			err = tp.state.ValidContract(contract)
-			if err != nil {
-				// Break out of the inner loop but pass the error down.
-				break
-			}
-		}
+		// Check that the transaction is stil valid on the current fork. This
+		// is mostly a paranoia test, will probably be removed.
+		err = tp.validTransaction(currentTxn.transaction)
 		if err != nil {
 			badTxn := currentTxn
 			currentTxn = currentTxn.next
