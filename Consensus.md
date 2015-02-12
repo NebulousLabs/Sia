@@ -180,7 +180,7 @@ Block Subsidy
 -------------
 
 The coinbase for a block is (300,000 - height) * 2^80, with a minimum of 30,000
-* 2^80. Any miner fees get added to the coinbase to create the block subsidy.
+\* 2^80. Any miner fees get added to the coinbase to create the block subsidy.
 The block subsidy is then given to multiple outputs, called the miner payouts.
 The total value of the miner payouts must equal the block subsidy. Having
 multiple outputs allows the block reward to be sent to multiple people,
