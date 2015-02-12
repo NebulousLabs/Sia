@@ -1,6 +1,19 @@
 Sia 0.2.0
 =========
 
+Sia is a new cryptosystem designed to enable incentivized, decentralized
+storage in a byzantine environment. The consensus protocol has been finished
+and is partially explained in Consensus.md. There is a working reference
+implementation in the consensus folder.
+
+While many of the components of Sia are well understood and trusted
+cryptographic ideas, Sia itself has not had a lot of academic review. As such,
+Sia should be seen as highly experimental, and using Sia should be seen as
+taking a risk. As per the license, Sia is software that comes without any
+warranty, and the developers cannot be held responsible for any damages that
+occur. We encourage you to use Sia, but only with files and money that you are
+comfortable using.
+
 This distribution is an early beta release. It is likely to have many bugs,
 some of which may be severe. Please use with caution.
 
