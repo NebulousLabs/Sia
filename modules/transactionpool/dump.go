@@ -10,7 +10,7 @@ import (
 // prioritizes transactions that have already been in a block (on another
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
-func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transaction, err error) {
+func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction, err error) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
 	tp.update()
@@ -19,52 +19,50 @@ func (tp *TransactionPool) TransactionSet() (transactions []consensus.Transactio
 	// more transactions or until the size limit has been reached.
 	var remainingSize int = consensus.BlockSizeLimit - 1024 // Leave 1kb for block header and metadata, which should actually only be about 120 bytes.
 
-	// Add storage proofs.
-	transactions, sizeUsed := tp.storageProofTransactionSet(remainingSize)
-	remainingSize -= sizeUsed
-
+	// Iterate through the transactions and add them in first-come-first-serve
+	// order.
 	currentTxn := tp.head
 	for currentTxn != nil {
-		// Check that the transaction is stil valid on the current fork. This
-		// is mostly a paranoia test, will probably be removed.
-		err = tp.validTransaction(currentTxn.transaction)
-		if err != nil {
-			badTxn := currentTxn
-			currentTxn = currentTxn.next
-			tp.removeTransactionFromList(badTxn)
-			continue
+		// Sanity check - the transaction should be valid against the
+		// unconfirmed set of transactions. Not checked is the additional
+		// constraint that all dependencies appear earlier in the linked list.
+		if DEBUG {
+			err = tp.validTransaction(currentTxn.transaction)
+			if err != nil {
+				panic(err)
+			}
 		}
 
-		// Allocate space for the transaction, breaking if there is not enough
-		// space.
+		// Allocate space for the transaction, exiting the loop if there is not
+		// enough space.
 		encodedTxn := encoding.Marshal(currentTxn.transaction)
 		remainingSize -= len(encodedTxn)
 		if remainingSize < 0 {
 			break
 		}
 
-		// Add the transaction to the list, without updating the linked list.
-		// (linked list updating only happens when processing an update from
-		// the state or getting a new transaction)
-		transactions = append(transactions, currentTxn.transaction)
+		// Add the transaction to the transaction set and move onto the next
+		// transaction.
+		transactionSet = append(transactionSet, currentTxn.transaction)
 		currentTxn = currentTxn.next
 	}
 
 	return
 }
 
-// Returns the set of diffs that would be applied to the state if all of the
-// transactions in the transaction pool (excluding storage proofs) got
-// accepted.
+// UnconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
+// would be created immediately if all of the unconfirmed transactions were
+// added to the next block.
 func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
 	tp.update()
 
-	// For each transaction in the linked list, grab the diffs that would be
-	// created by the transaction.
+	// For each transaction in the linked list, grab the siacoin output diffs
+	// that would be created by the transaction.
 	currentTxn := tp.head
 	for currentTxn != nil {
+		// Produce diffs for the siacoin outputs consumed by this transaction.
 		txn := currentTxn.transaction
 		for _, input := range txn.SiacoinInputs {
 			scod := consensus.SiacoinOutputDiff{
@@ -74,9 +72,12 @@ func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 
 			// Get the output from tpool if it's a new output, and from the
 			// state if it already existed.
-			output, exists := tp.outputs[input.ParentID]
+			output, exists := tp.siacoinOutputs[input.ParentID]
 			if !exists {
 				output, exists = tp.state.Output(input.ParentID)
+
+				// Sanity check - the output should exist in the state because
+				// the transaction is in the transaction pool.
 				if consensus.DEBUG {
 					if !exists {
 						panic("output in tpool txn that's neither in the state or in the tpool")
@@ -88,6 +89,7 @@ func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 			scods = append(scods, scod)
 		}
 
+		// Produce diffs for the siacoin outputs created by this transaction.
 		for i, output := range txn.SiacoinOutputs {
 			scod := consensus.SiacoinOutputDiff{
 				New:           true,
@@ -96,6 +98,8 @@ func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 			}
 			scods = append(scods, scod)
 		}
+
+		currentTxn = currentTxn.next
 	}
 
 	return

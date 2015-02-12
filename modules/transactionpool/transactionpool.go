@@ -5,62 +5,83 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/crypto"
 )
 
-type unconfirmedTransaction struct {
-	transaction  consensus.Transaction
-	dependents   map[*unconfirmedTransaction]struct{}
+// The current transaction pool code is blind to miner fees, and will not
+// prioritize transactions that have higher miner fees.
 
+// An unconfirmedTransaction is a node in a linked list containing a
+// transaction and a list of transactions directly dependent on the
+// transaction. The dependents list makes it easy to remove all invalid
+// transactions in the event that a conflict or double spend makes in into the
+// blockchain and invalidates existing unconfirmed transactions.
+type unconfirmedTransaction struct {
+	transaction consensus.Transaction
+	dependents  map[*unconfirmedTransaction]struct{}
+
+	// Linked list variables.
 	previous *unconfirmedTransaction
 	next     *unconfirmedTransaction
 }
 
+// The TransactionPool keeps a set of transactions that would be valid in a
+// block, including transactions that depend on eachother or (in the case of
+// storage proofs) depend on a specific block being in the blockchain.
+//
+// Transactions are kept in a linked list which indicates the order that
+// unconfirmed transactions should be added to the blockchain.
 type TransactionPool struct {
 	state       *consensus.State
 	recentBlock consensus.BlockID
 
+	// Linked list variables.
 	head *unconfirmedTransaction
 	tail *unconfirmedTransaction
 
+	// A reference to the outputs that have been created by other unconfirmed
+	// transactions.
 	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
 	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
 
 	usedSiacoinOutputs       map[consensus.SiacoinOutputID]*unconfirmedTransaction
+	newSiacoinOutputs        map[consensus.SiacoinOutputID]*unconfirmedTransaction
+	fileContracts            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	fileContractTerminations map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
+	newSiafundOutputs        map[consensus.SiafundOutputID]*unconfirmedTransaction
 
 	mu sync.RWMutex
 }
 
+// New creates a transaction pool that's ready to receive transactions.
 func New(state *consensus.State) (tp *TransactionPool, err error) {
 	if state == nil {
 		err = errors.New("transaction pool cannot use an nil state")
 		return
 	}
 
+	// Return a transaction pool with no transactions and a recentBlock
+	// pointing to the state's current block.
 	tp = &TransactionPool{
 		state:       state,
-		recentBlock: state.BlockAtHeight(0).ID(),
+		recentBlock: state.CurrentBlock().ID(),
 
 		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
 		siafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),
 
-		usedSiacoinOutputs: make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
+		usedSiacoinOutputs:       make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
 		fileContractTerminations: make(map[consensus.FileContractID]*unconfirmedTransaction),
-		storageProofs: make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
-		usedSiafundOutputs: make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
+		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
+		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
 	}
-
-	tp.state.RLock()
-	defer tp.state.RUnlock()
-	tp.update()
 
 	return
 }
 
-func (tp *TransactionPool) addTransactionToHead(ut *unconfirmedTransaction) {
+// prependUnconfirmedTransaction takes an unconfirmed transaction and prepends
+// it to the linked list of the transaction pool.
+func (tp *TransactionPool) prependUnconfirmedTransaction(ut *unconfirmedTransaction) {
 	if tp.head == nil {
 		// Sanity check - tail should never be nil unless head is also nil.
 		if consensus.DEBUG {
@@ -78,9 +99,9 @@ func (tp *TransactionPool) addTransactionToHead(ut *unconfirmedTransaction) {
 	}
 }
 
-// addTransactionToTail takes an unconfirmedTransaction and adds it to the tail
-// of the linked list of transactions.
-func (tp *TransactionPool) addTransactionToTail(ut *unconfirmedTransaction) {
+// appendUnconfirmedTransaction takes an unconfirmed transaction and appends it
+// to the linked list of the transaction pool.
+func (tp *TransactionPool) appendUnconfirmedTransaction(ut *unconfirmedTransaction) {
 	// Add the unconfirmedTransaction to the tail of the linked list.
 	if tp.tail == nil {
 		// Sanity check - tail should never be nil unless head is also nil.
@@ -99,7 +120,12 @@ func (tp *TransactionPool) addTransactionToTail(ut *unconfirmedTransaction) {
 	}
 }
 
-func (tp *TransactionPool) removeTransactionFromList(ut *unconfirmedTransaction) {
+// removeUnconfirmedTransactionFromList removes an unconfirmed transaction from
+// the linked list of the transaction pool. It does not update any of the other
+// fields of the transaction pool.
+func (tp *TransactionPool) removeUnconfirmedTransactionFromList(ut *unconfirmedTransaction) {
+	// Point the previous unconfirmed transaction at the next unconfirmed
+	// transaction.
 	if ut.previous == nil {
 		// Sanity check - ut should be the head if ut.previous is nil.
 		if consensus.DEBUG {
@@ -113,6 +139,8 @@ func (tp *TransactionPool) removeTransactionFromList(ut *unconfirmedTransaction)
 		ut.previous.next = ut.next
 	}
 
+	// Point the next unconfirmed transaction at the previous unconfirmed
+	// transaction.
 	if ut.next == nil {
 		// Sanity check - ut should be the tail if ut.next is nil.
 		if consensus.DEBUG {
