@@ -20,9 +20,6 @@ func (tp *TransactionPool) removeTransactionFromPool(ut *unconfirmedTransaction)
 }
 
 func (tp *TransactionPool) update() {
-	tp.state.RLock()
-	defer tp.state.RUnlock()
-
 	// Get the block diffs since the previous update.
 	removedBlocksIDs, addedBlocksIDs, err := tp.state.BlocksSince(tp.recentBlock)
 	if err != nil {
