@@ -4,53 +4,45 @@ import (
 	"sync"
 )
 
-// The zero address and the zero currency are convenience variables.
+// The ZeroUnlockHash and ZeroCurrency are convenience variables.
 var (
 	ZeroUnlockHash = UnlockHash{0}
 	ZeroCurrency   = NewCurrency64(0)
 )
 
 // The State is the object responsible for tracking the current status of the
-// blockchain. It accepts blocks and maintains an understanding of competing
-// forks. The State object is responsible for maintaining consensus.
+// blockchain. Broadly speaking, it is responsible for maintaining consensus.
+// It accepts blocks and constructs a blockchain, forking when necessary.
 type State struct {
-	// The blockRoot is the block node that contains the genesis block, which
-	// is the foundation for all other blocks. blockNodes form a tree, each
-	// having many children and pointing back to the parent.
+	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
-	// badBlocks and blockMap keep track of known blocks. badBlocks keeps track
-	// of invalid blocks and is used exclusively for DoS prevention. blockMap
-	// points only to blocks that exist in some competing fork within the
-	// blockchain.
-	badBlocks map[BlockID]struct{}
+	// blockMap and badBlocks keep track of seen blocks. blockMap holds all
+	// valid blocks, including those not on the main blockchain. badBlocks
+	// is a "blacklist" of blocks known to be invalid.
 	blockMap  map[BlockID]*blockNode
+	badBlocks map[BlockID]struct{}
 
 	// currentPath and currentBlockID track which blocks are currently accepted
 	// as the longest known blockchain.
-	currentBlockID BlockID
 	currentPath    map[BlockHeight]BlockID
+	currentBlockID BlockID
 
-	// These are the consensus variables, referred to as the 'consensus set'.
-	// All nodes on the network which have the same current path will have an
-	// identical consensus set. (Anything else is an error)
+	// These are the consensus variables, referred to as the "consensus set."
+	// All nodes with the same current path must have the same consensus set.
 	//
-	// The siafundPool counts how many siacoins have been taken from file
-	// contracts in total. As transactions and blocks are added to the
-	// currentPath, the siafundPool may only increase in size. The Currency
-	// type is not typically allowed to overflow, however in the case of the
-	// siafund pool it is okay.
+	// The siafundPool tracks the total number of siacoins that have been
+	// taxed from file contracts. Unless a reorg occurs, the siafundPool
+	// should never decrease.
 	//
-	// siacoinOutputs, fileContracts, and siafundOutputs are all atomic items
-	// within the state. Either they exist or they don't. Two objects with the
-	// same id will always have the same contents. This makes tracking diffs in
-	// the consensus set very easy.
+	// siacoinOutputs, fileContracts, and siafundOutputs keep track of the
+	// unspent outputs and active contracts present in the current path. If an
+	// output is spent or a contract expires, it is removed from the consensus
+	// set. These objects may also be removed in the event of a reorg.
 	//
 	// delayedSiacoinOutputs are siacoin outputs that have been created in a
-	// block but are not yet allowed to be spent. Miner payouts for example are
-	// not allowed to be spent right away. All of the delayed outputs that get
-	// created at a certain height are put into a list. When 'MaturityDelay'
-	// blocks have passed, the outputs are moved into the 'siafundOutputs' map.
+	// block, but are not allowed to be spent until a certain height. When
+	// that height is reached, they are moved to the siacoinOutputs map.
 	siafundPool           Currency
 	siacoinOutputs        map[SiacoinOutputID]SiacoinOutput
 	fileContracts         map[FileContractID]FileContract
@@ -66,14 +58,13 @@ type State struct {
 	mu sync.RWMutex
 }
 
-// CreateGenesisState will create the state that contains the genesis block and
-// nothing else. The unexported version of this function takes a timestamp and
-// some unlock hashes for the siafunds as input, which makes testing easier.
+// createGenesisState returns a State containing only the genesis block. It
+// takes arguments instead of using global constants to make testing easier.
 func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimUnlockHash UnlockHash) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		badBlocks:             make(map[BlockID]struct{}),
 		blockMap:              make(map[BlockID]*blockNode),
+		badBlocks:             make(map[BlockID]struct{}),
 		currentPath:           make(map[BlockHeight]BlockID),
 		siacoinOutputs:        make(map[SiacoinOutputID]SiacoinOutput),
 		fileContracts:         make(map[FileContractID]FileContract),
@@ -93,8 +84,8 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 
 	// Fill out the consensus information for the genesis block.
+	s.currentPath[0] = genesisBlock.ID()
 	s.currentBlockID = genesisBlock.ID()
-	s.currentPath[BlockHeight(0)] = genesisBlock.ID()
 	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
 		Value:      CalculateCoinbase(0),
 		UnlockHash: ZeroUnlockHash,
@@ -108,9 +99,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 	return
 }
 
-// CreateGenesisState returns the state that contains the genesis block and
-// nothing else. The exported version of this function uses the genesis
-// constants.
+// CreateGenesisState returns a State containing only the genesis block.
 func CreateGenesisState() (s *State) {
 	return createGenesisState(GenesisTimestamp, GenesisSiafundUnlockHash, GenesisClaimUnlockHash)
 }
