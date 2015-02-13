@@ -116,7 +116,7 @@ func NewAssistant(t *testing.T, s *State) *Assistant {
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: SignatureEd25519,
-				Key:       encoding.Marshal(pk),
+				Key:       string(encoding.Marshal(pk)),
 			},
 		},
 	}

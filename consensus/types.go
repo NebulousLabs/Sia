@@ -242,7 +242,7 @@ type UnlockConditions struct {
 // the protocol via a soft-fork.
 type SiaPublicKey struct {
 	Algorithm Specifier
-	Key       []byte
+	Key       string
 }
 
 // A TransactionSignature is a signature that is included in the transaction.

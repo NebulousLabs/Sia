@@ -197,7 +197,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		case SignatureEd25519:
 			// Decode the public key and signature.
 			var decodedPK crypto.PublicKey
-			err := encoding.Unmarshal(publicKey.Key, &decodedPK)
+			err := encoding.Unmarshal([]byte(publicKey.Key), &decodedPK)
 			if err != nil {
 				return err
 			}
