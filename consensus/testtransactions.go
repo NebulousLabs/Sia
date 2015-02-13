@@ -48,7 +48,7 @@ func (a *Assistant) AddSiacoinInputToTransaction(inputT Transaction, sci Siacoin
 
 	// Sign the input in an insecure way.
 	tsig := TransactionSignature{
-		InputID:        crypto.Hash(sci.ParentID),
+		ParentID:       crypto.Hash(sci.ParentID),
 		CoveredFields:  CoveredFields{},
 		PublicKeyIndex: 0,
 	}

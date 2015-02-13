@@ -259,7 +259,7 @@ type SiaPublicKey struct {
 //
 // TODO: use an enum here?
 type TransactionSignature struct {
-	InputID        crypto.Hash
+	ParentID       crypto.Hash
 	PublicKeyIndex uint64
 	Timelock       BlockHeight
 	CoveredFields  CoveredFields
@@ -481,7 +481,7 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 			t.SiafundOutputs,
 			t.MinerFees,
 			t.ArbitraryData,
-			t.Signatures[i].InputID,
+			t.Signatures[i].ParentID,
 			t.Signatures[i].PublicKeyIndex,
 			t.Signatures[i].Timelock,
 		)

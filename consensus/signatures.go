@@ -170,7 +170,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
-		id := crypto.Hash(sig.InputID)
+		id := crypto.Hash(sig.ParentID)
 
 		// Check that each signature signs a unique pubkey where
 		// RemainingSignatures > 0.
