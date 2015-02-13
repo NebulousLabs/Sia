@@ -8,28 +8,46 @@ import (
 type (
 	Timestamp   uint64
 	BlockHeight uint64
-	Siafund     Currency
+	Siafund     Currency // arbitrary-precision unsigned integer
 
+	// Specifiers are fixed-length strings that serve two purposes. In the
+	// wire protocol, they are used to identify a particular encoding
+	// algorithm, signature algorithm, etc. This allows nodes to communicate
+	// on their own terms; for example, to reduce bandwidth costs, a node
+	// might only accept compressed messages.
+	//
+	// Internally, Specifiers are used to guarantee unique IDs. Various
+	// consensus types have an associated ID, calculated by hashing the data
+	// contained in the type. By prepending the data with Specifier, we can
+	// guarantee that distinct types will never produce the same hash.
 	Specifier [16]byte
+
+	// Signatures are arbitrary-length to enable a variety of signature
+	// algorithms.
 	Signature string
 
-	// Each of these types all come back to a crypto.Hash, but provide
-	// important type safety when passing the various hashes around. Having
-	// everything be a different type means its less likely that a siacoin
-	// output id will accidentally be used where a siafund output id is
-	// intended.
+	// IDs are used to refer to a type without revealing its contents. They
+	// are constructed by hashing specific fields of the type, along with a
+	// Specifier. While all of these types are hashes, defining type aliases
+	// gives us type safety and makes the code more readable.
 	BlockID         crypto.Hash
 	SiacoinOutputID crypto.Hash
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
-	UnlockHash      crypto.Hash
-	Target          crypto.Hash
+
+	// An UnlockHash is a specially constructed hash of the UnlockConditions
+	// type. "Locked" values can be unlocked by providing the UnlockConditions
+	// that hash to a given UnlockHash. See SpendConditions.UnlockHash for
+	// details on how the UnlockHash is constructed.
+	UnlockHash crypto.Hash
+
+	// A Target is a hash that a block's ID must be 'less than' in order for the
+	// block to be considered valid.
+	Target crypto.Hash
 )
 
-// TODO: add a currency definition here.
-
-// Specifiers that get used when determining the IDs of various elements in
-// the consensus state.
+// These Specifiers are used internally when calculating a type's ID. See
+// Specifier for more details.
 var (
 	SpecifierSiacoinOutput                 = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 	SpecifierFileContract                  = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
@@ -38,16 +56,22 @@ var (
 	SpecifierSiafundOutput                 = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 )
 
-// Specifiers for the types of signatures that are recognized during signature
-// validation.
+// These Specifiers enumerate the types of signatures that are recognized by
+// this implementation. If a signature's type is unrecognized, the signature
+// is treated as valid. Signatures using the special "entropy" type are always
+// treated as invalid; see Consensus.md for more details.
 var (
 	SignatureEntropy = Specifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
 	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
 )
 
-// A Block contains all of the changes to the state that have occurred since
-// the previous block. There are constraints that make it difficult and
-// rewarding to find a block.
+// A Block is a summary of changes to the state that have occurred since the
+// previous block. Blocks reference the ID of the previous block (their
+// "parent"), creating the linked-list commonly known as the blockchain. Their
+// primary function is to bundle together transactions on the network. Blocks
+// are created by "miners," who collect transactions from other nodes, and
+// then try to pick a Nonce that results in a block whose BlockID is below a
+// given Target.
 type Block struct {
 	ParentID     BlockID
 	Nonce        uint64
@@ -56,10 +80,15 @@ type Block struct {
 	Transactions []Transaction
 }
 
-// A transaction is an atomic component of a block, a single update to the
-// consensus set. Transactions can depend on other transactions earlier in the
-// block, but transactions cannot spend outputs that they create or otherwise
-// be self-dependent.
+// A Transaction is an atomic component of a block. Transactions can contain
+// inputs and outputs, file contracts, storage proofs, and even arbitrary
+// data. They can also contain signatures to prove that a given party has
+// approved the transaction, or at least a particular subset of it.
+//
+// Transactions can depend on other previous transactions in the same block,
+// but transactions cannot spend outputs that they create or otherwise be
+// self-dependent. For a more in-depth description of transactions, refer to
+// the Sia whitepaper.
 type Transaction struct {
 	SiacoinInputs            []SiacoinInput
 	SiacoinOutputs           []SiacoinOutput
@@ -77,53 +106,43 @@ type Transaction struct {
 // siacoins that can be spent in the transaction. The ParentID points to the
 // output that is getting consumed, and the UnlockConditions contain the rules
 // for spending the output. The UnlockConditions must match the UnlockHash of
-// the output. The siacoins are added to the transactions total number of input
-// coins, and can be spent in SiacoinOutputs, MinerFees, or FileContracts.
+// the output.
 type SiacoinInput struct {
 	ParentID         SiacoinOutputID
 	UnlockConditions UnlockConditions
 }
 
-// A SiacoinOutput holds a volume of siacoins that must be spent atomically.
-// The volume is specified in the field 'Value'. The UnlockHash is the hash of
-// a set of UnlockConditions that must be fulfilled in order to spend the siacoin
-// output.
+// A SiacoinOutput holds a volume of siacoins. Outputs must be spent
+// atomically; that is, they must all be spent in the same transaction. The
+// UnlockHash is the hash of the UnlockConditions that must be fulfilled
+// in order to spend the output.
 type SiacoinOutput struct {
 	Value      Currency
 	UnlockHash UnlockHash
 }
 
-// A FileContract holds some party accountable for storing a file. The size of
-// the file and the file Merkle hash are stored in the contract, which can be
-// used to verify a storage proof that the party must submit. The party must
-// submit the storage proof in a block that is between BlockHeight 'Start' and
-// 'Expiration'. If the party submits a valid storage proof in a block between heights
-// 'Start' and 'Expiration', then the outputs for 'ValidProofOutputs' get created. If
-// the party does not submit a storage proof by the contract expiration, then
-// the outputs for 'MissedProofOutputs' get created. The value of the valid
-// proof outputs must sum to the payout after the fee has been applied. The
-// value of the missed proof outputs must sum to the payout (no fee is applied
-// for missed storage proofs).
+// A FileContract is a public record of a storage agreement between a "host"
+// and a "renter." It mandates that a host must submit a storage proof to the
+// network, proving that they still possess the file they have agreed to
+// store. See the Sia whitepaper for more details on storage proofs.
 //
-// Under normal circumstances, the Payout will be composed partially of coins
-// by the uploader, and partially of coins by the party accountable for storing
-// the file, which gives the party incentive not to lose the file. The
-// 'ValidProofUnlockHash' will typically be spendable by party storing the
-// file. The 'MissedProofUnlockHash' will either by spendable by the uploader,
-// or will be spendable by nobody (the ZeroUnlockHash).
+// The party must submit the storage proof in a block that is between 'Start'
+// and 'Expiration'. Upon submitting the proof, the outputs for
+// 'ValidProofOutputs' are created. If the party does not submit a storage
+// proof by 'Expiration', then the outputs for 'MissedProofOutputs' are
+// created instead. The sum of 'MissedProofOutputs' must equal 'Payout', and
+// the sum of 'ValidProofOutputs' must equal 'Payout' plus the siafund fee.
+// This fee is sent to the siafund pool, which is a set of siacoins only
+// spendable by siafund owners.
 //
-// A fee is taken from the payout when valid storage proofs are submitted and
-// put into the siafund pool, which is a set of siacoins only spendably by
-// siafund owners. The majority of Siafunds are owned by NebulousLabs, who
-// employs the majority of developers working on Sia.
+// Under normal circumstances, the payout will be funded by both the host and
+// the renter, which gives the host incentive not to lose the file. The
+// 'ValidProofUnlockHash' will typically be spendable by host, and the
+// 'MissedProofUnlockHash' will either by spendable by the renter or by
+// nobody (the ZeroUnlockHash).
 //
-// The FileContract can be terminated early by submitting a
-// FileContractTermination in a block. The FileContractTermination can be
-// submitted any time that the FileContract is still a part of the consensus
-// set. The TerminationHash is the hash of an UnlockConditions. Typical use
-// will require signatures from both the uploader and the party storing the
-// file in the contract, and will generally only be used if the file has been
-// edited and needs a new contract to reflect the changes to the file.
+// A contract can be terminated early by submitting a FileContractTermination
+// whose UnlockConditions hash to 'TerminationHash'.
 type FileContract struct {
 	FileSize           uint64
 	FileMerkleRoot     crypto.Hash
@@ -135,44 +154,31 @@ type FileContract struct {
 	TerminationHash    UnlockHash
 }
 
-// A FileContractTermination terminates a FileContract, removing it from the
-// consensus set. The ParentID points to the FileContract being terminated, and
-// the TerminationConditions are the conditions which enable the FileContract
-// to be terminated. The hash of the TerminationConditions must match the
-// TerminationHash in the FileContract. The PayoutReturn is a set of
-// SiacoinOutputs which must sum to the Payout of the FileContract being
-// terminated. The Payouts can have any Value and UnlockHash, and do not
-// need to match the ValidProofUnlockHash or MissedProofUnlockHash of the
-// original FileContract. The Payouts do need to sum to the original
-// FileContract Payout.
-//
-// The typical use case is to edit files and resubmit the contracts.
+// A FileContractTermination terminates a file contract. The ParentID
+// specifies the contract being terminated, and the TerminationConditions are
+// the conditions under which termination will be treated as valid. The hash
+// of the TerminationConditions must match the TerminationHash in the
+// contract. 'Payouts' is a set of SiacoinOutputs describing how the payout of
+// the contract is redistributed. It follows that the sum of these outputs
+// must equal the original payout. The outputs can have any Value and
+// UnlockHash, and do not need to match the ValidProofUnlockHash or
+// MissedProofUnlockHash of the original FileContract.
 type FileContractTermination struct {
 	ParentID              FileContractID
 	TerminationConditions UnlockConditions
 	Payouts               []SiacoinOutput
 }
 
-// A StorageProof fulfills a FileContract, resulting in the Payout getting put
-// in a SiacoinOutput with an UnlockHash of 'ValidProofUnlockHash' from the
-// FileContract getting fulfilled.. The StorageProof must be submitted between
-// the 'Start' and 'End' of the FileContract.
-//
-// The proof contains a specific segment of the file, which is chosen by using
-// the id of the trigger block. The trigger block is the block at height
-// 'Start' - 1. This provides a strong random number (can be manipulated, but
-// manipulating is expensive) that everyone can see. Using a random number
-// prevents the party storing the file from pregenerating the storage proof.
-//
-// The segment is provided in field 'Segment', and the field 'HashSet' contains
-// the set of hashes required to prove that the segment is part of the file
-// with the Merkle root 'FileMerkleRoot'.
+// A StorageProof fulfills a FileContract. The proof contains a specific
+// segment of the file, along with a set of hashes from the file's Merkle
+// tree. In combination, these can be used to prove that the segment came from
+// the file. To prevent abuse, the segment must be chosen randomly, so the ID
+// of block 'Start' - 1 is used as a seed value; see StorageProofSegment for
+// the exact implementation.
 //
 // A transaction with a StorageProof cannot have any SiacoinOutputs,
-// SiafundOutputs, or FileContracts. This is because StorageProofs can be
-// invalidated by simple and accidental reorgs, which will subsequently
-// invalidate the rest of the transaction, leaving the fields in limbo until
-// there is certainty that there will not be another reorg.
+// SiafundOutputs, or FileContracts. This is because a mundane reorg can
+// invalidate the proof, and with it the rest of the transaction.
 type StorageProof struct {
 	ParentID FileContractID
 	Segment  [crypto.SegmentSize]byte
@@ -189,20 +195,19 @@ type SiafundInput struct {
 	UnlockConditions UnlockConditions
 }
 
-// A SiafundOutput holds a volume of siafunds that must be spent atomically.
-// The volume is specified in the field 'Value'. The UnlockHash is the hash of
-// the UnlockConditions that must be fulfilled in order to spend the siafund
-// output. The siafunds are add to the transaction's total number of siafunds,
-// which can be spent in SiafundOutputs.
+// A SiafundOutput holds a volume of siafunds. Outputs must be spent
+// atomically; that is, they must all be spent in the same transaction. The
+// UnlockHash is the hash of a set of UnlockConditions that must be fulfilled
+// in order to spend the output.
 //
-// When the SiafundOutput is spent, a SiacoinOutput is created. The 'Value'
-// field of the SiacoinOutput is determined by ((SiafundPool - ClaimStart) /
-// 10,000). The 'UnlockHash' of the SiacoinOutput is set equal to the
-// 'ClaimUnlockHash' in the SiafundOutput.
+// When the SiafundOutput is spent, a SiacoinOutput is created, where:
+//
+//     SiacoinOutput.Value := (SiafundPool - ClaimStart) / 10,000
+//     SiacoinOutput.UnlockHash := SiafundOutput.ClaimUnlockHash
 //
 // When a SiafundOutput is put into a transaction, the ClaimStart must always
 // equal zero. While the transaction is being processed, the ClaimStart is set
-// equal to the value of the SiafundPool.
+// to the value of the SiafundPool.
 type SiafundOutput struct {
 	Value           Currency
 	UnlockHash      UnlockHash
@@ -210,57 +215,49 @@ type SiafundOutput struct {
 	ClaimStart      Currency
 }
 
-// UnlockConditions is a set of conditions which must be met to execute an
-// actions (such as spend a SiacoinOutput or terminate a FileContract). The
-// block containing the UnlockConditions must have a height equal to or greater
-// than 'Timelock'. 'NumSignatures' refers to the number of sigantures that
-// must appear in the transaction to fulfill the UnlockConditions, and each
-// signature must correspond to exactly one SiaPublicKey in the set of
-// 'PublicKeys'.
+// UnlockConditions are a set of conditions which must be met to execute
+// certain actions, such as spending a SiacoinOutput or terminating a
+// FileContract.
 //
-// If NumSignatures is 0, the UnlockConditions are effectively "anyone can
-// unlock." If NumSignatures > len(PublicKeys), then the UnlockConditions
-// cannot be fulfilled under any circumstances. The SiaPublicKeys that compose
-// PublicKeys do not need to use the same cryptographic algorithm, which means
-// multisig UnlockConditions can be set up which use multiple different
-// cryptographic algorithms, which is useful in case any of the algorithms is
-// ever compromised.
+// The simplest requirement is that the block containing the UnlockConditions
+// must have a height >= 'Timelock'.
 //
-// The UnlockHash is formed by making a Merkle Tree of the elements of the
-// UnlockConditions, where the Timelock is one leaf, each public key is one
-// leaf, and NumSignatures is one leaf. This allows individual elements of the
-// UnlockConditions to be revealed without revealing all of the elements. The
-// PublicKeys are put in the middle because Timelock and NumSignatures are each
-// low entropy fields. They can be protected by having random public keys next
-// to them. (The use case for revealing public keys but not timestamps or
-// numsignatures is unknown, but it is available nonetheless).
+// 'PublicKeys' specifies the set of keys that can be used to satisfy the
+// UnlockConditions; of these, at least 'NumSignatures' unique keys must sign
+// the transaction. The keys that do not need to use the same cryptographic
+// algorithm.
+//
+// If 'NumSignatures' == 0, the UnlockConditions are effectively "anyone can
+// unlock." If 'NumSignatures' > len('PublicKeys'), then the UnlockConditions
+// cannot be fulfilled under any circumstances.
 type UnlockConditions struct {
 	Timelock      BlockHeight
 	PublicKeys    []SiaPublicKey
 	NumSignatures uint64
 }
 
-// A SiaPublicKey is a public key prefixed by a specifier. The specifier
-// indicates the algorithm used for signing and verification, and the byte
-// slice contains the actual public key. Unrecognized algorithms will always
-// verify, which allows new algorithms to be soft forked into the protocol.
-// This is useful for safeguarding against the cryptographic break of an
-// algorithm in use, and useful for taking advantage of any new algorithms that
-// get discovered.
+// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
+// indicates the algorithm used for signing and verification. Unrecognized
+// algorithms will always verify, which allows new algorithms to be added to
+// the protocol via a soft-fork.
 type SiaPublicKey struct {
 	Algorithm Specifier
 	Key       []byte
 }
 
-// A TransactionSignature signs a single PublicKey in one of the
-// UnlockConditions of the transaction. Which UnlockConditions is indicated by
-// the ParentID, which is the same as the crypto.Hash representation of the
-// ParentID of the element that presented the UnlockConditions. The
-// PublicKeyIndex indicates which public key of the UnlockConditions is doing
-// the signing. The Timelock prevents the TransactionSignature from being used
-// until a certain block height. CoveredFields indicates which parts of the
-// transaction have been signed, and the Signature contains the actual
-// signature.
+// A TransactionSignature is a signature that is included in the transaction.
+// The signature should correspond to a public key in one of the
+// UnlockConditions of the transaction. This key is specified first by
+// 'ParentID', which specifies the UnlockConditions, and then
+// 'PublicKeyIndex', which indicates the key in the UnlockConditions. There
+// are three types that use UnlockConditions: SiacoinInputs, SiafundInputs,
+// and FileContractTerminations. Each of these types also references a
+// ParentID, and this is the hash that 'ParentID' must match. The 'Timelock'
+// prevents the signature from being used until a certain height.
+// 'CoveredFields' indicates which parts of the transaction are being signed;
+// see CoveredFields.
+//
+// TODO: use an enum here?
 type TransactionSignature struct {
 	InputID        crypto.Hash
 	PublicKeyIndex uint64
@@ -269,12 +266,17 @@ type TransactionSignature struct {
 	Signature      Signature
 }
 
-// The CoveredFields portion of a signature indicates which fields in the
-// transaction have been covered by the signature. Each slice of elements in a
-// transaction is represented by a slice of indices. The indices must be
-// sorted, must not repeat, and must point to elements that exist within the
-// transaction. If 'WholeTransaction' is set to true, all other fields must be
-// empty except for the Signatures field.
+// CoveredFields indicates which fields in a transaction have been covered by
+// the signature. (Note that the signature does not sign the fields
+// themselves, but rather their combined hash; see SigHash.) Each slice
+// corresponds to a slice in the Transaction type, indicating which indices of
+// the slice have been signed. The indices must be valid, i.e. within the
+// bounds of the slice. In addition, they must be sorted and unique.
+//
+// As a convenience, a signature of the entire transaction can be indicated by
+// the 'WholeTransaction' field. If 'WholeTransaction' == true, all other
+// fields must be empty (except for the Signatures field, since a signature
+// cannot sign itself).
 type CoveredFields struct {
 	WholeTransaction         bool
 	SiacoinInputs            []uint64
@@ -289,7 +291,10 @@ type CoveredFields struct {
 	Signatures               []uint64
 }
 
-// CalculateCoinbase takes a height and from that derives the coinbase.
+// CalculateCoinbase calculates the coinbase for a given height. The coinbase
+// equation is:
+//
+//     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * CoinbaseAugment
 func CalculateCoinbase(height BlockHeight) (c Currency) {
 	base := InitialCoinbase - uint64(height)
 	if base < MinimumCoinbase {
@@ -299,21 +304,22 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
 }
 
-// splitContractPayout takes a contract payout as input and returns the portion
-// of the payout that goes to the siafund pool, as well as the portion that
-// goes to the siacoin outputs. They add to the original payout exactly. The
-// portion that goes to the siafund pool is 3.9% of the contract payout,
-// rounded down to the nearest 10,000 siacoins.
+// SplitContractPayout applies the Siafund fee to a volume of Currency, and
+// returns the result along with the amount of tax.
+//
+// TODO: rename SiafundTax
 func SplitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
 	poolPortion = payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
 	outputPortion = payout.Sub(poolPortion)
 	return
 }
 
-// UnlockHash calculates the root hash of a Merkle tree of the UnlockConditions
-// object. The leaves of this tree are formed by taking the hash of the
-// timelock, the hash of the public keys (one leaf each), and the hash of the
-// number of signatures.
+// UnlockHash calculates the root hash of a Merkle tree of the
+// UnlockConditions object. The leaves of this tree are formed by taking the
+// hash of the timelock, the hash of the public keys (one leaf each), and the
+// hash of the number of signatures. The keys are put in the middle because
+// Timelock and NumSignatures are both low entropy fields; they can be
+// protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
 	leaves := []crypto.Hash{
 		crypto.HashObject(uc.Timelock),
@@ -325,9 +331,8 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 	return UnlockHash(crypto.MerkleRoot(leaves))
 }
 
-// ID returns the id of a block, which is calculated by concatenating the
-// parent block id, the block nonce, and the block Merkle root and taking the
-// hash.
+// ID returns the ID of a Block, which is calculated by hashing the
+// concatenation of the block's parent ID, nonce, and Merkle root.
 func (b Block) ID() BlockID {
 	return BlockID(crypto.HashAll(
 		b.ParentID,
@@ -336,9 +341,9 @@ func (b Block) ID() BlockID {
 	))
 }
 
-// MerkleRoot calculates the Merkle root of the block. The leaves of the Merkle
-// tree are composed of the Timestamp, the set of miner outputs (one leaf per
-// payout), and all of the transactions (one leaf per transaction).
+// MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
+// tree are composed of the Timestamp, the miner outputs (one leaf per
+// payout), and the transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
 	leaves := []crypto.Hash{
 		crypto.HashObject(b.Timestamp),
@@ -353,8 +358,8 @@ func (b Block) MerkleRoot() crypto.Hash {
 }
 
 // MinerPayoutID returns the ID of the miner payout at the given index, which
-// is derived by appending the index of the miner payout to the id of the
-// block.
+// is calculated by hashing the concatenation of the BlockID and the payout
+// index.
 func (b Block) MinerPayoutID(i int) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		b.ID(),
@@ -362,10 +367,10 @@ func (b Block) MinerPayoutID(i int) SiacoinOutputID {
 	))
 }
 
-// SiacoinOutputID returns the id of a siacoin output given the index of the
-// output. The id is derived by taking SpecifierSiacoinOutput, appending all of
-// the fields in the transaction except the signatures, and then appending the
-// index of the SiacoinOutput in the transaction and taking the hash.
+// SiacoinOutputID returns the ID of a siacoin output at the given index,
+// which is calculated by hashing the concatenation of the SiacoinOutput
+// Specifier, all of the fields in the transaction (except the signatures),
+// and output index.
 func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierSiacoinOutput,
@@ -382,10 +387,10 @@ func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
 	))
 }
 
-// FileContractID returns the id of a file contract given the index of the
-// contract. The id is derived by taking SpecifierFileContract, appending all
-// of the fields in the transaction except the signatures, and then appending
-// the index of the FileContract in the transaction and taking the hash.
+// FileContractID returns the ID of a file contract at the given index, which
+// is calculated by hashing the concatenation of the FileContract Specifier,
+// all of the fields in the transaction (except the signatures), and the
+// contract index.
 func (t Transaction) FileContractID(i int) FileContractID {
 	return FileContractID(crypto.HashAll(
 		SpecifierFileContract,
@@ -402,11 +407,11 @@ func (t Transaction) FileContractID(i int) FileContractID {
 	))
 }
 
-// FileContractTerminationPayoutID returns the id of a file contract
-// termination payout given the index of the payout in the termination. The id
-// is derived by taking SpecifierFileContractTerminationPayout, appending the
-// id of the file contract that is being terminated, and then appending the
-// index of the payout in the termination and taking the hash.
+// FileContractTerminationPayoutID returns the ID of a file contract
+// termination payout, given the index of the payout in the termination. The
+// ID is calculated by hashing the concatenation of the
+// FileContractTerminationPayout Specifier, the ID of the file contract being
+// terminated, and the payout index.
 func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierFileContractTerminationPayout,
@@ -415,12 +420,12 @@ func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputI
 	))
 }
 
-// StorageProofOutputID returns the id of the output created by a file contract
-// given the status of the storage proof. The id is derived by taking
-// SpecifierStorageProofOutput, appending the id of the file contract that the
-// proof is for, and then appending a bool indicating whether the proof was
-// valid or missed (true is valid, false is missed), and appending the index of
-// the output within the file contract, then taking the hash.
+// StorageProofOutputID returns the ID of an output created by a file
+// contract, given the status of the storage proof. The ID is calculating by
+// hashing the concatenation of the  StorageProofOutput Specifier, the ID of
+// the file contract that the proof is for, a boolean indicating whether the
+// proof was valid (true) or missed (false), and the index of the output
+// within the file contract.
 func (fcid FileContractID) StorageProofOutputID(proofValid bool, i int) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierStorageProofOutput,
@@ -430,10 +435,10 @@ func (fcid FileContractID) StorageProofOutputID(proofValid bool, i int) SiacoinO
 	))
 }
 
-// SiafundOutputID returns the id of a SiafundOutput given the index of the
-// output. The id is derived by taking SpecifierSiafundOutput, appending all of
-// the fields in the transaction except the signatures, and then appending the
-// index of the SiafundOutput in the transaction and taking the hash.
+// SiafundOutputID returns the ID of a SiafundOutput at the given index, which
+// is calculated by hashing the concatenation of the SiafundOutput Specifier,
+// all of the fields in the transaction (except the signatures), and output
+// index.
 func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 	return SiafundOutputID(crypto.HashAll(
 		SpecifierSiafundOutput,
@@ -450,22 +455,18 @@ func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 	))
 }
 
-// SiaClaimOutputID returns the id of the SiacoinOutput that is created when
-// the siafund output gets spent. The id is calculated by taking the hash of
-// the id of the SiafundOutput.
+// SiaClaimOutputID returns the ID of the SiacoinOutput that is created when
+// the siafund output is spent. The ID is the hash the SiafundOutputID.
 func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		id,
 	))
 }
 
-// SigHash returns the hash of a transaction for a specific signature. `i` is
-// the index of the signature for which the hash is being returned. If
-// `WholeTransaction` is set to true for the signature, then all of the
-// transaction fields except the signatures are included in the transactions.
-// If `WholeTransaction` is set to false, then the fees, inputs, ect. are all
-// added individually. The signatures are added individually regardless of the
-// value of `WholeTransaction`.
+// SigHash returns the hash of the fields in a transaction covered by a given
+// signature. See CoveredFields for more details.
+//
+// TODO: make this take a CoveredFields instead?
 func (t Transaction) SigHash(i int) crypto.Hash {
 	cf := t.Signatures[i].CoveredFields
 	var signedData []byte
