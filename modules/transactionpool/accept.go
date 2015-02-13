@@ -2,6 +2,7 @@ package transactionpool
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *unconfirmedTransaction) {
@@ -93,7 +94,7 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 			ut.dependents[dependent] = struct{}{}
 		}
 		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start)
-		proofMap, exists := tp.storageProofs[triggerBlock.ID()]
+		_, exists = tp.storageProofs[triggerBlock.ID()]
 		if exists {
 			dependent, exists := tp.storageProofs[triggerBlock.ID()][fcid]
 			if exists {
@@ -163,7 +164,7 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 		delete(tp.fileContracts, sp.ParentID)
 
 		// Check if this transaction is dependent on another transaction.
-		fcMap, exists := tp.newFileContracts[fc.Start]
+		_, exists = tp.newFileContracts[fc.Start]
 		if exists {
 			requirement, exists := tp.newFileContracts[fc.Start][sp.ParentID]
 			if exists {
@@ -271,6 +272,8 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 
 	// Add the transaction.
 	tp.addTransactionToPool(t)
+
+	tp.transactions[crypto.HashObject(t)] = struct{}{}
 
 	return
 }

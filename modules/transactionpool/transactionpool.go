@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // The current transaction pool code is blind to miner fees, and will not
@@ -39,6 +40,7 @@ type TransactionPool struct {
 	tail *unconfirmedTransaction
 
 	// These maps are essentially equivalent to the unconfirmed consensus set.
+	transactions   map[crypto.Hash]struct{}
 	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
 	fileContracts  map[consensus.FileContractID]consensus.FileContract
 	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
