@@ -4,21 +4,6 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-func (tp *TransactionPool) removeTransactionFromPool(ut *unconfirmedTransaction) {
-	// Remove this transaction from the linked list.
-	tp.removeTransactionFromList(ut)
-
-	// Remove self as a dependent from any requirements.
-	for requirement := range ut.requirements {
-		delete(requirement.dependents, ut)
-	}
-
-	// Remove each dependent from the transaction pool.
-	for dependent := range ut.dependents {
-		tp.removeTransactionFromPool(dependent)
-	}
-}
-
 func (tp *TransactionPool) update() {
 	tp.state.RLock()
 	defer tp.state.RUnlock()
@@ -59,31 +44,27 @@ func (tp *TransactionPool) update() {
 			txn := block.Transactions[j]
 
 			ut := &unconfirmedTransaction{
-				transaction:  txn,
-				requirements: make(map[*unconfirmedTransaction]struct{}),
-				dependents:   make(map[*unconfirmedTransaction]struct{}),
+				transaction: txn,
+				dependents:  make(map[*unconfirmedTransaction]struct{}),
 			}
 
-			// Find any transactions in our set that are dependent on this
-			// transaction.
-			for i := range txn.SiacoinOutputs {
-				dependent, exists := tp.usedOutputs[txn.SiacoinOutputID(i)]
-				if exists {
-					ut.dependents[dependent] = struct{}{}
-					dependent.requirements[ut] = struct{}{}
-				}
-			}
+			tp.applySiacoinInputs(txn, ut)
+			tp.applySiacoinOutputs(txn, ut)
+			tp.applyFileContracts(txn, ut)
+			tp.applyFileContractTerminations(txn, ut)
+			tp.applyStorageProofs(txn, ut)
+			tp.applySiafundInputs(txn, ut)
+			tp.applySiafundOutputs(txn, ut)
 
-			// Add the transaction to the linked list.
-			tp.addTransactionToHead(ut)
+			// Add the transaction to the front of the linked list.
+			tp.prependUnconfirmedTransaction(ut)
 
 			// If the transaction contains a storage proof or is non-standard,
 			// remove this transaction from the pool. This is done last because
 			// we also need to remove any dependents.
 			err = tp.IsStandardTransaction(txn)
-			if err != nil || len(txn.StorageProofs) != 0 {
-				// TODO: Call the function to remove a tranasction and
-				// dependents.
+			if err != nil {
+				tp.removeUnconfirmedTransactionFromPool()
 			}
 		}
 	}
@@ -93,9 +74,12 @@ func (tp *TransactionPool) update() {
 	for _, block := range addedBlocks {
 		for _, txn := range block.Transactions {
 			for _, input := range txn.SiacoinInputs {
-				conflict, exists := tp.usedOutputs[input.ParentID]
-				if exists {
-					tp.removeTransactionFromPool(conflict)
+
+				// TODO: Determine if there's a conflict.
+				var conflict bool
+
+				if conflict {
+					tp.removeUnconfirmedTransactionFromPool(conflict)
 				}
 			}
 		}

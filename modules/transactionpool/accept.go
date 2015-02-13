@@ -37,19 +37,26 @@ func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction, ut *unco
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - this output should not already exist in
 		// newSiacoinOutputs or siacoinOutputs.
+		scoid := t.SiacoinOutputID(i)
 		if consensus.DEBUG {
-			_, exists := tp.siacoinOutputs[t.SiacoinOutputID(i)]
+			_, exists := tp.siacoinOutputs[scoid]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
-			_, exists = tp.newSiacoinOutputs[t.SiacoinOutputID(i)]
+			_, exists = tp.newSiacoinOutputs[scoid]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
 		}
 
-		tp.siacoinOutputs[t.SiacoinOutputID(i)] = sco
-		tp.newSiacoinOutputs[t.SiacoinOutputID(i)] = ut
+		tp.siacoinOutputs[scoid] = sco
+		tp.newSiacoinOutputs[scoid] = ut
+
+		// Find any dependent transactions.
+		dependent, exists := tp.usedSiacoinOutputs[scoid]
+		if exists {
+			ut.dependents[dependent] = struct{}{}
+		}
 	}
 }
 
@@ -79,6 +86,20 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 			tp.newFileContracts[fc.Start] = make(map[consensus.FileContractID]*unconfirmedTransaction)
 		}
 		tp.newFileContracts[fc.Start][fcid] = ut
+
+		// Find any dependent transactions.
+		dependent, exists := tp.fileContractTerminations[fcid]
+		if exists {
+			ut.dependents[dependent] = struct{}{}
+		}
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start)
+		proofMap, exists := tp.storageProofs[triggerBlock.ID()]
+		if exists {
+			dependent, exists := tp.storageProofs[triggerBlock.ID()][fcid]
+			if exists {
+				ut.dependents[dependent] = struct{}{}
+			}
+		}
 	}
 }
 
@@ -95,6 +116,23 @@ func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction
 
 		// Remove the file contract from the set and add the termination.
 		delete(tp.fileContracts, fct.ParentID)
+
+		// Check if this transaction is dependent on another transaction.
+		fc, exists := tp.state.FileContract(fct.ParentID)
+		if !exists {
+			fc, exists = tp.fileContracts[fct.ParentID]
+			if consensus.DEBUG {
+				if !exists {
+					panic("file contract is getting terminated but cannot be found.")
+				}
+			}
+			requirement, exists := tp.newFileContracts[fc.Start][fct.ParentID]
+			if exists {
+				requirement.dependents[ut] = struct{}{}
+			}
+		}
+
+		// Add this termination to the set of terminations.
 		tp.fileContractTerminations[fct.ParentID] = ut
 	}
 }
@@ -118,6 +156,18 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 				if exists {
 					panic("storage proof for this file contract already exists in pool")
 				}
+			}
+		}
+
+		// Remove the file contract from the set and add the termination.
+		delete(tp.fileContracts, sp.ParentID)
+
+		// Check if this transaction is dependent on another transaction.
+		fcMap, exists := tp.newFileContracts[fc.Start]
+		if exists {
+			requirement, exists := tp.newFileContracts[fc.Start][sp.ParentID]
+			if exists {
+				requirement.dependents[ut] = struct{}{}
 			}
 		}
 
@@ -163,19 +213,26 @@ func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction, ut *unco
 	for i, sfo := range t.SiafundOutputs {
 		// Sanity check - this output should not already exist in
 		// newSiafundOutputs or siafundOutputs.
+		sfoid := t.SiafundOutputID(i)
 		if consensus.DEBUG {
-			_, exists := tp.siafundOutputs[t.SiafundOutputID(i)]
+			_, exists := tp.siafundOutputs[sfoid]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
-			_, exists = tp.newSiafundOutputs[t.SiafundOutputID(i)]
+			_, exists = tp.newSiafundOutputs[sfoid]
 			if exists {
 				panic("trying to add an output that already exists?")
 			}
 		}
 
-		tp.siafundOutputs[t.SiafundOutputID(i)] = sfo
-		tp.newSiafundOutputs[t.SiafundOutputID(i)] = ut
+		tp.siafundOutputs[sfoid] = sfo
+		tp.newSiafundOutputs[sfoid] = ut
+
+		// Find any dependent transactions.
+		dependent, exists := tp.usedSiafundOutputs[sfoid]
+		if exists {
+			ut.dependents[dependent] = struct{}{}
+		}
 	}
 }
 

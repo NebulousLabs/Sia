@@ -51,7 +51,7 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
 		// Check that the file contract has not already been terminated.
-		_, exists := tp.terminatedFileContracts[fct.ParentID]
+		_, exists := tp.fileContractTerminations[fct.ParentID]
 		if exists {
 			return errors.New("termination given for an already terminated file contract")
 		}
