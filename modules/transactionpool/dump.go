@@ -11,8 +11,6 @@ import (
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
 func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction, err error) {
-	tp.mu.RLock()
-	defer tp.mu.RUnlock()
 	tp.update()
 
 	// Add transactions from the head of the linked list until there are no
@@ -26,8 +24,8 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 		// Sanity check - the transaction should be valid against the
 		// unconfirmed set of transactions. Not checked is the additional
 		// constraint that all dependencies appear earlier in the linked list.
-		if DEBUG {
-			err = tp.validTransaction(currentTxn.transaction)
+		if consensus.DEBUG {
+			err = tp.validUnconfirmedTransaction(currentTxn.transaction)
 			if err != nil {
 				panic(err)
 			}
@@ -54,8 +52,6 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 // would be created immediately if all of the unconfirmed transactions were
 // added to the next block.
 func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
-	tp.mu.RLock()
-	defer tp.mu.RUnlock()
 	tp.update()
 
 	// For each transaction in the linked list, grab the siacoin output diffs
@@ -74,7 +70,7 @@ func (tp *TransactionPool) OutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 			// state if it already existed.
 			output, exists := tp.siacoinOutputs[input.ParentID]
 			if !exists {
-				output, exists = tp.state.Output(input.ParentID)
+				output, exists = tp.state.SiacoinOutput(input.ParentID)
 
 				// Sanity check - the output should exist in the state because
 				// the transaction is in the transaction pool.

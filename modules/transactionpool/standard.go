@@ -12,8 +12,10 @@ const (
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
-// public keys are recognized.
-func checkUnlockConditions(uc consensus.UnlockConditions) error {
+// public keys are recognized. Unrecognized public keys are automatically
+// accpeted as valid by the state, but should be rejected by miners.
+func (tp *TransactionPool) checkUnlockConditions(uc consensus.UnlockConditions) error {
+	// Check that all of the public keys are supported algorithms.
 	for _, pk := range uc.PublicKeys {
 		if pk.Algorithm != consensus.SignatureEntropy &&
 			pk.Algorithm != consensus.SignatureEd25519 {
@@ -37,19 +39,19 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	// of the UnlockConditions, which currently can appear in 3 separate fields
 	// of the transaction.
 	for _, sci := range t.SiacoinInputs {
-		err = checkUnlockConditions(sci.UnlockConditions)
+		err = tp.checkUnlockConditions(sci.UnlockConditions)
 		if err != nil {
 			return
 		}
 	}
 	for _, fct := range t.FileContractTerminations {
-		err = checkUnlockConditions(fct.TerminationConditions)
+		err = tp.checkUnlockConditions(fct.TerminationConditions)
 		if err != nil {
 			return
 		}
 	}
 	for _, sfi := range t.SiafundInputs {
-		err = checkUnlockConditions(sfi.UnlockConditions)
+		err = tp.checkUnlockConditions(sfi.UnlockConditions)
 		if err != nil {
 			return
 		}

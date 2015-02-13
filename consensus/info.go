@@ -254,7 +254,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 
 // Contract returns a the contract associated with the input id, and whether
 // the contract exists.
-func (s *State) Contract(id FileContractID) (fc FileContract, exists bool) {
+func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -310,10 +310,17 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 
 // Output returns the output associated with an OutputID, returning an error if
 // the output is not found.
-func (s *State) Output(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
+func (s *State) SiacoinOutput(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.output(id)
+}
+
+func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	output, exists = s.siafundOutputs[id]
+	return
 }
 
 // Sorted UtxoSet returns all of the unspent transaction outputs sorted
@@ -353,20 +360,31 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 // error if the state height is not sufficient to fulfill all of the
 // requirements of the transaction.
 func (s *State) ValidTransactionComponents(t Transaction) (err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	err = t.FollowsStorageProofRules()
 	if err != nil {
 		return
 	}
-
 	err = s.validFileContracts(t)
 	if err != nil {
 		return
 	}
-
+	err = s.validStorageProofs(t)
+	if err != nil {
+		return
+	}
 	err = s.validSignatures(t)
 	if err != nil {
 		return
 	}
 
 	return
+}
+
+func (s *State) ValidUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.validUnlockConditions(uc, uh)
 }

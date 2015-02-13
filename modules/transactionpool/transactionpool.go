@@ -41,11 +41,13 @@ type TransactionPool struct {
 	// A reference to the outputs that have been created by other unconfirmed
 	// transactions.
 	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
+	fileContracts  map[consensus.FileContractID]consensus.FileContract
 	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
 
 	usedSiacoinOutputs       map[consensus.SiacoinOutputID]*unconfirmedTransaction
 	newSiacoinOutputs        map[consensus.SiacoinOutputID]*unconfirmedTransaction
-	fileContracts            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
+	newFileContracts         map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
+	terminatedFileContracts  map[consensus.FileContractID]*unconfirmedTransaction
 	fileContractTerminations map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
