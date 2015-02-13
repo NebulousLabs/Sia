@@ -9,7 +9,7 @@ import (
 
 const (
 	FileContractConfirmWindow = 10
-	TransactionSizeLimit = 16 * 1024
+	TransactionSizeLimit      = 16 * 1024
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -61,7 +61,7 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	// Check that any file contracts do not start for at least
 	// FileContractConfirmWindow blocks.
 	for _, fc := range t.FileContracts {
-		if fc.Start > tp.state.Height() - FileContractConfirmWindow {
+		if fc.Start > tp.state.Height()-FileContractConfirmWindow {
 			return errors.New("file contract cannot start so close to the current height.")
 		}
 	}

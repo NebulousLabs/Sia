@@ -20,14 +20,6 @@ is the transaction that was most recently in the blockchain. This is to
 discourage double spending, and enforce that the first transaction seen is the
 one that should be kept by the network. Other conflicts are thrown out.
 
-The exeption to this rule is storage proof transacitons. The transaction pool
-will hold multiple storage proofs for a single file contract because each proof
-is necessarily only valid on a subset of forks, and storage proofs should be
-included into the blockchain wherever possible. Consensus rules prevent storage
-proofs that create other objects in the consensus set (siacoin outputs, file
-contracts, siafund outputs), which makes it non-risky to hold conflicting
-storage proof transactions.
-
 Transactions are currently included into blocks using a first-come first-serve
 algorithm. Eventually, transactions will be rejected if the fee does not meet a
 certain minimum. For the near future, there are no plans to prioritize
