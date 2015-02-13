@@ -304,16 +304,6 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
 }
 
-// SplitContractPayout applies the Siafund fee to a volume of Currency, and
-// returns the result along with the amount of tax.
-//
-// TODO: rename SiafundTax
-func SplitContractPayout(payout Currency) (poolPortion Currency, outputPortion Currency) {
-	poolPortion = payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
-	outputPortion = payout.Sub(poolPortion)
-	return
-}
-
 // UnlockHash calculates the root hash of a Merkle tree of the
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the
@@ -422,7 +412,7 @@ func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputI
 
 // StorageProofOutputID returns the ID of an output created by a file
 // contract, given the status of the storage proof. The ID is calculating by
-// hashing the concatenation of the  StorageProofOutput Specifier, the ID of
+// hashing the concatenation of the StorageProofOutput Specifier, the ID of
 // the file contract that the proof is for, a boolean indicating whether the
 // proof was valid (true) or missed (false), and the index of the output
 // within the file contract.
@@ -458,9 +448,7 @@ func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 // SiaClaimOutputID returns the ID of the SiacoinOutput that is created when
 // the siafund output is spent. The ID is the hash the SiafundOutputID.
 func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		id,
-	))
+	return SiacoinOutputID(crypto.HashObject(id))
 }
 
 // SigHash returns the hash of the fields in a transaction covered by a given

@@ -121,13 +121,13 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 		// siafund fee has been applied, and check that the missed proof
 		// outputs sum to the full payout.
 		var validProofOutputSum, missedProofOutputSum Currency
-		_, outputPortion := SplitContractPayout(fc.Payout)
 		for _, output := range fc.ValidProofOutputs {
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
 		for _, output := range fc.MissedProofOutputs {
 			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
+		outputPortion := fc.Payout.Sub(fc.Payout.ContractTax())
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return errors.New("contract valid proof outputs do not sum to the payout minus the siafund fee")
 		}

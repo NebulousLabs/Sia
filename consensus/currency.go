@@ -94,6 +94,12 @@ func (c Currency) RoundDown(n uint64) (y Currency) {
 	return
 }
 
+// ContractTax returns the amount of Currency that would be taxed from a
+// contract payout with value c.
+func (c Currency) ContractTax() Currency {
+	return c.MulFloat(SiafundPortion).RoundDown(SiafundCount)
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface. It returns the
 // byte-slice representation of the Currency's internal big.Int, prepended
 // with a single byte indicating the length of the slice. This implies a

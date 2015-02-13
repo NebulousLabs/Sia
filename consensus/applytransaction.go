@@ -120,8 +120,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
-		poolPortion, _ := SplitContractPayout(fc.Payout)
-		s.siafundPool = s.siafundPool.Add(poolPortion)
+		s.siafundPool = s.siafundPool.Add(fc.Payout.ContractTax())
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, output := range fc.ValidProofOutputs {

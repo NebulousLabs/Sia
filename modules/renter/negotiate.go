@@ -39,7 +39,7 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	payout := fund.Add(collateral)
 
 	// Determine the valid proof payout sum (payout - siafund fee)
-	_, validPayout := consensus.SplitContractPayout(payout)
+	validPayout := payout.Sub(payout.ContractTax())
 
 	// Fill out the contract according to the whims of the host.
 	contract := consensus.FileContract{
