@@ -6,13 +6,36 @@ import (
 )
 
 func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransaction) {
-
-	// after removing the unconfirmed transaction, try to throw it throught the
-	// acceptance process, it's potentially still valid after being replaced by
-	// a superset transaction.
+	t := ut.transaction
+	tp.removeDependentTransactions(t)
+	tp.confirmTransaction(t)
+	tp.removeUnconfirmedTransactionFromList(ut)
 }
 
 func (tp *TransactionPool) removeDependentTransactions(t consensus.Transaction) {
+	for i, _ := range t.SiacoinOutputs {
+		dependent, exists := tp.usedSiacoinOutputs[t.SiacoinOutputID(i)]
+		if exists {
+			tp.removeUnconfirmedTransaction(dependent)
+		}
+	}
+	for i, fc := range t.FileContracts {
+		dependent, exists := tp.fileContractTerminations[t.FileContractID(i)]
+		if exists {
+			tp.removeUnconfirmedTransaction(dependent)
+		}
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
+		dependent, exists = tp.storageProofs[triggerBlock.ID()][t.FileContractID(i)]
+		if exists {
+			tp.removeUnconfirmedTransaction(dependent)
+		}
+	}
+	for i, _ := range t.SiafundOutputs {
+		dependent, exists := tp.usedSiafundOutputs[t.SiafundOutputID(i)]
+		if exists {
+			tp.removeUnconfirmedTransaction(dependent)
+		}
+	}
 }
 
 func (tp *TransactionPool) confirmTransaction(t consensus.Transaction) {
@@ -34,7 +57,7 @@ func (tp *TransactionPool) confirmTransaction(t consensus.Transaction) {
 	}
 	for _, sp := range t.StorageProofs {
 		fc, _ := tp.state.FileContract(sp.ParentID)
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start)
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
 		delete(tp.storageProofs[triggerBlock.ID()], sp.ParentID)
 	}
 	for _, sfi := range t.SiafundInputs {
@@ -49,6 +72,42 @@ func (tp *TransactionPool) confirmTransaction(t consensus.Transaction) {
 }
 
 func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction) {
+	for _, sci := range t.SiacoinInputs {
+		conflict, exists := tp.usedSiacoinOutputs[sci.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+	}
+	for _, fct := range t.FileContractTerminations {
+		conflict, exists := tp.fileContractTerminations[fct.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+		fc, _ := tp.state.FileContract(fct.ParentID)
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
+		conflict, exists = tp.storageProofs[triggerBlock.ID()][fct.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+	}
+	for _, sp := range t.StorageProofs {
+		conflict, exists := tp.fileContractTerminations[sp.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+		fc, _ := tp.state.FileContract(sp.ParentID)
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
+		conflict, exists = tp.storageProofs[triggerBlock.ID()][sp.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+	}
+	for _, sfi := range t.SiafundInputs {
+		conflict, exists := tp.usedSiafundOutputs[sfi.ParentID]
+		if exists {
+			tp.removeUnconfirmedTransaction(conflict)
+		}
+	}
 }
 
 func (tp *TransactionPool) update() {

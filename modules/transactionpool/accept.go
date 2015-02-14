@@ -93,7 +93,7 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 		if exists {
 			ut.dependents[dependent] = struct{}{}
 		}
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start)
+		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
 		_, exists = tp.storageProofs[triggerBlock.ID()]
 		if exists {
 			dependent, exists := tp.storageProofs[triggerBlock.ID()][fcid]
@@ -142,7 +142,7 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 	for _, sp := range t.StorageProofs {
 		// Grab the trigger block.
 		fc, _ := tp.state.FileContract(sp.ParentID)
-		triggerBlock, exists := tp.state.BlockAtHeight(fc.Start)
+		triggerBlock, exists := tp.state.BlockAtHeight(fc.Start - 1)
 
 		// Sanity check - a storage proof for this file contract should not
 		// already exist.
