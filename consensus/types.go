@@ -41,8 +41,11 @@ type (
 	// details on how the UnlockHash is constructed.
 	UnlockHash crypto.Hash
 
-	// A Target is a hash that a block's ID must be 'less than' in order for the
-	// block to be considered valid.
+	// A Target is a hash that a block's ID must be "less than" in order for
+	// the block to be considered valid. Miners vary the block's 'Nonce' field
+	// in order to brute-force such an ID. The inverse of a Target is called
+	// the "difficulty," because it is proportional to the amount of time
+	// required to brute-force the Target.
 	Target crypto.Hash
 )
 
