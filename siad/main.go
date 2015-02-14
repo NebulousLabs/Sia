@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -14,6 +15,7 @@ var (
 	config  Config
 	homeDir string
 	siaDir  string
+	logger  *Logger
 )
 
 type Config struct {
@@ -143,6 +145,16 @@ func main() {
 	root.PersistentFlags().StringVarP(&config.Siacore.HostDirectory, "host-dir", "H", defaultHostDir, "location of hosted files")
 	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "location of downloaded files")
 	root.PersistentFlags().StringVarP(&config.Siad.WalletFile, "wallet-file", "w", defaultWalletFile, "location of the wallet file")
+
+	// Create a Logger for the Siad api
+	e, err := os.OpenFile("error.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Printf("error opening file: %v", err)
+		os.Exit(1)
+	}
+	defer e.Close()
+	errLog := log.New(e, ">>>", log.Ldate|log.Ltime)
+	errLog.Printf("TEST ERROR")
 
 	// Load the config file, which will overwrite the default values.
 	if exists(config.Siad.ConfigFilename) {
