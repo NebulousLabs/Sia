@@ -10,7 +10,7 @@ func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 	addr := network.Address(req.FormValue("addr"))
 	err := d.network.AddPeer(addr)
 	if err != nil {
-		http.Error(w, err.Error(), 400)
+		writeError(w, err.Error(), 400)
 		return
 	}
 
@@ -21,7 +21,7 @@ func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	addr := network.Address(req.FormValue("addr"))
 	err := d.network.RemovePeer(addr)
 	if err != nil {
-		http.Error(w, err.Error(), 400)
+		writeError(w, err.Error(), 400)
 		return
 	}
 

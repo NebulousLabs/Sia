@@ -17,13 +17,13 @@ const (
 func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("pieces"))
 	if err != nil {
-		http.Error(w, "Malformed pieces", 400)
+		writeError(w, "Malformed pieces", 400)
 		return
 	}
 
 	file, _, err := req.FormFile("file")
 	if err != nil {
-		http.Error(w, "Malformed/missing file: "+err.Error(), 400)
+		writeError(w, "Malformed/missing file: "+err.Error(), 400)
 		return
 	}
 	defer file.Close()
@@ -39,7 +39,7 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 		Pieces:   pieces,
 	})
 	if err != nil {
-		http.Error(w, "Upload failed: "+err.Error(), 500)
+		writeError(w, "Upload failed: "+err.Error(), 500)
 		return
 	}
 
@@ -49,14 +49,14 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("pieces"))
 	if err != nil {
-		http.Error(w, "Malformed pieces", 400)
+		writeError(w, "Malformed pieces", 400)
 		return
 	}
 
 	// open the file
 	file, err := os.Open(req.FormValue("filename"))
 	if err != nil {
-		http.Error(w, "Couldn't open file: "+err.Error(), 400)
+		writeError(w, "Couldn't open file: "+err.Error(), 400)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 		Pieces:   pieces,
 	})
 	if err != nil {
-		http.Error(w, "Upload failed: "+err.Error(), 500)
+		writeError(w, "Upload failed: "+err.Error(), 500)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := d.renter.Download(req.FormValue("nickname"), path)
 	if err != nil {
 		// TODO: if this err is a user error (e.g. bad nickname), return 400 instead
-		http.Error(w, "Download failed: "+err.Error(), 500)
+		writeError(w, "Download failed: "+err.Error(), 500)
 		return
 	}
 

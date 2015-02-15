@@ -27,7 +27,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		if req.FormValue(qs) != "" {
 			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 			if err != nil {
-				http.Error(w, "Malformed "+qs, 400)
+				writeError(w, "Malformed "+qs, 400)
 				return
 			}
 		}
@@ -42,18 +42,18 @@ func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
 	var freezeDuration consensus.BlockHeight
 	_, err := fmt.Sscan(req.FormValue("freezeVolume"), &freezeVolume)
 	if err != nil {
-		http.Error(w, "Malformed freezeVolume", 400)
+		writeError(w, "Malformed freezeVolume", 400)
 		return
 	}
 	_, err = fmt.Sscan(req.FormValue("freezeDuration"), &freezeDuration)
 	if err != nil {
-		http.Error(w, "Malformed freezeDuration", 400)
+		writeError(w, "Malformed freezeDuration", 400)
 		return
 	}
 	// TODO: return error if address unknown
 	err = d.host.Announce(d.network.Address(), freezeVolume, freezeDuration)
 	if err != nil {
-		http.Error(w, "Could not announce host:"+err.Error(), 400)
+		writeError(w, "Could not announce host:"+err.Error(), 400)
 		return
 	}
 	writeSuccess(w)

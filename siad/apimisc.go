@@ -9,7 +9,7 @@ import (
 func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		writeError(w, err.Error(), 500)
 		return
 	}
 
@@ -22,7 +22,7 @@ func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		writeError(w, err.Error(), 500)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
 	// TODO: don't spawn multiple CatchUps
 	peer, err := d.network.RandomPeer()
 	if err != nil {
-		http.Error(w, "No peers available for syncing", 500)
+		writeError(w, "No peers available for syncing", 500)
 		return
 	}
 
