@@ -11,7 +11,7 @@ import (
 
 // entryWeight determines the weight of a specific host, which is:
 //
-//		Freeze * Collateral / square(Price).
+//		Freeze * Collateral / sqrt(Price).
 //
 // Freeze has to be linear, because any non-linear freeze will invite sybil
 // attacks.
@@ -28,16 +28,15 @@ func entryWeight(entry modules.HostEntry) consensus.Currency {
 	// Catch a divide by 0 error, and let all hosts have at least some weight.
 	//
 	// TODO: Perhaps there's a better way to do this.
-	if entry.Price.IsZero() {
+	if entry.Price.Sign() <= 0 {
 		entry.Price = consensus.NewCurrency64(1)
 	}
-	if entry.Collateral.IsZero() {
+	if entry.Collateral.Sign() <= 0 {
 		entry.Collateral = consensus.NewCurrency64(1)
 	}
-	if entry.Freeze.IsZero() {
+	if entry.Freeze.Sign() <= 0 {
 		entry.Freeze = consensus.NewCurrency64(1)
 	}
 
-	// weight := entry.Freeze * entry.Collateral / sqrt(entry.Price)
 	return entry.Freeze.Mul(entry.Collateral).Div(entry.Price.Sqrt())
 }

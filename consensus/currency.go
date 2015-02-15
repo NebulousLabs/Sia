@@ -40,9 +40,10 @@ func (c Currency) Cmp(y Currency) int {
 	return c.i.Cmp(&y.i)
 }
 
-// IsZero returns true if c's value is 0.
-func (c Currency) IsZero() bool {
-	return c.i.Sign() == 0
+// Sign returns the sign of a Currency. The return value follows of the
+// convention of the math/big package.
+func (c Currency) Sign() int {
+	return c.i.Sign()
 }
 
 // Add returns a new Currency value y = c + x.
