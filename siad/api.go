@@ -12,7 +12,7 @@ const apiTimeout = 5e9 // 5 seconds
 
 func writeError(w http.ResponseWriter, msg string, err int) {
 	log.Printf("%d HTTP ERROR: %s", err, msg)
-	writeError(w, msg, err)
+	http.Error(w, msg, err)
 }
 
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
