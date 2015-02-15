@@ -26,7 +26,7 @@ func (a *Assistant) testBlockTimestamps() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != FutureBlockErr {
+	if err != FutureTimestampErr {
 		a.Tester.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }

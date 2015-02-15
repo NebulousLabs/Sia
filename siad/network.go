@@ -136,7 +136,7 @@ func (d *daemon) CatchUp(peer network.Address) {
 		if acceptErr != nil {
 			// TODO: something
 			//
-			// TODO: If the error is a FutureBlockErr, need to wait before trying the
+			// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 			// block again.
 		}
 	}

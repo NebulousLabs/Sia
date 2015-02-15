@@ -1,8 +1,8 @@
 package consensus
 
 import (
-	"bytes"
 	"math/big"
+	"sort"
 )
 
 // SurpassThreshold is a percentage that dictates how much heavier a competing
@@ -55,6 +55,25 @@ func (bn *blockNode) heavierThan(cmp *blockNode) bool {
 	diff := new(big.Rat).Sub(bn.depth.Inverse(), cmp.depth.Inverse())
 	threshold := new(big.Rat).Mul(cmp.target.Inverse(), SurpassThreshold)
 	return diff.Cmp(threshold) > 0
+}
+
+// earliestChildTimestamp returns the earliest timestamp that a child node
+// can have while still being valid. See section 'Timestamp Rules' in
+// Consensus.md.
+func (bn *blockNode) earliestChildTimestamp() Timestamp {
+	// Get the previous `MedianTimestampWindow` timestamps.
+	var intTimestamps []int
+	referenceNode := bn
+	for i := 0; i < MedianTimestampWindow; i++ {
+		intTimestamps = append(intTimestamps, int(referenceNode.block.Timestamp))
+		if referenceNode.parent != nil {
+			referenceNode = referenceNode.parent
+		}
+	}
+	sort.Ints(intTimestamps)
+
+	// Return the median of the sorted timestamps.
+	return Timestamp(intTimestamps[MedianTimestampWindow/2])
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
@@ -111,65 +130,4 @@ func (bn *blockNode) newChild(b Block) *blockNode {
 	bn.children = append(bn.children, child)
 
 	return child
-}
-
-// addBlockToTree takes a block and a parent node, and adds a child node to the
-// parent containing the block. No validation is done.
-func (s *State) addBlockToTree(b Block) (err error) {
-	parentNode := s.blockMap[b.ParentID]
-	newNode := parentNode.newChild(b)
-
-	// Add the node to the block map
-	s.blockMap[b.ID()] = newNode
-
-	if newNode.heavierThan(s.currentBlockNode()) {
-		err = s.forkBlockchain(newNode)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-// CheckTarget returns true if the block's ID meets the given target.
-func (b Block) CheckTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
-}
-
-// Int converts a Target to a big.Int.
-func (t Target) Int() *big.Int {
-	return new(big.Int).SetBytes(t[:])
-}
-
-// Rat converts a Target to a big.Rat.
-func (t Target) Rat() *big.Rat {
-	return new(big.Rat).SetInt(t.Int())
-}
-
-// Inv returns the inverse of a Target as a big.Rat
-func (t Target) Inverse() *big.Rat {
-	return new(big.Rat).Inv(t.Rat())
-}
-
-// IntToTarget converts a big.Int to a Target.
-func IntToTarget(i *big.Int) (t Target) {
-	// i may overflow the maximum target.
-	// In the event of overflow, return the maximum.
-	if i.BitLen() > 256 {
-		return RootDepth
-	}
-	b := i.Bytes()
-	// need to preserve big-endianness
-	offset := len(t[:]) - len(b)
-	copy(t[offset:], b)
-	return
-}
-
-// RatToTarget converts a big.Rat to a Target.
-func RatToTarget(r *big.Rat) Target {
-	// conversion to big.Int truncates decimal
-	i := new(big.Int).Div(r.Num(), r.Denom())
-	return IntToTarget(i)
 }

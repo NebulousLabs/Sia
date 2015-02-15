@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"bytes"
+	"math/big"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -314,6 +316,42 @@ func CalculateCoinbase(height BlockHeight) (c Currency) {
 	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
 }
 
+// Int converts a Target to a big.Int.
+func (t Target) Int() *big.Int {
+	return new(big.Int).SetBytes(t[:])
+}
+
+// Rat converts a Target to a big.Rat.
+func (t Target) Rat() *big.Rat {
+	return new(big.Rat).SetInt(t.Int())
+}
+
+// Inv returns the inverse of a Target as a big.Rat
+func (t Target) Inverse() *big.Rat {
+	return new(big.Rat).Inv(t.Rat())
+}
+
+// IntToTarget converts a big.Int to a Target.
+func IntToTarget(i *big.Int) (t Target) {
+	// i may overflow the maximum target.
+	// In the event of overflow, return the maximum.
+	if i.BitLen() > 256 {
+		return RootDepth
+	}
+	b := i.Bytes()
+	// need to preserve big-endianness
+	offset := len(t[:]) - len(b)
+	copy(t[offset:], b)
+	return
+}
+
+// RatToTarget converts a big.Rat to a Target.
+func RatToTarget(r *big.Rat) Target {
+	// conversion to big.Int truncates decimal
+	i := new(big.Int).Div(r.Num(), r.Denom())
+	return IntToTarget(i)
+}
+
 // UnlockHash calculates the root hash of a Merkle tree of the
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the
@@ -339,6 +377,12 @@ func (b Block) ID() BlockID {
 		b.Nonce,
 		b.MerkleRoot(),
 	))
+}
+
+// CheckTarget returns true if the block's ID meets the given target.
+func (b Block) CheckTarget(target Target) bool {
+	blockHash := b.ID()
+	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
 // MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
