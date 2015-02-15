@@ -10,20 +10,16 @@ import (
 
 const apiTimeout = 5e9 // 5 seconds
 
-func httpLogWrapper(f http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		log.Printf("%s %s", req.Method, req.URL)
-		f(w, req)
-	}
-}
-
 func writeError(w http.ResponseWriter, msg string, err int) {
 	log.Printf("%d HTTP ERROR: %s", err, msg)
 	writeError(w, msg, err)
 }
 
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
-	mux.HandleFunc(url, httpLogWrapper(handler))
+	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
+		log.Printf("%s %s", req.Method, req.URL)
+		handler(w, req)
+	})
 }
 
 func (d *daemon) listen(addr string) {
