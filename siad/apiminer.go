@@ -12,14 +12,14 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	var threads int
 	_, err := fmt.Sscan(req.FormValue("threads"), &threads)
 	if err != nil {
-		http.Error(w, "Malformed number of threads", 400)
+		writeError(w, "Malformed number of threads", 400)
 		return
 	}
 
 	d.miner.SetThreads(threads)
 	err = d.miner.StartMining()
 	if err != nil {
-		http.Error(w, err.Error(), 500) // TODO: Need to verify that this is the proper error code to be returning.
+		writeError(w, err.Error(), 500) // TODO: Need to verify that this is the proper error code to be returning.
 		return
 	}
 
@@ -30,7 +30,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 	mInfo, err := d.miner.Info()
 	if err != nil {
-		http.Error(w, "Failed to encode status object", 500)
+		writeError(w, "Failed to encode status object", 500)
 		return
 	}
 	writeJSON(w, mInfo)

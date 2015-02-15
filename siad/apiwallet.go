@@ -11,7 +11,7 @@ import (
 func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	coinAddress, _, err := d.wallet.CoinAddress()
 	if err != nil {
-		http.Error(w, "Failed to get a coin address", 500)
+		writeError(w, "Failed to get a coin address", 500)
 		return
 	}
 
@@ -29,7 +29,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	var dest consensus.UnlockHash
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
-		http.Error(w, "Malformed amount", 400)
+		writeError(w, "Malformed amount", 400)
 		return
 	}
 
@@ -38,7 +38,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	var destAddressBytes []byte
 	_, err = fmt.Sscanf(destString, "%x", &destAddressBytes)
 	if err != nil {
-		http.Error(w, "Malformed coin address", 400)
+		writeError(w, "Malformed coin address", 400)
 		return
 	}
 	copy(dest[:], destAddressBytes)
@@ -46,7 +46,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Spend the coins.
 	_, err = d.wallet.SpendCoins(amount, dest)
 	if err != nil {
-		http.Error(w, "Failed to create transaction: "+err.Error(), 500)
+		writeError(w, "Failed to create transaction: "+err.Error(), 500)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	walletStatus, err := d.wallet.Info()
 	if err != nil {
-		http.Error(w, "Failed to get wallet info", 500)
+		writeError(w, "Failed to get wallet info", 500)
 		return
 	}
 	writeJSON(w, walletStatus)
