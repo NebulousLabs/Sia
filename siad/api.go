@@ -46,8 +46,8 @@ func (d *daemon) listen(addr string) {
 	mux.HandleFunc("/sync", d.syncHandler)
 
 	// Debugging API Calls
-	mux.HandleFunc("/constants", d.debugConstantsHandler)
-	mux.HandleFunc("/mutextest", d.mutexTestHandler)
+	mux.HandleFunc("/debug/constants", d.debugConstantsHandler)
+	mux.HandleFunc("/debug/mutextest", d.mutexTestHandler)
 
 	// create graceful HTTP server
 	d.apiServer = &graceful.Server{
