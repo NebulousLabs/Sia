@@ -3,7 +3,6 @@ package consensus
 import (
 	"errors"
 	"sort"
-	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -96,8 +95,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
-	largestTimeAllowed := Timestamp(time.Now().Unix()) + FutureThreshold
-	if b.Timestamp > largestTimeAllowed {
+	if b.Timestamp > CurrentTimestamp()+FutureThreshold {
 		return FutureBlockErr
 	}
 

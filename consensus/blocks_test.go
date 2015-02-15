@@ -21,7 +21,7 @@ func (a *Assistant) testBlockTimestamps() {
 	}
 
 	// Create a block with a timestamp that is too late.
-	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime()+10+FutureThreshold, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp()+10+FutureThreshold, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func (a *Assistant) testSingleNoFeePayout() {
 	// before and after state hashes to see that they match.
 	beforeHash := a.State.StateHash()
 	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height()), UnlockHash: ZeroUnlockHash}}
-	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
+	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func (a *Assistant) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
 	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height() + 1), UnlockHash: ZeroUnlockHash}}
-	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func (a *Assistant) testMultipleFeesMultiplePayouts() {
 	txn.MinerFees = append(txn.MinerFees, value)
 	txn2.MinerFees = append(txn2.MinerFees, value2)
 	payouts := a.Payouts(a.State.Height()+1, []Transaction{txn, txn2})
-	b, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn}, a.State.CurrentTarget())
+	b, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn}, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Error(err)
 	}
@@ -168,7 +168,7 @@ func (a *Assistant) testMultipleFeesMultiplePayouts() {
 
 	// Mine a block with mutliple fees and a correct payout to multiple
 	// addresses.
-	b, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn, txn2}, a.State.CurrentTarget())
+	b, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn, txn2}, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Error(err)
 	}

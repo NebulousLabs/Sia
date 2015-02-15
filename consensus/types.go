@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"time"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
@@ -292,6 +294,11 @@ type CoveredFields struct {
 	MinerFees                []uint64
 	ArbitraryData            []uint64
 	Signatures               []uint64
+}
+
+// CurrentTimestamp returns the current time as a Timestamp.
+func CurrentTimestamp() Timestamp {
+	return Timestamp(time.Now().Unix())
 }
 
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase
