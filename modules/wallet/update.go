@@ -85,7 +85,7 @@ func (w *Wallet) update() error {
 	}
 
 	// Get, apply, and store the unconfirmed diffs currently available in the transaction pool.
-	w.unconfirmedDiffs = w.tpool.OutputDiffs()
+	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
 	for _, scod := range w.unconfirmedDiffs {
 		w.applyDiff(scod, true)
 	}

@@ -45,7 +45,6 @@ func (tp *TransactionPool) confirmTransaction(t consensus.Transaction) {
 	for i, _ := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(i)
 		delete(tp.siacoinOutputs, scoid)
-		delete(tp.newSiacoinOutputs, scoid)
 	}
 	for i, fc := range t.FileContracts {
 		fcid := t.FileContractID(i)
@@ -66,7 +65,6 @@ func (tp *TransactionPool) confirmTransaction(t consensus.Transaction) {
 	for i, _ := range t.SiafundOutputs {
 		sfoid := t.SiafundOutputID(i)
 		delete(tp.siafundOutputs, sfoid)
-		delete(tp.newSiafundOutputs, sfoid)
 	}
 	delete(tp.transactions, crypto.HashObject(t))
 }

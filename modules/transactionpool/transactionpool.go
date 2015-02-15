@@ -52,12 +52,10 @@ type TransactionPool struct {
 	// the list of fileContracts if an unconfirmed termination has appeared for
 	// the unconfirmed file contract.
 	usedSiacoinOutputs       map[consensus.SiacoinOutputID]*unconfirmedTransaction
-	newSiacoinOutputs        map[consensus.SiacoinOutputID]*unconfirmedTransaction
-	newFileContracts         map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
+	newFileContracts         map[consensus.BlockHeight]*unconfirmedTransaction
 	fileContractTerminations map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
-	newSiafundOutputs        map[consensus.SiafundOutputID]*unconfirmedTransaction
 
 	mu sync.RWMutex
 }
