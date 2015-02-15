@@ -41,7 +41,7 @@ type TransactionPool struct {
 	tail *unconfirmedTransaction
 
 	// These maps are essentially equivalent to the unconfirmed consensus set.
-	transactions   map[crypto.Hash]struct{}
+	transactions   map[crypto.Hash]*unconfirmedTransaction
 	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
 	fileContracts  map[consensus.FileContractID]consensus.FileContract
 	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
@@ -52,7 +52,7 @@ type TransactionPool struct {
 	// the list of fileContracts if an unconfirmed termination has appeared for
 	// the unconfirmed file contract.
 	usedSiacoinOutputs       map[consensus.SiacoinOutputID]*unconfirmedTransaction
-	newFileContracts         map[consensus.BlockHeight]*unconfirmedTransaction
+	newFileContracts         map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
 	fileContractTerminations map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction

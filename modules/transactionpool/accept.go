@@ -65,7 +65,7 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 		}
 
 		tp.fileContracts[fcid] = fc
-		tp.newFileContracts[fc.Start] = ut
+		tp.newFileContracts[fc.Start][fcid] = ut
 	}
 }
 
@@ -100,7 +100,7 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 		// Sanity check - a storage proof for this file contract should not
 		// already exist.
 		if consensus.DEBUG {
-			_, exists = tp.storageProofs[triggerBlock.ID()]
+			_, exists := tp.storageProofs[triggerBlock.ID()]
 			if exists {
 				_, exists = tp.storageProofs[triggerBlock.ID()][sp.ParentID]
 				if exists {
@@ -185,6 +185,8 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, directi
 	} else {
 		tp.prependUnconfirmedTransaction(ut)
 	}
+
+	tp.transactions[crypto.HashObject(t)] = ut
 }
 
 // AcceptTransaction takes a new transaction from the network and puts it in
@@ -204,8 +206,6 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	// may depend on existing unconfirmed transactions.
 	direction := true
 	tp.addTransactionToPool(t, direction)
-
-	tp.transactions[crypto.HashObject(t)] = struct{}{}
 
 	return
 }
