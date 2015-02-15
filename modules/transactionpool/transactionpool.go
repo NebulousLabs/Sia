@@ -13,18 +13,25 @@ import (
 
 // An unconfirmedTransaction is a node in a linked list containing a
 // transaction and pointers to the next and previous transactions in the list.
+// The linked list keeps transactions in a specific order, so that transactions
+// with dependencies always appear later in the list than their dependencies.
+// Linked lists also allow for easy removal of specific elements.
 type unconfirmedTransaction struct {
 	transaction consensus.Transaction
 	previous    *unconfirmedTransaction
 	next        *unconfirmedTransaction
 }
 
-// The TransactionPool keeps a set of transactions that would be valid in a
-// block, including transactions that depend on eachother or (in the case of
-// storage proofs) depend on a specific block being in the blockchain.
+// The transaction pool keeps an unconfirmed set of transactions along with the
+// contracts and outputs that have been created by unconfirmed transactions.
+// Incoming transactions are allowed to use objects in the unconfirmed
+// consensus set, and in doing so will consume them, preventing other
+// transactions from using them.
 //
-// Transactions are kept in a linked list which indicates the order that
-// unconfirmed transactions should be added to the blockchain.
+// Then there are a set of maps indicating which unconfirmed transactions have
+// created or consumed objects in the consensus set. This helps with detecting
+// invalid transactions, and transactions that are in conflict with other
+// unconfirmed transactions.
 type TransactionPool struct {
 	state       *consensus.State
 	recentBlock consensus.BlockID

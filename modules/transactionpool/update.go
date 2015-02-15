@@ -159,20 +159,11 @@ func (tp *TransactionPool) update() {
 				tp.removeDependentTransactions(txn)
 			}
 
-			ut := &unconfirmedTransaction{
-				transaction: txn,
-			}
-
-			tp.applySiacoinInputs(txn, ut)
-			tp.applySiacoinOutputs(txn, ut)
-			tp.applyFileContracts(txn, ut)
-			tp.applyFileContractTerminations(txn, ut)
-			tp.applyStorageProofs(txn, ut)
-			tp.applySiafundInputs(txn, ut)
-			tp.applySiafundOutputs(txn, ut)
-
-			// Add the transaction to the front of the linked list.
-			tp.prependUnconfirmedTransaction(ut)
+			// set `direction` to false because reversed transactions need to
+			// be added to the beginning of the linked list - existing
+			// unconfirmed transactions may depend on this rewound transaction.
+			direction := false
+			tp.addTransactionToPool(txn, direction)
 		}
 	}
 

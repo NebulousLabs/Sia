@@ -5,6 +5,9 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+// applySiacoinInputs adds every siacoin input to the transaction pool by
+// marking the consumed outputs and pointing to the transaction that consumed
+// them.
 func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *unconfirmedTransaction) {
 	// Go through the siacoin inputs and mark them as used.
 	for _, sci := range t.SiacoinInputs {
@@ -26,6 +29,8 @@ func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *uncon
 	}
 }
 
+// applySiacoinOutputs adds every new siacoin output to the unconfirmed
+// consensus set and points to the transaction that created the outputs.
 func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction, ut *unconfirmedTransaction) {
 	// Add each new siacoin output to the list of siacoinOutputs and newSiacoinOutputs.
 	for i, sco := range t.SiacoinOutputs {
@@ -173,7 +178,13 @@ func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction, ut *unco
 	}
 }
 
-func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
+// addTransactionToPool takes a transaction and creates an
+// unconfirmedTransaction object for the transaction, updating the pool to
+// indicate the resources that have been created and consumed. Then the
+// unconfirmedTransaction is appended or prepended to the linked list of
+// transactions depending on the value of `direction`, false means prepend,
+// true means append.
+func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, direction bool) {
 	ut := &unconfirmedTransaction{
 		transaction: t,
 	}
@@ -189,7 +200,11 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 
 	// Add the unconfirmed transaction to the end of the linked list of
 	// transactions.
-	tp.appendUnconfirmedTransaction(ut)
+	if direction {
+		tp.appendUnconfirmedTransaction(ut)
+	} else {
+		tp.prependUnconfirmedTransaction(ut)
+	}
 }
 
 // AcceptTransaction takes a new transaction from the network and puts it in
@@ -205,8 +220,10 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 		return
 	}
 
-	// Add the transaction.
-	tp.addTransactionToPool(t)
+	// direction is set to true because a new transaction has been added and it
+	// may depend on existing unconfirmed transactions.
+	direction := true
+	tp.addTransactionToPool(t, direction)
 
 	tp.transactions[crypto.HashObject(t)] = struct{}{}
 

@@ -11,6 +11,10 @@ import (
 // through it. But some of this code can be broken out into more pieces and
 // that will remove the redundancy.
 
+// validUnconfirmedSiacoins checks that the inputs are all valid in the context
+// of the unconfirmed consensus set and that the value of the inputs is equal
+// to the value of the outputs. There is an additional check on the unlock
+// conditions to see that the hash matches and that the timelock has expired.
 func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sci := range t.SiacoinInputs {
@@ -48,6 +52,10 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 	return
 }
 
+// validUnconfirmedFileContractTerminations checks that all file contract
+// terminations are valid in the context of the unconfirmed consensus set.
+// There is an additional check for the validity of the unlock conditions and
+// the validity of the termination payouts.
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
 		// Check that the file contract has not already been terminated.
@@ -86,6 +94,10 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 	return
 }
 
+// validUnconfirmedSiafunds checks that all siafund inputs are valid in the
+// context of the unconfirmed consensus set and that the value of the siafund
+// inputs matches the value of the siafund outputs. There is also a check on
+// the unlock conditions.
 func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sfi := range t.SiafundInputs {
