@@ -46,7 +46,8 @@ func (d *daemon) listen(addr string) {
 	mux.HandleFunc("/sync", d.syncHandler)
 
 	// Debugging API Calls
-	mux.HandleFunc("/mutextest", d.mutexTestHandler)
+	mux.HandleFunc("/debug/constants", d.debugConstantsHandler)
+	mux.HandleFunc("/debug/mutextest", d.mutexTestHandler)
 
 	// create graceful HTTP server
 	d.apiServer = &graceful.Server{
@@ -77,9 +78,4 @@ func writeSuccess(w http.ResponseWriter) {
 	writeJSON(w, struct {
 		Success bool
 	}{true})
-}
-
-func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: Bring back.
-	// d.core.ScanMutexes()
 }
