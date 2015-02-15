@@ -15,7 +15,6 @@ var (
 	config  Config
 	homeDir string
 	siaDir  string
-	logger  *log.Logger
 )
 
 type Config struct {
@@ -153,8 +152,8 @@ func main() {
 		os.Exit(1)
 	}
 	defer logFile.Close()
-	logger = log.New(logFile, ">>>", log.Ldate|log.Ltime)
-	logger.Printf("Logger Initialized")
+	log.SetOutput(logFile)
+	log.SetFlags(log.Ldate | log.Ltime)
 
 	// Load the config file, which will overwrite the default values.
 	if exists(config.Siad.ConfigFilename) {

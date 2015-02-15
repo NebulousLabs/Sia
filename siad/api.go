@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/stretchr/graceful"
@@ -11,7 +12,7 @@ const apiTimeout = 5e9 // 5 seconds
 
 func logWrapper(f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger.Printf("%s %s", req.Method, req.URL)
+		log.Printf("%s %s", req.Method, req.URL)
 		f(w, req)
 	}
 }
