@@ -57,23 +57,30 @@ func (bn *blockNode) heavierThan(cmp *blockNode) bool {
 	return diff.Cmp(threshold) > 0
 }
 
+// timestampSlice is used for sorting.
+type timestampSlice []Timestamp
+
+func (ts timestampSlice) Len() int           { return len(ts) }
+func (ts timestampSlice) Less(i, j int) bool { return ts[i] < ts[j] }
+func (ts timestampSlice) Swap(i, j int)      { ts[i], ts[j] = ts[j], ts[i] }
+
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
 func (bn *blockNode) earliestChildTimestamp() Timestamp {
-	// Get the previous `MedianTimestampWindow` timestamps.
-	var intTimestamps []int
-	referenceNode := bn
+	// Get the previous MedianTimestampWindow timestamps.
+	windowTimes := make(timestampSlice, MedianTimestampWindow)
+	traverse := bn
 	for i := 0; i < MedianTimestampWindow; i++ {
-		intTimestamps = append(intTimestamps, int(referenceNode.block.Timestamp))
-		if referenceNode.parent != nil {
-			referenceNode = referenceNode.parent
+		windowTimes[i] = traverse.block.Timestamp
+		if traverse.parent != nil {
+			traverse = traverse.parent
 		}
 	}
-	sort.Ints(intTimestamps)
+	sort.Sort(windowTimes)
 
 	// Return the median of the sorted timestamps.
-	return Timestamp(intTimestamps[MedianTimestampWindow/2])
+	return windowTimes[len(windowTimes)/2]
 }
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
