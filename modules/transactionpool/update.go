@@ -161,7 +161,6 @@ func (tp *TransactionPool) update() {
 
 			ut := &unconfirmedTransaction{
 				transaction: txn,
-				dependents:  make(map[*unconfirmedTransaction]struct{}),
 			}
 
 			tp.applySiacoinInputs(txn, ut)

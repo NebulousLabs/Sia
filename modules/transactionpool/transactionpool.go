@@ -12,17 +12,11 @@ import (
 // prioritize transactions that have higher miner fees.
 
 // An unconfirmedTransaction is a node in a linked list containing a
-// transaction and a list of transactions directly dependent on the
-// transaction. The dependents list makes it easy to remove all invalid
-// transactions in the event that a conflict or double spend makes in into the
-// blockchain and invalidates existing unconfirmed transactions.
+// transaction and pointers to the next and previous transactions in the list.
 type unconfirmedTransaction struct {
 	transaction consensus.Transaction
-	dependents  map[*unconfirmedTransaction]struct{}
-
-	// Linked list variables.
-	previous *unconfirmedTransaction
-	next     *unconfirmedTransaction
+	previous    *unconfirmedTransaction
+	next        *unconfirmedTransaction
 }
 
 // The TransactionPool keeps a set of transactions that would be valid in a

@@ -21,13 +21,6 @@ func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *uncon
 		// whether the ouput is in the confirmed or unconfirmed set.
 		delete(tp.siacoinOutputs, sci.ParentID)
 
-		// Check if this transaction is dependent on another unconfirmed
-		// transaction.
-		requirement, exists := tp.newSiacoinOutputs[sci.ParentID]
-		if exists {
-			requirement.dependents[ut] = struct{}{}
-		}
-
 		// Add this output to the list of spent outputs.
 		tp.usedSiacoinOutputs[sci.ParentID] = ut
 	}
@@ -52,12 +45,6 @@ func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction, ut *unco
 
 		tp.siacoinOutputs[scoid] = sco
 		tp.newSiacoinOutputs[scoid] = ut
-
-		// Find any dependent transactions.
-		dependent, exists := tp.usedSiacoinOutputs[scoid]
-		if exists {
-			ut.dependents[dependent] = struct{}{}
-		}
 	}
 }
 
@@ -87,20 +74,6 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 			tp.newFileContracts[fc.Start] = make(map[consensus.FileContractID]*unconfirmedTransaction)
 		}
 		tp.newFileContracts[fc.Start][fcid] = ut
-
-		// Find any dependent transactions.
-		dependent, exists := tp.fileContractTerminations[fcid]
-		if exists {
-			ut.dependents[dependent] = struct{}{}
-		}
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
-		_, exists = tp.storageProofs[triggerBlock.ID()]
-		if exists {
-			dependent, exists := tp.storageProofs[triggerBlock.ID()][fcid]
-			if exists {
-				ut.dependents[dependent] = struct{}{}
-			}
-		}
 	}
 }
 
@@ -117,21 +90,6 @@ func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction
 
 		// Remove the file contract from the set and add the termination.
 		delete(tp.fileContracts, fct.ParentID)
-
-		// Check if this transaction is dependent on another transaction.
-		fc, exists := tp.state.FileContract(fct.ParentID)
-		if !exists {
-			fc, exists = tp.fileContracts[fct.ParentID]
-			if consensus.DEBUG {
-				if !exists {
-					panic("file contract is getting terminated but cannot be found.")
-				}
-			}
-			requirement, exists := tp.newFileContracts[fc.Start][fct.ParentID]
-			if exists {
-				requirement.dependents[ut] = struct{}{}
-			}
-		}
 
 		// Add this termination to the set of terminations.
 		tp.fileContractTerminations[fct.ParentID] = ut
@@ -163,15 +121,6 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 		// Remove the file contract from the set and add the termination.
 		delete(tp.fileContracts, sp.ParentID)
 
-		// Check if this transaction is dependent on another transaction.
-		_, exists = tp.newFileContracts[fc.Start]
-		if exists {
-			requirement, exists := tp.newFileContracts[fc.Start][sp.ParentID]
-			if exists {
-				requirement.dependents[ut] = struct{}{}
-			}
-		}
-
 		// Add the storage proof to the set of storage proofs.
 		_, exists = tp.storageProofs[triggerBlock.ID()]
 		if !exists {
@@ -197,13 +146,6 @@ func (tp *TransactionPool) applySiafundInputs(t consensus.Transaction, ut *uncon
 		// whether the ouput is in the confirmed or unconfirmed set.
 		delete(tp.siafundOutputs, sfi.ParentID)
 
-		// Check if this transaction is dependent on another unconfirmed
-		// transaction.
-		requirement, exists := tp.newSiafundOutputs[sfi.ParentID]
-		if exists {
-			requirement.dependents[ut] = struct{}{}
-		}
-
 		// Add this output to the list of spent outputs.
 		tp.usedSiafundOutputs[sfi.ParentID] = ut
 	}
@@ -228,19 +170,12 @@ func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction, ut *unco
 
 		tp.siafundOutputs[sfoid] = sfo
 		tp.newSiafundOutputs[sfoid] = ut
-
-		// Find any dependent transactions.
-		dependent, exists := tp.usedSiafundOutputs[sfoid]
-		if exists {
-			ut.dependents[dependent] = struct{}{}
-		}
 	}
 }
 
 func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 	ut := &unconfirmedTransaction{
 		transaction: t,
-		dependents:  make(map[*unconfirmedTransaction]struct{}),
 	}
 
 	// Apply each individual part of the transaction to the transaction pool.
