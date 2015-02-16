@@ -37,7 +37,7 @@ func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 		}
 
 		scod := SiacoinOutputDiff{
-			New:           true,
+			Direction:     DiffApply,
 			ID:            id,
 			SiacoinOutput: sco,
 		}
@@ -79,7 +79,7 @@ func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
 
 	// Remove the file contract from the consensus set and update the diffs.
 	fcd := FileContractDiff{
-		New:          false,
+		Direction:    DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
 	}

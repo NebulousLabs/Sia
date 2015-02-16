@@ -95,8 +95,7 @@ func (a *Assistant) MineAndApplyValidBlock() (block Block) {
 // RewindABlock removes the most recent block from the consensus set.
 func (a *Assistant) RewindABlock() {
 	bn := a.State.currentBlockNode()
-	direction := false // set to false because we're removing a block.
-	a.State.applyDiffSet(bn, direction)
+	a.State.applyDiffSet(bn, DiffRevert)
 }
 
 // NewAssistant returns an assistant that's ready to help with testing.

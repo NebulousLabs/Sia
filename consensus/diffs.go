@@ -1,17 +1,18 @@
 package consensus
 
-// Everything in the consensus set has a binary existence. Either it exists or
-// it doesn't, and anything that exists with the same id in the same fork will
-// have the same contents. This means that all diffs either add an element to
-// the consensus set, or they remove an element from the consensus set, and
-// that all diffs are easily reversible. The `New` flag indicates whether the
-// item is being added or removed from the consensus set. When apply a diff,
-// use the new flag as intended. When reversing a diff, flip the new flag.
+// Diffs can be applied or reverted. A bool is used to restrict the value to
+// two possibilities.
+type DiffDirection bool
+
+const (
+	DiffApply  DiffDirection = true
+	DiffRevert DiffDirection = false
+)
 
 // A SiacoinOutputDiff indicates the addition or removal of a SiacoinOutput in
 // the consensus set.
 type SiacoinOutputDiff struct {
-	New           bool
+	Direction     DiffDirection
 	ID            SiacoinOutputID
 	SiacoinOutput SiacoinOutput
 }
@@ -19,7 +20,7 @@ type SiacoinOutputDiff struct {
 // A FileContractDiff indicates the addition or removal of a FileContract in
 // the consensus set.
 type FileContractDiff struct {
-	New          bool
+	Direction    DiffDirection
 	ID           FileContractID
 	FileContract FileContract
 }
@@ -27,7 +28,7 @@ type FileContractDiff struct {
 // A SiafundOutputDiff indicates the addition or removal of a SiafundOutput in
 // the consensus set.
 type SiafundOutputDiff struct {
-	New           bool
+	Direction     DiffDirection
 	ID            SiafundOutputID
 	SiafundOutput SiafundOutput
 }
@@ -42,15 +43,9 @@ type SiafundPoolDiff struct {
 }
 
 // commitSiacoinOutputDiff takes a SiacoinOutputDiff and applies it to the
-// consensus set. `applied` indicates whether the diff is being applied or
-// reversed.
-func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, applied bool) {
-	add := scod.New
-	if !applied {
-		add = !add
-	}
-
-	if add {
+// consensus set.
+func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, dir DiffDirection) {
+	if scod.Direction == dir {
 		// Sanity check - output should not already exist.
 		if DEBUG {
 			_, exists := s.siacoinOutputs[scod.ID]
@@ -76,13 +71,8 @@ func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, applied bool) {
 // commitFileContractDiff takes a FileContractDiff and applies it to the
 // consensus set.  `applied` indicates whether the diff is being applied or
 // reversed.
-func (s *State) commitFileContractDiff(fcd FileContractDiff, applied bool) {
-	add := fcd.New
-	if !applied {
-		add = !add
-	}
-
-	if add {
+func (s *State) commitFileContractDiff(fcd FileContractDiff, dir DiffDirection) {
+	if fcd.Direction == dir {
 		// Sanity check - contract should not already exist.
 		if DEBUG {
 			_, exists := s.fileContracts[fcd.ID]
@@ -108,13 +98,8 @@ func (s *State) commitFileContractDiff(fcd FileContractDiff, applied bool) {
 // commitSiafundOutputDiff takes a SiafundOutputDiff and applies it to the
 // consensus set. `applied` indicates whether the diff is being applied or
 // reversed.
-func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, applied bool) {
-	add := sfod.New
-	if !applied {
-		add = !add
-	}
-
-	if add {
+func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, dir DiffDirection) {
+	if sfod.Direction == dir {
 		// Sanity check - output should not already exist.
 		if DEBUG {
 			_, exists := s.siafundOutputs[sfod.ID]
@@ -140,8 +125,8 @@ func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, applied bool) {
 // commitSiafundPoolDiff takes a SiafundPoolDiff and applies it to the
 // consensus set. `applied` indicates whether the diff is being applied or
 // reversed.
-func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, applied bool) {
-	if applied {
+func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, dir DiffDirection) {
+	if dir == DiffApply {
 		s.siafundPool = sfpd.Adjusted
 	} else {
 		s.siafundPool = sfpd.Previous
@@ -153,7 +138,7 @@ func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, applied bool) {
 // reversed. The ordering is important, because transactions within the same
 // block are allowed to depend on each other. When reversing diffs, they must
 // be reversed in the opposite order that they were applied.
-func (s *State) applyDiffSet(bn *blockNode, applied bool) {
+func (s *State) applyDiffSet(bn *blockNode, dir DiffDirection) {
 	// Sanity check
 	if DEBUG {
 		// Diffs should have already been generated for this node.
@@ -163,7 +148,7 @@ func (s *State) applyDiffSet(bn *blockNode, applied bool) {
 
 		// Current node must be the input node's parent if applied = true, and
 		// current node must be the input node if applied = false.
-		if applied {
+		if dir == DiffApply {
 			if bn.parent.block.ID() != s.currentBlockID {
 				panic("applying a block node when it's not a valid successor")
 			}
@@ -179,33 +164,33 @@ func (s *State) applyDiffSet(bn *blockNode, applied bool) {
 	// sets, the diffs must be reversed in the opposite order that they were
 	// applied, due to transactions being able to depend on each other. This
 	// results is messier for loops when applied is false.
-	if applied {
+	if dir == DiffApply {
 		for _, scod := range bn.siacoinOutputDiffs {
-			s.commitSiacoinOutputDiff(scod, applied)
+			s.commitSiacoinOutputDiff(scod, dir)
 		}
 		for _, fcd := range bn.fileContractDiffs {
-			s.commitFileContractDiff(fcd, applied)
+			s.commitFileContractDiff(fcd, dir)
 		}
 		for _, sfod := range bn.siafundOutputDiffs {
-			s.commitSiafundOutputDiff(sfod, applied)
+			s.commitSiafundOutputDiff(sfod, dir)
 		}
 
-		s.commitSiafundPoolDiff(bn.siafundPoolDiff, applied)
+		s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 		s.currentBlockID = bn.block.ID()
 		s.currentPath[bn.height] = bn.block.ID()
 		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
 		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
-			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], applied)
+			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
 		}
 		for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
-			s.commitFileContractDiff(bn.fileContractDiffs[i], applied)
+			s.commitFileContractDiff(bn.fileContractDiffs[i], dir)
 		}
 		for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
-			s.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], applied)
+			s.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
 		}
 
-		s.commitSiafundPoolDiff(bn.siafundPoolDiff, applied)
+		s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 		s.currentBlockID = bn.parent.block.ID()
 		delete(s.currentPath, bn.height)
 		delete(s.delayedSiacoinOutputs, bn.height)
@@ -252,8 +237,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
-			applied := false // set applied to false because the diffs are being removed.
-			s.applyDiffSet(bn, applied)
+			s.applyDiffSet(bn, DiffRevert)
 			return
 		}
 

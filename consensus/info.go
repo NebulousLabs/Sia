@@ -219,8 +219,8 @@ func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err err
 	return
 }
 
-// OutputDiffsSince returns a set of output diffs representing how the state
-// has changed since block `id`. OutputDiffsSince will flip the `new` value for
+// BlocksSince returns a set of output diffs representing how the state
+// has changed since block 'id'. OutputDiffsSince will flip the `new` value for
 // diffs that got reversed.
 func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, err error) {
 	s.mu.RLock()
@@ -259,9 +259,6 @@ func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
 	defer s.mu.RUnlock()
 
 	fc, exists = s.fileContracts[id]
-	if !exists {
-		return
-	}
 	return
 }
 

@@ -8,20 +8,14 @@ import (
 // outputs known to the wallet. If adding is true, then new outputs will be
 // added and expired outputs will be deleted. If adding is false, then new
 // outputs will be deleted and expired outputs will be added.
-func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, adding bool) {
-	isNew := scod.New
-	if !adding {
-		isNew = !isNew
-	}
-
+func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffDirection) {
 	// See if the output in the diff is known to the wallet.
 	key, exists := w.keys[scod.SiacoinOutput.UnlockHash]
 	if !exists {
 		return
 	}
 
-	// Add the output if `isNew` is set, remove it otherwise.
-	if isNew {
+	if scod.Direction == dir {
 		// Sanity check - output should not already exist.
 		if consensus.DEBUG {
 			_, exists := key.outputs[scod.ID]
@@ -62,7 +56,7 @@ func (w *Wallet) update() error {
 	// Remove all of the diffs that have been applied by the unconfirmed set of
 	// transactions.
 	for _, scod := range w.unconfirmedDiffs {
-		w.applyDiff(scod, false)
+		w.applyDiff(scod, consensus.DiffRevert)
 	}
 
 	// Apply the diffs in the state that have happened since the last update.
@@ -76,7 +70,7 @@ func (w *Wallet) update() error {
 			return err
 		}
 		for _, scod := range scods {
-			w.applyDiff(scod, false)
+			w.applyDiff(scod, consensus.DiffRevert)
 		}
 	}
 	for _, id := range addedBlocks {
@@ -85,14 +79,14 @@ func (w *Wallet) update() error {
 			return err
 		}
 		for _, scod := range scods {
-			w.applyDiff(scod, true)
+			w.applyDiff(scod, consensus.DiffApply)
 		}
 	}
 
 	// Get, apply, and store the unconfirmed diffs currently available in the transaction pool.
 	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
 	for _, scod := range w.unconfirmedDiffs {
-		w.applyDiff(scod, true)
+		w.applyDiff(scod, consensus.DiffApply)
 	}
 
 	w.recentBlock = w.state.CurrentBlock().ID()

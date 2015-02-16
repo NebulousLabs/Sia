@@ -30,6 +30,9 @@ type blockNode struct {
 	// Diffs are computationally expensive to generate, so a lazy approach is
 	// taken wherein the diffs are only generated when needed. A boolean
 	// prevents duplicate work from being performed.
+	//
+	// Note that diffsGenerated == true iff the node is in the State's
+	// currentPath; this is because diffs must be generated to apply the node.
 	diffsGenerated        bool
 	siafundPoolDiff       SiafundPoolDiff
 	siacoinOutputDiffs    []SiacoinOutputDiff

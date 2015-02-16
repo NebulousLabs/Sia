@@ -41,8 +41,7 @@ func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
 	for s.currentBlockID != bn.block.ID() {
 		bn := s.currentBlockNode()
 		rewoundNodes = append(rewoundNodes, bn)
-		direction := false // direction is set to false because the node is being removed.
-		s.applyDiffSet(bn, direction)
+		s.applyDiffSet(bn, DiffRevert)
 	}
 	return
 }
@@ -87,8 +86,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if bn.diffsGenerated {
-			direction := true // the blockNode is being applied, direction is set to true.
-			s.applyDiffSet(bn, direction)
+			s.applyDiffSet(bn, DiffApply)
 			continue
 		}
 
@@ -104,8 +102,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 			s.invalidateNode(bn)
 			s.rewindToNode(commonParent)
 			for i := len(rewoundNodes) - 1; i >= 0; i-- {
-				direction := true // the blockNode is being applied, direction is set to true.
-				s.applyDiffSet(rewoundNodes[i], direction)
+				s.applyDiffSet(rewoundNodes[i], DiffApply)
 			}
 
 			// Check that the state hash is the same as before forking and then returning.

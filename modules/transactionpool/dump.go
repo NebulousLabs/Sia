@@ -52,8 +52,8 @@ func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.Si
 		txn := currentTxn.transaction
 		for _, input := range txn.SiacoinInputs {
 			scod := consensus.SiacoinOutputDiff{
-				New: false,
-				ID:  input.ParentID,
+				Direction: consensus.DiffRevert,
+				ID:        input.ParentID,
 			}
 
 			// Get the output from tpool if it's a new output, and from the
@@ -78,7 +78,7 @@ func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.Si
 		// Produce diffs for the siacoin outputs created by this transaction.
 		for i, output := range txn.SiacoinOutputs {
 			scod := consensus.SiacoinOutputDiff{
-				New:           true,
+				Direction:     consensus.DiffApply,
 				ID:            txn.SiacoinOutputID(i),
 				SiacoinOutput: output,
 			}
