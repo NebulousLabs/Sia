@@ -12,13 +12,13 @@ var (
 )
 
 // Each input has a list of public keys and a required number of signatures.
-// InputSignatures keeps track of which public keys have been used and how many
+// inputSignatures keeps track of which public keys have been used and how many
 // more signatures are needed.
-type InputSignatures struct {
-	RemainingSignatures uint64
-	PossibleKeys        []SiaPublicKey
-	UsedKeys            map[uint64]struct{}
-	Index               int
+type inputSignatures struct {
+	remainingSignatures uint64
+	possibleKeys        []SiaPublicKey
+	usedKeys            map[uint64]struct{}
+	index               int
 }
 
 // sortedUnique checks that all of the elements in a []unit64 are sorted and
@@ -123,8 +123,8 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		return
 	}
 
-	// Create the InputSignatures object for each input.
-	sigMap := make(map[crypto.Hash]*InputSignatures)
+	// Create the inputSignatures object for each input.
+	sigMap := make(map[crypto.Hash]*inputSignatures)
 	for i, input := range t.SiacoinInputs {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
@@ -132,10 +132,10 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			return errors.New("siacoin output spent twice in the same transaction.")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: input.UnlockConditions.NumSignatures,
-			PossibleKeys:        input.UnlockConditions.PublicKeys,
-			Index:               i,
+		inSig := &inputSignatures{
+			remainingSignatures: input.UnlockConditions.NumSignatures,
+			possibleKeys:        input.UnlockConditions.PublicKeys,
+			index:               i,
 		}
 		sigMap[id] = inSig
 	}
@@ -146,10 +146,10 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			return errors.New("file contract terminated twice in the same transaction.")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: termination.TerminationConditions.NumSignatures,
-			PossibleKeys:        termination.TerminationConditions.PublicKeys,
-			Index:               i,
+		inSig := &inputSignatures{
+			remainingSignatures: termination.TerminationConditions.NumSignatures,
+			possibleKeys:        termination.TerminationConditions.PublicKeys,
+			index:               i,
 		}
 		sigMap[id] = inSig
 	}
@@ -160,10 +160,10 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			return errors.New("siafund output spent twice in the same transaction.")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: input.UnlockConditions.NumSignatures,
-			PossibleKeys:        input.UnlockConditions.PublicKeys,
-			Index:               i,
+		inSig := &inputSignatures{
+			remainingSignatures: input.UnlockConditions.NumSignatures,
+			possibleKeys:        input.UnlockConditions.PublicKeys,
+			index:               i,
 		}
 		sigMap[id] = inSig
 	}
@@ -173,11 +173,11 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		id := crypto.Hash(sig.ParentID)
 
 		// Check that each signature signs a unique pubkey where
-		// RemainingSignatures > 0.
-		if sigMap[id].RemainingSignatures == 0 {
+		// remainingSignatures > 0.
+		if sigMap[id].remainingSignatures == 0 {
 			return errors.New("frivolous signature in transaction")
 		}
-		_, exists := sigMap[id].UsedKeys[sig.PublicKeyIndex]
+		_, exists := sigMap[id].usedKeys[sig.PublicKeyIndex]
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
@@ -190,7 +190,7 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		// Check that the signature verifies. Sia is built to support multiple
 		// types of signature algorithms, this is handled by the switch
 		// statement.
-		publicKey := sigMap[id].PossibleKeys[sig.PublicKeyIndex]
+		publicKey := sigMap[id].possibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case SignatureEntropy:
 			return crypto.ErrInvalidSignature
@@ -220,12 +220,12 @@ func (s *State) validSignatures(t Transaction) (err error) {
 		}
 
 		// Subtract the number of signatures remaining for this input.
-		sigMap[id].RemainingSignatures -= 1
+		sigMap[id].remainingSignatures -= 1
 	}
 
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
-		if reqSigs.RemainingSignatures != 0 {
+		if reqSigs.remainingSignatures != 0 {
 			return ErrMissingSignatures
 		}
 	}
