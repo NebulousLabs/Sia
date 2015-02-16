@@ -141,14 +141,39 @@ func (a *Assistant) testSingleNoFeePayout() {
 	}
 }
 
-// TODO: Implement this.
+// testMultipleFeesMultiplePayouts creates blocks with multiple fees and
+// multiple payouts and checks that the state correctly accepts or rejects
+// these blocks depending on the validity of the payouts.
 func (a *Assistant) testMultipleFeesMultiplePayouts() {
-	// TODO: Mine a block that has multiple fees and an incorrect payout to
-	// multiple addresses, compare the before and after consensus hash and see
-	// if everything matches.
+	// Mine a block that has multiple fees and an incorrect payout to multiple
+	// addresses, compare the before and after consensus hash and see if
+	// everything matches.
+	siacoinInput, value := a.FindSpendableSiacoinInput()
+	input2, value2 := a.FindSpendableSiacoinInput()
+	txn := a.AddSiacoinInputToTransaction(Transaction{}, siacoinInput)
+	txn2 := a.AddSiacoinInputToTransaction(Transaction{}, input2)
+	txn.MinerFees = append(txn.MinerFees, value)
+	txn2.MinerFees = append(txn2.MinerFees, value2)
+	payouts := a.Payouts(a.State.Height()+1, []Transaction{txn, txn2})
+	b, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn}, a.State.CurrentTarget())
+	if err != nil {
+		a.Tester.Error(err)
+	}
+	err = a.State.AcceptBlock(b)
+	if err != MinerPayoutErr {
+		a.Tester.Error("Expecting miner payout error:", err)
+	}
 
-	// TODO: Mine a block with mutliple fees and a correct payout to multiple
+	// Mine a block with mutliple fees and a correct payout to multiple
 	// addresses.
+	b, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn, txn2}, a.State.CurrentTarget())
+	if err != nil {
+		a.Tester.Error(err)
+	}
+	err = a.State.AcceptBlock(b)
+	if err != nil {
+		a.Tester.Error(err)
+	}
 }
 
 // testMissedTarget tries to submit a block that does not meet the target for
@@ -172,45 +197,44 @@ func (a *Assistant) testMissedTarget() {
 	}
 }
 
-/*
 // testRepeatBlock submits a block to the state, and then submits the same
 // block to the state, expecting nothing to change in the consensus set.
 func (a *Assistant) testRepeatBlock() {
 	// Add a non-repeat block to the state.
-	b, err := mineValidBlock(s)
+	b, err := a.MineCurrentBlock(nil)
 	if err != nil {
-		t.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = s.AcceptBlock(b)
+	err = a.State.AcceptBlock(b)
 	if err != nil {
-		t.Fatal(err)
+		a.Tester.Fatal(err)
 	}
 
-	// Collect metrics about the state.
-	bbLen := len(s.badBlocks)
-	bmLen := len(s.blockMap)
-	cpLen := len(s.currentPath)
-	uoLen := len(s.siacoinOutputs)
-	ocLen := len(s.fileContracts)
-	stateHash := s.StateHash()
-
-	// Submit the repeat block.
-	err = s.AcceptBlock(b)
+	// Get the consensus set hash, submit the block, then check that the
+	// consensus set hash hasn't changed.
+	chash := a.State.StateHash()
+	err = a.State.AcceptBlock(b)
 	if err != BlockKnownErr {
-		t.Error("expecting BlockKnownErr, got", err)
+		a.Tester.Error("expecting BlockKnownErr, got", err)
 	}
-
-	// Compare the metrics and report an error if something has changed.
-	if bbLen != len(s.badBlocks) ||
-		bmLen != len(s.blockMap) ||
-		cpLen != len(s.currentPath) ||
-		uoLen != len(s.siacoinOutputs) ||
-		ocLen != len(s.fileContracts) ||
-		stateHash != s.StateHash() {
-		t.Error("state changed after getting a repeat block.")
+	if chash != a.State.StateHash() {
+		a.Tester.Error("consensus set hash changed after submitting a repeat block.")
 	}
 }
-*/
+
+// testOrphan submits an orphan block to the state and checks that an orphan
+// error is returned.
+func (a *Assistant) testOrphan() {
+	b, err := a.MineCurrentBlock(nil)
+	if err != nil {
+		a.Tester.Fatal(err)
+	}
+	b.ParentID[0]++
+	err = a.State.AcceptBlock(b)
+	if err != OrphanErr {
+		a.Tester.Error("unexpected error, expecting OrphanErr:", err)
+	}
+}
 
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // TestBlockTimestamps.
@@ -242,7 +266,7 @@ func TestSingleNoFeePayout(t *testing.T) {
 
 // TestMultipleFeesMultiplePayouts creates a new testing environment and uses
 // it to call testMultipleFeesMultiplePayouts.
-func TtestMultipleFeesMultiplePayouts(t *testing.T) {
+func TestMultipleFeesMultiplePayouts(t *testing.T) {
 	a := NewTestingEnvironment(t)
 	a.testMultipleFeesMultiplePayouts()
 }
@@ -254,10 +278,15 @@ func TestMissedTarget(t *testing.T) {
 	a.testMissedTarget()
 }
 
-/*
-// TestRepeatBlock creates a new state and uses it to call testRepeatBlock.
+// TestRepeatBlock creates a new testing environment and uses it to call
+// testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
-	s := CreateGenesisState(currentTime())
-	testRepeatBlock(t, s)
+	a := NewTestingEnvironment(t)
+	a.testRepeatBlock()
 }
-*/
+
+// TestOrphan creates a new testing environment and uses it to call testOrphan.
+func TestOrphan(t *testing.T) {
+	a := NewTestingEnvironment(t)
+	a.testOrphan()
+}

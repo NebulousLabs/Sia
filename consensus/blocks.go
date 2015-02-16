@@ -47,9 +47,8 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	if !exists {
 		if DEBUG {
 			panic("misuse of checkMinerPayouts - block has no known parent")
-		} else {
-			return OrphanErr
 		}
+		return OrphanErr
 	}
 
 	// Find the total subsidy for the miners: coinbase + fees.
