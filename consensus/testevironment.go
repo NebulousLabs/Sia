@@ -96,6 +96,13 @@ func (a *Assistant) MineAndApplyValidBlock() (block Block) {
 	return
 }
 
+// RewindABlock removes the most recent block from the consensus set.
+func (a *Assistant) RewindABlock() {
+	bn := a.State.currentBlockNode()
+	direction := false // set to false because we're removing a block.
+	a.State.applyDiffSet(bn, direction)
+}
+
 // NewAssistant returns an assistant that's ready to help with testing.
 func NewAssistant(t *testing.T, s *State) *Assistant {
 	sk, pk, err := crypto.GenerateSignatureKeys()

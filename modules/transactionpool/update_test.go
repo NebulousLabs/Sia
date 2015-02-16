@@ -129,6 +129,45 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	}
 }
 
+// testRewinding adds transactions in a block, then removes the block and
+// verifies that the transaction pool adds the block transactions.
+func (tpt *tpoolTester) testRewinding() {
+	// Prerequisite/TODO: transaction pool should be empty at this point.
+	tset, err := tpt.transactionPool.TransactionSet()
+	if err != nil {
+		tpt.assistant.Tester.Error(err)
+	}
+	if len(tset) != 0 {
+		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+	}
+
+	// Mine a block with a transaction.
+	txn := tpt.addSiacoinTransactionToPool()
+	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
+	if err != nil {
+		tpt.assistant.Tester.Error(err)
+	}
+	err = tpt.assistant.State.AcceptBlock(block)
+	if err != nil {
+		tpt.assistant.Tester.Error(err)
+	}
+
+	// Rewind the block, update the transaction pool, and check that the
+	// transaction was added to the transaction pool.
+	tpt.assistant.RewindABlock()
+	tpt.transactionPool.update()
+	tset, err = tpt.transactionPool.TransactionSet()
+	if err != nil {
+		tpt.assistant.Tester.Error(err)
+	}
+	if len(tset) != 1 {
+		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+	}
+	if crypto.HashObject(tset[0]) != crypto.HashObject(txn) {
+		tpt.assistant.Tester.Error("dependent transaction is not the transaction that remains")
+	}
+}
+
 // TestUpdateTransactionRemoval creates a tpoolTester and uses it to call
 // tetsUpdateTransactionRemoval.
 func TestUpdateTransactionRemoval(t *testing.T) {
@@ -148,4 +187,10 @@ func TestBlockConflicts(t *testing.T) {
 func TestDependentUpdates(t *testing.T) {
 	tpt := CreateTpoolTester(t)
 	tpt.testDependentUpdates()
+}
+
+// TestRewinding creates a tpoolTester and uses it to call testRewinding.
+func TestRewinding(t *testing.T) {
+	tpt := CreateTpoolTester(t)
+	tpt.testRewinding()
 }
