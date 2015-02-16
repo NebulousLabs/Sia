@@ -13,13 +13,12 @@ func (s *State) applySiacoinInputs(bn *blockNode, t Transaction) {
 			}
 		}
 
-		scod := SiacoinOutputDiff{
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, SiacoinOutputDiff{
 			Direction:     DiffRevert,
 			ID:            sci.ParentID,
 			SiacoinOutput: s.siacoinOutputs[sci.ParentID],
-		}
+		})
 		delete(s.siacoinOutputs, sci.ParentID)
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
 
@@ -37,13 +36,12 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t Transaction) {
 			}
 		}
 
-		scod := SiacoinOutputDiff{
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, SiacoinOutputDiff{
 			Direction:     DiffApply,
 			ID:            scoid,
 			SiacoinOutput: sco,
-		}
+		})
 		s.siacoinOutputs[scoid] = sco
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
 	}
 }
 
@@ -61,13 +59,12 @@ func (s *State) applyFileContracts(bn *blockNode, t Transaction) {
 			}
 		}
 
-		fcd := FileContractDiff{
+		bn.fileContractDiffs = append(bn.fileContractDiffs, FileContractDiff{
 			Direction:    DiffApply,
 			ID:           fcid,
 			FileContract: fc,
-		}
+		})
 		s.fileContracts[fcid] = fc
-		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
 	return
 }
@@ -87,13 +84,12 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t Transaction) {
 		}
 
 		// Add the diff for the deletion to the block node.
-		fcd := FileContractDiff{
+		bn.fileContractDiffs = append(bn.fileContractDiffs, FileContractDiff{
 			Direction:    DiffRevert,
 			ID:           fct.ParentID,
 			FileContract: fc,
-		}
+		})
 		delete(s.fileContracts, fct.ParentID)
-		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 
 		// Add all of the payouts to the consensus set and block node diffs.
 		for i, payout := range fct.Payouts {
@@ -137,13 +133,12 @@ func (s *State) applyStorageProofs(bn *blockNode, t Transaction) {
 			bn.delayedSiacoinOutputs[id] = output
 		}
 
-		fcd := FileContractDiff{
+		bn.fileContractDiffs = append(bn.fileContractDiffs, FileContractDiff{
 			Direction:    DiffRevert,
 			ID:           sp.ParentID,
 			FileContract: fc,
-		}
+		})
 		delete(s.fileContracts, sp.ParentID)
-		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 	}
 	return
 }
@@ -176,13 +171,12 @@ func (s *State) applySiafundInputs(bn *blockNode, t Transaction) {
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.
-		sfod := SiafundOutputDiff{
+		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, SiafundOutputDiff{
 			Direction:     DiffRevert,
 			ID:            sfi.ParentID,
 			SiafundOutput: s.siafundOutputs[sfi.ParentID],
-		}
+		})
 		delete(s.siafundOutputs, sfi.ParentID)
-		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 	}
 }
 
@@ -203,22 +197,18 @@ func (s *State) applySiafundOutputs(bn *blockNode, t Transaction) {
 		sfo.ClaimStart = s.siafundPool
 
 		// Create and apply the diff.
-		sfod := SiafundOutputDiff{
+		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, SiafundOutputDiff{
 			Direction:     DiffApply,
 			ID:            sfoid,
 			SiafundOutput: sfo,
-		}
+		})
 		s.siafundOutputs[sfoid] = sfo
-		bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod)
 	}
 }
 
-// applyTransaction takes a transaction and uses the contents to update the
-// state of consensus according to the contents of the transaction. The
-// transaction is assumed to be valid. A set of diffs are returned that
-// represent how the state of consensus has changed. The changes to the
-// siafundPool and the delayedSiacoinOutputs are not recorded, as they are
-// handled externally.
+// applyTransaction applies the contents of a transaction to the State. This
+// produces a set of diffs, which are stored in the blockNode containing the
+// transaction.
 func (s *State) applyTransaction(bn *blockNode, t Transaction) {
 	// Sanity check - the input transaction should be valid.
 	if DEBUG {
