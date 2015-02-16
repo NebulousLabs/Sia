@@ -142,7 +142,9 @@ func (tpt *tpoolTester) testRewinding() {
 	}
 
 	// Mine a block with a transaction.
-	txn := tpt.addSiacoinTransactionToPool()
+	sci, value := tpt.assistant.FindSpendableSiacoinInput()
+	txn := tpt.assistant.AddSiacoinInputToTransaction(consensus.Transaction{}, sci)
+	txn.MinerFees = append(txn.MinerFees, value)
 	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
 	if err != nil {
 		tpt.assistant.Tester.Error(err)
@@ -154,6 +156,7 @@ func (tpt *tpoolTester) testRewinding() {
 
 	// Rewind the block, update the transaction pool, and check that the
 	// transaction was added to the transaction pool.
+	tpt.transactionPool.update()
 	tpt.assistant.RewindABlock()
 	tpt.transactionPool.update()
 	tset, err = tpt.transactionPool.TransactionSet()
@@ -161,7 +164,7 @@ func (tpt *tpoolTester) testRewinding() {
 		tpt.assistant.Tester.Error(err)
 	}
 	if len(tset) != 1 {
-		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+		tpt.assistant.Tester.Fatal("expecting new transaction after rewind")
 	}
 	if crypto.HashObject(tset[0]) != crypto.HashObject(txn) {
 		tpt.assistant.Tester.Error("dependent transaction is not the transaction that remains")
