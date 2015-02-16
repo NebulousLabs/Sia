@@ -141,154 +141,41 @@ func (a *Assistant) testSingleNoFeePayout() {
 	}
 }
 
-/*
-// testMinerPayouts tries to submit miner payouts in various legal and illegal
-// forms and verifies that the state handles the payouts correctly each time.
-func testMinerPayouts(t *testing.T, s *State) {
-	// Create a block with multiple miner payouts.
-	var sc UnlockConditions
-	coinbasePayout := CalculateCoinbase(s.Height() + 1)
-	coinbasePayout.Sub(NewCurrency64(750))
-	payout := []SiacoinOutput{
-		SiacoinOutput{Value: coinbasePayout, UnlockHash: sc.UnlockHash()},
-		SiacoinOutput{Value: NewCurrency64(250), UnlockHash: sc.UnlockHash()},
-		SiacoinOutput{Value: NewCurrency64(500), UnlockHash: sc.UnlockHash()},
-	}
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), CurrentTime(), payout, nil, s.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.AcceptBlock(b)
-	if err != nil {
-		t.Error(err)
-	}
-	// Check that all three payouts made it into the output list.
-	_, exists := s.siacoinOutputs[b.MinerPayoutID(0)]
-	if !exists {
-		t.Error("miner payout not found in the list of unspent outputs")
-	}
-	_, exists = s.siacoinOutputs[b.MinerPayoutID(1)]
-	output250 := b.MinerPayoutID(1)
-	if !exists {
-		t.Error("miner payout not found in the list of unspent outputs")
-	}
-	_, exists = s.siacoinOutputs[b.MinerPayoutID(2)]
-	output500 := b.MinerPayoutID(2)
-	if !exists {
-		t.Error("miner payout not found in the list of unspent outputs")
-	}
+// TODO: Implement this.
+func (a *Assistant) testMultipleFeesMultiplePayouts() {
+	// TODO: Mine a block that has multiple fees and an incorrect payout to
+	// multiple addresses, compare the before and after consensus hash and see
+	// if everything matches.
 
-	// Test legal multiple payouts when there are multiple miner fees.
-	txn1 := Transaction{
-		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{ParentID: output250},
-		},
-		MinerFees: []Currency{
-			NewCurrency64(50),
-			NewCurrency64(75),
-			NewCurrency64(125),
-		},
-	}
-	txn2 := Transaction{
-		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{ParentID: output500},
-		},
-		MinerFees: []Currency{
-			NewCurrency64(100),
-			NewCurrency64(150),
-			NewCurrency64(250),
-		},
-	}
-	coinbasePayout = CalculateCoinbase(s.Height() + 1).Add(NewCurrency64(25))
-	payout = []SiacoinOutput{
-		SiacoinOutput{Value: coinbasePayout},
-		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},
-		SiacoinOutput{Value: NewCurrency64(75), UnlockHash: sc.UnlockHash()},
-	}
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.AcceptBlock(b)
-	if err != nil {
-		t.Error(err)
-	}
-	// Check that the payout outputs made it into the state.
-	_, exists = s.siacoinOutputs[b.MinerPayoutID(0)]
-	if !exists {
-		t.Error("miner payout did not make it into the state")
-	}
-	_, exists = s.siacoinOutputs[b.MinerPayoutID(1)]
-	output650 := b.MinerPayoutID(1)
-	if !exists {
-		t.Error("miner payout did not make it into the state")
-	}
-	_, exists = s.siacoinOutputs[b.MinerPayoutID(2)]
-	output75 := b.MinerPayoutID(2)
-	if !exists {
-		t.Error("miner payout did not make it into the state")
-	}
-
-	// Test too large multiple payouts when there are multiple miner fees.
-	txn1 = Transaction{
-		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{ParentID: output650},
-		},
-		MinerFees: []Currency{
-			NewCurrency64(100),
-			NewCurrency64(50),
-			NewCurrency64(500),
-		},
-	}
-	txn2 = Transaction{
-		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{ParentID: output75},
-		},
-		MinerFees: []Currency{
-			NewCurrency64(10),
-			NewCurrency64(15),
-			NewCurrency64(50),
-		},
-	}
-	coinbasePayout = CalculateCoinbase(s.Height() + 1).Add(NewCurrency64(25))
-	payout = []SiacoinOutput{
-		SiacoinOutput{Value: coinbasePayout},
-		SiacoinOutput{Value: NewCurrency64(650), UnlockHash: sc.UnlockHash()},
-		SiacoinOutput{Value: NewCurrency64(75), UnlockHash: sc.UnlockHash()},
-	}
-	b, err = mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, []Transaction{txn1, txn2}, s.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.AcceptBlock(b)
-	if err != MinerPayoutErr {
-		t.Error("Expecting different error:", err)
-	}
+	// TODO: Mine a block with mutliple fees and a correct payout to multiple
+	// addresses.
 }
 
-// testMissedTarget tries to submit a block that does not meet the target for the next block.
-func testMissedTarget(t *testing.T, s *State) {
+// testMissedTarget tries to submit a block that does not meet the target for
+// the next block and verifies that the block gets rejected.
+func (a *Assistant) testMissedTarget() {
 	// Mine a block that doesn't meet the target.
-	b := Block{
-		ParentID:  s.CurrentBlock().ID(),
-		Timestamp: currentTime(),
+	b, err := a.MineCurrentBlock(nil)
+	if err != nil {
+		a.Tester.Fatal(err)
 	}
-	for b.CheckTarget(s.CurrentTarget()) && b.Nonce < 1000*1000 {
+	for b.CheckTarget(a.State.CurrentTarget()) && b.Nonce < 1000*1000 {
 		b.Nonce++
 	}
-	if b.CheckTarget(s.CurrentTarget()) {
+	if b.CheckTarget(a.State.CurrentTarget()) {
 		panic("unable to mine a block with a failing target (lol)")
 	}
 
-	err := s.AcceptBlock(b)
+	err = a.State.AcceptBlock(b)
 	if err != MissedTargetErr {
-		t.Error("Block with low target is not being rejected")
+		a.Tester.Error("Block with low target is not being rejected")
 	}
 }
 
+/*
 // testRepeatBlock submits a block to the state, and then submits the same
-// block to the state. If anything in the state has changed, an error is noted.
-func testRepeatBlock(t *testing.T, s *State) {
+// block to the state, expecting nothing to change in the consensus set.
+func (a *Assistant) testRepeatBlock() {
 	// Add a non-repeat block to the state.
 	b, err := mineValidBlock(s)
 	if err != nil {
@@ -353,46 +240,24 @@ func TestSingleNoFeePayout(t *testing.T) {
 	a.testSingleNoFeePayout()
 }
 
-/*
-// TestMinerPayouts creates a new state and uses it to call testMinerPayouts.
-func TestMinerPayouts(t *testing.T) {
-	s := CreateGenesisState(currentTime())
-	testMinerPayouts(t, s)
+// TestMultipleFeesMultiplePayouts creates a new testing environment and uses
+// it to call testMultipleFeesMultiplePayouts.
+func TtestMultipleFeesMultiplePayouts(t *testing.T) {
+	a := NewTestingEnvironment(t)
+	a.testMultipleFeesMultiplePayouts()
 }
 
-// TestMissedTarget creates a new state and uses it to call testMissedTarget.
+// TestMissedTarget creates a new testing environment and uses it to call
+// testMissedTarget.
 func TestMissedTarget(t *testing.T) {
-	s := CreateGenesisState(currentTime())
-	testMissedTarget(t, s)
+	a := NewTestingEnvironment(t)
+	a.testMissedTarget()
 }
 
+/*
 // TestRepeatBlock creates a new state and uses it to call testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
 	s := CreateGenesisState(currentTime())
 	testRepeatBlock(t, s)
 }
 */
-
-// TODO: Complex transaction building => Financial transactions, contract
-// transactions, and invalid forms of each. Bad outputs, many outputs, many
-// inputs, many fees, bad fees, overflows, bad proofs, early proofs, arbitrary
-// datas, bad signatures, too many signatures, repeat signatures.
-//
-// Build those transaction building functions as separate things, because
-// you want to be able to probe complex transactions that have lots of juicy
-// stuff.
-
-// TODO: Test the actual method which is used to calculate the earliest legal
-// timestamp for the next block. Like have some examples that should work out
-// algebraically and make sure that earliest timestamp follows the rules layed
-// out by the protocol. This should be done after we decide that the algorithm
-// for calculating the earliest allowed timestamp is sufficient.
-
-// TODO: Probe the target adjustments, make sure that they are happening
-// according to specification, moving as much as they should and that the
-// clamps are being effective.
-
-// TODO: Submit orphan blocks that have errors in them.
-
-// TODO: Make sure that the code operates correctly when a block is found with
-// an error halfway through validation.
