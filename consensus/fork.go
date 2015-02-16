@@ -19,9 +19,8 @@ func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
 		if bn == nil {
 			if DEBUG {
 				panic("backtrack hit a nil node?")
-			} else {
-				return
 			}
+			return
 		}
 	}
 	return
