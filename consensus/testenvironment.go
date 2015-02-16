@@ -95,7 +95,7 @@ func (a *Assistant) MineAndApplyValidBlock() (block Block) {
 // RewindABlock removes the most recent block from the consensus set.
 func (a *Assistant) RewindABlock() {
 	bn := a.State.currentBlockNode()
-	a.State.applyDiffSet(bn, DiffRevert)
+	a.State.commitDiffSet(bn, DiffRevert)
 }
 
 // NewAssistant returns an assistant that's ready to help with testing.

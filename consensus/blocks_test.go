@@ -68,11 +68,11 @@ func (a *Assistant) testEmptyBlock() {
 	// breaks proposed conventions. However, they provide useful information
 	// about the accuracy of invertRecentBlock and applyBlockNode.
 	cbn := a.State.currentBlockNode()
-	a.State.applyDiffSet(cbn, DiffRevert)
+	a.State.commitDiffSet(cbn, DiffRevert)
 	if beforeStateHash != a.State.StateHash() {
 		a.Tester.Error("state is different after applying and removing diffs")
 	}
-	a.State.applyDiffSet(cbn, DiffApply)
+	a.State.commitDiffSet(cbn, DiffApply)
 	if afterStateHash != a.State.StateHash() {
 		a.Tester.Error("state is different after generateApply, remove, and applying diffs")
 	}

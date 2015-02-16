@@ -51,7 +51,7 @@ func (s *State) rewindToNode(bn *blockNode) {
 	// Rewind blocks until we reach 'bn'.
 	for s.currentBlockID != bn.block.ID() {
 		cur := s.currentBlockNode()
-		s.applyDiffSet(cur, DiffRevert)
+		s.commitDiffSet(cur, DiffRevert)
 	}
 }
 
@@ -66,16 +66,12 @@ func (s *State) applyUntilNode(bn *blockNode) (err error) {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.diffsGenerated {
-			s.applyDiffSet(node, DiffApply)
-			continue
-		}
-
-		// If the diffs have not been generated, call generateAndApplyDiff.
-		err = s.generateAndApplyDiff(node)
-		if err != nil {
-			// Mark the block invalid.
-			s.invalidateNode(node)
-			return
+			s.commitDiffSet(node, DiffApply)
+		} else {
+			err = s.generateAndApplyDiff(node)
+			if err != nil {
+				break
+			}
 		}
 	}
 
