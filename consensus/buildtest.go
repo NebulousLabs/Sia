@@ -27,8 +27,8 @@ var (
 	RootTarget = Target{64}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-	MaxAdjustmentUp   = big.NewRat(1001, 1000)
-	MaxAdjustmentDown = big.NewRat(999, 1000)
+	MaxAdjustmentUp   = big.NewRat(10001, 10000)
+	MaxAdjustmentDown = big.NewRat(9999, 10000)
 
 	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
 
