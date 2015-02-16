@@ -22,34 +22,39 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, adding bool) {
 
 	// Add the output if `isNew` is set, remove it otherwise.
 	if isNew {
-		output, exists := key.outputs[scod.ID]
-		if exists {
-			if consensus.DEBUG {
-				if output.spendable {
-					panic("output is market as spendable, but it's new?")
-				}
-			}
-			output.spendable = true
-		} else {
-			ko := &knownOutput{
-				id:        scod.ID,
-				output:    scod.SiacoinOutput,
-				spendable: true,
-			}
-			key.outputs[scod.ID] = ko
-		}
-	} else {
-		output, exists := key.outputs[scod.ID]
+		// Sanity check - output should not already exist.
 		if consensus.DEBUG {
+			_, exists := key.outputs[scod.ID]
+			if exists {
+				panic("adding an output that already exists")
+			}
+		}
+
+		ko := &knownOutput{
+			id:     scod.ID,
+			output: scod.SiacoinOutput,
+		}
+		key.outputs[scod.ID] = ko
+	} else {
+		if consensus.DEBUG {
+			_, exists := key.outputs[scod.ID]
 			if !exists {
 				panic("trying to delete an output that doesn't exist?")
 			}
 		}
 
-		output.spendable = false
+		delete(key.outputs, scod.ID)
 	}
 }
 
+// update will synchronize the wallet to the latest set of outputs in the
+// consensus set and unconfirmed consensus set. It does this by first removing
+// all of the diffs from the previous unconfirmed consensus set, then applying
+// all of the diffs between the previous consensus set and current consensus
+// set, and then grabbing the current diffs for the unconfirmed consensus set.
+// This is only safe if calling tpool.UnconfirmedSiacoinOutputDiffs means that
+// the transaction pool will update it's own understanding of the consensus
+// set. (This is currently true).
 func (w *Wallet) update() error {
 	w.state.RLock()
 	defer w.state.RUnlock()
