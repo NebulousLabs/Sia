@@ -73,10 +73,13 @@ func New(state *consensus.State) (tp *TransactionPool, err error) {
 		state:       state,
 		recentBlock: state.CurrentBlock().ID(),
 
+		transactions:   make(map[crypto.Hash]*unconfirmedTransaction),
 		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
+		fileContracts:  make(map[consensus.FileContractID]consensus.FileContract),
 		siafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),
 
 		usedSiacoinOutputs:       make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
+		newFileContracts:         make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
 		fileContractTerminations: make(map[consensus.FileContractID]*unconfirmedTransaction),
 		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
 		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),

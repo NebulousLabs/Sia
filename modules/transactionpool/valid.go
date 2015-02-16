@@ -6,6 +6,10 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+var (
+	ErrDoubleSpend = errors.New("transaction spends an output that was spent by another transaction in the pool")
+)
+
 // TODO: A lot of the code in these functions is extremely similar to consensus
 // code, but I didn't want to touch the consensus code while Luke was going
 // through it. But some of this code can be broken out into more pieces and
@@ -22,7 +26,7 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 		// transaction.
 		_, exists := tp.usedSiacoinOutputs[sci.ParentID]
 		if exists {
-			return errors.New("transaction contains a double-spend")
+			return ErrDoubleSpend
 		}
 
 		// Check for the output in the confirmed and then unconfirmed output

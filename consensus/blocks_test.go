@@ -7,80 +7,80 @@ import (
 // testBlockTimestamps submits a block to the state with a timestamp that is
 // too early and a timestamp that is too late, and verifies that each get
 // rejected.
-func (a *assistant) testBlockTimestamps() {
+func (a *Assistant) testBlockTimestamps() {
 	// Create a block with a timestamp that is too early.
-	block, err := mineTestingBlock(a.state.CurrentBlock().ID(), a.state.EarliestTimestamp()-1, a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
+	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), a.State.EarliestTimestamp()-1, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
 	if err != nil {
-		a.tester.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = a.state.AcceptBlock(block)
+	err = a.State.AcceptBlock(block)
 	if err != EarlyTimestampErr {
-		a.tester.Error("unexpected error when submitting a too early timestamp:", err)
+		a.Tester.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
 	// Create a block with a timestamp that is too late.
-	block, err = mineTestingBlock(a.state.CurrentBlock().ID(), currentTime()+10+FutureThreshold, a.payouts(a.state.Height()+1, ZeroCurrency), nil, a.state.CurrentTarget())
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime()+10+FutureThreshold, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
 	if err != nil {
-		a.tester.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = a.state.AcceptBlock(block)
+	err = a.State.AcceptBlock(block)
 	if err != FutureBlockErr {
-		a.tester.Error("unexpected error when submitting a too-early timestamp:", err)
+		a.Tester.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }
 
 // testEmptyBlock adds an empty block to the state and checks for errors.
-func (a *assistant) testEmptyBlock() {
+func (a *Assistant) testEmptyBlock() {
 	// Get the hash of the state before the block was added.
-	beforeStateHash := a.state.StateHash()
+	beforeStateHash := a.State.StateHash()
 
 	// Mine and submit a block
-	block := a.mineAndApplyValidBlock()
+	block := a.MineAndApplyValidBlock()
 
 	// Get the hash of the state after the block was added.
-	afterStateHash := a.state.StateHash()
+	afterStateHash := a.State.StateHash()
 	if afterStateHash == beforeStateHash {
-		a.tester.Error("state hash is unchanged after mining a block")
+		a.Tester.Error("state hash is unchanged after mining a block")
 	}
 
 	// Check that the newly mined block is recognized as the current block.
-	if a.state.CurrentBlock().ID() != block.ID() {
-		a.tester.Error("the state's current block is not reporting as the recently mined block.")
+	if a.State.CurrentBlock().ID() != block.ID() {
+		a.Tester.Error("the state's current block is not reporting as the recently mined block.")
 	}
 
 	// These functions break the convention of only using exported functions.
 	// But they provide useful checks by making sure that the internals of the
 	// state have established in the necessary ways.
-	if a.state.currentPath[a.state.Height()] != block.ID() {
-		a.tester.Error("the state's current path didn't update correctly after accepting a new block")
+	if a.State.currentPath[a.State.Height()] != block.ID() {
+		a.Tester.Error("the state's current path didn't update correctly after accepting a new block")
 	}
-	bn, exists := a.state.blockMap[block.ID()]
+	bn, exists := a.State.blockMap[block.ID()]
 	if !exists {
-		a.tester.Error("the state's block map did not update correctly after getting an empty block")
+		a.Tester.Error("the state's block map did not update correctly after getting an empty block")
 	}
 	if !bn.diffsGenerated {
-		a.tester.Error("diffs were not generated on the new block")
+		a.Tester.Error("diffs were not generated on the new block")
 	}
 
 	// These functions manipulate the state using unexported functions, which
 	// breaks proposed conventions. However, they provide useful information
 	// about the accuracy of invertRecentBlock and applyBlockNode.
-	cbn := a.state.currentBlockNode()
+	cbn := a.State.currentBlockNode()
 	direction := false // false because the node is being removed.
-	a.state.applyDiffSet(cbn, direction)
-	if beforeStateHash != a.state.StateHash() {
-		a.tester.Error("state is different after applying and removing diffs")
+	a.State.applyDiffSet(cbn, direction)
+	if beforeStateHash != a.State.StateHash() {
+		a.Tester.Error("state is different after applying and removing diffs")
 	}
 	direction = true // true because the node is being applied.
-	a.state.applyDiffSet(cbn, direction)
-	if afterStateHash != a.state.StateHash() {
-		a.tester.Error("state is different after generateApply, remove, and applying diffs")
+	a.State.applyDiffSet(cbn, direction)
+	if afterStateHash != a.State.StateHash() {
+		a.Tester.Error("state is different after generateApply, remove, and applying diffs")
 	}
 }
 
 // testLargeBlock creates a block that is too large to be accepted by the state
 // and checks that it actually gets rejected.
-func (a *assistant) testLargeBlock() {
+func (a *Assistant) testLargeBlock() {
 	// Create a transaction that puts the block over the size limit.
 	txns := make([]Transaction, 1)
 	bigData := string(make([]byte, BlockSizeLimit))
@@ -89,65 +89,61 @@ func (a *assistant) testLargeBlock() {
 	}
 
 	// Mine and submit a block, checking for the too large error.
-	block, err := a.mineCurrentBlock(a.payouts(a.state.Height()+1, ZeroCurrency), txns)
+	block, err := a.MineCurrentBlock(txns)
 	if err != nil {
-		a.tester.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = a.state.AcceptBlock(block)
+	err = a.State.AcceptBlock(block)
 	if err != LargeBlockErr {
-		a.tester.Error(err)
+		a.Tester.Error(err)
 	}
 }
 
 // testSinglePayout creates a block with a single miner payout. An incorrect
 // and a correct payout get submitted.
-func (a *assistant) testSingleNoFeePayout() {
+func (a *Assistant) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and an incorrect payout. Compare the
 	// before and after state hashes to see that they match.
-	beforeHash := a.state.StateHash()
-	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height()), UnlockHash: ZeroUnlockHash}}
-	block, err := a.mineCurrentBlock(payouts, nil)
+	beforeHash := a.State.StateHash()
+	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height()), UnlockHash: ZeroUnlockHash}}
+	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
-		a.tester.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = a.state.AcceptBlock(block)
+	err = a.State.AcceptBlock(block)
 	if err != MinerPayoutErr {
-		a.tester.Error("Expecting miner payout error:", err)
+		a.Tester.Error("Expecting miner payout error:", err)
 	}
-	afterHash := a.state.StateHash()
+	afterHash := a.State.StateHash()
 	if beforeHash != afterHash {
-		a.tester.Error("state changed after invalid payouts")
+		a.Tester.Error("state changed after invalid payouts")
 	}
 
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
-	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.state.Height() + 1), UnlockHash: ZeroUnlockHash}}
-	block, err = a.mineCurrentBlock(payouts, nil)
+	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height() + 1), UnlockHash: ZeroUnlockHash}}
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
-		a.tester.Fatal(err)
+		a.Tester.Fatal(err)
 	}
-	err = a.state.AcceptBlock(block)
+	err = a.State.AcceptBlock(block)
 	if err != nil {
-		a.tester.Error("Expecting nil error:", err)
+		a.Tester.Error("Expecting nil error:", err)
 	}
 	// Checking the state for correctness requires using an internal function.
 	payoutID := block.MinerPayoutID(0)
-	output, exists := a.state.delayedSiacoinOutputs[a.state.Height()][payoutID]
+	output, exists := a.State.delayedSiacoinOutputs[a.State.Height()][payoutID]
 	if !exists {
-		a.tester.Error("could not find payout in delayedOutputs")
+		a.Tester.Error("could not find payout in delayedOutputs")
 	}
-	if output.Value.Cmp(CalculateCoinbase(a.state.Height())) != 0 {
-		a.tester.Error("payout dooes not pay the correct amount")
+	if output.Value.Cmp(CalculateCoinbase(a.State.Height())) != 0 {
+		a.Tester.Error("payout dooes not pay the correct amount")
 	}
 }
 
 /*
 // testMinerPayouts tries to submit miner payouts in various legal and illegal
 // forms and verifies that the state handles the payouts correctly each time.
-//
-// CONTRIBUTE: We need to test across multiple payouts, multiple fees, payouts
-// that are too high, payouts that are too low, and several other potential
-// ways that someone might slip illegal payouts through.
 func testMinerPayouts(t *testing.T, s *State) {
 	// Create a block with multiple miner payouts.
 	var sc UnlockConditions
@@ -158,7 +154,7 @@ func testMinerPayouts(t *testing.T, s *State) {
 		SiacoinOutput{Value: NewCurrency64(250), UnlockHash: sc.UnlockHash()},
 		SiacoinOutput{Value: NewCurrency64(500), UnlockHash: sc.UnlockHash()},
 	}
-	b, err := mineTestingBlock(s.CurrentBlock().ID(), currentTime(), payout, nil, s.CurrentTarget())
+	b, err := mineTestingBlock(s.CurrentBlock().ID(), CurrentTime(), payout, nil, s.CurrentTarget())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,29 +328,29 @@ func testRepeatBlock(t *testing.T, s *State) {
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // TestBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
-	a := newTestingEnvironment(t)
+	a := NewTestingEnvironment(t)
 	a.testBlockTimestamps()
 }
 
 // TestEmptyBlock creates a new testing environment and uses it to call
 // testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
-	a := newTestingEnvironment(t)
+	a := NewTestingEnvironment(t)
 	a.testEmptyBlock()
 }
 
 // TestLargeBlock creates a new testing environment and uses it to call
 // testLargeBlock.
 func TestLargeBlock(t *testing.T) {
-	a := newTestingEnvironment(t)
+	a := NewTestingEnvironment(t)
 	a.testLargeBlock()
 }
 
 // TestSingleNoFeePayouts creates a new testing environment and uses it to call
 // testSingleNoFeePayouts.
-func TestSingleNoFeePayouts(t *testing.T) {
-	a := newTestingEnvironment(t)
-	a.testLargeBlock()
+func TestSingleNoFeePayout(t *testing.T) {
+	a := NewTestingEnvironment(t)
+	a.testSingleNoFeePayout()
 }
 
 /*

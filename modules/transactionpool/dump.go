@@ -21,16 +21,6 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 	// order.
 	currentTxn := tp.head
 	for currentTxn != nil {
-		// Sanity check - the transaction should be valid against the
-		// unconfirmed set of transactions. Not checked is the additional
-		// constraint that all dependencies appear earlier in the linked list.
-		if consensus.DEBUG {
-			err = tp.validUnconfirmedTransaction(currentTxn.transaction)
-			if err != nil {
-				panic(err)
-			}
-		}
-
 		// Allocate space for the transaction, exiting the loop if there is not
 		// enough space.
 		encodedTxn := encoding.Marshal(currentTxn.transaction)
