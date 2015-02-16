@@ -4,50 +4,8 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// backtrackToBlockchain returns a list of nodes that go from the current node
-// to the first common parent. The common parent will be the final node in the
-// slice.
-func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
-	nodes = append(nodes, bn)
-	for s.currentPath[bn.height] != bn.block.ID() {
-		bn = bn.parent
-		nodes = append(nodes, bn)
-
-		// Sanity check - all block nodes should have a parent except the
-		// genesis block. This loop should break before reaching the genesis
-		// block.
-		if bn == nil {
-			if DEBUG {
-				panic("backtrack hit a nil node?")
-			}
-			return
-		}
-	}
-	return
-}
-
-// rewindToNode will rewind blocks until `bn` is the highest block, returning
-// the list of nodes that got rewound.
-func (s *State) rewindToNode(bn *blockNode) (rewoundNodes []*blockNode) {
-	// Sanity check - make sure that bn is in the currentPath.
-	if DEBUG {
-		if bn.block.ID() != s.currentPath[bn.height] {
-			panic("bad use of rewindToNode")
-		}
-	}
-
-	// Remove blocks from the ConsensusState until we get to the
-	// same parent that we are forking from.
-	for s.currentBlockID != bn.block.ID() {
-		bn := s.currentBlockNode()
-		rewoundNodes = append(rewoundNodes, bn)
-		s.applyDiffSet(bn, DiffRevert)
-	}
-	return
-}
-
-// invalidateNode recursively deletes all the generational children of a block
-// and puts them all on the bad blocks list.
+// invalidateNode recursively moves the children of a blockNode to the bad
+// blocks list.
 func (s *State) invalidateNode(node *blockNode) {
 	for i := range node.children {
 		s.invalidateNode(node.children[i])
@@ -57,63 +15,108 @@ func (s *State) invalidateNode(node *blockNode) {
 	s.badBlocks[node.block.ID()] = struct{}{}
 }
 
-// forkBlockchain will take the consensus of the State from whatever node it's
-// currently on to the node presented. An error will be returned if any of the
-// blocks that get applied in the transition are found to be invalid. If an
-// error is returned, forkBlockchain will bring the consensus variables back to
-// how they were before the call was made.
-func (s *State) forkBlockchain(newNode *blockNode) (err error) {
-	// Get the state hash before attempting a fork.
-	var stateHash crypto.Hash
+// backtrackToBlockchain traces backwards from 'bn' until it reaches a node in
+// the State's current path (the "common parent"). It returns the (inclusive)
+// set of nodes between the common parent and 'bn', starting from the former.
+func (s *State) backtrackToBlockchain(bn *blockNode) []*blockNode {
+	path := []*blockNode{bn}
+	for s.currentPath[bn.height] != bn.block.ID() {
+		bn = bn.parent
+		// prepend, not append
+		path = append([]*blockNode{bn}, path...)
+
+		// Sanity check - all block nodes should have a parent except the
+		// genesis block, and this loop should break before reaching the
+		// genesis block.
+		if bn == nil {
+			if DEBUG {
+				panic("backtrack hit a nil node?")
+			}
+			break
+		}
+	}
+	return path
+}
+
+// rewindToNode will rewind blocks from the State's current path until 'bn' is
+// the current block.
+func (s *State) rewindToNode(bn *blockNode) {
+	// Sanity check - make sure that bn is in the currentPath.
 	if DEBUG {
-		stateHash = s.stateHash()
+		if s.currentPath[bn.height] != bn.block.ID() {
+			panic("can't rewind to node not in current path")
+		}
 	}
 
-	// Get the list of blocks tracing from the new node to the blockchain, then
-	// rewind to the common parent.
-	backtrackNodes := s.backtrackToBlockchain(newNode)
-	commonParent := backtrackNodes[len(backtrackNodes)-1]
-	rewoundNodes := s.rewindToNode(commonParent)
+	// Rewind blocks until we reach 'bn'.
+	for s.currentBlockID != bn.block.ID() {
+		cur := s.currentBlockNode()
+		s.applyDiffSet(cur, DiffRevert)
+	}
+}
 
-	// Update the consensus to include all of the block nodes that go from the
-	// common parent to `newNode`. If any of the blocks are invalid, reverse
-	// all of the changes and switch back to the original block.
-	var appliedNodes []*blockNode
-	for i := len(backtrackNodes) - 2; i >= 0; i-- {
-		bn := backtrackNodes[i]
-		appliedNodes = append(appliedNodes, bn)
+// applyUntilNode will successively apply the blocks between the state's
+// currentPath and 'bn'.
+func (s *State) applyUntilNode(bn *blockNode) (err error) {
+	// Backtrack to the common parent of 'bn' and currentPath.
+	newPath := s.backtrackToBlockchain(bn)
 
+	// Apply new nodes.
+	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
-		if bn.diffsGenerated {
-			s.applyDiffSet(bn, DiffApply)
+		if node.diffsGenerated {
+			s.applyDiffSet(node, DiffApply)
 			continue
 		}
 
 		// If the diffs have not been generated, call generateAndApplyDiff.
-		// This call will fail if the block is somehow invalid. If the call
-		// fails, all of the applied blocks will be reversed, and all of the
-		// rewound blocks will be reapplied, restoring the consensus of the
-		// State to its original condition.
-		err = s.generateAndApplyDiff(bn)
+		err = s.generateAndApplyDiff(node)
 		if err != nil {
-			// Mark the invalid block, then rewind all the new blocks and
-			// reapply all of the rewound blocks.
-			s.invalidateNode(bn)
-			s.rewindToNode(commonParent)
-			for i := len(rewoundNodes) - 1; i >= 0; i-- {
-				s.applyDiffSet(rewoundNodes[i], DiffApply)
-			}
-
-			// Check that the state hash is the same as before forking and then returning.
-			if DEBUG {
-				if stateHash != s.stateHash() {
-					panic("state hash does not match after an unsuccessful fork attempt")
-				}
-			}
-
+			// Mark the block invalid.
+			s.invalidateNode(node)
 			return
 		}
+	}
+
+	return
+}
+
+// forkBlockchain will move the consensus set onto the 'newNode' fork. An error
+// will be returned if any of the blocks applied in the transition are found to
+// be invalid. forkBlockchain is atomic; the State is only updated if the
+// function returns nil.
+func (s *State) forkBlockchain(newNode *blockNode) (err error) {
+	// In debug mode, record the old state hash before attempting the fork.
+	// This variable is otherwise unused.
+	var oldHash crypto.Hash
+	if DEBUG {
+		oldHash = s.stateHash()
+	}
+
+	// determine common parent
+	commonParent := s.backtrackToBlockchain(newNode)[0]
+
+	// save currentBlockNode in case something goes wrong
+	oldHead := s.currentBlockNode()
+
+	// rewind to the common parent
+	s.rewindToNode(commonParent)
+
+	// fast-forward to newNode
+	err = s.applyUntilNode(newNode)
+	if err != nil {
+		// restore old path
+		s.rewindToNode(commonParent)
+		errReapply := s.applyUntilNode(oldHead)
+		if DEBUG {
+			if errReapply != nil {
+				panic("couldn't reapply previously applied diffs!")
+			} else if s.stateHash() != oldHash {
+				panic("state hash changed after an unsuccessful fork attempt")
+			}
+		}
+		return
 	}
 
 	return
