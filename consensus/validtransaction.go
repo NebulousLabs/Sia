@@ -76,9 +76,10 @@ func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err e
 	return
 }
 
-// validSiacoinInputs iterates through the inputs of a transaction, summing the
+// validSiacoins iterates through the inputs of a transaction, summing the
 // value of the inputs and checking that the inputs are legal.
-func (s *State) validSiacoinInputs(t Transaction) (inputSum Currency, err error) {
+func (s *State) validSiacoins(t Transaction) (err error) {
+	var inputSum Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output, and that the
 		// UnlockConditions are legal (signatures checked elsewhere).
@@ -87,6 +88,8 @@ func (s *State) validSiacoinInputs(t Transaction) (inputSum Currency, err error)
 			err = ErrMissingSiacoinOutput
 			return
 		}
+
+		// Check that the unlock conditions are reasonable.
 		err = s.validUnlockConditions(sci.UnlockConditions, sco.UnlockHash)
 		if err != nil {
 			return
@@ -94,6 +97,9 @@ func (s *State) validSiacoinInputs(t Transaction) (inputSum Currency, err error)
 
 		// Add the input value to the sum.
 		inputSum = inputSum.Add(sco.Value)
+	}
+	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
+		return errors.New("inputs do not equal outputs for transaction.")
 	}
 
 	return
@@ -143,6 +149,8 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 		if !exists {
 			return ErrMissingFileContract
 		}
+
+		// Check that the unlock conditions are reasonable.
 		err = s.validUnlockConditions(fct.TerminationConditions, fc.TerminationHash)
 		if err != nil {
 			return
@@ -226,22 +234,6 @@ func (s *State) validStorageProofs(t Transaction) error {
 	return nil
 }
 
-// validSiacoinInput checks that the given input spends an unspent output, and
-// that the UnlockConditions are correct.
-func (s *State) validSiafundInput(sfi SiafundInput) (sfo SiafundOutput, err error) {
-	sfo, exists := s.siafundOutputs[sfi.ParentID]
-	if !exists {
-		err = ErrMissingSiafundOutput
-		return
-	}
-	err = s.validUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 // validSiafunds checks that the transaction has valid siafund inputs and
 // outputs, and that the sum of the inputs matches the sum of the outputs.
 func (s *State) validSiafunds(t Transaction) (err error) {
@@ -249,9 +241,15 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 	// input siafunds.
 	var siafundInputSum Currency
 	for _, sfi := range t.SiafundInputs {
-		// Check that the input is valid.
-		var sfo SiafundOutput
-		sfo, err = s.validSiafundInput(sfi)
+		// Check that the siafund output being spent exists.
+		sfo, exists := s.siafundOutputs[sfi.ParentID]
+		if !exists {
+			err = ErrMissingSiafundOutput
+			return
+		}
+
+		// Check that the unlock conditions are reasonable.
+		err = s.validUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash)
 		if err != nil {
 			return
 		}
@@ -289,19 +287,12 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		return
 	}
 
-	// Check that all siacoin inputs are valid, and get the total number of
-	// input siacoins. Then compare the input siacoins to the output siacoins
-	// and return an error if there's a mismatch.
-	siacoinInputSum, err := s.validSiacoinInputs(t)
+	// Check that each general component of the transaction is valid, without
+	// checking signatures.
+	err = s.validSiacoins(t)
 	if err != nil {
 		return
 	}
-	if siacoinInputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return errors.New("inputs do not equal outputs for transaction.")
-	}
-
-	// Check that all file contracts, terminations, and storage proofs are
-	// valid.
 	err = s.validFileContracts(t)
 	if err != nil {
 		return
@@ -314,8 +305,6 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	if err != nil {
 		return
 	}
-
-	// Check that the siafund parts of the transaction are valid.
 	err = s.validSiafunds(t)
 	if err != nil {
 		return

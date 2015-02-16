@@ -201,14 +201,15 @@ func (s *State) validSignatures(t Transaction) (err error) {
 			if err != nil {
 				return err
 			}
-			var decodedSig crypto.Signature
+			var decodedSig [crypto.SignatureSize]byte
 			err = encoding.Unmarshal([]byte(sig.Signature), &decodedSig)
 			if err != nil {
 				return err
 			}
+			cryptoSig := crypto.Signature(&decodedSig)
 
 			sigHash := t.SigHash(i)
-			err = crypto.VerifyHash(sigHash, decodedPK, decodedSig)
+			err = crypto.VerifyHash(sigHash, decodedPK, cryptoSig)
 			if err != nil {
 				return err
 			}

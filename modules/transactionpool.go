@@ -16,7 +16,7 @@ type TransactionPool interface {
 
 	// OutputDiffs returns the set of diffs that are in the transaction pool
 	// but haven't been confirmed by a block yet.
-	OutputDiffs() []consensus.SiacoinOutputDiff
+	UnconfirmedSiacoinOutputDiffs() []consensus.SiacoinOutputDiff
 
 	// TransactionSet will return a set of transactions not exceeding the block
 	// size that can be inserted into a block in order.
