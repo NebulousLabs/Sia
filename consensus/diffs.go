@@ -49,7 +49,7 @@ func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, dir DiffDirectio
 	if DEBUG {
 		_, exists := s.siacoinOutputs[scod.ID]
 		if exists == (scod.Direction == dir) {
-			panic("rogue output in commitSiacoinOutputDiff")
+			panic("rogue siacoin output in commitSiacoinOutputDiff")
 		}
 	}
 
@@ -67,7 +67,7 @@ func (s *State) commitFileContractDiff(fcd FileContractDiff, dir DiffDirection) 
 	if DEBUG {
 		_, exists := s.fileContracts[fcd.ID]
 		if exists == (fcd.Direction == dir) {
-			panic("rogue contract in commitFileContractDiff")
+			panic("rogue file contract in commitFileContractDiff")
 		}
 	}
 
@@ -85,7 +85,7 @@ func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, dir DiffDirectio
 	if DEBUG {
 		_, exists := s.siafundOutputs[sfod.ID]
 		if exists == (sfod.Direction == dir) {
-			panic("rogue output in commitSiafundOutputDiff")
+			panic("rogue siafund output in commitSiafundOutputDiff")
 		}
 	}
 
