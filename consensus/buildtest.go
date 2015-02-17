@@ -20,7 +20,7 @@ const (
 	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
 
 	InitialCoinbase = 300e3
-	MinimumCoinbase = 299990
+	MinimumCoinbase = 299990 // Only takes 10 blocks to hit the max - useful for testing.
 )
 
 var (
