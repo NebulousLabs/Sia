@@ -352,6 +352,11 @@ func RatToTarget(r *big.Rat) Target {
 	return IntToTarget(i)
 }
 
+// Tax returns the amount of Currency that will be taxed from fc.
+func (fc FileContract) Tax() Currency {
+	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
+}
+
 // UnlockHash calculates the root hash of a Merkle tree of the
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the

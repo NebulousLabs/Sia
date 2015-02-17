@@ -127,7 +127,7 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 		for _, output := range fc.MissedProofOutputs {
 			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
-		outputPortion := fc.Payout.Sub(fc.Payout.ContractTax())
+		outputPortion := fc.Payout.Sub(fc.Tax())
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return errors.New("contract valid proof outputs do not sum to the payout minus the siafund fee")
 		}
