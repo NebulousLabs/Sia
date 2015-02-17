@@ -115,7 +115,7 @@ func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (index uin
 	return
 }
 
-// AddFileContract implements the core.Wallet interface.
+// AddFileContract adds a file contract to the transaction.
 func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

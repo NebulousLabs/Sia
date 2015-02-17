@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-// TODO: Add the 100block waiting outputs to the currency tallying.
-
-// TODO: Split some of these tests off into fork_test.go.
-
-// TODO: in fork_test.go (which doesn't exist yet), try calling fork() on a
-// node that's already in the current consensus set.
-
 // currentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
 // currentPath.
@@ -140,34 +133,6 @@ func TestEverything(t *testing.T) {
 	genesisTime := currentTime() - 1
 	s0 := CreateGenesisState(genesisTime)
 	s1 := CreateGenesisState(genesisTime)
-
-	// Verify that the genesis state creation is consistent.
-	if s0.stateHash() != s1.stateHash() {
-		t.Fatal("state hashes are different after calling CreateGenesisState")
-	}
-
-	// Get each on a separate fork.
-	b0, err := mineTestingBlock(s0.CurrentBlock().ID(), currentTime()-1, nullMinerPayouts(s0.Height()+1), nil, s0.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s0.AcceptBlock(b0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b1, err := mineTestingBlock(s1.CurrentBlock().ID(), currentTime(), nullMinerPayouts(s1.Height()+1), nil, s1.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s1.AcceptBlock(b1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify that each state is on a separate fork.
-	if s0.stateHash() == s1.stateHash() {
-		t.Fatal("states have the same hash when they need to be in different places")
-	}
 
 	// Call orderedTestBattery on each state.
 	orderedTestBattery(t, s0, s1)

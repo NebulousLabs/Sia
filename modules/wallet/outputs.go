@@ -17,9 +17,7 @@ import (
 type knownOutput struct {
 	id     consensus.SiacoinOutputID
 	output consensus.SiacoinOutput
-
-	spendable bool
-	age       int
+	age    int
 }
 
 // openOutput contains an output and the conditions needed to spend the output,
@@ -34,8 +32,8 @@ type key struct {
 
 // findOutputs returns a set of spendable outputs that add up to at least
 // `amount` of coins, returning an error if it cannot. It also returns the
-// `total`, which is the sum of all the outputs. It does not adjust the outputs
-// in any way.
+// `total`, which is the sum of all the outputs that were found, since it's
+// unlikely that it will equal amount exaclty.
 func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
 	w.update()
 
@@ -50,7 +48,7 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			continue
 		}
 		for _, knownOutput := range key.outputs {
-			if !knownOutput.spendable || knownOutput.age > w.age-AgeDelay {
+			if knownOutput.age > w.age-AgeDelay {
 				continue
 			}
 			total = total.Add(knownOutput.output.Value)
@@ -84,9 +82,6 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 			continue
 		}
 		for _, knownOutput := range key.outputs {
-			if !knownOutput.spendable {
-				continue
-			}
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}

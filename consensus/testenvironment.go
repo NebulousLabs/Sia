@@ -19,6 +19,8 @@ type Assistant struct {
 	UnlockConditions UnlockConditions
 	UnlockHash       UnlockHash
 	SecretKey        crypto.SecretKey
+
+	usedOutputs map[SiacoinOutputID]struct{}
 }
 
 // CurrentTime returns a Timestamp of the current time.
@@ -124,6 +126,8 @@ func NewAssistant(t *testing.T, s *State) *Assistant {
 		UnlockConditions: uc,
 		UnlockHash:       uc.UnlockHash(),
 		SecretKey:        sk,
+
+		usedOutputs: make(map[SiacoinOutputID]struct{}),
 	}
 }
 

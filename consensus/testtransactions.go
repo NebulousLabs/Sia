@@ -10,12 +10,20 @@ import (
 func (a *Assistant) FindSpendableSiacoinInput() (sci SiacoinInput, value Currency) {
 	for id, output := range a.State.siacoinOutputs {
 		if output.UnlockHash == a.UnlockHash {
+			// Check that we haven't already spent this input.
+			_, exists := a.usedOutputs[id]
+			if exists {
+				continue
+			}
+
 			sci = SiacoinInput{
 				ParentID:         id,
 				UnlockConditions: a.UnlockConditions,
 			}
-
 			value = output.Value
+
+			// Mark the input as spent.
+			a.usedOutputs[id] = struct{}{}
 
 			return
 		}

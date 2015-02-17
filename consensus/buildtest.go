@@ -20,19 +20,18 @@ const (
 	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
 
 	InitialCoinbase = 300e3
-	MinimumCoinbase = 30e3
+	MinimumCoinbase = 299990 // Only takes 10 blocks to hit the max - useful for testing.
 )
 
 var (
 	RootTarget = Target{64}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-	MaxAdjustmentUp   = big.NewRat(1001, 1000)
-	MaxAdjustmentDown = big.NewRat(999, 1000)
+	MaxAdjustmentUp   = big.NewRat(10001, 10000)
+	MaxAdjustmentDown = big.NewRat(9999, 10000)
 
 	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
 
-	// TODO: Pick more reasonable values for these constants.
 	GenesisTimestamp         = Timestamp(time.Now().Unix())
 	GenesisSiafundUnlockHash = ZeroUnlockHash
 	GenesisClaimUnlockHash   = ZeroUnlockHash

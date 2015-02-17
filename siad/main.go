@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
@@ -83,6 +84,9 @@ func init() {
 }
 
 func startEnvironment(*cobra.Command, []string) {
+	// Set GOMAXPROCS equal to the number of cpu cores.
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	daemonConfig := DaemonConfig{
 		APIAddr: config.Siad.APIaddr,
 		RPCAddr: config.Siacore.RPCaddr,

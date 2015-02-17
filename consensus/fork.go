@@ -19,9 +19,8 @@ func (s *State) backtrackToBlockchain(bn *blockNode) (nodes []*blockNode) {
 		if bn == nil {
 			if DEBUG {
 				panic("backtrack hit a nil node?")
-			} else {
-				return
 			}
+			return
 		}
 	}
 	return
@@ -106,7 +105,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 			s.rewindToNode(commonParent)
 			for i := len(rewoundNodes) - 1; i >= 0; i-- {
 				direction := true // the blockNode is being applied, direction is set to true.
-				s.applyDiffSet(bn, direction)
+				s.applyDiffSet(rewoundNodes[i], direction)
 			}
 
 			// Check that the state hash is the same as before forking and then returning.
