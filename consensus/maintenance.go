@@ -96,13 +96,13 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	// we need to store it and deleted once we're done iterating through the
 	// map.
 	currentHeight := s.height()
-	var expiredContracts []FileContractID
-	for id, contract := range s.fileContracts {
-		if contract.Expiration == currentHeight {
-			expiredContracts = append(expiredContracts, id)
+	var expiredFileContracts []FileContractID
+	for id, fc := range s.fileContracts {
+		if fc.Expiration == currentHeight {
+			expiredFileContracts = append(expiredFileContracts, id)
 		}
 	}
-	for _, id := range expiredContracts {
+	for _, id := range expiredFileContracts {
 		s.applyMissedProof(bn, id)
 	}
 
