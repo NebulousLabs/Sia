@@ -16,7 +16,7 @@ func (a *Assistant) testBlockTimestamps() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != EarlyTimestampErr {
+	if err != ErrEarlyTimestamp {
 		a.Tester.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
@@ -26,7 +26,7 @@ func (a *Assistant) testBlockTimestamps() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != FutureTimestampErr {
+	if err != ErrFutureTimestamp {
 		a.Tester.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }
@@ -94,7 +94,7 @@ func (a *Assistant) testLargeBlock() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != LargeBlockErr {
+	if err != ErrLargeBlock {
 		a.Tester.Error(err)
 	}
 }
@@ -111,7 +111,7 @@ func (a *Assistant) testSingleNoFeePayout() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != MinerPayoutErr {
+	if err != ErrMinerPayout {
 		a.Tester.Error("Expecting miner payout error:", err)
 	}
 	afterHash := a.State.StateHash()
@@ -160,7 +160,7 @@ func (a *Assistant) testMultipleFeesMultiplePayouts() {
 		a.Tester.Error(err)
 	}
 	err = a.State.AcceptBlock(b)
-	if err != MinerPayoutErr {
+	if err != ErrMinerPayout {
 		a.Tester.Error("Expecting miner payout error:", err)
 	}
 
@@ -192,7 +192,7 @@ func (a *Assistant) testMissedTarget() {
 	}
 
 	err = a.State.AcceptBlock(b)
-	if err != MissedTargetErr {
+	if err != ErrMissedTarget {
 		a.Tester.Error("Block with low target is not being rejected")
 	}
 }
@@ -214,7 +214,7 @@ func (a *Assistant) testRepeatBlock() {
 	// consensus set hash hasn't changed.
 	chash := a.State.StateHash()
 	err = a.State.AcceptBlock(b)
-	if err != BlockKnownErr {
+	if err != ErrBlockKnown {
 		a.Tester.Error("expecting BlockKnownErr, got", err)
 	}
 	if chash != a.State.StateHash() {
@@ -231,7 +231,7 @@ func (a *Assistant) testOrphan() {
 	}
 	b.ParentID[0]++
 	err = a.State.AcceptBlock(b)
-	if err != OrphanErr {
+	if err != ErrOrphan {
 		a.Tester.Error("unexpected error, expecting OrphanErr:", err)
 	}
 }
@@ -246,7 +246,7 @@ func (a *Assistant) testBadBlock() {
 		a.Tester.Error("expecting invalid signature:", err)
 	}
 	err = a.State.AcceptBlock(badBlock[0])
-	if err != BadBlockErr {
+	if err != ErrBadBlock {
 		a.Tester.Error("expecting bad block:", err)
 	}
 }

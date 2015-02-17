@@ -7,14 +7,14 @@ import (
 )
 
 var (
-	BadBlockErr        = errors.New("block is known to be invalid")
-	BlockKnownErr      = errors.New("block exists in block map")
-	EarlyTimestampErr  = errors.New("block timestamp is too early")
-	FutureTimestampErr = errors.New("block timestamp too far in future")
-	OrphanErr          = errors.New("block has no known parent")
-	LargeBlockErr      = errors.New("block is too large to be accepted")
-	MinerPayoutErr     = errors.New("miner payout sum does not equal block subsidy")
-	MissedTargetErr    = errors.New("block does not meet target")
+	ErrBadBlock        = errors.New("block is known to be invalid")
+	ErrBlockKnown      = errors.New("block exists in block map")
+	ErrEarlyTimestamp  = errors.New("block timestamp is too early")
+	ErrFutureTimestamp = errors.New("block timestamp too far in future")
+	ErrOrphan          = errors.New("block has no known parent")
+	ErrLargeBlock      = errors.New("block is too large to be accepted")
+	ErrMinerPayout     = errors.New("miner payout sum does not equal block subsidy")
+	ErrMissedTarget    = errors.New("block does not meet target")
 )
 
 // checkMinerPayouts verifies that the sum of all the miner payouts is equal to
@@ -26,7 +26,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 		if DEBUG {
 			panic("misuse of checkMinerPayouts - block has no known parent")
 		}
-		return OrphanErr
+		return ErrOrphan
 	}
 
 	// Find the total subsidy for the miners: coinbase + fees.
@@ -45,7 +45,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 
 	// Return an error if the subsidy isn't equal to the payouts.
 	if subsidy.Cmp(payoutSum) != 0 {
-		return MinerPayoutErr
+		return ErrMinerPayout
 	}
 
 	return
@@ -56,31 +56,31 @@ func (s *State) validHeader(b Block) (err error) {
 	// Grab the parent of the block.
 	parent, exists := s.blockMap[b.ParentID]
 	if !exists {
-		return OrphanErr
+		return ErrOrphan
 	}
 
 	// Check the ID meets the target. This is one of the earliest checks to
 	// enforce that blocks need to have committed to a large amount of work
 	// before being verified - a DoS protection.
 	if !b.CheckTarget(parent.target) {
-		return MissedTargetErr
+		return ErrMissedTarget
 	}
 
 	// Check that the block is the correct size.
 	if len(encoding.Marshal(b)) > BlockSizeLimit {
-		return LargeBlockErr
+		return ErrLargeBlock
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestChildTimestamp() > b.Timestamp {
-		return EarlyTimestampErr
+		return ErrEarlyTimestamp
 	}
 
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
 	if b.Timestamp > CurrentTimestamp()+FutureThreshold {
-		return FutureTimestampErr
+		return ErrFutureTimestamp
 	}
 
 	// Verify that the miner payouts sum to the total amount of fees allowed to
@@ -121,11 +121,11 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// Check maps for information about the block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
-		return BadBlockErr
+		return ErrBadBlock
 	}
 	_, exists = s.blockMap[b.ID()]
 	if exists {
-		return BlockKnownErr
+		return ErrBlockKnown
 	}
 
 	err = s.validHeader(b)
