@@ -103,19 +103,21 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 
 	// fast-forward to newNode
 	err = s.applyUntilNode(newNode)
-	if err != nil {
-		// restore old path
-		s.rewindToNode(commonParent)
-		errReapply := s.applyUntilNode(oldHead)
-		if DEBUG {
-			if errReapply != nil {
-				panic("couldn't reapply previously applied diffs")
-			} else if s.Hash() != oldHash {
-				panic("state hash changed after an unsuccessful fork attempt")
-			}
-		}
+	if err == nil {
+		// If application succeeded, we're done. Clean up code follows below,
+		// in the event of an error.
 		return
 	}
 
+	// restore old path
+	s.rewindToNode(commonParent)
+	errReapply := s.applyUntilNode(oldHead)
+	if DEBUG {
+		if errReapply != nil {
+			panic("couldn't reapply previously applied diffs")
+		} else if s.Hash() != oldHash {
+			panic("state hash changed after an unsuccessful fork attempt")
+		}
+	}
 	return
 }
