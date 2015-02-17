@@ -94,7 +94,12 @@ func TestComplexForking(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mine several blocks on each state.
+	// Mine several blocks on each state. For hte purposes of this test, the
+	// blocks can be anything as long as the states are all receiving the same
+	// block set. Because they can be anything, we actually apply a lot of the
+	// other tests to try and build up state objects that contain every type of
+	// transaction and are as complex as possible. The hope is to introduce an
+	// unexpected side effect and trigger an error.
 	for i := 0; i < 2; i++ {
 		// state 1 mining.
 		b1, err = a1.MineCurrentBlock(nil)
@@ -120,6 +125,12 @@ func TestComplexForking(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	// Consistency checks, sprinkled throughout the forking process to help
+	// catch any latent problems.
+	a1.ConsistencyChecks()
+	a2.ConsistencyChecks()
+	a3.ConsistencyChecks()
 
 	// Put state2 ahead of state1 and then give all of the state2 blocks to
 	// state1, causing state1 to fork. State3 is left alone.
@@ -149,6 +160,12 @@ func TestComplexForking(t *testing.T) {
 		t.Fatal("hashes don't match after trying to force a rewinding fork")
 	}
 
+	// Consistency checks, sprinkled throughout the forking process to help
+	// catch any latent problems.
+	a1.ConsistencyChecks()
+	a2.ConsistencyChecks()
+	a3.ConsistencyChecks()
+
 	// Put state3 ahead of state 1&2 on state1's original block path. Then feed
 	// all of state 3's blocks to state1, which will cause state1 to fork to
 	// state3. State1 will be applying diffs for many of the blocks instead of
@@ -176,6 +193,12 @@ func TestComplexForking(t *testing.T) {
 		}
 	}
 
+	// Consistency checks, sprinkled throughout the forking process to help
+	// catch any latent problems.
+	a1.ConsistencyChecks()
+	a2.ConsistencyChecks()
+	a3.ConsistencyChecks()
+
 	// State1 hash should match state3 hash.
 	if s1.StateHash() != s3.StateHash() {
 		t.Fatal("hashes don't match after trying to force an applying fork")
@@ -201,4 +224,10 @@ func TestComplexForking(t *testing.T) {
 	if s1.StateHash() != s3.StateHash() {
 		t.Fatal("hashes don't match after trying to force an invalid fork")
 	}
+
+	// Consistency checks, sprinkled throughout the forking process to help
+	// catch any latent problems.
+	a1.ConsistencyChecks()
+	a2.ConsistencyChecks()
+	a3.ConsistencyChecks()
 }
