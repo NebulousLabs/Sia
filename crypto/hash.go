@@ -7,6 +7,8 @@ package crypto
 // multiple.
 
 import (
+	"bytes"
+
 	"github.com/NebulousLabs/Sia/encoding"
 
 	"github.com/dchest/blake2b"
@@ -18,6 +20,9 @@ const (
 
 type (
 	Hash [HashSize]byte
+
+	// HashSlice is used for sorting
+	HashSlice []Hash
 )
 
 // HashAll takes a set of objects as input, encodes them all using the encoding
@@ -45,3 +50,8 @@ func HashObject(obj interface{}) Hash {
 func JoinHash(left, right Hash) Hash {
 	return HashBytes(append(left[:], right[:]...))
 }
+
+// These functions implement sort.Interface, allowing hashes to be sorted.
+func (hs HashSlice) Len() int           { return len(hs) }
+func (hs HashSlice) Less(i, j int) bool { return bytes.Compare(hs[i][:], hs[j][:]) < 0 }
+func (hs HashSlice) Swap(i, j int)      { hs[i], hs[j] = hs[j], hs[i] }

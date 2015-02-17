@@ -47,18 +47,11 @@ func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
 	return
 }
 
-// hashSlice is used for sorting
-type hashSlice []crypto.Hash
-
-func (hs hashSlice) Len() int           { return len(hs) }
-func (hs hashSlice) Less(i, j int) bool { return string(hs[i][:]) < string(hs[j][:]) }
-func (hs hashSlice) Swap(i, j int)      { hs[i], hs[j] = hs[j], hs[i] }
-
 // sortedUscoSet returns all of the unspent siacoin outputs sorted
 // according to the numerical value of their id.
 func (s *State) sortedUscoSet() []SiacoinOutput {
 	// Get all of the outputs in string form and sort the strings.
-	unspentOutputs := make(hashSlice, len(s.siacoinOutputs))
+	unspentOutputs := make(crypto.HashSlice, len(s.siacoinOutputs))
 	for outputID := range s.siacoinOutputs {
 		unspentOutputs = append(unspentOutputs, crypto.Hash(outputID))
 	}
@@ -77,7 +70,7 @@ func (s *State) sortedUscoSet() []SiacoinOutput {
 // to the numerical value of their id.
 func (s *State) sortedUsfoSet() []SiafundOutput {
 	// Get all of the outputs in string form and sort the strings.
-	outputIDs := make(hashSlice, len(s.siafundOutputs))
+	outputIDs := make(crypto.HashSlice, len(s.siafundOutputs))
 	for outputID := range s.siafundOutputs {
 		outputIDs = append(outputIDs, crypto.Hash(outputID))
 	}
@@ -135,7 +128,7 @@ func (s *State) stateHash() crypto.Hash {
 	}
 
 	// Sort the open contracts by the string value of their ID.
-	openContractIDs := make(hashSlice, len(s.fileContracts))
+	openContractIDs := make(crypto.HashSlice, len(s.fileContracts))
 	for contractID := range s.fileContracts {
 		openContractIDs = append(openContractIDs, crypto.Hash(contractID))
 	}
@@ -156,7 +149,7 @@ func (s *State) stateHash() crypto.Hash {
 	// their maturity height, and then by ID.
 	for i := BlockHeight(0); i <= s.height(); i++ {
 		delayedOutputs := s.delayedSiacoinOutputs[i]
-		delayedIDs := make(hashSlice, len(delayedOutputs))
+		delayedIDs := make(crypto.HashSlice, len(delayedOutputs))
 		for id := range delayedOutputs {
 			delayedIDs = append(delayedIDs, crypto.Hash(id))
 		}
@@ -171,6 +164,13 @@ func (s *State) stateHash() crypto.Hash {
 	return crypto.MerkleRoot(leaves)
 }
 
+// BlockAtHeight returns the block on the current path with the given height.
+func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.blockAtHeight(height)
+}
+
 // Block returns the block associated with the given id.
 func (s *State) Block(id BlockID) (b Block, exists bool) {
 	s.mu.RLock()
@@ -181,19 +181,6 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 		return
 	}
 	b = node.block
-	return
-}
-
-// BlockAtHeight returns the block in the current fork found at `height`.
-func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	bn, exists := s.blockMap[s.currentPath[height]]
-	if !exists {
-		return
-	}
-	b = bn.block
 	return
 }
 
