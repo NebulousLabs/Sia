@@ -8,15 +8,14 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// Contains basic information about the state, but does not go into depth.
+// StateInfo contains basic information about the State.
 type StateInfo struct {
 	CurrentBlock BlockID
 	Height       BlockHeight
 	Target       Target
 }
 
-// BlockAtHeight() returns the block from the current history at the
-// input height.
+// blockAtHeight returns the block on the current path with the given height.
 func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
 	bn, exists := s.blockMap[s.currentPath[height]]
 	if !exists {
@@ -26,21 +25,14 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
 	return
 }
 
-// currentBlockNode returns the node of the most recent block in the
-// longest fork.
+// currentBlockNode returns the blockNode of the current block.
 func (s *State) currentBlockNode() *blockNode {
 	return s.blockMap[s.currentBlockID]
 }
 
-// CurrentBlockWeight() returns the weight of the current block in the
-// heaviest fork.
+// currentBlockWeight returns the weight of the current block.
 func (s *State) currentBlockWeight() *big.Rat {
 	return s.currentBlockNode().target.Inverse()
-}
-
-// depth returns the depth of the current block of the state.
-func (s *State) depth() Target {
-	return s.currentBlockNode().depth
 }
 
 // height returns the current height of the state.
@@ -48,66 +40,70 @@ func (s *State) height() BlockHeight {
 	return s.blockMap[s.currentBlockID].height
 }
 
-// State.Output returns the Output associated with the id provided for input,
-// but only if the output is a part of the utxo set.
+// output returns the unspent SiacoinOutput associated with the given ID. If
+// the output is not in the UTXO set, 'exists' will be false.
 func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
 	sco, exists = s.siacoinOutputs[id]
 	return
 }
 
-// Sorted UscoSet returns all of the unspent transaction outputs sorted
-// according to the numerical value of their id.
-func (s *State) sortedUscoSet() (sortedOutputs []SiacoinOutput) {
-	// Get all of the outputs in string form and sort the strings.
-	var unspentOutputStrings []string
-	for outputID := range s.siacoinOutputs {
-		unspentOutputStrings = append(unspentOutputStrings, string(outputID[:]))
-	}
-	sort.Strings(unspentOutputStrings)
+// hashSlice is used for sorting
+type hashSlice []crypto.Hash
 
-	// Get the outputs in order according to their sorted string form.
-	for _, utxoString := range unspentOutputStrings {
-		var outputID SiacoinOutputID
-		copy(outputID[:], utxoString)
-		output, _ := s.output(outputID)
-		sortedOutputs = append(sortedOutputs, output)
+func (hs hashSlice) Len() int           { return len(hs) }
+func (hs hashSlice) Less(i, j int) bool { return string(hs[i][:]) < string(hs[j][:]) }
+func (hs hashSlice) Swap(i, j int)      { hs[i], hs[j] = hs[j], hs[i] }
+
+// sortedUscoSet returns all of the unspent siacoin outputs sorted
+// according to the numerical value of their id.
+func (s *State) sortedUscoSet() []SiacoinOutput {
+	// Get all of the outputs in string form and sort the strings.
+	unspentOutputs := make(hashSlice, len(s.siacoinOutputs))
+	for outputID := range s.siacoinOutputs {
+		unspentOutputs = append(unspentOutputs, crypto.Hash(outputID))
 	}
-	return
+	sort.Sort(unspentOutputs)
+
+	// Get the outputs in order according to their sorted form.
+	sortedOutputs := make([]SiacoinOutput, len(unspentOutputs))
+	for i, outputID := range unspentOutputs {
+		output, _ := s.output(SiacoinOutputID(outputID))
+		sortedOutputs[i] = output
+	}
+	return sortedOutputs
 }
 
 // Sorted UsfoSet returns all of the unspent siafund outputs sorted according
 // to the numerical value of their id.
-func (s *State) sortedUsfoSet() (sortedOutputs []SiafundOutput) {
+func (s *State) sortedUsfoSet() []SiafundOutput {
 	// Get all of the outputs in string form and sort the strings.
-	var idStrings []string
+	outputIDs := make(hashSlice, len(s.siafundOutputs))
 	for outputID := range s.siafundOutputs {
-		idStrings = append(idStrings, string(outputID[:]))
+		outputIDs = append(outputIDs, crypto.Hash(outputID))
 	}
-	sort.Strings(idStrings)
+	sort.Sort(outputIDs)
 
 	// Get the outputs in order according to their sorted string form.
-	for _, idString := range idStrings {
-		var outputID SiafundOutputID
-		copy(outputID[:], idString)
-
+	sortedOutputs := make([]SiafundOutput, len(outputIDs))
+	for i, outputID := range outputIDs {
 		// Sanity check - the output should exist.
-		output, exists := s.siafundOutputs[outputID]
+		output, exists := s.siafundOutputs[SiafundOutputID(outputID)]
 		if DEBUG {
 			if !exists {
 				panic("output doesn't exist")
 			}
 		}
 
-		sortedOutputs = append(sortedOutputs, output)
+		sortedOutputs[i] = output
 	}
-	return
+	return sortedOutputs
 }
 
-// StateHash returns the markle root of the current state of consensus.
+// StateHash returns the Markle root of the current consensus set.
 func (s *State) stateHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
-	// 2.	current block id
+	// 2.	current block ID
 	// 3.	current height
 	// 4.	current target
 	// 5.	current depth
@@ -133,46 +129,42 @@ func (s *State) stateHash() crypto.Hash {
 		leaves = append(leaves, crypto.Hash(s.currentPath[BlockHeight(i)]))
 	}
 
-	// Get the set of siacoin outputs in sorted order and add them.
-	sortedUscos := s.sortedUscoSet()
-	for _, output := range sortedUscos {
+	// Add the (sorted) set of siacoin outputs.
+	for _, output := range s.sortedUscoSet() {
 		leaves = append(leaves, crypto.HashObject(output))
 	}
 
 	// Sort the open contracts by the string value of their ID.
-	var openContractStrings []string
+	openContractIDs := make(hashSlice, len(s.fileContracts))
 	for contractID := range s.fileContracts {
-		openContractStrings = append(openContractStrings, string(contractID[:]))
+		openContractIDs = append(openContractIDs, crypto.Hash(contractID))
 	}
-	sort.Strings(openContractStrings)
+	sort.Sort(openContractIDs)
 
 	// Add the open contracts in sorted order.
-	for _, stringContractID := range openContractStrings {
-		var contractID FileContractID
-		copy(contractID[:], stringContractID)
-		leaves = append(leaves, crypto.HashObject(s.fileContracts[contractID]))
+	for _, contractID := range openContractIDs {
+		fc := s.fileContracts[FileContractID(contractID)]
+		leaves = append(leaves, crypto.HashObject(fc))
 	}
 
-	// Get the set of siafund outputs in sorted order and add them.
-	sortedUsfos := s.sortedUsfoSet()
-	for _, output := range sortedUsfos {
+	// Add the (sorted) set of siafund outputs.
+	for _, output := range s.sortedUsfoSet() {
 		leaves = append(leaves, crypto.HashObject(output))
 	}
 
-	// Get the set of delayed siacoin outputs, sorted by maturity height then
-	// sorted by id and add them.
+	// Add the set of delayed siacoin outputs. The outputs are sorted first by
+	// their maturity height, and then by ID.
 	for i := BlockHeight(0); i <= s.height(); i++ {
 		delayedOutputs := s.delayedSiacoinOutputs[i]
-		var delayedStrings []string
+		delayedIDs := make(hashSlice, len(delayedOutputs))
 		for id := range delayedOutputs {
-			delayedStrings = append(delayedStrings, string(id[:]))
+			delayedIDs = append(delayedIDs, crypto.Hash(id))
 		}
-		sort.Strings(delayedStrings)
+		sort.Sort(delayedIDs)
 
-		for _, delayedString := range delayedStrings {
-			var id SiacoinOutputID
-			copy(id[:], delayedString)
-			leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
+		for _, id := range delayedIDs {
+			output := delayedOutputs[SiacoinOutputID(id)]
+			leaves = append(leaves, crypto.HashObject(output))
 		}
 	}
 
@@ -346,7 +338,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 	return s.validTransaction(t)
 }
 
-// ValidTransactionComponenets checks that a transaction follows basic rules,
+// ValidTransactionComponents checks that a transaction follows basic rules,
 // such as the storage proof rules, and it checks that all of the signatures
 // are valid, but it does not check that all of the inputs, storage proofs, and
 // terminations act on existing outputs and contracts. This function is
