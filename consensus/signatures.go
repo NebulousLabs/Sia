@@ -12,220 +12,186 @@ var (
 )
 
 // Each input has a list of public keys and a required number of signatures.
-// InputSignatures keeps track of which public keys have been used and how many
+// inputSignatures keeps track of which public keys have been used and how many
 // more signatures are needed.
-type InputSignatures struct {
-	RemainingSignatures uint64
-	PossibleKeys        []SiaPublicKey
-	UsedKeys            map[uint64]struct{}
-	Index               int
+type inputSignatures struct {
+	remainingSignatures uint64
+	possibleKeys        []SiaPublicKey
+	usedKeys            map[uint64]struct{}
+	index               int
 }
 
-// sortedUnique checks that all of the elements in a []unit64 are sorted and
-// without repeates, and also checks that the largest element is less than or
-// equal to the biggest allowed element.
-func sortedUnique(elems []uint64, biggestAllowed int) (err error) {
+// sortedUnique checks that 'elems' is sorted, contains no repeats, and that no
+// element is larger than or equal to 'max'.
+func sortedUnique(elems []uint64, max int) bool {
 	if len(elems) == 0 {
-		return
+		return true
 	}
 
 	biggest := elems[0]
 	for _, elem := range elems[1:] {
 		if elem <= biggest {
-			err = errors.New("covered fields sorting violation")
-			return
+			return false
 		}
 	}
-	if int(biggest) > biggestAllowed {
-		err = errors.New("covered fields indexing violation")
-		return
+	if biggest >= uint64(max) {
+		return false
 	}
-	return
+	return true
 }
 
 // validCoveredFields makes sure that all covered fields objects in the
-// signatures follow the rules. This means that if `WholeTransaction` is set to
-// true, all fields except for `Signatures` must be empty. All fields must be
+// signatures follow the rules. This means that if 'WholeTransaction' is set to
+// true, all fields except for 'Signatures' must be empty. All fields must be
 // sorted numerically, and there can be no repeats.
-func (t Transaction) validCoveredFields() (err error) {
+func (t Transaction) validCoveredFields() error {
 	for _, sig := range t.Signatures {
-		// Check that all fields are empty if `WholeTransaction` is set.
+		// convenience variables
 		cf := sig.CoveredFields
+		fieldMaxs := []struct {
+			field []uint64
+			max   int
+		}{
+			{cf.SiacoinInputs, len(t.SiacoinInputs)},
+			{cf.MinerFees, len(t.MinerFees)},
+			{cf.FileContracts, len(t.FileContracts)},
+			{cf.FileContractTerminations, len(t.FileContractTerminations)},
+			{cf.StorageProofs, len(t.StorageProofs)},
+			{cf.SiafundInputs, len(t.SiafundInputs)},
+			{cf.SiafundOutputs, len(t.SiafundOutputs)},
+			{cf.ArbitraryData, len(t.ArbitraryData)},
+			{cf.Signatures, len(t.Signatures)},
+		}
+
+		// Check that all fields are empty if 'WholeTransaction' is set.
 		if cf.WholeTransaction {
-			if len(cf.SiacoinInputs) != 0 ||
-				len(cf.MinerFees) != 0 ||
-				len(cf.SiacoinOutputs) != 0 ||
-				len(cf.FileContracts) != 0 ||
-				len(cf.FileContractTerminations) != 0 ||
-				len(cf.StorageProofs) != 0 ||
-				len(cf.SiafundInputs) != 0 ||
-				len(cf.SiafundOutputs) != 0 ||
-				len(cf.ArbitraryData) != 0 {
-				err = errors.New("whole transaction flag is set but not all fields besides signatures are empty")
-				return
+			// 'WholeTransaction' does not check signatures.
+			for _, fieldMax := range fieldMaxs[:len(fieldMaxs)-1] {
+				if len(fieldMax.field) != 0 {
+					return errors.New("whole transaction flag is set, but not all fields besides signatures are empty")
+				}
 			}
 		}
 
 		// Check that all fields are sorted, and without repeat values, and
 		// that all elements point to objects that exists within the
 		// transaction.
-		err = sortedUnique(cf.SiacoinInputs, len(cf.SiacoinInputs)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.MinerFees, len(cf.MinerFees)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.SiacoinOutputs, len(cf.SiacoinOutputs)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.FileContracts, len(cf.FileContracts)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.FileContractTerminations, len(cf.FileContractTerminations)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.StorageProofs, len(cf.StorageProofs)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.SiafundInputs, len(cf.SiafundInputs)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.SiafundOutputs, len(cf.SiafundOutputs)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.ArbitraryData, len(cf.ArbitraryData)-1)
-		if err != nil {
-			return
-		}
-		err = sortedUnique(cf.Signatures, len(cf.Signatures)-1)
-		if err != nil {
-			return
+		for _, fieldMax := range fieldMaxs {
+			if !sortedUnique(fieldMax.field, fieldMax.max) {
+				return errors.New("field does not satisfy 'sorted and unique' requirement")
+			}
 		}
 	}
 
-	return
+	return nil
 }
 
-// validSignatures takes a transaction and returns an error if the signatures
-// are not all valid, or if any are missing.
-func (s *State) validSignatures(t Transaction) (err error) {
+// validSignatures checks the validaty of all signatures in a transaction.
+func (s *State) validSignatures(t Transaction) error {
 	// Check that all covered fields objects follow the rules.
-	err = t.validCoveredFields()
+	err := t.validCoveredFields()
 	if err != nil {
-		return
+		return err
 	}
 
-	// Create the InputSignatures object for each input.
-	sigMap := make(map[crypto.Hash]*InputSignatures)
+	// Create the inputSignatures object for each input.
+	sigMap := make(map[crypto.Hash]*inputSignatures)
 	for i, input := range t.SiacoinInputs {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siacoin output spent twice in the same transaction.")
+			return errors.New("siacoin output spent twice in the same transaction")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: input.UnlockConditions.NumSignatures,
-			PossibleKeys:        input.UnlockConditions.PublicKeys,
-			Index:               i,
+		sigMap[id] = &inputSignatures{
+			remainingSignatures: input.UnlockConditions.NumSignatures,
+			possibleKeys:        input.UnlockConditions.PublicKeys,
+			index:               i,
 		}
-		sigMap[id] = inSig
 	}
 	for i, termination := range t.FileContractTerminations {
 		id := crypto.Hash(termination.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("file contract terminated twice in the same transaction.")
+			return errors.New("file contract terminated twice in the same transaction")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: termination.TerminationConditions.NumSignatures,
-			PossibleKeys:        termination.TerminationConditions.PublicKeys,
-			Index:               i,
+		sigMap[id] = &inputSignatures{
+			remainingSignatures: termination.TerminationConditions.NumSignatures,
+			possibleKeys:        termination.TerminationConditions.PublicKeys,
+			index:               i,
 		}
-		sigMap[id] = inSig
 	}
 	for i, input := range t.SiafundInputs {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siafund output spent twice in the same transaction.")
+			return errors.New("siafund output spent twice in the same transaction")
 		}
 
-		inSig := &InputSignatures{
-			RemainingSignatures: input.UnlockConditions.NumSignatures,
-			PossibleKeys:        input.UnlockConditions.PublicKeys,
-			Index:               i,
+		sigMap[id] = &inputSignatures{
+			remainingSignatures: input.UnlockConditions.NumSignatures,
+			possibleKeys:        input.UnlockConditions.PublicKeys,
+			index:               i,
 		}
-		sigMap[id] = inSig
 	}
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.Signatures {
-		id := crypto.Hash(sig.InputID)
-
-		// Check that each signature signs a unique pubkey where
-		// RemainingSignatures > 0.
-		if sigMap[id].RemainingSignatures == 0 {
+		// check that sig corresponds to an entry in sigMap
+		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
+		if !exists || inSig.remainingSignatures == 0 {
 			return errors.New("frivolous signature in transaction")
 		}
-		_, exists := sigMap[id].UsedKeys[sig.PublicKeyIndex]
+		// check that sig's key hasn't already been used
+		_, exists = inSig.usedKeys[sig.PublicKeyIndex]
 		if exists {
 			return errors.New("one public key was used twice while signing an input")
 		}
-
 		// Check that the timelock has expired.
 		if sig.Timelock > s.height() {
 			return errors.New("signature used before timelock expiration")
 		}
 
-		// Check that the signature verifies. Sia is built to support multiple
-		// types of signature algorithms, this is handled by the switch
-		// statement.
-		publicKey := sigMap[id].PossibleKeys[sig.PublicKeyIndex]
+		// Check that the signature verifies. Multiple signature schemes are
+		// supported.
+		publicKey := inSig.possibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case SignatureEntropy:
 			return crypto.ErrInvalidSignature
+
 		case SignatureEd25519:
 			// Decode the public key and signature.
-			var decodedPK crypto.PublicKey
-			err := encoding.Unmarshal(publicKey.Key, &decodedPK)
+			var edPK crypto.PublicKey
+			err := encoding.Unmarshal([]byte(publicKey.Key), &edPK)
 			if err != nil {
 				return err
 			}
-			var decodedSig [crypto.SignatureSize]byte
-			err = encoding.Unmarshal([]byte(sig.Signature), &decodedSig)
+			var edSig [crypto.SignatureSize]byte
+			err = encoding.Unmarshal([]byte(sig.Signature), &edSig)
 			if err != nil {
 				return err
 			}
-			cryptoSig := crypto.Signature(&decodedSig)
+			cryptoSig := crypto.Signature(&edSig)
 
 			sigHash := t.SigHash(i)
-			err = crypto.VerifyHash(sigHash, decodedPK, cryptoSig)
+			err = crypto.VerifyHash(sigHash, edPK, cryptoSig)
 			if err != nil {
 				return err
 			}
+
 		default:
 			// If we don't recognize the identifier, assume that the signature
-			// is valid; do nothing. This allows more signature types to be
-			// added through soft forking.
+			// is valid. This allows more signature types to be added via soft
+			// forking.
 		}
 
-		// Subtract the number of signatures remaining for this input.
-		sigMap[id].RemainingSignatures -= 1
+		inSig.remainingSignatures--
 	}
 
 	// Check that all inputs have been sufficiently signed.
 	for _, reqSigs := range sigMap {
-		if reqSigs.RemainingSignatures != 0 {
+		if reqSigs.remainingSignatures != 0 {
 			return ErrMissingSignatures
 		}
 	}

@@ -2,42 +2,20 @@ package consensus
 
 import (
 	"errors"
-	"sort"
-	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// Exported Errors
 var (
-	BadBlockErr       = errors.New("block is known to be invalid.")
-	BlockKnownErr     = errors.New("block exists in block map.")
-	EarlyTimestampErr = errors.New("block timestamp is too early, block is illegal.")
-	FutureBlockErr    = errors.New("block timestamp too far in future")
-	OrphanErr         = errors.New("block has no known parent")
-	LargeBlockErr     = errors.New("block is too large to be accepted")
-	MinerPayoutErr    = errors.New("miner payout sum does not equal block subsidy")
-	MissedTargetErr   = errors.New("block does not meet target")
+	ErrBadBlock        = errors.New("block is known to be invalid")
+	ErrBlockKnown      = errors.New("block exists in block map")
+	ErrEarlyTimestamp  = errors.New("block timestamp is too early")
+	ErrFutureTimestamp = errors.New("block timestamp too far in future")
+	ErrOrphan          = errors.New("block has no known parent")
+	ErrLargeBlock      = errors.New("block is too large to be accepted")
+	ErrMinerPayout     = errors.New("miner payout sum does not equal block subsidy")
+	ErrMissedTarget    = errors.New("block does not meet target")
 )
-
-// earliestChildTimestamp returns the earliest timestamp that a child node
-// can have while still being valid. See section 'Timestamp Rules' in
-// Consensus.md.
-func (bn *blockNode) earliestChildTimestamp() Timestamp {
-	// Get the previous `MedianTimestampWindow` timestamps.
-	var intTimestamps []int
-	referenceNode := bn
-	for i := 0; i < MedianTimestampWindow; i++ {
-		intTimestamps = append(intTimestamps, int(referenceNode.block.Timestamp))
-		if referenceNode.parent != nil {
-			referenceNode = referenceNode.parent
-		}
-	}
-	sort.Ints(intTimestamps)
-
-	// Return the median of the sorted timestamps.
-	return Timestamp(intTimestamps[MedianTimestampWindow/2])
-}
 
 // checkMinerPayouts verifies that the sum of all the miner payouts is equal to
 // the block subsidy (which is the coinbase + miner fees).
@@ -48,7 +26,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 		if DEBUG {
 			panic("misuse of checkMinerPayouts - block has no known parent")
 		}
-		return OrphanErr
+		return ErrOrphan
 	}
 
 	// Find the total subsidy for the miners: coinbase + fees.
@@ -67,7 +45,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 
 	// Return an error if the subsidy isn't equal to the payouts.
 	if subsidy.Cmp(payoutSum) != 0 {
-		return MinerPayoutErr
+		return ErrMinerPayout
 	}
 
 	return
@@ -78,27 +56,31 @@ func (s *State) validHeader(b Block) (err error) {
 	// Grab the parent of the block.
 	parent, exists := s.blockMap[b.ParentID]
 	if !exists {
-		return OrphanErr
+		return ErrOrphan
 	}
 
-	// Check the id meets the target. This is one of the earliest checks to
+	// Check the ID meets the target. This is one of the earliest checks to
 	// enforce that blocks need to have committed to a large amount of work
 	// before being verified - a DoS protection.
 	if !b.CheckTarget(parent.target) {
-		return MissedTargetErr
+		return ErrMissedTarget
+	}
+
+	// Check that the block is the correct size.
+	if len(encoding.Marshal(b)) > BlockSizeLimit {
+		return ErrLargeBlock
 	}
 
 	// If timestamp is too far in the past, reject and put in bad blocks.
 	if parent.earliestChildTimestamp() > b.Timestamp {
-		return EarlyTimestampErr
+		return ErrEarlyTimestamp
 	}
 
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
-	largestTimeAllowed := Timestamp(time.Now().Unix()) + FutureThreshold
-	if b.Timestamp > largestTimeAllowed {
-		return FutureBlockErr
+	if b.Timestamp > CurrentTimestamp()+FutureThreshold {
+		return ErrFutureTimestamp
 	}
 
 	// Verify that the miner payouts sum to the total amount of fees allowed to
@@ -108,9 +90,24 @@ func (s *State) validHeader(b Block) (err error) {
 		return
 	}
 
-	// Check that the block is the correct size.
-	if len(encoding.Marshal(b)) > BlockSizeLimit {
-		return LargeBlockErr
+	return
+}
+
+// addBlockToTree inserts a block into the blockNode tree by adding it to its
+// parent's list of children. If the new blockNode is heavier than the current
+// node, the blockchain is forked.
+func (s *State) addBlockToTree(b Block) (err error) {
+	parentNode := s.blockMap[b.ParentID]
+	newNode := parentNode.newChild(b)
+
+	// Add the node to the block map
+	s.blockMap[b.ID()] = newNode
+
+	if newNode.heavierThan(s.currentBlockNode()) {
+		err = s.forkBlockchain(newNode)
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -125,11 +122,11 @@ func (s *State) AcceptBlock(b Block) (err error) {
 	// Check maps for information about the block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
-		return BadBlockErr
+		return ErrBadBlock
 	}
 	_, exists = s.blockMap[b.ID()]
 	if exists {
-		return BlockKnownErr
+		return ErrBlockKnown
 	}
 
 	err = s.validHeader(b)

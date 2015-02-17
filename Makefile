@@ -24,20 +24,13 @@ clean:
 
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
-#
-# Touching a file in the consensus folder forces the build tag files to be
-# rebuilt. This can also be achieved with 'go test -a', however using the '-a'
-# flag results in a multi-second compile time, which is undesirable. Leaving
-# out both the touch and the '-a' means that sometimes the tests will be run
-# using the developer constants, which is very slow.
 test: clean fmt REBUILD
 	go test -short -tags=test ./...
 
-#  test-long does a forced rebuild of all packages, and then runs both the
-#  short and long tests with the race libraries enabled. test-long aims to be
-#  thorough.
+# test-long does a forced rebuild of all packages, and then runs all tests
+# with the race libraries enabled. test-long aims to be
+# thorough.
 test-long: clean fmt REBUILD
-	go test -v -race -short -tags=test ./...
 	go test -v -race -tags=test ./...
 
 # cover runs the long tests and creats html files that show you which lines

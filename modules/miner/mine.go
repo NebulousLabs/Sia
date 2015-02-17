@@ -2,7 +2,6 @@ package miner
 
 import (
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
-	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 )
@@ -15,7 +14,7 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	// Fill out the block with potentially ready values.
 	b = consensus.Block{
 		ParentID:     m.parent,
-		Timestamp:    consensus.Timestamp(time.Now().Unix()),
+		Timestamp:    consensus.CurrentTimestamp(),
 		Nonce:        uint64(rand.Int()),
 		Transactions: m.transactions,
 	}

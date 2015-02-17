@@ -35,12 +35,12 @@ func currentPathCheck(t *testing.T, s *State) {
 // Then the state moves forwards to the initial starting place and verifies
 // that the state hash is the same.
 func rewindApplyCheck(t *testing.T, s *State) {
-	stateHash := s.stateHash()
+	stateHash := s.Hash()
 	rewoundNodes := s.rewindToNode(s.blockRoot)
 	for i := len(rewoundNodes) - 1; i >= 0; i-- {
 		s.applyBlockNode(rewoundNodes[i])
 	}
-	if stateHash != s.stateHash() {
+	if stateHash != s.Hash() {
 		t.Error("state hash is not consistent after rewinding and applying all the way through")
 	}
 }
@@ -138,7 +138,7 @@ func TestEverything(t *testing.T) {
 	orderedTestBattery(t, s0, s1)
 
 	// Verify that each state is still on a separate fork.
-	if s0.stateHash() == s1.stateHash() {
+	if s0.Hash() == s1.Hash() {
 		t.Fatal("states have the same hash when they need to be in different places")
 	}
 
@@ -155,7 +155,7 @@ func TestEverything(t *testing.T) {
 	}
 
 	// Verify that each state is still on a separate fork.
-	if s0.stateHash() == s1.stateHash() {
+	if s0.Hash() == s1.Hash() {
 		t.Fatal("states have the same hash when they need to be in different places")
 	}
 
@@ -163,7 +163,7 @@ func TestEverything(t *testing.T) {
 	// then show that block to s1. This should cause an error, but should also
 	// result in the state verifying all of the s0 blocks and then
 	// backtracking. Make sure the hash didn't shift during the backtracking.
-	s1Hash := s1.stateHash()
+	s1Hash := s1.Hash()
 	badID := OutputID{1, 2, 3}
 	input := SiacoinInput{
 		OutputID:        badID,
@@ -183,7 +183,7 @@ func TestEverything(t *testing.T) {
 	}
 
 	// Verify that after rejecting the block, the state hash hasn't changed.
-	if s1.stateHash() != s1Hash {
+	if s1.Hash() != s1Hash {
 		t.Error("s1 hash changed after rejecting a block")
 	}
 
@@ -211,7 +211,7 @@ func TestEverything(t *testing.T) {
 	}
 
 	// Check that s0 and s1 now have the same state hash
-	if s0.stateHash() != s1.stateHash() {
+	if s0.Hash() != s1.Hash() {
 		t.Error("state hashes do not match even though a fork should have occured")
 	}
 

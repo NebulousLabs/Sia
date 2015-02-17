@@ -16,17 +16,17 @@ func (a *Assistant) testBlockTimestamps() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != EarlyTimestampErr {
+	if err != ErrEarlyTimestamp {
 		a.Tester.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
 	// Create a block with a timestamp that is too late.
-	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime()+10+FutureThreshold, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp()+10+FutureThreshold, a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != FutureBlockErr {
+	if err != ErrFutureTimestamp {
 		a.Tester.Error("unexpected error when submitting a too-early timestamp:", err)
 	}
 }
@@ -68,13 +68,11 @@ func (a *Assistant) testEmptyBlock() {
 	// breaks proposed conventions. However, they provide useful information
 	// about the accuracy of invertRecentBlock and applyBlockNode.
 	cbn := a.State.currentBlockNode()
-	direction := false // false because the node is being removed.
-	a.State.applyDiffSet(cbn, direction)
+	a.State.commitDiffSet(cbn, DiffRevert)
 	if beforeStateHash != a.State.StateHash() {
 		a.Tester.Error("state is different after applying and removing diffs")
 	}
-	direction = true // true because the node is being applied.
-	a.State.applyDiffSet(cbn, direction)
+	a.State.commitDiffSet(cbn, DiffApply)
 	if afterStateHash != a.State.StateHash() {
 		a.Tester.Error("state is different after generateApply, remove, and applying diffs")
 	}
@@ -96,7 +94,7 @@ func (a *Assistant) testLargeBlock() {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != LargeBlockErr {
+	if err != ErrLargeBlock {
 		a.Tester.Error(err)
 	}
 }
@@ -108,12 +106,12 @@ func (a *Assistant) testSingleNoFeePayout() {
 	// before and after state hashes to see that they match.
 	beforeHash := a.State.StateHash()
 	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height()), UnlockHash: ZeroUnlockHash}}
-	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
+	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
 	err = a.State.AcceptBlock(block)
-	if err != MinerPayoutErr {
+	if err != ErrMinerPayout {
 		a.Tester.Error("Expecting miner payout error:", err)
 	}
 	afterHash := a.State.StateHash()
@@ -124,7 +122,7 @@ func (a *Assistant) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
 	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(a.State.Height() + 1), UnlockHash: ZeroUnlockHash}}
-	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, nil, a.State.CurrentTarget())
+	block, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
@@ -157,18 +155,18 @@ func (a *Assistant) testMultipleFeesMultiplePayouts() {
 	txn.MinerFees = append(txn.MinerFees, value)
 	txn2.MinerFees = append(txn2.MinerFees, value2)
 	payouts := a.Payouts(a.State.Height()+1, []Transaction{txn, txn2})
-	b, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn}, a.State.CurrentTarget())
+	b, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn}, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Error(err)
 	}
 	err = a.State.AcceptBlock(b)
-	if err != MinerPayoutErr {
+	if err != ErrMinerPayout {
 		a.Tester.Error("Expecting miner payout error:", err)
 	}
 
 	// Mine a block with mutliple fees and a correct payout to multiple
 	// addresses.
-	b, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), payouts, []Transaction{txn, txn2}, a.State.CurrentTarget())
+	b, err = MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn, txn2}, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Error(err)
 	}
@@ -194,7 +192,7 @@ func (a *Assistant) testMissedTarget() {
 	}
 
 	err = a.State.AcceptBlock(b)
-	if err != MissedTargetErr {
+	if err != ErrMissedTarget {
 		a.Tester.Error("Block with low target is not being rejected")
 	}
 }
@@ -216,7 +214,7 @@ func (a *Assistant) testRepeatBlock() {
 	// consensus set hash hasn't changed.
 	chash := a.State.StateHash()
 	err = a.State.AcceptBlock(b)
-	if err != BlockKnownErr {
+	if err != ErrBlockKnown {
 		a.Tester.Error("expecting BlockKnownErr, got", err)
 	}
 	if chash != a.State.StateHash() {
@@ -233,7 +231,7 @@ func (a *Assistant) testOrphan() {
 	}
 	b.ParentID[0]++
 	err = a.State.AcceptBlock(b)
-	if err != OrphanErr {
+	if err != ErrOrphan {
 		a.Tester.Error("unexpected error, expecting OrphanErr:", err)
 	}
 }
@@ -242,13 +240,13 @@ func (a *Assistant) testOrphan() {
 // the first time it should be processed and rejected, the second time it
 // should be recognized as a bad block.
 func (a *Assistant) testBadBlock() {
-	badBlock := a.MineInvalidSignatureBlockSet(0)
-	err := a.State.AcceptBlock(badBlock[0])
+	badBlock := a.MineInvalidSignatureBlockSet(0)[0]
+	err := a.State.AcceptBlock(badBlock)
 	if err != crypto.ErrInvalidSignature {
 		a.Tester.Error("expecting invalid signature:", err)
 	}
-	err = a.State.AcceptBlock(badBlock[0])
-	if err != BadBlockErr {
+	err = a.State.AcceptBlock(badBlock)
+	if err != ErrBadBlock {
 		a.Tester.Error("expecting bad block:", err)
 	}
 }

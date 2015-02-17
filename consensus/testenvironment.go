@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -21,11 +20,6 @@ type Assistant struct {
 	SecretKey        crypto.SecretKey
 
 	usedOutputs map[SiacoinOutputID]struct{}
-}
-
-// CurrentTime returns a Timestamp of the current time.
-func CurrentTime() Timestamp {
-	return Timestamp(time.Now().Unix())
 }
 
 // MineTestingBlock accepts a bunch of parameters for a block and then grinds
@@ -51,7 +45,7 @@ func MineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Siacoi
 // variables that satisfy the current state.
 func (a *Assistant) MineCurrentBlock(txns []Transaction) (b Block, err error) {
 	minerPayouts := a.Payouts(a.State.Height()+1, txns)
-	return MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), minerPayouts, txns, a.State.CurrentTarget())
+	return MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, a.State.CurrentTarget())
 }
 
 // Payouts returns a block with 12 payouts worth 1e6 and a final payout that
@@ -84,7 +78,7 @@ func (a *Assistant) Payouts(height BlockHeight, txns []Transaction) (payouts []S
 // volume of outputs to draw on for testing.
 func (a *Assistant) MineAndApplyValidBlock() (block Block) {
 	// Mine the block.
-	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTime(), a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
+	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
 	if err != nil {
 		a.Tester.Fatal(err)
 	}
@@ -101,8 +95,7 @@ func (a *Assistant) MineAndApplyValidBlock() (block Block) {
 // RewindABlock removes the most recent block from the consensus set.
 func (a *Assistant) RewindABlock() {
 	bn := a.State.currentBlockNode()
-	direction := false // set to false because we're removing a block.
-	a.State.applyDiffSet(bn, direction)
+	a.State.commitDiffSet(bn, DiffRevert)
 }
 
 // NewAssistant returns an assistant that's ready to help with testing.
@@ -116,7 +109,7 @@ func NewAssistant(t *testing.T, s *State) *Assistant {
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: SignatureEd25519,
-				Key:       encoding.Marshal(pk),
+				Key:       string(encoding.Marshal(pk)),
 			},
 		},
 	}

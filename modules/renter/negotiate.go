@@ -38,19 +38,18 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	// Determine the total payout.
 	payout := fund.Add(collateral)
 
-	// Determine the valid proof payout sum (payout - siafund fee)
-	_, validPayout := consensus.SplitContractPayout(payout)
-
-	// Fill out the contract according to the whims of the host.
+	// Fill out the contract.
 	contract := consensus.FileContract{
 		FileMerkleRoot:     merkleRoot,
 		FileSize:           terms.FileSize,
 		Start:              terms.StartHeight,
 		Expiration:         terms.StartHeight + duration,
 		Payout:             payout,
-		ValidProofOutputs:  []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: validPayout, UnlockHash: host.CoinAddress}},
 		MissedProofOutputs: []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: payout, UnlockHash: consensus.ZeroUnlockHash}},
 	}
+	// This field is filled last because Tax is a method of FileContract
+	validPayout := payout.Sub(contract.Tax())
+	contract.ValidProofOutputs = []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: validPayout, UnlockHash: host.CoinAddress}}
 
 	// Add a miner fee to the fund.
 	fund = fund.Add(minerFee)

@@ -32,7 +32,7 @@ func (a *Assistant) MineInvalidSignatureBlockSet(depth int) (blocks []Block) {
 	for i := 0; i < depth; i++ {
 		intTarget := a.State.CurrentTarget().Int()
 		safeIntTarget := intTarget.Div(intTarget, big.NewInt(2))
-		b, err = MineTestingBlock(recentID, CurrentTime(), a.Payouts(a.State.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
+		b, err = MineTestingBlock(recentID, CurrentTimestamp(), a.Payouts(a.State.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
 		if err != nil {
 			a.Tester.Fatal(err)
 		}
@@ -52,7 +52,7 @@ func TestComplexForking(t *testing.T) {
 
 	// Need to grab a single time to make sure that each state ends up with the
 	// same genesis hash.
-	time := CurrentTime()
+	time := CurrentTimestamp()
 	s1 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
 	s2 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
 	s3 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
@@ -183,7 +183,7 @@ func TestComplexForking(t *testing.T) {
 
 	// Mine a bunch of blocks on state2 where the first block has an invalid
 	// signature. Feed them all to state1. The result should be that state1
-	// attempts to fork, finds the valid singature, and then reverts to its
+	// attempts to fork, finds the invalid singature, and then reverts to its
 	// original position with state3.
 	invalidBlocks := a2.MineInvalidSignatureBlockSet(2)
 	for _, block := range invalidBlocks[:len(invalidBlocks)-1] {
