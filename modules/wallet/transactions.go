@@ -203,7 +203,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	for _, inputIndex := range openTxn.inputs {
 		input := txn.SiacoinInputs[inputIndex]
 		sig := consensus.TransactionSignature{
-			InputID:        crypto.Hash(input.ParentID),
+			ParentID:       crypto.Hash(input.ParentID),
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
 		}

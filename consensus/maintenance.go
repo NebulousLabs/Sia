@@ -1,7 +1,7 @@
 package consensus
 
-// applyMinerSubsidy adds all of the outputs recorded in the MinerPayouts to
-// the state, and returns the corresponding set of diffs.
+// applyMinerSubsidy adds a block's MinerPayouts to the State as delayed
+// siacoin outputs. They are also recorded in the blockNode itself.
 func (s *State) applyMinerSubsidy(bn *blockNode) {
 	for i, payout := range bn.block.MinerPayouts {
 		// Sanity check - the output should not already be in
@@ -24,9 +24,9 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 	return
 }
 
-// applyDelayedSiacoinOutputMaintenance goes through all of the outputs that
+// applyMaturedSiacoinOutputs goes through all of the outputs that
 // have matured and adds them to the list of siacoinOutputs.
-func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
+func (s *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if DEBUG {
@@ -36,13 +36,13 @@ func (s *State) applyDelayedSiacoinOutputMaintenance(bn *blockNode) {
 			}
 		}
 
-		scod := SiacoinOutputDiff{
-			New:           true,
+		// Add the output to the State and record the diff in the blockNode.
+		s.siacoinOutputs[id] = sco
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, SiacoinOutputDiff{
+			Direction:     DiffApply,
 			ID:            id,
 			SiacoinOutput: sco,
-		}
-		s.siacoinOutputs[id] = sco
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		})
 	}
 }
 
@@ -77,14 +77,13 @@ func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
 		s.delayedSiacoinOutputs[s.height()][outputID] = output
 	}
 
-	// Remove the file contract from the consensus set and update the diffs.
-	fcd := FileContractDiff{
-		New:          false,
+	// Remove the contract from the State and record the diff in the blockNode.
+	delete(s.fileContracts, fcid)
+	bn.fileContractDiffs = append(bn.fileContractDiffs, FileContractDiff{
+		Direction:    DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
-	}
-	delete(s.fileContracts, fcid)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+	})
 
 	return
 }
@@ -96,27 +95,26 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	// Expiring a contract deletes it from the map we are iterating through, so
 	// we need to store it and deleted once we're done iterating through the
 	// map.
-	var expiredContracts []FileContractID
-	for id, contract := range s.fileContracts {
-		if s.height() == contract.Expiration {
-			expiredContracts = append(expiredContracts, id)
+	currentHeight := s.height()
+	var expiredFileContracts []FileContractID
+	for id, fc := range s.fileContracts {
+		if fc.Expiration == currentHeight {
+			expiredFileContracts = append(expiredFileContracts, id)
 		}
 	}
-
-	// Handle all of the contracts that have expired.
-	for _, id := range expiredContracts {
+	for _, id := range expiredFileContracts {
 		s.applyMissedProof(bn, id)
 	}
 
 	return
 }
 
-// applyMaintence generates, adds, and applies diffs that are generated after
+// applyMaintenance generates, adds, and applies diffs that are generated after
 // all of the transactions of a block have been processed. This includes adding
 // the miner susidies, adding any matured outputs to the set of siacoin
 // outputs, and dealing with any contracts that have expired.
 func (s *State) applyMaintenance(bn *blockNode) {
 	s.applyMinerSubsidy(bn)
-	s.applyDelayedSiacoinOutputMaintenance(bn)
+	s.applyMaturedSiacoinOutputs(bn)
 	s.applyContractMaintenance(bn)
 }

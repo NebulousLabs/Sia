@@ -39,12 +39,11 @@ func (a *Assistant) CurrentPathCheck() {
 // Then the state moves forwards to the initial starting place and verifies
 // that the state hash is the same.
 func (a *Assistant) RewindApplyCheck() {
-	stateHash := a.State.stateHash()
-	rewoundNodes := a.State.rewindToNode(a.State.blockRoot)
-	for i := len(rewoundNodes) - 1; i >= 0; i-- {
-		a.State.applyDiffSet(rewoundNodes[i], true)
-	}
-	if stateHash != a.State.stateHash() {
+	csh := a.State.consensusSetHash()
+	cn := a.State.currentBlockNode()
+	a.State.rewindToNode(a.State.blockRoot)
+	a.State.applyUntilNode(cn)
+	if csh != a.State.consensusSetHash() {
 		a.Tester.Error("state hash is not consistent after rewinding and applying all the way through")
 	}
 }
@@ -95,7 +94,7 @@ func (a *Assistant) ConsistencyChecks() {
 }
 
 // stateHash returns the markle root of the current state of consensus.
-func (s *State) stateHash() crypto.Hash {
+func (s *State) consensusSetHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
 	// 2.	current block id
@@ -174,5 +173,5 @@ func (s *State) stateHash() crypto.Hash {
 func (s *State) StateHash() crypto.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.stateHash()
+	return s.consensusSetHash()
 }

@@ -29,7 +29,7 @@ var (
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
 	MaxAdjustmentDown = big.NewRat(999, 1000)
 
-	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
+	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
 
 	// TODO: Pick more reasonable values for these constants.
 	GenesisTimestamp         = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014

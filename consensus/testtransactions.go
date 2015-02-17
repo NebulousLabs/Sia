@@ -33,7 +33,7 @@ func (a *Assistant) FindSpendableSiacoinInput() (sci SiacoinInput, value Currenc
 	return
 }
 
-// AddInputToTransaction takes a transaction and adds an input that the
+// AddSiacoinInputToTransaction takes a transaction and adds an input that the
 // assistant knows how to spend, returning the transaction and the value of the
 // input that got added.
 func (a *Assistant) AddSiacoinInputToTransaction(inputT Transaction, sci SiacoinInput) (t Transaction) {
@@ -48,7 +48,7 @@ func (a *Assistant) AddSiacoinInputToTransaction(inputT Transaction, sci Siacoin
 
 	// Sign the input in an insecure way.
 	tsig := TransactionSignature{
-		InputID:        crypto.Hash(sci.ParentID),
+		ParentID:       crypto.Hash(sci.ParentID),
 		CoveredFields:  CoveredFields{},
 		PublicKeyIndex: 0,
 	}
