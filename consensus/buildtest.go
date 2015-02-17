@@ -20,7 +20,7 @@ const (
 	SiafundPortion        = 0.039       // Percent of all contract payouts that go to the siafund pool.
 
 	InitialCoinbase = 300e3
-	MinimumCoinbase = 30e3
+	MinimumCoinbase = 299990
 )
 
 var (
@@ -32,7 +32,6 @@ var (
 
 	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
 
-	// TODO: Pick more reasonable values for these constants.
 	GenesisTimestamp         = Timestamp(time.Now().Unix())
 	GenesisSiafundUnlockHash = ZeroUnlockHash
 	GenesisClaimUnlockHash   = ZeroUnlockHash
