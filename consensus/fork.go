@@ -21,10 +21,10 @@ func (s *State) invalidateNode(node *blockNode) {
 	recDelete(node)
 }
 
-// backtrackToBlockchain traces backwards from 'bn' until it reaches a node in
+// backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
 // the State's current path (the "common parent"). It returns the (inclusive)
 // set of nodes between the common parent and 'bn', starting from the former.
-func (s *State) backtrackToBlockchain(bn *blockNode) []*blockNode {
+func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for s.currentPath[bn.height] != bn.block.ID() {
 		bn = bn.parent
@@ -65,7 +65,7 @@ func (s *State) rewindToNode(bn *blockNode) {
 // currentPath and 'bn'.
 func (s *State) applyUntilNode(bn *blockNode) (err error) {
 	// Backtrack to the common parent of 'bn' and currentPath.
-	newPath := s.backtrackToBlockchain(bn)
+	newPath := s.backtrackToCurrentPath(bn)
 
 	// Apply new nodes.
 	for _, node := range newPath[1:] {
@@ -95,14 +95,10 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	if DEBUG {
 		oldHash = s.Hash()
 	}
-
-	// determine common parent
-	commonParent := s.backtrackToBlockchain(newNode)[0]
-
-	// save currentBlockNode in case something goes wrong
 	oldHead := s.currentBlockNode()
 
 	// rewind to the common parent
+	commonParent := s.backtrackToCurrentPath(newNode)[0]
 	s.rewindToNode(commonParent)
 
 	// fast-forward to newNode
@@ -113,7 +109,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 		errReapply := s.applyUntilNode(oldHead)
 		if DEBUG {
 			if errReapply != nil {
-				panic("couldn't reapply previously applied diffs!")
+				panic("couldn't reapply previously applied diffs")
 			} else if s.Hash() != oldHash {
 				panic("state hash changed after an unsuccessful fork attempt")
 			}

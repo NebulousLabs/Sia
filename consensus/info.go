@@ -213,7 +213,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 	}
 
 	// Get all the IDs from going backwards to the blockchain.
-	path := s.backtrackToBlockchain(node)
+	path := s.backtrackToCurrentPath(node)
 	for _, node := range path[1:] {
 		removedBlocks = append(removedBlocks, node.block.ID())
 	}

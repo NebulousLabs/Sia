@@ -127,7 +127,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 		}
 	}
 
-	// apply each of the diffs
+	// Apply each of the diffs.
 	for _, scod := range bn.siacoinOutputDiffs {
 		s.commitSiacoinOutputDiff(scod, dir)
 	}
@@ -139,7 +139,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 	}
 	s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 
-	// update State metadata
+	// Update the State's metadata
 	if dir == DiffApply {
 		s.currentBlockID = bn.block.ID()
 
