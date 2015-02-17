@@ -2,6 +2,8 @@ package consensus
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // testBlockTimestamps submits a block to the state with a timestamp that is
@@ -236,6 +238,21 @@ func (a *Assistant) testOrphan() {
 	}
 }
 
+// testBadBlock creates a bad block and then submits it to the state twice -
+// the first time it should be processed and rejected, the second time it
+// should be recognized as a bad block.
+func (a *Assistant) testBadBlock() {
+	badBlock := a.MineInvalidSignatureBlockSet(0)
+	err := a.State.AcceptBlock(badBlock[0])
+	if err != crypto.ErrInvalidSignature {
+		a.Tester.Error("expecting invalid signature:", err)
+	}
+	err = a.State.AcceptBlock(badBlock[0])
+	if err != BadBlockErr {
+		a.Tester.Error("expecting bad block:", err)
+	}
+}
+
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // TestBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
@@ -289,4 +306,11 @@ func TestRepeatBlock(t *testing.T) {
 func TestOrphan(t *testing.T) {
 	a := NewTestingEnvironment(t)
 	a.testOrphan()
+}
+
+// TestBadBlock creates a new testing environment and uses it to call
+// testBadBlock.
+func TestBadBlock(t *testing.T) {
+	a := NewTestingEnvironment(t)
+	a.testBadBlock()
 }
