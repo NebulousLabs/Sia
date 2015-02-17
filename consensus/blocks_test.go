@@ -254,7 +254,7 @@ func (a *Assistant) testBadBlock() {
 }
 
 // TestBlockTimestamps creates a new testing environment and uses it to call
-// TestBlockTimestamps.
+// testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
 	a := NewTestingEnvironment(t)
 	a.testBlockTimestamps()

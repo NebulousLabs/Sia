@@ -63,3 +63,14 @@ func (a *Assistant) AddSiacoinInputToTransaction(inputT Transaction, sci Siacoin
 
 	return
 }
+
+// testApplySiacoinOuptut creates a transaction that spends a siacoin output.
+func (a *Assistant) SiacoinOutputTransaction() (txn Transaction) {
+	sci, value := a.FindSpendableSiacoinInput()
+	txn = a.AddSiacoinInputToTransaction(Transaction{}, sci)
+	txn.SiacoinOutputs = append(txn.SiacoinOutputs, SiacoinOutput{
+		Value:      value,
+		UnlockHash: a.UnlockHash,
+	})
+	return
+}

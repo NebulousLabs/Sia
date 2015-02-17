@@ -94,12 +94,7 @@ func TestComplexForking(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mine several blocks on each state. For hte purposes of this test, the
-	// blocks can be anything as long as the states are all receiving the same
-	// block set. Because they can be anything, we actually apply a lot of the
-	// other tests to try and build up state objects that contain every type of
-	// transaction and are as complex as possible. The hope is to introduce an
-	// unexpected side effect and trigger an error.
+	// Mine several blocks on each state.
 	for i := 0; i < 2; i++ {
 		// state 1 mining.
 		b1, err = a1.MineCurrentBlock(nil)
