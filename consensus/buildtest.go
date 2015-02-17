@@ -29,7 +29,7 @@ var (
 	MaxAdjustmentUp   = big.NewRat(10001, 10000)
 	MaxAdjustmentDown = big.NewRat(9999, 10000)
 
-	CoinbaseAugment = new(big.Int).Lsh(big.NewInt(1), 80)
+	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
 
 	GenesisTimestamp         = CurrentTimestamp()
 	GenesisSiafundUnlockHash = ZeroUnlockHash
