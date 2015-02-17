@@ -4,15 +4,21 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// invalidateNode recursively moves the children of a blockNode to the bad
-// blocks list.
+// invalidateNode moves 'node' to the set of bad blocks and recursively deletes
+// its children from the set of known blocks. This means that the child blocks
+// may be accepted if they are resubmitted to the State.
 func (s *State) invalidateNode(node *blockNode) {
-	for i := range node.children {
-		s.invalidateNode(node.children[i])
-	}
-
-	delete(s.blockMap, node.block.ID())
 	s.badBlocks[node.block.ID()] = struct{}{}
+
+	// recursively delete node and its children from the blockMap.
+	var recDelete func(*blockNode)
+	recDelete = func(child *blockNode) {
+		for i := range child.children {
+			recDelete(child.children[i])
+		}
+		delete(s.blockMap, child.block.ID())
+	}
+	recDelete(node)
 }
 
 // backtrackToBlockchain traces backwards from 'bn' until it reaches a node in
