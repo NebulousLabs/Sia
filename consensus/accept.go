@@ -93,8 +93,9 @@ func (s *State) validHeader(b Block) (err error) {
 	return
 }
 
-// addBlockToTree takes a block and a parent node, and adds a child node to the
-// parent containing the block. No validation is done.
+// addBlockToTree inserts a block into the blockNode tree by adding it to its
+// parent's list of children. If the new blockNode is heavier than the current
+// node, the blockchain is forked.
 func (s *State) addBlockToTree(b Block) (err error) {
 	parentNode := s.blockMap[b.ParentID]
 	newNode := parentNode.newChild(b)

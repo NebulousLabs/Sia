@@ -109,7 +109,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	return
 }
 
-// applyMaintence generates, adds, and applies diffs that are generated after
+// applyMaintenance generates, adds, and applies diffs that are generated after
 // all of the transactions of a block have been processed. This includes adding
 // the miner susidies, adding any matured outputs to the set of siacoin
 // outputs, and dealing with any contracts that have expired.
