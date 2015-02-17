@@ -22,8 +22,8 @@ type inputSignatures struct {
 }
 
 // sortedUnique checks that 'elems' is sorted, contains no repeats, and that no
-// element is an invalid index of 'elems'.
-func sortedUnique(elems []uint64) bool {
+// element is larger than or equal to 'max'.
+func sortedUnique(elems []uint64, max int) bool {
 	if len(elems) == 0 {
 		return true
 	}
@@ -34,7 +34,7 @@ func sortedUnique(elems []uint64) bool {
 			return false
 		}
 	}
-	if biggest >= uint64(len(elems)) {
+	if biggest >= uint64(max) {
 		return false
 	}
 	return true
@@ -48,23 +48,26 @@ func (t Transaction) validCoveredFields() error {
 	for _, sig := range t.Signatures {
 		// convenience variables
 		cf := sig.CoveredFields
-		fields := [][]uint64{
-			cf.SiacoinInputs,
-			cf.MinerFees,
-			cf.FileContracts,
-			cf.FileContractTerminations,
-			cf.StorageProofs,
-			cf.SiafundInputs,
-			cf.SiafundOutputs,
-			cf.ArbitraryData,
-			cf.Signatures,
+		fieldMaxs := []struct {
+			field []uint64
+			max   int
+		}{
+			{cf.SiacoinInputs, len(t.SiacoinInputs)},
+			{cf.MinerFees, len(t.MinerFees)},
+			{cf.FileContracts, len(t.FileContracts)},
+			{cf.FileContractTerminations, len(t.FileContractTerminations)},
+			{cf.StorageProofs, len(t.StorageProofs)},
+			{cf.SiafundInputs, len(t.SiafundInputs)},
+			{cf.SiafundOutputs, len(t.SiafundOutputs)},
+			{cf.ArbitraryData, len(t.ArbitraryData)},
+			{cf.Signatures, len(t.Signatures)},
 		}
 
 		// Check that all fields are empty if 'WholeTransaction' is set.
 		if cf.WholeTransaction {
 			// 'WholeTransaction' does not check signatures.
-			for _, field := range fields[:len(fields)-1] {
-				if len(field) != 0 {
+			for _, fieldMax := range fieldMaxs[:len(fieldMaxs)-1] {
+				if len(fieldMax.field) != 0 {
 					return errors.New("whole transaction flag is set, but not all fields besides signatures are empty")
 				}
 			}
@@ -73,8 +76,8 @@ func (t Transaction) validCoveredFields() error {
 		// Check that all fields are sorted, and without repeat values, and
 		// that all elements point to objects that exists within the
 		// transaction.
-		for _, field := range fields {
-			if !sortedUnique(field) {
+		for _, fieldMax := range fieldMaxs {
+			if !sortedUnique(fieldMax.field, fieldMax.max) {
 				return errors.New("field does not satisfy 'sorted and unique' requirement")
 			}
 		}
