@@ -92,8 +92,8 @@ func (s *State) sortedUsfoSet() []SiafundOutput {
 	return sortedOutputs
 }
 
-// StateHash returns the Markle root of the current consensus set.
-func (s *State) stateHash() crypto.Hash {
+// Hash returns the Markle root of the current consensus set.
+func (s *State) Hash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
 	// 2.	current block ID
@@ -316,7 +316,7 @@ func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err erro
 func (s *State) StateHash() crypto.Hash {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.stateHash()
+	return s.Hash()
 }
 
 func (s *State) ValidTransaction(t Transaction) (err error) {

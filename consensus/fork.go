@@ -87,7 +87,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
 	if DEBUG {
-		oldHash = s.stateHash()
+		oldHash = s.Hash()
 	}
 
 	// determine common parent
@@ -108,7 +108,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 		if DEBUG {
 			if errReapply != nil {
 				panic("couldn't reapply previously applied diffs!")
-			} else if s.stateHash() != oldHash {
+			} else if s.Hash() != oldHash {
 				panic("state hash changed after an unsuccessful fork attempt")
 			}
 		}
