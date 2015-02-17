@@ -184,6 +184,7 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 	return
 }
 
+// BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
 	node, exists := s.blockMap[id]
 	if !exists {
@@ -191,7 +192,7 @@ func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err err
 		return
 	}
 	if !node.diffsGenerated {
-		err = errors.New("diffs have not been generated for the requested block.")
+		err = errors.New("diffs have not been generated for the requested block")
 		return
 	}
 	scods = node.siacoinOutputDiffs
@@ -230,8 +231,8 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 	return
 }
 
-// Contract returns a the contract associated with the input id, and whether
-// the contract exists.
+// FileContract returns the file contract associated with the 'id'. If the
+// contract does not exist, exists will be false.
 func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -255,22 +256,22 @@ func (s *State) CurrentTarget() Target {
 	return s.currentBlockNode().target
 }
 
-// EarliestLegalTimestamp returns the earliest legal timestamp of the next
-// block - earlier timestamps will render the block invalid.
+// EarliestTimestamp returns the earliest timestamp that the next block can
+// have in order for it to be considered valid.
 func (s *State) EarliestTimestamp() Timestamp {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.currentBlockNode().earliestChildTimestamp()
 }
 
-// State.Height() returns the height of the longest fork.
+// Height returns the height of the current blockchain (the longest fork).
 func (s *State) Height() BlockHeight {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.height()
 }
 
-// HeightOfBlock returns the height of the block with id `bid`.
+// HeightOfBlock returns the height of the block with the given ID.
 func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -283,14 +284,14 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 	return
 }
 
-// Output returns the output associated with an OutputID, returning an error if
-// the output is not found.
+// SiacoinOutput returns the siacoin output associated with the given ID.
 func (s *State) SiacoinOutput(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.output(id)
 }
 
+// SiafundOutput returns the siafund output associated with the given ID.
 func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -298,7 +299,7 @@ func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists 
 	return
 }
 
-// Sorted UtxoSet returns all of the unspent transaction outputs sorted
+// SortedUtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
 func (s *State) SortedUtxoSet() []SiacoinOutput {
 	s.mu.RLock()
@@ -306,6 +307,8 @@ func (s *State) SortedUtxoSet() []SiacoinOutput {
 	return s.sortedUscoSet()
 }
 
+// StorageProofSegment returns the segment to be used in the storage proof for
+// a given file contract.
 func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -319,6 +322,8 @@ func (s *State) StateHash() crypto.Hash {
 	return s.Hash()
 }
 
+// ValidTransaction checks that a transaction is valid within the context of
+// the current consensus set.
 func (s *State) ValidTransaction(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -358,6 +363,7 @@ func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 	return
 }
 
+// ValidUnlockConditions checks that the conditions of uc have been met.
 func (s *State) ValidUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

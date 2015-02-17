@@ -13,7 +13,7 @@ var (
 	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
 )
 
-// followsStorageProofRule checks that a transaction follows the limitations
+// FollowsStorageProofRules checks that a transaction follows the limitations
 // placed on transactions that have storage proofs.
 func (t Transaction) FollowsStorageProofRules() error {
 	// No storage proofs, no problems.
@@ -70,7 +70,7 @@ func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err e
 		return errors.New("unlock conditions do not match unlock hash")
 	}
 	if uc.Timelock > s.height() {
-		return errors.New("unlock condition timelock has not been met.")
+		return errors.New("unlock condition timelock has not been met")
 	}
 
 	return
@@ -99,7 +99,7 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return errors.New("inputs do not equal outputs for transaction.")
+		return errors.New("inputs do not equal outputs for transaction")
 	}
 
 	return
@@ -111,10 +111,10 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 	for _, fc := range t.FileContracts {
 		// Check that start and expiration are reasonable values.
 		if fc.Start <= s.height() {
-			return errors.New("contract must start in the future.")
+			return errors.New("contract must start in the future")
 		}
 		if fc.Expiration <= fc.Start {
-			return errors.New("contract duration must be at least one block.")
+			return errors.New("contract duration must be at least one block")
 		}
 
 		// Check that the valid proof outputs sum to the payout after the

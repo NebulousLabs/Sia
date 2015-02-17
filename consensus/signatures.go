@@ -95,7 +95,7 @@ func (s *State) validSignatures(t Transaction) error {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siacoin output spent twice in the same transaction.")
+			return errors.New("siacoin output spent twice in the same transaction")
 		}
 
 		sigMap[id] = &inputSignatures{
@@ -108,7 +108,7 @@ func (s *State) validSignatures(t Transaction) error {
 		id := crypto.Hash(termination.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("file contract terminated twice in the same transaction.")
+			return errors.New("file contract terminated twice in the same transaction")
 		}
 
 		sigMap[id] = &inputSignatures{
@@ -121,7 +121,7 @@ func (s *State) validSignatures(t Transaction) error {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siafund output spent twice in the same transaction.")
+			return errors.New("siafund output spent twice in the same transaction")
 		}
 
 		sigMap[id] = &inputSignatures{

@@ -240,12 +240,12 @@ func (a *Assistant) testOrphan() {
 // the first time it should be processed and rejected, the second time it
 // should be recognized as a bad block.
 func (a *Assistant) testBadBlock() {
-	badBlock := a.MineInvalidSignatureBlockSet(0)
-	err := a.State.AcceptBlock(badBlock[0])
+	badBlock := a.MineInvalidSignatureBlockSet(0)[0]
+	err := a.State.AcceptBlock(badBlock)
 	if err != crypto.ErrInvalidSignature {
 		a.Tester.Error("expecting invalid signature:", err)
 	}
-	err = a.State.AcceptBlock(badBlock[0])
+	err = a.State.AcceptBlock(badBlock)
 	if err != ErrBadBlock {
 		a.Tester.Error("expecting bad block:", err)
 	}

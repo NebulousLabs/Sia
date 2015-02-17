@@ -14,11 +14,11 @@ type (
 	BlockHeight uint64
 	Siafund     Currency // arbitrary-precision unsigned integer
 
-	// Specifiers are fixed-length strings that serve two purposes. In the
+	// A Specifier is a fixed-length string that serves two purposes. In the
 	// wire protocol, they are used to identify a particular encoding
-	// algorithm, signature algorithm, etc. This allows nodes to communicate
-	// on their own terms; for example, to reduce bandwidth costs, a node
-	// might only accept compressed messages.
+	// algorithm, signature algorithm, etc. This allows nodes to communicate on
+	// their own terms; for example, to reduce bandwidth costs, a node might
+	// only accept compressed messages.
 	//
 	// Internally, Specifiers are used to guarantee unique IDs. Various
 	// consensus types have an associated ID, calculated by hashing the data
@@ -26,7 +26,7 @@ type (
 	// guarantee that distinct types will never produce the same hash.
 	Specifier [16]byte
 
-	// Signatures are arbitrary-length to enable a variety of signature
+	// The Signature type is arbitrary-length to enable a variety of signature
 	// algorithms.
 	Signature string
 
@@ -326,7 +326,7 @@ func (t Target) Rat() *big.Rat {
 	return new(big.Rat).SetInt(t.Int())
 }
 
-// Inv returns the inverse of a Target as a big.Rat
+// Inverse returns the inverse of a Target as a big.Rat
 func (t Target) Inverse() *big.Rat {
 	return new(big.Rat).Inv(t.Rat())
 }

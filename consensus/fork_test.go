@@ -183,7 +183,7 @@ func TestComplexForking(t *testing.T) {
 
 	// Mine a bunch of blocks on state2 where the first block has an invalid
 	// signature. Feed them all to state1. The result should be that state1
-	// attempts to fork, finds the valid singature, and then reverts to its
+	// attempts to fork, finds the invalid singature, and then reverts to its
 	// original position with state3.
 	invalidBlocks := a2.MineInvalidSignatureBlockSet(2)
 	for _, block := range invalidBlocks[:len(invalidBlocks)-1] {

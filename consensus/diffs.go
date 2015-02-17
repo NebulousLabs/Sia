@@ -1,7 +1,7 @@
 package consensus
 
-// Diffs can be applied or reverted. A bool is used to restrict the value to
-// two possibilities.
+// A DiffDirection indicates the "direction" of a diff, either applied or
+// reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool
 
 const (
@@ -33,7 +33,7 @@ type SiafundOutputDiff struct {
 	SiafundOutput SiafundOutput
 }
 
-// A SiafundPool diff contains the value of the siafundPool before the block
+// A SiafundPoolDiff contains the value of the siafundPool before the block
 // was applied, and after the block was applied. When applying the diff, set
 // siafundPool to 'Adjusted'. When reverting the diff, set siafundPool to
 // 'Previous'.

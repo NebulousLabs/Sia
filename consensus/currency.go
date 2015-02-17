@@ -58,7 +58,7 @@ func (c Currency) Sub(x Currency) (y Currency) {
 	return
 }
 
-// Mult returns a new Currency value y = c * x.
+// Mul returns a new Currency value y = c * x.
 func (c Currency) Mul(x Currency) (y Currency) {
 	y.i.Mul(&c.i, &x.i)
 	return
