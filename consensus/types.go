@@ -94,8 +94,7 @@ type Block struct {
 //
 // Transactions can depend on other previous transactions in the same block,
 // but transactions cannot spend outputs that they create or otherwise be
-// self-dependent. For a more in-depth description of transactions, refer to
-// the Sia whitepaper.
+// self-dependent.
 type Transaction struct {
 	SiacoinInputs            []SiacoinInput
 	SiacoinOutputs           []SiacoinOutput
@@ -131,7 +130,7 @@ type SiacoinOutput struct {
 // A FileContract is a public record of a storage agreement between a "host"
 // and a "renter." It mandates that a host must submit a storage proof to the
 // network, proving that they still possess the file they have agreed to
-// store. See the Sia whitepaper for more details on storage proofs.
+// store.
 //
 // The party must submit the storage proof in a block that is between 'Start'
 // and 'Expiration'. Upon submitting the proof, the outputs for
