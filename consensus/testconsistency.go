@@ -6,9 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// TODO: rename stateHash and StateHash to consensusSetHash and
-// ConsensusSetHash.
-
 // CurrentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
 // currentPath.

@@ -76,7 +76,10 @@ func (w *Wallet) update() error {
 	for _, id := range addedBlocks {
 		scods, err := w.state.BlockOutputDiffs(id)
 		if err != nil {
-			return err
+			if consensus.DEBUG {
+				panic(err)
+			}
+			continue
 		}
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffApply)

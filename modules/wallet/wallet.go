@@ -69,13 +69,21 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		return
 	}
 
+	// Get the genesis block to set as 'recent block'.
+	genesisBlock, exists := state.BlockAtHeight(0)
+	if !exists {
+		err = errors.New("could not fetch genesis block")
+		return
+	}
+
 	w = &Wallet{
-		state: state,
-		tpool: tpool,
+		state:       state,
+		tpool:       tpool,
+		recentBlock: genesisBlock.ID(),
 
 		filename: filename,
 
-		age:            1,
+		age:            AgeDelay + 100,
 		keys:           make(map[consensus.UnlockHash]*key),
 		timelockedKeys: make(map[consensus.BlockHeight][]consensus.UnlockHash),
 

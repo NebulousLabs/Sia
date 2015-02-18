@@ -140,14 +140,14 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 		return
 	}
 
-	// Get all the IDs from going backwards to the blockchain.
+	// Get all the IDs from the blockchain to the current path.
 	path := s.backtrackToCurrentPath(node)
-	for _, node := range path[1:] {
-		removedBlocks = append(removedBlocks, node.block.ID())
+	for i := len(path) - 1; i > 0; i-- {
+		removedBlocks = append(removedBlocks, path[i].block.ID())
 	}
 
 	// Get all the IDs going forward from the common parent.
-	for height := path[0].height; ; height++ {
+	for height := path[0].height + 1; ; height++ {
 		if _, exists := s.currentPath[height]; !exists {
 			break
 		}
