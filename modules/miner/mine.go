@@ -109,9 +109,12 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			// TODO: If debug, check the error value of AcceptBlock and panic
-			// for err != nil.
-			m.state.AcceptBlock(b)
+			err = m.state.AcceptBlock(b)
+			if consensus.DEBUG {
+				if err != nil {
+					panic(err)
+				}
+			}
 
 			solved = true
 

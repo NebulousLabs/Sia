@@ -93,7 +93,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
 	if DEBUG {
-		oldHash = s.Hash()
+		oldHash = s.consensusSetHash()
 	}
 	oldHead := s.currentBlockNode()
 
@@ -115,7 +115,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	if DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")
-		} else if s.Hash() != oldHash {
+		} else if s.consensusSetHash() != oldHash {
 			panic("state hash changed after an unsuccessful fork attempt")
 		}
 	}

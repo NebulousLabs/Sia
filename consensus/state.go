@@ -80,6 +80,8 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		block:  genesisBlock,
 		target: RootTarget,
 		depth:  RootDepth,
+
+		diffsGenerated: true,
 	}
 	s.blockMap[genesisBlock.ID()] = s.blockRoot
 

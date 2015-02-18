@@ -92,78 +92,6 @@ func (s *State) sortedUsfoSet() []SiafundOutput {
 	return sortedOutputs
 }
 
-// Hash returns the Markle root of the current consensus set.
-func (s *State) Hash() crypto.Hash {
-	// Items of interest:
-	// 1.	genesis block
-	// 2.	current block ID
-	// 3.	current height
-	// 4.	current target
-	// 5.	current depth
-	// 6.	earliest allowed timestamp of next block
-	// 7.	current path, ordered by height.
-	// 8.	unspent siacoin outputs, sorted by id.
-	// 9.	open file contracts, sorted by id.
-	// 10.	unspent siafund outputs, sorted by id.
-	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
-
-	// Create a slice of hashes representing all items of interest.
-	leaves := []crypto.Hash{
-		crypto.HashObject(s.blockRoot.block),
-		crypto.Hash(s.currentBlockID),
-		crypto.HashObject(s.height()),
-		crypto.HashObject(s.currentBlockNode().target),
-		crypto.HashObject(s.currentBlockNode().depth),
-		crypto.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-	}
-
-	// Add all the blocks in the current path.
-	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, crypto.Hash(s.currentPath[BlockHeight(i)]))
-	}
-
-	// Add the (sorted) set of siacoin outputs.
-	for _, output := range s.sortedUscoSet() {
-		leaves = append(leaves, crypto.HashObject(output))
-	}
-
-	// Sort the open contracts by the string value of their ID.
-	openContractIDs := make(crypto.HashSlice, len(s.fileContracts))
-	for contractID := range s.fileContracts {
-		openContractIDs = append(openContractIDs, crypto.Hash(contractID))
-	}
-	sort.Sort(openContractIDs)
-
-	// Add the open contracts in sorted order.
-	for _, contractID := range openContractIDs {
-		fc := s.fileContracts[FileContractID(contractID)]
-		leaves = append(leaves, crypto.HashObject(fc))
-	}
-
-	// Add the (sorted) set of siafund outputs.
-	for _, output := range s.sortedUsfoSet() {
-		leaves = append(leaves, crypto.HashObject(output))
-	}
-
-	// Add the set of delayed siacoin outputs. The outputs are sorted first by
-	// their maturity height, and then by ID.
-	for i := BlockHeight(0); i <= s.height(); i++ {
-		delayedOutputs := s.delayedSiacoinOutputs[i]
-		delayedIDs := make(crypto.HashSlice, len(delayedOutputs))
-		for id := range delayedOutputs {
-			delayedIDs = append(delayedIDs, crypto.Hash(id))
-		}
-		sort.Sort(delayedIDs)
-
-		for _, id := range delayedIDs {
-			output := delayedOutputs[SiacoinOutputID(id)]
-			leaves = append(leaves, crypto.HashObject(output))
-		}
-	}
-
-	return crypto.MerkleRoot(leaves)
-}
-
 // BlockAtHeight returns the block on the current path with the given height.
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
 	s.mu.RLock()
@@ -212,14 +140,14 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 		return
 	}
 
-	// Get all the IDs from going backwards to the blockchain.
+	// Get all the IDs from the blockchain to the current path.
 	path := s.backtrackToCurrentPath(node)
-	for _, node := range path[1:] {
-		removedBlocks = append(removedBlocks, node.block.ID())
+	for i := len(path) - 1; i > 0; i-- {
+		removedBlocks = append(removedBlocks, path[i].block.ID())
 	}
 
 	// Get all the IDs going forward from the common parent.
-	for height := path[0].height; ; height++ {
+	for height := path[0].height + 1; ; height++ {
 		if _, exists := s.currentPath[height]; !exists {
 			break
 		}
@@ -313,13 +241,6 @@ func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err erro
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.storageProofSegment(fcid)
-}
-
-// StateHash returns the markle root of the current state of consensus.
-func (s *State) StateHash() crypto.Hash {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.Hash()
 }
 
 // ValidTransaction checks that a transaction is valid within the context of
