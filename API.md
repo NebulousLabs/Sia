@@ -39,7 +39,7 @@ HostInfo is a JSON object containing the following values:
     "Collateral"
     "StorageRemaining"
     "NumContracts"
-``
+```
 
 HostSettings: the following parameters can be set via `/host/setconfig`:
 ```
