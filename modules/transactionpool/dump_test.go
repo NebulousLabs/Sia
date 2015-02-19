@@ -34,9 +34,27 @@ func (tpt *tpoolTester) testSiacoinTransactionDump() {
 	tpt.testTransactionDumping()
 }
 
+// testUnconfirmedSiacoinOutputDiffs adds some unconfirmed transactions to the
+// transaction pool and then checks the diffs. Then a block is put into the
+// state with the transactions and the diffs are checked again.
+func (tpt *tpoolTester) testUnconfirmedSiacoinOutputDiffs() {
+	tpt.addDependentSiacoinTransactionToPool()
+	diffs := tpt.transactionPool.UnconfirmedSiacoinOutputDiffs()
+	if len(diffs) != 3 {
+		tpt.assistant.Tester.Error("wrong number of diffs")
+	}
+}
+
 // TestSiacoinTransactionDump creates a tpoolTester and uses it to call
 // testSiacoinTransactionDump.
 func TestSiacoinTransactionDump(t *testing.T) {
 	tpt := CreateTpoolTester(t)
 	tpt.testSiacoinTransactionDump()
+}
+
+// TestUnconfirmedSiacoinOutputDiffs creates a tpoolTester and uses it to call
+// testUnconfirmedSiacoinOutputDiffs.
+func TestUnconfirmedSiacoinOutputDiffs(t *testing.T) {
+	tpt := CreateTpoolTester(t)
+	tpt.testUnconfirmedSiacoinOutputDiffs()
 }
