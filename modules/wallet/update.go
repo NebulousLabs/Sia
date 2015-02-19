@@ -16,14 +16,13 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 	}
 
 	if scod.Direction == dir {
-		// Sanity check - output should not already exist.
-		if consensus.DEBUG {
-			_, exists := key.outputs[scod.ID]
-			if exists {
-				panic("adding an output that already exists")
-			}
+		// If the output is already known, ignore it.
+		_, exists := key.outputs[scod.ID]
+		if exists {
+			return
 		}
 
+		// Add the output.
 		ko := &knownOutput{
 			id:     scod.ID,
 			output: scod.SiacoinOutput,
@@ -55,8 +54,8 @@ func (w *Wallet) update() error {
 
 	// Remove all of the diffs that have been applied by the unconfirmed set of
 	// transactions.
-	for _, scod := range w.unconfirmedDiffs {
-		w.applyDiff(scod, consensus.DiffRevert)
+	for i := len(w.unconfirmedDiffs) - 1; i >= 0; i-- {
+		w.applyDiff(w.unconfirmedDiffs[i], consensus.DiffRevert)
 	}
 
 	// Apply the diffs in the state that have happened since the last update.
@@ -65,6 +64,9 @@ func (w *Wallet) update() error {
 		return err
 	}
 	for _, id := range removedBlocks {
+		// Decrement the age of the wallet.
+		w.age--
+
 		scods, err := w.state.BlockOutputDiffs(id)
 		if err != nil {
 			return err
@@ -74,6 +76,9 @@ func (w *Wallet) update() error {
 		}
 	}
 	for _, id := range addedBlocks {
+		// Increment the age of the wallet.
+		w.age++
+
 		scods, err := w.state.BlockOutputDiffs(id)
 		if err != nil {
 			if consensus.DEBUG {

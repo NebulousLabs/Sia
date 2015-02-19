@@ -69,7 +69,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err erro
 	// Create a refund output if needed.
 	if amount.Cmp(fundingTotal) != 0 {
 		var refundDest consensus.UnlockHash
-		refundDest, _, err = w.CoinAddress()
+		refundDest, _, err = w.coinAddress()
 		if err != nil {
 			return
 		}
