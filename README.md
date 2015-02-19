@@ -12,7 +12,7 @@ Sia should be seen as highly experimental, and using Sia should be seen as
 taking a risk. As per the license, Sia is software that comes without any
 warranty, and the developers cannot be held responsible for any damages that
 occur. We encourage you to use Sia, but only with files and money that you are
-comfortable using.
+comfortable losing.
 
 This distribution is an early beta release. It is likely to have many bugs,
 some of which may be severe. Please use with caution.
