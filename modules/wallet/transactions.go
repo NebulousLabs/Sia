@@ -52,7 +52,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err erro
 		key := w.keys[output.output.UnlockHash]
 		newInput := consensus.SiacoinInput{
 			ParentID:         output.id,
-			UnlockConditions: key.spendConditions,
+			UnlockConditions: key.unlockConditions,
 		}
 		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, newInput)
 	}

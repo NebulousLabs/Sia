@@ -13,13 +13,27 @@ const (
 	// user to double-spend a transaction under standard circumstances. The
 	// rationale is that most transactions are meant to be submitted to the
 	// blockchain immediately, and ones that take more than AgeDelay blocks
-	// have probably failed in some way. There are means to increase the
-	// AgeDelay for specific transactions.
+	// have probably failed in some way.
 	AgeDelay = 80
 )
 
-// The wallet contains a list of addresses and the methods to spend them (the
-// keys), as well as an interactive way to construct and sign transactions.
+// A Wallet uses the state and transaction pool to track the unconfirmed
+// balance of a user. All of the keys are stored in the file 'filename'.
+//
+// One feature of the wallet is preventing accidental double spends. The wallet
+// will block an output from being spent if it has been spent in the last
+// 'AgeDelay' blocks. This is managed by tracking a global age for the wallet
+// and then an age for each output, set to the age of the wallet that the
+// output was most recently spent. If the wallet is 'AgeDelay' blocks older
+// than an output, then the output can be spent again.
+//
+// A second feature of the wallet is the transaction builder, which is a series
+// of functions that can be used to build independent transactions for use with
+// untrusted parties. The transactions can be cobbled together piece by piece
+// and then signed. When using the transaction builder, the wallet will always
+// have exact outputs (by creating another transaction first if needed) and
+// thus the transaction does not need to be spent for the transaction builder
+// to be able to use any refunds.
 type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
@@ -100,6 +114,11 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the miner pool, but is also returned.
+//
+// TODO: Since the style of FundTransaction has changed to work with untrusted
+// parties, SpendCoins has actually become inefficient, creating 2 transactions
+// and extra outputs where something slimmer would do the same job just as
+// well.
 func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
 	output := consensus.SiacoinOutput{
