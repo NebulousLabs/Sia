@@ -18,6 +18,7 @@ var (
 type Gateway struct {
 	tcps  *network.TCPServer
 	state *consensus.State
+	tpool modules.TransactionPool
 
 	peers map[network.Address]struct{}
 
@@ -54,16 +55,26 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 	return
 }
 
-// RelayBlock relays a block to the network.
-func (g *Gateway) RelayBlock(b consensus.Block) error {
+// RelayBlock relays a block, both locally and to the network.
+// RelayBlock is called by Miners.
+func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
+	err = g.state.AcceptBlock(b)
+	if err != nil {
+		return
+	}
 	g.broadcast("RelayBlock", b, nil)
-	return nil
+	return
 }
 
-// RelayTransaction relays a transaction to the network.
-func (g *Gateway) RelayTransaction(t consensus.Transaction) error {
+// RelayTransaction relays a transaction, both locally and to the network.
+// RelayTransaction is called by Wallets.
+func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
+	err = g.tpool.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
 	g.broadcast("RelayTransaction", t, nil)
-	return nil
+	return
 }
 
 // SharePeers returns up to 10 randomly selected peers.
@@ -112,10 +123,11 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(tcps *network.TCPServer, s *consensus.State) *Gateway {
+func New(tcps *network.TCPServer, s *consensus.State, tp modules.TransactionPool) *Gateway {
 	return &Gateway{
 		tcps:  tcps,
 		state: s,
+		tpool: tp,
 		peers: make(map[network.Address]struct{}),
 	}
 }

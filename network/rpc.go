@@ -71,14 +71,6 @@ func (na *Address) RPC(name string, arg, resp interface{}) error {
 	})
 }
 
-// Broadcast calls the RPC on each peer in the address book.
-func (tcps *TCPServer) Broadcast(name string, arg, resp interface{}) {
-	for _, addr := range tcps.AddressBook() {
-		// TODO: remove unresponsive peers
-		_ = addr.RPC(name, arg, resp)
-	}
-}
-
 // RegisterRPC registers a function as an RPC handler for a given identifier.
 // The function must be one of four possible types:
 //     func(net.Conn) error

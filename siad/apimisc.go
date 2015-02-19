@@ -46,14 +46,11 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
-	// TODO: don't spawn multiple CatchUps
-	peer, err := d.network.RandomPeer()
+	err := d.gateway.Synchronize()
 	if err != nil {
 		writeError(w, "No peers available for syncing", 500)
 		return
 	}
-
-	go d.CatchUp(peer)
 
 	writeSuccess(w)
 }

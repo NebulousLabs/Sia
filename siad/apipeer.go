@@ -8,7 +8,7 @@ import (
 
 func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 	addr := network.Address(req.FormValue("addr"))
-	err := d.network.AddPeer(addr)
+	err := d.gateway.AddPeer(addr)
 	if err != nil {
 		writeError(w, err.Error(), 400)
 		return
@@ -19,7 +19,7 @@ func (d *daemon) peerAddHandler(w http.ResponseWriter, req *http.Request) {
 
 func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 	addr := network.Address(req.FormValue("addr"))
-	err := d.network.RemovePeer(addr)
+	err := d.gateway.RemovePeer(addr)
 	if err != nil {
 		writeError(w, err.Error(), 400)
 		return
@@ -29,5 +29,5 @@ func (d *daemon) peerRemoveHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) peerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.network.AddressBook())
+	writeJSON(w, d.gateway.Info())
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
@@ -43,6 +44,7 @@ type daemon struct {
 	host    *host.Host
 	hostDB  *hostdb.HostDB
 	renter  *renter.Renter
+	gateway *gateway.Gateway
 
 	styleDir    string
 	downloadDir string
@@ -83,18 +85,23 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
+	d.gateway = gateway.New(d.network, d.state, d.tpool)
 
 	// register RPC handlers
 	// TODO: register all RPCs in a separate function
-	err = d.network.RegisterRPC("AcceptBlock", d.state.AcceptBlock)
+	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
 	if err != nil {
 		return
 	}
-	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
+	err = d.network.RegisterRPC("RelayTransaction", d.gateway.RelayTransaction)
 	if err != nil {
 		return
 	}
-	err = d.network.RegisterRPC("SendBlocks", d.SendBlocks)
+	err = d.network.RegisterRPC("AddMe", d.gateway.AddMe)
+	if err != nil {
+		return
+	}
+	err = d.network.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
 	if err != nil {
 		return
 	}
