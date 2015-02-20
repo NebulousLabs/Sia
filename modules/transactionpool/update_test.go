@@ -25,10 +25,7 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	// TODO: Add all other types of transactions.
 
 	// Mine a block that has the transactions.
-	b, err := tpt.assistant.MineCurrentBlock(tset)
-	if err != nil {
-		tpt.assistant.Error(err)
-	}
+	b := tpt.assistant.MineCurrentBlock(tset)
 	err = tpt.assistant.AcceptBlock(b)
 	if err != nil {
 		tpt.assistant.Error(err)
@@ -100,10 +97,7 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	conflictTxn.SiacoinOutputs = nil
 
 	// Mine a block with the conflict transaction and put it in the state.
-	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{conflictTxn})
-	if err != nil {
-		tpt.assistant.Error(err)
-	}
+	block := tpt.assistant.MineCurrentBlock([]consensus.Transaction{conflictTxn})
 	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
 		tpt.assistant.Error(err)
@@ -139,10 +133,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	parentTxn, dependentTxn := tpt.addDependentSiacoinTransactionToPool()
 
 	// Mine a block with the parent transaction but not the dependent.
-	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{parentTxn})
-	if err != nil {
-		tpt.assistant.Error(err)
-	}
+	block := tpt.assistant.MineCurrentBlock([]consensus.Transaction{parentTxn})
 	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
 		tpt.assistant.Error(err)
@@ -179,10 +170,7 @@ func (tpt *tpoolTester) testRewinding() {
 	sci, value := tpt.assistant.FindSpendableSiacoinInput()
 	txn := tpt.assistant.AddSiacoinInputToTransaction(consensus.Transaction{}, sci)
 	txn.MinerFees = append(txn.MinerFees, value)
-	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
-	if err != nil {
-		tpt.assistant.Error(err)
-	}
+	block := tpt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
 	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
 		tpt.assistant.Error(err)

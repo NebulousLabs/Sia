@@ -11,20 +11,14 @@ import (
 // rejected.
 func (ct *ConsensusTester) testBlockTimestamps() {
 	// Create a block with a timestamp that is too early.
-	block, err := MineTestingBlock(ct.CurrentBlock().ID(), ct.EarliestTimestamp()-1, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := MineTestingBlock(ct.CurrentBlock().ID(), ct.EarliestTimestamp()-1, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
+	err := ct.AcceptBlock(block)
 	if err != ErrEarlyTimestamp {
 		ct.Error("unexpected error when submitting a too early timestamp:", err)
 	}
 
 	// Create a block with a timestamp that is too late.
-	block, err = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp()+10+FutureThreshold, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
-	if err != nil {
-		ct.Fatal(err)
-	}
+	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp()+10+FutureThreshold, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
 	err = ct.AcceptBlock(block)
 	if err != ErrFutureTimestamp {
 		ct.Error("unexpected error when submitting a too-early timestamp:", err)
@@ -89,11 +83,8 @@ func (ct *ConsensusTester) testLargeBlock() {
 	}
 
 	// Mine and submit a block, checking for the too large error.
-	block, err := ct.MineCurrentBlock(txns)
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := ct.MineCurrentBlock(txns)
+	err := ct.AcceptBlock(block)
 	if err != ErrLargeBlock {
 		ct.Error(err)
 	}
@@ -106,11 +97,8 @@ func (ct *ConsensusTester) testSingleNoFeePayout() {
 	// before and after state hashes to see that they match.
 	beforeHash := ct.StateHash()
 	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(ct.Height()), UnlockHash: ZeroUnlockHash}}
-	block, err := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
+	err := ct.AcceptBlock(block)
 	if err != ErrMinerPayout {
 		ct.Error("Expecting miner payout error:", err)
 	}
@@ -122,10 +110,7 @@ func (ct *ConsensusTester) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
 	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(ct.Height() + 1), UnlockHash: ZeroUnlockHash}}
-	block, err = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
-	if err != nil {
-		ct.Fatal(err)
-	}
+	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
 	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Error("Expecting nil error:", err)
@@ -155,22 +140,16 @@ func (ct *ConsensusTester) testMultipleFeesMultiplePayouts() {
 	txn.MinerFees = append(txn.MinerFees, value)
 	txn2.MinerFees = append(txn2.MinerFees, value2)
 	payouts := ct.Payouts(ct.Height()+1, []Transaction{txn, txn2})
-	b, err := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn}, ct.CurrentTarget())
-	if err != nil {
-		ct.Error(err)
-	}
-	err = ct.AcceptBlock(b)
+	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn}, ct.CurrentTarget())
+	err := ct.AcceptBlock(block)
 	if err != ErrMinerPayout {
 		ct.Error("Expecting miner payout error:", err)
 	}
 
 	// Mine a block with mutliple fees and a correct payout to multiple
 	// addresses.
-	b, err = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn, txn2}, ct.CurrentTarget())
-	if err != nil {
-		ct.Error(err)
-	}
-	err = ct.AcceptBlock(b)
+	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn, txn2}, ct.CurrentTarget())
+	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Error(err)
 	}
@@ -180,18 +159,15 @@ func (ct *ConsensusTester) testMultipleFeesMultiplePayouts() {
 // the next block and verifies that the block gets rejected.
 func (ct *ConsensusTester) testMissedTarget() {
 	// Mine a block that doesn't meet the target.
-	b, err := ct.MineCurrentBlock(nil)
-	if err != nil {
-		ct.Fatal(err)
+	block := ct.MineCurrentBlock(nil)
+	for block.CheckTarget(ct.CurrentTarget()) && block.Nonce < 1000*1000 {
+		block.Nonce++
 	}
-	for b.CheckTarget(ct.CurrentTarget()) && b.Nonce < 1000*1000 {
-		b.Nonce++
-	}
-	if b.CheckTarget(ct.CurrentTarget()) {
+	if block.CheckTarget(ct.CurrentTarget()) {
 		panic("unable to mine a block with a failing target (lol)")
 	}
 
-	err = ct.AcceptBlock(b)
+	err := ct.AcceptBlock(block)
 	if err != ErrMissedTarget {
 		ct.Error("Block with low target is not being rejected")
 	}
@@ -201,11 +177,8 @@ func (ct *ConsensusTester) testMissedTarget() {
 // block to the state, expecting nothing to change in the consensus set.
 func (ct *ConsensusTester) testRepeatBlock() {
 	// Add a non-repeat block to the state.
-	b, err := ct.MineCurrentBlock(nil)
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(b)
+	block := ct.MineCurrentBlock(nil)
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
@@ -213,7 +186,7 @@ func (ct *ConsensusTester) testRepeatBlock() {
 	// Get the consensus set hash, submit the block, then check that the
 	// consensus set hash hasn't changed.
 	chash := ct.StateHash()
-	err = ct.AcceptBlock(b)
+	err = ct.AcceptBlock(block)
 	if err != ErrBlockKnown {
 		ct.Error("expecting BlockKnownErr, got", err)
 	}
@@ -225,12 +198,9 @@ func (ct *ConsensusTester) testRepeatBlock() {
 // testOrphan submits an orphan block to the state and checks that an orphan
 // error is returned.
 func (ct *ConsensusTester) testOrphan() {
-	b, err := ct.MineCurrentBlock(nil)
-	if err != nil {
-		ct.Fatal(err)
-	}
-	b.ParentID[0]++
-	err = ct.AcceptBlock(b)
+	block := ct.MineCurrentBlock(nil)
+	block.ParentID[0]++
+	err := ct.AcceptBlock(block)
 	if err != ErrOrphan {
 		ct.Error("unexpected error, expecting OrphanErr:", err)
 	}

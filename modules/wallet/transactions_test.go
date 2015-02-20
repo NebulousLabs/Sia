@@ -23,10 +23,7 @@ func (wt *walletTester) testFundTransaction() {
 		UnlockHash: unlockConds.UnlockHash(),
 	}
 	walletFunderTxn.SiacoinOutputs = append(walletFunderTxn.SiacoinOutputs, walletFunderOutput)
-	block, err := wt.MineCurrentBlock([]consensus.Transaction{walletFunderTxn})
-	if err != nil {
-		wt.Fatal(err)
-	}
+	block := wt.MineCurrentBlock([]consensus.Transaction{walletFunderTxn})
 	err = wt.State.AcceptBlock(block)
 	if err != nil {
 		wt.Fatal(err)
@@ -72,10 +69,7 @@ func (wt *walletTester) testFundTransaction() {
 	if err != nil {
 		wt.Error(err)
 	}
-	block, err = wt.MineCurrentBlock(txns)
-	if err != nil {
-		wt.Error(err)
-	}
+	block = wt.MineCurrentBlock(txns)
 	err = wt.State.AcceptBlock(block)
 	if err != nil {
 		wt.Error(err)

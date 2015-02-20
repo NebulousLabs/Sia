@@ -16,10 +16,7 @@ func (tpt *tpoolTester) testTransactionDumping() {
 
 	// Add the transaction set to a block and check that it is valid in the
 	// state by adding it to the state.
-	b, err := tpt.assistant.MineCurrentBlock(tset)
-	if err != nil {
-		tpt.assistant.Error(err)
-	}
+	b := tpt.assistant.MineCurrentBlock(tset)
 	err = tpt.assistant.State.AcceptBlock(b)
 	if err != nil {
 		tpt.assistant.Error(err)

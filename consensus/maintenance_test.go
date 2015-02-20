@@ -8,19 +8,13 @@ import (
 // then checks that the payouts were added.
 func (ct *ConsensusTester) testApplyMissedProof() {
 	txn, _ := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
-	block, err := ct.MineCurrentBlock([]Transaction{txn})
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := ct.MineCurrentBlock([]Transaction{txn})
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		block, err = ct.MineCurrentBlock(nil)
-		if err != nil {
-			ct.Fatal(err)
-		}
+		block = ct.MineCurrentBlock(nil)
 		err = ct.AcceptBlock(block)
 		if err != nil {
 			ct.Fatal(err)

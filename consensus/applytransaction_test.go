@@ -13,11 +13,8 @@ import (
 func (ct *ConsensusTester) testApplySiacoinOutput() {
 	// Grab a transcation with a siacoin output and put it into the blockchain.
 	txn := ct.SiacoinOutputTransaction()
-	block, err := ct.MineCurrentBlock([]Transaction{txn})
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := ct.MineCurrentBlock([]Transaction{txn})
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
@@ -35,11 +32,8 @@ func (ct *ConsensusTester) testApplySiacoinOutput() {
 func (ct *ConsensusTester) testApplyFileContract() {
 	// Grab a transction with a file contract and put it into the blockchain.
 	txn, _ := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
-	block, err := ct.MineCurrentBlock([]Transaction{txn})
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := ct.MineCurrentBlock([]Transaction{txn})
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
@@ -58,22 +52,16 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	// Grab a transction with a file contract and put it into the blockchain.
 	fcTxn, file := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
 	fcid := fcTxn.FileContractID(0)
-	block, err := ct.MineCurrentBlock([]Transaction{fcTxn})
-	if err != nil {
-		ct.Fatal(err)
-	}
-	err = ct.AcceptBlock(block)
+	block := ct.MineCurrentBlock([]Transaction{fcTxn})
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
 
 	// Mine blocks until the file contract is active.
 	for ct.Height() < fcTxn.FileContracts[0].Start {
-		block, err := ct.MineCurrentBlock(nil)
-		if err != nil {
-			ct.Fatal(err)
-		}
-		err = ct.AcceptBlock(block)
+		block := ct.MineCurrentBlock(nil)
+		err := ct.AcceptBlock(block)
 		if err != nil {
 			ct.Fatal(err)
 		}
@@ -94,10 +82,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	// Put the storage proof in the blockchain.
 	proofTxn := Transaction{}
 	proofTxn.StorageProofs = append(proofTxn.StorageProofs, sp)
-	block, err = ct.MineCurrentBlock([]Transaction{proofTxn})
-	if err != nil {
-		ct.Fatal(err)
-	}
+	block = ct.MineCurrentBlock([]Transaction{proofTxn})
 	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)

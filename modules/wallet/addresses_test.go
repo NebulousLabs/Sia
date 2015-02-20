@@ -23,10 +23,7 @@ func (wt *walletTester) testCoinAddress() {
 		Value:      value,
 		UnlockHash: walletAddress,
 	})
-	block, err := wt.MineCurrentBlock([]consensus.Transaction{txn})
-	if err != nil {
-		wt.Fatal(err)
-	}
+	block := wt.MineCurrentBlock([]consensus.Transaction{txn})
 	err = wt.State.AcceptBlock(block)
 	if err != nil {
 		wt.Fatal(err)

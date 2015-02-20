@@ -24,11 +24,8 @@ func TestCeilingTarget(t *testing.T) {
 	ct := NewConsensusTester(t, s)
 
 	for i := 0; i < 20; i++ {
-		b, err := ct.MineCurrentBlock(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s.AcceptBlock(b)
+		block := ct.MineCurrentBlock(nil)
+		err := s.AcceptBlock(block)
 		if err != nil {
 			t.Fatal(err)
 		}

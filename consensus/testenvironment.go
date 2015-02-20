@@ -7,9 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// TODO: MineTestingBlock doesn't need to return an error, which means a lot of
-// the error checking isn't needed.
-
 // TODO: Add MineAndSubmitCurrentBlock, which mines the current block and calls
 // accept block, checking for err = nil.
 
@@ -29,7 +26,7 @@ type ConsensusTester struct {
 
 // MineTestingBlock accepts a bunch of parameters for a block and then grinds
 // blocks until a block with the appropriate target is found.
-func MineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []SiacoinOutput, txns []Transaction, target Target) (b Block, err error) {
+func MineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []SiacoinOutput, txns []Transaction, target Target) (b Block) {
 	b = Block{
 		ParentID:     parent,
 		Timestamp:    timestamp,
@@ -48,7 +45,7 @@ func MineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Siacoi
 
 // MineCurrentBlock is a shortcut function that calls MineTestingBlock using
 // variables that satisfy the current state.
-func (ct *ConsensusTester) MineCurrentBlock(txns []Transaction) (b Block, err error) {
+func (ct *ConsensusTester) MineCurrentBlock(txns []Transaction) (b Block) {
 	minerPayouts := ct.Payouts(ct.Height()+1, txns)
 	return MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, ct.CurrentTarget())
 }
@@ -82,18 +79,11 @@ func (ct *ConsensusTester) Payouts(height BlockHeight, txns []Transaction) (payo
 // addresses that the assistant can spend, which will give the assistant a good
 // volume of outputs to draw on for testing.
 func (ct *ConsensusTester) MineAndApplyValidBlock() (block Block) {
-	// Mine the block.
-	block, err := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
+	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
+	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
 	}
-
-	// Submit the block to the state.
-	err = ct.AcceptBlock(block)
-	if err != nil {
-		ct.Fatal(err)
-	}
-
 	return
 }
 

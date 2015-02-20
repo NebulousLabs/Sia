@@ -21,23 +21,17 @@ func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []Blo
 	txn.Signatures[0].Signature = Signature(byteSig)
 
 	// Mine a block with this transcation.
-	b, err := ct.MineCurrentBlock([]Transaction{txn})
-	if err != nil {
-		ct.Fatal(err)
-	}
-	blocks = append(blocks, b)
+	block := ct.MineCurrentBlock([]Transaction{txn})
+	blocks = append(blocks, block)
 
 	// Mine several more blocks.
-	recentID := b.ID()
+	recentID := block.ID()
 	for i := 0; i < depth; i++ {
 		intTarget := ct.CurrentTarget().Int()
 		safeIntTarget := intTarget.Div(intTarget, big.NewInt(2))
-		b, err = MineTestingBlock(recentID, CurrentTimestamp(), ct.Payouts(ct.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
-		if err != nil {
-			ct.Fatal(err)
-		}
-		blocks = append(blocks, b)
-		recentID = b.ID()
+		block = MineTestingBlock(recentID, CurrentTimestamp(), ct.Payouts(ct.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
+		blocks = append(blocks, block)
+		recentID = block.ID()
 	}
 
 	return
@@ -70,26 +64,20 @@ func TestComplexForking(t *testing.T) {
 
 	// Get state1 and state2 on different forks, s3 will follow s1 at this
 	// point.
-	b1, err := MineTestingBlock(s1.CurrentBlock().ID(), time, a1.Payouts(s1.Height()+1, nil), nil, s1.CurrentTarget())
+	block1 := MineTestingBlock(s1.CurrentBlock().ID(), time, a1.Payouts(s1.Height()+1, nil), nil, s1.CurrentTarget())
+	err := s1.AcceptBlock(block1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = s1.AcceptBlock(b1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b2, err := MineTestingBlock(s2.CurrentBlock().ID(), time+1, a2.Payouts(s2.Height()+1, nil), nil, s2.CurrentTarget())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s2.AcceptBlock(b2)
+	block2 := MineTestingBlock(s2.CurrentBlock().ID(), time+1, a2.Payouts(s2.Height()+1, nil), nil, s2.CurrentTarget())
+	err = s2.AcceptBlock(block2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s1.StateHash() == s2.StateHash() {
 		t.Fatal("failed to get states on different forks")
 	}
-	err = s3.AcceptBlock(b1)
+	err = s3.AcceptBlock(block1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,25 +85,19 @@ func TestComplexForking(t *testing.T) {
 	// Mine several blocks on each state.
 	for i := 0; i < 2; i++ {
 		// state 1 mining.
-		b1, err = a1.MineCurrentBlock(nil)
+		block1 = a1.MineCurrentBlock(nil)
+		err = s1.AcceptBlock(block1)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = s1.AcceptBlock(b1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s3.AcceptBlock(b1)
+		err = s3.AcceptBlock(block1)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// state 2 mining.
-		b2, err = a2.MineCurrentBlock(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s2.AcceptBlock(b2)
+		block2 = a2.MineCurrentBlock(nil)
+		err = s2.AcceptBlock(block2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,11 +112,8 @@ func TestComplexForking(t *testing.T) {
 	// Put state2 ahead of state1 and then give all of the state2 blocks to
 	// state1, causing state1 to fork. State3 is left alone.
 	for i := 0; i < 2; i++ {
-		b2, err = a2.MineCurrentBlock(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s2.AcceptBlock(b2)
+		block2 = a2.MineCurrentBlock(nil)
+		err = s2.AcceptBlock(block2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,11 +147,8 @@ func TestComplexForking(t *testing.T) {
 	// the previous fork.
 	s3InitialHeight := s3.Height()
 	for i := 0; i < 4; i++ {
-		b3, err := a3.MineCurrentBlock(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s3.AcceptBlock(b3)
+		block3 := a3.MineCurrentBlock(nil)
+		err = s3.AcceptBlock(block3)
 		if err != nil {
 			t.Fatal(err)
 		}
