@@ -65,11 +65,12 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.wallet, err = wallet.New(d.state, d.tpool, config.WalletDir)
+	d.gateway = gateway.New(d.network, d.state, d.tpool)
+	d.wallet, err = wallet.New(d.state, d.tpool, d.gateway, config.WalletDir)
 	if err != nil {
 		return
 	}
-	d.miner, err = miner.New(d.state, d.tpool, d.wallet)
+	d.miner, err = miner.New(d.state, d.tpool, d.wallet, d.gateway)
 	if err != nil {
 		return
 	}
@@ -85,7 +86,6 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.gateway = gateway.New(d.network, d.state, d.tpool)
 
 	// register RPC handlers
 	// TODO: register all RPCs in a separate function
