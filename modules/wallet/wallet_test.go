@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 )
 
@@ -19,7 +20,8 @@ func newWalletTester(t *testing.T) (wt *walletTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.Wallet, err = New(wt.State, tpool, "")
+	gateway := gateway.New(nil, wt.assistant.State, tpool)
+	wt.wallet, err = New(wt.assistant.State, tpool, gateway, "")
 	if err != nil {
 		t.Fatal(err)
 	}

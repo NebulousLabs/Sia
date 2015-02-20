@@ -35,7 +35,7 @@ test-long: clean fmt REBUILD
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
-coverpackages = consensus crypto encoding modules/hostdb modules/miner modules/transactionpool modules/wallet network siad
+coverpackages = consensus crypto encoding modules/hostdb modules/miner modules/transactionpool modules/wallet modules/gateway network siad
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \

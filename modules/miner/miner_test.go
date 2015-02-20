@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
@@ -17,11 +18,12 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wallet, err := wallet.New(state, tpool, "")
+	gateway := gateway.New(nil, state, tpool)
+	wallet, err := wallet.New(state, tpool, gateway, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	miner, err := New(state, tpool, wallet)
+	miner, err := New(state, tpool, wallet, gateway)
 	if err != nil {
 		t.Fatal(err)
 	}
