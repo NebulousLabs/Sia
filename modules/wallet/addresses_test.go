@@ -13,7 +13,7 @@ func (wt *walletTester) testCoinAddress() {
 	// Get an address.
 	walletAddress, _, err := wt.CoinAddress()
 	if err != nil {
-		wt.Tester.Fatal(err)
+		wt.Fatal(err)
 	}
 
 	// Send coins to the address, in a mined block.
@@ -25,16 +25,16 @@ func (wt *walletTester) testCoinAddress() {
 	})
 	block, err := wt.MineCurrentBlock([]consensus.Transaction{txn})
 	if err != nil {
-		wt.Tester.Fatal(err)
+		wt.Fatal(err)
 	}
 	err = wt.State.AcceptBlock(block)
 	if err != nil {
-		wt.Tester.Fatal(err)
+		wt.Fatal(err)
 	}
 
 	// Check that the wallet sees the coins.
 	if wt.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
-		wt.Tester.Error("wallet didn't get the coins sent to it.")
+		wt.Error("wallet didn't get the coins sent to it.")
 	}
 }
 

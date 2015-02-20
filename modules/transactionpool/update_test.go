@@ -16,10 +16,10 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	tpt.addDependentSiacoinTransactionToPool()
 	tset, err := tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) == 0 {
-		tpt.assistant.Tester.Error("tset should have some transacitons")
+		tpt.assistant.Error("tset should have some transacitons")
 	}
 
 	// TODO: Add all other types of transactions.
@@ -27,53 +27,53 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	// Mine a block that has the transactions.
 	b, err := tpt.assistant.MineCurrentBlock(tset)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
-	err = tpt.assistant.State.AcceptBlock(b)
+	err = tpt.assistant.AcceptBlock(b)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	// Call update and verify that the new transaction set is empty.
 	tpt.transactionPool.update()
 	tset, err = tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.assistant.Tester.Error("tset should not have any transactions")
+		tpt.assistant.Error("tset should not have any transactions")
 	}
 
 	// Check that all of the internal maps are also empty.
 	if len(tpt.transactionPool.transactions) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.siacoinOutputs) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.fileContracts) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.siafundOutputs) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.usedSiacoinOutputs) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.newFileContracts) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.newFileContracts) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.fileContractTerminations) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.storageProofs) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.transactionPool.usedSiafundOutputs) != 0 {
-		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+		tpt.assistant.Error("a field wasn't properly emptied out")
 	}
 }
 
@@ -86,10 +86,10 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+		tpt.assistant.Error("need tset length to be 0 for this test")
 	}
 
 	// Put two transactions, a parent and a dependent, into the transaction
@@ -102,11 +102,11 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	// Mine a block with the conflict transaction and put it in the state.
 	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{conflictTxn})
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
-	err = tpt.assistant.State.AcceptBlock(block)
+	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	// Update the transaction pool and check that both the parent and dependent
@@ -115,10 +115,10 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	tpt.transactionPool.update()
 	tset, err = tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.assistant.Tester.Error("conflict transactions not all cleared from transaction pool")
+		tpt.assistant.Error("conflict transactions not all cleared from transaction pool")
 	}
 }
 
@@ -130,10 +130,10 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+		tpt.assistant.Error("need tset length to be 0 for this test")
 	}
 
 	parentTxn, dependentTxn := tpt.addDependentSiacoinTransactionToPool()
@@ -141,11 +141,11 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	// Mine a block with the parent transaction but not the dependent.
 	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{parentTxn})
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
-	err = tpt.assistant.State.AcceptBlock(block)
+	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	// Update the transaction pool and check that only the dependent
@@ -153,13 +153,13 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	tpt.transactionPool.update()
 	tset, err = tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 1 {
-		tpt.assistant.Tester.Error("conflict transactions not all cleared from transaction pool")
+		tpt.assistant.Error("conflict transactions not all cleared from transaction pool")
 	}
 	if crypto.HashObject(tset[0]) != crypto.HashObject(dependentTxn) {
-		tpt.assistant.Tester.Error("dependent transaction is not the transaction that remains")
+		tpt.assistant.Error("dependent transaction is not the transaction that remains")
 	}
 }
 
@@ -169,10 +169,10 @@ func (tpt *tpoolTester) testRewinding() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.assistant.Tester.Error("need tset length to be 0 for this test")
+		tpt.assistant.Error("need tset length to be 0 for this test")
 	}
 
 	// Mine a block with a transaction.
@@ -181,11 +181,11 @@ func (tpt *tpoolTester) testRewinding() {
 	txn.MinerFees = append(txn.MinerFees, value)
 	block, err := tpt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
-	err = tpt.assistant.State.AcceptBlock(block)
+	err = tpt.assistant.AcceptBlock(block)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	// Rewind the block, update the transaction pool, and check that the
@@ -195,13 +195,13 @@ func (tpt *tpoolTester) testRewinding() {
 	tpt.transactionPool.update()
 	tset, err = tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	if len(tset) != 1 {
-		tpt.assistant.Tester.Fatal("expecting new transaction after rewind")
+		tpt.assistant.Fatal("expecting new transaction after rewind")
 	}
 	if crypto.HashObject(tset[0]) != crypto.HashObject(txn) {
-		tpt.assistant.Tester.Error("dependent transaction is not the transaction that remains")
+		tpt.assistant.Error("dependent transaction is not the transaction that remains")
 	}
 }
 

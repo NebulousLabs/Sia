@@ -14,7 +14,7 @@ func (tpt *tpoolTester) addConflictingSiacoinTransactionToPool() {
 	// Try to add the same transaction to the transaction pool.
 	err := tpt.transactionPool.AcceptTransaction(txn)
 	if err != ErrDoubleSpend {
-		tpt.assistant.Tester.Fatal(err)
+		tpt.assistant.Fatal(err)
 	}
 }
 

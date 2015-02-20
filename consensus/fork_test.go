@@ -10,9 +10,9 @@ import (
 // mineInvalidSignatureBlock will mine a block that is valid on the longest
 // fork except for having an illegal signature, and then will mine `i` more
 // blocks after that which are valid.
-func (a *Assistant) MineInvalidSignatureBlockSet(depth int) (blocks []Block) {
-	siacoinInput, value := a.FindSpendableSiacoinInput()
-	txn := a.AddSiacoinInputToTransaction(Transaction{}, siacoinInput)
+func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []Block) {
+	siacoinInput, value := ct.FindSpendableSiacoinInput()
+	txn := ct.AddSiacoinInputToTransaction(Transaction{}, siacoinInput)
 	txn.MinerFees = append(txn.MinerFees, value)
 
 	// Invalidate the signature.
@@ -21,20 +21,20 @@ func (a *Assistant) MineInvalidSignatureBlockSet(depth int) (blocks []Block) {
 	txn.Signatures[0].Signature = Signature(byteSig)
 
 	// Mine a block with this transcation.
-	b, err := a.MineCurrentBlock([]Transaction{txn})
+	b, err := ct.MineCurrentBlock([]Transaction{txn})
 	if err != nil {
-		a.Tester.Fatal(err)
+		ct.Fatal(err)
 	}
 	blocks = append(blocks, b)
 
 	// Mine several more blocks.
 	recentID := b.ID()
 	for i := 0; i < depth; i++ {
-		intTarget := a.State.CurrentTarget().Int()
+		intTarget := ct.CurrentTarget().Int()
 		safeIntTarget := intTarget.Div(intTarget, big.NewInt(2))
-		b, err = MineTestingBlock(recentID, CurrentTimestamp(), a.Payouts(a.State.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
+		b, err = MineTestingBlock(recentID, CurrentTimestamp(), ct.Payouts(ct.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
 		if err != nil {
-			a.Tester.Fatal(err)
+			ct.Fatal(err)
 		}
 		blocks = append(blocks, b)
 		recentID = b.ID()
@@ -56,9 +56,9 @@ func TestComplexForking(t *testing.T) {
 	s1 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
 	s2 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
 	s3 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
-	a1 := NewAssistant(t, s1)
-	a2 := NewAssistant(t, s2)
-	a3 := NewAssistant(t, s3)
+	a1 := NewConsensusTester(t, s1)
+	a2 := NewConsensusTester(t, s2)
+	a3 := NewConsensusTester(t, s3)
 
 	// Verify that the three states have the same initial hash.
 	if s1.StateHash() != s2.StateHash() {

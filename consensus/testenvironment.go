@@ -13,13 +13,12 @@ import (
 // TODO: Add MineAndSubmitCurrentBlock, which mines the current block and calls
 // accept block, checking for err = nil.
 
-// An Assistant keeps track of addresses and contracts and whatnot to help with
-// testing. There are also helper functions for mining blocks and cobbling
-// together transactions. It's designed to be simple, and it's not very smart
-// or efficient.
-type Assistant struct {
-	State  *State
-	Tester *testing.T
+// A ConsensusTester holds a state and a testing object as well as some minimal
+// and simplistic features for performing actions such as mining and building
+// transactions.
+type ConsensusTester struct {
+	*State
+	*testing.T
 
 	UnlockConditions UnlockConditions
 	UnlockHash       UnlockHash
@@ -49,15 +48,15 @@ func MineTestingBlock(parent BlockID, timestamp Timestamp, minerPayouts []Siacoi
 
 // MineCurrentBlock is a shortcut function that calls MineTestingBlock using
 // variables that satisfy the current state.
-func (a *Assistant) MineCurrentBlock(txns []Transaction) (b Block, err error) {
-	minerPayouts := a.Payouts(a.State.Height()+1, txns)
-	return MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, a.State.CurrentTarget())
+func (ct *ConsensusTester) MineCurrentBlock(txns []Transaction) (b Block, err error) {
+	minerPayouts := ct.Payouts(ct.Height()+1, txns)
+	return MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, ct.CurrentTarget())
 }
 
 // Payouts returns a block with 12 payouts worth 1e6 and a final payout that
 // makes the total payout amount add up correctly. This produces a large set of
 // outputs that can be used for testing.
-func (a *Assistant) Payouts(height BlockHeight, txns []Transaction) (payouts []SiacoinOutput) {
+func (ct *ConsensusTester) Payouts(height BlockHeight, txns []Transaction) (payouts []SiacoinOutput) {
 	var feeTotal Currency
 	for _, txn := range txns {
 		for _, fee := range txn.MinerFees {
@@ -72,9 +71,9 @@ func (a *Assistant) Payouts(height BlockHeight, txns []Transaction) (payouts []S
 	// 'remainder' payout.
 	for i := 0; i < 12; i++ {
 		valueRemaining = valueRemaining.Sub(NewCurrency64(1e6))
-		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), UnlockHash: a.UnlockHash})
+		payouts = append(payouts, SiacoinOutput{Value: NewCurrency64(1e6), UnlockHash: ct.UnlockHash})
 	}
-	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, UnlockHash: a.UnlockHash})
+	payouts = append(payouts, SiacoinOutput{Value: valueRemaining, UnlockHash: ct.UnlockHash})
 
 	return
 }
@@ -82,30 +81,30 @@ func (a *Assistant) Payouts(height BlockHeight, txns []Transaction) (payouts []S
 // MineAndApplyValidBlock mines a block and sets a handful of payouts to
 // addresses that the assistant can spend, which will give the assistant a good
 // volume of outputs to draw on for testing.
-func (a *Assistant) MineAndApplyValidBlock() (block Block) {
+func (ct *ConsensusTester) MineAndApplyValidBlock() (block Block) {
 	// Mine the block.
-	block, err := MineTestingBlock(a.State.CurrentBlock().ID(), CurrentTimestamp(), a.Payouts(a.State.Height()+1, nil), nil, a.State.CurrentTarget())
+	block, err := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
 	if err != nil {
-		a.Tester.Fatal(err)
+		ct.Fatal(err)
 	}
 
 	// Submit the block to the state.
-	err = a.State.AcceptBlock(block)
+	err = ct.AcceptBlock(block)
 	if err != nil {
-		a.Tester.Fatal(err)
+		ct.Fatal(err)
 	}
 
 	return
 }
 
 // RewindABlock removes the most recent block from the consensus set.
-func (a *Assistant) RewindABlock() {
-	bn := a.State.currentBlockNode()
-	a.State.commitDiffSet(bn, DiffRevert)
+func (ct *ConsensusTester) RewindABlock() {
+	bn := ct.currentBlockNode()
+	ct.commitDiffSet(bn, DiffRevert)
 }
 
-// NewAssistant returns an assistant that's ready to help with testing.
-func NewAssistant(t *testing.T, s *State) *Assistant {
+// NewConsensusTester returns an assistant that's ready to help with testing.
+func NewConsensusTester(t *testing.T, s *State) (ct *ConsensusTester) {
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -119,29 +118,30 @@ func NewAssistant(t *testing.T, s *State) *Assistant {
 			},
 		},
 	}
-	return &Assistant{
-		State:            s,
-		Tester:           t,
+	ct = &ConsensusTester{
 		UnlockConditions: uc,
 		UnlockHash:       uc.UnlockHash(),
 		SecretKey:        sk,
 
 		usedOutputs: make(map[SiacoinOutputID]struct{}),
 	}
+	ct.State = s
+	ct.T = t
+	return
 }
 
 // NewTestingEnvironment creates a state and an assistant that wraps around the
 // state, then mines enough blocks that the assistant has outputs ready to
 // spend.
-func NewTestingEnvironment(t *testing.T) (a *Assistant) {
+func NewTestingEnvironment(t *testing.T) (ct *ConsensusTester) {
 	// Get the state and assistant.
 	s := CreateGenesisState()
-	a = NewAssistant(t, s)
+	ct = NewConsensusTester(t, s)
 
 	// Mine enough blocks that the first miner payouts come to maturity. The
 	// assistant will then be ready to spend at least a few outputs.
 	for i := 0; i <= MaturityDelay; i++ {
-		a.MineAndApplyValidBlock()
+		ct.MineAndApplyValidBlock()
 	}
 
 	return

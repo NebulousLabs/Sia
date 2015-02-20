@@ -11,7 +11,7 @@ import (
 // a tpoolTester contains a testing assistant and a transaction pool, and
 // provides statefullness for doing testing.
 type tpoolTester struct {
-	assistant       *consensus.Assistant
+	assistant       *consensus.ConsensusTester
 	transactionPool *TransactionPool
 }
 

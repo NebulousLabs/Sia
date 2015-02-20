@@ -11,18 +11,18 @@ func (tpt *tpoolTester) testTransactionDumping() {
 	// Get the transaction set.
 	tset, err := tpt.transactionPool.TransactionSet()
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	// Add the transaction set to a block and check that it is valid in the
 	// state by adding it to the state.
 	b, err := tpt.assistant.MineCurrentBlock(tset)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 	err = tpt.assistant.State.AcceptBlock(b)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 }
 
@@ -41,7 +41,7 @@ func (tpt *tpoolTester) testUnconfirmedSiacoinOutputDiffs() {
 	tpt.addDependentSiacoinTransactionToPool()
 	diffs := tpt.transactionPool.UnconfirmedSiacoinOutputDiffs()
 	if len(diffs) != 3 {
-		tpt.assistant.Tester.Error("wrong number of diffs")
+		tpt.assistant.Error("wrong number of diffs")
 	}
 }
 

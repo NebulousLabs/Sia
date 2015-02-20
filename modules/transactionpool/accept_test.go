@@ -28,7 +28,7 @@ func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction
 	// Put the transaction into the transaction pool.
 	err := tpt.transactionPool.AcceptTransaction(txn)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	return
@@ -50,7 +50,7 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 
 	err := tpt.transactionPool.AcceptTransaction(dependentTxn)
 	if err != nil {
-		tpt.assistant.Tester.Error(err)
+		tpt.assistant.Error(err)
 	}
 
 	return
