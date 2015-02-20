@@ -115,6 +115,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 					panic(err)
 				}
 			}
+			m.gateway.RelayBlock(b)
 
 			solved = true
 

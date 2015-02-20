@@ -37,6 +37,7 @@ const (
 type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
+	gateway          modules.Gateway
 	recentBlock      consensus.BlockID
 	unconfirmedDiffs []consensus.SiacoinOutputDiff
 
@@ -73,7 +74,7 @@ type Wallet struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(state *consensus.State, tpool modules.TransactionPool, filename string) (w *Wallet, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, gateway modules.Gateway, filename string) (w *Wallet, err error) {
 	if state == nil {
 		err = errors.New("wallet cannot use a nil state")
 		return
@@ -93,6 +94,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 	w = &Wallet{
 		state:       state,
 		tpool:       tpool,
+		gateway:     gateway,
 		recentBlock: genesisBlock.ID(),
 
 		filename: filename,
@@ -142,6 +144,10 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash
 		return
 	}
 	err = w.tpool.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
+	err = w.gateway.RelayTransaction(t)
 	if err != nil {
 		return
 	}
