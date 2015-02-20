@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/NebulousLabs/Sia/network"
@@ -20,8 +21,8 @@ func (d *daemon) bootstrap() {
 	// TODO: add more bootstrap peers.
 	err := d.gateway.Bootstrap(BootstrapPeers[0])
 	if err != nil {
-		println("Warning: no peers responded to bootstrap request.")
-		println("Add peers manually to enable bootstrapping.")
+		fmt.Println(`Warning: no peers responded to bootstrap request.
+Add peers manually to enable bootstrapping.`)
 		// TODO: wait for new peers?
 		return
 	}
