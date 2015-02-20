@@ -8,18 +8,18 @@ import (
 )
 
 type walletTester struct {
-	assistant *consensus.Assistant
-	wallet    *Wallet
+	*consensus.Assistant
+	*Wallet
 }
 
 func newWalletTester(t *testing.T) (wt *walletTester) {
 	wt = new(walletTester)
-	wt.assistant = consensus.NewTestingEnvironment(t)
-	tpool, err := transactionpool.New(wt.assistant.State)
+	wt.Assistant = consensus.NewTestingEnvironment(t)
+	tpool, err := transactionpool.New(wt.State)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.wallet, err = New(wt.assistant.State, tpool, "")
+	wt.Wallet, err = New(wt.State, tpool, "")
 	if err != nil {
 		t.Fatal(err)
 	}

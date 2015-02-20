@@ -11,30 +11,30 @@ import (
 // recognizing coins sent to itself.
 func (wt *walletTester) testCoinAddress() {
 	// Get an address.
-	walletAddress, _, err := wt.wallet.CoinAddress()
+	walletAddress, _, err := wt.CoinAddress()
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
 
 	// Send coins to the address, in a mined block.
-	siacoinInput, value := wt.assistant.FindSpendableSiacoinInput()
-	txn := wt.assistant.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinInput)
+	siacoinInput, value := wt.FindSpendableSiacoinInput()
+	txn := wt.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinInput)
 	txn.SiacoinOutputs = append(txn.SiacoinOutputs, consensus.SiacoinOutput{
 		Value:      value,
 		UnlockHash: walletAddress,
 	})
-	block, err := wt.assistant.MineCurrentBlock([]consensus.Transaction{txn})
+	block, err := wt.MineCurrentBlock([]consensus.Transaction{txn})
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	err = wt.assistant.State.AcceptBlock(block)
+	err = wt.State.AcceptBlock(block)
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
 
 	// Check that the wallet sees the coins.
-	if wt.wallet.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
-		wt.assistant.Tester.Error("wallet didn't get the coins sent to it.")
+	if wt.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
+		wt.Tester.Error("wallet didn't get the coins sent to it.")
 	}
 }
 

@@ -11,84 +11,84 @@ import (
 // is created that is valid.
 func (wt *walletTester) testFundTransaction() {
 	// Get a coin address for the wallet and fund the wallet using money from
-	// the assistant.
-	_, unlockConds, err := wt.wallet.CoinAddress()
+	// the
+	_, unlockConds, err := wt.CoinAddress()
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	siacoinOutput, value := wt.assistant.FindSpendableSiacoinInput()
-	walletFunderTxn := wt.assistant.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinOutput)
+	siacoinOutput, value := wt.FindSpendableSiacoinInput()
+	walletFunderTxn := wt.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinOutput)
 	walletFunderOutput := consensus.SiacoinOutput{
 		Value:      value,
 		UnlockHash: unlockConds.UnlockHash(),
 	}
 	walletFunderTxn.SiacoinOutputs = append(walletFunderTxn.SiacoinOutputs, walletFunderOutput)
-	block, err := wt.assistant.MineCurrentBlock([]consensus.Transaction{walletFunderTxn})
+	block, err := wt.MineCurrentBlock([]consensus.Transaction{walletFunderTxn})
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	err = wt.assistant.State.AcceptBlock(block)
+	err = wt.State.AcceptBlock(block)
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	wt.wallet.update()
+	wt.update()
 
 	// Build a transaction that intentionally needs a refund.
-	id, err := wt.wallet.RegisterTransaction(consensus.Transaction{})
+	id, err := wt.RegisterTransaction(consensus.Transaction{})
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	err = wt.wallet.FundTransaction(id, value.Sub(consensus.NewCurrency64(1)))
+	err = wt.FundTransaction(id, value.Sub(consensus.NewCurrency64(1)))
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	err = wt.wallet.AddMinerFee(id, value.Sub(consensus.NewCurrency64(1)))
+	err = wt.AddMinerFee(id, value.Sub(consensus.NewCurrency64(1)))
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	t, err := wt.wallet.SignTransaction(id, true)
+	t, err := wt.SignTransaction(id, true)
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	err = wt.wallet.tpool.AcceptTransaction(t)
+	err = wt.tpool.AcceptTransaction(t)
 	if err != nil {
-		wt.assistant.Tester.Fatal(err)
+		wt.Tester.Fatal(err)
 	}
-	wt.wallet.update()
+	wt.update()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1.
 	if len(t.SiacoinOutputs) != 0 {
-		wt.assistant.Tester.Error("more than zero siacoin outputs created in custom transaction")
+		wt.Tester.Error("more than zero siacoin outputs created in custom transaction")
 	}
-	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
-		wt.assistant.Tester.Error(wt.wallet.Balance(true).MarshalJSON())
-		wt.assistant.Tester.Error("wallet balance not reporting at one?")
+	if wt.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
+		wt.Tester.Error(wt.Balance(true).MarshalJSON())
+		wt.Tester.Error("wallet balance not reporting at one?")
 	}
 
 	// Dump the transaction pool into a block and see that the balance still
 	// registers correctly.
-	txns, err := wt.wallet.tpool.TransactionSet()
+	txns, err := wt.tpool.TransactionSet()
 	if err != nil {
-		wt.assistant.Tester.Error(err)
+		wt.Tester.Error(err)
 	}
-	block, err = wt.assistant.MineCurrentBlock(txns)
+	block, err = wt.MineCurrentBlock(txns)
 	if err != nil {
-		wt.assistant.Tester.Error(err)
+		wt.Tester.Error(err)
 	}
-	err = wt.assistant.State.AcceptBlock(block)
+	err = wt.State.AcceptBlock(block)
 	if err != nil {
-		wt.assistant.Tester.Error(err)
+		wt.Tester.Error(err)
 	}
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1.
 	if len(t.SiacoinOutputs) != 0 {
-		wt.assistant.Tester.Error("more than zero siacoin outputs created in custom transaction")
+		wt.Tester.Error("more than zero siacoin outputs created in custom transaction")
 	}
-	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
-		wt.assistant.Tester.Error(wt.wallet.Balance(true).MarshalJSON())
-		wt.assistant.Tester.Error("wallet balance not reporting at one?")
+	if wt.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
+		wt.Tester.Error(wt.Balance(true).MarshalJSON())
+		wt.Tester.Error("wallet balance not reporting at one?")
 	}
 }
 
