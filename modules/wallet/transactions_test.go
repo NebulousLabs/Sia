@@ -9,7 +9,7 @@ import (
 // testFundTransaction funds and completes a transaction using the
 // build-your-own transaction functions, checking that a no-refund transaction
 // is created that is valid.
-func (wt *walletTester) testFundTransaction() {
+func (wt *WalletTester) testFundTransaction() {
 	// Get a coin address for the wallet and fund the wallet using money from
 	// the
 	_, unlockConds, err := wt.CoinAddress()
@@ -89,6 +89,6 @@ func (wt *walletTester) testFundTransaction() {
 // TestFundTransaction creates a wallet tester and uses it to call
 // testFundTransaction.
 func TestFundTransaction(t *testing.T) {
-	wt := newWalletTester(t)
+	wt := NewWalletTester(t)
 	wt.testFundTransaction()
 }

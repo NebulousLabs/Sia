@@ -9,7 +9,7 @@ import (
 // TestCoinAddress fetches a coin address from the wallet and then spends an
 // output to the coin address to verify that the wallet is correctly
 // recognizing coins sent to itself.
-func (wt *walletTester) testCoinAddress() {
+func (wt *WalletTester) testCoinAddress() {
 	// Get an address.
 	walletAddress, _, err := wt.CoinAddress()
 	if err != nil {
@@ -38,6 +38,6 @@ func (wt *walletTester) testCoinAddress() {
 // TestCoinAddress creates a new wallet tester and uses it to call
 // testCoinAddress.
 func TestCoinAddress(t *testing.T) {
-	wt := newWalletTester(t)
+	wt := NewWalletTester(t)
 	wt.testCoinAddress()
 }
