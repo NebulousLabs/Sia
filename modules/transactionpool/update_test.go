@@ -22,6 +22,8 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 		tpt.assistant.Tester.Error("tset should have some transacitons")
 	}
 
+	// TODO: Add all other types of transactions.
+
 	// Mine a block that has the transactions.
 	b, err := tpt.assistant.MineCurrentBlock(tset)
 	if err != nil {
@@ -40,6 +42,38 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	}
 	if len(tset) != 0 {
 		tpt.assistant.Tester.Error("tset should not have any transactions")
+	}
+
+	// Check that all of the internal maps are also empty.
+	if len(tpt.transactionPool.transactions) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.siacoinOutputs) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.fileContracts) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.siafundOutputs) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.usedSiacoinOutputs) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.newFileContracts) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.newFileContracts) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.fileContractTerminations) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.storageProofs) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.transactionPool.usedSiafundOutputs) != 0 {
+		tpt.assistant.Tester.Error("a field wasn't properly emptied out")
 	}
 }
 

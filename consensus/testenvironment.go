@@ -7,6 +7,12 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+// TODO: MineTestingBlock doesn't need to return an error, which means a lot of
+// the error checking isn't needed.
+
+// TODO: Add MineAndSubmitCurrentBlock, which mines the current block and calls
+// accept block, checking for err = nil.
+
 // An Assistant keeps track of addresses and contracts and whatnot to help with
 // testing. There are also helper functions for mining blocks and cobbling
 // together transactions. It's designed to be simple, and it's not very smart

@@ -19,10 +19,6 @@ func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *uncon
 			}
 		}
 
-		// Delete the parent output from the output list - this call will work
-		// whether the ouput is in the confirmed or unconfirmed set.
-		delete(tp.siacoinOutputs, sci.ParentID)
-
 		// Add this output to the list of spent outputs.
 		tp.usedSiacoinOutputs[sci.ParentID] = ut
 	}

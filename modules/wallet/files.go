@@ -10,9 +10,14 @@ import (
 )
 
 // Key is how we serialize and store spendable addresses on disk.
+//
+// TODO: When recreating this file, perhaps there are more intelligent things
+// that can be done than just saving the keys. Otherwise at start the wallet
+// needs to do a full catchup on the state, which involves requesting the diffs
+// of every single block.
 type Key struct {
-	SpendConditions consensus.UnlockConditions
-	SecretKey       crypto.SecretKey
+	UnlockConditions consensus.UnlockConditions
+	SecretKey        crypto.SecretKey
 }
 
 func (w *Wallet) save() (err error) {

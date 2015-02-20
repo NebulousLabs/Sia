@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"crypto/rand"
+
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -64,7 +66,8 @@ func (a *Assistant) AddSiacoinInputToTransaction(inputT Transaction, sci Siacoin
 	return
 }
 
-// testApplySiacoinOuptut creates a transaction that spends a siacoin output.
+// SiacoinOutputTransaction creates and funds a transaction that has a siacoin
+// output, and returns that transaction.
 func (a *Assistant) SiacoinOutputTransaction() (txn Transaction) {
 	sci, value := a.FindSpendableSiacoinInput()
 	txn = a.AddSiacoinInputToTransaction(Transaction{}, sci)
@@ -72,5 +75,41 @@ func (a *Assistant) SiacoinOutputTransaction() (txn Transaction) {
 		Value:      value,
 		UnlockHash: a.UnlockHash,
 	})
+	return
+}
+
+// FileContractTransaction creates and funds a transaction that has a file
+// contract, and returns that transaction.
+func (a *Assistant) FileContractTransaction(start BlockHeight, expiration BlockHeight) (txn Transaction, file []byte) {
+	sci, value := a.FindSpendableSiacoinInput()
+	txn = a.AddSiacoinInputToTransaction(Transaction{}, sci)
+
+	// Create the file to make the contract from, and get the Merkle root.
+	file = make([]byte, 4e3)
+	_, err := rand.Read(file)
+	if err != nil {
+		a.Tester.Fatal(err)
+	}
+	mRoot, err := crypto.BytesMerkleRoot(file)
+	if err != nil {
+		a.Tester.Fatal(err)
+	}
+
+	// Add a full file contract to the transaction.
+	txn.FileContracts = append(txn.FileContracts, FileContract{
+		FileSize:       4e3,
+		FileMerkleRoot: mRoot,
+		Start:          start,
+		Payout:         value,
+		Expiration:     expiration,
+		MissedProofOutputs: []SiacoinOutput{
+			SiacoinOutput{
+				Value: value,
+			},
+		},
+		TerminationHash: a.UnlockHash,
+	})
+	txn.FileContracts[0].ValidProofOutputs = []SiacoinOutput{SiacoinOutput{Value: value.Sub(txn.FileContracts[0].Tax())}}
+
 	return
 }

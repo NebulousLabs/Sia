@@ -32,55 +32,109 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 	return
 }
 
-// FundTransaction adds enough inputs to equal `amount` of input to the
-// transaction, and also adds any refunds necessary to get the balance correct.
-func (w *Wallet) FundTransaction(id string, amount consensus.Currency) error {
+// FundTransaction adds siacoins to a transaction that the wallet knows how to
+// spend. The exact amount of coins are always added, and this is achieved by
+// creating two transactions. The first transaciton, the parent, spends a set
+// of outputs that add up to at least the desired amount, and then creates a
+// single output of the exact amount and a second refund output.
+func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// Get the transaction.
+	// Create a parent transaction and supply it with enough inputs to cover
+	// 'amount'.
+	parentTxn := consensus.Transaction{}
+	fundingOutputs, fundingTotal, err := w.findOutputs(amount)
+	if err != nil {
+		return err
+	}
+	for _, output := range fundingOutputs {
+		key := w.keys[output.output.UnlockHash]
+		newInput := consensus.SiacoinInput{
+			ParentID:         output.id,
+			UnlockConditions: key.unlockConditions,
+		}
+		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, newInput)
+	}
+
+	// Create and add the output that will be used to fund the standard
+	// transaction.
+	parentDest, parentSpendConds, err := w.coinAddress()
+	exactOutput := consensus.SiacoinOutput{
+		Value:      amount,
+		UnlockHash: parentDest,
+	}
+	parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, exactOutput)
+
+	// Create a refund output if needed.
+	if amount.Cmp(fundingTotal) != 0 {
+		var refundDest consensus.UnlockHash
+		refundDest, _, err = w.coinAddress()
+		if err != nil {
+			return
+		}
+		refundOutput := consensus.SiacoinOutput{
+			Value:      fundingTotal.Sub(amount),
+			UnlockHash: refundDest,
+		}
+		parentTxn.SiacoinOutputs = append(parentTxn.SiacoinOutputs, refundOutput)
+	}
+
+	// Sign all of the inputs to the parent trancstion.
+	coveredFields := consensus.CoveredFields{WholeTransaction: true}
+	for _, input := range parentTxn.SiacoinInputs {
+		sig := consensus.TransactionSignature{
+			ParentID:       crypto.Hash(input.ParentID),
+			CoveredFields:  coveredFields,
+			PublicKeyIndex: 0,
+		}
+		parentTxn.Signatures = append(parentTxn.Signatures, sig)
+
+		// Hash the transaction according to the covered fields.
+		coinAddress := input.UnlockConditions.UnlockHash()
+		sigIndex := len(parentTxn.Signatures) - 1
+		secKey := w.keys[coinAddress].secretKey
+		sigHash := parentTxn.SigHash(sigIndex)
+
+		// Get the signature.
+		var encodedSig crypto.Signature
+		encodedSig, err = crypto.SignHash(sigHash, secKey)
+		if err != nil {
+			return
+		}
+		parentTxn.Signatures[sigIndex].Signature = consensus.Signature(encodedSig[:])
+	}
+
+	// Add the exact output to the wallet's knowledgebase before releasing the
+	// lock, to prevent the wallet from using the exact output elsewhere.
+	key := w.keys[parentSpendConds.UnlockHash()]
+	key.outputs[parentTxn.SiacoinOutputID(0)] = &knownOutput{
+		id:     parentTxn.SiacoinOutputID(0),
+		output: exactOutput,
+		age:    w.age,
+	}
+
+	// Send the transaction to the transaction pool.
+	err = w.tpool.AcceptTransaction(parentTxn)
+	if err != nil {
+		return
+	}
+
+	// Get the transaction that was originally meant to be funded.
 	openTxn, exists := w.transactions[id]
 	if !exists {
 		return errors.New("no transaction of given id found")
 	}
 	txn := openTxn.transaction
 
-	// Get the set of outputs to use as inputs.
-	knownOutputs, total, err := w.findOutputs(amount)
-	if err != nil {
-		return err
+	// Add the exact output.
+	newInput := consensus.SiacoinInput{
+		ParentID:         parentTxn.SiacoinOutputID(0),
+		UnlockConditions: parentSpendConds,
 	}
-
-	// Create and add all of the inputs.
-	for _, knownOutput := range knownOutputs {
-		key := w.keys[knownOutput.output.UnlockHash]
-		newInput := consensus.SiacoinInput{
-			ParentID:         knownOutput.id,
-			UnlockConditions: key.spendConditions,
-		}
-		openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
-		txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
-
-		// Set the age of the knownOutput to prevent accidental double spends.
-		knownOutput.age = w.age
-	}
-
-	// Add a refund output if needed.
-	if total.Cmp(amount) > 0 {
-		coinAddress, _, err := w.coinAddress()
-		if err != nil {
-			return err
-		}
-
-		txn.SiacoinOutputs = append(
-			txn.SiacoinOutputs,
-			consensus.SiacoinOutput{
-				Value:      total.Sub(amount),
-				UnlockHash: coinAddress,
-			},
-		)
-	}
-	return nil
+	openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
+	txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
+	return
 }
 
 // AddMinerFee will add a miner fee to the transaction, but will not add any

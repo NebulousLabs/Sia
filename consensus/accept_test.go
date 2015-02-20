@@ -254,6 +254,10 @@ func (a *Assistant) testBadBlock() {
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testBlockTimestamps()
 }
@@ -268,6 +272,10 @@ func TestEmptyBlock(t *testing.T) {
 // TestLargeBlock creates a new testing environment and uses it to call
 // testLargeBlock.
 func TestLargeBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testLargeBlock()
 }
@@ -275,6 +283,10 @@ func TestLargeBlock(t *testing.T) {
 // TestSingleNoFeePayouts creates a new testing environment and uses it to call
 // testSingleNoFeePayouts.
 func TestSingleNoFeePayout(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testSingleNoFeePayout()
 }
@@ -282,6 +294,10 @@ func TestSingleNoFeePayout(t *testing.T) {
 // TestMultipleFeesMultiplePayouts creates a new testing environment and uses
 // it to call testMultipleFeesMultiplePayouts.
 func TestMultipleFeesMultiplePayouts(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testMultipleFeesMultiplePayouts()
 }
@@ -289,6 +305,10 @@ func TestMultipleFeesMultiplePayouts(t *testing.T) {
 // TestMissedTarget creates a new testing environment and uses it to call
 // testMissedTarget.
 func TestMissedTarget(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testMissedTarget()
 }
@@ -296,6 +316,10 @@ func TestMissedTarget(t *testing.T) {
 // TestRepeatBlock creates a new testing environment and uses it to call
 // testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testRepeatBlock()
 }
@@ -309,6 +333,10 @@ func TestOrphan(t *testing.T) {
 // TestBadBlock creates a new testing environment and uses it to call
 // testBadBlock.
 func TestBadBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	a := NewTestingEnvironment(t)
 	a.testBadBlock()
 }

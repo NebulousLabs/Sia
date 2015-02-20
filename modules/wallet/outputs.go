@@ -23,9 +23,9 @@ type knownOutput struct {
 // openOutput contains an output and the conditions needed to spend the output,
 // including secret keys.
 type key struct {
-	spendable       bool
-	spendConditions consensus.UnlockConditions
-	secretKey       crypto.SecretKey
+	spendable        bool
+	unlockConditions consensus.UnlockConditions
+	secretKey        crypto.SecretKey
 
 	outputs map[consensus.SiacoinOutputID]*knownOutput
 }
