@@ -50,11 +50,10 @@ func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, f
 	})
 
 	// add announcement to arbitrary data field
-	err = h.wallet.AddArbitraryData(id, modules.HostAnnouncementPrefix+string(announcement))
+	err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
 	if err != nil {
 		return
 	}
-	// TODO: Have the wallet manually add a fee? How should this be managed?
 	t, err = h.wallet.SignTransaction(id, true)
 	if err != nil {
 		return

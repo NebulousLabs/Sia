@@ -2,14 +2,18 @@ package transactionpool
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
 	FileContractConfirmWindow = 10
 	TransactionSizeLimit      = 16 * 1024
+
+	PrefixNonSia = "NonSia"
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -66,9 +70,14 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 		}
 	}
 
-	// TODO: Check that the arbitrary data is either prefixed with 'NonSia' or
-	// is prefixed with 'HostAnnouncement' plus follows rules for making a host
-	// announcement.
+	// Check that all arbitrary data is prefixed using the recognized set of
+	// prefixes.
+	for _, data := range t.ArbitraryData {
+		if !strings.HasPrefix(data, modules.PrefixHostAnnouncement) &&
+			!strings.HasPrefix(data, PrefixNonSia) {
+			return errors.New("arbitrary data contains unrecognized prefix")
+		}
+	}
 
 	return
 }

@@ -14,13 +14,13 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ann
 	for _, t := range b.Transactions {
 		for _, data := range t.ArbitraryData {
 			// the HostAnnouncement must be prefaced by the standard host announcement string
-			if !strings.HasPrefix(data, modules.HostAnnouncementPrefix) {
+			if !strings.HasPrefix(data, modules.PrefixHostAnnouncement) {
 				continue
 			}
 
 			// decode the HostAnnouncement
 			var ha modules.HostAnnouncement
-			encAnnouncement := []byte(strings.TrimPrefix(data, modules.HostAnnouncementPrefix))
+			encAnnouncement := []byte(strings.TrimPrefix(data, modules.PrefixHostAnnouncement))
 			err := encoding.Unmarshal(encAnnouncement, &ha)
 			if err != nil {
 				continue

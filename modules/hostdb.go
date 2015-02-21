@@ -7,7 +7,7 @@ import (
 
 const (
 	// Denotes a host announcement in the Arbitrary Data section.
-	HostAnnouncementPrefix = "HostAnnouncement"
+	PrefixHostAnnouncement = "HostAnnouncement"
 )
 
 // HostAnnouncements are stored in the Arbitrary Data section of transactions
