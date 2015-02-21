@@ -6,25 +6,23 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// TODO: Test that all of the linked list functions work correctly.
-
-// a tpoolTester contains a testing assistant and a transaction pool, and
+// a TpoolTester contains a testing assistant and a transaction pool, and
 // provides statefullness for doing testing.
-type tpoolTester struct {
-	assistant       *consensus.Assistant
-	transactionPool *TransactionPool
+type TpoolTester struct {
+	*consensus.ConsensusTester
+	*TransactionPool
 }
 
-func CreateTpoolTester(t *testing.T) (tpt *tpoolTester) {
-	a := consensus.NewTestingEnvironment(t)
-	tp, err := New(a.State)
+// CreateTpoolTester initializes a TpoolTester.
+func CreateTpoolTester(t *testing.T) (tpt *TpoolTester) {
+	ct := consensus.NewTestingEnvironment(t)
+	tp, err := New(ct.State)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tpt = &tpoolTester{
-		assistant:       a,
-		transactionPool: tp,
-	}
+	tpt = new(TpoolTester)
+	tpt.ConsensusTester = ct
+	tpt.TransactionPool = tp
 	return
 }

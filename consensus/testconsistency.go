@@ -9,85 +9,85 @@ import (
 // CurrentPathCheck looks at every block listed in currentPath and verifies
 // that every block from current to genesis matches the block listed in
 // currentPath.
-func (a *Assistant) CurrentPathCheck() {
-	currentNode := a.State.currentBlockNode()
-	for i := a.State.Height(); i != 0; i-- {
+func (ct *ConsensusTester) CurrentPathCheck() {
+	currentNode := ct.currentBlockNode()
+	for i := ct.Height(); i != 0; i-- {
 		// Check that the CurrentPath entry exists.
-		id, exists := a.State.currentPath[i]
+		id, exists := ct.currentPath[i]
 		if !exists {
-			a.Tester.Error("current path is empty for a height with a known block.")
+			ct.Error("current path is empty for a height with a known block.")
 		}
 
 		// Check that the CurrentPath entry contains the correct block id.
 		if currentNode.block.ID() != id {
-			a.Tester.Error("current path does not have correct id!")
+			ct.Error("current path does not have correct id!")
 		}
 
 		// Check that each parent is one less in height than its child.
 		if currentNode.height != currentNode.parent.height+1 {
-			a.Tester.Error("heights are messed up")
+			ct.Error("heights are messed up")
 		}
 
-		currentNode = a.State.blockMap[currentNode.block.ParentID]
+		currentNode = ct.blockMap[currentNode.block.ParentID]
 	}
 }
 
 // rewindApplyCheck grabs the state hash and then rewinds to the genesis block.
 // Then the state moves forwards to the initial starting place and verifies
 // that the state hash is the same.
-func (a *Assistant) RewindApplyCheck() {
-	csh := a.State.consensusSetHash()
-	cn := a.State.currentBlockNode()
-	a.State.rewindToNode(a.State.blockRoot)
-	a.State.applyUntilNode(cn)
-	if csh != a.State.consensusSetHash() {
-		a.Tester.Error("state hash is not consistent after rewinding and applying all the way through")
+func (ct *ConsensusTester) RewindApplyCheck() {
+	csh := ct.consensusSetHash()
+	cn := ct.currentBlockNode()
+	ct.rewindToNode(ct.blockRoot)
+	ct.applyUntilNode(cn)
+	if csh != ct.consensusSetHash() {
+		ct.Error("state hash is not consistent after rewinding and applying all the way through")
 	}
 }
 
 // currencyCheck uses the height to determine the total amount of currency that
 // should be in the system, and then tallys up the outputs to see if that is
 // the case.
-func (a *Assistant) CurrencyCheck() {
+func (ct *ConsensusTester) CurrencyCheck() {
 	siafunds := NewCurrency64(0)
-	for _, siafundOutput := range a.State.siafundOutputs {
+	for _, siafundOutput := range ct.siafundOutputs {
 		siafunds = siafunds.Add(siafundOutput.Value)
 	}
 	if siafunds.Cmp(NewCurrency64(SiafundCount)) != 0 {
-		a.Tester.Error("siafunds inconsistency")
+		ct.Error("siafunds inconsistency")
 	}
 
 	expectedSiacoins := NewCurrency64(0)
-	for i := BlockHeight(0); i <= a.State.Height(); i++ {
+	for i := BlockHeight(0); i <= ct.Height(); i++ {
 		expectedSiacoins = expectedSiacoins.Add(CalculateCoinbase(i))
 	}
-	siacoins := a.State.siafundPool
-	for _, output := range a.State.siacoinOutputs {
+	siacoins := ct.siafundPool
+	for _, output := range ct.siacoinOutputs {
 		siacoins = siacoins.Add(output.Value)
 	}
-	for _, contract := range a.State.fileContracts {
+	for _, contract := range ct.fileContracts {
 		siacoins = siacoins.Add(contract.Payout)
 	}
-	for height, dsoMap := range a.State.delayedSiacoinOutputs {
-		if height+MaturityDelay > a.State.Height() {
+	for height, dsoMap := range ct.delayedSiacoinOutputs {
+		if height+MaturityDelay > ct.Height() {
 			for _, dso := range dsoMap {
 				siacoins = siacoins.Add(dso.Value)
 			}
 		}
 	}
 	if siacoins.Cmp(expectedSiacoins) != 0 {
-		a.Tester.Error(siacoins.i.String())
-		a.Tester.Error(expectedSiacoins.i.String())
-		a.Tester.Error("siacoins inconsistency")
+		ct.Error(siacoins.i.String())
+		ct.Error(expectedSiacoins.i.String())
+		ct.Error("siacoins inconsistency")
 	}
 }
 
 // consistencyChecks calls all of the consistency functions on each of the
 // states.
-func (a *Assistant) ConsistencyChecks() {
-	a.CurrentPathCheck()
-	a.RewindApplyCheck()
-	a.CurrencyCheck()
+func (ct *ConsensusTester) ConsistencyChecks() {
+	ct.CurrentPathCheck()
+	ct.RewindApplyCheck()
+	ct.CurrencyCheck()
 }
 
 // stateHash returns the markle root of the current state of consensus.
