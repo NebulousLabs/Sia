@@ -13,57 +13,40 @@ import (
 )
 
 const (
-	defaultWindowSize = 100
+	defaultWindowSize = 288 // 48 Hours
 )
 
-var (
-	// TODO: ask wallet
-	minerFee = consensus.NewCurrency64(10)
-)
+// createFileContractTransaction creates a transaction containing a file
+// contract that is aimed at negotiating with hosts.
+func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
+	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
+	var payout consensus.Currency
+	for _, output := range terms.MissedProofOutputs {
+		payout = payout.Add(output.Value)
+	}
 
-// TODO: I'm not sure that this function was working correctly. The payout of
-// the contract was never set, so I added it in. I might be doing the math
-// wrong.
-func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
-	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
-
-	// Determine our portion of the payout.
-	filesizeCost := consensus.NewCurrency64(terms.FileSize)
-	durationCost := consensus.NewCurrency64(uint64(duration))
-	fund := host.Price.Mul(filesizeCost).Mul(durationCost)
-
-	// Determine the host portion of the payout.
-	collateral := host.Collateral.Mul(filesizeCost).Mul(durationCost)
-
-	// Determine the total payout.
-	payout := fund.Add(collateral)
+	// Get the cost to the client as per the terms in the contract.
+	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
+	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
 
 	// Fill out the contract.
 	contract := consensus.FileContract{
 		FileMerkleRoot:     merkleRoot,
 		FileSize:           terms.FileSize,
-		Start:              terms.StartHeight,
-		Expiration:         terms.StartHeight + duration,
+		Start:              terms.DurationStart + terms.Duration,
+		Expiration:         terms.DurationStart + terms.Duration + terms.WindowSize,
 		Payout:             payout,
-		MissedProofOutputs: []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: payout, UnlockHash: consensus.ZeroUnlockHash}},
+		ValidProofOutputs:  terms.ValidProofOutputs,
+		MissedProofOutputs: terms.MissedProofOutputs,
 	}
-	// This field is filled last because Tax is a method of FileContract
-	validPayout := payout.Sub(contract.Tax())
-	contract.ValidProofOutputs = []consensus.SiacoinOutput{consensus.SiacoinOutput{Value: validPayout, UnlockHash: host.CoinAddress}}
-
-	// Add a miner fee to the fund.
-	fund = fund.Add(minerFee)
 
 	// Create the transaction.
 	id, err := r.wallet.RegisterTransaction(txn)
 	if err != nil {
 		return
 	}
-	err = r.wallet.FundTransaction(id, fund)
-	if err != nil {
-		return
-	}
-	err = r.wallet.AddMinerFee(id, minerFee)
+	err = r.wallet.FundTransaction(id, clientCost)
 	if err != nil {
 		return
 	}
@@ -79,37 +62,54 @@ func (r *Renter) createContractTransaction(host modules.HostEntry, terms modules
 	return
 }
 
+// negotiateContract creates a file contract for a host according to the
+// requests of the host. There is an assumption that only hosts with acceptable
+// terms will be put into the hostdb.
 func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract consensus.FileContract, err error) {
-	r.state.RLock()
 	height := r.state.Height()
-	r.state.RUnlock()
 
-	// get filesize via Seek
-	// (these Seeks are guaranteed not to return errors)
+	// Get the filesize by seeking to the end, grabbing the index, then seeking
+	// back to the beginning. These calls are guaranteed not to return errors.
 	n, _ := up.Data.Seek(0, 2)
 	filesize := uint64(n)
-	up.Data.Seek(0, 0) // seek back to beginning
+	up.Data.Seek(0, 0)
+
+	// Get the price and payout.
+	sizeCurrency := consensus.NewCurrency64(filesize)
+	durationCurrency := consensus.NewCurrency64(uint64(up.Duration))
+	clientCost := host.Price.Mul(sizeCurrency).Mul(durationCurrency)
+	hostCollateral := host.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
+	payout := clientCost.Add(hostCollateral)
+	validOutputValue := payout.Sub(consensus.FileContract{Payout: payout}.Tax())
 
 	// create ContractTerms
 	terms := modules.ContractTerms{
-		FileSize:           filesize,
-		StartHeight:        height + up.Delay,
-		WindowSize:         defaultWindowSize,
-		NumWindows:         (uint64(up.Duration) / defaultWindowSize) + 1,
-		Price:              host.Price,      // ??
-		Collateral:         host.Collateral, // ??
-		ValidProofAddress:  host.CoinAddress,
-		MissedProofAddress: consensus.ZeroUnlockHash,
+		FileSize:      filesize,
+		Duration:      up.Duration,
+		DurationStart: height - 1,
+		WindowSize:    defaultWindowSize,
+		Price:         host.Price,
+		Collateral:    host.Collateral,
+	}
+	terms.ValidProofOutputs = []consensus.SiacoinOutput{
+		consensus.SiacoinOutput{
+			Value:      validOutputValue,
+			UnlockHash: host.UnlockHash,
+		},
+	}
+	terms.MissedProofOutputs = []consensus.SiacoinOutput{
+		consensus.SiacoinOutput{
+			Value:      payout,
+			UnlockHash: consensus.ZeroUnlockHash,
+		},
 	}
 
-	// TODO: call r.hostDB.FlagHost(host.IPAddress) if negotiation is unsuccessful
-	// (and it isn't our fault)
+	// Perform the negotiations with the host through a network call.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {
-		// send ContractTerms
+		// Send the contract terms and read the response.
 		if _, err = encoding.WriteObject(conn, terms); err != nil {
 			return
 		}
-		// read response
 		var response string
 		if err = encoding.ReadObject(conn, &response, 128); err != nil {
 			return
@@ -118,24 +118,34 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 			return errors.New(response)
 		}
 
-		// file transfer is going to take a while, so extend the timeout.
-		// This assumes a minimum transfer rate of ~1 Mbps
-		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 8 * time.Microsecond))
+		// Set a timeout for the contract that assumes a minimum connection of
+		// 64kbps.
+		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 128 * time.Microsecond))
 
-		// simultaneously transmit file data and calculate Merkle root
+		// Simultaneously transmit file data and calculate Merkle root.
 		tee := io.TeeReader(up.Data, conn)
 		merkleRoot, err := crypto.ReaderMerkleRoot(tee, filesize)
 		if err != nil {
 			return
 		}
-		// create and transmit transaction containing file contract
-		txn, err := r.createContractTransaction(host, terms, merkleRoot)
+
+		// Create and transmit transaction containing the file contract.
+		txn, err := r.createContractTransaction(terms, merkleRoot)
 		if err != nil {
 			return
 		}
 		contract = txn.FileContracts[0]
 		_, err = encoding.WriteObject(conn, txn)
 		return
+
+		// TODO: Need some way to determine if the contract has succeeded or
+		// failed. This is tricky because the host can do a few things here.
+		// The safe way to handle this is to assume that the contract has
+		// succeeded and then check back in a few blocks. If the contract isn't
+		// in the blockchain at that point, we'll spend the output that we used
+		// to fund the file contract, which will prevent the host from
+		// submitting the file contract. We'll then need to upload this piece
+		// somewhere else.
 	})
 
 	return

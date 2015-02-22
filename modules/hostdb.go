@@ -33,7 +33,7 @@ type HostSettings struct {
 	MinWindow    consensus.BlockHeight
 	Price        consensus.Currency
 	Collateral   consensus.Currency
-	CoinAddress  consensus.UnlockHash
+	UnlockHash   consensus.UnlockHash
 }
 
 // A HostEntry is an entry in the HostDB. It contains the HostSettings, as

@@ -194,8 +194,8 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}
 
 	// file transfer is going to take a while, so extend the timeout.
-	// This assumes a minimum transfer rate of ~1 Mbps
-	conn.SetDeadline(time.Now().Add(time.Duration(terms.FileSize) * 8 * time.Microsecond))
+	// This assumes a minimum transfer rate of ~64 kbps.
+	conn.SetDeadline(time.Now().Add(time.Duration(terms.FileSize) * 128 * time.Microsecond))
 
 	// simultaneously download file and calculate its Merkle root.
 	tee := io.TeeReader(

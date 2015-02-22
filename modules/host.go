@@ -14,14 +14,14 @@ const (
 // ContractTerms are the parameters agreed upon by a client and a host when
 // forming a FileContract.
 type ContractTerms struct {
-	FileSize           uint64
-	StartHeight        consensus.BlockHeight
-	WindowSize         consensus.BlockHeight // how many blocks a host has to submit each proof
-	NumWindows         uint64
-	Price              consensus.Currency // client contribution towards payout each window
-	Collateral         consensus.Currency // host contribution towards payout each window
-	ValidProofAddress  consensus.UnlockHash
-	MissedProofAddress consensus.UnlockHash
+	FileSize           uint64                    // How large the file is.
+	Duration           consensus.BlockHeight     // How long the file is to be stored.
+	DurationStart      consensus.BlockHeight     // The block height that the storing starts (typically required to start immediately, unless it's a chained contract).
+	WindowSize         consensus.BlockHeight     // How long the host has to submit a proof of storage.
+	Price              consensus.Currency        // Client contribution towards payout each window
+	Collateral         consensus.Currency        // Host contribution towards payout each window
+	ValidProofOutputs  []consensus.SiacoinOutput // Where money goes if the storage proof is successful.
+	MissedProofOutputs []consensus.SiacoinOutput // Where the money goes if the storage proof fails.
 }
 
 type HostInfo struct {

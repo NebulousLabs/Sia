@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	maxUploadAttempts = 10
+	maxUploadAttempts = 25
 )
 
 // uploadPiece attempts to negotiate a contract with a host. If the negotiate
@@ -47,8 +47,8 @@ func (r *Renter) uploadPiece(up modules.UploadParams) (piece FilePiece, err erro
 	return
 }
 
-// Upload implements the modules.Renter interface. It selects a host to upload
-// to, negotiates a contract with it, and uploads the file contents.
+// Upload takes an upload parameters, which contain a file to upload, and then
+// creates a redundant copy of the file on the Sia network.
 func (r *Renter) Upload(up modules.UploadParams) (err error) {
 	r.mu.RLock()
 	_, exists := r.files[up.Nickname]

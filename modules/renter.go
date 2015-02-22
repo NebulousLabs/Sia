@@ -11,9 +11,6 @@ import (
 type UploadParams struct {
 	Data     io.ReadSeeker
 	Duration consensus.BlockHeight
-	Delay    consensus.BlockHeight
-
-	// these fields are not seen by the host
 	Nickname string
 	Pieces   int
 }
