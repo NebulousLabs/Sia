@@ -10,14 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
-// TODO: Add a whole set of features to the host database that allow hosts to
-// be pulled according to a variety of different weights. A 'natural
-// preference' will allow users to manually favor certain hosts, but even still
-// things that matter are price, burn, perhaps some sort of reliability metric,
-// a latency metric, and a throughput metric, as well as perhaps a cooperation
-// metric. Some of these need to be added to the HostEntry object, but some of
-// them can be polled regularly and managed entirely from within the hostdb.
-
 // The HostDB is a set of hosts that get weighted and inserted into a tree
 type HostDB struct {
 	state       *consensus.State
@@ -62,25 +54,6 @@ func (hdb *HostDB) insert(entry modules.HostEntry) error {
 	return nil
 }
 
-// Insert adds an entry to the hostdb, wrapping the standard insert call with a
-// lock. When called externally, the lock needs to be in place, however
-// sometimes insert needs to be called internally when there is already a lock
-// in place.
-func (hdb *HostDB) Insert(entry modules.HostEntry) error {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-	return hdb.insert(entry)
-}
-
-func (hdb *HostDB) FlagHost(addr network.Address) error {
-	// Check that we're online at all.
-
-	// Remove the flagged host.
-	//
-	// TODO: Smarter flagging code, perhaps cut the weight for example.
-	return hdb.Remove(addr)
-}
-
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) remove(addr network.Address) error {
 	// See if the node is in the set of active hosts.
@@ -102,12 +75,6 @@ func (hdb *HostDB) remove(addr network.Address) error {
 	node.remove()
 
 	return nil
-}
-
-func (hdb *HostDB) Remove(addr network.Address) error {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
-	return hdb.remove(addr)
 }
 
 // Update throws a bunch of blocks at the hostdb to be integrated.
@@ -155,6 +122,20 @@ func (hdb *HostDB) update() (err error) {
 	return
 }
 
+// FlagHost is called when a host is caught misbehaving. In general, the
+// behavior is that the host will be called less often. For the time being,
+// that means removing the host from the database outright.
+func (hdb *HostDB) FlagHost(addr network.Address) error {
+	return hdb.Remove(addr)
+}
+
+// Insert is the thread-safe version of insert.
+func (hdb *HostDB) Insert(entry modules.HostEntry) error {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	return hdb.insert(entry)
+}
+
 // RandomHost pulls a random host from the hostdb weighted according to
 // whatever internal metrics exist within the hostdb.
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
@@ -172,6 +153,12 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 	if err != nil {
 		return
 	}
-	// no possibility of error
 	return hdb.hostTree.entryAtWeight(consensus.NewCurrency(randWeight))
+}
+
+// Remove is the thread-safe version of remove.
+func (hdb *HostDB) Remove(addr network.Address) error {
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	return hdb.remove(addr)
 }

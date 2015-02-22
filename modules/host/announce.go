@@ -10,13 +10,12 @@ import (
 // Announce creates a host announcement transaction, adding information to the
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
-func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, freezeDuration consensus.BlockHeight) (err error) {
+func (h *Host) Announce(addr network.Address) (err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	// get current state height
 	h.state.RLock()
-	freezeUnlockHeight := h.state.Height() + freezeDuration
 	h.state.RUnlock()
 
 	// create the transaction that will hold the announcement
@@ -25,31 +24,12 @@ func (h *Host) Announce(addr network.Address, freezeVolume consensus.Currency, f
 	if err != nil {
 		return
 	}
-	err = h.wallet.FundTransaction(id, freezeVolume)
-	if err != nil {
-		return
-	}
-	spendHash, spendConditions, err := h.wallet.TimelockedCoinAddress(freezeUnlockHeight)
-	if err != nil {
-		return
-	}
-	output := consensus.SiacoinOutput{
-		Value:      freezeVolume,
-		UnlockHash: spendHash,
-	}
-	freezeIndex, err := h.wallet.AddOutput(id, output)
-	if err != nil {
-		return
-	}
 
-	// create and encode the announcement
+	// create and encode the announcement and add it to the arbitrary data of
+	// the transaction.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress:       addr,
-		FreezeIndex:     freezeIndex,
-		SpendConditions: spendConditions,
+		IPAddress: addr,
 	})
-
-	// add announcement to arbitrary data field
 	err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
 	if err != nil {
 		return

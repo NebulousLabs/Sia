@@ -26,24 +26,9 @@ func findHostAnnouncements(height consensus.BlockHeight, b consensus.Block) (ann
 				continue
 			}
 
-			// check that spend conditions are valid
-			if ha.SpendConditions.UnlockHash() != t.SiacoinOutputs[ha.FreezeIndex].UnlockHash {
-				continue
-			}
-
-			// calculate freeze and check for sane value
-			timelockCost := consensus.NewCurrency64(uint64(ha.SpendConditions.Timelock - height))
-			freeze := timelockCost.Mul(t.SiacoinOutputs[ha.FreezeIndex].Value)
-			if freeze.Sign() <= 0 {
-				continue
-			}
-
-			// At this point, the HostSettings are unknown. Before inserting
-			// the host, the HostDB will call threadedInsertFromAnnouncement
-			// to fill out the HostSettings.
+			// Add the announcement to the slice being returned.
 			announcements = append(announcements, modules.HostEntry{
 				IPAddress: ha.IPAddress,
-				Freeze:    freeze,
 			})
 		}
 	}
