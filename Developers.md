@@ -10,6 +10,17 @@ information, check the [go documentation](golang.org/doc/install).
 If you plan on cross compiling Sia, you may need to install go from source. You
 can find information on that [here](golang.org/doc/install/source)
 
+Golang does not like sym links, a problem which seems to have appeared
+recently. If you are using a sym link, you can expect to see an error similar
+to the one below:
+
+
+```
+consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" in any of:
+    /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
+    /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
+```
+
 Developer Conventions
 =====================
 
