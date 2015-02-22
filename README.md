@@ -1,7 +1,7 @@
 Sia 0.2.0
 =========
 
-Binaries can be found at [our website](siacoin.com).
+Binaries can be found at [our website](http://siacoin.com).
 
 Sia is a new cryptosystem designed to enable incentivized, decentralized
 storage in a byzantine environment. The consensus protocol has been finished
