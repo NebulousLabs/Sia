@@ -8,7 +8,7 @@ Then it should be sufficient to run `make dependencies && make`. For more
 information, check the [go documentation](golang.org/doc/install).
 
 If you plan on cross compiling Sia, you may need to install go from source. You
-can find information on that [here](golang.org/doc/install/source)
+can find information on that [here](golang.org/doc/install/source).
 
 Golang does not like sym links, a problem which seems to have appeared
 recently. If you are using a sym link, you can expect to see an error similar
@@ -20,6 +20,8 @@ consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" 
     /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
     /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
 ```
+
+A discussion on this problem can be found [here](groups.google.com/forum/#!topic/golang-nuts/f5ZYztyHK5I)
 
 Developer Conventions
 =====================
@@ -171,12 +173,14 @@ transactions. Where possible, these explicit assumptions should be validated.
 
 Example:
 
+```go
 if consensus.DEBUG {
 	_, exists := tp.usedOutputs[input.OutputID]
 	if exists {
 		panic("incorrect use of addTransaction")
 	}
 }
+```
 
 In the example, a panic is called for incorrect use of the function, but only
 in debug mode. This failure will be invisible in production code, but the code
