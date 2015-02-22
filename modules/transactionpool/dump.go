@@ -15,7 +15,7 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
-	var remainingSize int = consensus.BlockSizeLimit - 1024 // Leave 1kb for block header and metadata, which should actually only be about 120 bytes.
+	var remainingSize int = consensus.BlockSizeLimit - 5e3 // Leave 5kb for the block header and the miner transaction.
 
 	// Iterate through the transactions and add them in first-come-first-serve
 	// order.
