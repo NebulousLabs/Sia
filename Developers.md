@@ -1,3 +1,15 @@
+Developer Environment
+=====================
+
+Sia is mostly written in go. To build and test Sia, you are going to need a
+working go environment, including having both $GOROOT/bin and $GOPATH/bin in
+your $PATH. For most Linux distributions, go will be in the package manager.
+Then it should be sufficient to run `make dependencies && make`. For more
+information, check the [go documentation](golang.org/doc/install).
+
+If you plan on cross compiling Sia, you may need to install go from source. You
+can find information on that [here](golang.org/doc/install/source)
+
 Developer Conventions
 =====================
 
