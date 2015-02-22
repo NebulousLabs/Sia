@@ -24,8 +24,8 @@ uniform, much in the spirit of 'go fmt'. When everything looks the same,
 everyone has an easier time reading and reviewing code they did not write
 themselves.
 
-Documentation Conventions
--------------------------
+Documentation
+-------------
 
 All structs, functions, and interfaces must have a docstring.
 
@@ -52,8 +52,8 @@ than what you would expect to remember from an 'Intro to Data Structures' class
 should have an explanation about what the concept it is and why it was picked
 over other potential choices.
 
-Naming Conventions
-------------------
+Naming
+------
 
 Names are used to give readers and reviers a sense of what is happening in the
 code. When naming variables, you should assume that the person reading your
@@ -77,8 +77,33 @@ who are unfamiliar with the code. A reader should never have to ask 'What is
 `s`?' on their first pass through the code, even though to most of it is
 painfully obvious that `s` refers to a consensus.State.
 
-Mutex Convetions
-----------------
+Control Flow
+------------
+
+Where possible, control structures should be minimized or avoided. This
+includes avoiding nested if statements, and avoiding else statements where
+possible. Sometimes, complex control structures are necessary, but where
+possible use alternative code patterns and insert functions to break things up.
+
+Example:
+
+```go
+// Do not do this:
+if err != nil {
+	return
+} else {
+	forkBlockchain(node)
+}
+
+// Instead to this:
+if err != nil {
+	return
+}
+forkBlockchain(node)
+```
+
+Mutexes
+-------
 
 Any exported function will lock the data structures it interacts with such that
 the function can safely be called concurrently without the caller needing to
@@ -105,6 +130,26 @@ Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
 in their own goroutine ('go threadedMine()') and will manage their own mutexes.
 These functions typically loop forever, either listening on a channel or
 performing some regular task, and should not be called with a mutex locked.
+
+Error Handling
+--------------
+
+All errors need to be checked as soon as they are received, even if they are
+known to not cause problems. The statement that checks the error needs to be
+`if err != nil`, and if there is a good reason to use an alternative statement
+(such ass `err == nil`), it must be documented. The body of the if statement
+should be at most 4 lines, but usually only one. Anything requiring more lines
+needs to be its own function.
+
+Example:
+
+```go
+block, err := s.AcceptBlock()
+if err != nil {
+	handleAcceptBlockErr(block, err)
+	return
+}
+```
 
 Sanity Checks
 -------------
