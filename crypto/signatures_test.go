@@ -25,7 +25,7 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Test the public keys for equality.
-	if *pk != *unmarshalledPK {
+	if pk != unmarshalledPK {
 		t.Error("pubkey not the same after marshalling and unmarshalling")
 	}
 
@@ -46,7 +46,7 @@ func TestSignatureEncoding(t *testing.T) {
 	}
 
 	// Test signatures for equality.
-	if *sig != *unmarshalledSig {
+	if sig != unmarshalledSig {
 		t.Error("signature not same after marshalling and unmarshalling")
 	}
 }
@@ -106,17 +106,4 @@ func TestSigning(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	// Try to trigger a panic with nil data. Also here to get maximal test
-	// coverage.
-	_, pk, err := GenerateSignatureKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data Hash
-	SignHash(data, nil)
-	SignHash(data, nil)
-	VerifyHash(data, nil, nil)
-	VerifyHash(data, nil, nil)
-	VerifyHash(data, pk, nil)
 }

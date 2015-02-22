@@ -1,3 +1,28 @@
+Developer Environment
+=====================
+
+Sia is mostly written in go. To build and test Sia, you are going to need a
+working go environment, including having both $GOROOT/bin and $GOPATH/bin in
+your $PATH. For most Linux distributions, go will be in the package manager.
+Then it should be sufficient to run `make dependencies && make`. For more
+information, check the [go documentation](golang.org/doc/install).
+
+If you plan on cross compiling Sia, you may need to install go from source. You
+can find information on that [here](golang.org/doc/install/source).
+
+Golang does not like sym links, a problem which seems to have appeared
+recently. If you are using a sym link, you can expect to see an error similar
+to the one below:
+
+
+```
+consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" in any of:
+    /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
+    /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
+```
+
+A discussion on this problem can be found [here](groups.google.com/forum/#!topic/golang-nuts/f5ZYztyHK5I)
+
 Developer Conventions
 =====================
 
@@ -12,8 +37,8 @@ uniform, much in the spirit of 'go fmt'. When everything looks the same,
 everyone has an easier time reading and reviewing code they did not write
 themselves.
 
-Documentation Conventions
--------------------------
+Documentation
+-------------
 
 All structs, functions, and interfaces must have a docstring.
 
@@ -40,8 +65,8 @@ than what you would expect to remember from an 'Intro to Data Structures' class
 should have an explanation about what the concept it is and why it was picked
 over other potential choices.
 
-Naming Conventions
-------------------
+Naming
+------
 
 Names are used to give readers and reviers a sense of what is happening in the
 code. When naming variables, you should assume that the person reading your
@@ -65,8 +90,33 @@ who are unfamiliar with the code. A reader should never have to ask 'What is
 `s`?' on their first pass through the code, even though to most of it is
 painfully obvious that `s` refers to a consensus.State.
 
-Mutex Convetions
-----------------
+Control Flow
+------------
+
+Where possible, control structures should be minimized or avoided. This
+includes avoiding nested if statements, and avoiding else statements where
+possible. Sometimes, complex control structures are necessary, but where
+possible use alternative code patterns and insert functions to break things up.
+
+Example:
+
+```go
+// Do not do this:
+if err != nil {
+	return
+} else {
+	forkBlockchain(node)
+}
+
+// Instead to this:
+if err != nil {
+	return
+}
+forkBlockchain(node)
+```
+
+Mutexes
+-------
 
 Any exported function will lock the data structures it interacts with such that
 the function can safely be called concurrently without the caller needing to
@@ -94,6 +144,26 @@ in their own goroutine ('go threadedMine()') and will manage their own mutexes.
 These functions typically loop forever, either listening on a channel or
 performing some regular task, and should not be called with a mutex locked.
 
+Error Handling
+--------------
+
+All errors need to be checked as soon as they are received, even if they are
+known to not cause problems. The statement that checks the error needs to be
+`if err != nil`, and if there is a good reason to use an alternative statement
+(such ass `err == nil`), it must be documented. The body of the if statement
+should be at most 4 lines, but usually only one. Anything requiring more lines
+needs to be its own function.
+
+Example:
+
+```go
+block, err := s.AcceptBlock()
+if err != nil {
+	handleAcceptBlockErr(block, err)
+	return
+}
+```
+
 Sanity Checks
 -------------
 
@@ -103,12 +173,14 @@ transactions. Where possible, these explicit assumptions should be validated.
 
 Example:
 
+```go
 if consensus.DEBUG {
 	_, exists := tp.usedOutputs[input.OutputID]
 	if exists {
 		panic("incorrect use of addTransaction")
 	}
 }
+```
 
 In the example, a panic is called for incorrect use of the function, but only
 in debug mode. This failure will be invisible in production code, but the code

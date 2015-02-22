@@ -172,7 +172,7 @@ func (s *State) validSignatures(t Transaction) error {
 			if err != nil {
 				return err
 			}
-			cryptoSig := crypto.Signature(&edSig)
+			cryptoSig := crypto.Signature(edSig)
 
 			sigHash := t.SigHash(i)
 			err = crypto.VerifyHash(sigHash, edPK, cryptoSig)

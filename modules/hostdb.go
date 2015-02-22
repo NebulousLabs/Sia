@@ -7,7 +7,7 @@ import (
 
 const (
 	// Denotes a host announcement in the Arbitrary Data section.
-	HostAnnouncementPrefix = "HostAnnouncement"
+	PrefixHostAnnouncement = "HostAnnouncement"
 )
 
 // HostAnnouncements are stored in the Arbitrary Data section of transactions
@@ -18,9 +18,7 @@ const (
 // output in the transaction contains the frozen coins, and the
 // SpendConditions indicate the number of blocks the coins are frozen for.
 type HostAnnouncement struct {
-	IPAddress       network.Address
-	FreezeIndex     uint64 // the index of the output that froze coins
-	SpendConditions consensus.UnlockConditions
+	IPAddress network.Address
 }
 
 // HostSettings are the parameters advertised by the host. These are the

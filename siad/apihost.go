@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/NebulousLabs/Sia/consensus"
 )
 
 func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
@@ -38,20 +36,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	var freezeVolume consensus.Currency
-	var freezeDuration consensus.BlockHeight
-	_, err := fmt.Sscan(req.FormValue("freezeVolume"), &freezeVolume)
-	if err != nil {
-		writeError(w, "Malformed freezeVolume", 400)
-		return
-	}
-	_, err = fmt.Sscan(req.FormValue("freezeDuration"), &freezeDuration)
-	if err != nil {
-		writeError(w, "Malformed freezeDuration", 400)
-		return
-	}
-	// TODO: return error if address unknown
-	err = d.host.Announce(d.network.Address(), freezeVolume, freezeDuration)
+	err := d.host.Announce(d.network.Address())
 	if err != nil {
 		writeError(w, "Could not announce host:"+err.Error(), 400)
 		return
