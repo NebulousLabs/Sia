@@ -28,7 +28,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 
 	// Verify the file exists, using a mutex while reading the host.
 	h.mu.RLock()
-	contractObligation, exists := h.contracts[contractID]
+	contractObligation, exists := h.quickMap[contractID]
 	h.mu.RUnlock()
 	if !exists {
 		return errors.New("no record of that file")

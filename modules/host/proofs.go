@@ -1,116 +1,90 @@
 package host
 
 import (
-	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// ContractEntry houses a single contract with its id - you cannot derive the
-// id of a contract without having the transaction. Rather than keep the whole
-// transaction, we store only the id.
-// TODO: is this needed?
-type ContractEntry struct {
-	ID       consensus.FileContractID
-	Contract consensus.FileContract
+// Create a proof of storage for a contract, using the state height to
+// determine the random seed. Create proof must be under a host and state lock.
+func (h *Host) createStorageProof(obligation contractObligation, heightForProof consensus.BlockHeight) (err error) {
+	file, err := os.Open(obligation.path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	segmentIndex, err := h.state.StorageProofSegment(obligation.id)
+	if err != nil {
+		return
+	}
+	numSegments := crypto.CalculateSegments(obligation.fileContract.FileSize)
+	base, hashSet, err := crypto.BuildReaderProof(file, numSegments, segmentIndex)
+	if err != nil {
+		return
+	}
+	sp := consensus.StorageProof{obligation.id, base, hashSet}
+
+	// Create and send the transaction.
+	id, err := h.wallet.RegisterTransaction(consensus.Transaction{})
+	if err != nil {
+		return
+	}
+	err = h.wallet.AddStorageProof(id, sp)
+	if err != nil {
+		return
+	}
+	t, err := h.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
+	h.tpool.AcceptTransaction(t)
+
+	return
 }
 
-// TODO: Hold off on both storage proofs and deleting files for a few blocks
-// after the first possible opportunity to reduce risk of loss due to
-// blockchain reorganization.
-func (h *Host) threadedConsensusListen(updateChan chan struct{}) {
-	for _ = range updateChan {
+// threadedConsensusListen listens to a channel that's subscribed to the state
+// and updates every time the consensus set changes. When the consensus set
+// changes, the host checks if there are any storage proofs that need to be
+// submitted and submits them.
+func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
+	for _ = range consensusChan {
 		h.mu.Lock()
 
 		// Get the blocks since the recent update.
-		// TODO: Actually update the host.
-		_, _, err := h.state.BlocksSince(h.latestBlock)
+		_, appliedBlockIDs, err := h.state.BlocksSince(h.latestBlock)
 		if err != nil {
-			// This is a severe error and means that the host has somehow
-			// desynchronized. In debug mode, panic, but otherwise grab the
-			// most recent block and miss out on a bunch of diffs.
+			// The host has somehow desynchronized.
 			if consensus.DEBUG {
 				panic(err)
 			}
-
-			// TODO: Log the error
 			h.latestBlock = h.state.CurrentBlock().ID()
 		}
 
-		/*
-			// Iterate through the diffs and submit storage proofs for any contract we
-			// recognize.
-			var deletions []consensus.ContractID
-			var proofs []consensus.StorageProof
-			for _, contractDiff := range importantChanges {
-				// Check that the contract belongs to us.
-				_, exists := h.contracts[contractDiff.ContractID]
+		// Check the applied blocks and see if any of the contracts we have are
+		// ready for storage proofs.
+		for _, blockID := range appliedBlockIDs {
+			height, exists := h.state.HeightOfBlock(blockID)
+			if consensus.DEBUG {
 				if !exists {
-					continue
+					panic("a block returned by BlocksSince doesn't appear to exist")
 				}
+			}
 
-				// See if one of our contracts has terminated, and prepare to
-				// delete the file if it has.
-				if contractDiff.Terminated {
-					deletions = append(deletions, contractDiff.ContractID)
-				}
-				if contractDiff.NewOpenContract.WindowSatisfied {
-					continue
-				}
-
-				entry := ContractEntry{
-					ID:       contractDiff.ContractID,
-					Contract: contractDiff.Contract,
-				}
-				proof, err := h.createStorageProof(entry, h.state.Height())
+			for _, obligation := range h.contracts[height] {
+				// Submit a storage proof for the obligation.
+				err := h.createStorageProof(obligation, h.state.Height())
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
-				proofs = append(proofs, proof)
-			}
 
-			// Create and submit a transaction for every storage proof.
-			for _, proof := range proofs {
-				// Create the transaction.
-				minerFee := consensus.Currency(10) // TODO: ask wallet.
-				id, err := h.wallet.RegisterTransaction(consensus.Transaction{})
-				if err != nil {
-					fmt.Println("High Priority Error: RegisterTransaction failed:", err)
-					continue
-				}
-				err = h.wallet.FundTransaction(id, minerFee)
-				if err != nil {
-					fmt.Println("High Priority Error: FundTransaction failed:", err)
-					continue
-				}
-				err = h.wallet.AddMinerFee(id, minerFee)
-				if err != nil {
-					fmt.Println("High Priority Error: AddMinerFee failed:", err)
-					continue
-				}
-				err = h.wallet.AddStorageProof(id, proof)
-				if err != nil {
-					fmt.Println("High Priority Error: AddStorageProof failed:", err)
-					continue
-				}
-				transaction, err := h.wallet.SignTransaction(id, true)
-				if err != nil {
-					fmt.Println("High Priority Error: SignTransaction failed:", err)
-					continue
-				}
-
-				// Submit the transaction.
-				h.transactionChan <- transaction
-			}
-
-			// Delete all contracts which have expired.
-			for _, contractID := range deletions {
-				expiredContract := h.contracts[contractID]
-
-				fullpath := filepath.Join(h.hostDir, expiredContract.filename)
+				// Delete the obligation.
+				fullpath := filepath.Join(h.hostDir, obligation.path)
 				stat, err := os.Stat(fullpath)
 				if err != nil {
 					fmt.Println(err)
@@ -120,38 +94,10 @@ func (h *Host) threadedConsensusListen(updateChan chan struct{}) {
 				if err != nil {
 					fmt.Println(err)
 				}
-				delete(h.contracts, contractID)
 			}
-		*/
+			delete(h.contracts, height)
+		}
 
 		h.mu.Unlock()
 	}
-}
-
-// Create a proof of storage for a contract, using the state height to
-// determine the random seed. Create proof must be under a host and state lock.
-func (h *Host) createStorageProof(entry ContractEntry, heightForProof consensus.BlockHeight) (sp consensus.StorageProof, err error) {
-	contractObligation, exists := h.contracts[entry.ID]
-	if !exists {
-		err = errors.New("no record of that file")
-		return
-	}
-
-	file, err := os.Open(contractObligation.path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	segmentIndex, err := h.state.StorageProofSegment(entry.ID)
-	if err != nil {
-		return
-	}
-	numSegments := crypto.CalculateSegments(entry.Contract.FileSize)
-	base, hashSet, err := crypto.BuildReaderProof(file, numSegments, segmentIndex)
-	if err != nil {
-		return
-	}
-	sp = consensus.StorageProof{entry.ID, base, hashSet}
-	return
 }

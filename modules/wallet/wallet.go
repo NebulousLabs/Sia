@@ -147,10 +147,6 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash
 	if err != nil {
 		return
 	}
-	err = w.gateway.RelayTransaction(t)
-	if err != nil {
-		return
-	}
 
 	return
 }

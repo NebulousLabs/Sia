@@ -112,6 +112,9 @@ func verifyContract(fc consensus.FileContract, terms modules.ContractTerms, merk
 
 	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
 		return errors.New("bad file contract missed proof outputs")
+
+	case fc.TerminationHash != consensus.ZeroUnlockHash:
+		return errors.New("bad file contract termination hash")
 	}
 	return nil
 }
@@ -160,9 +163,6 @@ func (h *Host) acceptContract(txn consensus.Transaction) error {
 //      4. Renter funds, signs, and sends transaction containing file contract
 //      5. Host verifies transaction matches terms
 //      6. Host funds, signs, and submits transaction
-//
-// TODO: This function's error handling isn't safe; reveals too much info to
-// the other party.
 func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read the contract terms.
 	var terms modules.ContractTerms
@@ -254,9 +254,18 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 
 	// Add this contract to the host's list of obligations.
 	id := txn.FileContractID(0)
+	fc := txn.FileContracts[0]
+	proofHeight := fc.Expiration + StorageProofReorgDepth
 	h.mu.Lock()
-	h.contracts[id] = contractObligation{
-		path: path,
+	h.contracts[proofHeight] = append(h.contracts[proofHeight], contractObligation{
+		id:           id,
+		fileContract: fc,
+		path:         path,
+	})
+	h.quickMap[id] = contractObligation{
+		id:           id,
+		fileContract: fc,
+		path:         path,
 	}
 	h.mu.Unlock()
 

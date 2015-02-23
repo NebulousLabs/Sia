@@ -8,19 +8,18 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// TODO: Changing the host path should automatically move all of the files
-// over.
-
 const (
 	// StorageProofReorgDebth states how many blocks to wait before submitting
 	// a storage proof. This reduces the chance of needing to resubmit because
 	// of a reorg.
-	StorageProofReorgDepth = 6
+	StorageProofReorgDepth = 20
 	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire.
 )
 
 type contractObligation struct {
-	path string // Where on disk the file is stored.
+	id           consensus.FileContractID
+	fileContract consensus.FileContract
+	path         string // Where on disk the file is stored.
 }
 
 type Host struct {
@@ -36,7 +35,8 @@ type Host struct {
 	spaceRemaining int64
 	fileCounter    int
 
-	contracts map[consensus.FileContractID]contractObligation
+	quickMap  map[consensus.FileContractID]contractObligation
+	contracts map[consensus.BlockHeight][]contractObligation
 
 	mu sync.RWMutex
 }
@@ -62,16 +62,20 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			MaxFilesize: 4 * 1000 * 1000,
-			MaxDuration: 1008, // One week.
-			MinWindow:   20,
+			MaxFilesize: 16e6, // 16 MB
+			MaxDuration: 5e3,  // Just over a month.
+			MinWindow:   288,  // 48 hours.
 			Price:       consensus.NewCurrency64(1),
 			Collateral:  consensus.NewCurrency64(1),
 			UnlockHash:  addr,
 		},
 
-		contracts: make(map[consensus.FileContractID]contractObligation),
+		quickMap:  make(map[consensus.FileContractID]contractObligation),
+		contracts: make(map[consensus.BlockHeight][]contractObligation),
 	}
+
+	consensusChan := state.SubscribeToConsensusChanges()
+	go h.threadedConsensusListen(consensusChan)
 
 	return
 }
@@ -86,7 +90,6 @@ func (h *Host) SetConfig(settings modules.HostSettings) {
 
 // Settings is an RPC used to request the settings of a host.
 func (h *Host) Settings() (modules.HostSettings, error) {
-	// TODO: return an error if we haven't announced yet
 	return h.HostSettings, nil
 }
 
