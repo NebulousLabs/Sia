@@ -9,10 +9,9 @@ import (
 )
 
 type Miner struct {
-	state   *consensus.State
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
-	gateway modules.Gateway
+	state  *consensus.State
+	tpool  modules.TransactionPool
+	wallet modules.Wallet
 
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -33,7 +32,7 @@ type Miner struct {
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, gateway modules.Gateway) (m *Miner, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (m *Miner, err error) {
 	if state == nil {
 		err = errors.New("miner cannot use a nil state")
 		return
@@ -51,7 +50,6 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		state:                state,
 		tpool:                tpool,
 		wallet:               wallet,
-		gateway:              gateway,
 		threads:              1,
 		iterationsPerAttempt: 256 * 1024,
 	}

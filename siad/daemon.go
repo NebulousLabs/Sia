@@ -65,12 +65,15 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.gateway = gateway.New(d.network, d.state, d.tpool)
-	d.wallet, err = wallet.New(d.state, d.tpool, d.gateway, config.WalletDir)
+	d.gateway, err = gateway.New(d.network, d.state)
 	if err != nil {
 		return
 	}
-	d.miner, err = miner.New(d.state, d.tpool, d.wallet, d.gateway)
+	d.wallet, err = wallet.New(d.state, d.tpool, config.WalletDir)
+	if err != nil {
+		return
+	}
+	d.miner, err = miner.New(d.state, d.tpool, d.wallet)
 	if err != nil {
 		return
 	}

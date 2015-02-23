@@ -123,11 +123,20 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(tcps *network.TCPServer, s *consensus.State, tp modules.TransactionPool) *Gateway {
-	return &Gateway{
+func New(tcps *network.TCPServer, state *consensus.State) (g *Gateway, err error) {
+	if tcps == nil {
+		err = errors.New("gateway.New: cannot use nil tcp server")
+		return
+	}
+	if state == nil {
+		err = errors.New("gateway.New: cannot use nil state")
+		return
+	}
+
+	g = &Gateway{
 		tcps:  tcps,
-		state: s,
-		tpool: tp,
+		state: state,
 		peers: make(map[network.Address]struct{}),
 	}
+	return
 }
