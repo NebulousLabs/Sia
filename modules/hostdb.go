@@ -55,6 +55,11 @@ type HostDB interface {
 	// Insert adds a host to the database.
 	Insert(HostEntry) error
 
+	// PoolSize returns the number of hosts that are being selected from. The
+	// renter uses this to make sure that the pool is big enough before
+	// uploading a file.
+	NumHosts() int
+
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
 	RandomHost() (HostEntry, error)

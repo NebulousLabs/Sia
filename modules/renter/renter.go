@@ -12,10 +12,10 @@ import (
 // been uploaded to a host, including information about the host and the health
 // of the file piece.
 type FilePiece struct {
-	Host       modules.HostEntry        // Where to find the file.
+	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
 	Contract   consensus.FileContract   // The contract being enforced.
 	ContractID consensus.FileContractID // The ID of the contract.
-	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
+	Host       modules.HostEntry        // Where to find the file.
 }
 
 // A Renter is responsible for tracking all of the files that a user has
@@ -57,6 +57,9 @@ func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *
 // must exist, and there must not be any file that already has the replacement
 // nickname.
 func (r *Renter) Rename(currentName, newName string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	// Check that the currentName exists and the newName doesn't.
 	entry, exists := r.files[currentName]
 	if !exists {

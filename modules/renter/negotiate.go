@@ -82,7 +82,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	payout := clientCost.Add(hostCollateral)
 	validOutputValue := payout.Sub(consensus.FileContract{Payout: payout}.Tax())
 
-	// create ContractTerms
+	// Create the contract terms.
 	terms := modules.ContractTerms{
 		FileSize:      filesize,
 		Duration:      up.Duration,
@@ -104,6 +104,20 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		},
 	}
 
+	// Create the transaction holding the contract. This is done first so the
+	// transaction is created sooner, which will impact the user's wallet
+	// balance faster vs. waiting for the whole thing to upload before
+	// affecting the user's balance.
+	merkleRoot, err := crypto.ReaderMerkleRoot(up.Data, filesize)
+	if err != nil {
+		return
+	}
+	txn, err := r.createContractTransaction(terms, merkleRoot)
+	if err != nil {
+		return
+	}
+	up.Data.Seek(0, 0)
+
 	// Perform the negotiations with the host through a network call.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {
 		// Send the contract terms and read the response.
@@ -119,22 +133,13 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		// Set a timeout for the contract that assumes a minimum connection of
-		// 64kbps.
+		// 64kbps, then send the file followed by the transaction containing
+		// the file contract.
 		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 128 * time.Microsecond))
-
-		// Simultaneously transmit file data and calculate Merkle root.
-		tee := io.TeeReader(up.Data, conn)
-		merkleRoot, err := crypto.ReaderMerkleRoot(tee, filesize)
+		_, err = io.CopyN(conn, up.Data, int64(filesize))
 		if err != nil {
 			return
 		}
-
-		// Create and transmit transaction containing the file contract.
-		txn, err := r.createContractTransaction(terms, merkleRoot)
-		if err != nil {
-			return
-		}
-		contract = txn.FileContracts[0]
 		_, err = encoding.WriteObject(conn, txn)
 		return
 
@@ -146,6 +151,14 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		// to fund the file contract, which will prevent the host from
 		// submitting the file contract. We'll then need to upload this piece
 		// somewhere else.
+		//
+		// This will mean somehow finding the contract in the blockchain
+		// without knowing the id of the contract, because you can't know what
+		// outputs the host will use when funding the contract unless the host
+		// tells you ahead of time, which is actually something that we could
+		// arrange. For now though we're just not going to worry about it and
+		// assume everyone will play nice until we fix it. It's also not a huge
+		// catastrophe (or very incentivized) if only a few hosts play mean.
 	})
 
 	return
