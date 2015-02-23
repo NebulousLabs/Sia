@@ -92,11 +92,11 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 
 	// register RPC handlers
 	// TODO: register all RPCs in a separate function
-	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
+	err = d.network.RegisterRPC("AcceptBlock", d.state.AcceptBlock)
 	if err != nil {
 		return
 	}
-	err = d.network.RegisterRPC("RelayTransaction", d.gateway.RelayTransaction)
+	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
 	if err != nil {
 		return
 	}
