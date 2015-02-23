@@ -63,7 +63,7 @@ func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
 				panic(err)
 			}
 		}
-		h.latestBlock = h.state.CurrentBlock().ID()
+		h.latestBlock = appliedBlockIDs[len(appliedBlockIDs)-1]
 
 		// Check the applied blocks and see if any of the contracts we have are
 		// ready for storage proofs.

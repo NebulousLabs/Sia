@@ -15,13 +15,6 @@ type GatewayInfo struct {
 // it is responsible for ensuring that the local consensus set is consistent
 // with the "network" consensus set.
 type Gateway interface {
-	// AcceptBlock takes a block and submits it to the state.
-	AcceptBlock(consensus.Block) error
-
-	// AcceptTransaction takes a transaction and submits it to the transaction
-	// pool.
-	AcceptTransaction(consensus.Transaction) error
-
 	// Bootstrap joins the Sia network and establishes an initial peer list.
 	Bootstrap(network.Address) error
 

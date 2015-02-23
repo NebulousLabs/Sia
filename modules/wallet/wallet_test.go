@@ -1,12 +1,17 @@
 package wallet
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/network"
+)
+
+var (
+	tcpsPort int = 10000
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -20,7 +25,8 @@ type WalletTester struct {
 func NewWalletTester(t *testing.T) (wt *WalletTester) {
 	wt = new(WalletTester)
 	wt.ConsensusTester = consensus.NewTestingEnvironment(t)
-	tcps, err := network.NewTCPServer(":9003")
+	tcps, err := network.NewTCPServer(":" + strconv.Itoa(tcpsPort))
+	tcpsPort++
 	if err != nil {
 		t.Fatal(err)
 	}

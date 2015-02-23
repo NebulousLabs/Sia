@@ -16,9 +16,9 @@ var (
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
-	tcps  *network.TCPServer
-	state *consensus.State
-	tpool modules.TransactionPool
+	tcps        *network.TCPServer
+	state       *consensus.State
+	latestBlock consensus.BlockID
 
 	peers map[network.Address]struct{}
 
@@ -56,62 +56,22 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 }
 
 // RelayBlock relays a block, both locally and to the network.
-// RelayBlock is called by Miners.
 func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 	err = g.state.AcceptBlock(b)
 	if err != nil {
 		return
 	}
-	g.broadcast("RelayBlock", b, nil)
+	g.broadcast("AcceptBlock", b, nil)
 	return
 }
 
 // RelayTransaction relays a transaction, both locally and to the network.
-// RelayTransaction is called by Wallets.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
-	err = g.tpool.AcceptTransaction(t)
 	if err != nil {
 		return
 	}
-	g.broadcast("RelayTransaction", t, nil)
+	g.broadcast("AcceptTransaction", t, nil)
 	return
-}
-
-// SharePeers returns up to 10 randomly selected peers.
-func (g *Gateway) SharePeers() (peers []network.Address, err error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	for peer := range g.peers {
-		if len(peers) > 10 {
-			return
-		}
-		peers = append(peers, peer)
-	}
-	return
-}
-
-// AddPeer is an RPC that requests that the Gateway add a peer to its peer
-// list. The supplied peer is assumed to be the peer making the RPC.
-func (g *Gateway) AddMe(peer network.Address) error {
-	if !network.Ping(peer) {
-		return ErrUnreachable
-	}
-	g.AddPeer(peer)
-	return nil
-}
-
-// AddPeer adds a peer to the Gateway's peer list.
-func (g *Gateway) AddPeer(peer network.Address) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.addPeer(peer)
-}
-
-// RemovePeer removes a peer from the Gateway's peer list.
-func (g *Gateway) RemovePeer(peer network.Address) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.removePeer(peer)
 }
 
 // Info returns metadata about the Gateway.
@@ -123,20 +83,31 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(tcps *network.TCPServer, state *consensus.State) (g *Gateway, err error) {
+func New(tcps *network.TCPServer, s *consensus.State) (g *Gateway, err error) {
 	if tcps == nil {
-		err = errors.New("gateway.New: cannot use nil tcp server")
+		err = errors.New("gateway cannot use nil tcp server")
 		return
 	}
-	if state == nil {
-		err = errors.New("gateway.New: cannot use nil state")
+	if s == nil {
+		err = errors.New("gateway cannot use nil state")
 		return
 	}
 
 	g = &Gateway{
 		tcps:  tcps,
-		state: state,
+		state: s,
 		peers: make(map[network.Address]struct{}),
 	}
+	block, exists := g.state.BlockAtHeight(0)
+	if !exists {
+		err = errors.New("gateway state is missing the genesis block")
+		return
+	}
+	g.latestBlock = block.ID()
+
+	// Listen for new blocks.
+	c := s.SubscribeToConsensusChanges()
+	go g.threadedConsensusListen(c)
+
 	return
 }
