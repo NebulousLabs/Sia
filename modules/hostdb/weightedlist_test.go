@@ -11,6 +11,12 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
+// fakeAddr returns a network.Address to be used in a HostEntry. Such
+// addresses are needed in order to satisfy the HostDB's "1 host per IP" rule.
+func fakeAddr(n uint8) network.Address {
+	return network.Address("127.0.0." + strconv.Itoa(int(n)) + ":0")
+}
+
 // uniformTreeVerification checks that everything makes sense in the tree given
 // the number of entries that the tree is supposed to have and also given that
 // every entropy has the same weight.
@@ -72,7 +78,7 @@ func TestWeightedList(t *testing.T) {
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
 		entry.Freeze = consensus.NewCurrency64(10)
-		entry.IPAddress = network.Address(strconv.Itoa(i))
+		entry.IPAddress = fakeAddr(uint8(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions, t)
@@ -80,16 +86,16 @@ func TestWeightedList(t *testing.T) {
 	// Remove a few hosts and check that the tree is still in order.
 	removals := 12
 	// Keep a map of what we've removed so far.
-	removedMap := make(map[int]struct{})
+	removedMap := make(map[uint8]struct{})
 	for i := 0; i < removals; i++ {
 		// Try numbers until we roll a number that's not been removed yet.
-		var randInt int
+		var randInt uint8
 		for {
 			randBig, err := rand.Int(rand.Reader, big.NewInt(int64(firstInsertions)))
 			if err != nil {
 				t.Fatal(err)
 			}
-			randInt = int(randBig.Int64())
+			randInt = uint8(randBig.Int64())
 			_, exists := removedMap[randInt]
 			if !exists {
 				break
@@ -97,7 +103,7 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdb.Remove(network.Address(strconv.Itoa(randInt)))
+		err := hdb.Remove(fakeAddr(randInt))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,7 +118,7 @@ func TestWeightedList(t *testing.T) {
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
 		entry.Freeze = consensus.NewCurrency64(10)
-		entry.IPAddress = network.Address(strconv.Itoa(i))
+		entry.IPAddress = fakeAddr(uint8(i))
 		hdb.Insert(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)
