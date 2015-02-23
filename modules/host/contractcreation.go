@@ -37,40 +37,39 @@ func (h *Host) deallocate(filesize uint64, path string) {
 // considerTerms checks that the terms of a potential file contract fall
 // within acceptable bounds, as defined by the host.
 func (h *Host) considerTerms(terms modules.ContractTerms) error {
-	h.state.RLock()
-	maxheight := h.state.Height() + 20
-	h.state.RUnlock()
-
-	duration := terms.WindowSize * consensus.BlockHeight(terms.NumWindows)
-
 	switch {
-	// TODO: check for minheight too?
-	case terms.StartHeight > maxheight:
-		return errors.New("first window is too far in the future")
-
 	case terms.FileSize < h.MinFilesize || terms.FileSize > h.MaxFilesize:
 		return errors.New("file is of incorrect size")
 
 	case terms.FileSize > uint64(h.spaceRemaining):
 		return HostCapacityErr
 
-	case duration < h.MinDuration || duration > h.MaxDuration:
+	case terms.Duration < h.MinDuration || terms.Duration > h.MaxDuration:
 		return errors.New("duration is out of bounds")
+
+	case terms.DurationStart >= h.state.Height():
+		return errors.New("duration cannot start in the future")
 
 	case terms.WindowSize < h.MinWindow:
 		return errors.New("challenge window is not large enough")
-
-	case terms.ValidProofAddress != h.CoinAddress:
-		return errors.New("coins are not paying out to correct address")
-
-	case terms.MissedProofAddress != consensus.ZeroUnlockHash:
-		return errors.New("burn payout needs to go to the zero address")
 
 	case terms.Price.Cmp(h.Price) < 0:
 		return errors.New("price does not match host settings")
 
 	case terms.Collateral.Cmp(h.Collateral) > 0:
 		return errors.New("collateral does not match host settings")
+
+	case len(terms.ValidProofOutputs) != 1:
+		return errors.New("payment does not match host settings")
+
+	case terms.ValidProofOutputs[0].UnlockHash != h.UnlockHash:
+		return errors.New("payment does not match host settings")
+
+	case len(terms.MissedProofOutputs) != 1:
+		return errors.New("refund does not match host settings")
+
+	case terms.MissedProofOutputs[0].UnlockHash != consensus.ZeroUnlockHash:
+		return errors.New("coins are not paying out to correct address")
 	}
 
 	return nil
@@ -78,30 +77,41 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 
 // verifyContract verifies that the values in the FileContract match the
 // ContractTerms agreed upon.
-func verifyContract(contract consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
+func verifyContract(fc consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
+	// Get the expected payout.
+	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
+	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
+	hostCollateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
+	expectedPayout := clientCost.Add(hostCollateral)
+
 	switch {
-	case contract.FileSize != terms.FileSize:
-		return errors.New("bad FileSize")
+	case fc.FileSize != terms.FileSize:
+		return errors.New("bad file contract file size")
 
-	case contract.Start != terms.StartHeight:
-		return errors.New("bad Start")
+	case fc.FileMerkleRoot != merkleRoot:
+		return errors.New("bad file contract Merkle root")
 
-	case contract.Expiration != terms.StartHeight+(terms.WindowSize*consensus.BlockHeight(terms.NumWindows)):
-		return errors.New("bad End")
+	case fc.Start != terms.DurationStart+terms.Duration:
+		return errors.New("bad file contract start height")
 
-	case terms.Price.Add(terms.Collateral).Cmp(contract.Payout) != 0:
-		return errors.New("bad Payout")
+	case fc.Expiration != terms.DurationStart+terms.Duration+terms.WindowSize:
+		return errors.New("bad file contract expiration")
 
-	// TODO: reconstruct how the terms work.
-	case len(contract.ValidProofOutputs) != 1 || contract.ValidProofOutputs[0].UnlockHash != terms.ValidProofAddress:
-		return errors.New("bad ValidProofAddress")
+	case fc.Payout.Cmp(expectedPayout) != 0:
+		return errors.New("bad file contract payout")
 
-	// TODO: reconsturct how the terms work.
-	case len(contract.MissedProofOutputs) != 1 || contract.MissedProofOutputs[0].UnlockHash != terms.MissedProofAddress:
-		return errors.New("bad MissedProofAddress")
+	case len(fc.ValidProofOutputs) != 1:
+		return errors.New("bad file contract valid proof outputs")
 
-	case contract.FileMerkleRoot != merkleRoot:
-		return errors.New("bad FileMerkleRoot")
+	case fc.ValidProofOutputs[0].UnlockHash != terms.ValidProofOutputs[0].UnlockHash:
+		return errors.New("bad file contract valid proof outputs")
+
+	case len(fc.MissedProofOutputs) != 1:
+		return errors.New("bad file contract missed proof outputs")
+
+	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
+		return errors.New("bad file contract missed proof outputs")
 	}
 	return nil
 }

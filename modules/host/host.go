@@ -2,15 +2,9 @@ package host
 
 import (
 	"errors"
-	"io"
-	"net"
-	"os"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -18,8 +12,11 @@ import (
 // over.
 
 const (
-	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
-	maxContractLen         = 1 << 24
+	// StorageProofReorgDebth states how many blocks to wait before submitting
+	// a storage proof. This reduces the chance of needing to resubmit because
+	// of a reorg.
+	StorageProofReorgDepth = 6
+	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire.
 )
 
 type contractObligation struct {
@@ -70,53 +67,10 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 			MinWindow:   20,
 			Price:       consensus.NewCurrency64(1),
 			Collateral:  consensus.NewCurrency64(1),
-			CoinAddress: addr,
+			UnlockHash:  addr,
 		},
 
 		contracts: make(map[consensus.FileContractID]contractObligation),
-	}
-
-	return
-}
-
-// RetrieveFile is an RPC that uploads a specified file to a client.
-//
-// Mutexes are applied carefully to avoid any disk intensive or network
-// intensive operations. All necessary interaction with the host involves
-// looking up the filepath of the file being requested. This is done all at
-// once.
-//
-// TODO: Move this function to a different file in the package?
-func (h *Host) RetrieveFile(conn net.Conn) (err error) {
-	// Get the filename.
-	var contractID consensus.FileContractID
-	err = encoding.ReadObject(conn, &contractID, crypto.HashSize)
-	if err != nil {
-		return
-	}
-
-	// Verify the file exists, using a mutex while reading the host.
-	h.mu.RLock()
-	contractObligation, exists := h.contracts[contractID]
-	h.mu.RUnlock()
-	if !exists {
-		return errors.New("no record of that file")
-	}
-
-	// Open the file.
-	file, err := os.Open(contractObligation.path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	info, _ := file.Stat()
-
-	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 8 * time.Microsecond))
-
-	// Transmit the file.
-	_, err = io.Copy(conn, file)
-	if err != nil {
-		return
 	}
 
 	return

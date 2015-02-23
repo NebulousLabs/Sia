@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // StateInfo contains basic information about the State.
@@ -267,7 +268,7 @@ func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 	// This will stop too-large transactions from accidentally being validated.
 	// This check doesn't happen when checking blocks, because the size of the
 	// block was already checked.
-	if len(enconding.Marshal(t)) < MaxBlockSize - 5e3 {
+	if len(encoding.Marshal(t)) > BlockSizeLimit-5e3 {
 		return errors.New("transaction is too large")
 	}
 

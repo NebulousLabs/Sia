@@ -14,10 +14,6 @@ func (h *Host) Announce(addr network.Address) (err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// get current state height
-	h.state.RLock()
-	h.state.RUnlock()
-
 	// create the transaction that will hold the announcement
 	var t consensus.Transaction
 	id, err := h.wallet.RegisterTransaction(t)

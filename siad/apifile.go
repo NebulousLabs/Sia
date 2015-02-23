@@ -29,12 +29,8 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	defer file.Close()
 
 	err = d.renter.Upload(modules.UploadParams{
-		Data: file,
-
-		// TODO: the user should probably supply these
+		Data:     file,
 		Duration: duration,
-		Delay:    delay,
-
 		Nickname: req.FormValue("nickname"),
 		Pieces:   pieces,
 	})
@@ -61,12 +57,8 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 	}
 
 	err = d.renter.Upload(modules.UploadParams{
-		Data: file,
-
-		// TODO: the user should probably supply these
+		Data:     file,
 		Duration: duration,
-		Delay:    delay,
-
 		Nickname: req.FormValue("nickname"),
 		Pieces:   pieces,
 	})
