@@ -202,6 +202,7 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	// may depend on existing unconfirmed transactions.
 	direction := true
 	tp.addTransactionToPool(t, direction)
+	tp.gateway.RelayTransaction(t) // error is not checked
 
 	return
 }

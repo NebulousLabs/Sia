@@ -57,15 +57,15 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
-	d.tpool, err = transactionpool.New(d.state)
-	if err != nil {
-		return
-	}
 	d.network, err = network.NewTCPServer(config.RPCAddr)
 	if err != nil {
 		return
 	}
 	d.gateway, err = gateway.New(d.network, d.state)
+	if err != nil {
+		return
+	}
+	d.tpool, err = transactionpool.New(d.state, d.gateway)
 	if err != nil {
 		return
 	}

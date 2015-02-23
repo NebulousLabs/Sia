@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // The current transaction pool code is blind to miner fees, and will not
@@ -35,6 +36,7 @@ type unconfirmedTransaction struct {
 type TransactionPool struct {
 	state       *consensus.State
 	recentBlock consensus.BlockID
+	gateway     modules.Gateway
 
 	// Linked list variables.
 	head *unconfirmedTransaction
@@ -61,17 +63,21 @@ type TransactionPool struct {
 }
 
 // New creates a transaction pool that's ready to receive transactions.
-func New(state *consensus.State) (tp *TransactionPool, err error) {
-	if state == nil {
-		err = errors.New("transaction pool cannot use an nil state")
+func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error) {
+	if s == nil {
+		err = errors.New("transaction pool cannot use a nil state")
 		return
+	}
+	if g == nil {
+		err = errors.New("transaction pool cannot use a nil gateway")
 	}
 
 	// Return a transaction pool with no transactions and a recentBlock
 	// pointing to the state's current block.
 	tp = &TransactionPool{
-		state:       state,
-		recentBlock: state.CurrentBlock().ID(),
+		state:       s,
+		recentBlock: s.CurrentBlock().ID(),
+		gateway:     g,
 
 		transactions:   make(map[crypto.Hash]*unconfirmedTransaction),
 		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
