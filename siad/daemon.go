@@ -74,7 +74,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.host, err = host.New(d.state, d.wallet)
+	d.host, err = host.New(d.state, d.tpool, d.wallet)
 	if err != nil {
 		return
 	}

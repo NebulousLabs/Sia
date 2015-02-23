@@ -62,8 +62,8 @@ func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
 			if consensus.DEBUG {
 				panic(err)
 			}
-			h.latestBlock = h.state.CurrentBlock().ID()
 		}
+		h.latestBlock = h.state.CurrentBlock().ID()
 
 		// Check the applied blocks and see if any of the contracts we have are
 		// ready for storage proofs.
@@ -75,7 +75,7 @@ func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
 				}
 			}
 
-			for _, obligation := range h.contracts[height] {
+			for _, obligation := range h.obligationsByHeight[height] {
 				// Submit a storage proof for the obligation.
 				err := h.createStorageProof(obligation, h.state.Height())
 				if err != nil {
@@ -94,8 +94,10 @@ func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
 				if err != nil {
 					fmt.Println(err)
 				}
+
+				delete(h.obligationsByID, obligation.id)
 			}
-			delete(h.contracts, height)
+			delete(h.obligationsByHeight, height)
 		}
 
 		h.mu.Unlock()

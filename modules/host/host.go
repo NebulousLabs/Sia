@@ -16,39 +16,46 @@ const (
 	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 )
 
+// A contractObligation tracks a file contract that the host is obligated to
+// fulfill.
 type contractObligation struct {
 	id           consensus.FileContractID
 	fileContract consensus.FileContract
 	path         string // Where on disk the file is stored.
 }
 
+// A Host contains all the fields necessary for storing files for clients and
+// performing the storage proofs on the received files.
 type Host struct {
 	state       *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	// our HostSettings, embedded for convenience
-	modules.HostSettings
-
 	hostDir        string
 	spaceRemaining int64
 	fileCounter    int
 
-	quickMap  map[consensus.FileContractID]contractObligation
-	contracts map[consensus.BlockHeight][]contractObligation
+	obligationsByID     map[consensus.FileContractID]contractObligation
+	obligationsByHeight map[consensus.BlockHeight][]contractObligation
+
+	modules.HostSettings
 
 	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
-	if wallet == nil {
-		err = errors.New("host.New: cannot have nil wallet")
-		return
-	}
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (h *Host, err error) {
 	if state == nil {
 		err = errors.New("host.New: cannot have nil state")
+		return
+	}
+	if tpool == nil {
+		err = errors.New("host.New: cannot have nil tpool")
+		return
+	}
+	if wallet == nil {
+		err = errors.New("host.New: cannot have nil wallet")
 		return
 	}
 
@@ -58,6 +65,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 	}
 	h = &Host{
 		state:  state,
+		tpool:  tpool,
 		wallet: wallet,
 
 		// default host settings
@@ -70,9 +78,15 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 			UnlockHash:  addr,
 		},
 
-		quickMap:  make(map[consensus.FileContractID]contractObligation),
-		contracts: make(map[consensus.BlockHeight][]contractObligation),
+		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
+		obligationsByHeight: make(map[consensus.BlockHeight][]contractObligation),
 	}
+	block, exists := state.BlockAtHeight(0)
+	if !exists {
+		err = errors.New("state doesn't have a genesis block?")
+		return
+	}
+	h.latestBlock = block.ID()
 
 	consensusChan := state.SubscribeToConsensusChanges()
 	go h.threadedConsensusListen(consensusChan)
@@ -101,7 +115,7 @@ func (h *Host) Info() modules.HostInfo {
 		HostSettings: h.HostSettings,
 
 		StorageRemaining: h.spaceRemaining,
-		NumContracts:     len(h.contracts),
+		NumContracts:     len(h.obligationsByID),
 	}
 	return info
 }

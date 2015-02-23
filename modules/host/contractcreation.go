@@ -257,12 +257,12 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	fc := txn.FileContracts[0]
 	proofHeight := fc.Expiration + StorageProofReorgDepth
 	h.mu.Lock()
-	h.contracts[proofHeight] = append(h.contracts[proofHeight], contractObligation{
+	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], contractObligation{
 		id:           id,
 		fileContract: fc,
 		path:         path,
 	})
-	h.quickMap[id] = contractObligation{
+	h.obligationsByID[id] = contractObligation{
 		id:           id,
 		fileContract: fc,
 		path:         path,
