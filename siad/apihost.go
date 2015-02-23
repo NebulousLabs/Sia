@@ -31,7 +31,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	d.host.SetConfig(config)
+	d.host.SetSettings(config)
 	writeSuccess(w)
 }
 

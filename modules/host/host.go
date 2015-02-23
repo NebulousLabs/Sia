@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	// StorageProofReorgDebth states how many blocks to wait before submitting
+	// StorageProofReorgDepth states how many blocks to wait before submitting
 	// a storage proof. This reduces the chance of needing to resubmit because
 	// of a reorg.
 	StorageProofReorgDepth = 20
-	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire.
+	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 )
 
 type contractObligation struct {
@@ -62,9 +62,9 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			MaxFilesize: 16e6, // 16 MB
-			MaxDuration: 5e3,  // Just over a month.
-			MinWindow:   288,  // 48 hours.
+			MaxFilesize: 300e6, // 300 MB
+			MaxDuration: 5e3,   // Just over a month.
+			MinWindow:   288,   // 48 hours.
 			Price:       consensus.NewCurrency64(1),
 			Collateral:  consensus.NewCurrency64(1),
 			UnlockHash:  addr,
@@ -82,7 +82,7 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
-func (h *Host) SetConfig(settings modules.HostSettings) {
+func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.HostSettings = settings

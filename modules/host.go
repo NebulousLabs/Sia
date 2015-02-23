@@ -47,7 +47,7 @@ type Host interface {
 	RetrieveFile(net.Conn) error
 
 	// SetConfig sets the hosting parameters of the host.
-	SetConfig(HostSettings)
+	SetSettings(HostSettings)
 
 	// Info returns info about the host, including its hosting parameters, the
 	// amount of storage remaining, and the number of active contracts.
