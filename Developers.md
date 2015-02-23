@@ -10,6 +10,12 @@ information, check the [go documentation](http://golang.org/doc/install).
 If you plan on cross compiling Sia, you may need to install go from source. You
 can find information on that [here](http://golang.org/doc/install/source).
 
+When you clone the Sia repository, make sure that you call `git clone` from the
+folder `$GOPATH/github.com/NebulousLabs/`. It will not be sufficient to clone
+Sia from the gopath. Alternatively, you should be able to call `go get -u
+github.com/NebulousLabs/Sia/... && go get -u
+github.com/NebulousLabs/Sia/modules/...`.
+
 Golang does not like sym links, a problem which seems to have appeared
 recently. If you are using a sym link, you can expect to see an error similar
 to the one below:
