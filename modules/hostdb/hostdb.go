@@ -10,14 +10,15 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
-// The HostDB is a set of hosts that get weighted and inserted into a tree
+// The HostDB is a database of potential hosts. It assigns a weight to each
+// host based on their hosting parameters.
 type HostDB struct {
 	state       *consensus.State
 	recentBlock consensus.BlockID
 
 	hostTree      *hostNode
-	activeHosts   map[network.Address]*hostNode
-	inactiveHosts map[network.Address]*modules.HostEntry
+	activeHosts   map[string]*hostNode
+	inactiveHosts map[string]*modules.HostEntry
 
 	mu sync.RWMutex
 }
@@ -31,39 +32,44 @@ func New(state *consensus.State) (hdb *HostDB, err error) {
 	hdb = &HostDB{
 		state:         state,
 		recentBlock:   state.CurrentBlock().ID(),
-		activeHosts:   make(map[network.Address]*hostNode),
-		inactiveHosts: make(map[network.Address]*modules.HostEntry),
+		activeHosts:   make(map[string]*hostNode),
+		inactiveHosts: make(map[string]*modules.HostEntry),
 	}
 	return
 }
 
 // insert will add a host entry to the state.
 func (hdb *HostDB) insert(entry modules.HostEntry) error {
-	_, exists := hdb.activeHosts[entry.IPAddress]
+	// Entries are stored by address, sans port number. This limits each IP to
+	// advertising 1 host.
+	hostname := entry.IPAddress.Host()
+	_, exists := hdb.activeHosts[hostname]
 	if exists {
 		return errors.New("entry of given id already exists in host db")
 	}
 
 	if hdb.hostTree == nil {
 		hdb.hostTree = createNode(nil, entry)
-		hdb.activeHosts[entry.IPAddress] = hdb.hostTree
+		hdb.activeHosts[hostname] = hdb.hostTree
 	} else {
 		_, hostNode := hdb.hostTree.insert(entry)
-		hdb.activeHosts[entry.IPAddress] = hostNode
+		hdb.activeHosts[hostname] = hostNode
 	}
 	return nil
 }
 
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) remove(addr network.Address) error {
+	// Strip the port (see insert).
+	hostname := addr.Host()
 	// See if the node is in the set of active hosts.
-	node, exists := hdb.activeHosts[addr]
+	node, exists := hdb.activeHosts[hostname]
 	if !exists {
 		// If the node is in the set of inactive hosts, delete from that set,
 		// otherwise return a not found error.
-		_, exists := hdb.inactiveHosts[addr]
+		_, exists := hdb.inactiveHosts[hostname]
 		if exists {
-			delete(hdb.inactiveHosts, addr)
+			delete(hdb.inactiveHosts, hostname)
 			return nil
 		} else {
 			return errors.New("address not found in host database")
@@ -71,7 +77,7 @@ func (hdb *HostDB) remove(addr network.Address) error {
 	}
 
 	// Delete the node from the active hosts, and remove it from the tree.
-	delete(hdb.activeHosts, addr)
+	delete(hdb.activeHosts, hostname)
 	node.remove()
 
 	return nil

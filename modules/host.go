@@ -32,9 +32,7 @@ type HostInfo struct {
 }
 
 type Host interface {
-	// Announce announces the host on the blockchain. A host announcement
-	// requires two things: the host's address, and a volume of "frozen"
-	// (time-locked) coins, used to mitigate Sybil attacks.
+	// Announce announces the host on the blockchain.
 	Announce(addr network.Address) error
 
 	// NegotiateContract is a strict function that enables a client to

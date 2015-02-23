@@ -13,7 +13,7 @@ const (
 	FileContractConfirmWindow = 10
 	TransactionSizeLimit      = 16 * 1024
 
-	PrefixNonSia = "NonSia\n"
+	PrefixNonSia = "NonSia"
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
