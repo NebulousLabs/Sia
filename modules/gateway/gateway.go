@@ -57,19 +57,12 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 
 // RelayBlock relays a block, both locally and to the network.
 func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
-	err = g.state.AcceptBlock(b)
-	if err != nil {
-		return
-	}
 	g.broadcast("AcceptBlock", b, nil)
 	return
 }
 
 // RelayTransaction relays a transaction, both locally and to the network.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
-	if err != nil {
-		return
-	}
 	g.broadcast("AcceptTransaction", t, nil)
 	return
 }

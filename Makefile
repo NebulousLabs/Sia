@@ -31,7 +31,7 @@ test: clean fmt REBUILD
 # with the race libraries enabled. test-long aims to be
 # thorough.
 test-long: clean fmt REBUILD
-	go test -v -race -tags=test -timeout=30s ./...
+	go test -v -race -tags=test -timeout=40s ./...
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.

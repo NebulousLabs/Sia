@@ -115,6 +115,9 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	node, exists := s.blockMap[id]
 	if !exists {
 		err = errors.New("requested an unknown block")
