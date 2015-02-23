@@ -264,6 +264,13 @@ func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	// This will stop too-large transactions from accidentally being validated.
+	// This check doesn't happen when checking blocks, because the size of the
+	// block was already checked.
+	if len(enconding.Marshal(t)) < MaxBlockSize - 5e3 {
+		return errors.New("transaction is too large")
+	}
+
 	err = t.FollowsStorageProofRules()
 	if err != nil {
 		return
