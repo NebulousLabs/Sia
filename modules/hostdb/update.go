@@ -36,24 +36,10 @@ func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry
 	return
 }
 
-// threadedInsertNewEntry takes a host entry and asks the host what its
-// settings are. After getting the settings, the entry is inserted into the
-// host database.
-func (hdb *HostDB) threadedInsertNewEntry(entry modules.HostEntry) {
-	// Add the host to the set of all hosts.
-	hdb.allHosts[entry.IPAddress] = &entry
-
-	err := entry.IPAddress.RPC("HostSettings", nil, &entry.HostSettings)
-	if err != nil {
-		return
-	}
-	hdb.Insert(entry)
-}
-
 // update grabs all of the new blocks from the consensus set and searches them
 // for host announcements. The threading is careful to avoid holding a lock
 // while network communication is happening.
-func (hdb *HostDB) threadedUpdate() {
+func (hdb *HostDB) update() {
 	hdb.state.RLock()
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {
@@ -78,7 +64,8 @@ func (hdb *HostDB) threadedUpdate() {
 			continue
 		}
 		for _, entry := range findHostAnnouncements(block) {
-			go hdb.threadedInsertNewEntry(entry)
+			hdb.allHosts[entry.IPAddress] = &entry
+			go hdb.threadedInsert(&entry)
 		}
 	}
 

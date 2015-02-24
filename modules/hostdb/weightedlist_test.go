@@ -74,12 +74,11 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		var entry modules.HostEntry
+		entry := new(modules.HostEntry)
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
-		entry.Freeze = consensus.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
-		hdb.Insert(entry)
+		hdb.insertCompleteHostEntry(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions, t)
 
@@ -114,12 +113,11 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		var entry modules.HostEntry
+		entry := new(modules.HostEntry)
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
-		entry.Freeze = consensus.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
-		hdb.Insert(entry)
+		hdb.insertCompleteHostEntry(entry)
 	}
 	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)
 }

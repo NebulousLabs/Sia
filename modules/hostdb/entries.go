@@ -11,30 +11,48 @@ import (
 
 // For the time being, all entries are weighted equally.
 //
-// TODO: Weight entries according to cryptographically verified queries of host
-// capacity.
+// TODO: Take collateral and price into account when weighting.
 func entryWeight(entry modules.HostEntry) consensus.Currency {
 	return consensus.NewCurrency64(1)
 }
 
-// insert adds a host entry to the state.
-func (hdb *HostDB) insert(entry modules.HostEntry) error {
-	// Entries are stored by address, sans port number. This limits each IP to
-	// advertising 1 host.
+// insertCompleteHostEntry inserts a host entry without making a network call
+// to the host to grab the settings.
+func (hdb *HostDB) insertCompleteHostEntry(entry *modules.HostEntry) {
+	// Active entries are stored by address, sans port number. This limits each
+	// IP to advertising 1 host. Do not replace
 	hostname := entry.IPAddress.Host()
 	_, exists := hdb.activeHosts[hostname]
 	if exists {
-		return errors.New("entry of given id already exists in host db")
+		return
 	}
 
+	// Add the host as a node to the host tree.
 	if hdb.hostTree == nil {
-		hdb.hostTree = createNode(nil, entry)
+		hdb.hostTree = createNode(nil, *entry)
 		hdb.activeHosts[hostname] = hdb.hostTree
 	} else {
-		_, hostNode := hdb.hostTree.insert(entry)
+		_, hostNode := hdb.hostTree.insert(*entry)
 		hdb.activeHosts[hostname] = hostNode
 	}
-	return nil
+}
+
+// threadedInsert adds a host entry to the state. The entry is passed by
+// pointer so that changes made to the entry are received by all parties.
+func (hdb *HostDB) threadedInsert(entry *modules.HostEntry) {
+	// Get the settings from the host. Host will remain active if a valid
+	// response is not given.
+	var hs modules.HostSettings
+	err := entry.IPAddress.RPC("HostSettings", nil, &hs)
+	if err != nil {
+		return
+	}
+
+	// Lock the host db after the network call has finished.
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
+	entry.HostSettings = hs
+	hdb.insertCompleteHostEntry(entry)
 }
 
 // Remove deletes an entry from the hostdb.
@@ -70,14 +88,16 @@ func (hdb *HostDB) FlagHost(addr network.Address) error {
 func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	return hdb.insert(entry)
+	hdb.allHosts[entry.IPAddress] = &entry
+	go hdb.threadedInsert(&entry)
+	return nil
 }
 
 // NumHosts returns the number of hosts in the active database.
 func (hdb *HostDB) NumHosts() int {
-	hdb.threadedUpdate()
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
+	hdb.update()
 
 	if hdb.hostTree == nil {
 		return 0
@@ -88,9 +108,9 @@ func (hdb *HostDB) NumHosts() int {
 // RandomHost pulls a random host from the hostdb weighted according to the
 // internal metrics of the hostdb.
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
-	hdb.threadedUpdate()
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
+	hdb.update()
 
 	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
