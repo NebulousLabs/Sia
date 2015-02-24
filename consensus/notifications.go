@@ -14,11 +14,11 @@ func (s *State) notifySubscribers() {
 
 // SubscribeToConsensusChanges returns a channel that will be sent an empty
 // struct every time the consensus set changes.
-func (s *State) SubscribeToConsensusChanges() (c chan struct{}) {
+func (s *State) SubscribeToConsensusChanges() <-chan struct{} {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c = make(chan struct{}, 1)
+	c := make(chan struct{}, 1)
 	s.subscriptions[s.subscriptionCounter] = c
 	s.subscriptionCounter++
-	return
+	return c
 }

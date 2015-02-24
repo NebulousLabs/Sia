@@ -57,7 +57,25 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 
 // RelayBlock relays a block, both locally and to the network.
 func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
-	g.broadcast("AcceptBlock", b, nil)
+	err = g.state.AcceptBlock(b)
+	if err != nil {
+		return
+	}
+
+	// Check if b is in the current path.
+	height, exists := g.state.HeightOfBlock(b.ID())
+	if !exists {
+		if consensus.DEBUG {
+			panic("could not get the height of a block that did not return an error when being accepted into the state.")
+		}
+		return errors.New("state malfunction")
+	}
+	currentPathBlock, exists := g.state.BlockAtHeight(height)
+	if !exists || b.ID() != currentPathBlock.ID() {
+		return errors.New("block added, but it does not extend the state height.")
+	}
+
+	g.broadcast("RelayBlock", b, nil)
 	return
 }
 
@@ -97,10 +115,6 @@ func New(tcps *network.TCPServer, s *consensus.State) (g *Gateway, err error) {
 		return
 	}
 	g.latestBlock = block.ID()
-
-	// Listen for new blocks.
-	c := s.SubscribeToConsensusChanges()
-	go g.threadedConsensusListen(c)
 
 	return
 }

@@ -31,7 +31,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(s, tpool, w)
+	m, err := New(s, g, tpool, w)
 	if err != nil {
 		t.Fatal(err)
 	}

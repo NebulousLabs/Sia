@@ -51,7 +51,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 // and updates every time the consensus set changes. When the consensus set
 // changes, the host checks if there are any storage proofs that need to be
 // submitted and submits them.
-func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
+func (h *Host) threadedConsensusListen(consensusChan <-chan struct{}) {
 	for _ = range consensusChan {
 		h.mu.Lock()
 
@@ -80,6 +80,7 @@ func (h *Host) threadedConsensusListen(consensusChan chan struct{}) {
 				err := h.createStorageProof(obligation, h.state.Height())
 				if err != nil {
 					fmt.Println(err)
+					h.mu.Unlock()
 					continue
 				}
 

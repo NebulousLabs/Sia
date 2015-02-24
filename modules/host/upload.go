@@ -42,7 +42,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	defer file.Close()
 	info, _ := file.Stat()
 
-	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 8 * time.Microsecond))
+	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 128 * time.Microsecond))
 
 	// Transmit the file.
 	_, err = io.Copy(conn, file)

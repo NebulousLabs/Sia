@@ -29,6 +29,10 @@ type Gateway interface {
 	// peers.
 	Synchronize() error
 
+	// RelayBlock accepts a block and submits it to the state, broadcasting it
+	// to the network if it's valid and on the current longest fork.
+	RelayBlock(consensus.Block) error
+
 	// RelayTransaction announces a transaction to all of the Gateway's
 	// known peers.
 	RelayTransaction(consensus.Transaction) error
