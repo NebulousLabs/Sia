@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	tcpsPort int = 10500
+	tcpsPort int = 11000
 )
 
 // A RenterTester contains a consensus tester and a renter, and provides a set
