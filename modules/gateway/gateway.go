@@ -9,6 +9,12 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
+const (
+	// maxStrikes is the number of "strikes" that can be incurred by a peer
+	// before it will be removed.
+	maxStrikes = 5
+)
+
 var (
 	ErrNoPeers     = errors.New("no peers")
 	ErrUnreachable = errors.New("peer did not respond to ping")
@@ -20,7 +26,10 @@ type Gateway struct {
 	state       *consensus.State
 	latestBlock consensus.BlockID
 
-	peers map[network.Address]struct{}
+	// Peers are stored in a map to guarantee uniqueness. They are paired with
+	// the number of "strikes" against them; peers with too many strikes are
+	// removed.
+	peers map[network.Address]int
 
 	mu sync.RWMutex
 }
@@ -118,7 +127,7 @@ func New(tcps *network.TCPServer, s *consensus.State) (g *Gateway, err error) {
 	g = &Gateway{
 		tcps:  tcps,
 		state: s,
-		peers: make(map[network.Address]struct{}),
+		peers: make(map[network.Address]int),
 	}
 	block, exists := g.state.BlockAtHeight(0)
 	if !exists {

@@ -14,7 +14,7 @@ func (g *Gateway) addPeer(peer network.Address) error {
 	if _, exists := g.peers[peer]; exists {
 		return errors.New("peer already added")
 	}
-	g.peers[peer] = struct{}{}
+	g.peers[peer] = 0
 	return nil
 }
 
@@ -37,21 +37,37 @@ func (g *Gateway) randomPeer() (network.Address, error) {
 	return "", ErrNoPeers
 }
 
-// threadedBroadcast broadcasts an RPC to all of the Gateway's peers. The
-// calls are run in parallel.
+// threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
+// list. The calls are run in parallel.
 func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
-	g.mu.RLock()
+	var badpeers []network.Address
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
+
+	g.mu.RLock()
 	for peer := range g.peers {
+		// contact each peer in a separate thread
 		go func(peer network.Address) {
-			peer.RPC(name, arg, resp)
+			err := peer.RPC(name, arg, resp)
+			// TODO: some errors will be our fault. Need to distinguish them.
+			if err != nil {
+				badpeers = append(badpeers, peer)
+			}
 			wg.Done()
 		}(peer)
 	}
-	// release lock while we wait for RPCs to complete
 	g.mu.RUnlock()
 	wg.Wait()
+
+	// process the bad peers
+	g.mu.Lock()
+	for _, peer := range badpeers {
+		g.peers[peer]++ // increment strikes
+		if g.peers[peer] > maxStrikes {
+			g.removePeer(peer)
+		}
+	}
+	g.mu.Unlock()
 }
 
 func (g *Gateway) save(filename string) error {
