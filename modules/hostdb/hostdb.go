@@ -37,7 +37,7 @@ func New(s *consensus.State) (hdb *HostDB, err error) {
 	genesisBlock, exists := s.BlockAtHeight(0)
 	if !exists {
 		if consensus.DEBUG {
-			panic(ErrMissingGenesisBlock.Error())
+			panic(ErrMissingGenesisBlock)
 		}
 		err = ErrMissingGenesisBlock
 		return

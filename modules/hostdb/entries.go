@@ -3,17 +3,32 @@ package hostdb
 import (
 	"crypto/rand"
 	"errors"
+	"math/big"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/network"
 )
 
-// For the time being, all entries are weighted equally.
-//
-// TODO: Take collateral and price into account when weighting.
-func entryWeight(entry modules.HostEntry) consensus.Currency {
-	return consensus.NewCurrency64(1)
+// entryWeight returns the weight of a host entry according to the internal
+// metrics of the HostDB. Currently, that means using the weight (10^30 *
+// entry.Collateral / (entry.Price)^2), where entry.Collateral is adjusted to
+// be at most twice the price and at least half the price.
+func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
+	// Clamp the collateral to between 0.5x and 2x the price.
+	collateral := entry.Collateral
+	if collateral.Cmp(entry.Price.MulFloat(2)) > 0 {
+		collateral = entry.Price.MulFloat(2)
+	} else if collateral.Cmp(entry.Price.MulFloat(0.5)) < 0 {
+		collateral = entry.Price.MulFloat(0.5)
+	}
+
+	// Create a baseline weight of 10^30, which adds precision to the equation
+	// and makes sure that all reasonable prices end with a weight that's
+	// greater than zero.
+	weight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
+	weight = weight.Mul(collateral).Div(entry.Price).Div(entry.Price)
+	return
 }
 
 // insertCompleteHostEntry inserts a host entry without making a network call
