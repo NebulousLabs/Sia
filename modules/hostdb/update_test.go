@@ -20,6 +20,35 @@ func TestFindHostAnnouncements(t *testing.T) {
 		t.Error("host found after initialization")
 	}
 
+	// Submit a transaction to the blockchain with random arbitrary data, check
+	// that it's not interpreted as a host announcement.
+	noAnnouncementTxn := consensus.Transaction{
+		ArbitraryData: []string{"bad data"},
+	}
+	err := hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{noAnnouncementTxn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdbt.update()
+	if len(hdbt.allHosts) != 0 {
+		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
+	}
+
+	// Submit a transaction to the blockchain that says it's a host
+	// announcement, but doesn't decode into one, and check that it's not
+	// interpreted as one.
+	dirtyAnnouncementTxn := consensus.Transaction{
+		ArbitraryData: []string{modules.PrefixHostAnnouncement},
+	}
+	err = hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{dirtyAnnouncementTxn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdbt.update()
+	if len(hdbt.allHosts) != 0 {
+		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
+	}
+
 	// Submit a host announcement to the blockchain for a host that won't
 	// respond.
 	falseAnnouncement := string(encoding.Marshal(modules.HostAnnouncement{
@@ -28,8 +57,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	falseAnnouncementTxn := consensus.Transaction{
 		ArbitraryData: []string{modules.PrefixHostAnnouncement + falseAnnouncement},
 	}
-	falseAnnouncementBlock := hdbt.MineCurrentBlock([]consensus.Transaction{falseAnnouncementTxn})
-	err := hdbt.AcceptBlock(falseAnnouncementBlock)
+	err = hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{falseAnnouncementTxn})
 	if err != nil {
 		t.Fatal(err)
 	}
