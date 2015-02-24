@@ -10,25 +10,36 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
-// entryWeight returns the weight of a host entry according to the internal
-// metrics of the HostDB. Currently, that means using the weight (10^30 *
-// entry.Collateral / (entry.Price)^2), where entry.Collateral is adjusted to
-// be at most twice the price and at least half the price.
+var (
+	// Because most weights would otherwise be fractional, we set the base
+	// weight to 10^30 to give ourselves lots of precision when determing an
+	// entries weight.
+	baseWeight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
+
+	// Convenience variables for doing currency math. Originally we were just
+	// using MulFloat but this was causing precision problems during testing.
+	currencyTwo      = consensus.NewCurrency64(2)
+	currencyFive     = consensus.NewCurrency64(5)
+	currencyTen      = consensus.NewCurrency64(10)
+	currencyTwenty   = consensus.NewCurrency64(20)
+	currencyThousand = consensus.NewCurrency64(1e3)
+)
+
+// entryWeight returns the weight of an entry according to the price and
+// collateral of the entry. The current general equation is:
+//		(collateral / price^2).
 func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 	// Clamp the collateral to between 0.5x and 2x the price.
 	collateral := entry.Collateral
-	if collateral.Cmp(entry.Price.MulFloat(2)) > 0 {
-		collateral = entry.Price.MulFloat(2)
-	} else if collateral.Cmp(entry.Price.MulFloat(0.5)) < 0 {
-		collateral = entry.Price.MulFloat(0.5)
+	if collateral.Cmp(entry.Price.Mul(currencyTwo)) > 0 {
+		collateral = entry.Price.Mul(currencyTwo)
+	} else if collateral.Cmp(entry.Price.Div(currencyTwo)) < 0 {
+		collateral = entry.Price.Div(currencyTwo)
 	}
 
-	// Create a baseline weight of 10^30, which adds precision to the equation
-	// and makes sure that all reasonable prices end with a weight that's
-	// greater than zero.
-	weight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
-	weight = weight.Mul(collateral).Div(entry.Price).Div(entry.Price)
-	return
+	// Take the base weight, multiply it by the clapmed collateral, then divide
+	// it by the square of the price.
+	return baseWeight.Mul(collateral).Div(entry.Price).Div(entry.Price)
 }
 
 // insertCompleteHostEntry inserts a host entry without making a network call
