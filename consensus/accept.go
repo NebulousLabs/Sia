@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrBadBlock        = errors.New("block is known to be invalid")
+	ErrBadBlock = errors.New("block is known to be invalid")
 	ErrBlockKnown      = errors.New("block exists in block map")
 	ErrEarlyTimestamp  = errors.New("block timestamp is too early")
 	ErrFutureTimestamp = errors.New("block timestamp too far in future")

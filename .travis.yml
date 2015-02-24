@@ -5,6 +5,7 @@ go:
 
 install:
   - make dependencies
+  - make fmt-strict
   - make
 
 script: make test-long && make cover

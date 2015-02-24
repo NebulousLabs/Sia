@@ -6,6 +6,9 @@ all: install
 fmt:
 	go fmt ./...
 
+fmt-strict:
+	@exit $(shell go fmt ./... | wc -l)
+
 # REBUILD touches all of the build-dependent source files, forcing them to be
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
 # a rebuild when build tags have been changed.
