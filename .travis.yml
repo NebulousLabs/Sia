@@ -1,10 +1,11 @@
 language: go
 
 go:
-  - 1.4
+  - 1.4.1
 
 install:
   - make dependencies
+  - $(exit $(go fmt ./... | wc -l))
   - make
 
 script: make test-long && make cover
