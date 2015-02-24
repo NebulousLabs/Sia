@@ -1,13 +1,21 @@
 package transactionpool
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/network"
 )
 
-// a TpoolTester contains a testing assistant and a transaction pool, and
-// provides statefullness for doing testing.
+var (
+	tcpsPort int = 9500
+)
+
+// a TpoolTester contains a consensus tester and a transaction pool, and
+// provides a set of helper functions for testing the transaction pool without
+// modules that need to use the transaction pool.
 type TpoolTester struct {
 	*consensus.ConsensusTester
 	*TransactionPool
@@ -16,7 +24,16 @@ type TpoolTester struct {
 // CreateTpoolTester initializes a TpoolTester.
 func CreateTpoolTester(t *testing.T) (tpt *TpoolTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	tp, err := New(ct.State)
+	tcps, err := network.NewTCPServer(":" + strconv.Itoa(tcpsPort))
+	tcpsPort++
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := gateway.New(tcps, ct.State)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := New(ct.State, g)
 	if err != nil {
 		t.Fatal(err)
 	}

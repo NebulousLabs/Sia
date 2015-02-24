@@ -3,6 +3,7 @@ package gateway
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
 )
 
@@ -13,7 +14,10 @@ func TestPeerSharing(t *testing.T) {
 		t.Fatal(err)
 	}
 	myAddr := tcps.Address()
-	g := New(tcps, nil, nil)
+	g, err := New(tcps, consensus.CreateGenesisState())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// register SharePeers RPC
 	tcps.RegisterRPC("SharePeers", g.SharePeers)

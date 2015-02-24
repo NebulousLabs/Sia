@@ -142,6 +142,10 @@ func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 	return hdb.insert(entry)
 }
 
+func (hdb *HostDB) NumHosts() int {
+	return hdb.hostTree.count
+}
+
 // RandomHost pulls a random host from the hostdb weighted according to
 // whatever internal metrics exist within the hostdb.
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {

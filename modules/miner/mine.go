@@ -109,13 +109,12 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			err = m.state.AcceptBlock(b)
+			err = m.gateway.RelayBlock(b)
 			if consensus.DEBUG {
 				if err != nil {
 					panic(err)
 				}
 			}
-			m.gateway.RelayBlock(b)
 
 			solved = true
 
@@ -123,7 +122,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 			m.mu.Lock()
 			var addr consensus.UnlockHash
 			addr, _, err = m.wallet.CoinAddress()
-			if err == nil { // Special case: we only update the address if there was no error while generating one.
+			if err == nil { // Special case: only update the address if there was no error.
 				m.address = addr
 			}
 			m.mu.Unlock()

@@ -10,6 +10,9 @@ import (
 // that every block from current to genesis matches the block listed in
 // currentPath.
 func (ct *ConsensusTester) CurrentPathCheck() {
+	ct.mu.RLock()
+	defer ct.mu.RUnlock()
+
 	currentNode := ct.currentBlockNode()
 	for i := ct.Height(); i != 0; i-- {
 		// Check that the CurrentPath entry exists.
@@ -36,6 +39,9 @@ func (ct *ConsensusTester) CurrentPathCheck() {
 // Then the state moves forwards to the initial starting place and verifies
 // that the state hash is the same.
 func (ct *ConsensusTester) RewindApplyCheck() {
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+
 	csh := ct.consensusSetHash()
 	cn := ct.currentBlockNode()
 	ct.rewindToNode(ct.blockRoot)
@@ -49,6 +55,9 @@ func (ct *ConsensusTester) RewindApplyCheck() {
 // should be in the system, and then tallys up the outputs to see if that is
 // the case.
 func (ct *ConsensusTester) CurrencyCheck() {
+	ct.mu.RLock()
+	defer ct.mu.RUnlock()
+
 	siafunds := NewCurrency64(0)
 	for _, siafundOutput := range ct.siafundOutputs {
 		siafunds = siafunds.Add(siafundOutput.Value)

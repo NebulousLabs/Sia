@@ -57,24 +57,27 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
-	d.tpool, err = transactionpool.New(d.state)
-	if err != nil {
-		return
-	}
 	d.network, err = network.NewTCPServer(config.RPCAddr)
 	if err != nil {
 		return
 	}
-	d.gateway = gateway.New(d.network, d.state, d.tpool)
-	d.wallet, err = wallet.New(d.state, d.tpool, d.gateway, config.WalletDir)
+	d.gateway, err = gateway.New(d.network, d.state)
 	if err != nil {
 		return
 	}
-	d.miner, err = miner.New(d.state, d.tpool, d.wallet, d.gateway)
+	d.tpool, err = transactionpool.New(d.state, d.gateway)
 	if err != nil {
 		return
 	}
-	d.host, err = host.New(d.state, d.wallet)
+	d.wallet, err = wallet.New(d.state, d.tpool, config.WalletDir)
+	if err != nil {
+		return
+	}
+	d.miner, err = miner.New(d.state, d.gateway, d.tpool, d.wallet)
+	if err != nil {
+		return
+	}
+	d.host, err = host.New(d.state, d.tpool, d.wallet)
 	if err != nil {
 		return
 	}
@@ -89,11 +92,11 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 
 	// register RPC handlers
 	// TODO: register all RPCs in a separate function
-	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
+	err = d.network.RegisterRPC("AcceptBlock", d.gateway.RelayBlock)
 	if err != nil {
 		return
 	}
-	err = d.network.RegisterRPC("RelayTransaction", d.gateway.RelayTransaction)
+	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
 	if err != nil {
 		return
 	}

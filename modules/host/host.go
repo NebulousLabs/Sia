@@ -2,56 +2,60 @@ package host
 
 import (
 	"errors"
-	"io"
-	"net"
-	"os"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// TODO: Changing the host path should automatically move all of the files
-// over.
-
 const (
-	StorageProofReorgDepth = 6 // How many blocks to wait before submitting a storage proof.
-	maxContractLen         = 1 << 24
+	// StorageProofReorgDepth states how many blocks to wait before submitting
+	// a storage proof. This reduces the chance of needing to resubmit because
+	// of a reorg.
+	StorageProofReorgDepth = 20
+	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 )
 
+// A contractObligation tracks a file contract that the host is obligated to
+// fulfill.
 type contractObligation struct {
-	path string // Where on disk the file is stored.
+	id           consensus.FileContractID
+	fileContract consensus.FileContract
+	path         string // Where on disk the file is stored.
 }
 
+// A Host contains all the fields necessary for storing files for clients and
+// performing the storage proofs on the received files.
 type Host struct {
 	state       *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	// our HostSettings, embedded for convenience
-	modules.HostSettings
-
 	hostDir        string
 	spaceRemaining int64
 	fileCounter    int
 
-	contracts map[consensus.FileContractID]contractObligation
+	obligationsByID     map[consensus.FileContractID]contractObligation
+	obligationsByHeight map[consensus.BlockHeight][]contractObligation
+
+	modules.HostSettings
 
 	mu sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
-	if wallet == nil {
-		err = errors.New("host.New: cannot have nil wallet")
-		return
-	}
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (h *Host, err error) {
 	if state == nil {
 		err = errors.New("host.New: cannot have nil state")
+		return
+	}
+	if tpool == nil {
+		err = errors.New("host.New: cannot have nil tpool")
+		return
+	}
+	if wallet == nil {
+		err = errors.New("host.New: cannot have nil wallet")
 		return
 	}
 
@@ -61,70 +65,38 @@ func New(state *consensus.State, wallet modules.Wallet) (h *Host, err error) {
 	}
 	h = &Host{
 		state:  state,
+		tpool:  tpool,
 		wallet: wallet,
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			MaxFilesize: 4 * 1000 * 1000,
-			MaxDuration: 1008, // One week.
-			MinWindow:   20,
+			MaxFilesize: 300e6, // 300 MB
+			MaxDuration: 5e3,   // Just over a month.
+			MinWindow:   288,   // 48 hours.
 			Price:       consensus.NewCurrency64(1),
 			Collateral:  consensus.NewCurrency64(1),
-			CoinAddress: addr,
+			UnlockHash:  addr,
 		},
 
-		contracts: make(map[consensus.FileContractID]contractObligation),
+		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
+		obligationsByHeight: make(map[consensus.BlockHeight][]contractObligation),
 	}
-
-	return
-}
-
-// RetrieveFile is an RPC that uploads a specified file to a client.
-//
-// Mutexes are applied carefully to avoid any disk intensive or network
-// intensive operations. All necessary interaction with the host involves
-// looking up the filepath of the file being requested. This is done all at
-// once.
-//
-// TODO: Move this function to a different file in the package?
-func (h *Host) RetrieveFile(conn net.Conn) (err error) {
-	// Get the filename.
-	var contractID consensus.FileContractID
-	err = encoding.ReadObject(conn, &contractID, crypto.HashSize)
-	if err != nil {
-		return
-	}
-
-	// Verify the file exists, using a mutex while reading the host.
-	h.mu.RLock()
-	contractObligation, exists := h.contracts[contractID]
-	h.mu.RUnlock()
+	block, exists := state.BlockAtHeight(0)
 	if !exists {
-		return errors.New("no record of that file")
-	}
-
-	// Open the file.
-	file, err := os.Open(contractObligation.path)
-	if err != nil {
+		err = errors.New("state doesn't have a genesis block?")
 		return
 	}
-	defer file.Close()
-	info, _ := file.Stat()
+	h.latestBlock = block.ID()
 
-	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 8 * time.Microsecond))
-
-	// Transmit the file.
-	_, err = io.Copy(conn, file)
-	if err != nil {
-		return
-	}
+	consensusChan := state.SubscribeToConsensusChanges()
+	go h.threadedConsensusListen(consensusChan)
 
 	return
 }
 
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
-func (h *Host) SetConfig(settings modules.HostSettings) {
+func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.HostSettings = settings
@@ -132,7 +104,6 @@ func (h *Host) SetConfig(settings modules.HostSettings) {
 
 // Settings is an RPC used to request the settings of a host.
 func (h *Host) Settings() (modules.HostSettings, error) {
-	// TODO: return an error if we haven't announced yet
 	return h.HostSettings, nil
 }
 
@@ -144,7 +115,7 @@ func (h *Host) Info() modules.HostInfo {
 		HostSettings: h.HostSettings,
 
 		StorageRemaining: h.spaceRemaining,
-		NumContracts:     len(h.contracts),
+		NumContracts:     len(h.obligationsByID),
 	}
 	return info
 }

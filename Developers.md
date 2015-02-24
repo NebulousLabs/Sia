@@ -5,10 +5,15 @@ Sia is mostly written in go. To build and test Sia, you are going to need a
 working go environment, including having both $GOROOT/bin and $GOPATH/bin in
 your $PATH. For most Linux distributions, go will be in the package manager.
 Then it should be sufficient to run `make dependencies && make`. For more
-information, check the [go documentation](golang.org/doc/install).
+information, check the [go documentation](http://golang.org/doc/install).
 
 If you plan on cross compiling Sia, you may need to install go from source. You
-can find information on that [here](golang.org/doc/install/source).
+can find information on that [here](http://golang.org/doc/install/source).
+
+When you clone the Sia repository, make sure that you call `git clone` from the
+folder `$GOPATH/github.com/NebulousLabs/`. It will not be sufficient to clone
+Sia from the gopath. Alternatively, you should be able to call `go get -u
+github.com/NebulousLabs/Sia/...`.
 
 Golang does not like sym links, a problem which seems to have appeared
 recently. If you are using a sym link, you can expect to see an error similar
@@ -21,7 +26,7 @@ consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" 
     /home/david/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
 ```
 
-A discussion on this problem can be found [here](groups.google.com/forum/#!topic/golang-nuts/f5ZYztyHK5I)
+A discussion on this problem can be found [here](http://groups.google.com/forum/#!topic/golang-nuts/f5ZYztyHK5I).
 
 Developer Conventions
 =====================

@@ -89,6 +89,9 @@ func (ct *ConsensusTester) MineAndApplyValidBlock() (block Block) {
 
 // RewindABlock removes the most recent block from the consensus set.
 func (ct *ConsensusTester) RewindABlock() {
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+
 	bn := ct.currentBlockNode()
 	ct.commitDiffSet(bn, DiffRevert)
 }

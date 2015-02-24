@@ -17,6 +17,7 @@ var (
 
 // Sychronize to synchronize the local consensus set (i.e. the blockchain) with
 // the network consensus set.
+//
 // TODO: don't run two Synchronize threads at the same time
 func (g *Gateway) Synchronize() (err error) {
 	peer, err := g.randomPeer()
@@ -37,15 +38,12 @@ func (g *Gateway) synchronize(peer network.Address) {
 	var newBlocks []consensus.Block
 	err := peer.RPC("SendBlocks", g.blockHistory(), &newBlocks)
 	if err != nil && err.Error() != moreBlocksErr.Error() {
-		// log error
 		// TODO: try a different peer?
 		return
 	}
 	for _, block := range newBlocks {
 		acceptErr := g.state.AcceptBlock(block)
 		if acceptErr != nil {
-			// TODO: something
-			//
 			// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 			// block again.
 		}
@@ -123,6 +121,7 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 	}
 
 	// Send blocks, starting with the child of the most recent known block.
+	//
 	// TODO: use BlocksSince instead?
 	for i := start; i < start+MaxCatchUpBlocks; i++ {
 		b, exists := g.state.BlockAtHeight(i)

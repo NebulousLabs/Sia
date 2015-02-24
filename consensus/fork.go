@@ -104,8 +104,9 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// fast-forward to newNode
 	err = s.applyUntilNode(newNode)
 	if err == nil {
-		// If application succeeded, we're done. Clean up code follows below,
-		// in the event of an error.
+		// If application succeeded, notify the subscribers and return. Error
+		// handling happens outside this if statement.
+		s.notifySubscribers()
 		return
 	}
 

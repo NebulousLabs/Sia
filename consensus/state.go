@@ -49,6 +49,13 @@ type State struct {
 	siafundOutputs        map[SiafundOutputID]SiafundOutput
 	delayedSiacoinOutputs map[BlockHeight]map[SiacoinOutputID]SiacoinOutput
 
+	// subscriptions is a map containing a bunch of channels that are being
+	// listend on by modules. An empty struct is thrown down the channel any
+	// time that the consensus set of the state changes. subscriptionCounter
+	// only ever increments, and prevents collisions in the map.
+	subscriptions       map[int]chan struct{}
+	subscriptionCounter int
+
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
 	// To keep things simple, the entire state was chosen to have a single
@@ -63,13 +70,17 @@ type State struct {
 func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimUnlockHash UnlockHash) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		blockMap:              make(map[BlockID]*blockNode),
-		badBlocks:             make(map[BlockID]struct{}),
-		currentPath:           make(map[BlockHeight]BlockID),
+		blockMap:  make(map[BlockID]*blockNode),
+		badBlocks: make(map[BlockID]struct{}),
+
+		currentPath: make(map[BlockHeight]BlockID),
+
 		siacoinOutputs:        make(map[SiacoinOutputID]SiacoinOutput),
 		fileContracts:         make(map[FileContractID]FileContract),
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
+
+		subscriptions: make(map[int]chan struct{}),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.

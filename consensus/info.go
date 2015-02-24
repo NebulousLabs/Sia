@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // StateInfo contains basic information about the State.
@@ -114,6 +115,9 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	node, exists := s.blockMap[id]
 	if !exists {
 		err = errors.New("requested an unknown block")
@@ -263,6 +267,13 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	// This will stop too-large transactions from accidentally being validated.
+	// This check doesn't happen when checking blocks, because the size of the
+	// block was already checked.
+	if len(encoding.Marshal(t)) > BlockSizeLimit-5e3 {
+		return errors.New("transaction is too large")
+	}
 
 	err = t.FollowsStorageProofRules()
 	if err != nil {
