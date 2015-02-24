@@ -170,7 +170,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	err = h.considerTerms(terms)
 	h.mu.RUnlock()
 	if err != nil {
-		_, err = encoding.WriteObject(conn, err.Error())
+		err = encoding.WriteObject(conn, err.Error())
 		return
 	}
 
@@ -191,7 +191,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}()
 
 	// signal that we are ready to download file
-	_, err = encoding.WriteObject(conn, modules.AcceptTermsResponse)
+	err = encoding.WriteObject(conn, modules.AcceptTermsResponse)
 	if err != nil {
 		return
 	}
@@ -235,7 +235,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
-	_, err = encoding.WriteObject(conn, collateralTxn)
+	err = encoding.WriteObject(conn, collateralTxn)
 	if err != nil {
 		return
 	}

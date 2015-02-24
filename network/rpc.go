@@ -50,7 +50,7 @@ func (na *Address) RPC(name string, arg, resp interface{}) error {
 	return na.Call(name, func(conn net.Conn) error {
 		// write arg
 		if arg != nil {
-			if _, err := encoding.WriteObject(conn, arg); err != nil {
+			if err := encoding.WriteObject(conn, arg); err != nil {
 				return err
 			}
 		}
@@ -130,7 +130,7 @@ func registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		retvals := fn.Call([]reflect.Value{arg.Elem()})
 		resp, errInter := retvals[0].Interface(), retvals[1].Interface()
 		// write resp
-		if _, err := encoding.WriteObject(conn, resp); err != nil {
+		if err := encoding.WriteObject(conn, resp); err != nil {
 			return err
 		}
 		// write err
@@ -138,8 +138,7 @@ func registerRPC(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		if errInter != nil {
 			errStr = errInter.(error).Error()
 		}
-		_, err := encoding.WriteObject(conn, errStr)
-		return err
+		return encoding.WriteObject(conn, errStr)
 	}
 }
 
@@ -158,8 +157,7 @@ func registerArg(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		if errInter != nil {
 			errStr = errInter.(error).Error()
 		}
-		_, err := encoding.WriteObject(conn, errStr)
-		return err
+		return encoding.WriteObject(conn, errStr)
 	}
 }
 
@@ -170,7 +168,7 @@ func registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		retvals := fn.Call(nil)
 		resp, errInter := retvals[0].Interface(), retvals[1].Interface()
 		// write resp
-		if _, err := encoding.WriteObject(conn, resp); err != nil {
+		if err := encoding.WriteObject(conn, resp); err != nil {
 			return err
 		}
 		// write err
@@ -178,7 +176,6 @@ func registerResp(fn reflect.Value, typ reflect.Type) func(net.Conn) error {
 		if errInter != nil {
 			errStr = errInter.(error).Error()
 		}
-		_, err := encoding.WriteObject(conn, errStr)
-		return err
+		return encoding.WriteObject(conn, errStr)
 	}
 }

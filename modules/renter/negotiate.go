@@ -125,7 +125,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	// Perform the negotiations with the host through a network call.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {
 		// Send the contract terms and read the response.
-		if _, err = encoding.WriteObject(conn, terms); err != nil {
+		if err = encoding.WriteObject(conn, terms); err != nil {
 			return
 		}
 		var response string
@@ -145,7 +145,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		// Send the unsigned transaction to the host.
-		_, err = encoding.WriteObject(conn, unsignedTxn)
+		err = encoding.WriteObject(conn, unsignedTxn)
 		if err != nil {
 			return
 		}
@@ -170,7 +170,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		// Send the signed transaction back to the host.
-		_, err = encoding.WriteObject(conn, signedTxn)
+		err = encoding.WriteObject(conn, signedTxn)
 		if err != nil {
 			return
 		}

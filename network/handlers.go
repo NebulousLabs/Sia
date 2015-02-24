@@ -21,7 +21,7 @@ func pong() (string, error) {
 // sendHostname replies to the sender with the sender's external IP.
 func sendHostname(conn net.Conn) error {
 	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	_, err := encoding.WriteObject(conn, host)
+	err := encoding.WriteObject(conn, host)
 	// write error
 	encoding.WriteObject(conn, "")
 	return err
