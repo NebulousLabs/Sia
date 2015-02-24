@@ -40,6 +40,9 @@ func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry
 // settings are. After getting the settings, the entry is inserted into the
 // host database.
 func (hdb *HostDB) threadedInsertNewEntry(entry modules.HostEntry) {
+	// Add the host to the set of all hosts.
+	hdb.allHosts[entry.IPAddress] = &entry
+
 	err := entry.IPAddress.RPC("HostSettings", nil, &entry.HostSettings)
 	if err != nil {
 		return
@@ -50,7 +53,7 @@ func (hdb *HostDB) threadedInsertNewEntry(entry modules.HostEntry) {
 // update grabs all of the new blocks from the consensus set and searches them
 // for host announcements. The threading is careful to avoid holding a lock
 // while network communication is happening.
-func (hdb *HostDB) threadedUpdate() (err error) {
+func (hdb *HostDB) threadedUpdate() {
 	hdb.state.RLock()
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {

@@ -38,29 +38,23 @@ func (hdb *HostDB) insert(entry modules.HostEntry) error {
 }
 
 // Remove deletes an entry from the hostdb.
-//
-// TODO: inactiveHosts should contain full addresses, not just addr.Host().
 func (hdb *HostDB) remove(addr network.Address) error {
-	// Strip the port (see insert).
+	// Remove the host from the set of all hosts.
+	_, exists := hdb.allHosts[addr]
+	if exists {
+		delete(hdb.allHosts, addr)
+	}
+
+	// Strip the port (see insert), then check the set of active hosts for an
+	// entry.
 	hostname := addr.Host()
 
 	// See if the node is in the set of active hosts.
 	node, exists := hdb.activeHosts[hostname]
-	if !exists {
-		// If the node is in the set of inactive hosts, delete from that set,
-		// otherwise return a not found error.
-		_, exists := hdb.inactiveHosts[hostname]
-		if exists {
-			delete(hdb.inactiveHosts, hostname)
-			return nil
-		} else {
-			return errors.New("address not found in host database")
-		}
+	if exists {
+		delete(hdb.activeHosts, hostname)
+		node.remove()
 	}
-
-	// Delete the node from the active hosts, and remove it from the tree.
-	delete(hdb.activeHosts, hostname)
-	node.remove()
 
 	return nil
 }
@@ -84,6 +78,10 @@ func (hdb *HostDB) NumHosts() int {
 	hdb.threadedUpdate()
 	hdb.mu.RLock()
 	defer hdb.mu.RUnlock()
+
+	if hdb.hostTree == nil {
+		return 0
+	}
 	return hdb.hostTree.count
 }
 

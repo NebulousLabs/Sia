@@ -1,8 +1,6 @@
 package hostdb
 
 import (
-	"fmt"
-
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -85,10 +83,12 @@ func (hn *hostNode) remove() {
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
 func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.HostEntry, err error) {
-	// Check for an errored weight call.
-	if weight.Cmp(hn.weight) > 0 {
-		err = fmt.Errorf("tree is not that heavy, asked for %v and got %v", weight, hn.weight)
-		return
+	// Sanity check - entryAtWeight should never be called with a too-large
+	// weight.
+	if consensus.DEBUG {
+		if weight.Cmp(hn.weight) > 0 {
+			panic("entryAtWeight called with an input exceeding the size of the database.")
+		}
 	}
 
 	// Check if the left or right child should be returned.
