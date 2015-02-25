@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	tcpsPort int = 11000
+	tcpsPort  int = 11000
+	walletNum int = 0
 )
 
 // A RenterTester contains a consensus tester and a renter, and provides a set
@@ -45,7 +46,7 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "")
+	w, err := wallet.New(ct.State, tp, "../../renter_test"+strconv.Itoa(walletNum)+".wallet")
 	if err != nil {
 		t.Fatal(err)
 	}

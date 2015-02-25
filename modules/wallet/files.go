@@ -30,7 +30,6 @@ func (w *Wallet) save() (err error) {
 
 	// Write the data to file.
 	// TODO: Instead of using WriteFile, write to a temp file and then do a move.
-	// TODO: append instead of overwriting everything.
 	err = ioutil.WriteFile(w.filename, encoding.Marshal(keySlice), 0666)
 	if err != nil {
 		return
