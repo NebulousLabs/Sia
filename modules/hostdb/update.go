@@ -9,7 +9,8 @@ import (
 )
 
 // findHostAnnouncements returns a list of the host announcements found within
-// a given block.
+// a given block. No check is made to see that the ip address found in the
+// announcement is actually a valid ip address.
 func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry) {
 	for _, t := range b.Transactions {
 		for _, data := range t.ArbitraryData {
@@ -41,6 +42,9 @@ func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry
 // while network communication is happening.
 func (hdb *HostDB) update() {
 	hdb.state.RLock()
+	defer hdb.state.RUnlock()
+
+	// Get the blocks that have been added since the previous update.
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {
 		// Sanity check - err should be nil.
@@ -49,10 +53,6 @@ func (hdb *HostDB) update() {
 		}
 	}
 	hdb.recentBlock = hdb.state.CurrentBlock().ID()
-	hdb.state.RUnlock()
-
-	// Hosts that appeared in rewound blocks are left in the hostdb. Knowing
-	// about more hosts is better.
 
 	// Add hosts announced in blocks that were applied.
 	for _, blockID := range appliedBlocks {
@@ -64,7 +64,7 @@ func (hdb *HostDB) update() {
 			continue
 		}
 		for _, entry := range findHostAnnouncements(block) {
-			hdb.insert(&entry)
+			hdb.insert(entry)
 		}
 	}
 
