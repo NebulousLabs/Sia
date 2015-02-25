@@ -10,39 +10,62 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
-// entryWeight returns the weight of a host entry according to the internal
-// metrics of the HostDB. Currently, that means using the weight (10^30 *
-// entry.Collateral / (entry.Price)^2), where entry.Collateral is adjusted to
-// be at most twice the price and at least half the price.
+var (
+	// Because most weights would otherwise be fractional, we set the base
+	// weight to 10^30 to give ourselves lots of precision when determing an
+	// entries weight.
+	baseWeight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
+
+	// Convenience variables for doing currency math. Originally we were just
+	// using MulFloat but this was causing precision problems during testing.
+	// The actual functionality of the program isn't affected by loss of
+	// precision, it just makes testing simpler.
+	currencyZero     = consensus.NewCurrency64(0)
+	currencyOne      = consensus.NewCurrency64(1)
+	currencyTwo      = consensus.NewCurrency64(2)
+	currencyFive     = consensus.NewCurrency64(5)
+	currencyTen      = consensus.NewCurrency64(10)
+	currencyTwenty   = consensus.NewCurrency64(20)
+	currencyThousand = consensus.NewCurrency64(1e3)
+)
+
+// entryWeight returns the weight of an entry according to the price and
+// collateral of the entry. The current general equation is:
+//		(collateral / price^2)
+//
+// The collateral is clamped so that it is not treated as being less than 0.5x
+// the price or more than 2x the price.
 func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 	// Clamp the collateral to between 0.5x and 2x the price.
 	collateral := entry.Collateral
-	if collateral.Cmp(entry.Price.MulFloat(2)) > 0 {
-		collateral = entry.Price.MulFloat(2)
-	} else if collateral.Cmp(entry.Price.MulFloat(0.5)) < 0 {
-		collateral = entry.Price.MulFloat(0.5)
+	if collateral.Cmp(entry.Price.Mul(currencyTwo)) > 0 {
+		collateral = entry.Price.Mul(currencyTwo)
+	} else if collateral.Cmp(entry.Price.Div(currencyTwo)) < 0 {
+		collateral = entry.Price.Div(currencyTwo)
 	}
 
-	// Create a baseline weight of 10^30, which adds precision to the equation
-	// and makes sure that all reasonable prices end with a weight that's
-	// greater than zero.
-	weight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
-	weight = weight.Mul(collateral).Div(entry.Price).Div(entry.Price)
-	return
+	// Prevent a divide by zero error by making sure the price is at least one.
+	price := entry.Price
+	if price.Cmp(currencyZero) <= 0 {
+		price = currencyOne
+	}
+
+	// Take the base weight, multiply it by the clapmed collateral, then divide
+	// it by the square of the price.
+	return baseWeight.Mul(collateral).Div(price).Div(price)
 }
 
-// insertCompleteHostEntry inserts a host entry without making a network call
-// to the host to grab the settings.
+// insertCompleteHostEntry inserts a host entry into the host tree, removing
+// any conflicts. The host settings are assummed to be correct.
 func (hdb *HostDB) insertCompleteHostEntry(entry *modules.HostEntry) {
-	// Active entries are stored by address, sans port number. This limits each
-	// IP to advertising 1 host. Do not replace
+	// If there's already a host of the same id, remove that host.
 	hostname := entry.IPAddress.Host()
-	_, exists := hdb.activeHosts[hostname]
+	priorEntry, exists := hdb.activeHosts[hostname]
 	if exists {
-		return
+		priorEntry.remove()
 	}
 
-	// Add the host as a node to the host tree.
+	// Insert the updated entry into the host tree.
 	if hdb.hostTree == nil {
 		hdb.hostTree = createNode(nil, *entry)
 		hdb.activeHosts[hostname] = hdb.hostTree
@@ -52,37 +75,60 @@ func (hdb *HostDB) insertCompleteHostEntry(entry *modules.HostEntry) {
 	}
 }
 
-// threadedInsert adds a host entry to the state. The entry is passed by
-// pointer so that changes made to the entry are received by all parties.
-func (hdb *HostDB) threadedInsert(entry *modules.HostEntry) {
-	// Get the settings from the host. Host will remain active if a valid
-	// response is not given.
+// insertActiveHost takes a host entry and queries the host for its settings.
+// Once it has the settings, it inserts it into the host tree. If it cannot get
+// the settings, it gives up and quits.
+func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
+	// Get the settings from the host. Host is removed from the set of active
+	// hosts if no response is given.
 	var hs modules.HostSettings
 	err := entry.IPAddress.RPC("HostSettings", nil, &hs)
 	if err != nil {
 		return
 	}
 
-	// Lock the host db after the network call has finished.
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 	entry.HostSettings = hs
+
 	hdb.insertCompleteHostEntry(entry)
+}
+
+// insert adds a host entry to the state. The host is guaranteed to make it
+// into the set of all hosts. The host will only make it into the set of active
+// hosts if there are no previous hosts that exist at the same ip address (this
+// is to make it more difficult for a single host to sybil the network). If the
+// host is at the same ip address and port number as the existing host, then
+// it's assumed to be the same host, and an update is made.
+//
+// Once the entry has been added to the database, all calls use pointers to the
+// entry. This is because some of the calls modify the entry (under a lock) and
+// everyone needs to receive the modifications.
+func (hdb *HostDB) insert(entry modules.HostEntry) {
+	// Add the host to allHosts.
+	hdb.allHosts[entry.IPAddress] = &entry
+
+	// Check if there is another host in the set of active hosts with the same
+	// ip address. If there is, this host is not given precedent. The exception
+	// is if this host has the same full address (including port number), in
+	// which case it's assumed that the host is trying to post an update.
+	hostname := entry.IPAddress.Host()
+	priorEntry, exists := hdb.activeHosts[hostname]
+	if exists {
+		if priorEntry.hostEntry.IPAddress != entry.IPAddress {
+			return
+		}
+	}
+
+	go hdb.threadedInsertActiveHost(&entry)
 }
 
 // Remove deletes an entry from the hostdb.
 func (hdb *HostDB) remove(addr network.Address) error {
-	// Remove the host from the set of all hosts.
-	_, exists := hdb.allHosts[addr]
-	if exists {
-		delete(hdb.allHosts, addr)
-	}
-
-	// Strip the port (see insert), then check the set of active hosts for an
-	// entry.
-	hostname := addr.Host()
+	delete(hdb.allHosts, addr)
 
 	// See if the node is in the set of active hosts.
+	hostname := addr.Host()
 	node, exists := hdb.activeHosts[hostname]
 	if exists {
 		delete(hdb.activeHosts, hostname)
@@ -99,12 +145,11 @@ func (hdb *HostDB) FlagHost(addr network.Address) error {
 	return hdb.Remove(addr)
 }
 
-// Insert is the thread-safe version of insert.
+// Insert attempts to insert a host entry into the database.
 func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	hdb.allHosts[entry.IPAddress] = &entry
-	go hdb.threadedInsert(&entry)
+	hdb.insert(entry)
 	return nil
 }
 

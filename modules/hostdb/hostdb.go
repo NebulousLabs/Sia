@@ -15,7 +15,8 @@ var (
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
-// host based on their hosting parameters.
+// host based on their hosting parameters, and then can select hosts at random
+// for uploading files.
 type HostDB struct {
 	state       *consensus.State
 	recentBlock consensus.BlockID

@@ -50,6 +50,14 @@ func (ct *ConsensusTester) MineCurrentBlock(txns []Transaction) (b Block) {
 	return MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, ct.CurrentTarget())
 }
 
+// MineAndSubmitCurrentBlock is a shortcut function that calls MineCurrentBlock
+// and then submits it to the state.
+func (ct *ConsensusTester) MineAndSubmitCurrentBlock(txns []Transaction) error {
+	minerPayouts := ct.Payouts(ct.Height()+1, txns)
+	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, ct.CurrentTarget())
+	return ct.AcceptBlock(block)
+}
+
 // Payouts returns a block with 12 payouts worth 1e6 and a final payout that
 // makes the total payout amount add up correctly. This produces a large set of
 // outputs that can be used for testing.
