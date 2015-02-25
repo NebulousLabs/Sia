@@ -64,8 +64,7 @@ func (hdb *HostDB) update() {
 			continue
 		}
 		for _, entry := range findHostAnnouncements(block) {
-			hdb.allHosts[entry.IPAddress] = &entry
-			go hdb.threadedInsert(&entry)
+			hdb.insert(&entry)
 		}
 	}
 

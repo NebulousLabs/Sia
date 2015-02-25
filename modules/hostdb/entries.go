@@ -18,6 +18,8 @@ var (
 
 	// Convenience variables for doing currency math. Originally we were just
 	// using MulFloat but this was causing precision problems during testing.
+	currencyZero     = consensus.NewCurrency64(0)
+	currencyOne      = consensus.NewCurrency64(1)
 	currencyTwo      = consensus.NewCurrency64(2)
 	currencyFive     = consensus.NewCurrency64(5)
 	currencyTen      = consensus.NewCurrency64(10)
@@ -37,23 +39,21 @@ func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
 		collateral = entry.Price.Div(currencyTwo)
 	}
 
+	// Prevent a divide by zero error by making sure the price is at least one.
+	price := entry.Price
+	if price.Cmp(currencyZero) <= 0 {
+		price = currencyOne
+	}
+
 	// Take the base weight, multiply it by the clapmed collateral, then divide
 	// it by the square of the price.
-	return baseWeight.Mul(collateral).Div(entry.Price).Div(entry.Price)
+	return baseWeight.Mul(collateral).Div(price).Div(price)
 }
 
 // insertCompleteHostEntry inserts a host entry without making a network call
 // to the host to grab the settings.
 func (hdb *HostDB) insertCompleteHostEntry(entry *modules.HostEntry) {
-	// Active entries are stored by address, sans port number. This limits each
-	// IP to advertising 1 host. Do not replace
 	hostname := entry.IPAddress.Host()
-	_, exists := hdb.activeHosts[hostname]
-	if exists {
-		return
-	}
-
-	// Add the host as a node to the host tree.
 	if hdb.hostTree == nil {
 		hdb.hostTree = createNode(nil, *entry)
 		hdb.activeHosts[hostname] = hdb.hostTree
@@ -63,22 +63,51 @@ func (hdb *HostDB) insertCompleteHostEntry(entry *modules.HostEntry) {
 	}
 }
 
-// threadedInsert adds a host entry to the state. The entry is passed by
-// pointer so that changes made to the entry are received by all parties.
-func (hdb *HostDB) threadedInsert(entry *modules.HostEntry) {
-	// Get the settings from the host. Host will remain active if a valid
-	// response is not given.
+// insertActiveHost adds a host to the active set of hosts.
+func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
+	// Get the settings from the host. Host is removed from the set of active
+	// hosts if no response is given.
 	var hs modules.HostSettings
 	err := entry.IPAddress.RPC("HostSettings", nil, &hs)
 	if err != nil {
 		return
 	}
 
-	// Lock the host db after the network call has finished.
+	// If there's already a host of the same id, remove it. This is done in an
+	// anonymous function so that 'defer Unlock' can be used.
+	hostname := entry.IPAddress.Host()
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
+
+	priorEntry, exists := hdb.activeHosts[hostname]
+	if exists {
+		priorEntry.remove()
+	}
 	entry.HostSettings = hs
 	hdb.insertCompleteHostEntry(entry)
+}
+
+// threadedInsert adds a host entry to the state. The entry is passed by
+// pointer because multiple locations are using the same data, and each should
+// get any changes.
+func (hdb *HostDB) insert(entry *modules.HostEntry) {
+	// Add the host to allHosts.
+	hdb.allHosts[entry.IPAddress] = entry
+
+	// Active entries are stored by address, sans port number. This limits each
+	// IP to advertising 1 host. If a host already exists for this IP Addresss,
+	// see if it's got the same full address. If so, update the settings for
+	// the host. If not, don't add it to the set of active hosts, the existing
+	// one takes priority.
+	hostname := entry.IPAddress.Host()
+	priorEntry, exists := hdb.activeHosts[hostname]
+	if exists {
+		if priorEntry.hostEntry.IPAddress != entry.IPAddress {
+			return
+		}
+	}
+
+	go hdb.threadedInsertActiveHost(entry)
 }
 
 // Remove deletes an entry from the hostdb.
@@ -114,8 +143,7 @@ func (hdb *HostDB) FlagHost(addr network.Address) error {
 func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	hdb.allHosts[entry.IPAddress] = &entry
-	go hdb.threadedInsert(&entry)
+	hdb.insert(&entry)
 	return nil
 }
 
