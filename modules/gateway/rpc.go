@@ -1,4 +1,4 @@
-package network
+package gateway
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // reflection helpers
@@ -24,9 +25,9 @@ func handlerName(name string) []byte {
 	return b
 }
 
-// Call establishes a TCP connection to the Address, calls the provided
+// Call establishes a TCP connection to the NetAddress, calls the provided
 // function on it, and closes the connection.
-func (na Address) Call(name string, fn func(net.Conn) error) error {
+func (g *Gateway) Call(na modules.NetAddress, name string, fn func(net.Conn) error) error {
 	conn, err := net.DialTimeout("tcp", string(na), timeout)
 	if err != nil {
 		return err
@@ -46,8 +47,8 @@ func (na Address) Call(name string, fn func(net.Conn) error) error {
 // encoded argument, and decoding the response into the supplied object.
 // 'resp' must be a pointer. If arg is nil, no object is sent. If 'resp' is
 // nil, no response is read.
-func (na *Address) RPC(name string, arg, resp interface{}) error {
-	return na.Call(name, func(conn net.Conn) error {
+func (g *Gateway) RPC(na modules.NetAddress, name string, arg, resp interface{}) error {
+	return g.Call(na, name, func(conn net.Conn) error {
 		// write arg
 		if arg != nil {
 			if err := encoding.WriteObject(conn, arg); err != nil {

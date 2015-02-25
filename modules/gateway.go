@@ -1,12 +1,28 @@
 package modules
 
 import (
+	"net"
+
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
+// A NetAddress contains the information needed to contact a peer.
+type NetAddress string
+
+// Host returns the NetAddress' IP.
+func (na NetAddress) Host() string {
+	host, _, _ := net.SplitHostPort(string(na))
+	return host
+}
+
+// Port returns the NetAddress' port number.
+func (na NetAddress) Port() string {
+	_, port, _ := net.SplitHostPort(string(na))
+	return port
+}
+
 type GatewayInfo struct {
-	Peers []network.Address
+	Peers []NetAddress
 }
 
 // A Gateway facilitates the interactions between the local node and remote
@@ -16,14 +32,14 @@ type GatewayInfo struct {
 // with the "network" consensus set.
 type Gateway interface {
 	// Bootstrap joins the Sia network and establishes an initial peer list.
-	Bootstrap(network.Address) error
+	Bootstrap(NetAddress) error
 
 	// AddPeer adds a peer to the Gateway's peer list. The peer
 	// may be rejected. AddPeer is also an RPC.
-	AddPeer(network.Address) error
+	AddPeer(NetAddress) error
 
 	// RemovePeer removes a peer from the Gateway's peer list.
-	RemovePeer(network.Address) error
+	RemovePeer(NetAddress) error
 
 	// Synchronize synchronizes the local consensus set with the sets of known
 	// peers.
@@ -39,7 +55,7 @@ type Gateway interface {
 
 	// AddMe is the RPC version of AddPeer. It is assumed that the supplied
 	// peer is the peer making the RPC.
-	AddMe(network.Address) error
+	AddMe(NetAddress) error
 
 	// SendBlocks is an RPC that returns a set of sequential blocks following
 	// the most recent known block ID in of the 32 IDs provided. The number of
@@ -48,7 +64,7 @@ type Gateway interface {
 
 	// SharePeers is an RPC that returns a set of the Gateway's peers. The
 	// number of peers returned is unspecified.
-	SharePeers() ([]network.Address, error)
+	SharePeers() ([]NetAddress, error)
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo

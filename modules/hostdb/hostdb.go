@@ -6,7 +6,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
@@ -23,7 +22,7 @@ type HostDB struct {
 
 	hostTree    *hostNode
 	activeHosts map[string]*hostNode
-	allHosts    map[network.Address]*modules.HostEntry
+	allHosts    map[modules.NetAddress]*modules.HostEntry
 
 	mu sync.RWMutex
 }
@@ -48,7 +47,7 @@ func New(s *consensus.State) (hdb *HostDB, err error) {
 		state:       s,
 		recentBlock: genesisBlock.ID(),
 		activeHosts: make(map[string]*hostNode),
-		allHosts:    make(map[network.Address]*modules.HostEntry),
+		allHosts:    make(map[modules.NetAddress]*modules.HostEntry),
 	}
 	return
 }

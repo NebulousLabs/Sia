@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
@@ -34,9 +34,9 @@ func (g *Gateway) Synchronize() (err error) {
 // most recent block seen by both peers. From this starting height, it
 // transmits blocks sequentially. Multiple such transmissions may be required
 // to fully synchronize.
-func (g *Gateway) synchronize(peer network.Address) {
+func (g *Gateway) synchronize(peer modules.NetAddress) {
 	var newBlocks []consensus.Block
-	err := peer.RPC("SendBlocks", g.blockHistory(), &newBlocks)
+	err := g.RPC(peer, "SendBlocks", g.blockHistory(), &newBlocks)
 	if err != nil && err.Error() != moreBlocksErr.Error() {
 		// TODO: try a different peer?
 		return

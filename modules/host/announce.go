@@ -4,13 +4,12 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // Announce creates a host announcement transaction, adding information to the
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
-func (h *Host) Announce(addr network.Address) (err error) {
+func (h *Host) Announce(addr modules.NetAddress) (err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

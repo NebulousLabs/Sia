@@ -4,13 +4,35 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-func (g *Gateway) addPeer(peer network.Address) error {
+// Ping returns whether an Address is reachable and responds correctly to the
+// ping request -- in other words, whether it is a potential peer.
+func (g *Gateway) Ping(addr modules.NetAddress) bool {
+	var pong string
+	err := g.RPC(addr, "Ping", nil, &pong)
+	return err == nil && pong == "pong"
+}
+
+func pong() (string, error) {
+	return "pong", nil
+}
+
+// sendHostname replies to the sender with the sender's external IP.
+func sendHostname(conn net.Conn) error {
+	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+	err := encoding.WriteObject(conn, host)
+	// write error
+	encoding.WriteObject(conn, "")
+	return err
+}
+
+func (g *Gateway) addPeer(peer modules.NetAddress) error {
 	if _, exists := g.peers[peer]; exists {
 		return errors.New("peer already added")
 	}
@@ -18,7 +40,7 @@ func (g *Gateway) addPeer(peer network.Address) error {
 	return nil
 }
 
-func (g *Gateway) removePeer(peer network.Address) error {
+func (g *Gateway) removePeer(peer modules.NetAddress) error {
 	if _, exists := g.peers[peer]; !exists {
 		return errors.New("no record of that peer")
 	}
@@ -26,7 +48,7 @@ func (g *Gateway) removePeer(peer network.Address) error {
 	return nil
 }
 
-func (g *Gateway) randomPeer() (network.Address, error) {
+func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	r := rand.Intn(len(g.peers))
 	for peer := range g.peers {
 		if r == 0 {
@@ -40,15 +62,15 @@ func (g *Gateway) randomPeer() (network.Address, error) {
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
 // list. The calls are run in parallel.
 func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
-	var badpeers []network.Address
+	var badpeers []modules.NetAddress
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
 
 	g.mu.RLock()
 	for peer := range g.peers {
 		// contact each peer in a separate thread
-		go func(peer network.Address) {
-			err := peer.RPC(name, arg, resp)
+		go func(peer modules.NetAddress) {
+			err := g.RPC(peer, name, arg, resp)
 			// TODO: some errors will be our fault. Need to distinguish them.
 			if err != nil {
 				badpeers = append(badpeers, peer)
@@ -80,7 +102,7 @@ func (g *Gateway) load(filename string) (err error) {
 	if err != nil {
 		return
 	}
-	var peers []network.Address
+	var peers []modules.NetAddress
 	err = encoding.Unmarshal(contents, &peers)
 	if err != nil {
 		return

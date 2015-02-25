@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // SiaConstants is a struct listing all of the constants in use.
@@ -83,7 +83,7 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.State = true
 	}()
 	go func() {
-		d.gateway.RemovePeer(network.Address(""))
+		d.gateway.RemovePeer(modules.NetAddress(""))
 		mds.Gateway = true
 	}()
 	go func() {
@@ -99,7 +99,7 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Host = true
 	}()
 	go func() {
-		d.hostdb.Remove(network.Address(""))
+		d.hostdb.Remove(modules.NetAddress(""))
 		mds.HostDB = true
 	}()
 	go func() {

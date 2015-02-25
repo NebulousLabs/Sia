@@ -1,11 +1,12 @@
-package network
+package gateway
 
 import (
-	"errors"
 	"net"
 	"net/http" // for getExternalIP()
 	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
@@ -17,32 +18,24 @@ const (
 // of peers to broadcast to and make requests of.
 type TCPServer struct {
 	net.Listener
-	myAddr     Address
+	myAddr     modules.NetAddress
 	handlerMap map[string]func(net.Conn) error
 	// used to protect addressbook and handlerMap
 	sync.RWMutex
 }
 
-// Address returns the Address of the server.
-func (tcps *TCPServer) Address() Address {
+// Address returns the NetAddress of the server.
+func (tcps *TCPServer) Address() modules.NetAddress {
 	tcps.RLock()
 	defer tcps.RUnlock()
 	return tcps.myAddr
 }
 
-// setHostname sets the hostname of the server. The port is unchanged. If we
-// can't ping ourselves using the new hostname, setHostname returns false and
-// the hostname is unchanged.
-func (tcps *TCPServer) setHostname(host string) error {
-	newAddr := Address(net.JoinHostPort(host, tcps.myAddr.Port()))
-	// try to ping ourselves
-	if !Ping(newAddr) {
-		return errors.New("supplied hostname was unreachable")
-	}
+// setHostname sets the hostname of the server.
+func (tcps *TCPServer) setHostname(host string) {
 	tcps.Lock()
-	tcps.myAddr = newAddr
-	tcps.Unlock()
-	return nil
+	defer tcps.Unlock()
+	tcps.myAddr = modules.NetAddress(net.JoinHostPort(host, tcps.myAddr.Port()))
 }
 
 // listen runs in the background, accepting incoming connections and serving
@@ -95,38 +88,20 @@ func (tcps *TCPServer) getExternalIP() (err error) {
 	buf := make([]byte, 64)
 	n, _ := resp.Body.Read(buf)
 	hostname := string(buf[:n-1]) // trim newline
-	err = tcps.setHostname(hostname)
+	// TODO: try to ping ourselves
+	tcps.setHostname(hostname)
 	return
 }
 
-// Bootstrap discovers the external IP of the TCPServer, requests peers from
-// the initial peer list, and announces itself to those peers.
-func (tcps *TCPServer) Bootstrap(bootstrapPeer Address) (err error) {
-	// if bootstrapPeer is reachable, ask it for our hostname
-	var hostname string
-	if Ping(bootstrapPeer) && bootstrapPeer.RPC("SendHostname", nil, &hostname) == nil {
-		err = tcps.setHostname(hostname)
-		return
-	}
-
-	// otherwise, fallback to centralized service
-	err = tcps.getExternalIP()
-	if err != nil {
-		return
-	}
-
-	return errors.New("unable to determine hostname")
-}
-
-// NewTCPServer creates a TCPServer that listens on the specified address.
-func NewTCPServer(addr string) (tcps *TCPServer, err error) {
+// newTCPServer creates a TCPServer that listens on the specified address.
+func newTCPServer(addr string) (tcps *TCPServer, err error) {
 	tcpServ, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
 	tcps = &TCPServer{
 		Listener:   tcpServ,
-		myAddr:     Address(addr),
+		myAddr:     modules.NetAddress(addr),
 		handlerMap: make(map[string]func(net.Conn) error),
 	}
 	// default handlers (defined in handlers.go)

@@ -6,12 +6,12 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
 	// maxStrikes is the number of "strikes" that can be incurred by a peer
 	// before it will be removed.
+	// TODO: need a way to whitelist peers (e.g. hosts)
 	maxStrikes = 5
 )
 
@@ -22,14 +22,14 @@ var (
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
-	tcps        *network.TCPServer
+	tcps        *TCPServer
 	state       *consensus.State
 	latestBlock consensus.BlockID
 
 	// Peers are stored in a map to guarantee uniqueness. They are paired with
 	// the number of "strikes" against them; peers with too many strikes are
 	// removed.
-	peers map[network.Address]int
+	peers map[modules.NetAddress]int
 
 	mu sync.RWMutex
 }
@@ -40,9 +40,9 @@ type Gateway struct {
 // communication.
 //
 // TODO: Peers are pinged sequentially!
-func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
+func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// contact the bootstrap peer
-	if !network.Ping(bootstrapPeer) {
+	if !g.Ping(bootstrapPeer) {
 		return ErrUnreachable
 	}
 	g.mu.Lock()
@@ -51,16 +51,28 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 
 	g.synchronize(bootstrapPeer)
 
+	// ask the bootstrap peer for our hostname
+	var hostname string
+	if g.RPC(bootstrapPeer, "SendHostname", nil, &hostname) == nil {
+		// TODO: try to ping ourselves
+		g.tcps.setHostname(hostname)
+	} else {
+		// otherwise, fallback to centralized service
+		err = g.tcps.getExternalIP()
+		if err != nil {
+			return
+		}
+	}
+
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
-	var newPeers []network.Address
-	err = bootstrapPeer.RPC("SharePeers", nil, &newPeers)
+	var newPeers []modules.NetAddress
+	err = g.RPC(bootstrapPeer, "SharePeers", nil, &newPeers)
 	if err != nil {
 		return
 	}
 	for _, peer := range newPeers {
-		if peer != g.tcps.Address() && network.Ping(peer) {
-			g.mu.Lock()
+		if peer != g.tcps.Address() && g.Ping(peer) {
 			g.addPeer(peer)
 			g.mu.Unlock()
 		}
@@ -114,20 +126,20 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(tcps *network.TCPServer, s *consensus.State) (g *Gateway, err error) {
-	if tcps == nil {
-		err = errors.New("gateway cannot use nil tcp server")
-		return
-	}
+func New(addr string, s *consensus.State) (g *Gateway, err error) {
 	if s == nil {
 		err = errors.New("gateway cannot use nil state")
+		return
+	}
+	tcps, err := newTCPServer(addr)
+	if err != nil {
 		return
 	}
 
 	g = &Gateway{
 		tcps:  tcps,
 		state: s,
-		peers: make(map[network.Address]int),
+		peers: make(map[modules.NetAddress]int),
 	}
 	block, exists := g.state.BlockAtHeight(0)
 	if !exists {

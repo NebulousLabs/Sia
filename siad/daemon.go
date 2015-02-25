@@ -14,7 +14,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 type DaemonConfig struct {
@@ -37,7 +36,6 @@ type DaemonConfig struct {
 
 type daemon struct {
 	state   *consensus.State
-	network *network.TCPServer
 	gateway modules.Gateway
 	host    modules.Host
 	hostdb  modules.HostDB
@@ -57,11 +55,7 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
-	d.network, err = network.NewTCPServer(config.RPCAddr)
-	if err != nil {
-		return
-	}
-	d.gateway, err = gateway.New(d.network, d.state)
+	d.gateway, err = gateway.New(d.state)
 	if err != nil {
 		return
 	}

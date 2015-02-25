@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
@@ -33,7 +32,7 @@ type HostInfo struct {
 
 type Host interface {
 	// Announce announces the host on the blockchain.
-	Announce(addr network.Address) error
+	Announce(NetAddress) error
 
 	// NegotiateContract is a strict function that enables a client to
 	// communicate with the host to propose a contract.
