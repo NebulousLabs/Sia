@@ -31,32 +31,35 @@ type Wallet interface {
 	// reference the transaction.
 	RegisterTransaction(consensus.Transaction) (id string, err error)
 
-	// FundTransaction will add `amount` to a transaction's inputs.
-	FundTransaction(id string, amount consensus.Currency) error
+	// FundTransaction will add `amount` to a transaction's inputs. The funded
+	// transaction is returned with an error.
+	FundTransaction(id string, amount consensus.Currency) (consensus.Transaction, error)
 
-	// AddMinerFee adds a single miner fee of value `fee`.
-	AddMinerFee(id string, fee consensus.Currency) error
+	// AddMinerFee adds a single miner fee of value `fee`. The transaction is
+	// returned, along with the index that the added fee ended up at.
+	AddMinerFee(id string, fee consensus.Currency) (consensus.Transaction, uint64, error)
 
-	// AddOutput adds an output to a transaction. It returns the index of the
-	// output in the transaction.
-	AddOutput(id string, output consensus.SiacoinOutput) (uint64, error)
+	// AddOutput adds an output to a transaction. It returns the transaction
+	// with index of the output that got added.
+	AddOutput(id string, output consensus.SiacoinOutput) (consensus.Transaction, uint64, error)
 
-	// AddFileContract adds a file contract to a transaction.
-	AddFileContract(id string, fc consensus.FileContract) error
+	// AddFileContract adds a file contract to a transaction, returning the
+	// transaction and the index that the file contract was put at.
+	AddFileContract(id string, fc consensus.FileContract) (consensus.Transaction, uint64, error)
 
-	// AddStorageProof adds a storage proof to a transaction.
-	AddStorageProof(id string, sp consensus.StorageProof) error
+	// AddStorageProof adds a storage proof to a transaction, returning the
+	// transaction and the index that the storage proof was put at.
+	AddStorageProof(id string, sp consensus.StorageProof) (consensus.Transaction, uint64, error)
 
 	// AddArbitraryData adds a byte slice to the arbitrary data section of the
-	// transaction.
-	AddArbitraryData(id string, arb string) error
+	// transaction, returning the transaction and the index of the new
+	// arbitrary data.
+	AddArbitraryData(id string, arb string) (consensus.Transaction, uint64, error)
 
 	// Sign transaction will sign the transaction associated with the id and
 	// then return the transaction. If wholeTransaction is set to true, then
 	// the wholeTransaction flag will be set in CoveredFields for each
-	// signature.
-	//
-	// Upon being signed and returned, the transaction-in-progress is deleted
-	// from the wallet.
+	// signature. After being signed, the transaction is deleted from the
+	// wallet and must be reregistered if more changes are to be made.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
 }
