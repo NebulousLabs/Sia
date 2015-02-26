@@ -45,7 +45,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (h *Host, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, dir string) (h *Host, err error) {
 	if state == nil {
 		err = errors.New("host cannot use a nil state")
 		return
@@ -70,7 +70,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 2e6,                                    // 2 GB
+			TotalStorage: 2e9,                                    // 2 GB
 			MaxFilesize:  300e6,                                  // 300 MB
 			MaxDuration:  5e3,                                    // Just over a month.
 			MinWindow:    288,                                    // 48 hours.
@@ -78,6 +78,9 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 			Collateral:   consensus.NewCurrency64(0),
 			UnlockHash:   addr,
 		},
+
+		hostDir:        dir,
+		spaceRemaining: 2e9,
 
 		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
 		obligationsByHeight: make(map[consensus.BlockHeight][]contractObligation),

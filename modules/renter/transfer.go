@@ -81,10 +81,10 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 
 		r.mu.Lock()
 		*piece = FilePiece{
-			HostIP:   host.IPAddress,
-			Contract: contract,
+			HostIP:     host.IPAddress,
+			Contract:   contract,
 			ContractID: contractID,
-			Active: true,
+			Active:     true,
 		}
 		r.mu.Unlock()
 		return
