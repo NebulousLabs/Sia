@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/network"
 )
 
 // A FilePiece contains information about an individual file piece that has
@@ -15,7 +16,7 @@ type FilePiece struct {
 	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
 	Contract   consensus.FileContract   // The contract being enforced.
 	ContractID consensus.FileContractID // The ID of the contract.
-	Host       modules.HostEntry        // Where to find the file.
+	HostIP     network.Address          // Where to find the file.
 }
 
 // A Renter is responsible for tracking all of the files that a user has
