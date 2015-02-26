@@ -25,6 +25,11 @@ func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error)
 	h.fileCounter++
 	path = filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
 	file, err = os.Create(path)
+	if err != nil {
+		println("bogus")
+		println(path)
+		return
+	}
 	return
 }
 

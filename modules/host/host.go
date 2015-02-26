@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -91,6 +92,11 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		return
 	}
 	h.latestBlock = block.ID()
+
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return
+	}
 
 	consensusChan := state.SubscribeToConsensusChanges()
 	go h.threadedConsensusListen(consensusChan)
