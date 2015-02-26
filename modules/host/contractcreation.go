@@ -148,14 +148,6 @@ func (h *Host) addCollateral(txn consensus.Transaction, terms modules.ContractTe
 // NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
-//
-// Order of events:
-//      1. Renter proposes contract terms
-//      2. Host accepts or rejects terms
-//      3. If host accepts, renter sends file contents
-//      4. Renter funds, signs, and sends transaction containing file contract
-//      5. Host verifies transaction matches terms
-//      6. Host funds, signs, and submits transaction
 func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read the contract terms.
 	var terms modules.ContractTerms
@@ -282,6 +274,9 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[fcid] = co
 	h.mu.Unlock()
+
+	// TODO: we don't currently watch the blockchain to make sure that the
+	// transaction actually gets into the blockchain.
 
 	return
 }

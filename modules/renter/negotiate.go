@@ -16,9 +16,11 @@ const (
 	defaultWindowSize = 288 // 48 Hours
 )
 
-// createFileContractTransaction creates a transaction containing a file
-// contract that is aimed at negotiating with hosts.
-func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, err error) {
+// createContractTransaction takes contract terms and a merkle root and uses
+// them to build a transaction containing a file contract that satisfies the
+// terms, including providing an input balance. The transaction does not get
+// signed.
+func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, id string, err error) {
 	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
 	var payout consensus.Currency
 	for _, output := range terms.MissedProofOutputs {
@@ -42,19 +44,15 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 	}
 
 	// Create the transaction.
-	id, err := r.wallet.RegisterTransaction(txn)
+	id, err = r.wallet.RegisterTransaction(txn)
 	if err != nil {
 		return
 	}
-	err = r.wallet.FundTransaction(id, clientCost)
+	_, err = r.wallet.FundTransaction(id, clientCost)
 	if err != nil {
 		return
 	}
-	err = r.wallet.AddFileContract(id, contract)
-	if err != nil {
-		return
-	}
-	txn, err = r.wallet.SignTransaction(id, false)
+	txn, _, err = r.wallet.AddFileContract(id, contract)
 	if err != nil {
 		return
 	}
@@ -65,7 +63,7 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 // negotiateContract creates a file contract for a host according to the
 // requests of the host. There is an assumption that only hosts with acceptable
 // terms will be put into the hostdb.
-func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract consensus.FileContract, err error) {
+func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract consensus.FileContract, fcid consensus.FileContractID, err error) {
 	height := r.state.Height()
 
 	// Get the filesize by seeking to the end, grabbing the index, then seeking
@@ -112,7 +110,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	if err != nil {
 		return
 	}
-	txn, err := r.createContractTransaction(terms, merkleRoot)
+	unsignedTxn, txnRef, err := r.createContractTransaction(terms, merkleRoot)
 	if err != nil {
 		return
 	}
@@ -128,37 +126,55 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		if err = encoding.ReadObject(conn, &response, 128); err != nil {
 			return
 		}
-		if response != modules.AcceptContractResponse {
+		if response != modules.AcceptTermsResponse {
 			return errors.New(response)
 		}
 
 		// Set a timeout for the contract that assumes a minimum connection of
-		// 64kbps, then send the file followed by the transaction containing
-		// the file contract.
+		// 64kbps, then send the data that the host will be storing.
 		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 128 * time.Microsecond))
 		_, err = io.CopyN(conn, up.Data, int64(filesize))
 		if err != nil {
 			return
 		}
-		_, err = encoding.WriteObject(conn, txn)
-		return
 
-		// TODO: Need some way to determine if the contract has succeeded or
-		// failed. This is tricky because the host can do a few things here.
-		// The safe way to handle this is to assume that the contract has
-		// succeeded and then check back in a few blocks. If the contract isn't
-		// in the blockchain at that point, we'll spend the output that we used
-		// to fund the file contract, which will prevent the host from
-		// submitting the file contract. We'll then need to upload this piece
-		// somewhere else.
-		//
-		// This will mean somehow finding the contract in the blockchain
-		// without knowing the id of the contract, because you can't know what
-		// outputs the host will use when funding the contract unless the host
-		// tells you ahead of time, which is actually something that we could
-		// arrange. For now though we're just not going to worry about it and
-		// assume everyone will play nice until we fix it. It's also not a huge
-		// catastrophe (or very incentivized) if only a few hosts play mean.
+		// Send the unsigned transaction to the host.
+		_, err = encoding.WriteObject(conn, unsignedTxn)
+		if err != nil {
+			return
+		}
+
+		// The host will respond with a transaction with the collateral added.
+		// Add the collateral inputs from the host to the original wallet
+		// transaction.
+		var collateralTxn consensus.Transaction
+		err = encoding.ReadObject(conn, &collateralTxn, 16e3)
+		if err != nil {
+			return
+		}
+		for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
+			_, _, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
+			if err != nil {
+				return
+			}
+		}
+		signedTxn, err := r.wallet.SignTransaction(txnRef, true)
+		if err != nil {
+			return
+		}
+
+		// Send the signed transaction back to the host.
+		_, err = encoding.WriteObject(conn, signedTxn)
+		if err != nil {
+			return
+		}
+
+		fcid = signedTxn.FileContractID(0)
+
+		// TODO: We don't actually watch the blockchain to make sure that the
+		// file contract made it.
+
+		return
 	})
 
 	return

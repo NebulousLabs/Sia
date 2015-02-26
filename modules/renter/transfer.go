@@ -74,17 +74,17 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 		// Negotiate the contract with the host. If the negotiation is
 		// unsuccessful, we need to try again with a new host. Otherwise, the
 		// file will be uploaded and we'll be done.
-		contract, err := r.negotiateContract(host, up)
+		contract, contractID, err := r.negotiateContract(host, up)
 		if err != nil {
 			continue
 		}
 
 		r.mu.Lock()
 		*piece = FilePiece{
-			Host:     host,
-			Contract: contract,
-			// TODO: ContractID: contractID,
-			Active: true,
+			Host:       host,
+			Contract:   contract,
+			ContractID: contractID,
+			Active:     true,
 		}
 		r.mu.Unlock()
 		return
