@@ -56,6 +56,12 @@ type Wallet interface {
 	// arbitrary data.
 	AddArbitraryData(id string, arb string) (consensus.Transaction, uint64, error)
 
+	// AddSignature adds a signature to the transaction, the signature should
+	// already be valid, and shouldn't sign any of the inputs that were added
+	// by calling 'FundTransaction'. The updated transaction and the index of
+	// the new signature are returned.
+	AddSignature(id string, sig consensus.TransactionSignature) (consensus.Transaction, uint64, error)
+
 	// Sign transaction will sign the transaction associated with the id and
 	// then return the transaction. If wholeTransaction is set to true, then
 	// the wholeTransaction flag will be set in CoveredFields for each

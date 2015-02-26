@@ -8,6 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+var (
+	ErrInvalidID = errors.New("no transaction of given id found")
+)
+
 // openTransaction is a type that the wallet uses to track a transaction as it
 // adds inputs and other features. `inputs` is a list of inputs (their indicies
 // in the transaction) that the wallet has added personally, so that the inputs
@@ -123,7 +127,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	// Get the transaction that was originally meant to be funded.
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction of given id found")
+		err = ErrInvalidID
 		return
 	}
 	txn := openTxn.transaction
@@ -148,7 +152,7 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Tra
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
@@ -167,7 +171,7 @@ func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consens
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
@@ -186,7 +190,7 @@ func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consen
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
@@ -205,7 +209,7 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consen
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
@@ -223,7 +227,7 @@ func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transactio
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
@@ -242,7 +246,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	// Fetch the transaction.
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 	txn = *openTxn.transaction
@@ -303,5 +307,25 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	// Delete the open transaction.
 	delete(w.transactions, id)
 
+	return
+}
+
+// AddSignature adds a signature to the transaction, presumably signing one of
+// the inputs that 'SignTransaction' will not sign automatically. This can be
+// useful for dealing with multiparty signatures, or for staged negotiations
+// which involve sending the transaction first and the signature later.
+func (w *Wallet) AddSignature(id string, sig consensus.TransactionSignature) (t consensus.Transaction, sigIndex uint64, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.Signatures = append(openTxn.transaction.Signatures, sig)
+	t = *openTxn.transaction
+	sigIndex = uint64(len(t.Signatures) - 1)
 	return
 }
