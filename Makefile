@@ -20,7 +20,7 @@ install: fmt REBUILD
 # development.
 clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
-		*.wallet cover
+		*.wallet *_test cover
 
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.

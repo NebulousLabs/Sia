@@ -17,7 +17,7 @@ const (
 
 // downloadPiece attempts to retrieve a file from a host.
 func downloadPiece(piece FilePiece, path string) error {
-	return piece.Host.IPAddress.Call("RetrieveFile", func(conn net.Conn) (err error) {
+	return piece.HostIP.Call("RetrieveFile", func(conn net.Conn) (err error) {
 		// Send the id of the contract for the file piece we're requesting. The
 		// response will be the file piece contents.
 		if _, err = encoding.WriteObject(conn, piece.ContractID); err != nil {
@@ -81,10 +81,10 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 
 		r.mu.Lock()
 		*piece = FilePiece{
-			Host:       host,
-			Contract:   contract,
+			HostIP:   host.IPAddress,
+			Contract: contract,
 			ContractID: contractID,
-			Active:     true,
+			Active: true,
 		}
 		r.mu.Unlock()
 		return

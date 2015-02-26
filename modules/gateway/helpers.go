@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"errors"
+	"io/ioutil"
 	"math/rand"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/network"
 )
 
@@ -38,4 +40,25 @@ func (g *Gateway) broadcast(name string, arg, resp interface{}) {
 	for peer := range g.peers {
 		peer.RPC(name, arg, resp)
 	}
+}
+
+func (g *Gateway) save(filename string) error {
+	peers := g.Info().Peers
+	return ioutil.WriteFile(filename, encoding.Marshal(peers), 0666)
+}
+
+func (g *Gateway) load(filename string) (err error) {
+	contents, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return
+	}
+	var peers []network.Address
+	err = encoding.Unmarshal(contents, &peers)
+	if err != nil {
+		return
+	}
+	for _, peer := range peers {
+		g.addPeer(peer)
+	}
+	return
 }
