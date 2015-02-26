@@ -45,6 +45,7 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	walletNum++
 	h, err := New(ct.State, tp, w)
 	if err != nil {
 		t.Fatal(err)

@@ -50,6 +50,7 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	walletNum++
 	r, err := New(ct.State, hdb, w)
 	if err != nil {
 		t.Fatal(err)
