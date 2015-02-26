@@ -12,7 +12,7 @@ import (
 func (wt *WalletTester) testFundTransaction() {
 	// Get a coin address for the wallet and fund the wallet using money from
 	// the
-	_, unlockConds, err := wt.CoinAddress()
+	addr, _, err := wt.CoinAddress()
 	if err != nil {
 		wt.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func (wt *WalletTester) testFundTransaction() {
 	walletFunderTxn := wt.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinOutput)
 	walletFunderOutput := consensus.SiacoinOutput{
 		Value:      value,
-		UnlockHash: unlockConds.UnlockHash(),
+		UnlockHash: addr,
 	}
 	walletFunderTxn.SiacoinOutputs = append(walletFunderTxn.SiacoinOutputs, walletFunderOutput)
 	block := wt.MineCurrentBlock([]consensus.Transaction{walletFunderTxn})
