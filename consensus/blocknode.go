@@ -111,9 +111,6 @@ func (bn *blockNode) newChild(b Block) *blockNode {
 	// to compare our timestamp with the timestamp of the reference node, which
 	// is `TargetWindow` blocks earlier, or if the height is less than
 	// `TargetWindow`, it's the genesis block.
-	//
-	// CONTRIBUTE: find a way to look up the correct parent without scrolling
-	// through 'TargetWindow' elements in a linked list.
 	var numBlocks BlockHeight
 	windowStart := child
 	for numBlocks = 0; numBlocks < TargetWindow && windowStart.parent != nil; numBlocks++ {

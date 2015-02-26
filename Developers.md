@@ -49,15 +49,11 @@ All structs, functions, and interfaces must have a docstring.
 
 Anytime that something is left unfinished, place a comment containing the
 string 'TODO:'. This sends a clear message to other developers, and creates a
-greppable way to find unfinished parts of the codebase. Currently, it is okay
-to leave a large volume of 'TODO' statements in the codebase. As the codebase
-matures, 'TODO' statements will become increasingly frowned upon.
-
-A softer form of 'TODO' is 'CONTRIBUTE:', which indicates a place in the
-codebase that could use additional code, but it is only a 'would be nice', and
-is not a high enough priority to actually be implemented. It is meant to
-indicate to other developers (especially those new to the codebase) places that
-would be easy contribute to.
+greppable way to find unfinished parts of the codebase. 'TODO' statements are
+currently discouraged.  As the codebase matures, 'TODO' statements will become
+increasingly frowned upon. 'TODO' statements should not document feature
+requests, but instead document incompleteness where the incompleteness causes
+disruption to user experience or causes a security vulnerability.
 
 Documentation should give a sense of what each function does, but should also
 give a sense of the overall architecture of the code. Where useful, examples
