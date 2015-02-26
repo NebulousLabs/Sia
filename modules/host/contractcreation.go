@@ -75,9 +75,16 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	return nil
 }
 
-// verifyContract verifies that the values in the FileContract match the
-// ContractTerms agreed upon.
-func verifyContract(fc consensus.FileContract, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
+// verifyTransaction checks that the provided transaction matches the provided
+// contract terms, and that the Merkle root provided is equal to the merkle
+// root of the transaction file contract.
+func verifyTransaction(txn consensus.Transaction, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
+	// Check that there is only one file contract.
+	if len(txn.FileContracts) != 1 {
+		return errors.New("transaction should have only one file contract.")
+	}
+	fc := txn.FileContracts[0]
+
 	// Get the expected payout.
 	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
 	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
@@ -119,37 +126,23 @@ func verifyContract(fc consensus.FileContract, terms modules.ContractTerms, merk
 	return nil
 }
 
-// acceptContract adds the host's funds to the contract transaction and
-// submits it to the transaction pool. If we encounter an error here, we
-// return a HostCapacityError to hide the fact that we're experiencing
-// internal problems.
-func (h *Host) acceptContract(txn consensus.Transaction) error {
-	contract := txn.FileContracts[0]
-	duration := uint64(contract.Expiration - contract.Start)
-	filesizeCost := consensus.NewCurrency64(contract.FileSize)
-	durationCost := consensus.NewCurrency64(duration)
-	penalty := h.Collateral.Mul(filesizeCost).Mul(durationCost)
+// addCollateral takes a transaction and its contract terms and adds the host
+// collateral to the transaction.
+func (h *Host) addCollateral(txn consensus.Transaction, terms modules.ContractTerms) (fundedTxn consensus.Transaction, txnID string, err error) {
+	// Determine the amount of colletaral the host needs to provide.
+	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
+	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	collateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 
-	id, err := h.wallet.RegisterTransaction(txn)
+	txnID, err = h.wallet.RegisterTransaction(txn)
 	if err != nil {
-		return HostCapacityErr
+		return
 	}
-
-	err = h.wallet.FundTransaction(id, penalty)
+	fundedTxn, err = h.wallet.FundTransaction(txnID, collateral)
 	if err != nil {
-		return HostCapacityErr
+		return
 	}
-
-	signedTxn, err := h.wallet.SignTransaction(id, true)
-	if err != nil {
-		return HostCapacityErr
-	}
-
-	err = h.tpool.AcceptTransaction(signedTxn)
-	if err != nil {
-		return HostCapacityErr
-	}
-	return nil
+	return
 }
 
 // NegotiateContract is an RPC that negotiates a file contract. If the
@@ -198,7 +191,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}()
 
 	// signal that we are ready to download file
-	_, err = encoding.WriteObject(conn, modules.AcceptContractResponse)
+	_, err = encoding.WriteObject(conn, modules.AcceptTermsResponse)
 	if err != nil {
 		return
 	}
@@ -214,56 +207,80 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		// each byte we read from tee will also be written to file
 		file,
 	)
-
 	merkleRoot, err := crypto.ReaderMerkleRoot(tee, terms.FileSize)
 	if err != nil {
 		return
 	}
 
-	// Read contract transaction.
-	var txn consensus.Transaction
-	err = encoding.ReadObject(conn, &txn, maxContractLen)
+	// Data has been sent, read in the unsigned transaction with the file
+	// contract.
+	var unsignedTxn consensus.Transaction
+	err = encoding.ReadObject(conn, &unsignedTxn, maxContractLen)
 	if err != nil {
 		return
 	}
 
-	// Ensure transaction contains a file contract
-	if len(txn.FileContracts) != 1 {
-		err = errors.New("transaction must contain exactly one file contract")
-		encoding.WriteObject(conn, err.Error())
-		return
-	}
-	contract := txn.FileContracts[0]
-
-	// Verify that the contract in the transaction matches the agreed upon
-	// terms, and that the Merkle root in the contract matches our
-	// independently calculated Merkle root.
-	err = verifyContract(contract, terms, merkleRoot)
+	// Verify that the transaction matches the agreed upon terms, and that the
+	// Merkle root in the file contract matches our independently calculated
+	// Merkle root.
+	err = verifyTransaction(unsignedTxn, terms, merkleRoot)
 	if err != nil {
-		err = errors.New("contract does not satisfy terms: " + err.Error())
+		err = errors.New("transaction does not satisfy terms: " + err.Error())
 		encoding.WriteObject(conn, err.Error())
 		return
 	}
 
-	// Fund and submit the transaction.
-	err = h.acceptContract(txn)
+	// Add the collateral to the transaction, but do not sign the transaction.
+	collateralTxn, txnID, err := h.addCollateral(unsignedTxn, terms)
 	if err != nil {
-		encoding.WriteObject(conn, err.Error())
+		return
+	}
+	_, err = encoding.WriteObject(conn, collateralTxn)
+	if err != nil {
+		return
+	}
+
+	// Read in the renter-signed transaction and check that it matches the
+	// previously accepted transaction.
+	var signedTxn consensus.Transaction
+	err = encoding.ReadObject(conn, &signedTxn, maxContractLen)
+	if err != nil {
+		return
+	}
+	if collateralTxn.ID() != signedTxn.ID() {
+		err = errors.New("signed transaction does not match the transaction with collateral")
+		return
+	}
+
+	// Add the signatures from the renter signed transaction, and then sign the
+	// transaction, then submit the transaction.
+	for _, sig := range signedTxn.Signatures {
+		_, _, err = h.wallet.AddSignature(txnID, sig)
+		if err != nil {
+			return
+		}
+	}
+	fullTxn, err := h.wallet.SignTransaction(txnID, true)
+	if err != nil {
+		return
+	}
+	err = h.tpool.AcceptTransaction(fullTxn)
+	if err != nil {
 		return
 	}
 
 	// Add this contract to the host's list of obligations.
-	id := txn.FileContractID(0)
-	fc := txn.FileContracts[0]
+	fcid := signedTxn.FileContractID(0)
+	fc := signedTxn.FileContracts[0]
 	proofHeight := fc.Expiration + StorageProofReorgDepth
 	co := contractObligation{
-		id:           id,
+		id:           fcid,
 		fileContract: fc,
 		path:         path,
 	}
 	h.mu.Lock()
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
-	h.obligationsByID[id] = co
+	h.obligationsByID[fcid] = co
 	h.mu.Unlock()
 
 	return

@@ -26,7 +26,7 @@ func (h *Host) Announce(addr network.Address) (err error) {
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: addr,
 	})
-	err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
+	_, _, err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
 	if err != nil {
 		return
 	}

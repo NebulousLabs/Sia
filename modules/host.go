@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	AcceptContractResponse = "accept"
+	AcceptTermsResponse = "accept"
 )
 
 // ContractTerms are the parameters agreed upon by a client and a host when

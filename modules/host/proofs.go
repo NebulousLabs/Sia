@@ -34,7 +34,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	if err != nil {
 		return
 	}
-	err = h.wallet.AddStorageProof(id, sp)
+	_, _, err = h.wallet.AddStorageProof(id, sp)
 	if err != nil {
 		return
 	}

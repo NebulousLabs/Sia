@@ -55,9 +55,3 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 	ht.Host = h
 	return
 }
-
-// TestCreateHostTester is a temporary function to call CreateHostTester during
-// testing.
-func TestCreateHostTester(t *testing.T) {
-	_ = CreateHostTester(t)
-}

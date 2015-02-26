@@ -11,9 +11,9 @@ connection.
 2. The renter sends the host a `ContractTerms` object containing terms for a
 potential file contract.
 
-3. The host can accept the contract by replying with the
-`AcceptBontractResponse`. If the host does not agree with any part of the
-terms, the host can instead write an error and close the connection.
+3. The host can accept the contract terms by replying with the
+`AcceptTermsResponse`. If the host does not agree with any part of the terms,
+the host can instead write an error and close the connection.
 
 4. The renter then sends the data that the host will be storing. The data must
 be equal in length to the size indicated in the contract terms.
