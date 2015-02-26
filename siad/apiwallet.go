@@ -56,10 +56,5 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 // walletStatusHandler returns a struct containing wallet information, like the
 // balance.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	walletStatus, err := d.wallet.Info()
-	if err != nil {
-		writeError(w, "Failed to get wallet info", 500)
-		return
-	}
-	writeJSON(w, walletStatus)
+	writeJSON(w, d.wallet.Info())
 }

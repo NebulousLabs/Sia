@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
@@ -35,16 +36,15 @@ type DaemonConfig struct {
 }
 
 type daemon struct {
-	// Modules. TODO: Implement all modules.
 	state   *consensus.State
-	tpool   *transactionpool.TransactionPool
+	tpool   modules.TransactionPool
 	network *network.TCPServer
-	wallet  *wallet.Wallet
+	wallet  modules.Wallet
 	miner   *miner.Miner
-	host    *host.Host
-	hostDB  *hostdb.HostDB
-	renter  *renter.Renter
-	gateway *gateway.Gateway
+	host    modules.Host
+	hostDB  modules.HostDB
+	renter  modules.Renter
+	gateway modules.Gateway
 
 	styleDir    string
 	downloadDir string

@@ -10,6 +10,13 @@ var (
 	LowBalanceErr = errors.New("Insufficient Balance")
 )
 
+// WalletInfo contains basic information about the wallet.
+type WalletInfo struct {
+	Balance      consensus.Currency
+	FullBalance  consensus.Currency
+	NumAddresses int
+}
+
 // Wallet in an interface that helps to build and sign transactions. The user
 // can make a new transaction-in-progress by calling Register, and then can
 // add outputs, fees, etc. This gives other modules full flexibility in
@@ -74,4 +81,8 @@ type Wallet interface {
 	// signature. After being signed, the transaction is deleted from the
 	// wallet and must be reregistered if more changes are to be made.
 	SignTransaction(id string, wholeTransaction bool) (consensus.Transaction, error)
+
+	Info() WalletInfo
+
+	SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (consensus.Transaction, error)
 }
