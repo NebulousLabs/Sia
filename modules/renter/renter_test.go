@@ -61,8 +61,16 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	return
 }
 
-// TestCreateHostTester is a temporary function to call CreateHostTester during
-// testing.
-func TestCreateRenterTester(t *testing.T) {
-	_ = CreateRenterTester(t)
+// TestSaveLoad tests that saving and loading a Renter restores its data.
+// TODO: expand this once Renter testing is fleshed out.
+func TestSaveLoad(t *testing.T) {
+	rt := CreateRenterTester(t)
+	err := rt.save("../../renterdata_test")
+	if err != nil {
+		rt.Fatal(err)
+	}
+	err = rt.load("../../renterdata_test")
+	if err != nil {
+		rt.Fatal(err)
+	}
 }
