@@ -143,6 +143,25 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	return
 }
 
+// AddSiacoinInput will add a siacoin input to the transaction, returning the
+// index of the input within the transaction and the transaction itself. When
+// 'SignTransaction' is called, this input will not be signed.
+func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t consensus.Transaction, inputIndex uint64, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, input)
+	t = *openTxn.transaction
+	inputIndex = uint64(len(t.SiacoinInputs) - 1)
+	return
+}
+
 // AddMinerFee will add a miner fee to the transaction, but will not add any
 // inputs. The transaction and the index of the new miner fee within the
 // transaction are returned.

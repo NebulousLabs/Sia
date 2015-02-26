@@ -35,6 +35,12 @@ type Wallet interface {
 	// transaction is returned with an error.
 	FundTransaction(id string, amount consensus.Currency) (consensus.Transaction, error)
 
+	// AddSiacoinInput adds a siacoin input to the transaction. When
+	// 'SignTransaction' gets called, this input will be left unsigned. The
+	// updated transaction is returned along with the index of the new siacoin
+	// input within the transaction.
+	AddSiacoinInput(id string, input consensus.SiacoinInput) (consensus.Transaction, uint64, error)
+
 	// AddMinerFee adds a single miner fee of value `fee`. The transaction is
 	// returned, along with the index that the added fee ended up at.
 	AddMinerFee(id string, fee consensus.Currency) (consensus.Transaction, uint64, error)

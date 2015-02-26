@@ -35,11 +35,11 @@ func (wt *WalletTester) testFundTransaction() {
 	if err != nil {
 		wt.Fatal(err)
 	}
-	err = wt.FundTransaction(id, value.Sub(consensus.NewCurrency64(1)))
+	_, err = wt.FundTransaction(id, value.Sub(consensus.NewCurrency64(1)))
 	if err != nil {
 		wt.Fatal(err)
 	}
-	err = wt.AddMinerFee(id, value.Sub(consensus.NewCurrency64(1)))
+	_, _, err = wt.AddMinerFee(id, value.Sub(consensus.NewCurrency64(1)))
 	if err != nil {
 		wt.Fatal(err)
 	}
