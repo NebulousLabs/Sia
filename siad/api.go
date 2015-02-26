@@ -23,7 +23,7 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 	})
 }
 
-func (d *daemon) listen(addr string) error {
+func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
 	// Host API Calls
@@ -70,7 +70,9 @@ func (d *daemon) listen(addr string) error {
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
 	}
+}
 
+func (d *daemon) listen() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.
 	err := d.apiServer.ListenAndServe()

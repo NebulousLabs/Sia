@@ -90,8 +90,14 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
-	// register RPC handlers
-	// TODO: register all RPCs in a separate function
+	d.initRPC()
+	d.initAPI(config.APIAddr)
+
+	return
+}
+
+// initRPC registers all of the daemon's RPC handlers
+func (d *daemon) initRPC() (err error) {
 	err = d.network.RegisterRPC("AcceptBlock", d.gateway.RelayBlock)
 	if err != nil {
 		return

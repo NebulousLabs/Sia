@@ -114,7 +114,7 @@ func startEnvironment(*cobra.Command, []string) {
 		go d.bootstrap()
 	}
 	// listen for API requests
-	err = d.listen(daemonConfig.APIAddr)
+	err = d.listen()
 	if err != nil {
 		fmt.Println("API server quit unexpectedly:", err)
 	}
