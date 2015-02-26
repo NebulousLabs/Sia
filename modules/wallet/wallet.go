@@ -104,9 +104,13 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		transactions: make(map[string]*openTransaction),
 	}
 
-	err = w.Load(filename)
-	if err != nil {
-		return
+	// If the wallet file already exists, try to load it.
+	if fileExists(filename) {
+		// lock not necessary here because no one else has access to w
+		err = w.load(filename)
+		if err != nil {
+			return
+		}
 	}
 
 	return

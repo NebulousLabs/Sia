@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	tcpsPort int = 10500
+	tcpsPort  int = 10500
+	walletNum int = 0
 )
 
 // A HostTester contains a consensus tester and a host, and provides a set of
@@ -40,7 +41,7 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "")
+	w, err := wallet.New(ct.State, tp, "../../host_test"+strconv.Itoa(walletNum)+".wallet")
 	if err != nil {
 		t.Fatal(err)
 	}

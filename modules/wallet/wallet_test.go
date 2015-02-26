@@ -10,8 +10,10 @@ import (
 	"github.com/NebulousLabs/Sia/network"
 )
 
+// global variables used to prevent conflicts
 var (
-	tcpsPort int = 10000
+	tcpsPort  int = 10000
+	walletNum int = 0
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -38,10 +40,11 @@ func NewWalletTester(t *testing.T) (wt *WalletTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.Wallet, err = New(wt.State, tpool, "")
+	wt.Wallet, err = New(wt.State, tpool, "../../wallet_test"+strconv.Itoa(walletNum)+".wallet")
 	if err != nil {
 		t.Fatal(err)
 	}
+	walletNum++
 
 	return
 }

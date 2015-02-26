@@ -31,22 +31,17 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 	// unlocked, also add it to the list of currently spendable addresses. It
 	// needs to go in both though in case there is a reorganization of the
 	// blockchain.
-	newKey := &key{
+	w.keys[coinAddress] = &key{
+		spendable:        w.state.Height() >= unlockHeight,
 		unlockConditions: unlockConditions,
 		secretKey:        sk,
 
 		outputs: make(map[consensus.SiacoinOutputID]*knownOutput),
 	}
-	if unlockHeight <= w.state.Height() {
-		newKey.spendable = true
-	}
-	w.keys[coinAddress] = newKey
 
 	// Add this key to the list of addresses that get unlocked at
 	// `unlockHeight`
-	heightAddrs := w.timelockedKeys[unlockHeight]
-	heightAddrs = append(heightAddrs, coinAddress)
-	w.timelockedKeys[unlockHeight] = heightAddrs
+	w.timelockedKeys[unlockHeight] = append(w.timelockedKeys[unlockHeight], coinAddress)
 
 	// Save the wallet state, which now includes the new address.
 	err = w.save()

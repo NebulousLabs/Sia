@@ -27,7 +27,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(s, tpool, "")
+	w, err := wallet.New(s, tpool, "../../miner_test.wallet")
 	if err != nil {
 		t.Fatal(err)
 	}
