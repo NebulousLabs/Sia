@@ -106,7 +106,7 @@ func startEnvironment(*cobra.Command, []string) {
 	}
 	d, err := newDaemon(daemonConfig)
 	if err != nil {
-		fmt.Println("Failed to start daemon:", err)
+		fmt.Println("Failed to create daemon:", err)
 		return
 	}
 	// join the network
@@ -114,7 +114,10 @@ func startEnvironment(*cobra.Command, []string) {
 		go d.bootstrap()
 	}
 	// listen for API requests
-	d.listen(daemonConfig.APIAddr)
+	err = d.listen(daemonConfig.APIAddr)
+	if err != nil {
+		fmt.Println("API server quit unexpectedly:", err)
+	}
 }
 
 func version(*cobra.Command, []string) {
