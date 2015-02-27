@@ -13,7 +13,7 @@ import (
 // space is returned and the file is actually deleted.
 func (ht *HostTester) testAllocation() {
 	initialSpace := ht.spaceRemaining
-	filesize := int64(4e3)
+	const filesize = 4e3
 
 	// Allocate a 4kb file.
 	file, path, err := ht.allocate(filesize)
@@ -30,7 +30,7 @@ func (ht *HostTester) testAllocation() {
 	}
 
 	// Check that spaceRemaining has decreased appropriately.
-	if initialSpace+filesize != ht.spaceRemaining {
+	if ht.spaceRemaining != initialSpace-filesize {
 		ht.Error("space remaining did not decrease appropriately after allocating a file")
 	}
 
