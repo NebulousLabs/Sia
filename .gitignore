@@ -5,6 +5,7 @@ renterDownload
 whitepaper.aux
 whitepaper.log
 whitepaper.pdf
+*_test
 *.wallet
 *.swp
 info.log

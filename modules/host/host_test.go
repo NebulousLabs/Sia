@@ -14,6 +14,7 @@ import (
 var (
 	tcpsPort  int = 10500
 	walletNum int = 0
+	hostNum   int = 0
 )
 
 // A HostTester contains a consensus tester and a host, and provides a set of
@@ -46,27 +47,14 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 		t.Fatal(err)
 	}
 	walletNum++
-	h, err := New(ct.State, tp, w)
+	h, err := New(ct.State, tp, w, "../../hostdir"+strconv.Itoa(hostNum))
 	if err != nil {
 		t.Fatal(err)
 	}
+	hostNum++
 
 	ht = new(HostTester)
 	ht.ConsensusTester = ct
 	ht.Host = h
 	return
-}
-
-// TestSaveLoad tests that saving and loading a Host restores its data.
-// TODO: expand this once Host testing is fleshed out.
-func TestSaveLoad(t *testing.T) {
-	ht := CreateHostTester(t)
-	err := ht.save("../../hostdata_test")
-	if err != nil {
-		ht.Fatal(err)
-	}
-	err = ht.load("../../hostdata_test")
-	if err != nil {
-		ht.Fatal(err)
-	}
 }

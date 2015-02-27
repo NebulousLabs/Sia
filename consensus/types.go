@@ -262,8 +262,6 @@ type SiaPublicKey struct {
 // prevents the signature from being used until a certain height.
 // 'CoveredFields' indicates which parts of the transaction are being signed;
 // see CoveredFields.
-//
-// TODO: use an enum here?
 type TransactionSignature struct {
 	ParentID       crypto.Hash
 	PublicKeyIndex uint64
@@ -511,8 +509,6 @@ func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 
 // SigHash returns the hash of the fields in a transaction covered by a given
 // signature. See CoveredFields for more details.
-//
-// TODO: make this take a CoveredFields instead?
 func (t Transaction) SigHash(i int) crypto.Hash {
 	cf := t.Signatures[i].CoveredFields
 	var signedData []byte
@@ -566,4 +562,22 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 	}
 
 	return crypto.HashBytes(signedData)
+}
+
+// ID returns the id of a transaction, which is taken by marshalling all of the
+// fields except for the signatures and taking the hash of the result.
+func (t Transaction) ID() crypto.Hash {
+	tBytes := encoding.MarshalAll(
+		t.SiacoinInputs,
+		t.SiacoinOutputs,
+		t.FileContracts,
+		t.FileContractTerminations,
+		t.StorageProofs,
+		t.SiafundInputs,
+		t.SiafundOutputs,
+		t.MinerFees,
+		t.ArbitraryData,
+	)
+
+	return crypto.HashBytes(tBytes)
 }

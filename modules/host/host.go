@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"os"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -45,17 +46,17 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet) (h *Host, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, dir string) (h *Host, err error) {
 	if state == nil {
-		err = errors.New("host.New: cannot have nil state")
+		err = errors.New("host cannot use a nil state")
 		return
 	}
 	if tpool == nil {
-		err = errors.New("host.New: cannot have nil tpool")
+		err = errors.New("host cannot use a nil tpool")
 		return
 	}
 	if wallet == nil {
-		err = errors.New("host.New: cannot have nil wallet")
+		err = errors.New("host cannot use a nil wallet")
 		return
 	}
 
@@ -70,23 +71,32 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			MaxFilesize: 300e6, // 300 MB
-			MaxDuration: 5e3,   // Just over a month.
-			MinWindow:   288,   // 48 hours.
-			Price:       consensus.NewCurrency64(1),
-			Collateral:  consensus.NewCurrency64(1),
-			UnlockHash:  addr,
+			TotalStorage: 2e9,                                    // 2 GB
+			MaxFilesize:  300e6,                                  // 300 MB
+			MaxDuration:  5e3,                                    // Just over a month.
+			MinWindow:    288,                                    // 48 hours.
+			Price:        consensus.NewCurrency64(1000000000000), // 10^12
+			Collateral:   consensus.NewCurrency64(0),
+			UnlockHash:   addr,
 		},
+
+		hostDir:        dir,
+		spaceRemaining: 2e9,
 
 		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
 		obligationsByHeight: make(map[consensus.BlockHeight][]contractObligation),
 	}
 	block, exists := state.BlockAtHeight(0)
 	if !exists {
-		err = errors.New("state doesn't have a genesis block?")
+		err = errors.New("state doesn't have a genesis block")
 		return
 	}
 	h.latestBlock = block.ID()
+
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return
+	}
 
 	consensusChan := state.SubscribeToConsensusChanges()
 	go h.threadedConsensusListen(consensusChan)

@@ -25,10 +25,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	noAnnouncementTxn := consensus.Transaction{
 		ArbitraryData: []string{"bad data"},
 	}
-	err := hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{noAnnouncementTxn})
-	if err != nil {
-		t.Fatal(err)
-	}
+	hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{noAnnouncementTxn})
 	hdbt.update()
 	if len(hdbt.allHosts) != 0 {
 		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
@@ -40,10 +37,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	dirtyAnnouncementTxn := consensus.Transaction{
 		ArbitraryData: []string{modules.PrefixHostAnnouncement},
 	}
-	err = hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{dirtyAnnouncementTxn})
-	if err != nil {
-		t.Fatal(err)
-	}
+	hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{dirtyAnnouncementTxn})
 	hdbt.update()
 	if len(hdbt.allHosts) != 0 {
 		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
@@ -57,10 +51,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	falseAnnouncementTxn := consensus.Transaction{
 		ArbitraryData: []string{modules.PrefixHostAnnouncement + falseAnnouncement},
 	}
-	err = hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{falseAnnouncementTxn})
-	if err != nil {
-		t.Fatal(err)
-	}
+	hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{falseAnnouncementTxn})
 
 	// Update the host db and check that the announcement made it to the
 	// inactive set of hosts.

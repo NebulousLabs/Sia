@@ -8,6 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+var (
+	ErrInvalidID = errors.New("no transaction of given id found")
+)
+
 // openTransaction is a type that the wallet uses to track a transaction as it
 // adds inputs and other features. `inputs` is a list of inputs (their indicies
 // in the transaction) that the wallet has added personally, so that the inputs
@@ -37,7 +41,7 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 // creating two transactions. The first transaciton, the parent, spends a set
 // of outputs that add up to at least the desired amount, and then creates a
 // single output of the exact amount and a second refund output.
-func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err error) {
+func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consensus.Transaction, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -46,7 +50,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err erro
 	parentTxn := consensus.Transaction{}
 	fundingOutputs, fundingTotal, err := w.findOutputs(amount)
 	if err != nil {
-		return err
+		return
 	}
 	for _, output := range fundingOutputs {
 		key := w.keys[output.output.UnlockHash]
@@ -123,7 +127,8 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err erro
 	// Get the transaction that was originally meant to be funded.
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction of given id found")
+		err = ErrInvalidID
+		return
 	}
 	txn := openTxn.transaction
 
@@ -134,84 +139,125 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (err erro
 	}
 	openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
 	txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
+	t = *txn
+	return
+}
+
+// AddSiacoinInput will add a siacoin input to the transaction, returning the
+// index of the input within the transaction and the transaction itself. When
+// 'SignTransaction' is called, this input will not be signed.
+func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t consensus.Transaction, inputIndex uint64, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, input)
+	t = *openTxn.transaction
+	inputIndex = uint64(len(t.SiacoinInputs) - 1)
 	return
 }
 
 // AddMinerFee will add a miner fee to the transaction, but will not add any
-// inputs.
-func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) error {
+// inputs. The transaction and the index of the new miner fee within the
+// transaction are returned.
+func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Transaction, feeIndex uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction found for given id")
+		err = ErrInvalidID
+		return
 	}
 
 	openTxn.transaction.MinerFees = append(openTxn.transaction.MinerFees, fee)
-	return nil
+	t = *openTxn.transaction
+	feeIndex = uint64(len(t.MinerFees) - 1)
+	return
 }
 
 // AddOutput adds an output to the transaction, but will not add any inputs.
-// It returns the index of the output in the transaction.
-func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (index uint64, err error) {
+// AddOutput returns the transaction and the index of the new output within the
+// transaction.
+func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consensus.Transaction, outputIndex uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 
 	openTxn.transaction.SiacoinOutputs = append(openTxn.transaction.SiacoinOutputs, output)
-	index = uint64(len(openTxn.transaction.SiacoinOutputs) - 1)
+	t = *openTxn.transaction
+	outputIndex = uint64(len(t.SiacoinOutputs) - 1)
 	return
 }
 
-// AddFileContract adds a file contract to the transaction.
-func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) error {
+// AddFileContract adds a file contract to the transaction, returning a copy of
+// the transaction and the index of the new file contract within the
+// transaction.
+func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consensus.Transaction, fcIndex uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction found for given id")
+		err = ErrInvalidID
+		return
 	}
 
 	openTxn.transaction.FileContracts = append(openTxn.transaction.FileContracts, fc)
-	return nil
+	t = *openTxn.transaction
+	fcIndex = uint64(len(t.FileContracts) - 1)
+	return
 }
 
-// AddStorageProof implements the core.Wallet interface.
-func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) error {
+// AddStorageProof adds a storage proof to the transaction, returning a copy of
+// the transaction and the index of the new storage proof within the
+// transaction.
+func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consensus.Transaction, spIndex uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction found for given id")
+		err = ErrInvalidID
+		return
 	}
 
 	openTxn.transaction.StorageProofs = append(openTxn.transaction.StorageProofs, sp)
-	return nil
+	t = *openTxn.transaction
+	spIndex = uint64(len(t.StorageProofs) - 1)
+	return
 }
 
-// AddArbitraryData implements the core.Wallet interface.
-func (w *Wallet) AddArbitraryData(id string, arb string) error {
+// AddArbitraryData adds arbitrary data to the transaction, returning a copy of
+// the transaction and the index of the new data within the transaction.
+func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transaction, adIndex uint64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		return errors.New("no transaction found for given id")
+		err = ErrInvalidID
+		return
 	}
 
 	openTxn.transaction.ArbitraryData = append(openTxn.transaction.ArbitraryData, arb)
-	return nil
+	t = *openTxn.transaction
+	adIndex = uint64(len(t.ArbitraryData) - 1)
+	return
 }
 
-// SignTransaction implements the core.Wallet interface.
+// SignTransaction signs the transaction, then deletes the transaction from the
+// wallet's internal memory, then returns the transaction.
 func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensus.Transaction, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -219,7 +265,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	// Fetch the transaction.
 	openTxn, exists := w.transactions[id]
 	if !exists {
-		err = errors.New("no transaction found for given id")
+		err = ErrInvalidID
 		return
 	}
 	txn = *openTxn.transaction
@@ -244,7 +290,6 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		for i := range txn.StorageProofs {
 			coveredFields.StorageProofs = append(coveredFields.StorageProofs, uint64(i))
 		}
-		// TODO: Siafund stuff here.
 		for i := range txn.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
@@ -281,5 +326,25 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	// Delete the open transaction.
 	delete(w.transactions, id)
 
+	return
+}
+
+// AddSignature adds a signature to the transaction, presumably signing one of
+// the inputs that 'SignTransaction' will not sign automatically. This can be
+// useful for dealing with multiparty signatures, or for staged negotiations
+// which involve sending the transaction first and the signature later.
+func (w *Wallet) AddSignature(id string, sig consensus.TransactionSignature) (t consensus.Transaction, sigIndex uint64, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.Signatures = append(openTxn.transaction.Signatures, sig)
+	t = *openTxn.transaction
+	sigIndex = uint64(len(t.Signatures) - 1)
 	return
 }

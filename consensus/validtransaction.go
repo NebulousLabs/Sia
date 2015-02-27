@@ -219,6 +219,7 @@ func (s *State) validStorageProofs(t Transaction) error {
 		if err != nil {
 			return err
 		}
+
 		verified := crypto.VerifySegment(
 			sp.Segment,
 			sp.HashSet,

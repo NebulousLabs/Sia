@@ -133,11 +133,11 @@ func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash
 	if err != nil {
 		return
 	}
-	err = w.FundTransaction(id, amount)
+	_, err = w.FundTransaction(id, amount)
 	if err != nil {
 		return
 	}
-	_, err = w.AddOutput(id, output)
+	_, _, err = w.AddOutput(id, output)
 	if err != nil {
 		return
 	}
