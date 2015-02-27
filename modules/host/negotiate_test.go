@@ -2,7 +2,11 @@ package host
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // testAllocation allocates and then deallocates a file, checking that the
@@ -21,7 +25,8 @@ func (ht *HostTester) testAllocation() {
 	if path == "" {
 		ht.Fatal("path of allocated file is empty!")
 	}
-	_, err = os.Stat(path)
+	fullpath := filepath.Join(ht.Host.hostDir, path)
+	_, err = os.Stat(fullpath)
 	if os.IsNotExist(err) {
 		ht.Fatal("file does not exist on disk")
 	}
@@ -36,9 +41,37 @@ func (ht *HostTester) testAllocation() {
 	if currentSpaceRemaining != ht.spaceRemaining {
 		ht.Error("space remaining did not return to the correct value after the file was deallocated")
 	}
-	_, err = os.Stat(path)
+	_, err = os.Stat(fullpath)
 	if !os.IsNotExist(err) {
 		ht.Fatal("file still exists on disk after deallocation")
+	}
+}
+
+// testConsiderTerms presents a sensible set of contract terms to the
+// considerTerms function, and checks that they pass.
+func (ht *HostTester) testConsiderTerms() {
+	saneTerms := modules.ContractTerms{
+		FileSize:      4e3,
+		Duration:      12,
+		DurationStart: 0,
+		WindowSize:    ht.MinWindow,
+		Price:         ht.Price,
+		Collateral:    ht.Collateral,
+		ValidProofOutputs: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{
+				UnlockHash: ht.Host.UnlockHash,
+			},
+		},
+		MissedProofOutputs: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{
+				UnlockHash: consensus.ZeroUnlockHash,
+			},
+		},
+	}
+
+	err := ht.considerTerms(saneTerms)
+	if err != nil {
+		ht.Error(err)
 	}
 }
 
@@ -46,4 +79,10 @@ func (ht *HostTester) testAllocation() {
 func TestAllocation(t *testing.T) {
 	ht := CreateHostTester(t)
 	ht.testAllocation()
+}
+
+// TestConsiderTerms creates a host tester and calls testConsiderTerms.
+func TestConsiderTerms(t *testing.T) {
+	ht := CreateHostTester(t)
+	ht.testConsiderTerms()
 }

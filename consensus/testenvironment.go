@@ -7,9 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// TODO: Add MineAndSubmitCurrentBlock, which mines the current block and calls
-// accept block, checking for err = nil.
-
 // A ConsensusTester holds a state and a testing object as well as some minimal
 // and simplistic features for performing actions such as mining and building
 // transactions.
@@ -52,10 +49,13 @@ func (ct *ConsensusTester) MineCurrentBlock(txns []Transaction) (b Block) {
 
 // MineAndSubmitCurrentBlock is a shortcut function that calls MineCurrentBlock
 // and then submits it to the state.
-func (ct *ConsensusTester) MineAndSubmitCurrentBlock(txns []Transaction) error {
+func (ct *ConsensusTester) MineAndSubmitCurrentBlock(txns []Transaction) {
 	minerPayouts := ct.Payouts(ct.Height()+1, txns)
 	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), minerPayouts, txns, ct.CurrentTarget())
-	return ct.AcceptBlock(block)
+	err := ct.AcceptBlock(block)
+	if err != nil {
+		ct.Fatal(err)
+	}
 }
 
 // Payouts returns a block with 12 payouts worth 1e6 and a final payout that

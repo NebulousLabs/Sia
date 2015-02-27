@@ -23,11 +23,10 @@ var (
 func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error) {
 	h.spaceRemaining -= int64(filesize)
 	h.fileCounter++
-	path = filepath.Join(h.hostDir, strconv.Itoa(h.fileCounter))
-	file, err = os.Create(path)
+	path = strconv.Itoa(h.fileCounter)
+	fullpath := filepath.Join(h.hostDir, path)
+	file, err = os.Create(fullpath)
 	if err != nil {
-		println("bogus")
-		println(path)
 		return
 	}
 	return
@@ -35,7 +34,8 @@ func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error)
 
 // deallocate deletes a file and restores its allocated space.
 func (h *Host) deallocate(filesize uint64, path string) {
-	os.Remove(path)
+	fullpath := filepath.Join(h.hostDir, path)
+	os.Remove(fullpath)
 	h.spaceRemaining += int64(filesize)
 }
 
@@ -65,13 +65,13 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 		return errors.New("collateral does not match host settings")
 
 	case len(terms.ValidProofOutputs) != 1:
-		return errors.New("payment does not match host settings")
+		return errors.New("payment len does not match host settings")
 
 	case terms.ValidProofOutputs[0].UnlockHash != h.UnlockHash:
-		return errors.New("payment does not match host settings")
+		return errors.New("payment output does not match host settings")
 
 	case len(terms.MissedProofOutputs) != 1:
-		return errors.New("refund does not match host settings")
+		return errors.New("refund len does not match host settings")
 
 	case terms.MissedProofOutputs[0].UnlockHash != consensus.ZeroUnlockHash:
 		return errors.New("coins are not paying out to correct address")
