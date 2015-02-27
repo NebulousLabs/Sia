@@ -12,19 +12,17 @@ import (
 // testAllocation allocates and then deallocates a file, checking that the
 // space is returned and the file is actually deleted.
 func (ht *HostTester) testAllocation() {
-	currentSpaceRemaining := ht.spaceRemaining
+	initialSpace := ht.spaceRemaining
+	filesize := int64(4e3)
 
 	// Allocate a 4kb file.
-	file, path, err := ht.allocate(4e3)
+	file, path, err := ht.allocate(filesize)
 	if err != nil {
 		ht.Fatal(err)
 	}
 	file.Close()
 
 	// Check that the file has a real name and that it exists on disk.
-	if path == "" {
-		ht.Fatal("path of allocated file is empty!")
-	}
 	fullpath := filepath.Join(ht.Host.hostDir, path)
 	_, err = os.Stat(fullpath)
 	if os.IsNotExist(err) {
@@ -32,13 +30,13 @@ func (ht *HostTester) testAllocation() {
 	}
 
 	// Check that spaceRemaining has decreased appropriately.
-	if currentSpaceRemaining != ht.spaceRemaining+4e3 {
+	if initialSpace+filesize != ht.spaceRemaining {
 		ht.Error("space remaining did not decrease appropriately after allocating a file")
 	}
 
 	// Deallocate the file.
-	ht.deallocate(4e3, path)
-	if currentSpaceRemaining != ht.spaceRemaining {
+	ht.deallocate(filesize, path)
+	if initialSpace != ht.spaceRemaining {
 		ht.Error("space remaining did not return to the correct value after the file was deallocated")
 	}
 	_, err = os.Stat(fullpath)

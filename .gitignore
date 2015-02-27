@@ -1,12 +1,11 @@
 cover
 hostdir
-hostdata_test
 release
-renterdata_test
 renterDownload
 whitepaper.aux
 whitepaper.log
 whitepaper.pdf
+*_test
 *.wallet
 *.swp
 info.log

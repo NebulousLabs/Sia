@@ -1,5 +1,5 @@
-File Contract Negotitation
-==========================
+File Contract Negotiation
+=========================
 
 Two untrusting parties, a renter and a host, need to fund a file contract and
 put it in the blockchain. The following is a protocol for negotiating and
