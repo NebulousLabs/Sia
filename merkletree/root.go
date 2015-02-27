@@ -23,6 +23,14 @@ type node struct {
 	value  []byte
 }
 
+// sum returns the sha256 hash of the input data.
+func sum(h hash.Hash, data []byte) (result []byte) {
+	h.Write(data)
+	result = h.Sum(nil)
+	h.Reset()
+	return
+}
+
 // New initializes a Tree with a hash object, which is used to hash and combine
 // data.
 func New(h hash.Hash) *Tree {
@@ -34,10 +42,10 @@ func New(h hash.Hash) *Tree {
 // Push adds a leaf to the tree by hashing the data and then inserting the
 // result as a leaf.
 func (t *Tree) Push(data []byte) {
-	value := t.hash.Sum(data)
+	value := sum(t.hash, data)
 	height := 1
 	for t.head != nil && height == t.head.height {
-		value = t.hash.Sum(append(t.head.value, value...))
+		value = sum(t.hash, append(t.head.value, value...))
 		height++
 		t.head = t.head.next
 	}
@@ -53,18 +61,18 @@ func (t *Tree) Push(data []byte) {
 // then clears all of the data out. Making a copy of the tree is sufficient to
 // preserve the data. Asking for the root when no data has been added will
 // return nil.
-func (t *Tree) Root() (value []byte) {
+func (t *Tree) Root() (root []byte) {
 	if t.head == nil {
 		return
 	}
 
-	value = t.head.value
+	value := t.head.value
 	for t.head.next != nil {
-		value = t.hash.Sum(append(t.head.next.value, value...))
+		value = sum(t.hash, append(t.head.next.value, value...))
 		t.head = t.head.next
 	}
 
 	t.head = nil
-
+	root = value
 	return
 }

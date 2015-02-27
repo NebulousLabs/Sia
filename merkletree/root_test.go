@@ -9,7 +9,7 @@ import (
 // join takes two byte slices, appends them, hashes them, and then returns the
 // result.
 func join(a, b []byte) []byte {
-	return sha256.New().Sum(append(a, b...))
+	return sum(sha256.New(), append(a, b...))
 }
 
 // TestTree builds a few trees manually and then compares them to the result
@@ -25,7 +25,7 @@ func TestTree(t *testing.T) {
 	// hashes it automatically. This prepares the data to be joined manually.
 	var leaves [][]byte
 	for i := byte(0); i < 8; i++ {
-		leaves = append(leaves, sha256.New().Sum(data[i]))
+		leaves = append(leaves, sum(sha256.New(), data[i]))
 	}
 
 	// Build out the expected values for merkle trees of each size 0 - 8.
