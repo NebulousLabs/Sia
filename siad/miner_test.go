@@ -1,31 +1,31 @@
 package main
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/miner"
 )
 
-// mineSingleBlock mines a single block and then uses the blocking function
-// processBlock to integrate the block with the state.
-func mineSingleBlock(t *testing.T, d *daemon) {
-	_, found, err := d.miner.SolveBlock()
-	for !found && err == nil {
-		_, found, err = d.miner.SolveBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
+// TestMining starts the miner, mines a few blocks, and checks that the wallet
+// balance increased.
+func TestMining(t *testing.T) {
+	dt := newDaemonTester(t)
+	// start miner
+	dt.callAPI("/miner/start?threads=1")
+	// check that miner has started
+	var minerstatus miner.MinerInfo
+	dt.getAPI("/miner/status", &minerstatus)
+	fmt.Println(minerstatus)
+	if minerstatus.State != "On" {
+		dt.Fatal("Miner did not start")
 	}
-	if err != nil {
-		t.Error(err)
+	dt.callAPI("/miner/stop")
+	// check balance
+	var walletstatus modules.WalletInfo
+	dt.getAPI("/wallet/status", &walletstatus)
+	if walletstatus.Balance.Sign() <= 0 {
+		dt.Fatal("Mining did not increase wallet balance")
 	}
 }
-
-/*
-func testMinerDeadlocking(t *testing.T, d *daemon) {
-	d.miner.Threads()
-	d.miner.SetThreads(2)
-	d.miner.StartMining()
-	d.miner.Threads()
-	d.miner.StopMining()
-	d.miner.Threads()
-}
-*/
