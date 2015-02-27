@@ -4,7 +4,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"testing"
+)
+
+var (
+	APIPort int = 9020
+	RPCPort int = 9120
 )
 
 type daemonTester struct {
@@ -14,12 +20,12 @@ type daemonTester struct {
 
 func newDaemonTester(t *testing.T) *daemonTester {
 	dc := DaemonConfig{
-		APIAddr: ":9020",
-		RPCAddr: ":9021",
+		APIAddr: ":" + strconv.Itoa(APIPort),
+		RPCAddr: ":" + strconv.Itoa(RPCPort),
 
 		HostDir: "hostDir",
 
-		Threads: 2,
+		Threads: 1,
 
 		DownloadDir: "downloadDir",
 
@@ -36,6 +42,8 @@ func newDaemonTester(t *testing.T) *daemonTester {
 			t.Fatal("API server quit:", listenErr)
 		}
 	}()
+	APIPort++
+	RPCPort++
 
 	return &daemonTester{d, t}
 }
