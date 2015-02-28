@@ -1,6 +1,7 @@
 package merkletree
 
 import (
+	"bytes"
 	"hash"
 )
 
@@ -185,13 +186,15 @@ func (t *Tree) Prove() (proveSet [][]byte) {
 	// every larget subTree until they have all been added.
 	myHeight := len(t.proveSet)
 	current := t.head
+	value := current.value
 	for current.next != nil {
 		if current.next.height == myHeight {
-			t.proveSet = append(t.proveSet, current.value)
+			t.proveSet = append(t.proveSet, value)
 			// Skip over the subTree that proveIndex is in.
 			current = current.next.next
 			break
 		}
+		value = sum(t.hash, append(current.next.value, value...))
 		current = current.next
 	}
 	for current != nil {
@@ -201,4 +204,88 @@ func (t *Tree) Prove() (proveSet [][]byte) {
 		current = current.next
 	}
 	return t.proveSet
+}
+
+// VerifyProof takes a merkle, a proveSet, and a proveIndex and returns true if
+// the first element of the prove set is a leaf of data in the merkle root.
+func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex int, numSegments int) bool {
+	if numSegments == 0 {
+		return true
+	}
+	if len(proveSet) == 0 || merkleRoot == nil {
+		println("header violation")
+		return false
+	}
+
+	// Determine the size of the largest full subTree (a tree with 2^n leaves)
+	// that contains the proveIndex.
+	largerSubTrees := 0
+	value := sum(h, proveSet[0])
+	proveSet = proveSet[1:]
+	for {
+		// Determine the size of the largest remaining subTree.
+		subTreeSize := 1
+		for subTreeSize*2 <= numSegments {
+			subTreeSize *= 2
+		}
+		if proveIndex < subTreeSize {
+			// We have found the subtree that contains the prove index. Build
+			// up the proof inside of the complete subTree, where we don't need
+			// to worry about edge cases.
+			height := 1
+			for int(1<<uint(height)) <= subTreeSize {
+				heightSize := int(1 << uint(height))
+				heightStart := (proveIndex / heightSize) * heightSize
+				mid := heightStart + (heightSize / 2)
+				if len(proveSet) == 0 {
+					println("mainloop violation")
+					return false
+				}
+				if proveIndex < mid {
+					value = sum(h, append(value, proveSet[0]...))
+				} else {
+					value = sum(h, append(proveSet[0], value...))
+				}
+				height++
+				proveSet = proveSet[1:]
+			}
+
+			// Check if there's a smaller subTree.
+			if subTreeSize < numSegments {
+				if len(proveSet) == 0 {
+					println("smaller subtree violation")
+					return false
+				}
+				value = sum(h, append(value, proveSet[0]...))
+				proveSet = proveSet[1:]
+			}
+			break
+		}
+		largerSubTrees++
+		proveIndex -= subTreeSize
+		numSegments -= subTreeSize
+	}
+
+	// Add for each larger subTree.
+	for i := 0; i < largerSubTrees; i++ {
+		if len(proveSet) == 0 {
+			println("larget subtree violation")
+			return false
+		}
+		value = sum(h, append(proveSet[0], value...))
+		proveSet = proveSet[1:]
+	}
+
+	// If there are still elements remaining in the prove set, return false.
+	if len(proveSet) != 0 {
+		println("proveSet remaining violation")
+		return false
+	}
+
+	if bytes.Compare(value, merkleRoot) == 0 {
+		return true
+	} else {
+		println("endgame violation")
+		return false
+	}
 }

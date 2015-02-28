@@ -15,18 +15,16 @@ func join(a, b []byte) []byte {
 // TestTree builds a few trees manually and then compares them to the result
 // obtained from using the tree.
 func TestBuildRoot(t *testing.T) {
-	t.Skip()
-
 	// Create the data that is going to be hashed.
 	var data [][]byte
-	for i := byte(0); i < 8; i++ {
+	for i := byte(0); i < 16; i++ {
 		data = append(data, []byte{i})
 	}
 
 	// Join joins hashes, but the data hasn't been hashed yet because the tree
 	// hashes it automatically. This prepares the data to be joined manually.
 	var leaves [][]byte
-	for i := byte(0); i < 8; i++ {
+	for i := byte(0); i < 16; i++ {
 		leaves = append(leaves, sum(sha256.New(), data[i]))
 	}
 
@@ -81,6 +79,7 @@ func TestBuildRoot(t *testing.T) {
 		join(leaves[0], leaves[1]),
 		leaves[2],
 	)
+
 	root2 := join(leaves[0], leaves[1])
 
 	root1 := leaves[0]
@@ -175,19 +174,17 @@ func TestBuildRoot(t *testing.T) {
 
 // TestTreeProve manually builds storage proves for trees and indexes, and
 // compares the result obtained from using the TreeProve.
-//
-// TODO: 15_13, 15_10, 15_4
 func TestBuildProof(t *testing.T) {
 	// Create the data that is going to be hashed.
 	var data [][]byte
-	for i := byte(0); i < 8; i++ {
+	for i := byte(0); i < 16; i++ {
 		data = append(data, []byte{i})
 	}
 
 	// Join joins hashes, but the data hasn't been hashed yet because the tree
 	// hashes it automatically. This prepares the data to be joined manually.
 	var leaves [][]byte
-	for i := byte(0); i < 8; i++ {
+	for i := byte(0); i < 16; i++ {
 		leaves = append(leaves, sum(sha256.New(), data[i]))
 	}
 
@@ -219,6 +216,50 @@ func TestBuildProof(t *testing.T) {
 	prove7_5 = append(prove7_5, join(
 		join(leaves[0], leaves[1]),
 		join(leaves[2], leaves[3]),
+	))
+
+	var prove15_10 [][]byte
+	prove15_10 = append(prove15_10, data[10])
+	prove15_10 = append(prove15_10, leaves[11])
+	prove15_10 = append(prove15_10, join(
+		leaves[8],
+		leaves[9],
+	))
+	prove15_10 = append(prove15_10, join(
+		join(leaves[12], leaves[13]),
+		leaves[14],
+	))
+	prove15_10 = append(prove15_10, join(
+		join(
+			join(leaves[0], leaves[1]),
+			join(leaves[2], leaves[3]),
+		),
+		join(
+			join(leaves[4], leaves[5]),
+			join(leaves[6], leaves[7]),
+		),
+	))
+
+	var prove15_3 [][]byte
+	prove15_3 = append(prove15_3, data[3])
+	prove15_3 = append(prove15_3, leaves[2])
+	prove15_3 = append(prove15_3, join(
+		leaves[0],
+		leaves[1],
+	))
+	prove15_3 = append(prove15_3, join(
+		join(leaves[4], leaves[5]),
+		join(leaves[6], leaves[7]),
+	))
+	prove15_3 = append(prove15_3, join(
+		join(
+			join(leaves[8], leaves[9]),
+			join(leaves[10], leaves[11]),
+		),
+		join(
+			join(leaves[12], leaves[13]),
+			leaves[14],
+		),
 	))
 
 	// Create a proof using the tree for each of the manually built proofs and
@@ -319,6 +360,254 @@ func TestBuildProof(t *testing.T) {
 			t.Error("tree7_5 proof failed at index", i)
 			t.Error(tree7_5[i])
 			t.Error(prove7_5[i])
+		}
+	}
+
+	tree.SetIndex(10)
+	for i := 0; i < 15; i++ {
+		tree.Push(data[i])
+	}
+	tree15_10 := tree.Prove()
+	if len(tree15_10) != len(prove15_10) {
+		t.Error(len(tree15_10))
+		t.Error(len(prove15_10))
+		t.Fatal("tree15_10 proof failed")
+	}
+	for i := range prove15_10 {
+		if bytes.Compare(tree15_10[i], prove15_10[i]) != 0 {
+			t.Error("tree15_10 proof failed at index", i)
+			t.Error(tree15_10[i])
+			t.Error(prove15_10[i])
+		}
+	}
+
+	tree.SetIndex(3)
+	for i := 0; i < 15; i++ {
+		tree.Push(data[i])
+	}
+	tree15_3 := tree.Prove()
+	if len(tree15_3) != len(prove15_3) {
+		t.Error(len(tree15_3))
+		t.Error(len(prove15_3))
+		t.Fatal("tree15_3 proof failed")
+	}
+	for i := range prove15_3 {
+		if bytes.Compare(tree15_3[i], prove15_3[i]) != 0 {
+			t.Error("tree15_3 proof failed at index", i)
+			t.Error(tree15_3[i])
+			t.Error(prove15_3[i])
+		}
+	}
+}
+
+// TestVerifyProof checks that correct proofs verify for the right index but do
+// not verify for any other index.
+func TestVerifyProof(t *testing.T) {
+	// Create the data that is going to be hashed.
+	var data [][]byte
+	for i := byte(0); i < 16; i++ {
+		data = append(data, []byte{i})
+	}
+
+	// Join joins hashes, but the data hasn't been hashed yet because the tree
+	// hashes it automatically. This prepares the data to be joined manually.
+	var leaves [][]byte
+	for i := byte(0); i < 16; i++ {
+		leaves = append(leaves, sum(sha256.New(), data[i]))
+	}
+
+	// Build out the expected values for merkle trees of each needed size.
+	root15 := join(
+		join(
+			join(
+				join(leaves[0], leaves[1]),
+				join(leaves[2], leaves[3]),
+			),
+			join(
+				join(leaves[4], leaves[5]),
+				join(leaves[6], leaves[7]),
+			),
+		),
+		join(
+			join(
+				join(leaves[8], leaves[9]),
+				join(leaves[10], leaves[11]),
+			),
+			join(
+				join(leaves[12], leaves[13]),
+				leaves[14],
+			),
+		),
+	)
+
+	root7 := join(
+		join(
+			join(leaves[0], leaves[1]),
+			join(leaves[2], leaves[3]),
+		),
+		join(
+			join(leaves[4], leaves[5]),
+			leaves[6],
+		),
+	)
+
+	root5 := join(
+		join(
+			join(leaves[0], leaves[1]),
+			join(leaves[2], leaves[3]),
+		),
+		leaves[4],
+	)
+
+	root2 := join(leaves[0], leaves[1])
+
+	root1 := leaves[0]
+
+	root0 := []byte(nil)
+
+	// Manually create proofs for chosen set of edge cases.
+	prove0 := [][]byte(nil)
+
+	var prove1 [][]byte
+	prove1 = append(prove1, data[0])
+
+	var prove2_0 [][]byte
+	prove2_0 = append(prove2_0, data[0])
+	prove2_0 = append(prove2_0, leaves[1])
+
+	var prove2_1 [][]byte
+	prove2_1 = append(prove2_1, data[1])
+	prove2_1 = append(prove2_1, leaves[0])
+
+	var prove5_4 [][]byte
+	prove5_4 = append(prove5_4, data[4])
+	prove5_4 = append(prove5_4, join(
+		join(leaves[0], leaves[1]),
+		join(leaves[2], leaves[3]),
+	))
+
+	var prove7_5 [][]byte
+	prove7_5 = append(prove7_5, data[5])
+	prove7_5 = append(prove7_5, leaves[4])
+	prove7_5 = append(prove7_5, leaves[6])
+	prove7_5 = append(prove7_5, join(
+		join(leaves[0], leaves[1]),
+		join(leaves[2], leaves[3]),
+	))
+
+	var prove15_10 [][]byte
+	prove15_10 = append(prove15_10, data[10])
+	prove15_10 = append(prove15_10, leaves[11])
+	prove15_10 = append(prove15_10, join(
+		leaves[8],
+		leaves[9],
+	))
+	prove15_10 = append(prove15_10, join(
+		join(leaves[12], leaves[13]),
+		leaves[14],
+	))
+	prove15_10 = append(prove15_10, join(
+		join(
+			join(leaves[0], leaves[1]),
+			join(leaves[2], leaves[3]),
+		),
+		join(
+			join(leaves[4], leaves[5]),
+			join(leaves[6], leaves[7]),
+		),
+	))
+
+	var prove15_3 [][]byte
+	prove15_3 = append(prove15_3, data[3])
+	prove15_3 = append(prove15_3, leaves[2])
+	prove15_3 = append(prove15_3, join(
+		leaves[0],
+		leaves[1],
+	))
+	prove15_3 = append(prove15_3, join(
+		join(leaves[4], leaves[5]),
+		join(leaves[6], leaves[7]),
+	))
+	prove15_3 = append(prove15_3, join(
+		join(
+			join(leaves[8], leaves[9]),
+			join(leaves[10], leaves[11]),
+		),
+		join(
+			join(leaves[12], leaves[13]),
+			leaves[14],
+		),
+	))
+
+	// Check that each valid proof verifies correctly, and check that the valid
+	// proofs don't verify for all the wrong indicies.
+	if !VerifyProof(sha256.New(), root0, prove0, 0, 0) {
+		t.Error("prove0 did not verify")
+	}
+
+	if !VerifyProof(sha256.New(), root1, prove1, 0, 1) {
+		t.Error("prove1 did not verify")
+	}
+
+	if !VerifyProof(sha256.New(), root2, prove2_0, 0, 2) {
+		t.Error("prove2_0 did not verify")
+	}
+	if VerifyProof(sha256.New(), root2, prove2_0, 1, 2) {
+		t.Error("prove2_0 verified for index 1")
+	}
+
+	if !VerifyProof(sha256.New(), root2, prove2_1, 1, 2) {
+		t.Error("prove2_1 did not verify")
+	}
+	if VerifyProof(sha256.New(), root2, prove2_1, 0, 2) {
+		t.Error("prove2_1 verified for index 0")
+	}
+
+	if !VerifyProof(sha256.New(), root5, prove5_4, 4, 5) {
+		t.Error("prove5_4 did not verify")
+	}
+	for i := 0; i < 5; i++ {
+		if i == 4 {
+			continue
+		}
+		if VerifyProof(sha256.New(), root5, prove5_4, i, 5) {
+			t.Error("prove5_4 verified for index", i)
+		}
+	}
+
+	if !VerifyProof(sha256.New(), root7, prove7_5, 5, 7) {
+		t.Error("prove7_5 did not verify")
+	}
+	for i := 0; i < 7; i++ {
+		if i == 5 {
+			continue
+		}
+		if VerifyProof(sha256.New(), root7, prove7_5, i, 7) {
+			t.Error("prove7_5 verified for index", i)
+		}
+	}
+
+	if !VerifyProof(sha256.New(), root15, prove15_10, 10, 15) {
+		t.Error("prove15_10 did not verify")
+	}
+	for i := 0; i < 15; i++ {
+		if i == 10 {
+			continue
+		}
+		if VerifyProof(sha256.New(), root15, prove15_10, i, 15) {
+			t.Error("prove15_10 verified for index", i)
+		}
+	}
+
+	if !VerifyProof(sha256.New(), root15, prove15_3, 3, 15) {
+		t.Error("prove15_3 did not verify")
+	}
+	for i := 0; i < 15; i++ {
+		if i == 3 {
+			continue
+		}
+		if VerifyProof(sha256.New(), root15, prove15_3, i, 15) {
+			t.Error("prove15_3 verified for index", i)
 		}
 	}
 }
