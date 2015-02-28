@@ -60,7 +60,7 @@ func (dt *daemonTester) get(call string) (resp *http.Response) {
 	if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
-		dt.Fatalf("GET %s returned error %v: %v", resp.StatusCode, errResp)
+		dt.Fatalf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
 	}
 	return
 }

@@ -8,10 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 )
 
-// TestMining starts the miner, mines a few blocks, and checks that the wallet
-// balance increased.
-func TestMining(t *testing.T) {
-	dt := newDaemonTester(t)
+func (dt *daemonTester) testMining() {
 	// start miner
 	dt.callAPI("/miner/start?threads=1")
 	// check that miner has started
@@ -28,4 +25,11 @@ func TestMining(t *testing.T) {
 	if walletstatus.Balance.Sign() <= 0 {
 		dt.Fatal("Mining did not increase wallet balance")
 	}
+}
+
+// TestMining starts the miner, mines a few blocks, and checks that the wallet
+// balance increased.
+func TestMining(t *testing.T) {
+	dt := newDaemonTester(t)
+	dt.testMining()
 }
