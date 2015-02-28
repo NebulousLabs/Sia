@@ -57,11 +57,21 @@ type subTree struct {
 }
 
 // sum returns the sha256 hash of the input data.
-func sum(h hash.Hash, data []byte) (result []byte) {
+func sum(h hash.Hash, data []byte) []byte {
+	if data == nil {
+		return nil
+	}
+
 	h.Write(data)
-	result = h.Sum(nil)
+	result := h.Sum(nil)
 	h.Reset()
-	return
+	return result
+}
+
+// join takes two byte slices, appends them, hashes them, and then returns the
+// result.
+func join(h hash.Hash, a, b []byte) []byte {
+	return sum(h, append(a, b...))
 }
 
 // New initializes a Tree with a hash object, which is used to hash and combine
@@ -168,11 +178,12 @@ func (t *Tree) Root() (root []byte) {
 // Prove returns a proof that the data at index 'proveIndex' is an element in
 // the current Tree. The proof will be invalid if any more elements are added
 // to the tree after calling Prove. Prove does not alter the tree.
-func (t *Tree) Prove() (proveSet [][]byte) {
+func (t *Tree) Prove() (h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex int, numSegments int) {
 	// Return nil if the Tree is empty.
 	if t.head == nil {
-		return nil
+		return h, t.Root(), nil, t.proveIndex, t.currentIndex
 	}
+	proveSet = t.proveSet
 
 	// At this point, there will be at least one and perhaps multiple subTrees
 	// in the Tree. The current height of the proveSet will be the height of
@@ -184,12 +195,12 @@ func (t *Tree) Prove() (proveSet [][]byte) {
 	// First loop condenses all of the smaller subTrees and combine them until
 	// you get the subTree whose hash you need. Second loop grabs a hash of
 	// every larget subTree until they have all been added.
-	myHeight := len(t.proveSet)
+	myHeight := len(proveSet)
 	current := t.head
 	value := current.value
 	for current.next != nil {
 		if current.next.height == myHeight {
-			t.proveSet = append(t.proveSet, value)
+			proveSet = append(proveSet, value)
 			// Skip over the subTree that proveIndex is in.
 			current = current.next.next
 			break
@@ -199,11 +210,11 @@ func (t *Tree) Prove() (proveSet [][]byte) {
 	}
 	for current != nil {
 		if myHeight < current.height {
-			t.proveSet = append(t.proveSet, current.value)
+			proveSet = append(proveSet, current.value)
 		}
 		current = current.next
 	}
-	return t.proveSet
+	return t.hash, t.Root(), proveSet, t.proveIndex, t.currentIndex
 }
 
 // VerifyProof takes a merkle, a proveSet, and a proveIndex and returns true if
@@ -213,7 +224,6 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 		return true
 	}
 	if len(proveSet) == 0 || merkleRoot == nil {
-		println("header violation")
 		return false
 	}
 
@@ -238,7 +248,6 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 				heightStart := (proveIndex / heightSize) * heightSize
 				mid := heightStart + (heightSize / 2)
 				if len(proveSet) == 0 {
-					println("mainloop violation")
 					return false
 				}
 				if proveIndex < mid {
@@ -253,7 +262,6 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 			// Check if there's a smaller subTree.
 			if subTreeSize < numSegments {
 				if len(proveSet) == 0 {
-					println("smaller subtree violation")
 					return false
 				}
 				value = sum(h, append(value, proveSet[0]...))
@@ -269,7 +277,6 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 	// Add for each larger subTree.
 	for i := 0; i < largerSubTrees; i++ {
 		if len(proveSet) == 0 {
-			println("larget subtree violation")
 			return false
 		}
 		value = sum(h, append(proveSet[0], value...))
@@ -278,14 +285,12 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 
 	// If there are still elements remaining in the prove set, return false.
 	if len(proveSet) != 0 {
-		println("proveSet remaining violation")
 		return false
 	}
 
 	if bytes.Compare(value, merkleRoot) == 0 {
 		return true
 	} else {
-		println("endgame violation")
 		return false
 	}
 }
