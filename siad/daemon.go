@@ -98,7 +98,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 
 // initRPC registers all of the daemon's RPC handlers
 func (d *daemon) initRPC() (err error) {
-	err = d.network.RegisterRPC("AcceptBlock", d.gateway.RelayBlock)
+	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
 	if err != nil {
 		return
 	}
