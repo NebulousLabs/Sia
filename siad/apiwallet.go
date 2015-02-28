@@ -15,8 +15,9 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// TODO: Explain what's happening here, and why it doesn't look like all of
-	// the other calls.
+	// Since coinAddress is not a struct, we define one here so that writeJSON
+	// writes an object instead of a bare value. In addition, we transmit the
+	// coinAddress as a hex-encoded string rather than a byte array.
 	writeJSON(w, struct {
 		Address string
 	}{fmt.Sprintf("%x", coinAddress)})
@@ -27,7 +28,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
 	var dest consensus.UnlockHash
-	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
+	err := amount.UnmarshalJSON([]byte(req.FormValue("amount")))
 	if err != nil {
 		writeError(w, "Malformed amount", 400)
 		return
