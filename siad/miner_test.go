@@ -1,29 +1,33 @@
 package main
 
 import (
-	"fmt"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/miner"
 )
 
 func (dt *daemonTester) testMining() {
+	if testing.Short() {
+		dt.Skip()
+	}
+
 	// start miner
 	dt.callAPI("/miner/start?threads=1")
 	// check that miner has started
 	var minerstatus miner.MinerInfo
 	dt.getAPI("/miner/status", &minerstatus)
-	fmt.Println(minerstatus)
 	if minerstatus.State != "On" {
 		dt.Fatal("Miner did not start")
 	}
+	time.Sleep(1000 * time.Millisecond)
 	dt.callAPI("/miner/stop")
 	// check balance
 	var walletstatus modules.WalletInfo
 	dt.getAPI("/wallet/status", &walletstatus)
-	if walletstatus.Balance.Sign() <= 0 {
-		dt.Fatal("Mining did not increase wallet balance")
+	if walletstatus.FullBalance.Sign() <= 0 {
+		dt.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
 	}
 }
 
