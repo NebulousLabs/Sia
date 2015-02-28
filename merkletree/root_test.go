@@ -98,6 +98,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree8 doesn't match root8")
 	}
 
+	tree.Reset()
 	for i := 0; i < 7; i++ {
 		tree.Push(data[i])
 	}
@@ -106,6 +107,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree7 doesn't match root7")
 	}
 
+	tree.Reset()
 	for i := 0; i < 6; i++ {
 		tree.Push(data[i])
 	}
@@ -114,6 +116,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree6 doesn't match root6")
 	}
 
+	tree.Reset()
 	for i := 0; i < 5; i++ {
 		tree.Push(data[i])
 	}
@@ -122,6 +125,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree5 doesn't match root5")
 	}
 
+	tree.Reset()
 	for i := 0; i < 4; i++ {
 		tree.Push(data[i])
 	}
@@ -130,6 +134,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree4 doesn't match root4")
 	}
 
+	tree.Reset()
 	for i := 0; i < 3; i++ {
 		tree.Push(data[i])
 	}
@@ -138,6 +143,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree3 doesn't match root3")
 	}
 
+	tree.Reset()
 	for i := 0; i < 2; i++ {
 		tree.Push(data[i])
 	}
@@ -146,6 +152,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree2 doesn't match root2")
 	}
 
+	tree.Reset()
 	for i := 0; i < 1; i++ {
 		tree.Push(data[i])
 	}
@@ -154,6 +161,7 @@ func TestTree(t *testing.T) {
 		t.Error("tree1 doesn't match root1")
 	}
 
+	tree.Reset()
 	for i := 0; i < 0; i++ {
 		tree.Push(data[i])
 	}
