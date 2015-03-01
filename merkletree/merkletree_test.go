@@ -2,6 +2,7 @@ package merkletree
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"testing"
 )
@@ -362,5 +363,44 @@ func TestCompatibility(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// BenchmarkSha256_4MB runs a benchmark on hashing 4MB using sha256.
+func BenchmarkSha256_4MB(b *testing.B) {
+	data := make([]byte, 4*1024*1024)
+	rand.Read(data)
+	for i := 0; i < b.N; i++ {
+		sha256.Sum256(data)
+	}
+}
+
+// BenchmarkTree64Sha256 runs a benchmark on creating a Merkle tree out of 4MB
+// using 64 bytes at a time, using sha256 as the hashing algorithm.
+func BenchmarkTree64Sha256(b *testing.B) {
+	data := make([]byte, 4*1024*1024)
+	rand.Read(data)
+	segmentSize := 64
+	tree := New(sha256.New())
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < len(data)/segmentSize; j++ {
+			tree.Push(data[j*segmentSize : (j+1)*segmentSize])
+		}
+		tree.Root()
+	}
+}
+
+// BenchmarkTree4kSha256 runs a benchmark on creating a Merkle tree out of 4MB
+// using 4k bytes at a time, using sha256 as the hashing algorithm.
+func BenchmarkTree4kSha256(b *testing.B) {
+	data := make([]byte, 4*1024*1024)
+	rand.Read(data)
+	segmentSize := 4096
+	tree := New(sha256.New())
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < len(data)/segmentSize; j++ {
+			tree.Push(data[j*segmentSize : (j+1)*segmentSize])
+		}
+		tree.Root()
 	}
 }
