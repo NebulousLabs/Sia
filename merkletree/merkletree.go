@@ -6,6 +6,7 @@ package merkletree
 
 import (
 	"bytes"
+	"errors"
 	"hash"
 )
 
@@ -74,9 +75,12 @@ func (t *Tree) Reset() {
 
 // SetIndex resets the tree, and then sets the index for which a proof that the
 // element is in the Tree will be built.
-func (t *Tree) SetIndex(i int) {
-	t.Reset()
+func (t *Tree) SetIndex(i int) error {
+	if t.head != nil {
+		return errors.New("cannot call SetIndex on Tree if Tree has not been reset")
+	}
 	t.proveIndex = i
+	return nil
 }
 
 // Push adds a leaf to the tree by hashing the input and then inserting the
