@@ -209,77 +209,99 @@ func (t *Tree) Prove() (h hash.Hash, merkleRoot []byte, proveSet [][]byte, prove
 	return t.hash, t.Root(), proveSet, t.proveIndex, t.currentIndex
 }
 
-// VerifyProof takes a merkle, a proveSet, and a proveIndex and returns true if
-// the first element of the prove set is a leaf of data in the merkle root.
+// VerifyProof takes a Merkle root, a proveSet, and a proveIndex and returns
+// true if the first element of the prove set is a leaf of data in the Merkle
+// root.
 func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex int, numLeaves int) bool {
-	if numLeaves == 0 {
-		return true
-	}
-	if len(proveSet) == 0 || merkleRoot == nil {
+	if len(proveSet) == 0 || merkleRoot == nil || numLeaves == 0 {
 		return false
 	}
 
-	// Determine the size of the largest full subTree (a tree with 2^n leaves)
-	// that contains the proveIndex.
+	// The first element of the prove set is the original data. Hash it to get
+	// the first level subTree root.
+	height := 0
+	sum := sum(h, proveSet[height])
+	height++
+
+	// A proof on a complete tree can be constructed by finding the two
+	// relevant subTrees of each height and determining which subTree contains
+	// the prove index. If the subTree that comes first contains the prove
+	// index, you set sum equal to H(sum || proveSet[height]), otherwise you
+	// set it equal to H(proveSet[height] || sum).
+	//
+	// Verification starts by searching for the subTree that contains the
+	// proveIndex, and applying the above algorithm. After that, any smaller
+	// subTrees can be accounted for by setting sum equal to H(sum ||
+	// proveSet[height]) (skip if there are no smaller subTrees). For each
+	// larger subTree, set sum equal to H(proveSet[height] || sum). At this
+	// point, the proof is complete. If there are any elements in the prove set
+	// that haven't been used, return false. If 'sum' == 'merkleRoot', return
+	// true.
+
+	// The code starts by counting the number of larger subTrees while figuring
+	// out which subTree contains the proveIndex.
+	leavesSkipped := 0
 	largerSubTrees := 0
-	sum := sum(h, proveSet[0])
-	proveSet = proveSet[1:]
+	subTreeSize := 1
 	for {
-		// Determine the size of the largest remaining subTree.
-		subTreeSize := 1
-		for subTreeSize*2 <= numLeaves {
+		subTreeSize = 1
+		for subTreeSize*2 <= numLeaves-leavesSkipped {
 			subTreeSize *= 2
 		}
-		if proveIndex < subTreeSize {
-			// We have found the subTree that contains the prove index. Build
-			// up the proof inside of the complete subTree, where we don't need
-			// to worry about edge cases.
-			height := 1
-			for int(1<<uint(height)) <= subTreeSize {
-				heightSize := int(1 << uint(height))
-				heightStart := (proveIndex / heightSize) * heightSize
-				mid := heightStart + (heightSize / 2)
-				if len(proveSet) == 0 {
-					return false
-				}
-				if proveIndex < mid {
-					sum = join(h, sum, proveSet[0])
-				} else {
-					sum = join(h, proveSet[0], sum)
-				}
-				height++
-				proveSet = proveSet[1:]
-			}
 
-			// Check if there's a smaller subTree.
-			if subTreeSize < numLeaves {
-				if len(proveSet) == 0 {
-					return false
-				}
-				sum = join(h, sum, proveSet[0])
-				proveSet = proveSet[1:]
-			}
+		if proveIndex-leavesSkipped < subTreeSize {
 			break
 		}
+		leavesSkipped += subTreeSize
 		largerSubTrees++
-		proveIndex -= subTreeSize
-		numLeaves -= subTreeSize
 	}
 
-	// Add for each larger subTree.
-	for i := 0; i < largerSubTrees; i++ {
-		if len(proveSet) == 0 {
+	// relativePosition descrives the starting point of the subTree that
+	// contains the prove index. The for loop will iterate once per level of
+	// the subTree. Each level, find the pair of nodes that contain the prove
+	// index and then determine which of those two contains the prove index.
+	adjustedProveIndex := proveIndex - leavesSkipped
+	for int(1)<<uint(height) <= subTreeSize {
+		// Check that there are enough items in the prove set.
+		if len(proveSet) <= height {
 			return false
 		}
-		sum = join(h, proveSet[0], sum)
-		proveSet = proveSet[1:]
+		levelSize := int(1 << uint(height))
+		levelStart := (adjustedProveIndex / levelSize) * levelSize
+		mid := levelStart + (levelSize / 2)
+		if adjustedProveIndex < mid {
+			sum = join(h, sum, proveSet[height])
+		} else {
+			sum = join(h, proveSet[height], sum)
+		}
+		height++
+	}
+
+	// If there is a smaller subTree, account for the hash that gets included
+	// in the proof.
+	if subTreeSize < numLeaves-leavesSkipped {
+		if len(proveSet) <= height {
+			return false
+		}
+		sum = join(h, sum, proveSet[height])
+		height++
+	}
+
+	// Include a hash for each larger subTree.
+	for i := 0; i < largerSubTrees; i++ {
+		if len(proveSet) <= height {
+			return false
+		}
+		sum = join(h, proveSet[height], sum)
+		height++
 	}
 
 	// If there are still elements remaining in the prove set, return false.
-	if len(proveSet) != 0 {
+	if len(proveSet) > height {
 		return false
 	}
 
+	// Compare our calculated Merkle root to the desired Merkle root.
 	if bytes.Compare(sum, merkleRoot) == 0 {
 		return true
 	} else {

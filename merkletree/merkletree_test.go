@@ -109,9 +109,6 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 
 	// Manually build out some prove sets that should should match what the
 	// Tree creates for the same values.
-	mt.proveSets[0] = make(map[int][][]byte)
-	mt.proveSets[0][0] = [][]byte(nil)
-
 	mt.proveSets[1] = make(map[int][][]byte)
 	mt.proveSets[1][0] = append([][]byte(nil), mt.data[0])
 
@@ -232,7 +229,7 @@ func TestBuildAndVerifyProof(t *testing.T) {
 			// Check that verification works on for the desired prove index but
 			// fails for all other indices.
 			if !VerifyProof(hash, merkleRoot, proveSet, proveIndex, numSegments) {
-				t.Error("prove set does not verify!")
+				t.Error("prove set does not verify for indices", i, j)
 			}
 			for k := 0; k < i; k++ {
 				if k == proveIndex {
