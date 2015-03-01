@@ -367,6 +367,8 @@ func TestCompatibility(t *testing.T) {
 func BenchmarkSha256_4MB(b *testing.B) {
 	data := make([]byte, 4*1024*1024)
 	rand.Read(data)
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sha256.Sum256(data)
 	}
@@ -378,6 +380,8 @@ func BenchmarkTree64Sha256(b *testing.B) {
 	data := make([]byte, 4*1024*1024)
 	rand.Read(data)
 	segmentSize := 64
+
+	b.ResetTimer()
 	tree := New(sha256.New())
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < len(data)/segmentSize; j++ {
@@ -393,6 +397,8 @@ func BenchmarkTree4kSha256(b *testing.B) {
 	data := make([]byte, 4*1024*1024)
 	rand.Read(data)
 	segmentSize := 4096
+
+	b.ResetTimer()
 	tree := New(sha256.New())
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < len(data)/segmentSize; j++ {
