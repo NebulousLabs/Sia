@@ -211,7 +211,7 @@ func TestBuildAndVerifyProof(t *testing.T) {
 			}
 
 			// Get the proof and check all values.
-			hash, merkleRoot, proveSet, proveIndex, numSegments := tree.Prove()
+			merkleRoot, proveSet, proveIndex, numSegments := tree.Prove()
 			if bytes.Compare(merkleRoot, mt.roots[i]) != 0 {
 				t.Error("incorrect Merkle root returned by Tree for indices", i, j)
 			}
@@ -233,24 +233,21 @@ func TestBuildAndVerifyProof(t *testing.T) {
 
 			// Check that verification works on for the desired prove index but
 			// fails for all other indices.
-			if !VerifyProof(hash, merkleRoot, proveSet, proveIndex, numSegments) {
+			if !VerifyProof(sha256.New(), merkleRoot, proveSet, proveIndex, numSegments) {
 				t.Error("prove set does not verify for indices", i, j)
 			}
 			for k := 0; k < i; k++ {
 				if k == proveIndex {
 					continue
 				}
-				if VerifyProof(hash, merkleRoot, proveSet, k, numSegments) {
+				if VerifyProof(sha256.New(), merkleRoot, proveSet, k, numSegments) {
 					t.Error("prove set verifies for wrong index at indices", i, j, k)
 				}
 			}
 
 			// Check that calling Prove a second time results in the same
 			// values.
-			hash2, merkleRoot2, proveSet2, proveIndex2, numSegments2 := tree.Prove()
-			if hash2 != hash {
-				t.Error("tree returned different hashes after calling Prove twice for indices", i, j)
-			}
+			merkleRoot2, proveSet2, proveIndex2, numSegments2 := tree.Prove()
 			if bytes.Compare(merkleRoot, merkleRoot2) != 0 {
 				t.Error("tree returned different merkle roots after calling Prove twice for indices", i, j)
 			}
@@ -287,7 +284,7 @@ func TestBadInputs(t *testing.T) {
 	if root != nil {
 		t.Error("root of empty tree should be nil")
 	}
-	_, _, proof, _, _ := tree.Prove()
+	_, proof, _, _ := tree.Prove()
 	if proof != nil {
 		t.Error("proof of empty tree should be nil")
 	}
@@ -298,7 +295,7 @@ func TestBadInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	tree.Push([]byte{1})
-	_, _, proof, _, _ = tree.Prove()
+	_, proof, _, _ = tree.Prove()
 	if proof != nil {
 		t.Fatal(err)
 	}
@@ -348,8 +345,8 @@ func TestCompatibility(t *testing.T) {
 			}
 
 			// Build the proof for the tree and run it through verify.
-			hash, merkleRoot, proveSet, proveIndex, numLeaves := tree.Prove()
-			if !VerifyProof(hash, merkleRoot, proveSet, proveIndex, numLeaves) {
+			merkleRoot, proveSet, proveIndex, numLeaves := tree.Prove()
+			if !VerifyProof(sha256.New(), merkleRoot, proveSet, proveIndex, numLeaves) {
 				t.Error("proof didn't verify for indices", i, j)
 			}
 
@@ -358,7 +355,7 @@ func TestCompatibility(t *testing.T) {
 				if k == j {
 					continue
 				}
-				if VerifyProof(hash, merkleRoot, proveSet, k, numLeaves) {
+				if VerifyProof(sha256.New(), merkleRoot, proveSet, k, numLeaves) {
 					t.Error("proof verified for indices", i, j, k)
 				}
 			}

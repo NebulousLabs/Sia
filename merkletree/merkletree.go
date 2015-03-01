@@ -168,11 +168,11 @@ func (t *Tree) Root() (root []byte) {
 // Prove returns a proof that the data at index 'proveIndex' is an element in
 // the current Tree. The proof will be invalid if any more elements are added
 // to the tree after calling Prove. The tree is left unaltered.
-func (t *Tree) Prove() (h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex int, numLeaves int) {
+func (t *Tree) Prove() (merkleRoot []byte, proveSet [][]byte, proveIndex int, numLeaves int) {
 	// Return nil if the Tree is empty, or if the proveIndex hasn't yet been
 	// reached.
 	if t.head == nil || len(t.proveSet) == 0 {
-		return h, t.Root(), nil, t.proveIndex, t.currentIndex
+		return t.Root(), nil, t.proveIndex, t.currentIndex
 	}
 	proveSet = t.proveSet
 
@@ -210,7 +210,7 @@ func (t *Tree) Prove() (h hash.Hash, merkleRoot []byte, proveSet [][]byte, prove
 		proveSet = append(proveSet, current.sum)
 		current = current.next
 	}
-	return t.hash, t.Root(), proveSet, t.proveIndex, t.currentIndex
+	return t.Root(), proveSet, t.proveIndex, t.currentIndex
 }
 
 // VerifyProof takes a Merkle root, a proveSet, and a proveIndex and returns
