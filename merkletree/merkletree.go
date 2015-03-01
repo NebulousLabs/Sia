@@ -56,7 +56,7 @@ type subTree struct {
 	value  []byte
 }
 
-// sum returns the sha256 hash of the input data.
+// sum returns the hash of the input data.
 func sum(h hash.Hash, data []byte) []byte {
 	if data == nil {
 		return nil
@@ -141,7 +141,7 @@ func (t *Tree) Push(data []byte) {
 			}
 		}
 
-		value = sum(t.hash, append(t.head.value, value...))
+		value = join(t.hash, t.head.value, value)
 		height++
 		t.head = t.head.next
 	}
@@ -169,7 +169,8 @@ func (t *Tree) Root() (root []byte) {
 	current := t.head
 	root = current.value
 	for current.next != nil {
-		root = sum(t.hash, append(current.next.value, root...))
+		rott = join(t.hash, current.next.value, root)
+		root = t.join
 		current = current.next
 	}
 	return root
@@ -205,7 +206,7 @@ func (t *Tree) Prove() (h hash.Hash, merkleRoot []byte, proveSet [][]byte, prove
 			current = current.next.next
 			break
 		}
-		value = sum(t.hash, append(current.next.value, value...))
+		value = join(t.hash, current.next.value, value)
 		current = current.next
 	}
 	for current != nil {
@@ -251,9 +252,9 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 					return false
 				}
 				if proveIndex < mid {
-					value = sum(h, append(value, proveSet[0]...))
+					value = join(h, value, proveSet[0])
 				} else {
-					value = sum(h, append(proveSet[0], value...))
+					value = join(h, proveSet[0], value)
 				}
 				height++
 				proveSet = proveSet[1:]
@@ -264,7 +265,7 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 				if len(proveSet) == 0 {
 					return false
 				}
-				value = sum(h, append(value, proveSet[0]...))
+				value = join(h, value, proveSet[0])
 				proveSet = proveSet[1:]
 			}
 			break
@@ -279,7 +280,7 @@ func VerifyProof(h hash.Hash, merkleRoot []byte, proveSet [][]byte, proveIndex i
 		if len(proveSet) == 0 {
 			return false
 		}
-		value = sum(h, append(proveSet[0], value...))
+		value = join(h, proveSet[0], value)
 		proveSet = proveSet[1:]
 	}
 

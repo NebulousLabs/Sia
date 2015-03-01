@@ -42,34 +42,23 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 
 	// Manually build out expected merkle root values.
 	mt.roots[0] = []byte(nil)
-
 	mt.roots[1] = mt.leaves[0]
-
 	mt.roots[2] = mt.join(mt.leaves[0], mt.leaves[1])
-
 	mt.roots[3] = mt.join(
-		mt.join(mt.leaves[0], mt.leaves[1]),
+		mt.roots[2],
 		mt.leaves[2],
 	)
-
 	mt.roots[4] = mt.join(
-		mt.join(mt.leaves[0], mt.leaves[1]),
+		mt.roots[2],
 		mt.join(mt.leaves[2], mt.leaves[3]),
 	)
-
 	mt.roots[5] = mt.join(
-		mt.join(
-			mt.join(mt.leaves[0], mt.leaves[1]),
-			mt.join(mt.leaves[2], mt.leaves[3]),
-		),
+		mt.roots[4],
 		mt.leaves[4],
 	)
 
 	mt.roots[6] = mt.join(
-		mt.join(
-			mt.join(mt.leaves[0], mt.leaves[1]),
-			mt.join(mt.leaves[2], mt.leaves[3]),
-		),
+		mt.roots[4],
 		mt.join(
 			mt.leaves[4],
 			mt.leaves[5],
@@ -77,10 +66,7 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 	)
 
 	mt.roots[7] = mt.join(
-		mt.join(
-			mt.join(mt.leaves[0], mt.leaves[1]),
-			mt.join(mt.leaves[2], mt.leaves[3]),
-		),
+		mt.roots[4],
 		mt.join(
 			mt.join(mt.leaves[4], mt.leaves[5]),
 			mt.leaves[6],
@@ -88,10 +74,7 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 	)
 
 	mt.roots[8] = mt.join(
-		mt.join(
-			mt.join(mt.leaves[0], mt.leaves[1]),
-			mt.join(mt.leaves[2], mt.leaves[3]),
-		),
+		mt.roots[4],
 		mt.join(
 			mt.join(mt.leaves[4], mt.leaves[5]),
 			mt.join(mt.leaves[6], mt.leaves[7]),
@@ -99,16 +82,7 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 	)
 
 	mt.roots[15] = mt.join(
-		mt.join(
-			mt.join(
-				mt.join(mt.leaves[0], mt.leaves[1]),
-				mt.join(mt.leaves[2], mt.leaves[3]),
-			),
-			mt.join(
-				mt.join(mt.leaves[4], mt.leaves[5]),
-				mt.join(mt.leaves[6], mt.leaves[7]),
-			),
-		),
+		mt.roots[8],
 		mt.join(
 			mt.join(
 				mt.join(mt.leaves[8], mt.leaves[9]),
@@ -138,19 +112,13 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 
 	mt.proveSets[5] = make(map[int][][]byte)
 	mt.proveSets[5][4] = append(mt.proveSets[5][4], mt.data[4])
-	mt.proveSets[5][4] = append(mt.proveSets[5][4], mt.join(
-		mt.join(mt.leaves[0], mt.leaves[1]),
-		mt.join(mt.leaves[2], mt.leaves[3]),
-	))
+	mt.proveSets[5][4] = append(mt.proveSets[5][4], mt.roots[4])
 
 	mt.proveSets[7] = make(map[int][][]byte)
 	mt.proveSets[7][5] = append(mt.proveSets[7][5], mt.data[5])
 	mt.proveSets[7][5] = append(mt.proveSets[7][5], mt.leaves[4])
 	mt.proveSets[7][5] = append(mt.proveSets[7][5], mt.leaves[6])
-	mt.proveSets[7][5] = append(mt.proveSets[7][5], mt.join(
-		mt.join(mt.leaves[0], mt.leaves[1]),
-		mt.join(mt.leaves[2], mt.leaves[3]),
-	))
+	mt.proveSets[7][5] = append(mt.proveSets[7][5], mt.roots[4])
 
 	mt.proveSets[15] = make(map[int][][]byte)
 	mt.proveSets[15][10] = append(mt.proveSets[15][10], mt.data[10])
@@ -163,23 +131,11 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 		mt.join(mt.leaves[12], mt.leaves[13]),
 		mt.leaves[14],
 	))
-	mt.proveSets[15][10] = append(mt.proveSets[15][10], mt.join(
-		mt.join(
-			mt.join(mt.leaves[0], mt.leaves[1]),
-			mt.join(mt.leaves[2], mt.leaves[3]),
-		),
-		mt.join(
-			mt.join(mt.leaves[4], mt.leaves[5]),
-			mt.join(mt.leaves[6], mt.leaves[7]),
-		),
-	))
+	mt.proveSets[15][10] = append(mt.proveSets[15][10], mt.roots[8])
 
 	mt.proveSets[15][3] = append(mt.proveSets[15][3], mt.data[3])
 	mt.proveSets[15][3] = append(mt.proveSets[15][3], mt.leaves[2])
-	mt.proveSets[15][3] = append(mt.proveSets[15][3], mt.join(
-		mt.leaves[0],
-		mt.leaves[1],
-	))
+	mt.proveSets[15][3] = append(mt.proveSets[15][3], mt.roots[2])
 	mt.proveSets[15][3] = append(mt.proveSets[15][3], mt.join(
 		mt.join(mt.leaves[4], mt.leaves[5]),
 		mt.join(mt.leaves[6], mt.leaves[7]),
