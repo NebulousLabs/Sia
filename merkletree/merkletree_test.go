@@ -6,11 +6,23 @@ import (
 	"testing"
 )
 
-// A MerkleTester contains data types which are used in multiple tests.
+// A MerkleTester contains data types that can be filled out manually to
+// compare against function results.
 type MerkleTester struct {
-	data      [][]byte
-	leaves    [][]byte
-	roots     map[int][]byte
+	// data is the raw data of the merkle tree.
+	data [][]byte
+
+	// leaves is the hashes of the data, and should be the same length.
+	leaves [][]byte
+
+	// roots contains the root hashes of merkle trees of various heights using
+	// the data for input.
+	roots map[int][]byte
+
+	// proveSets contains proofs that certain data is in a merkle tree. The
+	// first map is the number of leaves in the tree that the proof is for. The
+	// root of that tree can be found in roots. The second map is the
+	// proveIndex that was used when building the proof.
 	proveSets map[int]map[int][][]byte
 	*testing.T
 }
@@ -154,8 +166,8 @@ func CreateMerkleTester(t *testing.T) (mt *MerkleTester) {
 	return
 }
 
-// TestTree builds a few trees manually and then compares them to the result
-// obtained from using the tree.
+// TestBuildRoot checks that the root returned by Tree matches the manually
+// created roots for all of the manually created roots.
 func TestBuildRoot(t *testing.T) {
 	mt := CreateMerkleTester(t)
 
@@ -174,17 +186,14 @@ func TestBuildRoot(t *testing.T) {
 		if bytes.Compare(root, treeRoot) != 0 {
 			t.Error("tree root doesn't match manual root for index", i)
 		}
-
-		// Check that calling Root a second time results in the same
-		// value.
-		if bytes.Compare(treeRoot, tree.Root()) != 0 {
-			t.Error("consecutive calls to Root did not produce the same value for index", i)
-		}
 	}
 }
 
-// TestTreeProve manually builds storage proves for trees and indexes, and
-// compares the result obtained from using the TreeProve.
+// TestBuildAndVerifyProof builds a proof using a tree for every single
+// manually created proof in the MerkleTester. Then it checks that the proof
+// matches the manually created proof, and that the proof is verified by
+// VerifyProof. Then it checks that the proof fails for all other indices,
+// which should happen if all of the leaves are unique.
 func TestBuildAndVerifyProof(t *testing.T) {
 	mt := CreateMerkleTester(t)
 
@@ -205,7 +214,7 @@ func TestBuildAndVerifyProof(t *testing.T) {
 				t.Error("incorrect Merkle root returned by Tree for indices", i, j)
 			}
 			if len(proveSet) != len(expectedProveSet) {
-				t.Error("prove set is wrong lenght for indices", i, j)
+				t.Error("prove set is wrong length for indices", i, j)
 				continue
 			}
 			if proveIndex != j {
