@@ -110,6 +110,10 @@ func (d *daemon) initRPC() (err error) {
 	if err != nil {
 		return
 	}
+	err = d.network.RegisterRPC("SharePeers", d.gateway.SharePeers)
+	if err != nil {
+		return
+	}
 	err = d.network.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
 	if err != nil {
 		return
