@@ -6,35 +6,49 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// addPeer creates a new daemonTester and bootstraps it to dt. It returns the
+// new peer.
+func (dt *daemonTester) addPeer() *daemonTester {
+	newPeer := newDaemonTester(dt.T)
+	// bootstrap newPeer to dt
+	err := newPeer.gateway.Bootstrap(dt.Address())
+	if err != nil {
+		dt.Fatal("bootstrap failed:", err)
+	}
+	// newPeer and dt should now have the same number of peers
+	if len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
+		dt.Fatal("bootstrap did not synchronize peer lists")
+	}
+	return newPeer
+}
+
 // TestPeering tests that peers are properly announced and relayed throughout
 // the network.
 func TestPeering(t *testing.T) {
-	// create three peers
+	// create two peers
 	peer1 := newDaemonTester(t)
 	peer2 := newDaemonTester(t)
-	peer3 := newDaemonTester(t)
-	// add peer3 to peer2
-	peer2.callAPI("/peer/add?addr=" + string(peer3.Address()))
-	// peer3 should now be in peer2's peer list
+	// add peer2 to peer1
+	peer1.callAPI("/peer/add?addr=" + string(peer2.Address()))
+	// peer2 should now be in peer1's peer list
 	var info modules.GatewayInfo
-	peer2.getAPI("/peer/status", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer3.Address() {
-		t.Fatal("/peer/add did not add peer", peer3.Address())
-	}
-	// have peer1 bootstrap to peer2
-	err := peer1.gateway.Bootstrap(peer2.Address())
-	if err != nil {
-		t.Fatal("bootstrap failed:", err)
-	}
-	// peer1 should now have both peer2 and peer3
 	peer1.getAPI("/peer/status", &info)
+	if len(info.Peers) != 1 || info.Peers[0] != peer2.Address() {
+		t.Fatal("/peer/add did not add peer", peer2.Address())
+	}
+
+	// now create a new peer that bootstraps to peer1
+	peer3 := peer1.addPeer()
+	// peer3 should have both peer1 and peer2
+	peer3.getAPI("/peer/status", &info)
 	if len(info.Peers) != 2 {
 		t.Fatal("bootstrap peer did not share its peers")
 	}
-	// peer3 should have received peer1 via peer2. Note that it does not have
-	// peer2 though, because peer2 did not use the "AddMe" RPC.
-	peer3.getAPI("/peer/status", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer1.Address() {
+
+	// peer2 should have received peer3 via peer1. Note that it does not have
+	// peer1 though, because /peer/add does not contact the added peer.
+	peer2.getAPI("/peer/status", &info)
+	if len(info.Peers) != 1 || info.Peers[0] != peer3.Address() {
 		t.Fatal("bootstrap peer did not relay the bootstrapping peer")
 	}
 }
