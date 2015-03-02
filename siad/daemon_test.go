@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
@@ -46,6 +48,10 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	RPCPort++
 
 	return &daemonTester{d, t}
+}
+
+func (dt *daemonTester) Address() network.Address {
+	return dt.network.Address()
 }
 
 // get wraps a GET request with a status code check, such that if the GET does

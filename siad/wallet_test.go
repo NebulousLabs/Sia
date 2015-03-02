@@ -13,8 +13,8 @@ func TestSendCoins(t *testing.T) {
 	sender := newDaemonTester(t)
 	receiver := newDaemonTester(t)
 	miner := newDaemonTester(t)
-	sender.gateway.AddPeer(miner.network.Address())
-	miner.gateway.AddPeer(receiver.network.Address())
+	sender.gateway.AddPeer(miner.Address())
+	miner.gateway.AddPeer(receiver.Address())
 
 	// need to mine a few coins first
 	sender.testMining()
