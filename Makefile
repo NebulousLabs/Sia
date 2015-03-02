@@ -66,6 +66,7 @@ dependencies:
 	go get -u github.com/stretchr/graceful
 	go get -u golang.org/x/crypto/twofish
 	go get -u golang.org/x/tools/cmd/cover
+	go get -u github.com/NebulousLabs/merkletree
 
 # release builds and installs release binaries.
 release: dependencies test-long REBUILD

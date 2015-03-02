@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"crypto/rand"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -90,7 +91,7 @@ func (ct *ConsensusTester) FileContractTransaction(start BlockHeight, expiration
 	if err != nil {
 		ct.Fatal(err)
 	}
-	mRoot, err := crypto.BytesMerkleRoot(file)
+	mRoot, err := crypto.ReaderMerkleRoot(bytes.NewReader(file))
 	if err != nil {
 		ct.Fatal(err)
 	}

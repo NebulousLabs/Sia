@@ -73,7 +73,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 		ct.Fatal(err)
 	}
 	reader := bytes.NewReader(file)
-	base, hashSet, err := crypto.BuildReaderProof(reader, crypto.CalculateSegments(uint64(len(file))), segmentIndex)
+	base, hashSet, err := crypto.BuildReaderProof(reader, segmentIndex)
 	if err != nil {
 		ct.Fatal(err)
 	}

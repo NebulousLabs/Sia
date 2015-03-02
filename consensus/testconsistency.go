@@ -99,7 +99,7 @@ func (ct *ConsensusTester) ConsistencyChecks() {
 	ct.CurrencyCheck()
 }
 
-// stateHash returns the markle root of the current state of consensus.
+// stateHash returns the Merkle root of the current state of consensus.
 func (s *State) consensusSetHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
@@ -115,64 +115,57 @@ func (s *State) consensusSetHash() crypto.Hash {
 	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
 
 	// Create a slice of hashes representing all items of interest.
-	leaves := []crypto.Hash{
-		crypto.HashObject(s.blockRoot.block),
-		crypto.Hash(s.currentBlockID),
-		crypto.HashObject(s.height()),
-		crypto.HashObject(s.currentBlockNode().target),
-		crypto.HashObject(s.currentBlockNode().depth),
-		crypto.HashObject(s.currentBlockNode().earliestChildTimestamp()),
-	}
+	tree := crypto.NewTree()
+	tree.PushObject(s.blockRoot.block)
+	tree.PushObject(s.currentBlockID)
+	tree.PushObject(s.height())
+	tree.PushObject(s.currentBlockNode().target)
+	tree.PushObject(s.currentBlockNode().depth)
+	tree.PushObject(s.currentBlockNode().earliestChildTimestamp())
 
 	// Add all the blocks in the current path.
 	for i := 0; i < len(s.currentPath); i++ {
-		leaves = append(leaves, crypto.Hash(s.currentPath[BlockHeight(i)]))
+		tree.PushObject(s.currentPath[BlockHeight(i)])
 	}
 
 	// Get the set of siacoin outputs in sorted order and add them.
 	sortedUscos := s.sortedUscoSet()
 	for _, output := range sortedUscos {
-		leaves = append(leaves, crypto.HashObject(output))
+		tree.PushObject(output)
 	}
 
-	// Sort the open contracts by the string value of their ID.
-	var openContractStrings []string
+	// Sort the open contracts by ID.
+	var openContracts crypto.HashSlice
 	for contractID := range s.fileContracts {
-		openContractStrings = append(openContractStrings, string(contractID[:]))
+		openContracts = append(openContracts, crypto.Hash(contractID))
 	}
-	sort.Strings(openContractStrings)
+	sort.Sort(openContracts)
 
 	// Add the open contracts in sorted order.
-	for _, stringContractID := range openContractStrings {
-		var contractID FileContractID
-		copy(contractID[:], stringContractID)
-		leaves = append(leaves, crypto.HashObject(s.fileContracts[contractID]))
+	for _, id := range openContracts {
+		tree.PushObject(id)
 	}
 
 	// Get the set of siafund outputs in sorted order and add them.
-	sortedUsfos := s.sortedUsfoSet()
-	for _, output := range sortedUsfos {
-		leaves = append(leaves, crypto.HashObject(output))
+	for _, output := range s.sortedUsfoSet() {
+		tree.PushObject(output)
 	}
 
 	// Get the set of delayed siacoin outputs, sorted by maturity height then
 	// sorted by id and add them.
 	for i := BlockHeight(0); i <= s.height(); i++ {
-		delayedOutputs := s.delayedSiacoinOutputs[i]
-		var delayedStrings []string
-		for id := range delayedOutputs {
-			delayedStrings = append(delayedStrings, string(id[:]))
+		var delayedOutputs crypto.HashSlice
+		for id := range s.delayedSiacoinOutputs[i] {
+			delayedOutputs = append(delayedOutputs, crypto.Hash(id))
 		}
-		sort.Strings(delayedStrings)
+		sort.Sort(delayedOutputs)
 
-		for _, delayedString := range delayedStrings {
-			var id SiacoinOutputID
-			copy(id[:], delayedString)
-			leaves = append(leaves, crypto.HashObject(delayedOutputs[id]))
+		for _, output := range delayedOutputs {
+			tree.PushObject(output)
 		}
 	}
 
-	return crypto.MerkleRoot(leaves)
+	return tree.Root()
 }
 
 // StateHash returns the markle root of the current state of consensus.

@@ -23,8 +23,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	if err != nil {
 		return
 	}
-	numSegments := crypto.CalculateSegments(obligation.fileContract.FileSize)
-	base, hashSet, err := crypto.BuildReaderProof(file, numSegments, segmentIndex)
+	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
 	if err != nil {
 		return
 	}
