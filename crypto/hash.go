@@ -51,11 +51,6 @@ func HashObject(obj interface{}) Hash {
 	return HashBytes(encoding.Marshal(obj))
 }
 
-// JoinHash appends two hashes and then hashes the result.
-func JoinHash(left, right Hash) Hash {
-	return HashBytes(append(left[:], right[:]...))
-}
-
 // These functions implement sort.Interface, allowing hashes to be sorted.
 func (hs HashSlice) Len() int           { return len(hs) }
 func (hs HashSlice) Less(i, j int) bool { return bytes.Compare(hs[i][:], hs[j][:]) < 0 }

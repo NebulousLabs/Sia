@@ -1,10 +1,6 @@
 package crypto
 
-// TODO: Give this file a lot more love. And maybe break it into its own
-// package.
-
 import (
-	"bytes"
 	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -58,10 +54,6 @@ func CalculateSegments(fileSize uint64) (numSegments uint64) {
 		numSegments++
 	}
 	return
-}
-
-func BytesMerkleRoot(data []byte) (Hash, error) {
-	return ReaderMerkleRoot(bytes.NewReader(data))
 }
 
 func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {

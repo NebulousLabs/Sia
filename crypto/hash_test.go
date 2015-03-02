@@ -50,10 +50,4 @@ func TestHashing(t *testing.T) {
 	if h2 == emptyHash {
 		t.Error("HashObject returned the zero hash!")
 	}
-
-	// Call JoinHash twice on the hashes we made.
-	h3 := JoinHash(h0, JoinHash(h1, h2))
-	if h3 == emptyHash {
-		t.Error("HashObject returned the zero hash!")
-	}
 }
