@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 )
@@ -127,4 +128,10 @@ func (c Currency) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (c *Currency) UnmarshalJSON(b []byte) error {
 	return c.i.UnmarshalJSON(b)
+}
+
+// Scan implements the fmt.Scanner interface, allowing Currency values to be
+// scanned from text.
+func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
+	return c.i.Scan(s, ch)
 }
