@@ -106,7 +106,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	// transaction is created sooner, which will impact the user's wallet
 	// balance faster vs. waiting for the whole thing to upload before
 	// affecting the user's balance.
-	merkleRoot, err := crypto.ReaderMerkleRoot(up.Data, filesize)
+	merkleRoot, err := crypto.ReaderMerkleRoot(up.Data)
 	if err != nil {
 		return
 	}

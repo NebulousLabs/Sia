@@ -45,7 +45,7 @@ func downloadPiece(piece FilePiece, path string) error {
 		if err != nil {
 			return
 		}
-		merkleRoot, err := crypto.ReaderMerkleRoot(file, piece.Contract.FileSize)
+		merkleRoot, err := crypto.ReaderMerkleRoot(file)
 		if err != nil {
 			return
 		}

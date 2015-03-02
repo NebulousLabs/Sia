@@ -31,7 +31,7 @@ func (ht *HostTester) testObligation() {
 	// the data's merkle root.
 	input, value := ht.FindSpendableSiacoinInput()
 	txn := ht.AddSiacoinInputToTransaction(consensus.Transaction{}, input)
-	merkleRoot, err := crypto.ReaderMerkleRoot(file, filesize)
+	merkleRoot, err := crypto.ReaderMerkleRoot(file)
 	if err != nil {
 		ht.Fatal(err)
 	}

@@ -361,14 +361,13 @@ func (fc FileContract) Tax() Currency {
 // Timelock and NumSignatures are both low entropy fields; they can be
 // protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
-	leaves := []crypto.Hash{
-		crypto.HashObject(uc.Timelock),
-	}
+	tree := crypto.NewTree()
+	tree.PushObject(uc.Timelock)
 	for i := range uc.PublicKeys {
-		leaves = append(leaves, crypto.HashObject(uc.PublicKeys[i]))
+		tree.PushObject(uc.PublicKeys[i])
 	}
-	leaves = append(leaves, crypto.HashObject(uc.NumSignatures))
-	return UnlockHash(crypto.MerkleRoot(leaves))
+	tree.PushObject(uc.NumSignatures)
+	return UnlockHash(tree.Root())
 }
 
 // ID returns the ID of a Block, which is calculated by hashing the
@@ -391,16 +390,15 @@ func (b Block) CheckTarget(target Target) bool {
 // tree are composed of the Timestamp, the miner outputs (one leaf per
 // payout), and the transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
-	leaves := []crypto.Hash{
-		crypto.HashObject(b.Timestamp),
-	}
+	tree := crypto.NewTree()
+	tree.PushObject(b.Timestamp)
 	for _, payout := range b.MinerPayouts {
-		leaves = append(leaves, crypto.HashObject(payout))
+		tree.PushObject(payout)
 	}
 	for _, txn := range b.Transactions {
-		leaves = append(leaves, crypto.HashObject(txn))
+		tree.PushObject(txn)
 	}
-	return crypto.MerkleRoot(leaves)
+	return tree.Root()
 }
 
 // MinerPayoutID returns the ID of the miner payout at the given index, which

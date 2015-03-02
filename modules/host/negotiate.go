@@ -204,7 +204,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		// each byte we read from tee will also be written to file
 		file,
 	)
-	merkleRoot, err := crypto.ReaderMerkleRoot(tee, terms.FileSize)
+	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
 	if err != nil {
 		return
 	}
