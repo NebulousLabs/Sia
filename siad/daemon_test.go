@@ -34,7 +34,7 @@ func newDaemonTester(t *testing.T) *daemonTester {
 
 		DownloadDir: "downloadDir",
 
-		WalletDir: "walletDir",
+		WalletDir: "walletDir" + strconv.Itoa(APIPort),
 	}
 
 	d, err := newDaemon(dc)
