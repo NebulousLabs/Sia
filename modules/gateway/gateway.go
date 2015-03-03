@@ -87,6 +87,8 @@ func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 
 // Info returns metadata about the Gateway.
 func (g *Gateway) Info() (info modules.GatewayInfo) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
 	}
