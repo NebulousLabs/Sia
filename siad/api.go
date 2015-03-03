@@ -26,6 +26,11 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
+	// Daemon API Calls
+	handleHTTPRequest(mux, "/daemon/stop", d.stopHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", d.updateCheckHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
+
 	// Consensus API Calls
 	handleHTTPRequest(mux, "/consensus/status", d.statusHandler)
 
@@ -59,13 +64,6 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/address", d.walletAddressHandler)
 	handleHTTPRequest(mux, "/wallet/send", d.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", d.walletStatusHandler)
-
-	// Update API Calls
-	handleHTTPRequest(mux, "/daemon/stop", d.stopHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", d.updateCheckHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
-
-	// Daemon API Calls
 
 	// Debugging API Calls
 	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)

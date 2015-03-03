@@ -82,22 +82,28 @@ func (dt *daemonTester) acceptTransaction(t consensus.Transaction) error {
 	return err
 }
 
+// mineBlock mines a block and puts it into the consensus set.
+func (dt *daemonTester) mineBlock() {
+	for {
+		_, solved, err := dt.miner.SolveBlock()
+		if err != nil {
+			dt.Fatal("Mining faild:", err)
+		} else if solved {
+			// SovleBlock automatically puts the block into the consensus set.
+			break
+		}
+	}
+}
+
 // mineMoney mines 5 blocks, enough for the coinbase to be accepted by the
 // wallet.
-func (dt *daemonTester) mineBlock() {
+func (dt *daemonTester) mineMoney() {
 	// get old balance
 	var info modules.WalletInfo
 	dt.getAPI("/wallet/status", &info)
 	oldBalance := info.Balance
 	for i := 0; i < 5; i++ {
-		for {
-			_, solved, err := dt.miner.SolveBlock()
-			if err != nil {
-				dt.Fatal("Mining failed:", err)
-			} else if solved {
-				break
-			}
-		}
+		dt.mineBlock()
 	}
 	dt.getAPI("/wallet/status", &info)
 	if info.FullBalance.Cmp(oldBalance) <= 0 {

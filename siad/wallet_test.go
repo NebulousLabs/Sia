@@ -14,7 +14,7 @@ func TestSendCoins(t *testing.T) {
 	receiver := sender.addPeer()
 
 	// need to mine a few coins first
-	sender.mineBlock()
+	sender.mineMoney()
 
 	// get current balances
 	var oldSenderStatus modules.WalletInfo

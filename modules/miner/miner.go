@@ -85,7 +85,6 @@ func (m *Miner) SetThreads(threads int) error {
 	return nil
 }
 
-// Grabs the set of
 func (m *Miner) updateTransactionSet() {
 	tset, err := m.tpool.TransactionSet()
 	if err != nil {
