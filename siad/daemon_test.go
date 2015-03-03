@@ -41,7 +41,7 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	if err != nil {
 		t.Fatal("Could not create daemon:", err)
 	}
-	dt := &daemonTester{d, t, make(chan struct{}, 10)}
+	dt := &daemonTester{d, t, make(chan struct{})}
 
 	// overwrite RPCs with special testing RPCs
 	dt.network.RegisterRPC("AddMe", dt.addMe)
@@ -72,7 +72,7 @@ func (dt *daemonTester) addMe(peer network.Address) error {
 
 func (dt *daemonTester) relayBlock(b consensus.Block) error {
 	err := dt.gateway.RelayBlock(b)
-	dt.rpcChan <- struct{}{}
+	//dt.rpcChan <- struct{}{}
 	return err
 }
 
@@ -98,7 +98,6 @@ func (dt *daemonTester) mineBlock() {
 				break
 			}
 		}
-		<-dt.rpcChan
 	}
 	dt.getAPI("/wallet/status", &info)
 	if info.FullBalance.Cmp(oldBalance) <= 0 {

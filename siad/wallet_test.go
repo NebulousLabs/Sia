@@ -30,10 +30,11 @@ func TestSendCoins(t *testing.T) {
 
 	// send 3e4 coins from the sender to the receiver
 	sender.callAPI("/wallet/send?amount=30000&dest=" + addr.Address)
-
 	// wait until the transaction is relayed to the receiver
 	<-receiver.rpcChan
 	<-receiver.rpcChan
+	<-sender.rpcChan
+	<-sender.rpcChan
 
 	// get updated balances
 	var newSenderStatus modules.WalletInfo
