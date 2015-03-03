@@ -13,7 +13,7 @@ func TestSendCoins(t *testing.T) {
 	sender := newDaemonTester(t)
 	receiver := sender.addPeer()
 
-	// need to mine a few coins first
+	// Give some money to the sender.
 	sender.mineMoney()
 
 	// get current balances
@@ -22,14 +22,8 @@ func TestSendCoins(t *testing.T) {
 	var oldReceiverStatus modules.WalletInfo
 	receiver.getAPI("/wallet/status", &oldReceiverStatus)
 
-	// get an address from the receiver
-	var addr struct {
-		Address string
-	}
-	receiver.getAPI("/wallet/address", &addr)
-
-	// send 3e4 coins from the sender to the receiver
-	sender.callAPI("/wallet/send?amount=30000&dest=" + addr.Address)
+	// send 3 coins from the sender to the receiver
+	sender.callAPI("/wallet/send?amount=3&dest=" + receiver.coinAddress())
 	// wait until the transaction is relayed to the receiver
 	<-receiver.rpcChan
 	<-receiver.rpcChan
