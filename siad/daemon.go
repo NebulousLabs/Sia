@@ -37,14 +37,14 @@ type DaemonConfig struct {
 
 type daemon struct {
 	state   *consensus.State
-	tpool   modules.TransactionPool
 	network *network.TCPServer
-	wallet  modules.Wallet
-	miner   *miner.Miner
+	gateway modules.Gateway
 	host    modules.Host
 	hostDB  modules.HostDB
+	miner   *miner.Miner
 	renter  modules.Renter
-	gateway modules.Gateway
+	tpool   modules.TransactionPool
+	wallet  modules.Wallet
 
 	styleDir    string
 	downloadDir string

@@ -57,7 +57,7 @@ func New(s *consensus.State, g modules.Gateway, tpool modules.TransactionPool, w
 		tpool:                tpool,
 		wallet:               w,
 		threads:              1,
-		iterationsPerAttempt: 256 * 1024,
+		iterationsPerAttempt: 64 * 1024,
 	}
 
 	addr, _, err := m.wallet.CoinAddress()
