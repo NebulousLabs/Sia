@@ -31,25 +31,25 @@ func TestPeering(t *testing.T) {
 	peer1 := newDaemonTester(t)
 	peer2 := newDaemonTester(t)
 	// add peer2 to peer1
-	peer1.callAPI("/peer/add?addr=" + string(peer2.address()))
+	peer1.callAPI("/gateway/add?addr=" + string(peer2.address()))
 	// peer2 should now be in peer1's peer list
 	var info modules.GatewayInfo
-	peer1.getAPI("/peer/status", &info)
+	peer1.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer2.address() {
-		t.Fatal("/peer/add did not add peer", peer2.address())
+		t.Fatal("/gateway/add did not add peer", peer2.address())
 	}
 
 	// now create a new peer that bootstraps to peer1
 	peer3 := peer1.addPeer()
 	// peer3 should have both peer1 and peer2
-	peer3.getAPI("/peer/status", &info)
+	peer3.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 2 {
 		t.Fatal("bootstrap peer did not share its peers")
 	}
 
 	// peer2 should have received peer3 via peer1. Note that it does not have
-	// peer1 though, because /peer/add does not contact the added peer.
-	peer2.getAPI("/peer/status", &info)
+	// peer1 though, because /gateway/add does not contact the added peer.
+	peer2.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer3.address() {
 		t.Fatal("bootstrap peer did not relay the bootstrapping peer")
 	}

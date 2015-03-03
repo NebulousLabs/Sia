@@ -87,7 +87,15 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Gateway = true
 	}()
 	go func() {
-		d.host.SetSettings(d.host.Settings())
+		settings, err := d.host.Settings()
+		if err != nil {
+			if consensus.DEBUG {
+				panic(err)
+			}
+			mds.Host = true
+			return
+		}
+		d.host.SetSettings(settings)
 		mds.Host = true
 	}()
 	go func() {

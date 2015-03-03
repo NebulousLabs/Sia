@@ -40,7 +40,7 @@ type daemon struct {
 	network *network.TCPServer
 	gateway modules.Gateway
 	host    modules.Host
-	hostDB  modules.HostDB
+	hostdb  modules.HostDB
 	miner   *miner.Miner
 	renter  modules.Renter
 	tpool   modules.TransactionPool
@@ -81,16 +81,19 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.hostDB, err = hostdb.New(d.state)
+	d.hostdb, err = hostdb.New(d.state)
 	if err != nil {
 		return
 	}
-	d.renter, err = renter.New(d.state, d.hostDB, d.wallet)
+	d.renter, err = renter.New(d.state, d.hostdb, d.wallet)
 	if err != nil {
 		return
 	}
 
-	d.initRPC()
+	err = d.initRPC()
+	if err != nil {
+		return
+	}
 	d.initAPI(config.APIAddr)
 
 	return

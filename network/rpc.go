@@ -85,7 +85,7 @@ func (tcps *TCPServer) RegisterRPC(name string, fn interface{}) error {
 	val, typ := reflect.ValueOf(fn), reflect.TypeOf(fn)
 	if typ.Kind() != reflect.Func || typ.NumIn() > 1 || typ.NumOut() > 2 ||
 		typ.NumOut() < 1 || typ.Out(typ.NumOut()-1) != typeOfError {
-		panic("registered function has wrong type signature")
+		return errors.New("registered function has wrong type signature:" + name)
 	}
 
 	var handler func(net.Conn) error

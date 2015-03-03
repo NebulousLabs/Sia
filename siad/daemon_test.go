@@ -83,7 +83,7 @@ func (dt *daemonTester) acceptTransaction(t consensus.Transaction) error {
 }
 
 // mineMoney mines 5 blocks, enough for the coinbase to be accepted by the
-// wallet. This may take a while.
+// wallet.
 func (dt *daemonTester) mineBlock() {
 	// get old balance
 	var info modules.WalletInfo
@@ -140,5 +140,5 @@ func (dt *daemonTester) callAPI(call string) {
 
 // TestCreateDaemon creates a daemonTester and immediately stops it.
 func TestCreateDaemon(t *testing.T) {
-	newDaemonTester(t).callAPI("/stop")
+	newDaemonTester(t).callAPI("/daemon/stop")
 }
