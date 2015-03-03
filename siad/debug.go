@@ -32,15 +32,15 @@ type SiaConstants struct {
 	MaxAdjustmentDown *big.Rat
 }
 
-type ModuleDealockStatus struct {
-	State bool
-	Gateway bool
-	Host bool
-	HostDB bool
-	Miner bool
-	Renter bool
+type ModuleDeadlockStatus struct {
+	State           bool
+	Gateway         bool
+	Host            bool
+	HostDB          bool
+	Miner           bool
+	Renter          bool
 	TransactionPool bool
-	Wallet bool
+	Wallet          bool
 }
 
 // debugConstantsHandler prints a json file containing all of the constants.
@@ -87,7 +87,7 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Gateway = true
 	}()
 	go func() {
-		d.host.SetSettings(d.Host.Settings())
+		d.host.SetSettings(d.host.Settings())
 		mds.Host = true
 	}()
 	go func() {
@@ -110,5 +110,7 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		d.wallet.CoinAddress()
 		mds.Wallet = true
 	}()
+	time.Sleep(time.Second * 3)
+
 	writeJSON(w, mds)
 }
