@@ -42,9 +42,9 @@ func (m *Miner) Info() (MinerInfo, error) {
 		info.State = "Turning Off"
 	} else if m.desiredThreads == m.runningThreads {
 		info.State = "On"
-	} else if m.desiredThreads < m.runningThreads {
-		info.State = "Turning On"
 	} else if m.desiredThreads > m.runningThreads {
+		info.State = "Turning On"
+	} else if m.desiredThreads < m.runningThreads {
 		info.State = "Decreasing number of threads."
 	} else {
 		info.State = "Miner is in an ERROR state!"

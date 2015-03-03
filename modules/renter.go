@@ -23,5 +23,5 @@ type Renter interface {
 	Upload(UploadParams) error
 	Download(nickname, filepath string) error
 	Rename(currentName, newName string) error
-	Info() (RentInfo, error)
+	Info() RentInfo
 }

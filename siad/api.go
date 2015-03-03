@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/stretchr/graceful"
 )
@@ -22,7 +23,7 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 	})
 }
 
-func (d *daemon) listen(addr string) {
+func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
 	// Host API Calls
@@ -69,14 +70,17 @@ func (d *daemon) listen(addr string) {
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
 	}
+}
 
+func (d *daemon) listen() error {
 	// graceful will run until it catches a signal.
-	// it can also be stopped manually by stopHandler.
-	//
-	// TODO: this fails silently. The error should be checked, but then it
-	// will print an error even if interrupted normally. Need a better
-	// solution.
-	d.apiServer.ListenAndServe()
+	// It can also be stopped manually by stopHandler.
+	err := d.apiServer.ListenAndServe()
+	// despite its name, graceful still propogates this benign error
+	if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
+		err = nil
+	}
+	return err
 }
 
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an

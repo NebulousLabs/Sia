@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
@@ -35,16 +36,15 @@ type DaemonConfig struct {
 }
 
 type daemon struct {
-	// Modules. TODO: Implement all modules.
 	state   *consensus.State
-	tpool   *transactionpool.TransactionPool
+	tpool   modules.TransactionPool
 	network *network.TCPServer
-	wallet  *wallet.Wallet
+	wallet  modules.Wallet
 	miner   *miner.Miner
-	host    *host.Host
-	hostDB  *hostdb.HostDB
-	renter  *renter.Renter
-	gateway *gateway.Gateway
+	host    modules.Host
+	hostDB  modules.HostDB
+	renter  modules.Renter
+	gateway modules.Gateway
 
 	styleDir    string
 	downloadDir string
@@ -90,9 +90,15 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
-	// register RPC handlers
-	// TODO: register all RPCs in a separate function
-	err = d.network.RegisterRPC("AcceptBlock", d.gateway.RelayBlock)
+	d.initRPC()
+	d.initAPI(config.APIAddr)
+
+	return
+}
+
+// initRPC registers all of the daemon's RPC handlers
+func (d *daemon) initRPC() (err error) {
+	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
 	if err != nil {
 		return
 	}
@@ -101,6 +107,10 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 	err = d.network.RegisterRPC("AddMe", d.gateway.AddMe)
+	if err != nil {
+		return
+	}
+	err = d.network.RegisterRPC("SharePeers", d.gateway.SharePeers)
 	if err != nil {
 		return
 	}

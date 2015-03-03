@@ -50,7 +50,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 	}
 
 	// announce ourselves to new peers
-	g.broadcast("AddMe", g.tcps.Address(), nil)
+	go g.threadedBroadcast("AddMe", g.tcps.Address(), nil)
 
 	return
 }
@@ -75,18 +75,21 @@ func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 		return errors.New("block added, but it does not extend the state height.")
 	}
 
-	g.broadcast("RelayBlock", b, nil)
+	go g.threadedBroadcast("RelayBlock", b, nil)
 	return
 }
 
 // RelayTransaction relays a transaction, both locally and to the network.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
-	g.broadcast("AcceptTransaction", t, nil)
+	// no locking necessary
+	go g.threadedBroadcast("AcceptTransaction", t, nil)
 	return
 }
 
 // Info returns metadata about the Gateway.
 func (g *Gateway) Info() (info modules.GatewayInfo) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
 	}

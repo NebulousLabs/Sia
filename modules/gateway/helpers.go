@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/rand"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/network"
@@ -36,10 +37,21 @@ func (g *Gateway) randomPeer() (network.Address, error) {
 	return "", ErrNoPeers
 }
 
-func (g *Gateway) broadcast(name string, arg, resp interface{}) {
+// threadedBroadcast broadcasts an RPC to all of the Gateway's peers. The
+// calls are run in parallel.
+func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
+	g.mu.RLock()
+	var wg sync.WaitGroup
+	wg.Add(len(g.peers))
 	for peer := range g.peers {
-		peer.RPC(name, arg, resp)
+		go func(peer network.Address) {
+			peer.RPC(name, arg, resp)
+			wg.Done()
+		}(peer)
 	}
+	// release lock while we wait for RPCs to complete
+	g.mu.RUnlock()
+	wg.Wait()
 }
 
 func (g *Gateway) save(filename string) error {

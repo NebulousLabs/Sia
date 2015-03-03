@@ -1,59 +1,53 @@
 package main
 
-/*
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-// testSendToSelf does a send from the wallet to itself, and checks that all of
-// the balance reporting at each step makes sense, and then checks that all of
-// the coins are still sendable.
-func testSendToSelf(t *testing.T, c *Core) {
-	if c.wallet.Balance(false) == 0 {
-		t.Error("c.wallet is empty.")
-		return
-	}
-	originalBalance := c.wallet.Balance(false)
+// TestSendCoins creates two addresses and sends coins from one to the other.
+// The first balance should decrease, and the second balance should increase
+// proportionally.
+func TestSendCoins(t *testing.T) {
+	sender := newDaemonTester(t)
+	receiver := sender.addPeer()
 
-	// Get a new coin address from the wallet and send the coins to yourself.
-	dest, _, err := c.wallet.CoinAddress()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	_, err = c.wallet.SpendCoins(c.wallet.Balance(false)-10, dest)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	// need to mine a few coins first
+	sender.mineBlock()
 
-	// Process the transaction and check the balance, which should now be 0.
-	//
-	// TODO: This error checking is hacky, instead should use some sort of
-	// synchronization technique.
-	if c.wallet.Balance(false) != 0 {
-		t.Error("Expecting a balance of 0, got", c.wallet.Balance(false))
-	}
+	// get current balances
+	var oldSenderStatus modules.WalletInfo
+	sender.getAPI("/wallet/status", &oldSenderStatus)
+	var oldReceiverStatus modules.WalletInfo
+	receiver.getAPI("/wallet/status", &oldReceiverStatus)
 
-	// Mine the block and check the balance, which should now be
-	// originalBalance + Coinbase.
-	// mineSingleBlock(t, c)
-	if c.wallet.Balance(false) != originalBalance+consensus.CalculateCoinbase(c.state.Height()) {
-		t.Errorf("Expecting a balance of %v, got %v", originalBalance+consensus.CalculateCoinbase(c.state.Height()), c.wallet.Balance(false))
+	// get an address from the receiver
+	var addr struct {
+		Address string
 	}
-	if c.wallet.Balance(false) != c.wallet.Balance(true) {
-		t.Errorf("Expecting balance and full balance to be equal, but instead they are false: %v, full: %v", c.wallet.Balance(false), c.wallet.Balance(true))
+	receiver.getAPI("/wallet/address", &addr)
+
+	// send 3e4 coins from the sender to the receiver
+	sender.callAPI("/wallet/send?amount=30000&dest=" + addr.Address)
+	// wait until the transaction is relayed to the receiver
+	<-receiver.rpcChan
+	<-receiver.rpcChan
+	//<-sender.rpcChan
+	//<-sender.rpcChan
+
+	// get updated balances
+	var newSenderStatus modules.WalletInfo
+	sender.getAPI("/wallet/status", &newSenderStatus)
+	var newReceiverStatus modules.WalletInfo
+	receiver.getAPI("/wallet/status", &newReceiverStatus)
+
+	// sender balance should have gone down
+	if newSenderStatus.FullBalance.Cmp(oldSenderStatus.FullBalance) >= 0 {
+		t.Fatalf("Sender balance should have gone down:\n\told: %v\n\tnew: %v", oldSenderStatus.FullBalance.Big(), newSenderStatus.FullBalance.Big())
+	}
+	// receiver balance should have gone up
+	if newReceiverStatus.FullBalance.Cmp(oldReceiverStatus.FullBalance) <= 0 {
+		t.Fatalf("Receiver balance should have gone up:\n\told: %v\n\tnew: %v", oldReceiverStatus.FullBalance.Big(), newReceiverStatus.FullBalance.Big())
 	}
 }
-
-// testWalletInfo calles wallet.Info to see if an error is thrown. Also make sure
-// there is no deadlock.
-func testWalletInfo(t *testing.T, c *Core) {
-	_, err := c.wallet.WalletInfo()
-	if err != nil {
-		t.Error(err)
-	}
-}
-*/

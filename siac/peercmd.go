@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -57,14 +57,14 @@ func peerremovecmd(addr string) {
 }
 
 func peerstatuscmd() {
-	var peers []network.Address
-	err := getAPI("/peer/status", &peers)
+	var info modules.GatewayInfo
+	err := getAPI("/peer/status", &info)
 	if err != nil {
 		fmt.Println("Could not get peer status:", err)
 		return
 	}
-	fmt.Println(len(peers), "active peers:")
-	for _, peer := range peers {
+	fmt.Println(len(info.Peers), "active peers:")
+	for _, peer := range info.Peers {
 		fmt.Println("\t", peer)
 	}
 }
