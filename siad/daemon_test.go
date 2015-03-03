@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/network"
 )
 
@@ -18,6 +20,7 @@ var (
 type daemonTester struct {
 	*daemon
 	*testing.T
+	rpcChan chan struct{}
 }
 
 func newDaemonTester(t *testing.T) *daemonTester {
@@ -38,6 +41,13 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	if err != nil {
 		t.Fatal("Could not create daemon:", err)
 	}
+	dt := &daemonTester{d, t, make(chan struct{}, 10)}
+
+	// overwrite RPCs with special testing RPCs
+	dt.network.RegisterRPC("AddMe", dt.addMe)
+	dt.network.RegisterRPC("RelayBlock", dt.relayBlock)
+	dt.network.RegisterRPC("AcceptTransaction", dt.acceptTransaction)
+
 	go func() {
 		listenErr := d.listen()
 		if listenErr != nil {
@@ -47,11 +57,53 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	APIPort++
 	RPCPort++
 
-	return &daemonTester{d, t}
+	return dt
 }
 
-func (dt *daemonTester) Address() network.Address {
+func (dt *daemonTester) address() network.Address {
 	return dt.network.Address()
+}
+
+func (dt *daemonTester) addMe(peer network.Address) error {
+	err := dt.gateway.AddMe(peer)
+	dt.rpcChan <- struct{}{}
+	return err
+}
+
+func (dt *daemonTester) relayBlock(b consensus.Block) error {
+	err := dt.gateway.RelayBlock(b)
+	dt.rpcChan <- struct{}{}
+	return err
+}
+
+func (dt *daemonTester) acceptTransaction(t consensus.Transaction) error {
+	err := dt.tpool.AcceptTransaction(t)
+	dt.rpcChan <- struct{}{}
+	return err
+}
+
+// mineMoney mines 5 blocks, enough for the coinbase to be accepted by the
+// wallet. This may take a while.
+func (dt *daemonTester) mineBlock() {
+	// get old balance
+	var info modules.WalletInfo
+	dt.getAPI("/wallet/status", &info)
+	oldBalance := info.Balance
+	for i := 0; i < 5; i++ {
+		for {
+			_, solved, err := dt.miner.SolveBlock()
+			if err != nil {
+				dt.Fatal("Mining failed:", err)
+			} else if solved {
+				break
+			}
+		}
+		<-dt.rpcChan
+	}
+	dt.getAPI("/wallet/status", &info)
+	if info.FullBalance.Cmp(oldBalance) <= 0 {
+		dt.Fatal("Mining did not increase balance")
+	}
 }
 
 // get wraps a GET request with a status code check, such that if the GET does
