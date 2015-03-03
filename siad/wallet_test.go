@@ -33,8 +33,8 @@ func TestSendCoins(t *testing.T) {
 	// wait until the transaction is relayed to the receiver
 	<-receiver.rpcChan
 	<-receiver.rpcChan
-	<-sender.rpcChan
-	<-sender.rpcChan
+	//<-sender.rpcChan
+	//<-sender.rpcChan
 
 	// get updated balances
 	var newSenderStatus modules.WalletInfo
