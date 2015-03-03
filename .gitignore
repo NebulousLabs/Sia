@@ -7,5 +7,6 @@ whitepaper.log
 whitepaper.pdf
 *_test
 *.wallet
+walletDir*
 *.swp
 info.log
