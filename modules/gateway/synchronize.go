@@ -49,9 +49,6 @@ func (g *Gateway) synchronize(peer network.Address) {
 		}
 	}
 
-	// TODO: There is probably a better approach than to call CatchUp
-	// recursively. Furthermore, if there is a reorg that's greater than 100
-	// blocks, CatchUp is going to fail outright.
 	if err != nil && err.Error() == moreBlocksErr.Error() {
 		go g.synchronize(peer)
 	}

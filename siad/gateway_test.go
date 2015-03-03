@@ -2,13 +2,19 @@ package main
 
 import (
 	"testing"
+	"time"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
 // addPeer creates a new daemonTester and bootstraps it to dt. It returns the
 // new peer.
 func (dt *daemonTester) addPeer() *daemonTester {
+	// Mine a block on dt, in the event that both dt and newPeer are new, they
+	// will be at the same height unless we mine a block on dt.
+	dt.mineBlock()
+
 	// Create a new peer and bootstrap it to dt.
 	newPeer := newDaemonTester(dt.T)
 	err := newPeer.gateway.Bootstrap(dt.netAddress())
@@ -17,10 +23,12 @@ func (dt *daemonTester) addPeer() *daemonTester {
 	}
 
 	// Wait for RPC to finish, then check that each has the same number of
-	// peers.
-	<-dt.rpcChan
-	if len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
-		dt.Fatal("bootstrap did not synchronize peer lists")
+	// peers and blocks.
+	for len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
+		time.Sleep(time.Millisecond)
+	}
+	for dt.state.Height() != newPeer.state.Height() {
+		time.Sleep(time.Millisecond)
 	}
 	return newPeer
 }
@@ -62,9 +70,6 @@ func TestTransactionRelay(t *testing.T) {
 	// Create a daemon tester and give it a peer.
 	dt := newDaemonTester(t)
 	dt2 := dt.addPeer()
-
-	// Give some money to the daemon tester.
-	dt.mineMoney()
 
 	// Make sure both daemons have empty transaction pools.
 	tset, err := dt.tpool.TransactionSet()

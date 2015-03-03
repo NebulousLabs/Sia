@@ -11,6 +11,8 @@ import (
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
 func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction, err error) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
 	tp.update()
 
 	// Add transactions from the head of the linked list until there are no
@@ -42,6 +44,8 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 // would be created immediately if all of the unconfirmed transactions were
 // added to the blockchain.
 func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
 	tp.update()
 
 	// For each transaction in the linked list, grab the siacoin output diffs

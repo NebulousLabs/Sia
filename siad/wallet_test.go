@@ -13,9 +13,6 @@ func TestSendCoins(t *testing.T) {
 	sender := newDaemonTester(t)
 	receiver := sender.addPeer()
 
-	// Give some money to the sender.
-	sender.mineMoney()
-
 	// get current balances
 	var oldSenderStatus modules.WalletInfo
 	sender.getAPI("/wallet/status", &oldSenderStatus)
@@ -24,11 +21,6 @@ func TestSendCoins(t *testing.T) {
 
 	// send 3 coins from the sender to the receiver
 	sender.callAPI("/wallet/send?amount=3&dest=" + receiver.coinAddress())
-	// wait until the transaction is relayed to the receiver
-	<-receiver.rpcChan
-	<-receiver.rpcChan
-	//<-sender.rpcChan
-	//<-sender.rpcChan
 
 	// get updated balances
 	var newSenderStatus modules.WalletInfo
@@ -37,11 +29,11 @@ func TestSendCoins(t *testing.T) {
 	receiver.getAPI("/wallet/status", &newReceiverStatus)
 
 	// sender balance should have gone down
-	if newSenderStatus.FullBalance.Cmp(oldSenderStatus.FullBalance) >= 0 {
-		t.Fatalf("Sender balance should have gone down:\n\told: %v\n\tnew: %v", oldSenderStatus.FullBalance.Big(), newSenderStatus.FullBalance.Big())
+	if newSenderStatus.Balance.Cmp(oldSenderStatus.Balance) >= 0 {
+		t.Fatalf("Sender balance should have gone down:\n\told: %v\n\tnew: %v", oldSenderStatus.Balance.Big(), newSenderStatus.Balance.Big())
 	}
 	// receiver balance should have gone up
-	if newReceiverStatus.FullBalance.Cmp(oldReceiverStatus.FullBalance) <= 0 {
-		t.Fatalf("Receiver balance should have gone up:\n\told: %v\n\tnew: %v", oldReceiverStatus.FullBalance.Big(), newReceiverStatus.FullBalance.Big())
+	if newReceiverStatus.Balance.Cmp(oldReceiverStatus.Balance) <= 0 {
+		t.Fatalf("Receiver balance should have gone up:\n\told: %v\n\tnew: %v", oldReceiverStatus.Balance.Big(), newReceiverStatus.Balance.Big())
 	}
 }
