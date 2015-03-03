@@ -81,6 +81,7 @@ func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 
 // RelayTransaction relays a transaction, both locally and to the network.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
+	// no locking necessary
 	go g.threadedBroadcast("AcceptTransaction", t, nil)
 	return
 }

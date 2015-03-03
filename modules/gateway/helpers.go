@@ -40,19 +40,17 @@ func (g *Gateway) randomPeer() (network.Address, error) {
 // threadedBroadcast broadcasts an RPC to all of the Gateway's peers. The
 // calls are run in parallel.
 func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
-	// get peer list
 	g.mu.RLock()
-	peers := g.peers
-	g.mu.RUnlock()
-
 	var wg sync.WaitGroup
-	wg.Add(len(peers))
-	for peer := range peers {
+	wg.Add(len(g.peers))
+	for peer := range g.peers {
 		go func(peer network.Address) {
 			peer.RPC(name, arg, resp)
 			wg.Done()
 		}(peer)
 	}
+	// release lock while we wait for RPCs to complete
+	g.mu.RUnlock()
 	wg.Wait()
 }
 
