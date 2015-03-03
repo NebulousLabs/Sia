@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/network"
@@ -50,7 +51,11 @@ func (g *Gateway) synchronize(peer network.Address) {
 	}
 
 	if err != nil && err.Error() == moreBlocksErr.Error() {
+		fmt.Println("getting more blocks")
 		go g.synchronize(peer)
+	} else {
+		fmt.Println(err)
+		fmt.Println("not getting more blocks")
 	}
 }
 
@@ -67,6 +72,8 @@ func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
 			// faulty state; log high-priority error
 			return
 		}
+		fmt.Println("appending blocks")
+		fmt.Println(height)
 		knownBlocks = append(knownBlocks, block.ID())
 
 		// after 12, start doubling
@@ -120,6 +127,7 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 	// Send blocks, starting with the child of the most recent known block.
 	//
 	// TODO: use BlocksSince instead?
+	fmt.Println("start", start)
 	for i := start; i < start+MaxCatchUpBlocks; i++ {
 		b, exists := g.state.BlockAtHeight(i)
 		if !exists {

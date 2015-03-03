@@ -92,7 +92,7 @@ func TestTransactionRelay(t *testing.T) {
 	// the second. The check is done via spinning because network propagation
 	// will take an unknown amount of time.
 	dt.callAPI("/wallet/send?amount=15&dest=" + dt2.coinAddress())
-	for len(tset) != 0 || len(tset2) != 0 {
+	for len(tset) == 0 || len(tset2) == 0 {
 		tset, err = dt.tpool.TransactionSet()
 		if err != nil {
 			t.Fatal(err)
@@ -116,5 +116,26 @@ func TestTransactionRelay(t *testing.T) {
 		t.Error(origBal2.Big())
 		t.Error(dt2.wallet.Balance(false).Big())
 		t.Error("balances are incorrect for 0-conf transaction")
+	}
+}
+
+// TestBlockBootstrap checks that gateway.Synchronize will be effective even
+// when the first state has a few thousand blocks.
+func TestBlockBootstrap(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// Create a daemon and give it 2500 blocks.
+	dt := newDaemonTester(t)
+	for i := 0; i < 65; i++ {
+		dt.mineBlock()
+	}
+
+	// Add a peer and spin until the peer is caught up. addPeer() already does
+	// this check, but it's left here to be explict anyway.
+	dt2 := dt.addPeer()
+	for dt.state.Height() != dt2.state.Height() {
+		time.Sleep(time.Millisecond)
 	}
 }
