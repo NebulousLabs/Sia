@@ -9,15 +9,16 @@ import (
 // addPeer creates a new daemonTester and bootstraps it to dt. It returns the
 // new peer.
 func (dt *daemonTester) addPeer() *daemonTester {
+	// Create a new peer and bootstrap it to dt.
 	newPeer := newDaemonTester(dt.T)
-	// bootstrap newPeer to dt
 	err := newPeer.gateway.Bootstrap(dt.address())
 	if err != nil {
 		dt.Fatal("bootstrap failed:", err)
 	}
-	// wait for RPC to finish
+
+	// Wait for RPC to finish, then check that each has the same number of
+	// peers.
 	<-dt.rpcChan
-	// newPeer and dt should now have the same number of peers
 	if len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
 		dt.Fatal("bootstrap did not synchronize peer lists")
 	}
@@ -27,21 +28,21 @@ func (dt *daemonTester) addPeer() *daemonTester {
 // TestPeering tests that peers are properly announced and relayed throughout
 // the network.
 func TestPeering(t *testing.T) {
-	// create two peers
+	// Create to peers and add the first to the second.
 	peer1 := newDaemonTester(t)
 	peer2 := newDaemonTester(t)
-	// add peer2 to peer1
 	peer1.callAPI("/gateway/add?addr=" + string(peer2.address()))
-	// peer2 should now be in peer1's peer list
+
+	// Check that the first has the second as a peer.
 	var info modules.GatewayInfo
 	peer1.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer2.address() {
 		t.Fatal("/gateway/add did not add peer", peer2.address())
 	}
 
-	// now create a new peer that bootstraps to peer1
+	// Create a third peer that bootstraps to the first peer and check that it
+	// reports the others as peers.
 	peer3 := peer1.addPeer()
-	// peer3 should have both peer1 and peer2
 	peer3.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 2 {
 		t.Fatal("bootstrap peer did not share its peers")
