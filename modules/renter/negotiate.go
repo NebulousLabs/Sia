@@ -176,6 +176,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		fcid = signedTxn.FileContractID(0)
+		contract = signedTxn.FileContracts[0]
 
 		// TODO: We don't actually watch the blockchain to make sure that the
 		// file contract made it.

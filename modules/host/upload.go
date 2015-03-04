@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -35,7 +36,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	}
 
 	// Open the file.
-	file, err := os.Open(contractObligation.path)
+	file, err := os.Open(filepath.Join(h.hostDir, contractObligation.path))
 	if err != nil {
 		return
 	}
@@ -45,7 +46,7 @@ func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	conn.SetDeadline(time.Now().Add(time.Duration(info.Size()) * 128 * time.Microsecond))
 
 	// Transmit the file.
-	_, err = io.Copy(conn, file)
+	_, err = io.CopyN(conn, file, int64(contractObligation.fileContract.FileSize))
 	if err != nil {
 		return
 	}

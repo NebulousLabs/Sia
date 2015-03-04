@@ -34,7 +34,7 @@ func downloadPiece(piece FilePiece, path string) error {
 		// Write the host's response into the file.
 		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
 		if err != nil {
-			os.Remove(path)
+			// os.Remove(path)
 			// r.hostDB.FlagHost(piece.Host.IPAddress)
 			return
 		}
@@ -118,6 +118,7 @@ func (r *Renter) Download(nickname, filename string) error {
 		downloadErr := downloadPiece(piece, filename)
 		if downloadErr == nil {
 			return nil
+		} else {
 		}
 		// r.hostDB.FlagHost(piece.Host.IPAddress)
 	}
@@ -132,7 +133,7 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	defer r.mu.Unlock()
 
 	// Check for a nickname conflict.
-	pieces, exists := r.files[up.Nickname]
+	_, exists := r.files[up.Nickname]
 	if exists {
 		return errors.New("file with that nickname already exists")
 	}
@@ -142,7 +143,7 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	// more complex; once there is erasure coding we'll want to hit the minimum
 	// number of pieces plus some buffer before we decide that an upload is
 	// okay.
-	if r.hostDB.NumHosts() < 3 {
+	if r.hostDB.NumHosts() < 1 {
 		return errors.New("not enough hosts on the network to upload a file :( - maybe you need to upgrade your software")
 	}
 
@@ -155,7 +156,7 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 
 	// Upload a piece to every host on the network.
 	r.files[up.Nickname] = make([]FilePiece, up.Pieces)
-	for i := range pieces {
+	for i := range r.files[up.Nickname] {
 		// TODO: Eventually, each piece is likely to have different
 		// requirements. Erasure coding, index, etc. There will likely need to
 		// be a 'filePieceParameters' struct which is more complicated than the
@@ -166,7 +167,7 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 		// threadedUploadPiece will change the memory that the piece points to,
 		// which is useful because it means the file itself can be renamed but
 		// will still point to the same underlying pieces.
-		go r.threadedUploadPiece(up, &pieces[i])
+		go r.threadedUploadPiece(up, &r.files[up.Nickname][i])
 	}
 
 	return nil
