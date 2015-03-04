@@ -26,44 +26,48 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
+	// Daemon API Calls
+	handleHTTPRequest(mux, "/daemon/stop", d.stopHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", d.updateCheckHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
+
+	// Consensus API Calls
+	handleHTTPRequest(mux, "/consensus/status", d.statusHandler)
+
+	// Gateway API Calls
+	handleHTTPRequest(mux, "/gateway/status", d.peerStatusHandler)
+	handleHTTPRequest(mux, "/gateway/synchronize", d.syncHandler)
+	handleHTTPRequest(mux, "/gateway/peer/add", d.peerAddHandler)
+	handleHTTPRequest(mux, "/gateway/peer/remove", d.peerRemoveHandler)
+
 	// Host API Calls
 	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
 	handleHTTPRequest(mux, "/host/announce", d.hostAnnounceHandler)
 	handleHTTPRequest(mux, "/host/status", d.hostStatusHandler)
+
+	// HostDB API Calls
 
 	// Miner API Calls
 	handleHTTPRequest(mux, "/miner/start", d.minerStartHandler)
 	handleHTTPRequest(mux, "/miner/status", d.minerStatusHandler)
 	handleHTTPRequest(mux, "/miner/stop", d.minerStopHandler)
 
+	// Renter API Calls
+	handleHTTPRequest(mux, "/renter/upload", d.fileUploadHandler)
+	handleHTTPRequest(mux, "/renter/uploadpath", d.fileUploadPathHandler)
+	handleHTTPRequest(mux, "/renter/download", d.fileDownloadHandler)
+	handleHTTPRequest(mux, "/renter/status", d.fileStatusHandler)
+
+	// TransactionPool API Calls
+
 	// Wallet API Calls
 	handleHTTPRequest(mux, "/wallet/address", d.walletAddressHandler)
 	handleHTTPRequest(mux, "/wallet/send", d.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", d.walletStatusHandler)
 
-	// File API Calls
-	handleHTTPRequest(mux, "/file/upload", d.fileUploadHandler)
-	handleHTTPRequest(mux, "/file/uploadpath", d.fileUploadPathHandler)
-	handleHTTPRequest(mux, "/file/download", d.fileDownloadHandler)
-	handleHTTPRequest(mux, "/file/status", d.fileStatusHandler)
-
-	// Peer API Calls
-	handleHTTPRequest(mux, "/peer/add", d.peerAddHandler)
-	handleHTTPRequest(mux, "/peer/remove", d.peerRemoveHandler)
-	handleHTTPRequest(mux, "/peer/status", d.peerStatusHandler)
-
-	// Misc. API Calls
-	handleHTTPRequest(mux, "/update/check", d.updateCheckHandler)
-	handleHTTPRequest(mux, "/update/apply", d.updateApplyHandler)
-	handleHTTPRequest(mux, "/status", d.statusHandler)
-	handleHTTPRequest(mux, "/stop", d.stopHandler)
-	handleHTTPRequest(mux, "/sync", d.syncHandler)
-
 	// Debugging API Calls
 	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
 	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
-
-	handleHTTPRequest(mux, "/mutextest", d.mutexTestHandler)
 
 	// create graceful HTTP server
 	d.apiServer = &graceful.Server{

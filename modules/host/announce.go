@@ -35,6 +35,7 @@ func (h *Host) Announce(addr network.Address) (err error) {
 		return
 	}
 
+	// Add the transaction to the transaction pool.
 	err = h.tpool.AcceptTransaction(t)
 	if err != nil {
 		return

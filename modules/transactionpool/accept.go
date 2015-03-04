@@ -60,6 +60,10 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 			}
 		}
 
+		_, exists := tp.newFileContracts[fc.Start]
+		if !exists {
+			tp.newFileContracts[fc.Start] = make(map[consensus.FileContractID]*unconfirmedTransaction)
+		}
 		tp.fileContracts[fcid] = fc
 		tp.newFileContracts[fc.Start][fcid] = ut
 	}

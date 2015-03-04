@@ -26,15 +26,21 @@ type Gateway struct {
 }
 
 // Bootstrap joins the Sia network and establishes an initial peer list.
+//
+// Bootstrap handles mutexes manually to avoid having a lock during network
+// communication.
+//
+// TODO: Peers are pinged sequentially!
 func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
 	// contact the bootstrap peer
 	if !network.Ping(bootstrapPeer) {
 		return ErrUnreachable
 	}
+	g.mu.Lock()
 	g.addPeer(bootstrapPeer)
+	g.mu.Unlock()
+
+	g.synchronize(bootstrapPeer)
 
 	// request peers
 	// TODO: maybe iterate until we have enough new peers?
@@ -45,7 +51,9 @@ func (g *Gateway) Bootstrap(bootstrapPeer network.Address) (err error) {
 	}
 	for _, peer := range newPeers {
 		if peer != g.tcps.Address() && network.Ping(peer) {
+			g.mu.Lock()
 			g.addPeer(peer)
+			g.mu.Unlock()
 		}
 	}
 

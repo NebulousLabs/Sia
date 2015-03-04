@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks = 100
+	MaxCatchUpBlocks = 50
 )
 
 var (
@@ -49,11 +49,10 @@ func (g *Gateway) synchronize(peer network.Address) {
 		}
 	}
 
-	// TODO: There is probably a better approach than to call CatchUp
-	// recursively. Furthermore, if there is a reorg that's greater than 100
-	// blocks, CatchUp is going to fail outright.
 	if err != nil && err.Error() == moreBlocksErr.Error() {
+		//fmt.Println("getting more blocks")
 		go g.synchronize(peer)
+		return
 	}
 }
 
@@ -70,6 +69,8 @@ func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
 			// faulty state; log high-priority error
 			return
 		}
+		//fmt.Println("appending blocks")
+		//fmt.Println(height)
 		knownBlocks = append(knownBlocks, block.ID())
 
 		// after 12, start doubling
@@ -105,8 +106,7 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 	found := false
 	var start consensus.BlockHeight
 	for _, id := range knownBlocks {
-		height, exists := g.state.HeightOfBlock(id)
-		if !exists {
+		if height, exists := g.state.HeightOfBlock(id); exists {
 			found = true
 			start = height + 1 // start at child
 			break
@@ -132,7 +132,7 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 	}
 
 	// If more blocks are available, send a benign error
-	if _, exists := g.state.BlockAtHeight(start + MaxCatchUpBlocks); !exists {
+	if _, exists := g.state.BlockAtHeight(start + MaxCatchUpBlocks); exists {
 		err = moreBlocksErr
 	}
 

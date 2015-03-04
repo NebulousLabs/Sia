@@ -20,6 +20,8 @@ const (
 
 	InitialCoinbase = 300e3
 	MinimumCoinbase = 299990 // Only takes 10 blocks to hit the max - useful for testing.
+
+	RenterZeroConfDelay = 2e9 // 2 seconds
 )
 
 var (

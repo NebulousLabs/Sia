@@ -143,6 +143,9 @@ func (h *Host) addCollateral(txn consensus.Transaction, terms modules.ContractTe
 	if err != nil {
 		return
 	}
+	if collateral.Cmp(consensus.NewCurrency64(0)) == 0 {
+		return txn, txnID, nil
+	}
 	fundedTxn, err = h.wallet.FundTransaction(txnID, collateral)
 	if err != nil {
 		return

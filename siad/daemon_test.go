@@ -43,11 +43,6 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	}
 	dt := &daemonTester{d, t, make(chan struct{})}
 
-	// overwrite RPCs with special testing RPCs
-	dt.network.RegisterRPC("AddMe", dt.addMe)
-	dt.network.RegisterRPC("RelayBlock", dt.relayBlock)
-	dt.network.RegisterRPC("AcceptTransaction", dt.acceptTransaction)
-
 	go func() {
 		listenErr := d.listen()
 		if listenErr != nil {
@@ -57,50 +52,55 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	APIPort++
 	RPCPort++
 
+	// Give the daemon some money.
+	dt.mineMoney()
+
 	return dt
 }
 
-func (dt *daemonTester) address() network.Address {
+// netAddress returns the network address of the caller.
+func (dt *daemonTester) netAddress() network.Address {
 	return dt.network.Address()
 }
 
-func (dt *daemonTester) addMe(peer network.Address) error {
-	err := dt.gateway.AddMe(peer)
-	dt.rpcChan <- struct{}{}
-	return err
+// coinAddress returns a coin address that the caller is able to spend from.
+func (dt *daemonTester) coinAddress() string {
+	var addr struct {
+		Address string
+	}
+	dt.getAPI("/wallet/address", &addr)
+	return addr.Address
 }
 
-func (dt *daemonTester) relayBlock(b consensus.Block) error {
-	err := dt.gateway.RelayBlock(b)
-	//dt.rpcChan <- struct{}{}
-	return err
-}
-
-func (dt *daemonTester) acceptTransaction(t consensus.Transaction) error {
-	err := dt.tpool.AcceptTransaction(t)
-	dt.rpcChan <- struct{}{}
-	return err
+// mineBlock mines a block and puts it into the consensus set.
+func (dt *daemonTester) mineBlock() {
+	for {
+		_, solved, err := dt.miner.SolveBlock()
+		if err != nil {
+			dt.Fatal("Mining faild:", err)
+		} else if solved {
+			// SovleBlock automatically puts the block into the consensus set.
+			break
+		}
+	}
 }
 
 // mineMoney mines 5 blocks, enough for the coinbase to be accepted by the
-// wallet. This may take a while.
-func (dt *daemonTester) mineBlock() {
-	// get old balance
+// wallet.
+func (dt *daemonTester) mineMoney() {
+	// Get old balance.
 	var info modules.WalletInfo
 	dt.getAPI("/wallet/status", &info)
-	oldBalance := info.Balance
-	for i := 0; i < 5; i++ {
-		for {
-			_, solved, err := dt.miner.SolveBlock()
-			if err != nil {
-				dt.Fatal("Mining failed:", err)
-			} else if solved {
-				break
-			}
-		}
+
+	// Mine enough blocks to overcome the maturity delay and receive coins.
+	for i := 0; i < 1+consensus.MaturityDelay; i++ {
+		dt.mineBlock()
 	}
-	dt.getAPI("/wallet/status", &info)
-	if info.FullBalance.Cmp(oldBalance) <= 0 {
+
+	// Compare new balance to old balance.
+	var info2 modules.WalletInfo
+	dt.getAPI("/wallet/status", &info2)
+	if info2.Balance.Cmp(info.Balance) <= 0 {
 		dt.Fatal("Mining did not increase balance")
 	}
 }
@@ -140,5 +140,5 @@ func (dt *daemonTester) callAPI(call string) {
 
 // TestCreateDaemon creates a daemonTester and immediately stops it.
 func TestCreateDaemon(t *testing.T) {
-	newDaemonTester(t).callAPI("/stop")
+	newDaemonTester(t).callAPI("/daemon/stop")
 }
