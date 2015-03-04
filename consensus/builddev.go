@@ -19,6 +19,8 @@ const (
 	MaturityDelay         = 10          // The number of blocks that need to be waited before certain types of outputs come to maturity.
 	InitialCoinbase       = 300e3
 	MinimumCoinbase       = 30e3
+
+	RenterZeroConfDelay = 60e9 // 1 minute
 )
 
 var (

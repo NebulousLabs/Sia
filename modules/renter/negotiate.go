@@ -120,7 +120,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	// transactions have propgated to the host's transaction pool. Instead,
 	// built into the protocol should be a step where any dependent
 	// transactions are automatically provided.
-	time.Sleep(time.Second * 60)
+	time.Sleep(consensus.RenterZeroConfDelay)
 
 	// Perform the negotiations with the host through a network call.
 	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {

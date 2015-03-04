@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -26,9 +27,9 @@ func TestUploadAndDownload(t *testing.T) {
 	// Upload to the host.
 	dt.callAPI("/renter/uploadpath?pieces=1&filename=api.go&nickname=first&pieces=1")
 
-	// Wait 65 seconds for the upload to finish - this is necessary due to the
+	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
-	time.Sleep(time.Second * 65)
+	time.Sleep(consensus.RenterZeroConfDelay + 1e9)
 
 	rentInfo := dt.renter.Info()
 	if len(rentInfo.Files) != 1 {
@@ -37,7 +38,7 @@ func TestUploadAndDownload(t *testing.T) {
 
 	// Try to download the file.
 	dt.callAPI("/renter/download?filename=renterTestDL_test&nickname=first")
-	time.Sleep(time.Second * 15)
+	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.
 	upFile, err := os.Open("api.go")
