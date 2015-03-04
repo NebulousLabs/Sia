@@ -52,34 +52,23 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	g.synchronize(bootstrapPeer)
 
 	// ask the bootstrap peer for our hostname
-	var hostname string
-	if g.RPC(bootstrapPeer, "SendHostname", nil, &hostname) == nil {
-		// TODO: try to ping ourselves
-		g.tcps.setHostname(hostname)
-	} else {
-		// otherwise, fallback to centralized service
+	err = g.learnHostname(bootstrapPeer)
+	if err != nil {
 		err = g.tcps.getExternalIP()
 		if err != nil {
 			return
 		}
 	}
+	if !g.Ping(g.tcps.myAddr) {
+		return errors.New("couldn't learn hostname")
+	}
 
 	// request peers
-	// TODO: maybe iterate until we have enough new peers?
-	var newPeers []modules.NetAddress
-	err = g.RPC(bootstrapPeer, "SharePeers", nil, &newPeers)
-	if err != nil {
-		return
-	}
-	for _, peer := range newPeers {
-		if peer != g.tcps.Address() && g.Ping(peer) {
-			g.addPeer(peer)
-			g.mu.Unlock()
-		}
-	}
+	// TODO: what if this returns an error?
+	_ = g.requestPeers(bootstrapPeer)
 
 	// announce ourselves to new peers
-	go g.threadedBroadcast("AddMe", g.tcps.Address(), nil)
+	go g.threadedBroadcast("AddMe", modules.WriterRPC(g.tcps.Address()))
 
 	return
 }
@@ -104,14 +93,14 @@ func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 		return errors.New("block added, but it does not extend the state height.")
 	}
 
-	go g.threadedBroadcast("RelayBlock", b, nil)
+	go g.threadedBroadcast("RelayBlock", modules.WriterRPC(b))
 	return
 }
 
 // RelayTransaction relays a transaction, both locally and to the network.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 	// no locking necessary
-	go g.threadedBroadcast("AcceptTransaction", t, nil)
+	go g.threadedBroadcast("AcceptTransaction", modules.WriterRPC(t))
 	return
 }
 

@@ -4,22 +4,16 @@ import (
 	"net"
 	"net/http" // for getExternalIP()
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-)
-
-const (
-	timeout   = time.Second * 10
-	maxMsgLen = 1 << 24
 )
 
 // A TCPServer sends and receives messages. It also maintains an address book
 // of peers to broadcast to and make requests of.
 type TCPServer struct {
-	net.Listener
+	listener   net.Listener
 	myAddr     modules.NetAddress
-	handlerMap map[string]func(net.Conn) error
+	handlerMap map[rpcID]func(modules.NetConn) error
 	// used to protect addressbook and handlerMap
 	sync.RWMutex
 }
@@ -40,17 +34,13 @@ func (tcps *TCPServer) setHostname(host string) {
 
 // listen runs in the background, accepting incoming connections and serving
 // them. listen will return after TCPServer.Close() is called, because the
-// Accept() call will fail.
+// accept call will fail.
 func (tcps *TCPServer) listen() {
 	for {
-		conn, err := tcps.Accept()
+		conn, err := accept(tcps.listener)
 		if err != nil {
 			return
 		}
-
-		// set default deadline
-		// note: the handler can extend this deadline as needed
-		conn.SetDeadline(time.Now().Add(timeout))
 
 		// it is the handler's responsibility to close the connection
 		go tcps.handleConn(conn)
@@ -59,16 +49,16 @@ func (tcps *TCPServer) listen() {
 
 // handleConn reads header data from a connection, then routes it to the
 // appropriate handler for further processing.
-func (tcps *TCPServer) handleConn(conn net.Conn) {
+func (tcps *TCPServer) handleConn(conn modules.NetConn) {
 	defer conn.Close()
-	ident := make([]byte, 8)
-	if n, err := conn.Read(ident); err != nil || n != len(ident) {
+	var id rpcID
+	if err := conn.ReadObject(&id, 9); err != nil {
 		// TODO: log error
 		return
 	}
-	// call registered handler for this message type
+	// call registered handler for this ID
 	tcps.RLock()
-	fn, ok := tcps.handlerMap[string(ident)]
+	fn, ok := tcps.handlerMap[id]
 	tcps.RUnlock()
 	if ok {
 		fn(conn)
@@ -100,11 +90,11 @@ func newTCPServer(addr string) (tcps *TCPServer, err error) {
 		return
 	}
 	tcps = &TCPServer{
-		Listener:   tcpServ,
+		listener:   tcpServ,
 		myAddr:     modules.NetAddress(addr),
-		handlerMap: make(map[string]func(net.Conn) error),
+		handlerMap: make(map[rpcID]func(modules.NetConn) error),
 	}
-	// default handlers (defined in handlers.go)
+
 	tcps.RegisterRPC("Ping", pong)
 	tcps.RegisterRPC("SendHostname", sendHostname)
 

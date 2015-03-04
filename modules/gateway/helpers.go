@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"math/rand"
-	"net"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -15,21 +14,27 @@ import (
 // ping request -- in other words, whether it is a potential peer.
 func (g *Gateway) Ping(addr modules.NetAddress) bool {
 	var pong string
-	err := g.RPC(addr, "Ping", nil, &pong)
+	err := g.RPC(addr, "Ping", modules.ReaderRPC(&pong, 5))
 	return err == nil && pong == "pong"
 }
 
-func pong() (string, error) {
-	return "pong", nil
+func pong(conn modules.NetConn) error {
+	return conn.WriteObject("pong")
 }
 
 // sendHostname replies to the sender with the sender's external IP.
-func sendHostname(conn net.Conn) error {
-	host, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-	err := encoding.WriteObject(conn, host)
-	// write error
-	encoding.WriteObject(conn, "")
-	return err
+func sendHostname(conn modules.NetConn) error {
+	return conn.WriteObject(conn.Addr().Host())
+}
+
+func (g *Gateway) learnHostname(addr modules.NetAddress) error {
+	var hostname string
+	err := g.RPC(addr, "SendHostname", modules.ReaderRPC(&hostname, 50))
+	if err != nil {
+		return err
+	}
+	g.tcps.setHostname(hostname)
+	return nil
 }
 
 func (g *Gateway) addPeer(peer modules.NetAddress) error {
@@ -61,7 +66,7 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
 // list. The calls are run in parallel.
-func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
+func (g *Gateway) threadedBroadcast(name string, fn func(modules.NetConn) error) {
 	var badpeers []modules.NetAddress
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
@@ -70,7 +75,7 @@ func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
 	for peer := range g.peers {
 		// contact each peer in a separate thread
 		go func(peer modules.NetAddress) {
-			err := g.RPC(peer, name, arg, resp)
+			err := g.RPC(peer, name, fn)
 			// TODO: some errors will be our fault. Need to distinguish them.
 			if err != nil {
 				badpeers = append(badpeers, peer)

@@ -5,10 +5,16 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-// A Conn is a monitored network connection.
-type Conn struct {
+const (
+	dialTimeout = time.Second * 10
+)
+
+// A conn is a monitored TCP connection. It satisfies the modules.NetConn
+// interface.
+type conn struct {
 	nc net.Conn
 
 	startTime time.Time
@@ -20,9 +26,9 @@ type Conn struct {
 }
 
 // Read implements the io.Reader interface. Successful reads will reset the
-// read timeout. If the Connection has already timed out, Read will return an
+// read timeout. If the connection has already timed out, Read will return an
 // error without reading anything.
-func (c *Conn) Read(b []byte) (n int, err error) {
+func (c *conn) Read(b []byte) (n int, err error) {
 	n, err = c.nc.Read(b)
 	c.nRead += uint64(n)
 	c.lastRead = time.Now()
@@ -30,35 +36,52 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 }
 
 // Write implements the io.Writer interface. Successful writes will reset the
-// write timeout. If the Connection has already timed out, Write will return
+// write timeout. If the connection has already timed out, Write will return
 // an error without writing anything.
-func (c *Conn) Write(b []byte) (n int, err error) {
+func (c *conn) Write(b []byte) (n int, err error) {
 	n, err = c.nc.Write(b)
 	c.nWritten += uint64(n)
 	c.lastWrite = time.Now()
 	return
 }
 
-func (c *Conn) Close() error {
+func (c *conn) Close() error {
 	return c.nc.Close()
 }
 
-func (c *Conn) ReadObject(obj interface{}, maxLen uint64) error {
+func (c *conn) ReadObject(obj interface{}, maxLen uint64) error {
 	return encoding.ReadObject(c, obj, maxLen)
 }
 
-func (c *Conn) WriteObject(obj interface{}) error {
+func (c *conn) WriteObject(obj interface{}) error {
 	return encoding.WriteObject(c, obj)
 }
 
-// Addr returns the Address of the remote end of the connection.
-func (c *Conn) Addr() Address {
-	return Address(c.nc.RemoteAddr().String())
+// Addr returns the NetAddress of the remote end of the connection.
+func (c *conn) Addr() modules.NetAddress {
+	return modules.NetAddress(c.nc.RemoteAddr().String())
 }
 
-func newConn(nc net.Conn) *Conn {
-	return &Conn{
+// dial wraps the connection returned by net.Dial in a conn.
+func dial(addr modules.NetAddress) (*conn, error) {
+	nc, err := net.DialTimeout("tcp", string(addr), dialTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return &conn{
 		nc:        nc,
 		startTime: time.Now(),
+	}, nil
+}
+
+// accept wraps the connection return by net.Accept in a conn.
+func accept(l net.Listener) (*conn, error) {
+	nc, err := l.Accept()
+	if err != nil {
+		return nil, err
 	}
+	return &conn{
+		nc:        nc,
+		startTime: time.Now(),
+	}, nil
 }

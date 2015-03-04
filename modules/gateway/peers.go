@@ -17,6 +17,24 @@ func (g *Gateway) SharePeers() (peers []modules.NetAddress, err error) {
 	return
 }
 
+func (g *Gateway) requestPeers(addr modules.NetAddress) error {
+	// TODO: maybe iterate until we have enough new peers?
+	var newPeers []modules.NetAddress
+	err := g.RPC(addr, "SharePeers", func(conn modules.NetConn) error {
+		return conn.ReadObject(&newPeers, 10*50)
+	})
+	if err != nil {
+		return err
+	}
+	for _, peer := range newPeers {
+		// don't add ourselves, or peers that are unreachable
+		if peer != g.tcps.Address() && g.Ping(peer) {
+			g.addPeer(peer)
+		}
+	}
+	return nil
+}
+
 // AddPeer is an RPC that requests that the Gateway add a peer to its peer
 // list. The supplied peer is assumed to be the peer making the RPC.
 func (g *Gateway) AddMe(peer modules.NetAddress) error {

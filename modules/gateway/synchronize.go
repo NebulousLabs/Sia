@@ -36,7 +36,7 @@ func (g *Gateway) Synchronize() (err error) {
 // to fully synchronize.
 func (g *Gateway) synchronize(peer modules.NetAddress) {
 	var newBlocks []consensus.Block
-	err := g.RPC(peer, "SendBlocks", g.blockHistory(), &newBlocks)
+	newBlocks, err := g.requestBlocks(peer)
 	if err != nil && err.Error() != moreBlocksErr.Error() {
 		// TODO: try a different peer?
 		return
@@ -54,47 +54,6 @@ func (g *Gateway) synchronize(peer modules.NetAddress) {
 		go g.synchronize(peer)
 		return
 	}
-}
-
-// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
-// BlockIDs and then doubling in step size until the genesis block is reached.
-// The genesis block is always included. This array of BlockIDs is used to
-// establish a shared commonality between peers during synchronization.
-func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
-	knownBlocks := make([]consensus.BlockID, 0, 32)
-	step := consensus.BlockHeight(1)
-	for height := g.state.Height(); ; height -= step {
-		block, exists := g.state.BlockAtHeight(height)
-		if !exists {
-			// faulty state; log high-priority error
-			return
-		}
-		//fmt.Println("appending blocks")
-		//fmt.Println(height)
-		knownBlocks = append(knownBlocks, block.ID())
-
-		// after 12, start doubling
-		if len(knownBlocks) >= 12 {
-			step *= 2
-		}
-
-		// this check has to come before height -= step;
-		// otherwise we might underflow
-		if height <= step {
-			break
-		}
-	}
-
-	// always include the genesis block
-	genesis, exists := g.state.BlockAtHeight(0)
-	if !exists {
-		// this should never happen
-		return
-	}
-	knownBlocks = append(knownBlocks, genesis.ID())
-
-	copy(blockIDs[:], knownBlocks)
-	return
 }
 
 // SendBlocks returns a sequential set of blocks based on the 32 input block
@@ -136,5 +95,56 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 		err = moreBlocksErr
 	}
 
+	return
+}
+
+func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.Block, err error) {
+	history := g.blockHistory()
+	err = g.RPC(peer, "SendBlocks", func(conn modules.NetConn) error {
+		err := conn.WriteObject(history)
+		if err != nil {
+			return err
+		}
+		return conn.ReadObject(newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
+	})
+	return
+}
+
+// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
+// BlockIDs and then doubling in step size until the genesis block is reached.
+// The genesis block is always included. This array of BlockIDs is used to
+// establish a shared commonality between peers during synchronization.
+func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
+	knownBlocks := make([]consensus.BlockID, 0, 32)
+	step := consensus.BlockHeight(1)
+	for height := g.state.Height(); ; height -= step {
+		block, exists := g.state.BlockAtHeight(height)
+		if !exists {
+			// faulty state; log high-priority error
+			return
+		}
+		knownBlocks = append(knownBlocks, block.ID())
+
+		// after 12, start doubling
+		if len(knownBlocks) >= 12 {
+			step *= 2
+		}
+
+		// this check has to come before height -= step;
+		// otherwise we might underflow
+		if height <= step {
+			break
+		}
+	}
+
+	// always include the genesis block
+	genesis, exists := g.state.BlockAtHeight(0)
+	if !exists {
+		// this should never happen
+		return
+	}
+	knownBlocks = append(knownBlocks, genesis.ID())
+
+	copy(blockIDs[:], knownBlocks)
 	return
 }

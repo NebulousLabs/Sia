@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"io"
 	"net"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -19,6 +20,21 @@ func (na NetAddress) Host() string {
 func (na NetAddress) Port() string {
 	_, port, _ := net.SplitHostPort(string(na))
 	return port
+}
+
+// A NetConn is a monitored network connection.
+type NetConn interface {
+	io.ReadWriteCloser
+
+	// ReadObject reads and decodes an object from the NetConn. It takes a
+	// maximum length, which the encoded object must not exceed.
+	ReadObject(interface{}, uint64) error
+
+	// WriteObject encodes an object and writes it to the connection.
+	WriteObject(interface{}) error
+
+	// Addr returns the NetAddress of the remote end of the connection.
+	Addr() NetAddress
 }
 
 type GatewayInfo struct {
@@ -40,6 +56,11 @@ type Gateway interface {
 
 	// RemovePeer removes a peer from the Gateway's peer list.
 	RemovePeer(NetAddress) error
+
+	// RPC establishes a connection to the supplied address and writes the RPC
+	// header, indicating which function will handle the connection. The
+	// supplied function takes over from there.
+	RPC(NetAddress, string, func(NetConn) error) error
 
 	// Synchronize synchronizes the local consensus set with the sets of known
 	// peers.
@@ -68,4 +89,20 @@ type Gateway interface {
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
+}
+
+// ReaderRPC returns a closure that can be passed to Gateway.RPC to read a
+// single value.
+func ReaderRPC(obj interface{}, maxLen uint64) func(NetConn) error {
+	return func(conn NetConn) error {
+		return conn.ReadObject(obj, maxLen)
+	}
+}
+
+// WriterRPC returns a closure that can be passed to Gateway.RPC to write a
+// single value.
+func WriterRPC(obj interface{}) func(NetConn) error {
+	return func(conn NetConn) error {
+		return conn.WriteObject(obj)
+	}
 }
