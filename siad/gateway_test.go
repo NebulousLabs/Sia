@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
 // addPeer creates a new daemonTester and bootstraps it to dt. It returns the
@@ -128,7 +129,7 @@ func TestBlockBootstrap(t *testing.T) {
 
 	// Create a daemon and give it 2500 blocks.
 	dt := newDaemonTester(t)
-	for i := 0; i < 65; i++ {
+	for i := 0; i < 2*gateway.MaxCatchUpBlocks+1; i++ {
 		dt.mineBlock()
 	}
 
