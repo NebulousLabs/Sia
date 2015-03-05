@@ -12,10 +12,6 @@ const (
 	MaxCatchUpBlocks = 50
 )
 
-var (
-	moreBlocksErr = errors.New("more blocks are available")
-)
-
 // Sychronize to synchronize the local consensus set (i.e. the blockchain) with
 // the network consensus set.
 //
@@ -25,7 +21,7 @@ func (g *Gateway) Synchronize() (err error) {
 	if err != nil {
 		return
 	}
-	go g.synchronize(peer)
+	g.synchronize(peer)
 	return
 }
 
@@ -37,8 +33,8 @@ func (g *Gateway) Synchronize() (err error) {
 // to fully synchronize.
 func (g *Gateway) synchronize(peer modules.NetAddress) {
 	var newBlocks []consensus.Block
-	newBlocks, err := g.requestBlocks(peer)
-	if err != nil && err.Error() != moreBlocksErr.Error() {
+	newBlocks, moreAvailable, err := g.requestBlocks(peer)
+	if err != nil {
 		// TODO: try a different peer?
 		return
 	}
@@ -50,17 +46,15 @@ func (g *Gateway) synchronize(peer modules.NetAddress) {
 		}
 	}
 
-	if err != nil && err.Error() == moreBlocksErr.Error() {
-		//fmt.Println("getting more blocks")
+	if moreAvailable {
 		go g.synchronize(peer)
-		return
 	}
 }
 
 // SendBlocks returns a sequential set of blocks based on the 32 input block
 // IDs. The most recent known ID is used as the starting point, and up to
-// 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. If more
-// blocks could be returned, a 'moreBlocksErr' will be returned as well.
+// 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
+// sends a boolean indicating whether more blocks are available.
 func (g *Gateway) SendBlocks(conn modules.NetConn) (err error) {
 	// read known blocks
 	var knownBlocks [32]consensus.BlockID
@@ -83,8 +77,7 @@ func (g *Gateway) SendBlocks(conn modules.NetConn) (err error) {
 		// The genesis block should be included in knownBlocks - if no matching
 		// blocks are found, the caller is probably on a different blockchain
 		// altogether.
-		err = errors.New("no matching block found")
-		return
+		return errors.New("no matching block found")
 	}
 
 	// Send blocks, starting with the child of the most recent known block.
@@ -98,24 +91,28 @@ func (g *Gateway) SendBlocks(conn modules.NetConn) (err error) {
 		}
 		blocks = append(blocks, b)
 	}
-
-	// If more blocks are available, send a benign error
-	if _, exists := g.state.BlockAtHeight(start + MaxCatchUpBlocks); exists {
-		err = moreBlocksErr
+	err = conn.WriteObject(blocks)
+	if err != nil {
+		return
 	}
 
-	return
+	// Indicate whether more blocks are available.
+	_, more := g.state.BlockAtHeight(start + MaxCatchUpBlocks)
+	return conn.WriteObject(more)
 }
 
-func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.Block, err error) {
+func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.Block, moreAvailable bool, err error) {
 	history := g.blockHistory()
 	err = g.RPC(peer, "SendBlocks", func(conn modules.NetConn) error {
 		err := conn.WriteObject(history)
 		if err != nil {
 			return err
 		}
-		// TODO: read error
-		return conn.ReadObject(newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
+		err = conn.ReadObject(&newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
+		if err != nil {
+			return err
+		}
+		return conn.ReadObject(&moreAvailable, 1)
 	})
 	return
 }

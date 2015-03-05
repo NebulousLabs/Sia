@@ -47,9 +47,6 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	g.addPeer(bootstrapPeer)
 	g.mu.Unlock()
 
-	// TODO: why are we synchronizing here?
-	g.synchronize(bootstrapPeer)
-
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
 	if err != nil {
@@ -69,6 +66,8 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// announce ourselves to new peers
 	go g.threadedBroadcast("AddMe", modules.WriterRPC(g.tcps.Address()))
 
+	// synchronize to a random peer
+	go g.Synchronize()
 	return
 }
 
