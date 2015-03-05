@@ -40,7 +40,7 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 }
 
 // listen runs in the background, accepting incoming connections and serving
-// them. listen will return after TCPServer.Close() is called, because the
+// them. listen will return after Gateway.Close() is called, because the
 // accept call will fail.
 func (g *Gateway) listen() {
 	for {

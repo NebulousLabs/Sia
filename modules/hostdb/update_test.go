@@ -6,7 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // TestFindHostAnnouncements checks that host announcements are being found and
@@ -46,7 +45,7 @@ func TestFindHostAnnouncements(t *testing.T) {
 	// Submit a host announcement to the blockchain for a host that won't
 	// respond.
 	falseAnnouncement := string(encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: network.Address(":4500"),
+		IPAddress: modules.NetAddress(":4500"),
 	}))
 	falseAnnouncementTxn := consensus.Transaction{
 		ArbitraryData: []string{modules.PrefixHostAnnouncement + falseAnnouncement},

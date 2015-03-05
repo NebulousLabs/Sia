@@ -9,11 +9,10 @@ import (
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
-	tcpsPort  int = 11000
+	rpcPort   int = 11000
 	walletNum int = 0
 )
 
@@ -29,16 +28,12 @@ type RenterTester struct {
 func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
 
-	tcps, err := network.NewTCPServer(":" + strconv.Itoa(tcpsPort))
-	tcpsPort++
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := gateway.New(tcps, ct.State)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hdb, err := hostdb.New(ct.State)
+	rpcPort++
+	hdb, err := hostdb.New(ct.State, g)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +46,7 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 		t.Fatal(err)
 	}
 	walletNum++
-	r, err := New(ct.State, hdb, w)
+	r, err := New(ct.State, g, hdb, w)
 	if err != nil {
 		t.Fatal(err)
 	}

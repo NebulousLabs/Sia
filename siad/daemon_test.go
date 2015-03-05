@@ -9,7 +9,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
@@ -58,9 +57,9 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	return dt
 }
 
-// netAddress returns the network address of the caller.
-func (dt *daemonTester) netAddress() network.Address {
-	return dt.network.Address()
+// netAddress returns the NetAddress of the caller.
+func (dt *daemonTester) netAddress() modules.NetAddress {
+	return dt.gateway.Info().Address
 }
 
 // coinAddress returns a coin address that the caller is able to spend from.

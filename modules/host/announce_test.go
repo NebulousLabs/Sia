@@ -6,7 +6,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // TestAnnouncement has a host announce itself to the blockchain and then
@@ -15,7 +14,7 @@ func TestAnnouncement(t *testing.T) {
 	ht := CreateHostTester(t)
 
 	// Place the announcement.
-	originalAddress := network.Address(":1111")
+	originalAddress := modules.NetAddress(":1111")
 	err := ht.Announce(originalAddress)
 	if err != nil {
 		t.Fatal(err)
