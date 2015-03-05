@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"net"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -22,9 +23,14 @@ var (
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
-	tcps        *TCPServer
-	state       *consensus.State
-	latestBlock consensus.BlockID
+	state *consensus.State
+
+	listener net.Listener
+	myAddr   modules.NetAddress
+
+	// Each incoming connection begins with a string of 8 bytes, indicating
+	// which function should handle the connection.
+	handlerMap map[rpcID]modules.RPCFunc
 
 	// Peers are stored in a map to guarantee uniqueness. They are paired with
 	// the number of "strikes" against them; peers with too many strikes are
@@ -50,12 +56,12 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
 	if err != nil {
-		err = g.tcps.getExternalIP()
+		err = g.getExternalIP()
 		if err != nil {
 			return
 		}
 	}
-	if !g.Ping(g.tcps.myAddr) {
+	if !g.Ping(g.myAddr) {
 		return errors.New("couldn't learn hostname")
 	}
 
@@ -64,7 +70,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	_ = g.requestPeers(bootstrapPeer)
 
 	// announce ourselves to new peers
-	go g.threadedBroadcast("AddMe", modules.WriterRPC(g.tcps.Address()))
+	go g.threadedBroadcast("AddMe", modules.WriterRPC(g.myAddr))
 
 	// synchronize to a random peer
 	go g.Synchronize()
@@ -106,15 +112,15 @@ func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 func (g *Gateway) Info() (info modules.GatewayInfo) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	info.Address = g.tcps.myAddr
+	info.Address = g.myAddr
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
 	}
 	return
 }
 
-func (g *Gateway) RegisterRPC(id string, fn modules.RPCFunc) {
-	g.tcps.RegisterRPC(id, fn)
+func (g *Gateway) Close() error {
+	return g.listener.Close()
 }
 
 // New returns an initialized Gateway.
@@ -123,22 +129,23 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		err = errors.New("gateway cannot use nil state")
 		return
 	}
-	tcps, err := newTCPServer(addr)
+
+	// spawn listener
+	l, err := g.listen(addr)
 	if err != nil {
 		return
 	}
 
 	g = &Gateway{
-		tcps:  tcps,
-		state: s,
+		state:    s,
+		listener: l,
+		myAddr:   modules.NetAddress(addr),
+
 		peers: make(map[modules.NetAddress]int),
 	}
-	block, exists := g.state.BlockAtHeight(0)
-	if !exists {
-		err = errors.New("gateway state is missing the genesis block")
-		return
-	}
-	g.latestBlock = block.ID()
+
+	g.RegisterRPC("Ping", pong)
+	g.RegisterRPC("SendHostname", sendHostname)
 
 	return
 }

@@ -40,7 +40,7 @@ func (g *Gateway) requestPeers(addr modules.NetAddress) error {
 	}
 	for _, peer := range newPeers {
 		// don't add ourselves
-		if peer == g.tcps.Address() {
+		if peer == g.myAddr {
 			continue
 		}
 		// ping each peer in a separate goroutine

@@ -33,7 +33,7 @@ func (g *Gateway) learnHostname(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-	g.tcps.setHostname(hostname)
+	g.setHostname(hostname)
 	return nil
 }
 

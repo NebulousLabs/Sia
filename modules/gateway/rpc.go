@@ -33,8 +33,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 // RegisterRPC registers a function as an RPC handler for a given identifier.
 // To call an RPC, use gateway.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
-func (tcps *TCPServer) RegisterRPC(name string, fn modules.RPCFunc) {
-	tcps.Lock()
-	defer tcps.Unlock()
-	tcps.handlerMap[handlerName(name)] = fn
+func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.handlerMap[handlerName(name)] = fn
 }
