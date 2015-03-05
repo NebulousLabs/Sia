@@ -82,19 +82,6 @@ type Gateway interface {
 	// known peers.
 	RelayTransaction(consensus.Transaction) error
 
-	// AddMe is the RPC version of AddPeer. It is assumed that the supplied
-	// peer is the peer making the RPC.
-	AddMe(NetConn) error
-
-	// SendBlocks is an RPC that returns a set of sequential blocks following
-	// the most recent known block ID in of the 32 IDs provided. The number of
-	// blocks returned is unspecified.
-	SendBlocks(NetConn) error
-
-	// SharePeers is an RPC that returns a set of the Gateway's peers. The
-	// number of peers returned is unspecified.
-	SharePeers(NetConn) error
-
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
 }

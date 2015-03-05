@@ -10,19 +10,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+var pong = [4]byte{'p', 'o', 'n', 'g'}
+
 // Ping returns whether an Address is reachable and responds correctly to the
 // ping request -- in other words, whether it is a potential peer.
 func (g *Gateway) Ping(addr modules.NetAddress) bool {
-	var pong string
-	err := g.RPC(addr, "Ping", modules.ReaderRPC(&pong, 4))
-	if err != nil {
-		println(err.Error())
-	}
-	return err == nil && pong == "pong"
-}
-
-func pong(conn modules.NetConn) error {
-	return conn.WriteObject("pong")
+	var resp [4]byte
+	err := g.RPC(addr, "Ping", modules.ReaderRPC(&resp, 4))
+	return err == nil && resp == pong
 }
 
 // sendHostname replies to the sender with the sender's external IP.

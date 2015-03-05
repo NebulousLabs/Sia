@@ -152,8 +152,11 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		peers:      make(map[modules.NetAddress]int),
 	}
 
-	g.RegisterRPC("Ping", pong)
+	g.RegisterRPC("Ping", modules.WriterRPC(pong))
 	g.RegisterRPC("SendHostname", sendHostname)
+	g.RegisterRPC("AddMe", g.addMe)
+	g.RegisterRPC("SharePeers", g.sharePeers)
+	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
 	// spawn RPC handler
 	go g.listen()

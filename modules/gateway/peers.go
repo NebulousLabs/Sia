@@ -53,9 +53,9 @@ func (g *Gateway) RemovePeer(peer modules.NetAddress) error {
 	return g.removePeer(peer)
 }
 
-// AddPeer is an RPC that requests that the Gateway add a peer to its peer
+// addMe is an RPC that requests that the Gateway add a peer to its peer
 // list. The supplied peer is assumed to be the peer making the RPC.
-func (g *Gateway) AddMe(conn modules.NetConn) error {
+func (g *Gateway) addMe(conn modules.NetConn) error {
 	var peer modules.NetAddress
 	err := conn.ReadObject(&peer, maxAddrLength)
 	if err != nil {
@@ -68,8 +68,8 @@ func (g *Gateway) AddMe(conn modules.NetConn) error {
 	return nil
 }
 
-// SharePeers is an RPC that returns up to 10 randomly selected peers.
-func (g *Gateway) SharePeers(conn modules.NetConn) error {
+// sharePeers is an RPC that returns up to 10 randomly selected peers.
+func (g *Gateway) sharePeers(conn modules.NetConn) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 

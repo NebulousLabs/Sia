@@ -79,22 +79,15 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
-	d.initRPC()
-	d.initAPI(config.APIAddr)
-
-	return
-}
-
-// initRPC registers all of the daemon's RPC handlers
-func (d *daemon) initRPC() (err error) {
+	// Register RPCs for each module
 	d.gateway.RegisterRPC("RelayBlock", d.relayBlock)
 	d.gateway.RegisterRPC("AcceptTransaction", d.acceptTransaction)
-	d.gateway.RegisterRPC("AddMe", d.gateway.AddMe)
-	d.gateway.RegisterRPC("SharePeers", d.gateway.SharePeers)
-	d.gateway.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
 	d.gateway.RegisterRPC("HostSettings", d.host.Settings)
 	d.gateway.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
 	d.gateway.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
+
+	d.initAPI(config.APIAddr)
+
 	return
 }
 

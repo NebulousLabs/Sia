@@ -51,11 +51,11 @@ func (g *Gateway) synchronize(peer modules.NetAddress) {
 	}
 }
 
-// SendBlocks returns a sequential set of blocks based on the 32 input block
+// sendBlocks returns a sequential set of blocks based on the 32 input block
 // IDs. The most recent known ID is used as the starting point, and up to
 // 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
 // sends a boolean indicating whether more blocks are available.
-func (g *Gateway) SendBlocks(conn modules.NetConn) (err error) {
+func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	// read known blocks
 	var knownBlocks [32]consensus.BlockID
 	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
