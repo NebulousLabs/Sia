@@ -38,8 +38,6 @@ type Gateway struct {
 //
 // Bootstrap handles mutexes manually to avoid having a lock during network
 // communication.
-//
-// TODO: Peers are pinged sequentially!
 func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// contact the bootstrap peer
 	if !g.Ping(bootstrapPeer) {
@@ -49,6 +47,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	g.addPeer(bootstrapPeer)
 	g.mu.Unlock()
 
+	// TODO: why are we synchronizing here?
 	g.synchronize(bootstrapPeer)
 
 	// ask the bootstrap peer for our hostname

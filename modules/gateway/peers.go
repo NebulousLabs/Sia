@@ -4,12 +4,17 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+const (
+	sharedPeers   = 10
+	maxAddrLength = 100
+)
+
 // SharePeers returns up to 10 randomly selected peers.
 func (g *Gateway) SharePeers() (peers []modules.NetAddress, err error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	for peer := range g.peers {
-		if len(peers) > 10 {
+		if len(peers) == sharedPeers {
 			return
 		}
 		peers = append(peers, peer)
@@ -17,27 +22,43 @@ func (g *Gateway) SharePeers() (peers []modules.NetAddress, err error) {
 	return
 }
 
+// requestPeers calls the SharePeers RPC to learn about new peers. Each
+// returned peer is pinged to ensure connectivity, and then added to the peer
+// list. Each ping is performed in its own goroutine, which manages its own
+// mutexes.
+//
+// TODO: maybe iterate until we have enough new peers?
 func (g *Gateway) requestPeers(addr modules.NetAddress) error {
-	// TODO: maybe iterate until we have enough new peers?
 	var newPeers []modules.NetAddress
 	err := g.RPC(addr, "SharePeers", func(conn modules.NetConn) error {
-		return conn.ReadObject(&newPeers, 10*50)
+		return conn.ReadObject(&newPeers, sharedPeers*maxAddrLength)
 	})
 	if err != nil {
 		return err
 	}
 	for _, peer := range newPeers {
-		// don't add ourselves, or peers that are unreachable
-		if peer != g.tcps.Address() && g.Ping(peer) {
-			g.addPeer(peer)
+		// don't add ourselves
+		if peer == g.tcps.Address() {
+			continue
 		}
+		// ping each peer in a separate goroutine
+		go func(peer modules.NetAddress) {
+			if g.Ping(peer) {
+				g.AddPeer(peer)
+			}
+		}(peer)
 	}
 	return nil
 }
 
 // AddPeer is an RPC that requests that the Gateway add a peer to its peer
 // list. The supplied peer is assumed to be the peer making the RPC.
-func (g *Gateway) AddMe(peer modules.NetAddress) error {
+func (g *Gateway) AddMe(conn modules.NetConn) error {
+	var peer modules.NetAddress
+	err := conn.ReadObject(&peer, maxAddrLength)
+	if err != nil {
+		return err
+	}
 	if !g.Ping(peer) {
 		return ErrUnreachable
 	}
