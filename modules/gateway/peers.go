@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	sharedPeers   = 10
-	maxAddrLength = 100
+	maxSharedPeers = 10
+	maxAddrLength  = 100
 )
 
 func (g *Gateway) addPeer(peer modules.NetAddress) error {
@@ -75,7 +75,7 @@ func (g *Gateway) sharePeers(conn modules.NetConn) error {
 
 	var peers []modules.NetAddress
 	for peer := range g.peers {
-		if len(peers) == sharedPeers {
+		if len(peers) == maxSharedPeers {
 			break
 		}
 		peers = append(peers, peer)
@@ -92,7 +92,7 @@ func (g *Gateway) sharePeers(conn modules.NetConn) error {
 func (g *Gateway) requestPeers(addr modules.NetAddress) error {
 	var newPeers []modules.NetAddress
 	err := g.RPC(addr, "SharePeers", func(conn modules.NetConn) error {
-		return conn.ReadObject(&newPeers, sharedPeers*maxAddrLength)
+		return conn.ReadObject(&newPeers, maxSharedPeers*maxAddrLength)
 	})
 	if err != nil {
 		return err

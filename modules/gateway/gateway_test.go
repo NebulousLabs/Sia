@@ -8,7 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-var port int = 9001
+var port = 9001
 
 func newTestGateway(t *testing.T) *Gateway {
 	g, err := New(":"+strconv.Itoa(port), consensus.CreateGenesisState())

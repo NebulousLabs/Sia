@@ -12,7 +12,7 @@ const (
 	MaxCatchUpBlocks = 50
 )
 
-// Sychronize to synchronize the local consensus set (i.e. the blockchain) with
+// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
 // the network consensus set.
 //
 // TODO: don't run two Synchronize threads at the same time

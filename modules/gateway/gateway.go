@@ -17,6 +17,7 @@ const (
 )
 
 var (
+	// TODO: unexport these, or move them to modules
 	ErrNoPeers     = errors.New("no peers")
 	ErrUnreachable = errors.New("peer did not respond to ping")
 )
@@ -100,13 +101,13 @@ func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 	height, exists := g.state.HeightOfBlock(b.ID())
 	if !exists {
 		if consensus.DEBUG {
-			panic("could not get the height of a block that did not return an error when being accepted into the state.")
+			panic("could not get the height of a block that did not return an error when being accepted into the state")
 		}
 		return errors.New("state malfunction")
 	}
 	currentPathBlock, exists := g.state.BlockAtHeight(height)
 	if !exists || b.ID() != currentPathBlock.ID() {
-		return errors.New("block added, but it does not extend the state height.")
+		return errors.New("block added, but it does not extend the state height")
 	}
 
 	go g.threadedBroadcast("RelayBlock", modules.WriterRPC(b))
