@@ -38,3 +38,38 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	defer g.mu.Unlock()
 	g.handlerMap[handlerName(name)] = fn
 }
+
+// listen runs in the background, accepting incoming connections and serving
+// them. listen will return after TCPServer.Close() is called, because the
+// accept call will fail.
+func (g *Gateway) listen() {
+	for {
+		conn, err := accept(g.listener)
+		if err != nil {
+			return
+		}
+
+		// it is the handler's responsibility to close the connection
+		go g.handleConn(conn)
+	}
+}
+
+// handleConn reads header data from a connection, then routes it to the
+// appropriate handler for further processing.
+func (g *Gateway) handleConn(conn modules.NetConn) {
+	defer conn.Close()
+	var id rpcID
+	if err := conn.ReadObject(&id, 8); err != nil {
+		// TODO: log error
+		return
+	}
+	// call registered handler for this ID
+	g.mu.RLock()
+	fn, ok := g.handlerMap[id]
+	g.mu.RUnlock()
+	if ok {
+		fn(conn)
+		// TODO: log error
+	}
+	return
+}

@@ -40,6 +40,18 @@ type Gateway struct {
 	mu sync.RWMutex
 }
 
+// Address returns the NetAddress of the Gateway.
+func (g *Gateway) Address() modules.NetAddress {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.myAddr
+}
+
+// Close stops the Gateway's listener process.
+func (g *Gateway) Close() error {
+	return g.listener.Close()
+}
+
 // Bootstrap joins the Sia network and establishes an initial peer list.
 //
 // Bootstrap handles mutexes manually to avoid having a lock during network
@@ -119,10 +131,6 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 	return
 }
 
-func (g *Gateway) Close() error {
-	return g.listener.Close()
-}
-
 // New returns an initialized Gateway.
 func New(addr string, s *consensus.State) (g *Gateway, err error) {
 	if s == nil {
@@ -130,22 +138,25 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		return
 	}
 
-	// spawn listener
-	l, err := g.listen(addr)
+	// create listener
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
 
 	g = &Gateway{
-		state:    s,
-		listener: l,
-		myAddr:   modules.NetAddress(addr),
-
-		peers: make(map[modules.NetAddress]int),
+		state:      s,
+		listener:   l,
+		myAddr:     modules.NetAddress(addr),
+		handlerMap: make(map[rpcID]modules.RPCFunc),
+		peers:      make(map[modules.NetAddress]int),
 	}
 
 	g.RegisterRPC("Ping", pong)
 	g.RegisterRPC("SendHostname", sendHostname)
+
+	// spawn RPC handler
+	go g.listen()
 
 	return
 }

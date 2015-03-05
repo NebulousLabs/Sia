@@ -1,9 +1,9 @@
 package gateway
 
 import (
-	"errors"
 	"io/ioutil"
-	"math/rand"
+	"net"
+	"net/http"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -14,7 +14,10 @@ import (
 // ping request -- in other words, whether it is a potential peer.
 func (g *Gateway) Ping(addr modules.NetAddress) bool {
 	var pong string
-	err := g.RPC(addr, "Ping", modules.ReaderRPC(&pong, 5))
+	err := g.RPC(addr, "Ping", modules.ReaderRPC(&pong, 4))
+	if err != nil {
+		println(err.Error())
+	}
 	return err == nil && pong == "pong"
 }
 
@@ -37,31 +40,11 @@ func (g *Gateway) learnHostname(addr modules.NetAddress) error {
 	return nil
 }
 
-func (g *Gateway) addPeer(peer modules.NetAddress) error {
-	if _, exists := g.peers[peer]; exists {
-		return errors.New("peer already added")
-	}
-	g.peers[peer] = 0
-	return nil
-}
-
-func (g *Gateway) removePeer(peer modules.NetAddress) error {
-	if _, exists := g.peers[peer]; !exists {
-		return errors.New("no record of that peer")
-	}
-	delete(g.peers, peer)
-	return nil
-}
-
-func (g *Gateway) randomPeer() (modules.NetAddress, error) {
-	r := rand.Intn(len(g.peers))
-	for peer := range g.peers {
-		if r == 0 {
-			return peer, nil
-		}
-		r--
-	}
-	return "", ErrNoPeers
+// setHostname sets the hostname of the server.
+func (g *Gateway) setHostname(host string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
 }
 
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
@@ -95,6 +78,22 @@ func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
 		}
 	}
 	g.mu.Unlock()
+}
+
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func (g *Gateway) getExternalIP() (err error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 64)
+	n, _ := resp.Body.Read(buf)
+	hostname := string(buf[:n-1]) // trim newline
+	// TODO: try to ping ourselves
+	g.setHostname(hostname)
+	return
 }
 
 func (g *Gateway) save(filename string) error {
