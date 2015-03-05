@@ -219,7 +219,6 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	err = verifyTransaction(unsignedTxn, terms, merkleRoot)
 	if err != nil {
 		err = errors.New("transaction does not satisfy terms: " + err.Error())
-		conn.WriteObject(err.Error())
 		return
 	}
 
