@@ -3,11 +3,9 @@ package renter
 import (
 	"errors"
 	"io"
-	"net"
 	"os"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -16,11 +14,11 @@ const (
 )
 
 // downloadPiece attempts to retrieve a file from a host.
-func downloadPiece(piece FilePiece, path string) error {
-	return piece.HostIP.Call("RetrieveFile", func(conn net.Conn) (err error) {
+func (r *Renter) downloadPiece(piece FilePiece, path string) error {
+	return r.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) (err error) {
 		// Send the id of the contract for the file piece we're requesting. The
 		// response will be the file piece contents.
-		if err = encoding.WriteObject(conn, piece.ContractID); err != nil {
+		if err = conn.WriteObject(piece.ContractID); err != nil {
 			return
 		}
 
@@ -32,6 +30,7 @@ func downloadPiece(piece FilePiece, path string) error {
 		defer file.Close()
 
 		// Write the host's response into the file.
+		// TODO: use a tee reader here
 		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
 		if err != nil {
 			// os.Remove(path)
@@ -115,7 +114,7 @@ func (r *Renter) Download(nickname, filename string) error {
 	// TODO: Multiple opportunities for optimization here but we should wait
 	// until we're actually erasure coding.
 	for _, piece := range pieces {
-		downloadErr := downloadPiece(piece, filename)
+		downloadErr := r.downloadPiece(piece, filename)
 		if downloadErr == nil {
 			return nil
 		} else {

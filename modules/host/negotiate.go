@@ -3,15 +3,12 @@ package host
 import (
 	"errors"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -156,10 +153,10 @@ func (h *Host) addCollateral(txn consensus.Transaction, terms modules.ContractTe
 // NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
-func (h *Host) NegotiateContract(conn net.Conn) (err error) {
+func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	// Read the contract terms.
 	var terms modules.ContractTerms
-	err = encoding.ReadObject(conn, &terms, maxContractLen)
+	err = conn.ReadObject(&terms, maxContractLen)
 	if err != nil {
 		return
 	}
@@ -170,7 +167,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	err = h.considerTerms(terms)
 	h.mu.RUnlock()
 	if err != nil {
-		err = encoding.WriteObject(conn, err.Error())
+		err = conn.WriteObject(err.Error())
 		return
 	}
 
@@ -191,14 +188,10 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	}()
 
 	// signal that we are ready to download file
-	err = encoding.WriteObject(conn, modules.AcceptTermsResponse)
+	err = conn.WriteObject(modules.AcceptTermsResponse)
 	if err != nil {
 		return
 	}
-
-	// file transfer is going to take a while, so extend the timeout.
-	// This assumes a minimum transfer rate of ~64 kbps.
-	conn.SetDeadline(time.Now().Add(time.Duration(terms.FileSize) * 128 * time.Microsecond))
 
 	// simultaneously download file and calculate its Merkle root.
 	tee := io.TeeReader(
@@ -215,7 +208,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Data has been sent, read in the unsigned transaction with the file
 	// contract.
 	var unsignedTxn consensus.Transaction
-	err = encoding.ReadObject(conn, &unsignedTxn, maxContractLen)
+	err = conn.ReadObject(&unsignedTxn, maxContractLen)
 	if err != nil {
 		return
 	}
@@ -226,7 +219,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	err = verifyTransaction(unsignedTxn, terms, merkleRoot)
 	if err != nil {
 		err = errors.New("transaction does not satisfy terms: " + err.Error())
-		encoding.WriteObject(conn, err.Error())
+		conn.WriteObject(err.Error())
 		return
 	}
 
@@ -235,7 +228,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
-	err = encoding.WriteObject(conn, collateralTxn)
+	err = conn.WriteObject(collateralTxn)
 	if err != nil {
 		return
 	}
@@ -243,7 +236,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read in the renter-signed transaction and check that it matches the
 	// previously accepted transaction.
 	var signedTxn consensus.Transaction
-	err = encoding.ReadObject(conn, &signedTxn, maxContractLen)
+	err = conn.ReadObject(&signedTxn, maxContractLen)
 	if err != nil {
 		return
 	}
