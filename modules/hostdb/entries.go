@@ -81,7 +81,7 @@ func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
 	// Get the settings from the host. Host is removed from the set of active
 	// hosts if no response is given.
 	var hs modules.HostSettings
-	err := entry.IPAddress.RPC("HostSettings", nil, &hs)
+	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", modules.ReaderRPC(&hs, 1024))
 	if err != nil {
 		return
 	}
@@ -123,7 +123,7 @@ func (hdb *HostDB) insert(entry modules.HostEntry) {
 }
 
 // Remove deletes an entry from the hostdb.
-func (hdb *HostDB) remove(addr network.Address) error {
+func (hdb *HostDB) remove(addr modules.NetAddress) error {
 	delete(hdb.allHosts, addr)
 
 	// See if the node is in the set of active hosts.

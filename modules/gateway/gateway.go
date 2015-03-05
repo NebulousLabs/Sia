@@ -107,10 +107,15 @@ func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 func (g *Gateway) Info() (info modules.GatewayInfo) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+	info.Address = g.tcps.myAddr
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
 	}
 	return
+}
+
+func (g *Gateway) RegisterRPC(id string, fn func(modules.NetConn) error) {
+	g.tcps.RegisterRPC(id, fn)
 }
 
 // New returns an initialized Gateway.

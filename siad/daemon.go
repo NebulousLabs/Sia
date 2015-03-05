@@ -55,7 +55,7 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
-	d.gateway, err = gateway.New(d.state)
+	d.gateway, err = gateway.New(config.RPCAddr, d.state)
 	if err != nil {
 		return
 	}
@@ -75,19 +75,16 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.hostdb, err = hostdb.New(d.state)
+	d.hostdb, err = hostdb.New(d.state, d.gateway)
 	if err != nil {
 		return
 	}
-	d.renter, err = renter.New(d.state, d.hostdb, d.wallet)
+	d.renter, err = renter.New(d.state, d.gateway, d.hostdb, d.wallet)
 	if err != nil {
 		return
 	}
 
-	err = d.initRPC()
-	if err != nil {
-		return
-	}
+	d.initRPC()
 	d.initAPI(config.APIAddr)
 
 	return
@@ -95,38 +92,13 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 
 // initRPC registers all of the daemon's RPC handlers
 func (d *daemon) initRPC() (err error) {
-	err = d.network.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("AddMe", d.gateway.AddMe)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("SharePeers", d.gateway.SharePeers)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("HostSettings", d.host.Settings)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
-	if err != nil {
-		return
-	}
-	err = d.network.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
-	if err != nil {
-		return
-	}
-
+	d.gateway.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
+	d.gateway.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
+	d.gateway.RegisterRPC("AddMe", d.gateway.AddMe)
+	d.gateway.RegisterRPC("SharePeers", d.gateway.SharePeers)
+	d.gateway.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
+	d.gateway.RegisterRPC("HostSettings", d.host.Settings)
+	d.gateway.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
+	d.gateway.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
 	return
 }

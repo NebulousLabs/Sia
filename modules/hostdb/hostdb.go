@@ -18,6 +18,7 @@ var (
 // for uploading files.
 type HostDB struct {
 	state       *consensus.State
+	gateway     modules.Gateway
 	recentBlock consensus.BlockID
 
 	hostTree    *hostNode
@@ -28,7 +29,7 @@ type HostDB struct {
 }
 
 // New returns an empty HostDatabase.
-func New(s *consensus.State) (hdb *HostDB, err error) {
+func New(s *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 	if s == nil {
 		err = ErrNilState
 		return
@@ -45,6 +46,7 @@ func New(s *consensus.State) (hdb *HostDB, err error) {
 
 	hdb = &HostDB{
 		state:       s,
+		gateway:     g,
 		recentBlock: genesisBlock.ID(),
 		activeHosts: make(map[string]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*modules.HostEntry),

@@ -38,7 +38,8 @@ type NetConn interface {
 }
 
 type GatewayInfo struct {
-	Peers []NetAddress
+	Address NetAddress
+	Peers   []NetAddress
 }
 
 // A Gateway facilitates the interactions between the local node and remote
@@ -62,6 +63,10 @@ type Gateway interface {
 	// supplied function takes over from there.
 	RPC(NetAddress, string, func(NetConn) error) error
 
+	// RegisterRPC registers a function to handle incoming connections that
+	// supply the given RPC ID.
+	RegisterRPC(string, func(NetConn) error)
+
 	// Synchronize synchronizes the local consensus set with the sets of known
 	// peers.
 	Synchronize() error
@@ -76,7 +81,7 @@ type Gateway interface {
 
 	// AddMe is the RPC version of AddPeer. It is assumed that the supplied
 	// peer is the peer making the RPC.
-	AddMe(NetAddress) error
+	AddMe(NetConn) error
 
 	// SendBlocks is an RPC that returns a set of sequential blocks following
 	// the most recent known block ID in of the 32 IDs provided. The number of

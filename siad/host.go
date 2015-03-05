@@ -36,7 +36,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.host.Announce(d.network.Address())
+	err := d.host.Announce(d.gateway.Info().Address)
 	if err != nil {
 		writeError(w, "Could not announce host:"+err.Error(), 400)
 		return
