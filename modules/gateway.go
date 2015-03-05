@@ -37,6 +37,9 @@ type NetConn interface {
 	Addr() NetAddress
 }
 
+// RPCFunc is the type signature of functions that handle incoming RPCs.
+type RPCFunc func(NetConn) error
+
 type GatewayInfo struct {
 	Address NetAddress
 	Peers   []NetAddress
@@ -61,11 +64,11 @@ type Gateway interface {
 	// RPC establishes a connection to the supplied address and writes the RPC
 	// header, indicating which function will handle the connection. The
 	// supplied function takes over from there.
-	RPC(NetAddress, string, func(NetConn) error) error
+	RPC(NetAddress, string, RPCFunc) error
 
 	// RegisterRPC registers a function to handle incoming connections that
 	// supply the given RPC ID.
-	RegisterRPC(string, func(NetConn) error)
+	RegisterRPC(string, RPCFunc)
 
 	// Synchronize synchronizes the local consensus set with the sets of known
 	// peers.
@@ -98,7 +101,7 @@ type Gateway interface {
 
 // ReaderRPC returns a closure that can be passed to Gateway.RPC to read a
 // single value.
-func ReaderRPC(obj interface{}, maxLen uint64) func(NetConn) error {
+func ReaderRPC(obj interface{}, maxLen uint64) RPCFunc {
 	return func(conn NetConn) error {
 		return conn.ReadObject(obj, maxLen)
 	}
@@ -106,7 +109,7 @@ func ReaderRPC(obj interface{}, maxLen uint64) func(NetConn) error {
 
 // WriterRPC returns a closure that can be passed to Gateway.RPC to write a
 // single value.
-func WriterRPC(obj interface{}) func(NetConn) error {
+func WriterRPC(obj interface{}) RPCFunc {
 	return func(conn NetConn) error {
 		return conn.WriteObject(obj)
 	}

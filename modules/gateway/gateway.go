@@ -113,7 +113,7 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 	return
 }
 
-func (g *Gateway) RegisterRPC(id string, fn func(modules.NetConn) error) {
+func (g *Gateway) RegisterRPC(id string, fn modules.RPCFunc) {
 	g.tcps.RegisterRPC(id, fn)
 }
 

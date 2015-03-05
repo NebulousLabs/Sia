@@ -92,7 +92,7 @@ func newTCPServer(addr string) (tcps *TCPServer, err error) {
 	tcps = &TCPServer{
 		listener:   tcpServ,
 		myAddr:     modules.NetAddress(addr),
-		handlerMap: make(map[rpcID]func(modules.NetConn) error),
+		handlerMap: make(map[rpcID]modules.RPCFunc),
 	}
 
 	tcps.RegisterRPC("Ping", pong)

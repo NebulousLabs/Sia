@@ -17,7 +17,7 @@ func handlerName(name string) (id rpcID) {
 // RPC establishes a TCP connection to the NetAddress, writes the RPC
 // identifier, and then hands off the connection to fn. When fn returns, the
 // connection is closed.
-func (g *Gateway) RPC(addr modules.NetAddress, name string, fn func(modules.NetConn) error) error {
+func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
 	conn, err := dial(addr)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn func(modules.NetC
 // RegisterRPC registers a function as an RPC handler for a given identifier.
 // To call an RPC, use gateway.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
-func (tcps *TCPServer) RegisterRPC(name string, fn func(modules.NetConn) error) {
+func (tcps *TCPServer) RegisterRPC(name string, fn modules.RPCFunc) {
 	tcps.Lock()
 	defer tcps.Unlock()
 	tcps.handlerMap[handlerName(name)] = fn

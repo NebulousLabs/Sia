@@ -66,7 +66,7 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
 // list. The calls are run in parallel.
-func (g *Gateway) threadedBroadcast(name string, fn func(modules.NetConn) error) {
+func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
 	var badpeers []modules.NetAddress
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
