@@ -1,8 +1,6 @@
 package main
 
 import (
-	"html/template"
-
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -44,10 +42,7 @@ type daemon struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	styleDir    string
 	downloadDir string
-
-	template *template.Template
 
 	apiServer *graceful.Server
 }
@@ -92,8 +87,8 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 
 // initRPC registers all of the daemon's RPC handlers
 func (d *daemon) initRPC() (err error) {
-	d.gateway.RegisterRPC("RelayBlock", d.gateway.RelayBlock)
-	d.gateway.RegisterRPC("AcceptTransaction", d.tpool.AcceptTransaction)
+	d.gateway.RegisterRPC("RelayBlock", d.relayBlock)
+	d.gateway.RegisterRPC("AcceptTransaction", d.acceptTransaction)
 	d.gateway.RegisterRPC("AddMe", d.gateway.AddMe)
 	d.gateway.RegisterRPC("SharePeers", d.gateway.SharePeers)
 	d.gateway.RegisterRPC("SendBlocks", d.gateway.SendBlocks)
@@ -101,4 +96,24 @@ func (d *daemon) initRPC() (err error) {
 	d.gateway.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
 	d.gateway.RegisterRPC("RetrieveFile", d.host.RetrieveFile)
 	return
+}
+
+// TODO: move this to the state module?
+func (d *daemon) relayBlock(conn modules.NetConn) error {
+	var b consensus.Block
+	err := conn.ReadObject(&b, consensus.BlockSizeLimit)
+	if err != nil {
+		return err
+	}
+	return d.gateway.RelayBlock(b)
+}
+
+// TODO: move this to the tpool module?
+func (d *daemon) acceptTransaction(conn modules.NetConn) error {
+	var t consensus.Transaction
+	err := conn.ReadObject(&t, consensus.BlockSizeLimit)
+	if err != nil {
+		return err
+	}
+	return d.tpool.AcceptTransaction(t)
 }

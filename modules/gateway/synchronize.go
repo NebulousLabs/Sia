@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -60,7 +61,14 @@ func (g *Gateway) synchronize(peer modules.NetAddress) {
 // IDs. The most recent known ID is used as the starting point, and up to
 // 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. If more
 // blocks could be returned, a 'moreBlocksErr' will be returned as well.
-func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
+func (g *Gateway) SendBlocks(conn modules.NetConn) (err error) {
+	// read known blocks
+	var knownBlocks [32]consensus.BlockID
+	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
+	if err != nil {
+		return
+	}
+
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
 	var start consensus.BlockHeight
@@ -82,6 +90,7 @@ func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consen
 	// Send blocks, starting with the child of the most recent known block.
 	//
 	// TODO: use BlocksSince instead?
+	var blocks []consensus.Block
 	for i := start; i < start+MaxCatchUpBlocks; i++ {
 		b, exists := g.state.BlockAtHeight(i)
 		if !exists {
@@ -105,6 +114,7 @@ func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.
 		if err != nil {
 			return err
 		}
+		// TODO: read error
 		return conn.ReadObject(newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
 	})
 	return

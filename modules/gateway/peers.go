@@ -10,16 +10,18 @@ const (
 )
 
 // SharePeers returns up to 10 randomly selected peers.
-func (g *Gateway) SharePeers() (peers []modules.NetAddress, err error) {
+func (g *Gateway) SharePeers(conn modules.NetConn) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+
+	var peers []modules.NetAddress
 	for peer := range g.peers {
 		if len(peers) == sharedPeers {
-			return
+			break
 		}
 		peers = append(peers, peer)
 	}
-	return
+	return conn.WriteObject(peers)
 }
 
 // requestPeers calls the SharePeers RPC to learn about new peers. Each

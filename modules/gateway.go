@@ -86,11 +86,11 @@ type Gateway interface {
 	// SendBlocks is an RPC that returns a set of sequential blocks following
 	// the most recent known block ID in of the 32 IDs provided. The number of
 	// blocks returned is unspecified.
-	SendBlocks([32]consensus.BlockID) ([]consensus.Block, error)
+	SendBlocks(NetConn) error
 
 	// SharePeers is an RPC that returns a set of the Gateway's peers. The
 	// number of peers returned is unspecified.
-	SharePeers() ([]NetAddress, error)
+	SharePeers(NetConn) error
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo

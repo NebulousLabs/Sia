@@ -46,7 +46,8 @@ type Host interface {
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)
 
-	Settings() (HostSettings, error)
+	// Settings is an RPC that returns the host's settings.
+	Settings(NetConn) error
 
 	// Info returns info about the host, including its hosting parameters, the
 	// amount of storage remaining, and the number of active contracts.
