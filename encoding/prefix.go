@@ -11,7 +11,7 @@ import (
 // specified maximum length.
 func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 	prefix := make([]byte, 8)
-	if n, err := r.Read(prefix); err != nil || n != len(prefix) {
+	if _, err := io.ReadFull(r, prefix); err != nil {
 		return nil, errors.New("could not read length prefix")
 	}
 	dataLen := DecUint64(prefix)
