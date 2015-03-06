@@ -27,9 +27,9 @@ func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
 	// Daemon API Calls
-	handleHTTPRequest(mux, "/daemon/stop", d.stopHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", d.updateCheckHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
+	handleHTTPRequest(mux, "/daemon/stop", d.daemonStopHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", d.daemonUpdateCheckHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", d.daemonUpdateApplyHandler)
 
 	// Consensus API Calls
 	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)

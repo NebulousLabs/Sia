@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-// consensusStatusHandler returns information about the consensus module.
+// consensusStatusHandler handles the api call asking for the consensus status.
 func (d *daemon) consensusStatusHandler(w http.ResponseWriter, req *http.Request) {
 	currentBlock := d.state.CurrentBlock().ID()
 	target := d.state.CurrentTarget()
