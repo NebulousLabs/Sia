@@ -29,25 +29,18 @@ func (r *Renter) downloadPiece(piece FilePiece, path string) error {
 		}
 		defer file.Close()
 
-		// Write the host's response into the file.
-		// TODO: use a tee reader here
-		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
+		// Simultaneously download file and calculate its Merkle root.
+		tee := io.TeeReader(
+			// use a LimitedReader to ensure we don't read indefinitely
+			io.LimitReader(conn, int64(piece.Contract.FileSize)),
+			// each byte we read from tee will also be written to file
+			file,
+		)
+		merkleRoot, err := crypto.ReaderMerkleRoot(tee)
 		if err != nil {
-			// os.Remove(path)
-			// r.hostDB.FlagHost(piece.Host.IPAddress)
 			return
 		}
 
-		// Do an integrity check to make sure that the piece we were given is
-		// actually what we were looking for.
-		_, err = file.Seek(0, 0)
-		if err != nil {
-			return
-		}
-		merkleRoot, err := crypto.ReaderMerkleRoot(file)
-		if err != nil {
-			return
-		}
 		if merkleRoot != piece.Contract.FileMerkleRoot {
 			return errors.New("host provided a file that's invalid")
 		}
