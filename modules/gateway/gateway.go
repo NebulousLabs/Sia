@@ -17,9 +17,8 @@ const (
 )
 
 var (
-	// TODO: unexport these, or move them to modules
-	ErrNoPeers     = errors.New("no peers")
-	ErrUnreachable = errors.New("peer did not respond to ping")
+	errNoPeers     = errors.New("no peers")
+	errUnreachable = errors.New("peer did not respond to ping")
 )
 
 // Gateway implements the modules.Gateway interface.
@@ -60,7 +59,7 @@ func (g *Gateway) Close() error {
 func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// contact the bootstrap peer
 	if !g.Ping(bootstrapPeer) {
-		return ErrUnreachable
+		return errUnreachable
 	}
 	g.mu.Lock()
 	g.addPeer(bootstrapPeer)

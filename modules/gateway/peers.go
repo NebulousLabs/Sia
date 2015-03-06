@@ -37,7 +37,7 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 		}
 		r--
 	}
-	return "", ErrNoPeers
+	return "", errNoPeers
 }
 
 func (g *Gateway) addStrike(peer modules.NetAddress) {
@@ -73,7 +73,7 @@ func (g *Gateway) addMe(conn modules.NetConn) error {
 		return err
 	}
 	if !g.Ping(peer) {
-		return ErrUnreachable
+		return errUnreachable
 	}
 	g.AddPeer(peer)
 	return nil
