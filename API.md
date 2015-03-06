@@ -1,8 +1,52 @@
 Siad API
 ========
 
-Unless otherwise specified, API calls return the JSON object { "Success": true }.
-Errors are sent as plaintext, accompanied by an appropriate status code.
+All API calls return JSON objects. If there is an error, the error is returned
+in plaintext. The standard response is { "Success": true}. In this document,
+the API responses are defined as go structs. The go structs will get encoded to
+JSON before being sent. Go structs are used here to provide type information.
+
+Daemon
+------
+
+Queries:
+
+* /daemon/stop
+* /daemon/update/check
+* /daemon/update/apply
+
+#### /daemon/stop
+
+Function: Cleanly shuts down the daemon. May take a while.
+
+Params: none
+
+Response: standard
+
+#### /daemon/update/check:
+
+Function: Checks for an update, returning a bool indicating whether
+there is an update and a version indicating the version of the update.
+
+Params: none
+
+Response:
+```
+struct {
+	Available bool
+	Version string
+}
+```
+
+#### /daemon/update/apply:
+
+Function: Applies any updates that are available.
+
+Params: none
+
+Response: standard
+
+-----
 
 | Path              | Params                           | Response                     |
 |:------------------|:---------------------------------|:-----------------------------|
@@ -29,7 +73,7 @@ Errors are sent as plaintext, accompanied by an appropriate status code.
 
 HostInfo is a JSON object containing the following values:
 ```
-    TotalStorage"
+    "TotalStorage"
     "Minfilesize"
     "Maxfilesize"
     "Minwindow"

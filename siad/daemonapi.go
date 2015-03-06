@@ -13,6 +13,11 @@ import (
 
 const VERSION = "0.2.0"
 
+// TODO: Updates need to be signed!
+// TODO: Updating on Windows may not work correctly.
+// TODO: Will this code properly handle the case where multiple versions in a
+// row have been missed?
+
 // Updates work like this: each version is stored in a folder on a Linode
 // server operated by the developers. The most recent version is stored in
 // current/. The folder contains the files changed by the update, as well as a
@@ -22,26 +27,25 @@ const VERSION = "0.2.0"
 // manifest.
 var updateURL = "http://23.239.14.98/releases/" + runtime.GOOS + "_" + runtime.GOARCH
 
-// returns true if version is "greater than" VERSION.
+// newerVersion returns true if version is "greater than" VERSION.
 func newerVersion(version string) bool {
-	// super naive; assumes same number of .s
-	// TODO: make this more robust... if it's worth the effort.
-	nums := strings.Split(version, ".")
-	NUMS := strings.Split(VERSION, ".")
-	for i := range nums {
-		// inputs are trusted, so no need to check the error
-		ni, _ := strconv.Atoi(nums[i])
-		Ni, _ := strconv.Atoi(NUMS[i])
-		if ni != Ni {
-			return ni > Ni
+	remote := strings.Split(VERSION, ".")
+	local := strings.Split(version, ".")
+	for i := range remote {
+		ri, _ := strconv.Atoi(remote[i])
+		li, _ := strconv.Atoi(local[i])
+		if ri != li {
+			return ri < li
+		}
+		if len(local)-1 == i {
+			return false
 		}
 	}
-	// versions are equal
-	return false
+	return true
 }
 
-// helper function that requests and parses the update manifest.
-// It returns the manifest (if available) as a slice of lines.
+// fetchManifest requests and parses the update manifest. It returns the
+// manifest (if available) as a slice of lines.
 func fetchManifest(version string) (lines []string, err error) {
 	resp, err := http.Get(updateURL + "/" + version + "/MANIFEST")
 	if err != nil {
@@ -69,32 +73,59 @@ func checkForUpdate() (bool, string, error) {
 }
 
 // applyUpdate downloads and applies an update.
-//
-// TODO: lots of room for improvement here.
-//   - binary diffs
-//   - signed updates
-//   - zipped updates
 func applyUpdate(version string) (err error) {
 	manifest, err := fetchManifest(version)
 	if err != nil {
 		return
 	}
 
+	// Perform updates as indicated by the manifest.
 	for _, file := range manifest[1:] {
 		err, _ = update.New().Target(file).FromUrl(updateURL + "/" + version + "/" + file)
 		if err != nil {
-			// TODO: revert prior successful updates?
 			return
 		}
 	}
 
 	// the binary must always be updated, because if nothing else, the version
 	// number has to be bumped.
-	// TODO: should it be siad.exe on Windows?
 	err, _ = update.New().FromUrl(updateURL + "/" + version + "/siad")
 	if err != nil {
 		return
 	}
 
 	return
+}
+
+// stopHandler handles the api call to stop the daemon cleanly.
+func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
+	writeSuccess(w)
+
+	// send stop signal
+	d.apiServer.Stop(1e9)
+}
+
+// updateCheckHandler handles the api call to check for updates.
+func (d *daemon) updateCheckHandler(w http.ResponseWriter, req *http.Request) {
+	available, version, err := checkForUpdate()
+	if err != nil {
+		writeError(w, err.Error(), 500)
+		return
+	}
+
+	writeJSON(w, struct {
+		Available bool
+		Version   string
+	}{available, version})
+}
+
+// updateApplyHandler handles the api call to apply updates.
+func (d *daemon) updateApplyHandler(w http.ResponseWriter, req *http.Request) {
+	err := applyUpdate(req.FormValue("version"))
+	if err != nil {
+		writeError(w, err.Error(), 500)
+		return
+	}
+
+	writeSuccess(w)
 }

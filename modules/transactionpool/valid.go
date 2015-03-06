@@ -10,11 +10,6 @@ var (
 	ErrDoubleSpend = errors.New("transaction spends an output that was spent by another transaction in the pool")
 )
 
-// TODO: A lot of the code in these functions is extremely similar to consensus
-// code, but I didn't want to touch the consensus code while Luke was going
-// through it. But some of this code can be broken out into more pieces and
-// that will remove the redundancy.
-
 // validUnconfirmedSiacoins checks that the inputs are all valid in the context
 // of the unconfirmed consensus set and that the value of the inputs is equal
 // to the value of the outputs. There is an additional check on the unlock
