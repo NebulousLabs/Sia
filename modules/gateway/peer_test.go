@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// TestPeerSharing tests that peers are correctly shared.
 func TestPeerSharing(t *testing.T) {
 	g := newTestGateway(t)
 
@@ -43,5 +44,27 @@ func TestPeerSharing(t *testing.T) {
 				t.Fatal("gateway gave duplicate addresses:", peers)
 			}
 		}
+	}
+}
+
+// TestBadPeer tests that "bad" peers are correctly identified and removed.
+func TestBadPeer(t *testing.T) {
+	g := newTestGateway(t)
+
+	// create bad peer
+	badpeer := newTestGateway(t)
+	// overwrite badpeer's Ping RPC with an incorrect one
+	badpeer.RegisterRPC("Ping", modules.WriterRPC("lol"))
+
+	g.addPeer(badpeer.Address())
+
+	// try to ping the peer 'maxStrikes'+1 times
+	for i := 0; i < maxStrikes+1; i++ {
+		g.Ping(badpeer.Address())
+	}
+
+	// badpeer should no longer be in our peer list
+	if len(g.peers) != 0 {
+		t.Fatal("gateway did not remove bad peer:", g.Info().Peers)
 	}
 }
