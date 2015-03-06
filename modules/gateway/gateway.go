@@ -79,8 +79,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	}
 
 	// request peers
-	// TODO: what if this returns an error?
-	_ = g.requestPeers(bootstrapPeer)
+	go g.requestPeers(bootstrapPeer)
 
 	// announce ourselves to new peers
 	go g.threadedBroadcast("AddMe", modules.WriterRPC(g.myAddr))

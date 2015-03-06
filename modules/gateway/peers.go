@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"math/rand"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -107,17 +108,22 @@ func (g *Gateway) requestPeers(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
+
+	var wg sync.WaitGroup
 	for _, peer := range newPeers {
 		// don't add ourselves
 		if peer == g.Address() {
 			continue
 		}
 		// ping each peer in a separate goroutine
+		wg.Add(1)
 		go func(peer modules.NetAddress) {
 			if g.Ping(peer) {
 				g.AddPeer(peer)
 			}
+			wg.Done()
 		}(peer)
 	}
+	wg.Wait()
 	return nil
 }
