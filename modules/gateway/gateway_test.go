@@ -21,6 +21,7 @@ func newTestGateway(t *testing.T) *Gateway {
 
 func TestTableTennis(t *testing.T) {
 	g := newTestGateway(t)
+	defer g.Close()
 	if !g.Ping(g.myAddr) {
 		t.Fatal("gateway did not respond to ping")
 	}
@@ -28,6 +29,7 @@ func TestTableTennis(t *testing.T) {
 
 func TestRPC(t *testing.T) {
 	g := newTestGateway(t)
+	defer g.Close()
 
 	g.RegisterRPC("Foo", func(conn modules.NetConn) error {
 		var i uint64
