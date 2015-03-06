@@ -86,16 +86,16 @@ func (g *Gateway) startListener(addr string) (err error) {
 			}
 
 			// it is the handler's responsibility to close the connection
-			go g.handleConn(conn)
+			go g.threadedHandleConn(conn)
 		}
 	}()
 
 	return
 }
 
-// handleConn reads header data from a connection, then routes it to the
+// threadedHandleConn reads header data from a connection, then routes it to the
 // appropriate handler for further processing.
-func (g *Gateway) handleConn(conn modules.NetConn) {
+func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 	defer conn.Close()
 	var id rpcID
 	if err := conn.ReadObject(&id, 8); err != nil {
