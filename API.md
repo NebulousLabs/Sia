@@ -19,7 +19,7 @@ Queries:
 
 Function: Cleanly shuts down the daemon. May take a while.
 
-Params: none
+Parameters: none
 
 Response: standard
 
@@ -28,13 +28,13 @@ Response: standard
 Function: Checks for an update, returning a bool indicating whether
 there is an update and a version indicating the version of the update.
 
-Params: none
+Parameters: none
 
 Response:
 ```
 struct {
 	Available bool
-	Version string
+	Version   string
 }
 ```
 
@@ -42,13 +42,35 @@ struct {
 
 Function: Applies any updates that are available.
 
-Params: none
+Parameters: none
 
 Response: standard
 
+Consensus
+---------
+
+Queries:
+
+* /consensus/status
+
+#### /consensus/status
+
+Function: Returns information about the consensus set, such as the current
+block height.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Height       int
+	CurrentBlock string
+	Target       string
+}
+
 -----
 
-| Path              | Params                           | Response                     |
+| Path              | Parameters                           | Response                     |
 |:------------------|:---------------------------------|:-----------------------------|
 | /host/config      |                                  | See HostInfo                 |
 | /host/setconfig   | See HostSettings                 |                              |

@@ -32,7 +32,7 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
 
 	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus/status", d.statusHandler)
+	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", d.peerStatusHandler)
