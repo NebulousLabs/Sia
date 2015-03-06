@@ -5,6 +5,18 @@ import (
 	"net/http"
 )
 
+// hostAnnounceHandler handles the api call to get the host to announce itself
+// to the network.
+func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
+	err := d.host.Announce(d.network.Address())
+	if err != nil {
+		writeError(w, "Could not announce host:"+err.Error(), 400)
+		return
+	}
+	writeSuccess(w)
+}
+
+// hostConfigHandler handles the api call to set the host configuration.
 func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
 	config := d.host.Info().HostSettings
@@ -35,15 +47,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.host.Announce(d.network.Address())
-	if err != nil {
-		writeError(w, "Could not announce host:"+err.Error(), 400)
-		return
-	}
-	writeSuccess(w)
-}
-
+// hostStatusHandler handles the api call that queries the host status.
 func (d *daemon) hostStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.host.Info())
 }

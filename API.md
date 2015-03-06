@@ -134,3 +134,77 @@ struct {
 Address should be an IP address of the form: "a.b.c.d:port"
 
 Response: standard
+
+Host
+----
+
+Queries:
+
+* /host/announce
+* /host/config
+* /host/status
+
+#### /host/announce
+
+Function: The host will announce itself to the network as a source of storage.
+Generally only needs to be called once.
+
+Parameters: none
+
+Response: standard
+
+#### /host/config
+
+Function: Sets the configuration of the host.
+
+Parameters:
+```
+struct {
+	TotalStorage int
+	MinFilesize  int
+	MaxFilesize  int
+	MinDuration  int
+	MaxDuration  int
+	Price        int
+	Collateral   int
+}
+```
+TotalStorage (in bytes) is how much storage the host will rent to the network.
+
+MinFilesize is the minimum allowed file size.
+
+MaxFilesize is the maximum allowed file size.
+
+MinDuration is the minimum amount of time a contract is allowed to last.
+
+MaxDuration is the maximum amount of time a contract is allowed to last.
+
+Price is the cost in hastings per byte per block of hosting files on the network.
+
+Collateral is the amount of collateral the host will offer in hastings per byte
+per block for losing files on the network.
+
+Response: standard
+
+#### /host/status
+
+Function: Queries the host for general information.
+
+Parameters: none
+
+Response:
+```
+struct {
+	TotalStorage     int
+	MinFilesize      int
+	MaxFilesize      int
+	MinDuration      int
+	MaxDuration      int
+	MinWindow        int
+	Price            int
+	Collateral       int
+	UnlockHash       string
+	StorageRemaining int
+	NumContracts     int
+}
+```
