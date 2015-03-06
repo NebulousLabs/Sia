@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"sync"
+
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -17,17 +19,27 @@ func handlerName(name string) (id rpcID) {
 // RPC establishes a TCP connection to the NetAddress, writes the RPC
 // identifier, and then hands off the connection to fn. When fn returns, the
 // connection is closed.
-func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) (err error) {
+	// if something goes wrong, give the peer a strike
+	defer func() {
+		if err != nil {
+			g.mu.Lock()
+			g.addStrike(addr)
+			g.mu.Unlock()
+		}
+	}()
+
 	conn, err := dial(addr)
 	if err != nil {
-		return err
+		return
 	}
 	defer conn.Close()
 	// write header
-	if err := conn.WriteObject(handlerName(name)); err != nil {
-		return err
+	if err = conn.WriteObject(handlerName(name)); err != nil {
+		return
 	}
-	return fn(conn)
+	err = fn(conn)
+	return
 }
 
 // RegisterRPC registers a function as an RPC handler for a given identifier.
@@ -72,4 +84,21 @@ func (g *Gateway) handleConn(conn modules.NetConn) {
 		// TODO: log error
 	}
 	return
+}
+
+// threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
+// list. The calls are run in parallel.
+func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
+	var wg sync.WaitGroup
+	wg.Add(len(g.peers))
+	g.mu.RLock()
+	for peer := range g.peers {
+		// contact each peer in a separate thread
+		go func(peer modules.NetAddress) {
+			g.RPC(peer, name, fn)
+			wg.Done()
+		}(peer)
+	}
+	g.mu.RUnlock()
+	wg.Wait()
 }

@@ -39,6 +39,16 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	return "", ErrNoPeers
 }
 
+func (g *Gateway) addStrike(peer modules.NetAddress) {
+	if _, exists := g.peers[peer]; !exists {
+		return
+	}
+	g.peers[peer]++
+	if g.peers[peer] > maxStrikes {
+		g.removePeer(peer)
+	}
+}
+
 // AddPeer adds a peer to the Gateway's peer list.
 func (g *Gateway) AddPeer(peer modules.NetAddress) error {
 	g.mu.Lock()

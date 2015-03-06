@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -40,39 +39,6 @@ func (g *Gateway) setHostname(host string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
-}
-
-// threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
-// list. The calls are run in parallel.
-func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
-	var badpeers []modules.NetAddress
-	var wg sync.WaitGroup
-	wg.Add(len(g.peers))
-
-	g.mu.RLock()
-	for peer := range g.peers {
-		// contact each peer in a separate thread
-		go func(peer modules.NetAddress) {
-			err := g.RPC(peer, name, fn)
-			// TODO: some errors will be our fault. Need to distinguish them.
-			if err != nil {
-				badpeers = append(badpeers, peer)
-			}
-			wg.Done()
-		}(peer)
-	}
-	g.mu.RUnlock()
-	wg.Wait()
-
-	// process the bad peers
-	g.mu.Lock()
-	for _, peer := range badpeers {
-		g.peers[peer]++ // increment strikes
-		if g.peers[peer] > maxStrikes {
-			g.removePeer(peer)
-		}
-	}
-	g.mu.Unlock()
 }
 
 // getExternalIP learns the server's hostname from a centralized service,
