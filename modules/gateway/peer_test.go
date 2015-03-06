@@ -114,9 +114,14 @@ func TestBootstrap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// heights should eventually match
-	for g.state.Height() != bootstrap.state.Height() {
-		time.Sleep(time.Millisecond)
+	// heights should match
+	if g.state.Height() != bootstrap.state.Height() {
+		// g may have tried to synchronize to the other peer, so try manually
+		// synchronizing to the bootstrap
+		g.synchronize(bootstrap.Address())
+		if g.state.Height() != bootstrap.state.Height() {
+			t.Fatalf("gateway height %v does not match bootstrap height %v", g.state.Height(), bootstrap.state.Height())
+		}
 	}
 	// peer lists should be the same size, though they won't match; bootstrap
 	// will have g and g will have bootstrap.

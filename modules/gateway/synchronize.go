@@ -32,22 +32,25 @@ func (g *Gateway) Synchronize() (err error) {
 // transmits blocks sequentially. Multiple such transmissions may be required
 // to fully synchronize.
 func (g *Gateway) synchronize(peer modules.NetAddress) {
-	var newBlocks []consensus.Block
-	newBlocks, moreAvailable, err := g.requestBlocks(peer)
-	if err != nil {
-		// TODO: try a different peer?
-		return
-	}
-	for _, block := range newBlocks {
-		acceptErr := g.state.AcceptBlock(block)
-		if acceptErr != nil {
-			// TODO: If the error is a FutureTimestampErr, need to wait before trying the
-			// block again.
+	for {
+		var newBlocks []consensus.Block
+		newBlocks, moreAvailable, err := g.requestBlocks(peer)
+		if err != nil {
+			// TODO: try a different peer?
+			return
 		}
-	}
+		for _, block := range newBlocks {
+			acceptErr := g.state.AcceptBlock(block)
+			if acceptErr != nil {
+				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
+				// block again.
+			}
+		}
 
-	if moreAvailable {
-		go g.synchronize(peer)
+		// loop until there are no more blocks available
+		if !moreAvailable {
+			break
+		}
 	}
 }
 
