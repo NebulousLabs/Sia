@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	rpcPort int = 9500
+	rpcPort int = 9700
 )
 
 // A HostDBTester is a consensus tester that contains a hostdb and has
