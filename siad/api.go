@@ -26,13 +26,17 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
-	// Daemon API Calls
-	handleHTTPRequest(mux, "/daemon/stop", d.daemonStopHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", d.daemonUpdateCheckHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", d.daemonUpdateApplyHandler)
-
 	// Consensus API Calls
 	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)
+
+	// Daemon API Calls
+	handleHTTPRequest(mux, "/daemon/stop", d.daemonStopHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", d.daemonUpdateApplyHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", d.daemonUpdateCheckHandler)
+
+	// Debugging API Calls
+	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
+	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", d.gatewayStatusHandler)
@@ -41,8 +45,8 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/gateway/peer/remove", d.gatewayPeerRemoveHandler)
 
 	// Host API Calls
-	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
 	handleHTTPRequest(mux, "/host/announce", d.hostAnnounceHandler)
+	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
 	handleHTTPRequest(mux, "/host/status", d.hostStatusHandler)
 
 	// HostDB API Calls
@@ -53,10 +57,10 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/stop", d.minerStopHandler)
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/upload", d.fileUploadHandler)
-	handleHTTPRequest(mux, "/renter/uploadpath", d.fileUploadPathHandler)
 	handleHTTPRequest(mux, "/renter/download", d.fileDownloadHandler)
 	handleHTTPRequest(mux, "/renter/status", d.fileStatusHandler)
+	handleHTTPRequest(mux, "/renter/upload", d.fileUploadHandler)
+	handleHTTPRequest(mux, "/renter/uploadpath", d.fileUploadPathHandler)
 
 	// TransactionPool API Calls
 
@@ -64,10 +68,6 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/address", d.walletAddressHandler)
 	handleHTTPRequest(mux, "/wallet/send", d.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", d.walletStatusHandler)
-
-	// Debugging API Calls
-	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
 
 	// create graceful HTTP server
 	d.apiServer = &graceful.Server{
