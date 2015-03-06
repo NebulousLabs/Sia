@@ -23,7 +23,7 @@ func TestPeerSharing(t *testing.T) {
 
 	// ask gateway for peers
 	var peers []modules.NetAddress
-	err := g.RPC(g.myAddr, "SharePeers", modules.ReaderRPC(&peers, 1024))
+	err := g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestPeerSharing(t *testing.T) {
 	g.AddPeer("bar:9002")
 	g.AddPeer("baz:9003")
 	g.AddPeer("quux:9004")
-	err = g.RPC(g.myAddr, "SharePeers", modules.ReaderRPC(&peers, 1024))
+	err = g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestPeerSharing(t *testing.T) {
 	}
 
 	// no peers should be returned
-	err = g.RPC(g.myAddr, "SharePeers", modules.ReaderRPC(&peers, 1024))
+	err = g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestBadPeer(t *testing.T) {
 	// create bad peer
 	badpeer := newTestGateway(t)
 	// overwrite badpeer's Ping RPC with an incorrect one
-	badpeer.RegisterRPC("Ping", modules.WriterRPC("lol"))
+	badpeer.RegisterRPC("Ping", writerRPC("lol"))
 
 	g.AddPeer(badpeer.Address())
 

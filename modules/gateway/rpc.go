@@ -51,6 +51,22 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	g.handlerMap[handlerName(name)] = fn
 }
 
+// readerRPC returns a closure that can be passed to RPC to read a
+// single value.
+func readerRPC(obj interface{}, maxLen uint64) modules.RPCFunc {
+	return func(conn modules.NetConn) error {
+		return conn.ReadObject(obj, maxLen)
+	}
+}
+
+// writerRPC returns a closure that can be passed to RPC to write a
+// single value.
+func writerRPC(obj interface{}) modules.RPCFunc {
+	return func(conn modules.NetConn) error {
+		return conn.WriteObject(obj)
+	}
+}
+
 // listen runs in the background, accepting incoming connections and serving
 // them. listen will return after Gateway.Close() is called, because the
 // accept call will fail.

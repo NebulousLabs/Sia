@@ -81,7 +81,9 @@ func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
 	// Get the settings from the host. Host is removed from the set of active
 	// hosts if no response is given.
 	var hs modules.HostSettings
-	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", modules.ReaderRPC(&hs, 1024))
+	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
+		return conn.ReadObject(&hs, 1024)
+	})
 	if err != nil {
 		return
 	}

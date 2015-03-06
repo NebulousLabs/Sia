@@ -15,7 +15,7 @@ var pong = [4]byte{'p', 'o', 'n', 'g'}
 // ping request -- in other words, whether it is a potential peer.
 func (g *Gateway) Ping(addr modules.NetAddress) bool {
 	var resp [4]byte
-	err := g.RPC(addr, "Ping", modules.ReaderRPC(&resp, 4))
+	err := g.RPC(addr, "Ping", readerRPC(&resp, 4))
 	return err == nil && resp == pong
 }
 
@@ -26,7 +26,7 @@ func sendHostname(conn modules.NetConn) error {
 
 func (g *Gateway) learnHostname(addr modules.NetAddress) error {
 	var hostname string
-	err := g.RPC(addr, "SendHostname", modules.ReaderRPC(&hostname, 50))
+	err := g.RPC(addr, "SendHostname", readerRPC(&hostname, 50))
 	if err != nil {
 		return err
 	}

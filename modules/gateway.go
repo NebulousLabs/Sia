@@ -85,19 +85,3 @@ type Gateway interface {
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
 }
-
-// ReaderRPC returns a closure that can be passed to Gateway.RPC to read a
-// single value.
-func ReaderRPC(obj interface{}, maxLen uint64) RPCFunc {
-	return func(conn NetConn) error {
-		return conn.ReadObject(obj, maxLen)
-	}
-}
-
-// WriterRPC returns a closure that can be passed to Gateway.RPC to write a
-// single value.
-func WriterRPC(obj interface{}) RPCFunc {
-	return func(conn NetConn) error {
-		return conn.WriteObject(obj)
-	}
-}

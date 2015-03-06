@@ -82,7 +82,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 		// request peers from the bootstrap
 		g.requestPeers(bootstrapPeer)
 		// announce ourselves to the new peers
-		g.threadedBroadcast("AddMe", modules.WriterRPC(g.myAddr))
+		g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
 		// synchronize to a random peer
 		g.Synchronize()
 	}()
@@ -110,14 +110,14 @@ func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
 		return errors.New("block added, but it does not extend the state height")
 	}
 
-	go g.threadedBroadcast("RelayBlock", modules.WriterRPC(b))
+	go g.threadedBroadcast("RelayBlock", writerRPC(b))
 	return
 }
 
 // RelayTransaction relays a transaction, both locally and to the network.
 func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 	// no locking necessary
-	go g.threadedBroadcast("AcceptTransaction", modules.WriterRPC(t))
+	go g.threadedBroadcast("AcceptTransaction", writerRPC(t))
 	return
 }
 
@@ -153,7 +153,7 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		peers:      make(map[modules.NetAddress]int),
 	}
 
-	g.RegisterRPC("Ping", modules.WriterRPC(pong))
+	g.RegisterRPC("Ping", writerRPC(pong))
 	g.RegisterRPC("SendHostname", sendHostname)
 	g.RegisterRPC("AddMe", g.addMe)
 	g.RegisterRPC("SharePeers", g.sharePeers)
