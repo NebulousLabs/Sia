@@ -35,10 +35,10 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)
 
 	// Gateway API Calls
-	handleHTTPRequest(mux, "/gateway/status", d.peerStatusHandler)
-	handleHTTPRequest(mux, "/gateway/synchronize", d.syncHandler)
-	handleHTTPRequest(mux, "/gateway/peer/add", d.peerAddHandler)
-	handleHTTPRequest(mux, "/gateway/peer/remove", d.peerRemoveHandler)
+	handleHTTPRequest(mux, "/gateway/status", d.gatewayStatusHandler)
+	handleHTTPRequest(mux, "/gateway/synchronize", d.gatewaySynchronizeHandler)
+	handleHTTPRequest(mux, "/gateway/peer/add", d.gatewayPeerAddHandler)
+	handleHTTPRequest(mux, "/gateway/peer/remove", d.gatewayPeerRemoveHandler)
 
 	// Host API Calls
 	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
