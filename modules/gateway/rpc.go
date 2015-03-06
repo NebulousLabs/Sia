@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -67,19 +68,29 @@ func writerRPC(obj interface{}) modules.RPCFunc {
 	}
 }
 
-// listen runs in the background, accepting incoming connections and serving
-// them. listen will return after Gateway.Close() is called, because the
-// accept call will fail.
-func (g *Gateway) listen() {
-	for {
-		conn, err := accept(g.listener)
-		if err != nil {
-			return
-		}
-
-		// it is the handler's responsibility to close the connection
-		go g.handleConn(conn)
+// startListener creates a net.Listener on the RPC port and spawns a goroutine
+// that accepts and serves connections. This goroutine will terminate when
+// Close is called.
+func (g *Gateway) startListener(addr string) (err error) {
+	// create listener
+	g.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
 	}
+
+	go func() {
+		for {
+			conn, err := accept(g.listener)
+			if err != nil {
+				return
+			}
+
+			// it is the handler's responsibility to close the connection
+			go g.handleConn(conn)
+		}
+	}()
+
+	return
 }
 
 // handleConn reads header data from a connection, then routes it to the

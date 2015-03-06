@@ -138,15 +138,8 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		return
 	}
 
-	// create listener
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return
-	}
-
 	g = &Gateway{
 		state:      s,
-		listener:   l,
 		myAddr:     modules.NetAddress(addr),
 		handlerMap: make(map[rpcID]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]int),
@@ -159,7 +152,10 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
 	// spawn RPC handler
-	go g.listen()
+	err = g.startListener(addr)
+	if err != nil {
+		return
+	}
 
 	return
 }
