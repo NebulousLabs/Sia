@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
@@ -125,8 +124,8 @@ func TestBootstrap(t *testing.T) {
 	}
 	// peer lists should be the same size, though they won't match; bootstrap
 	// will have g and g will have bootstrap.
-	for len(g.Info().Peers) != len(bootstrap.Info().Peers) {
-		time.Sleep(time.Millisecond)
+	if len(g.Info().Peers) != len(bootstrap.Info().Peers) {
+		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.Info().Peers, bootstrap.Info().Peers)
 	}
 
 	// add another two peers to bootstrap: a real peer and a "dummy", which won't respond.

@@ -23,8 +23,8 @@ func (dt *daemonTester) addPeer() *daemonTester {
 		dt.Fatal("bootstrap failed:", err)
 	}
 
-	// Wait for RPC to finish, then check that each has the same number of
-	// peers and blocks.
+	// Wait for bootstrapping to finish, then check that each has the same
+	// number of peers and blocks.
 	for len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
 		time.Sleep(time.Millisecond)
 	}

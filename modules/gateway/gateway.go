@@ -77,14 +77,14 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 		return errors.New("couldn't learn hostname")
 	}
 
-	go func() {
-		// request peers from the bootstrap
-		g.requestPeers(bootstrapPeer)
-		// announce ourselves to the new peers
-		g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
-		// synchronize to a random peer
-		g.Synchronize()
-	}()
+	// request peers from the bootstrap
+	g.requestPeers(bootstrapPeer)
+
+	// announce ourselves to the new peers
+	go g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
+
+	// synchronize to a random peer
+	g.Synchronize()
 
 	return
 }
