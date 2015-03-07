@@ -21,7 +21,7 @@ func (g *Gateway) Synchronize() (err error) {
 	if err != nil {
 		return
 	}
-	g.synchronize(peer)
+	go g.synchronize(peer)
 	return
 }
 
