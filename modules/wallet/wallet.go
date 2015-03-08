@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -105,10 +106,12 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 	}
 
 	// If the wallet file already exists, try to load it.
+	// TODO: log warning if no file found?
 	if fileExists(filename) {
 		// lock not necessary here because no one else has access to w
 		err = w.load(filename)
 		if err != nil {
+			err = fmt.Errorf("couldn't load wallet file %s: %v", filename, err)
 			return
 		}
 	}

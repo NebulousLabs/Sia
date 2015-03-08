@@ -22,16 +22,21 @@ type savedKey struct {
 
 // save writes the contents of a wallet to a file.
 func (w *Wallet) save() (err error) {
-	// convert key map to a slice
+	// Convert the key map to a slice.
 	keySlice := make([]savedKey, 0, len(w.keys))
 	for _, key := range w.keys {
 		keySlice = append(keySlice, savedKey{key.secretKey, key.unlockConditions})
 	}
 
-	// Write the data to file.
-	// TODO: Instead of using WriteFile, write to a temp file and then do a move.
-	err = ioutil.WriteFile(w.filename, encoding.Marshal(keySlice), 0666)
+	// Write the data to a temp file
+	err = ioutil.WriteFile(w.filename+"_temp", encoding.Marshal(keySlice), 0666)
 	if err != nil {
+		return
+	}
+	// Atomically overwrite the old wallet file with the new wallet file.
+	err = os.Rename(w.filename+"_temp", w.filename)
+	if err != nil {
+		// TODO: instruct user to recover wallet from w.filename+"_temp"
 		return
 	}
 
@@ -47,7 +52,7 @@ func (w *Wallet) load(filename string) (err error) {
 	var savedKeys []savedKey
 	err = encoding.Unmarshal(contents, &savedKeys)
 	if err != nil {
-		return
+		return errors.New("corrupted wallet file")
 	}
 
 	height := w.state.Height()
