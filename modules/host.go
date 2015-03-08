@@ -1,10 +1,7 @@
 package modules
 
 import (
-	"net"
-
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
@@ -33,23 +30,24 @@ type HostInfo struct {
 
 type Host interface {
 	// Announce announces the host on the blockchain.
-	Announce(addr network.Address) error
+	Announce(NetAddress) error
 
-	// NegotiateContract is a strict function that enables a client to
-	// communicate with the host to propose a contract.
+	// NegotiateContract is an RPC that enables a client to communicate with
+	// the host to propose a contract.
 	//
 	// TODO: enhance this documentataion. For now, see the host package for a
 	// reference implementation.
-	NegotiateContract(net.Conn) error
+	NegotiateContract(NetConn) error
 
-	// RetrieveFile is a strict function that enables a client to download a
-	// file from a host.
-	RetrieveFile(net.Conn) error
+	// RetrieveFile is an RPC that enables a client to download a file from
+	// the host.
+	RetrieveFile(NetConn) error
 
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)
 
-	Settings() (HostSettings, error)
+	// Settings is an RPC that returns the host's settings.
+	Settings(NetConn) error
 
 	// Info returns info about the host, including its hosting parameters, the
 	// amount of storage remaining, and the number of active contracts.

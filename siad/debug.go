@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // SiaConstants is a struct listing all of the constants in use.
@@ -70,10 +69,10 @@ func (d *daemon) debugConstantsHandler(w http.ResponseWriter, req *http.Request)
 	writeJSON(w, sc)
 }
 
-// mutexTestHandler creates an int for each module and then calls a function to
-// lock and unlock the module in a goroutine. After the function, the int for
-// that module is incremented. Any module that enters deadlock will not
-// increment its integer. Diagnostic results are then printed.
+// mutexTestHandler creates an bool for each module and then calls a function
+// to lock and unlock the module in a goroutine. After the function, the bool
+// for that module is set to true. Deadlocked modules will retain a false
+// boolean. Diagnostic results are then printed.
 func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 	// Call functions that result in locks but use inputs that don't result in
 	// changes. After the blocking function unlocks, set the value to true.
@@ -83,23 +82,15 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.State = true
 	}()
 	go func() {
-		d.gateway.RemovePeer(network.Address(""))
+		d.gateway.RemovePeer("")
 		mds.Gateway = true
 	}()
 	go func() {
-		settings, err := d.host.Settings()
-		if err != nil {
-			if consensus.DEBUG {
-				panic(err)
-			}
-			mds.Host = true
-			return
-		}
-		d.host.SetSettings(settings)
+		d.host.Info()
 		mds.Host = true
 	}()
 	go func() {
-		d.hostdb.Remove(network.Address(""))
+		d.hostdb.Remove("")
 		mds.HostDB = true
 	}()
 	go func() {

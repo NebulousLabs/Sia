@@ -7,7 +7,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // TestMiner creates a miner, mines a few blocks, and checks that the wallet
@@ -15,11 +14,7 @@ import (
 func TestMiner(t *testing.T) {
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	tcps, err := network.NewTCPServer(":9003")
-	if err != nil {
-		t.Fatal(err)
-	}
-	g, err := gateway.New(tcps, s)
+	g, err := gateway.New(":8900", s)
 	if err != nil {
 		t.Fatal(err)
 	}

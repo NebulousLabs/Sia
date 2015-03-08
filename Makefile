@@ -37,7 +37,7 @@ test-long: clean fmt REBUILD
 # have been hit during testing and how many times each line has been hit.
 coverpackages = consensus crypto encoding modules/gateway modules/host          \
 	modules/hostdb modules/miner modules/renter modules/transactionpool         \
-	modules/wallet network siad
+	modules/wallet siad
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \

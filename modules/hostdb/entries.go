@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 var (
@@ -82,7 +81,9 @@ func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
 	// Get the settings from the host. Host is removed from the set of active
 	// hosts if no response is given.
 	var hs modules.HostSettings
-	err := entry.IPAddress.RPC("HostSettings", nil, &hs)
+	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
+		return conn.ReadObject(&hs, 1024)
+	})
 	if err != nil {
 		return
 	}
@@ -124,7 +125,7 @@ func (hdb *HostDB) insert(entry modules.HostEntry) {
 }
 
 // Remove deletes an entry from the hostdb.
-func (hdb *HostDB) remove(addr network.Address) error {
+func (hdb *HostDB) remove(addr modules.NetAddress) error {
 	delete(hdb.allHosts, addr)
 
 	// See if the node is in the set of active hosts.
@@ -141,7 +142,7 @@ func (hdb *HostDB) remove(addr network.Address) error {
 // FlagHost is called when a host is caught misbehaving. In general, the
 // behavior is that the host will be called less often. For the time being,
 // that means removing the host from the database outright.
-func (hdb *HostDB) FlagHost(addr network.Address) error {
+func (hdb *HostDB) FlagHost(addr modules.NetAddress) error {
 	return hdb.Remove(addr)
 }
 
@@ -187,7 +188,7 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 }
 
 // Remove is the thread-safe version of remove.
-func (hdb *HostDB) Remove(addr network.Address) error {
+func (hdb *HostDB) Remove(addr modules.NetAddress) error {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
 	return hdb.remove(addr)

@@ -11,7 +11,7 @@ import (
 // specified maximum length.
 func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 	prefix := make([]byte, 8)
-	if n, err := r.Read(prefix); err != nil || n != len(prefix) {
+	if _, err := io.ReadFull(r, prefix); err != nil {
 		return nil, errors.New("could not read length prefix")
 	}
 	dataLen := DecUint64(prefix)
@@ -34,12 +34,13 @@ func ReadObject(r io.Reader, obj interface{}, maxLen uint64) error {
 }
 
 // WritePrefix prepends data with a 4-byte length before writing it.
-func WritePrefix(w io.Writer, data []byte) (int, error) {
-	return w.Write(append(EncUint64(uint64(len(data))), data...))
+func WritePrefix(w io.Writer, data []byte) error {
+	_, err := w.Write(append(EncUint64(uint64(len(data))), data...))
+	return err
 }
 
 // WriteObject encodes an object and prepends it with a 4-byte length before
 // writing it.
-func WriteObject(w io.Writer, obj interface{}) (int, error) {
+func WriteObject(w io.Writer, obj interface{}) error {
 	return WritePrefix(w, Marshal(obj))
 }

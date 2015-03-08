@@ -109,6 +109,12 @@ func startEnvironment(*cobra.Command, []string) {
 		fmt.Println("Failed to create daemon:", err)
 		return
 	}
+
+	// join the network
+	if !config.Siacore.NoBootstrap {
+		go d.bootstrap()
+	}
+
 	// listen for API requests
 	err = d.listen()
 	if err != nil {

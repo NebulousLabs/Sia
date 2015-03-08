@@ -23,13 +23,16 @@ func (dt *daemonTester) addPeer() *daemonTester {
 		dt.Fatal("bootstrap failed:", err)
 	}
 
-	// Wait for RPC to finish, then check that each has the same number of
-	// peers and blocks.
+	// Wait for bootstrapping to finish, then check that each has the same
+	// number of peers and blocks.
 	for len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
 		time.Sleep(time.Millisecond)
 	}
+	// force synchronization to dt, in case newPeer tried to synchronize to
+	// one of dt's peers.
 	for dt.state.Height() != newPeer.state.Height() {
-		time.Sleep(time.Millisecond)
+		newPeer.gateway.Synchronize()
+		time.Sleep(10 * time.Millisecond)
 	}
 	return newPeer
 }
@@ -61,7 +64,7 @@ func TestPeering(t *testing.T) {
 	// peer1 though, because /gateway/add does not contact the added peer.
 	peer2.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer3.netAddress() {
-		t.Fatal("bootstrap peer did not relay the bootstrapping peer")
+		t.Fatal("bootstrap peer did not relay the bootstrapping peer", info)
 	}
 }
 
