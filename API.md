@@ -248,5 +248,3 @@ If the Mining flag is set, the miner is currently mining. Otherwise it is not.
 Function: Stops the miner.
 
 Parameters: none
-
-Response: standard

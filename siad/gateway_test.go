@@ -40,7 +40,7 @@ func TestPeering(t *testing.T) {
 	// Create to peers and add the first to the second.
 	peer1 := newDaemonTester(t)
 	peer2 := newDaemonTester(t)
-	peer1.callAPI("/gateway/peer/add?addr=" + string(peer2.netAddress()))
+	peer1.callAPI("/gateway/peer/add?Address=" + string(peer2.netAddress()))
 
 	// Check that the first has the second as a peer.
 	var info modules.GatewayInfo
