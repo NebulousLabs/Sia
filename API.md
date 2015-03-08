@@ -208,3 +208,45 @@ struct {
 	NumContracts     int
 }
 ```
+
+HostDB
+------
+
+Queries: none
+
+Miner
+-----
+
+Queries:
+
+* /miner/start
+* /miner/status
+* /miner/stop
+
+#### /miner/start
+
+Function: Starts the miner.
+
+Parameters: none
+
+Response: standard
+
+#### /miner/status
+
+Parameters: none
+
+Response:
+```
+struct {
+	Mining bool
+}
+```
+If the Mining flag is set, the miner is currently mining. Otherwise it is not.
+
+#### /miner/stop
+
+Function: Stops the miner.
+
+Parameters: none
+
+Response: standard

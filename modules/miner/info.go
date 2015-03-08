@@ -8,6 +8,7 @@ import (
 // item is returned in the format that it's meant to be displayed.
 type MinerInfo struct {
 	State          string
+	Mining         bool
 	Threads        int
 	RunningThreads int
 	Address        consensus.UnlockHash
@@ -33,6 +34,9 @@ func (m *Miner) Info() (MinerInfo, error) {
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
+	}
+	if info.RunningThreads != 0 {
+		info.Mining = true
 	}
 
 	// Set the running info based on desiredThreads vs. runningThreads.
