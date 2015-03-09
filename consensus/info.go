@@ -18,17 +18,21 @@ type StateInfo struct {
 
 // blockAtHeight returns the block on the current path with the given height.
 func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
-	bn, exists := s.blockMap[s.currentPath[height]]
-	if !exists {
-		return
+	exists = height <= s.height()
+	if exists {
+		b = s.blockMap[s.currentPath[height]].block
 	}
-	b = bn.block
 	return
+}
+
+// currentBlockID returns the ID of the current block.
+func (s *State) currentBlockID() BlockID {
+	return s.currentPath[s.height()]
 }
 
 // currentBlockNode returns the blockNode of the current block.
 func (s *State) currentBlockNode() *blockNode {
-	return s.blockMap[s.currentBlockID]
+	return s.blockMap[s.currentBlockID()]
 }
 
 // currentBlockWeight returns the weight of the current block.
@@ -38,7 +42,7 @@ func (s *State) currentBlockWeight() *big.Rat {
 
 // height returns the current height of the state.
 func (s *State) height() BlockHeight {
-	return s.blockMap[s.currentBlockID].height
+	return BlockHeight(len(s.currentPath) - 1)
 }
 
 // output returns the unspent SiacoinOutput associated with the given ID. If
@@ -113,6 +117,30 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 	return
 }
 
+// BlockRange returns a slice of the blocks that fall within the given range
+// [start, stop].
+func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if start > stop || stop > s.height() {
+		return nil, errors.New("invalid range")
+	}
+
+	blocks := make([]Block, (stop-start)+1)
+	for i, id := range s.currentPath[start : stop+1] {
+		node, exists := s.blockMap[id]
+		if !exists {
+			if DEBUG {
+				panic("blockMap is missing a block whose ID is in the currentPath")
+			}
+			return nil, errors.New("State is inconsistent")
+		}
+		blocks[i] = node.block
+	}
+	return blocks, nil
+}
+
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
 	s.mu.RLock()
@@ -151,15 +179,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 	}
 
 	// Get all the IDs going forward from the common parent.
-	for height := path[0].height + 1; ; height++ {
-		if _, exists := s.currentPath[height]; !exists {
-			break
-		}
-
-		node := s.blockMap[s.currentPath[height]]
-		addedBlocks = append(addedBlocks, node.block.ID())
-	}
-
+	addedBlocks = s.currentPath[path[0].height+1:]
 	return
 }
 

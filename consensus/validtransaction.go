@@ -180,17 +180,15 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 		return
 	}
 
-	// Get the id of the trigger block, which is the block at height fc.Start -
-	// 1.
+	// Get the ID of the trigger block.
 	triggerHeight := fc.Start - 1
-	triggerBlock, exists := s.blockAtHeight(triggerHeight)
-	if !exists {
+	if triggerHeight > s.height() {
 		err = errors.New("no block found at contract trigger block height")
 		return
 	}
-	triggerID := triggerBlock.ID()
+	triggerID := s.currentPath[triggerHeight]
 
-	// Get the index by appending the file contract id to the trigger block and
+	// Get the index by appending the file contract ID to the trigger block and
 	// taking the hash, then converting the hash to a numerical value and
 	// modding it against the number of segments in the file. The result is a
 	// random number in range [0, numSegments]. The probability is very
@@ -211,7 +209,7 @@ func (s *State) validStorageProofs(t Transaction) error {
 	for _, sp := range t.StorageProofs {
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
-			return errors.New("unrecognized file contract id in storage proof")
+			return errors.New("unrecognized file contract ID in storage proof")
 		}
 
 		// Check that the storage proof itself is valid.

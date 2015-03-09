@@ -26,10 +26,14 @@ func (s *State) invalidateNode(node *blockNode) {
 // set of nodes between the common parent and 'bn', starting from the former.
 func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
-	for s.currentPath[bn.height] != bn.block.ID() {
+	for {
+		// stop when we reach the common parent
+		if bn.height <= s.height() && s.currentPath[bn.height] == bn.block.ID() {
+			break
+		}
+
 		bn = bn.parent
-		// prepend, not append
-		path = append([]*blockNode{bn}, path...)
+		path = append([]*blockNode{bn}, path...) // prepend, not append
 
 		// Sanity check - all block nodes should have a parent except the
 		// genesis block, and this loop should break before reaching the
@@ -55,7 +59,7 @@ func (s *State) rewindToNode(bn *blockNode) {
 	}
 
 	// Rewind blocks until we reach 'bn'.
-	for s.currentBlockID != bn.block.ID() {
+	for s.currentBlockID() != bn.block.ID() {
 		cur := s.currentBlockNode()
 		s.commitDiffSet(cur, DiffRevert)
 	}

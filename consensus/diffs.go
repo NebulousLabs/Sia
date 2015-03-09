@@ -117,11 +117,11 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
 		if dir == DiffApply {
-			if bn.parent.block.ID() != s.currentBlockID {
+			if bn.parent.block.ID() != s.currentBlockID() {
 				panic("applying a block node when it's not a valid successor")
 			}
 		} else {
-			if bn.block.ID() != s.currentBlockID {
+			if bn.block.ID() != s.currentBlockID() {
 				panic("applying a block node when it's not a valid successor")
 			}
 		}
@@ -141,14 +141,10 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 
 	// Update the State's metadata
 	if dir == DiffApply {
-		s.currentBlockID = bn.block.ID()
-
-		s.currentPath[bn.height] = bn.block.ID()
+		s.currentPath = append(s.currentPath, bn.block.ID())
 		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
-		s.currentBlockID = bn.parent.block.ID()
-
-		delete(s.currentPath, bn.height)
+		s.currentPath = s.currentPath[:len(s.currentPath)-1]
 		delete(s.delayedSiacoinOutputs, bn.height)
 	}
 }
@@ -168,14 +164,13 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 		}
 
 		// Current node must be the input node's parent.
-		if bn.parent.block.ID() != s.currentBlockID {
+		if bn.parent.block.ID() != s.currentBlockID() {
 			panic("applying a block node when it's not a valid successor")
 		}
 	}
 
 	// Update the state to point to the new block.
-	s.currentBlockID = bn.block.ID()
-	s.currentPath[bn.height] = bn.block.ID()
+	s.currentPath = append(s.currentPath, bn.block.ID())
 	s.delayedSiacoinOutputs[s.height()] = make(map[SiacoinOutputID]SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
