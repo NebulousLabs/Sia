@@ -15,23 +15,22 @@ func (ct *ConsensusTester) CurrentPathCheck() {
 
 	currentNode := ct.currentBlockNode()
 	for i := ct.Height(); i != 0; i-- {
-		// Check that the CurrentPath entry exists.
-		id, exists := ct.currentPath[i]
-		if !exists {
-			ct.Error("current path is empty for a height with a known block.")
+		// Check that the node has a corresponding entry in the blockMap
+		if _, exists := ct.blockMap[currentNode.block.ID()]; !exists {
+			ct.Error("currentPath has diverged from blockMap")
 		}
 
-		// Check that the CurrentPath entry contains the correct block id.
-		if currentNode.block.ID() != id {
-			ct.Error("current path does not have correct id!")
+		// Check that the CurrentPath entry contains the correct block ID.
+		if currentNode.block.ID() != ct.currentPath[i] {
+			ct.Error("current path does not have correct ID!")
 		}
 
-		// Check that each parent is one less in height than its child.
+		// Check that the node's height is correct.
 		if currentNode.height != currentNode.parent.height+1 {
 			ct.Error("heights are messed up")
 		}
 
-		currentNode = ct.blockMap[currentNode.block.ParentID]
+		currentNode = currentNode.parent
 	}
 }
 

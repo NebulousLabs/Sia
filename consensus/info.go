@@ -18,11 +18,10 @@ type StateInfo struct {
 
 // blockAtHeight returns the block on the current path with the given height.
 func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
-	bn, exists := s.blockMap[s.currentPath[height]]
-	if !exists {
-		return
+	exists = height <= s.height()
+	if exists {
+		b = s.blockMap[s.currentPath[height]].block
 	}
-	b = bn.block
 	return
 }
 
@@ -38,7 +37,7 @@ func (s *State) currentBlockWeight() *big.Rat {
 
 // height returns the current height of the state.
 func (s *State) height() BlockHeight {
-	return s.blockMap[s.currentBlockID].height
+	return BlockHeight(len(s.currentPath) - 1)
 }
 
 // output returns the unspent SiacoinOutput associated with the given ID. If
@@ -151,15 +150,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 	}
 
 	// Get all the IDs going forward from the common parent.
-	for height := path[0].height + 1; ; height++ {
-		if _, exists := s.currentPath[height]; !exists {
-			break
-		}
-
-		node := s.blockMap[s.currentPath[height]]
-		addedBlocks = append(addedBlocks, node.block.ID())
-	}
-
+	addedBlocks = s.currentPath[path[0].height+1:]
 	return
 }
 

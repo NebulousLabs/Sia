@@ -25,7 +25,7 @@ type State struct {
 
 	// currentPath and currentBlockID track which blocks are currently accepted
 	// as the longest known blockchain.
-	currentPath    map[BlockHeight]BlockID
+	currentPath    []BlockID
 	currentBlockID BlockID
 
 	// These are the consensus variables, referred to as the "consensus set."
@@ -73,7 +73,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		blockMap:  make(map[BlockID]*blockNode),
 		badBlocks: make(map[BlockID]struct{}),
 
-		currentPath: make(map[BlockHeight]BlockID),
+		currentPath: make([]BlockID, 1),
 
 		siacoinOutputs:        make(map[SiacoinOutputID]SiacoinOutput),
 		fileContracts:         make(map[FileContractID]FileContract),
