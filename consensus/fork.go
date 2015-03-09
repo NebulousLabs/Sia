@@ -59,7 +59,7 @@ func (s *State) rewindToNode(bn *blockNode) {
 	}
 
 	// Rewind blocks until we reach 'bn'.
-	for s.currentBlockID != bn.block.ID() {
+	for s.currentBlockID() != bn.block.ID() {
 		cur := s.currentBlockNode()
 		s.commitDiffSet(cur, DiffRevert)
 	}

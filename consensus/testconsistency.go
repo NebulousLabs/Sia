@@ -116,7 +116,6 @@ func (s *State) consensusSetHash() crypto.Hash {
 	// Create a slice of hashes representing all items of interest.
 	tree := crypto.NewTree()
 	tree.PushObject(s.blockRoot.block)
-	tree.PushObject(s.currentBlockID)
 	tree.PushObject(s.height())
 	tree.PushObject(s.currentBlockNode().target)
 	tree.PushObject(s.currentBlockNode().depth)

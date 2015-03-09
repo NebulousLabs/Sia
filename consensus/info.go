@@ -25,9 +25,14 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
 	return
 }
 
+// currentBlockID returns the ID of the current block.
+func (s *State) currentBlockID() BlockID {
+	return s.currentPath[s.height()]
+}
+
 // currentBlockNode returns the blockNode of the current block.
 func (s *State) currentBlockNode() *blockNode {
-	return s.blockMap[s.currentBlockID]
+	return s.blockMap[s.currentBlockID()]
 }
 
 // currentBlockWeight returns the weight of the current block.
