@@ -248,3 +248,86 @@ If the Mining flag is set, the miner is currently mining. Otherwise it is not.
 Function: Stops the miner.
 
 Parameters: none
+
+Response: standard
+
+Renter
+------
+
+Queries:
+
+* /renter/download
+* /renter/status
+* /renter/upload
+* /renter/uploadpath
+
+#### /renter/download
+
+Function: Starts a file download.
+
+Parameters:
+```
+struct {
+	Nickname    string
+	Destination string
+}
+```
+Nickname is the nickname of the file that has been uploaded to the network.
+
+Destination is the filepath that the file should be downloaded to.
+
+Response: standard
+
+#### /renter/status
+
+Function: Returns the status of the renter.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Files []string
+}
+```
+Files is a list of all the files by their nickname.
+
+#### /renter/upload
+
+Function: Upload a file using a datastream.
+
+Parameters:
+```
+struct {
+	Data     io.ReadSeeker
+	Duration int
+	Nickname string
+	Pieces   int
+}
+```
+Data is a datastream from an html request.
+
+Duration is the number of blocks that the file will be available.
+
+Nickname is the name the renter uses for the file.
+
+Pieces is the redundancy of the file.
+
+Response: standard
+
+#### /renter/uploadpath
+
+Function: Upload a file using an explicit filepath.
+
+Parameters:
+```
+struct {
+	Data     string
+	Duration int
+	Nickname string
+	Pieces   int
+}
+```
+Data is a filename.
+
+Response: standard.

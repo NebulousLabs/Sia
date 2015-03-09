@@ -14,8 +14,28 @@ const (
 	delay    = 20
 )
 
-func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
-	pieces, err := strconv.Atoi(req.FormValue("pieces"))
+// renterDownloadHandler handles the api call to download a file.
+func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
+	path := filepath.Join(d.downloadDir, req.FormValue("Destination"))
+	err := d.renter.Download(req.FormValue("Nickname"), path)
+	if err != nil {
+		// TODO: if this err is a user error (e.g. bad nickname), return 400 instead
+		writeError(w, "Download failed: "+err.Error(), 500)
+		return
+	}
+
+	writeSuccess(w)
+}
+
+// renterStatusHandler handles the api call querying the renter's status.
+func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, d.renter.Info())
+}
+
+// renterUploadHandler handles the api call to upload a file using a
+// datastream.
+func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
+	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
 	if err != nil {
 		writeError(w, "Malformed pieces", 400)
 		return
@@ -31,7 +51,7 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	err = d.renter.Upload(modules.UploadParams{
 		Data:     file,
 		Duration: duration,
-		Nickname: req.FormValue("nickname"),
+		Nickname: req.FormValue("Nickname"),
 		Pieces:   pieces,
 	})
 	if err != nil {
@@ -42,15 +62,17 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request) {
-	pieces, err := strconv.Atoi(req.FormValue("pieces"))
+// renterUploadPathHandler handles the api call to upload a file using a
+// filepath.
+func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Request) {
+	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
 	if err != nil {
 		writeError(w, "Malformed pieces", 400)
 		return
 	}
 
 	// open the file
-	file, err := os.Open(req.FormValue("filename"))
+	file, err := os.Open(req.FormValue("Source"))
 	if err != nil {
 		writeError(w, "Couldn't open file: "+err.Error(), 400)
 		return
@@ -59,7 +81,7 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 	err = d.renter.Upload(modules.UploadParams{
 		Data:     file,
 		Duration: duration,
-		Nickname: req.FormValue("nickname"),
+		Nickname: req.FormValue("Nickname"),
 		Pieces:   pieces,
 	})
 	if err != nil {
@@ -68,20 +90,4 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 	}
 
 	writeSuccess(w)
-}
-
-func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	path := filepath.Join(d.downloadDir, req.FormValue("filename"))
-	err := d.renter.Download(req.FormValue("nickname"), path)
-	if err != nil {
-		// TODO: if this err is a user error (e.g. bad nickname), return 400 instead
-		writeError(w, "Download failed: "+err.Error(), 500)
-		return
-	}
-
-	writeSuccess(w)
-}
-
-func (d *daemon) fileStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.renter.Info())
 }
