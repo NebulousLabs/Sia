@@ -84,15 +84,13 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	}
 
 	// Send blocks, starting with the child of the most recent known block.
-	//
-	// TODO: use BlocksSince instead?
-	var blocks []consensus.Block
-	for i := start; i < start+MaxCatchUpBlocks; i++ {
-		b, exists := g.state.BlockAtHeight(i)
-		if !exists {
-			break
-		}
-		blocks = append(blocks, b)
+	stop := start + MaxCatchUpBlocks
+	if stop > g.state.Height() {
+		stop = g.state.Height()
+	}
+	blocks, err := g.state.BlockRange(start, stop)
+	if err != nil {
+		return
 	}
 	err = conn.WriteObject(blocks)
 	if err != nil {
@@ -100,7 +98,7 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	}
 
 	// Indicate whether more blocks are available.
-	_, more := g.state.BlockAtHeight(start + MaxCatchUpBlocks)
+	more := g.state.Height() > stop
 	return conn.WriteObject(more)
 }
 

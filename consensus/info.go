@@ -112,6 +112,30 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 	return
 }
 
+// BlockRange returns a slice of the blocks that fall within the given range
+// [start, stop].
+func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if start > stop || stop > s.height() {
+		return nil, errors.New("invalid range")
+	}
+
+	blocks := make([]Block, (stop-start)+1)
+	for i, id := range s.currentPath[start : stop+1] {
+		node, exists := s.blockMap[id]
+		if !exists {
+			if DEBUG {
+				panic("blockMap is missing a block whose ID is in the currentPath")
+			}
+			return nil, errors.New("State is inconsistent")
+		}
+		blocks[i] = node.block
+	}
+	return blocks, nil
+}
+
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
 	s.mu.RLock()
