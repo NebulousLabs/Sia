@@ -179,9 +179,9 @@ MinDuration is the minimum amount of time a contract is allowed to last.
 
 MaxDuration is the maximum amount of time a contract is allowed to last.
 
-Price is the cost in hastings per byte per block of hosting files on the network.
+Price is the cost in Hastings per byte per block of hosting files on the network.
 
-Collateral is the amount of collateral the host will offer in hastings per byte
+Collateral is the amount of collateral the host will offer in Hastings per byte
 per block for losing files on the network.
 
 Response: standard
@@ -331,3 +331,64 @@ struct {
 Data is a filename.
 
 Response: standard.
+
+Wallet
+------
+
+Queries:
+
+* /wallet/address
+* /wallet/send
+* /wallet/status
+
+#### /wallet/address
+
+Function: Returns an address that is spendable by the wallet.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Address string
+}
+```
+Address is a hex representation of a wallet address.
+
+#### /wallet/send
+
+Function: Sends coins to a destination address.
+
+Parameters:
+```
+struct {
+	Amount      int
+	Destination string
+}
+```
+Amount is a volume of Hastings.
+
+Destination is an address represented in hex.
+
+Response: standard
+
+#### /wallet/status
+
+Function: Get the status of the wallet.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Balance      int
+	FullBalance  int
+	NumAddresses int
+}
+```
+Balance is the spendable balance of the wallet.
+
+FullBalance is the balance of the wallet, including outputs that are not yet
+spendable or have been spent but have not been confirmed.
+
+NumAddresses is the number of addresses that the wallet is currently watching.

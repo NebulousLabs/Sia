@@ -92,7 +92,7 @@ func TestTransactionRelay(t *testing.T) {
 	// Create a transaction in the first daemon and check that it propagates to
 	// the second. The check is done via spinning because network propagation
 	// will take an unknown amount of time.
-	dt.callAPI("/wallet/send?amount=15&dest=" + dt2.coinAddress())
+	dt.callAPI("/wallet/send?Amount=15&Destination=" + dt2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
 		tset, err = dt.tpool.TransactionSet()
 		if err != nil {

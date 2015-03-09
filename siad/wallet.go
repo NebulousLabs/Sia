@@ -7,7 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// walletAddressHandler manages requests for CoinAddresses from the wallet.
+// walletAddressHandler handles the api request for a new address.
 func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	coinAddress, _, err := d.wallet.CoinAddress()
 	if err != nil {
@@ -23,12 +23,12 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 	}{fmt.Sprintf("%x", coinAddress)})
 }
 
-// walletSendHandler manages 'send' requests that are made to the wallet.
+// walletSendHandler handles the api call to send coins to another address.
 func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
 	var dest consensus.UnlockHash
-	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
+	_, err := fmt.Sscan(req.FormValue("Amount"), &amount)
 	if err != nil {
 		writeError(w, "Malformed amount", 400)
 		return
@@ -36,7 +36,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 
 	// Parse the string into an address.
 	var destAddressBytes []byte
-	_, err = fmt.Sscanf(req.FormValue("dest"), "%x", &destAddressBytes)
+	_, err = fmt.Sscanf(req.FormValue("Destination"), "%x", &destAddressBytes)
 	if err != nil {
 		writeError(w, "Malformed coin address", 400)
 		return
@@ -53,8 +53,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// walletStatusHandler returns a struct containing wallet information, like the
-// balance.
+// walletStatusHandler handles the api call querying the status of the wallet.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.wallet.Info())
 }
