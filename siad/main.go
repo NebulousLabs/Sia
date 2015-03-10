@@ -10,6 +10,8 @@ import (
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -111,8 +113,10 @@ func startEnvironment(*cobra.Command, []string) {
 	}
 
 	// join the network
+	//
+	// TODO: This should proabably happen in newDaemon.
 	if !config.Siacore.NoBootstrap {
-		go d.bootstrap()
+		go d.gateway.Bootstrap(modules.BootstrapPeers[0])
 	}
 
 	// listen for API requests
