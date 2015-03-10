@@ -182,6 +182,8 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// rollback everything if something goes wrong
 	defer func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
 		if err != nil {
 			h.deallocate(terms.FileSize, path)
 		}

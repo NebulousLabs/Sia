@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
-	duration = 2000 // Duration that hosts will hold onto the file.
+	duration   = 2000 // Duration that hosts will hold onto the file.
+	redundancy = 15   // Redundancy of files uploaded to the network.
 )
 
 // renterDownloadHandler handles the api call to download a file.
@@ -33,12 +33,6 @@ func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 // renterUploadHandler handles the api call to upload a file using a
 // datastream.
 func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
-	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
-	if err != nil {
-		writeError(w, "Malformed pieces", http.StatusBadRequest)
-		return
-	}
-
 	file, _, err := req.FormFile("Source")
 	if err != nil {
 		writeError(w, "Malformed/missing file: "+err.Error(), http.StatusBadRequest)
@@ -50,7 +44,7 @@ func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 		Data:     file,
 		Duration: duration,
 		Nickname: req.FormValue("Nickname"),
-		Pieces:   pieces,
+		Pieces:   redundancy,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
@@ -63,12 +57,6 @@ func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 // renterUploadPathHandler handles the api call to upload a file using a
 // filepath.
 func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Request) {
-	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
-	if err != nil {
-		writeError(w, "Malformed pieces", http.StatusBadRequest)
-		return
-	}
-
 	// open the file
 	file, err := os.Open(req.FormValue("Source"))
 	if err != nil {
@@ -80,7 +68,7 @@ func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Reques
 		Data:     file,
 		Duration: duration,
 		Nickname: req.FormValue("Nickname"),
-		Pieces:   pieces,
+		Pieces:   redundancy,
 	})
 	if err != nil {
 		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)

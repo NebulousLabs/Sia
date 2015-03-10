@@ -29,7 +29,11 @@ func TestUploadAndDownload(t *testing.T) {
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
-	time.Sleep(consensus.RenterZeroConfDelay + 1e9)
+	//
+	// TODO: There should be some way to just spinblock until the download
+	// completes. Except there's no exported function in the renter that will
+	// indicate if a download has completed or not.
+	time.Sleep(consensus.RenterZeroConfDelay + time.Second*10)
 
 	rentInfo := dt.renter.Info()
 	if len(rentInfo.Files) != 1 {
