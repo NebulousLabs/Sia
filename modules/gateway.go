@@ -1,12 +1,48 @@
 package modules
 
 import (
+	"io"
+	"net"
+
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
+// A NetAddress contains the information needed to contact a peer.
+type NetAddress string
+
+// Host returns the NetAddress' IP.
+func (na NetAddress) Host() string {
+	host, _, _ := net.SplitHostPort(string(na))
+	return host
+}
+
+// Port returns the NetAddress' port number.
+func (na NetAddress) Port() string {
+	_, port, _ := net.SplitHostPort(string(na))
+	return port
+}
+
+// A NetConn is a monitored network connection.
+type NetConn interface {
+	io.ReadWriteCloser
+
+	// ReadObject reads and decodes an object from the NetConn. It takes a
+	// maximum length, which the encoded object must not exceed.
+	ReadObject(interface{}, uint64) error
+
+	// WriteObject encodes an object and writes it to the connection.
+	WriteObject(interface{}) error
+
+	// Addr returns the NetAddress of the remote end of the connection.
+	Addr() NetAddress
+}
+
+// RPCFunc is the type signature of functions that handle incoming RPCs.
+type RPCFunc func(NetConn) error
+
 type GatewayInfo struct {
-	Peers []network.Address
+	Address NetAddress
+	Peers   []NetAddress
 }
 
 // A Gateway facilitates the interactions between the local node and remote
@@ -16,14 +52,23 @@ type GatewayInfo struct {
 // with the "network" consensus set.
 type Gateway interface {
 	// Bootstrap joins the Sia network and establishes an initial peer list.
-	Bootstrap(network.Address) error
+	Bootstrap(NetAddress) error
 
 	// AddPeer adds a peer to the Gateway's peer list. The peer
 	// may be rejected. AddPeer is also an RPC.
-	AddPeer(network.Address) error
+	AddPeer(NetAddress) error
 
 	// RemovePeer removes a peer from the Gateway's peer list.
-	RemovePeer(network.Address) error
+	RemovePeer(NetAddress) error
+
+	// RPC establishes a connection to the supplied address and writes the RPC
+	// header, indicating which function will handle the connection. The
+	// supplied function takes over from there.
+	RPC(NetAddress, string, RPCFunc) error
+
+	// RegisterRPC registers a function to handle incoming connections that
+	// supply the given RPC ID.
+	RegisterRPC(string, RPCFunc)
 
 	// Synchronize synchronizes the local consensus set with the sets of known
 	// peers.
@@ -36,19 +81,6 @@ type Gateway interface {
 	// RelayTransaction announces a transaction to all of the Gateway's
 	// known peers.
 	RelayTransaction(consensus.Transaction) error
-
-	// AddMe is the RPC version of AddPeer. It is assumed that the supplied
-	// peer is the peer making the RPC.
-	AddMe(network.Address) error
-
-	// SendBlocks is an RPC that returns a set of sequential blocks following
-	// the most recent known block ID in of the 32 IDs provided. The number of
-	// blocks returned is unspecified.
-	SendBlocks([32]consensus.BlockID) ([]consensus.Block, error)
-
-	// SharePeers is an RPC that returns a set of the Gateway's peers. The
-	// number of peers returned is unspecified.
-	SharePeers() ([]network.Address, error)
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo

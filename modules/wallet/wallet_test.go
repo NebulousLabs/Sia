@@ -7,12 +7,11 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // global variables used to prevent conflicts
 var (
-	tcpsPort  int = 10000
+	rpcPort   int = 10000
 	walletNum int = 0
 )
 
@@ -27,15 +26,11 @@ type WalletTester struct {
 func NewWalletTester(t *testing.T) (wt *WalletTester) {
 	wt = new(WalletTester)
 	wt.ConsensusTester = consensus.NewTestingEnvironment(t)
-	tcps, err := network.NewTCPServer(":" + strconv.Itoa(tcpsPort))
-	tcpsPort++
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), wt.State)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := gateway.New(tcps, wt.State)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rpcPort++
 	tpool, err := transactionpool.New(wt.State, g)
 	if err != nil {
 		t.Fatal(err)

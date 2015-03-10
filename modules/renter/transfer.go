@@ -3,11 +3,9 @@ package renter
 import (
 	"errors"
 	"io"
-	"net"
 	"os"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -16,11 +14,11 @@ const (
 )
 
 // downloadPiece attempts to retrieve a file from a host.
-func downloadPiece(piece FilePiece, path string) error {
-	return piece.HostIP.Call("RetrieveFile", func(conn net.Conn) (err error) {
+func (r *Renter) downloadPiece(piece FilePiece, path string) error {
+	return r.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) (err error) {
 		// Send the id of the contract for the file piece we're requesting. The
 		// response will be the file piece contents.
-		if _, err = encoding.WriteObject(conn, piece.ContractID); err != nil {
+		if err = conn.WriteObject(piece.ContractID); err != nil {
 			return
 		}
 
@@ -31,24 +29,18 @@ func downloadPiece(piece FilePiece, path string) error {
 		}
 		defer file.Close()
 
-		// Write the host's response into the file.
-		_, err = io.CopyN(file, conn, int64(piece.Contract.FileSize))
+		// Simultaneously download file and calculate its Merkle root.
+		tee := io.TeeReader(
+			// use a LimitedReader to ensure we don't read indefinitely
+			io.LimitReader(conn, int64(piece.Contract.FileSize)),
+			// each byte we read from tee will also be written to file
+			file,
+		)
+		merkleRoot, err := crypto.ReaderMerkleRoot(tee)
 		if err != nil {
-			// os.Remove(path)
-			// r.hostDB.FlagHost(piece.Host.IPAddress)
 			return
 		}
 
-		// Do an integrity check to make sure that the piece we were given is
-		// actually what we were looking for.
-		_, err = file.Seek(0, 0)
-		if err != nil {
-			return
-		}
-		merkleRoot, err := crypto.ReaderMerkleRoot(file)
-		if err != nil {
-			return
-		}
 		if merkleRoot != piece.Contract.FileMerkleRoot {
 			return errors.New("host provided a file that's invalid")
 		}
@@ -111,14 +103,12 @@ func (r *Renter) Download(nickname, filename string) error {
 
 	// We only need one piece, so iterate through the hosts until a download
 	// succeeds.
-	//
-	// TODO: Multiple opportunities for optimization here but we should wait
-	// until we're actually erasure coding.
 	for _, piece := range pieces {
-		downloadErr := downloadPiece(piece, filename)
+		downloadErr := r.downloadPiece(piece, filename)
 		if downloadErr == nil {
 			return nil
 		} else {
+			// log error
 		}
 		// r.hostDB.FlagHost(piece.Host.IPAddress)
 	}
@@ -157,13 +147,6 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	// Upload a piece to every host on the network.
 	r.files[up.Nickname] = make([]FilePiece, up.Pieces)
 	for i := range r.files[up.Nickname] {
-		// TODO: Eventually, each piece is likely to have different
-		// requirements. Erasure coding, index, etc. There will likely need to
-		// be a 'filePieceParameters' struct which is more complicated than the
-		// 'uploadParameters' struct. For now, because we're using perfect
-		// redundancy, it is sufficient to just tell the uploading thread what
-		// index it's using.
-
 		// threadedUploadPiece will change the memory that the piece points to,
 		// which is useful because it means the file itself can be renamed but
 		// will still point to the same underlying pieces.

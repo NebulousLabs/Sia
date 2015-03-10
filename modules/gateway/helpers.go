@@ -1,57 +1,60 @@
 package gateway
 
 import (
-	"errors"
 	"io/ioutil"
-	"math/rand"
-	"sync"
+	"net"
+	"net/http"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-func (g *Gateway) addPeer(peer network.Address) error {
-	if _, exists := g.peers[peer]; exists {
-		return errors.New("peer already added")
+var pong = [4]byte{'p', 'o', 'n', 'g'}
+
+// Ping returns whether an Address is reachable and responds correctly to the
+// ping request -- in other words, whether it is a potential peer.
+func (g *Gateway) Ping(addr modules.NetAddress) bool {
+	var resp [4]byte
+	err := g.RPC(addr, "Ping", readerRPC(&resp, 4))
+	return err == nil && resp == pong
+}
+
+// sendHostname replies to the sender with the sender's external IP.
+func sendHostname(conn modules.NetConn) error {
+	return conn.WriteObject(conn.Addr().Host())
+}
+
+func (g *Gateway) learnHostname(addr modules.NetAddress) error {
+	var hostname string
+	err := g.RPC(addr, "SendHostname", readerRPC(&hostname, 50))
+	if err != nil {
+		return err
 	}
-	g.peers[peer] = struct{}{}
+	g.setHostname(hostname)
 	return nil
 }
 
-func (g *Gateway) removePeer(peer network.Address) error {
-	if _, exists := g.peers[peer]; !exists {
-		return errors.New("no record of that peer")
-	}
-	delete(g.peers, peer)
-	return nil
+// setHostname sets the hostname of the server.
+func (g *Gateway) setHostname(host string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
 }
 
-func (g *Gateway) randomPeer() (network.Address, error) {
-	r := rand.Intn(len(g.peers))
-	for peer := range g.peers {
-		if r == 0 {
-			return peer, nil
-		}
-		r--
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func (g *Gateway) getExternalIP() (err error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return
 	}
-	return "", ErrNoPeers
-}
-
-// threadedBroadcast broadcasts an RPC to all of the Gateway's peers. The
-// calls are run in parallel.
-func (g *Gateway) threadedBroadcast(name string, arg, resp interface{}) {
-	g.mu.RLock()
-	var wg sync.WaitGroup
-	wg.Add(len(g.peers))
-	for peer := range g.peers {
-		go func(peer network.Address) {
-			peer.RPC(name, arg, resp)
-			wg.Done()
-		}(peer)
-	}
-	// release lock while we wait for RPCs to complete
-	g.mu.RUnlock()
-	wg.Wait()
+	defer resp.Body.Close()
+	buf := make([]byte, 64)
+	n, _ := resp.Body.Read(buf)
+	hostname := string(buf[:n-1]) // trim newline
+	// TODO: try to ping ourselves
+	g.setHostname(hostname)
+	return
 }
 
 func (g *Gateway) save(filename string) error {
@@ -64,7 +67,7 @@ func (g *Gateway) load(filename string) (err error) {
 	if err != nil {
 		return
 	}
-	var peers []network.Address
+	var peers []modules.NetAddress
 	err = encoding.Unmarshal(contents, &peers)
 	if err != nil {
 		return

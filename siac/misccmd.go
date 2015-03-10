@@ -43,13 +43,6 @@ var (
 		Long:  "Stop the Sia daemon.",
 		Run:   wrap(stopcmd),
 	}
-
-	syncCmd = &cobra.Command{
-		Use:   "sync",
-		Short: "Synchronize with the network",
-		Long:  "Attempt to synchronize with a randomly selected peer.",
-		Run:   wrap(synccmd),
-	}
 )
 
 // TODO: this should be defined outside of siac
@@ -60,7 +53,7 @@ type updateResp struct {
 
 func updatecmd() {
 	update := new(updateResp)
-	err := getAPI("/update/check", update)
+	err := getAPI("/daemon/update/check", update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -69,7 +62,7 @@ func updatecmd() {
 		fmt.Println("Already up to date.")
 		return
 	}
-	err = callAPI("/update/apply?version=" + update.Version)
+	err = callAPI("/daemon/update/apply?version=" + update.Version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
@@ -79,7 +72,7 @@ func updatecmd() {
 
 func updatecheckcmd() {
 	update := new(updateResp)
-	err := getAPI("/update/check", update)
+	err := getAPI("/daemon/update/check", update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -92,7 +85,7 @@ func updatecheckcmd() {
 }
 
 func updateapplycmd(version string) {
-	err := callAPI("/update/apply?version=" + version)
+	err := callAPI("/daemon/update/apply?version=" + version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
@@ -102,7 +95,7 @@ func updateapplycmd(version string) {
 
 func statuscmd() {
 	status := new(consensus.StateInfo)
-	err := getAPI("/status", status)
+	err := getAPI("/consensus/status", status)
 	if err != nil {
 		fmt.Println("Could not get daemon status:", err)
 		return
@@ -114,18 +107,10 @@ Target: %v
 }
 
 func stopcmd() {
-	err := callAPI("/stop")
+	err := callAPI("/stop/stop")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
 	}
 	fmt.Println("Sia daemon stopped.")
-}
-
-func synccmd() {
-	err := callAPI("/sync")
-	if err != nil {
-		fmt.Println("Could not sync:", err)
-	}
-	fmt.Println("Sync initiated.")
 }

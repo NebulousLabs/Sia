@@ -2,7 +2,6 @@ package modules
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 const (
@@ -18,7 +17,7 @@ const (
 // output in the transaction contains the frozen coins, and the
 // SpendConditions indicate the number of blocks the coins are frozen for.
 type HostAnnouncement struct {
-	IPAddress network.Address
+	IPAddress NetAddress
 }
 
 // HostSettings are the parameters advertised by the host. These are the
@@ -41,7 +40,7 @@ type HostSettings struct {
 // coins frozen in the host's announcement transaction.
 type HostEntry struct {
 	HostSettings
-	IPAddress network.Address
+	IPAddress NetAddress
 }
 
 type HostDB interface {
@@ -49,7 +48,7 @@ type HostDB interface {
 	// HostDB may decide to remove the host, or just reduce the weight, or it
 	// may decide to ignore the flagging. If the flagging is ignored, an error
 	// will be returned explaining why.
-	FlagHost(network.Address) error
+	FlagHost(NetAddress) error
 
 	// Insert adds a host to the database.
 	Insert(HostEntry) error
@@ -64,5 +63,5 @@ type HostDB interface {
 	RandomHost() (HostEntry, error)
 
 	// Remove deletes the host with the given address from the database.
-	Remove(network.Address) error
+	Remove(NetAddress) error
 }

@@ -3,12 +3,10 @@ package renter
 import (
 	"errors"
 	"io"
-	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -123,29 +121,27 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	time.Sleep(consensus.RenterZeroConfDelay)
 
 	// Perform the negotiations with the host through a network call.
-	err = host.IPAddress.Call("NegotiateContract", func(conn net.Conn) (err error) {
+	err = r.gateway.RPC(host.IPAddress, "NegotiateContract", func(conn modules.NetConn) (err error) {
 		// Send the contract terms and read the response.
-		if _, err = encoding.WriteObject(conn, terms); err != nil {
+		if err = conn.WriteObject(terms); err != nil {
 			return
 		}
 		var response string
-		if err = encoding.ReadObject(conn, &response, 128); err != nil {
+		if err = conn.ReadObject(&response, 128); err != nil {
 			return
 		}
 		if response != modules.AcceptTermsResponse {
 			return errors.New(response)
 		}
 
-		// Set a timeout for the contract that assumes a minimum connection of
-		// 64kbps, then send the data that the host will be storing.
-		conn.SetDeadline(time.Now().Add(time.Duration(filesize) * 128 * time.Microsecond))
+		// write file data
 		_, err = io.CopyN(conn, up.Data, int64(filesize))
 		if err != nil {
 			return
 		}
 
 		// Send the unsigned transaction to the host.
-		_, err = encoding.WriteObject(conn, unsignedTxn)
+		err = conn.WriteObject(unsignedTxn)
 		if err != nil {
 			return
 		}
@@ -154,7 +150,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		// Add the collateral inputs from the host to the original wallet
 		// transaction.
 		var collateralTxn consensus.Transaction
-		err = encoding.ReadObject(conn, &collateralTxn, 16e3)
+		err = conn.ReadObject(&collateralTxn, 16e3)
 		if err != nil {
 			return
 		}
@@ -170,7 +166,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		// Send the signed transaction back to the host.
-		_, err = encoding.WriteObject(conn, signedTxn)
+		err = conn.WriteObject(signedTxn)
 		if err != nil {
 			return
 		}

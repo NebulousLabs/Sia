@@ -5,7 +5,7 @@ go:
 
 install:
   - make dependencies
-  - $(exit $(go fmt ./... | wc -l))
+  - test -z "$(go fmt ./...)"
   - make
 
 script: make test-long && make cover

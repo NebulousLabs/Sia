@@ -8,33 +8,32 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
-// fakeAddr returns a network.Address to be used in a HostEntry. Such
+// fakeAddr returns a modules.NetAddress to be used in a HostEntry. Such
 // addresses are needed in order to satisfy the HostDB's "1 host per IP" rule.
-func fakeAddr(n uint8) network.Address {
-	return network.Address("127.0.0." + strconv.Itoa(int(n)) + ":0")
+func fakeAddr(n uint8) modules.NetAddress {
+	return modules.NetAddress("127.0.0." + strconv.Itoa(int(n)) + ":0")
 }
 
 // uniformTreeVerification checks that everything makes sense in the tree given
 // the number of entries that the tree is supposed to have and also given that
 // every entropy has the same weight.
-func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
+func (hdbt *HostDBTester) uniformTreeVerification(numEntries int) {
 	// Check that the weight of the hostTree is what is expected.
-	randomHost, err := hdb.RandomHost()
+	randomHost, err := hdbt.RandomHost()
 	if err != nil {
-		t.Fatal(err)
+		hdbt.Fatal(err)
 	}
 	expectedWeight := consensus.NewCurrency64(uint64(numEntries)).Mul(entryWeight(randomHost))
-	if hdb.hostTree.weight.Cmp(expectedWeight) != 0 {
-		t.Error("Expected weight is incorrect")
+	if hdbt.hostTree.weight.Cmp(expectedWeight) != 0 {
+		hdbt.Error("Expected weight is incorrect")
 	}
 
 	// Check that the length of activeHosts and the count of hostTree are
 	// consistent.
-	if len(hdb.activeHosts) != numEntries {
-		t.Error("activeHosts should equal ", numEntries, "equals", len(hdb.activeHosts))
+	if len(hdbt.activeHosts) != numEntries {
+		hdbt.Error("activeHosts should equal ", numEntries, "equals", len(hdbt.activeHosts))
 	}
 
 	// Select many random hosts and do naive statistical analysis on the
@@ -42,12 +41,12 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 	if !testing.Short() {
 		// Pull a bunch of random hosts and count how many times we pull each
 		// host.
-		selectionMap := make(map[network.Address]int)
+		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entry, err := hdb.RandomHost()
+			entry, err := hdbt.RandomHost()
 			if err != nil {
-				t.Fatal(err)
+				hdbt.Fatal(err)
 			}
 			selectionMap[entry.IPAddress] = selectionMap[entry.IPAddress] + 1
 		}
@@ -56,7 +55,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 		errorBound := 64 // Pretty large, but will still detect if something is seriously wrong.
 		for i, count := range selectionMap {
 			if count < expected-errorBound || count > expected+errorBound {
-				t.Error(i, count)
+				hdbt.Error(i, count)
 			}
 		}
 	}
@@ -66,10 +65,7 @@ func uniformTreeVerification(hdb *HostDB, numEntries int, t *testing.T) {
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
-	hdb, err := New(consensus.CreateGenesisState())
-	if err != nil {
-		t.Fatal(err)
-	}
+	hdbt := CreateHostDBTester(t)
 
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
@@ -78,9 +74,9 @@ func TestWeightedList(t *testing.T) {
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
-		hdb.insertCompleteHostEntry(entry)
+		hdbt.insertCompleteHostEntry(entry)
 	}
-	uniformTreeVerification(hdb, firstInsertions, t)
+	hdbt.uniformTreeVerification(firstInsertions)
 
 	// Remove a few hosts and check that the tree is still in order.
 	removals := 12
@@ -102,13 +98,13 @@ func TestWeightedList(t *testing.T) {
 		}
 
 		// Remove the entry and add it to the list of removed entries
-		err := hdb.Remove(fakeAddr(randInt))
+		err := hdbt.Remove(fakeAddr(randInt))
 		if err != nil {
 			t.Fatal(err)
 		}
 		removedMap[randInt] = struct{}{}
 	}
-	uniformTreeVerification(hdb, firstInsertions-removals, t)
+	hdbt.uniformTreeVerification(firstInsertions - removals)
 
 	// Do some more insertions.
 	secondInsertions := 64
@@ -117,7 +113,7 @@ func TestWeightedList(t *testing.T) {
 		entry.Collateral = consensus.NewCurrency64(10)
 		entry.Price = consensus.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
-		hdb.insertCompleteHostEntry(entry)
+		hdbt.insertCompleteHostEntry(entry)
 	}
-	uniformTreeVerification(hdb, firstInsertions-removals+secondInsertions, t)
+	hdbt.uniformTreeVerification(firstInsertions - removals + secondInsertions)
 }

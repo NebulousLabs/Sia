@@ -4,18 +4,15 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
 	MaxCatchUpBlocks = 50
 )
 
-var (
-	moreBlocksErr = errors.New("more blocks are available")
-)
-
-// Sychronize to synchronize the local consensus set (i.e. the blockchain) with
+// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
 // the network consensus set.
 //
 // TODO: don't run two Synchronize threads at the same time
@@ -34,26 +31,91 @@ func (g *Gateway) Synchronize() (err error) {
 // most recent block seen by both peers. From this starting height, it
 // transmits blocks sequentially. Multiple such transmissions may be required
 // to fully synchronize.
-func (g *Gateway) synchronize(peer network.Address) {
-	var newBlocks []consensus.Block
-	err := peer.RPC("SendBlocks", g.blockHistory(), &newBlocks)
-	if err != nil && err.Error() != moreBlocksErr.Error() {
-		// TODO: try a different peer?
-		return
-	}
-	for _, block := range newBlocks {
-		acceptErr := g.state.AcceptBlock(block)
-		if acceptErr != nil {
-			// TODO: If the error is a FutureTimestampErr, need to wait before trying the
-			// block again.
+func (g *Gateway) synchronize(peer modules.NetAddress) {
+	for {
+		var newBlocks []consensus.Block
+		newBlocks, moreAvailable, err := g.requestBlocks(peer)
+		if err != nil {
+			// TODO: try a different peer?
+			return
+		}
+		for _, block := range newBlocks {
+			acceptErr := g.state.AcceptBlock(block)
+			if acceptErr != nil {
+				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
+				// block again.
+			}
+		}
+
+		// loop until there are no more blocks available
+		if !moreAvailable {
+			break
 		}
 	}
+}
 
-	if err != nil && err.Error() == moreBlocksErr.Error() {
-		//fmt.Println("getting more blocks")
-		go g.synchronize(peer)
+// sendBlocks returns a sequential set of blocks based on the 32 input block
+// IDs. The most recent known ID is used as the starting point, and up to
+// 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
+// sends a boolean indicating whether more blocks are available.
+func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
+	// read known blocks
+	var knownBlocks [32]consensus.BlockID
+	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
+	if err != nil {
 		return
 	}
+
+	// Find the most recent block from knownBlocks that is in our current path.
+	found := false
+	var start consensus.BlockHeight
+	for _, id := range knownBlocks {
+		if height, exists := g.state.HeightOfBlock(id); exists {
+			found = true
+			start = height + 1 // start at child
+			break
+		}
+	}
+	if !found {
+		// The genesis block should be included in knownBlocks - if no matching
+		// blocks are found, the caller is probably on a different blockchain
+		// altogether.
+		return errors.New("no matching block found")
+	}
+
+	// Send blocks, starting with the child of the most recent known block.
+	stop := start + MaxCatchUpBlocks
+	if stop > g.state.Height() {
+		stop = g.state.Height()
+	}
+	blocks, err := g.state.BlockRange(start, stop)
+	if err != nil {
+		return
+	}
+	err = conn.WriteObject(blocks)
+	if err != nil {
+		return
+	}
+
+	// Indicate whether more blocks are available.
+	more := g.state.Height() > stop
+	return conn.WriteObject(more)
+}
+
+func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.Block, moreAvailable bool, err error) {
+	history := g.blockHistory()
+	err = g.RPC(peer, "SendBlocks", func(conn modules.NetConn) error {
+		err := conn.WriteObject(history)
+		if err != nil {
+			return err
+		}
+		err = conn.ReadObject(&newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
+		if err != nil {
+			return err
+		}
+		return conn.ReadObject(&moreAvailable, 1)
+	})
+	return
 }
 
 // blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
@@ -69,8 +131,6 @@ func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
 			// faulty state; log high-priority error
 			return
 		}
-		//fmt.Println("appending blocks")
-		//fmt.Println(height)
 		knownBlocks = append(knownBlocks, block.ID())
 
 		// after 12, start doubling
@@ -94,47 +154,5 @@ func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
 	knownBlocks = append(knownBlocks, genesis.ID())
 
 	copy(blockIDs[:], knownBlocks)
-	return
-}
-
-// SendBlocks returns a sequential set of blocks based on the 32 input block
-// IDs. The most recent known ID is used as the starting point, and up to
-// 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. If more
-// blocks could be returned, a 'moreBlocksErr' will be returned as well.
-func (g *Gateway) SendBlocks(knownBlocks [32]consensus.BlockID) (blocks []consensus.Block, err error) {
-	// Find the most recent block from knownBlocks that is in our current path.
-	found := false
-	var start consensus.BlockHeight
-	for _, id := range knownBlocks {
-		if height, exists := g.state.HeightOfBlock(id); exists {
-			found = true
-			start = height + 1 // start at child
-			break
-		}
-	}
-	if !found {
-		// The genesis block should be included in knownBlocks - if no matching
-		// blocks are found, the caller is probably on a different blockchain
-		// altogether.
-		err = errors.New("no matching block found")
-		return
-	}
-
-	// Send blocks, starting with the child of the most recent known block.
-	//
-	// TODO: use BlocksSince instead?
-	for i := start; i < start+MaxCatchUpBlocks; i++ {
-		b, exists := g.state.BlockAtHeight(i)
-		if !exists {
-			break
-		}
-		blocks = append(blocks, b)
-	}
-
-	// If more blocks are available, send a benign error
-	if _, exists := g.state.BlockAtHeight(start + MaxCatchUpBlocks); exists {
-		err = moreBlocksErr
-	}
-
 	return
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/network"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // gatewayStatusHandler handles the api call asking for the gatway status.

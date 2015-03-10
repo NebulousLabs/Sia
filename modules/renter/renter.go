@@ -6,7 +6,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/network"
 )
 
 // A FilePiece contains information about an individual file piece that has
@@ -16,24 +15,29 @@ type FilePiece struct {
 	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
 	Contract   consensus.FileContract   // The contract being enforced.
 	ContractID consensus.FileContractID // The ID of the contract.
-	HostIP     network.Address          // Where to find the file.
+	HostIP     modules.NetAddress       // Where to find the file.
 }
 
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	state  *consensus.State
-	files  map[string][]FilePiece
-	hostDB modules.HostDB
-	wallet modules.Wallet
+	state   *consensus.State
+	gateway modules.Gateway
+	files   map[string][]FilePiece
+	hostDB  modules.HostDB
+	wallet  modules.Wallet
 
 	mu sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *Renter, err error) {
+func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet) (r *Renter, err error) {
 	if state == nil {
 		err = errors.New("renter.New: cannot have nil state")
+		return
+	}
+	if gateway == nil {
+		err = errors.New("renter.New: cannot have nil gateway")
 		return
 	}
 	if hdb == nil {
@@ -46,10 +50,11 @@ func New(state *consensus.State, hdb modules.HostDB, wallet modules.Wallet) (r *
 	}
 
 	r = &Renter{
-		state:  state,
-		hostDB: hdb,
-		wallet: wallet,
-		files:  make(map[string][]FilePiece),
+		state:   state,
+		gateway: gateway,
+		hostDB:  hdb,
+		wallet:  wallet,
+		files:   make(map[string][]FilePiece),
 	}
 	return
 }
