@@ -169,6 +169,7 @@ struct {
 	MaxFilesize  int
 	MinDuration  int
 	MaxDuration  int
+	WindowSize   int
 	Price        int
 	Collateral   int
 }
@@ -182,6 +183,8 @@ MaxFilesize is the maximum allowed file size.
 MinDuration is the minimum amount of time a contract is allowed to last.
 
 MaxDuration is the maximum amount of time a contract is allowed to last.
+
+WindowSize is the number of blocks a host has to prove they are holding the file.
 
 Price is the cost in Hastings per byte per block of hosting files on the network.
 
@@ -204,10 +207,9 @@ struct {
 	MaxFilesize      int
 	MinDuration      int
 	MaxDuration      int
-	MinWindow        int
+	WindowSize       int
 	Price            int
 	Collateral       int
-	UnlockHash       string
 	StorageRemaining int
 	NumContracts     int
 }
@@ -303,19 +305,13 @@ Function: Upload a file using a datastream.
 Parameters:
 ```
 struct {
-	Data     io.ReadSeeker
-	Duration int
+	Source   io.ReadSeeker
 	Nickname string
-	Pieces   int
 }
 ```
-Data is a datastream from an html request.
-
-Duration is the number of blocks that the file will be available.
+Source is a datastream from an html request.
 
 Nickname is the name the renter uses for the file.
-
-Pieces is the redundancy of the file.
 
 Response: standard
 
@@ -326,13 +322,13 @@ Function: Upload a file using an explicit filepath.
 Parameters:
 ```
 struct {
-	Data     string
-	Duration int
+	Source   string
 	Nickname string
-	Pieces   int
 }
 ```
-Data is a filename.
+Source is a filename.
+
+Nickname is the name the renter uses for the file.
 
 Response: standard.
 
@@ -386,13 +382,6 @@ Response:
 ```
 struct {
 	Balance      int
-	FullBalance  int
-	NumAddresses int
 }
 ```
 Balance is the spendable balance of the wallet.
-
-FullBalance is the balance of the wallet, including outputs that are not yet
-spendable or have been spent but have not been confirmed.
-
-NumAddresses is the number of addresses that the wallet is currently watching.
