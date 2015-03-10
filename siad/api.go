@@ -53,10 +53,10 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/stop", d.minerStopHandler)
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/upload", d.fileUploadHandler)
-	handleHTTPRequest(mux, "/renter/uploadpath", d.fileUploadPathHandler)
-	handleHTTPRequest(mux, "/renter/download", d.fileDownloadHandler)
-	handleHTTPRequest(mux, "/renter/status", d.fileStatusHandler)
+	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)
+	handleHTTPRequest(mux, "/renter/uploadpath", d.renterUploadPathHandler)
+	handleHTTPRequest(mux, "/renter/download", d.renterDownloadHandler)
+	handleHTTPRequest(mux, "/renter/status", d.renterStatusHandler)
 
 	// TransactionPool API Calls
 

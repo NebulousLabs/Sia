@@ -14,7 +14,7 @@ const (
 	delay    = 20
 )
 
-func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("pieces"))
 	if err != nil {
 		writeError(w, "Malformed pieces", 400)
@@ -42,7 +42,7 @@ func (d *daemon) fileUploadHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("pieces"))
 	if err != nil {
 		writeError(w, "Malformed pieces", 400)
@@ -70,7 +70,7 @@ func (d *daemon) fileUploadPathHandler(w http.ResponseWriter, req *http.Request)
 	writeSuccess(w)
 }
 
-func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	path := filepath.Join(d.downloadDir, req.FormValue("filename"))
 	err := d.renter.Download(req.FormValue("nickname"), path)
 	if err != nil {
@@ -82,6 +82,6 @@ func (d *daemon) fileDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-func (d *daemon) fileStatusHandler(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.renter.Info())
 }
