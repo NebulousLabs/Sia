@@ -26,7 +26,9 @@ func get(call string) (resp *http.Response, err error) {
 		return
 	}
 	// check error code
-	if resp.StatusCode != 200 {
+	if resp.StatusCode == http.StatusNotFound {
+		err = errors.New("API call not recognized: " + call)
+	} else if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		err = errors.New(strings.TrimSpace(string(errResp)))
 	}
