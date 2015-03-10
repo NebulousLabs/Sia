@@ -30,13 +30,16 @@ func (g *Gateway) removePeer(peer modules.NetAddress) error {
 }
 
 func (g *Gateway) randomPeer() (modules.NetAddress, error) {
-	r := rand.Intn(len(g.peers))
-	for peer := range g.peers {
-		if r == 0 {
-			return peer, nil
+	if len(g.peers) > 0 {
+		r := rand.Intn(len(g.peers))
+		for peer := range g.peers {
+			if r == 0 {
+				return peer, nil
+			}
+			r--
 		}
-		r--
 	}
+
 	return "", errNoPeers
 }
 
