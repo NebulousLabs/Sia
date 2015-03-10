@@ -23,7 +23,7 @@ const (
 func get(call string) (resp *http.Response, err error) {
 	resp, err = http.Get(hostname + call)
 	if err != nil {
-		return
+		return nil, errors.New("no response from daemon")
 	}
 	// check error code
 	if resp.StatusCode != 200 {

@@ -96,6 +96,11 @@ func (c Currency) RoundDown(n uint64) (y Currency) {
 	return
 }
 
+// String implements the fmt.Stringer interface.
+func (c Currency) String() string {
+	return c.i.String()
+}
+
 // MarshalSia implements the encoding.SiaMarshaler interface. It returns the
 // byte-slice representation of the Currency's internal big.Int, prepended
 // with a single byte indicating the length of the slice. This implies a
