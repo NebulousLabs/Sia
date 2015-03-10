@@ -43,13 +43,6 @@ var (
 		Long:  "Stop the Sia daemon.",
 		Run:   wrap(stopcmd),
 	}
-
-	syncCmd = &cobra.Command{
-		Use:   "sync",
-		Short: "Synchronize with the network",
-		Long:  "Attempt to synchronize with a randomly selected peer.",
-		Run:   wrap(synccmd),
-	}
 )
 
 // TODO: this should be defined outside of siac
@@ -120,12 +113,4 @@ func stopcmd() {
 		return
 	}
 	fmt.Println("Sia daemon stopped.")
-}
-
-func synccmd() {
-	err := callAPI("/sync")
-	if err != nil {
-		fmt.Println("Could not sync:", err)
-	}
-	fmt.Println("Sync initiated.")
 }

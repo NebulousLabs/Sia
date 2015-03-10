@@ -44,13 +44,3 @@ func (d *daemon) stopHandler(w http.ResponseWriter, req *http.Request) {
 	// send stop signal
 	d.apiServer.Stop(1e9)
 }
-
-func (d *daemon) syncHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.gateway.Synchronize()
-	if err != nil {
-		writeError(w, "No peers available for syncing", 500)
-		return
-	}
-
-	writeSuccess(w)
-}

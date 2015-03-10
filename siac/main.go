@@ -118,13 +118,13 @@ func main() {
 	root.AddCommand(fileCmd)
 	fileCmd.AddCommand(fileUploadCmd, fileDownloadCmd, fileStatusCmd)
 
-	root.AddCommand(peerCmd)
-	peerCmd.AddCommand(peerAddCmd, peerRemoveCmd, peerStatusCmd)
+	root.AddCommand(gatewayCmd)
+	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewaySynchronizeCmd, gatewayStatusCmd)
 
 	root.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
-	root.AddCommand(statusCmd, stopCmd, syncCmd)
+	root.AddCommand(statusCmd, stopCmd)
 
 	// run
 	root.Execute()
