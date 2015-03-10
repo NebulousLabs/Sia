@@ -265,7 +265,6 @@ Queries:
 * /renter/download
 * /renter/status
 * /renter/upload
-* /renter/uploadpath
 
 #### /renter/download
 
@@ -300,24 +299,7 @@ Files is a list of all the files by their nickname.
 
 #### /renter/upload
 
-Function: Upload a file using a datastream.
-
-Parameters:
-```
-struct {
-	Source   io.ReadSeeker
-	Nickname string
-}
-```
-Source is a datastream from an html request.
-
-Nickname is the name the renter uses for the file.
-
-Response: standard
-
-#### /renter/uploadpath
-
-Function: Upload a file using an explicit filepath.
+Function: Upload a file using a filepath.
 
 Parameters:
 ```

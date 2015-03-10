@@ -31,32 +31,8 @@ func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // renterUploadHandler handles the api call to upload a file using a
-// datastream.
-func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
-	file, _, err := req.FormFile("Source")
-	if err != nil {
-		writeError(w, "Malformed/missing file: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	err = d.renter.Upload(modules.UploadParams{
-		Data:     file,
-		Duration: duration,
-		Nickname: req.FormValue("Nickname"),
-		Pieces:   redundancy,
-	})
-	if err != nil {
-		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	writeSuccess(w)
-}
-
-// renterUploadPathHandler handles the api call to upload a file using a
 // filepath.
-func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Request) {
+func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	// open the file
 	file, err := os.Open(req.FormValue("Source"))
 	if err != nil {
