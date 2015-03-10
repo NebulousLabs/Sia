@@ -112,7 +112,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 			err = m.gateway.RelayBlock(b)
 			if consensus.DEBUG {
 				if err != nil {
-					panic(err)
+					// Log Error
 				}
 			}
 
