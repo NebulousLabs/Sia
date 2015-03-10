@@ -25,7 +25,7 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Upload to the host.
-	dt.callAPI("/renter/uploadpath?pieces=1&filename=api.go&nickname=first&pieces=1")
+	dt.callAPI("/renter/uploadpath?Pieces=1&Source=api.go&Nickname=first")
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
@@ -37,7 +37,7 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Try to download the file.
-	dt.callAPI("/renter/download?filename=renterTestDL_test&nickname=first")
+	dt.callAPI("/renter/download?Destination=renterTestDL_test&Nickname=first")
 	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.

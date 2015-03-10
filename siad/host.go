@@ -8,9 +8,9 @@ import (
 // hostAnnounceHandler handles the api call to get the host to announce itself
 // to the network.
 func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.host.Announce(d.network.Address())
+	err := d.host.Announce(d.gateway.Info().Address)
 	if err != nil {
-		writeError(w, "Could not announce host:"+err.Error(), 400)
+		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)
@@ -37,7 +37,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		if req.FormValue(qs) != "" {
 			_, err := fmt.Sscan(req.FormValue(qs), qsVars[qs])
 			if err != nil {
-				writeError(w, "Malformed "+qs, 400)
+				writeError(w, "Malformed "+qs, http.StatusBadRequest)
 				return
 			}
 		}
@@ -46,7 +46,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	d.host.SetSettings(config)
 	err := d.host.Announce(d.gateway.Info().Address)
 	if err != nil {
-		writeError(w, "Could not announce host:"+err.Error(), 400)
+		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)

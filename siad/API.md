@@ -11,6 +11,10 @@ that we will not remove elements from the responses (but we may add additional
 elements), and we will not add any required parameters (though we may add
 optional parameters, and we may disable parameters).
 
+There may be functional API calls which are not documented. These are not
+guaranteed to be supported beyond the current release, and should not be used
+in production.
+
 Daemon
 ------
 

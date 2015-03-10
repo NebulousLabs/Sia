@@ -16,7 +16,7 @@ func (d *daemon) gatewayStatusHandler(w http.ResponseWriter, req *http.Request) 
 func (d *daemon) gatewaySynchronizeHandler(w http.ResponseWriter, req *http.Request) {
 	err := d.gateway.Synchronize()
 	if err != nil {
-		writeError(w, "No peers available for syncing", 500)
+		writeError(w, "No peers available for syncing", http.StatusInternalServerError)
 		return
 	}
 
@@ -25,10 +25,10 @@ func (d *daemon) gatewaySynchronizeHandler(w http.ResponseWriter, req *http.Requ
 
 // gatewayPeerAddHandler handles the api call to add a peer to the gateway.
 func (d *daemon) gatewayPeerAddHandler(w http.ResponseWriter, req *http.Request) {
-	addr := network.Address(req.FormValue("Address"))
+	addr := modules.NetAddress(req.FormValue("Address"))
 	err := d.gateway.AddPeer(addr)
 	if err != nil {
-		writeError(w, err.Error(), 400)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -37,10 +37,10 @@ func (d *daemon) gatewayPeerAddHandler(w http.ResponseWriter, req *http.Request)
 
 // gatewayPeerRemoveHandler handles the api call to remove a peer from the gateway.
 func (d *daemon) gatewayPeerRemoveHandler(w http.ResponseWriter, req *http.Request) {
-	addr := network.Address(req.FormValue("Address"))
+	addr := modules.NetAddress(req.FormValue("Address"))
 	err := d.gateway.RemovePeer(addr)
 	if err != nil {
-		writeError(w, err.Error(), 400)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

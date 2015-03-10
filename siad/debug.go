@@ -31,6 +31,9 @@ type SiaConstants struct {
 	MaxAdjustmentDown *big.Rat
 }
 
+// ModuleDeadlockStatus is a struct containing a bool for each module, 'false'
+// indicating that the module is deadlocked and 'true' indicating that the
+// module is not deadlocked.
 type ModuleDeadlockStatus struct {
 	State           bool
 	Gateway         bool
@@ -73,6 +76,10 @@ func (d *daemon) debugConstantsHandler(w http.ResponseWriter, req *http.Request)
 // to lock and unlock the module in a goroutine. After the function, the bool
 // for that module is set to true. Deadlocked modules will retain a false
 // boolean. Diagnostic results are then printed.
+//
+// 'false' may merely indicate that it's taking longer than 3 seconds to
+// acquire a lock. For our purposes, this is deadlock, even if it may
+// eventually resolve.
 func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 	// Call functions that result in locks but use inputs that don't result in
 	// changes. After the blocking function unlocks, set the value to true.

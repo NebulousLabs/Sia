@@ -102,14 +102,14 @@ func (d *daemon) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 
 	// send stop signal
-	d.apiServer.Stop(1e9)
+	d.apiServer.Stop(1e9) // TODO: What's with the constant?
 }
 
 // daemonUpdateCheckHandler handles the api call to check for daemon updates.
 func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
-		writeError(w, err.Error(), 500)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Reque
 func (d *daemon) daemonUpdateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
-		writeError(w, err.Error(), 500)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

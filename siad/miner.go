@@ -11,14 +11,14 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	var threads int
 	_, err := fmt.Sscan(req.FormValue("threads"), &threads)
 	if err != nil {
-		writeError(w, "Malformed number of threads", 400)
+		writeError(w, "Malformed number of threads", http.StatusBadRequest)
 		return
 	}
 
 	d.miner.SetThreads(threads)
 	err = d.miner.StartMining()
 	if err != nil {
-		writeError(w, err.Error(), 500) // TODO: Need to verify that this is the proper error code to be returning.
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -29,7 +29,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 	mInfo, err := d.miner.Info()
 	if err != nil {
-		writeError(w, "Failed to encode status object", 500)
+		writeError(w, "Failed to encode status object", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, mInfo)
@@ -38,6 +38,5 @@ func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
 // minerStopHandler handles the api call to stop the miner.
 func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	d.miner.StopMining()
-
 	writeSuccess(w)
 }

@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	duration = 2000
-	delay    = 20
+	duration = 2000 // Duration that hosts will hold onto the file.
 )
 
 // renterDownloadHandler handles the api call to download a file.
@@ -19,8 +18,7 @@ func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request)
 	path := filepath.Join(d.downloadDir, req.FormValue("Destination"))
 	err := d.renter.Download(req.FormValue("Nickname"), path)
 	if err != nil {
-		// TODO: if this err is a user error (e.g. bad nickname), return 400 instead
-		writeError(w, "Download failed: "+err.Error(), 500)
+		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -37,13 +35,13 @@ func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
 	if err != nil {
-		writeError(w, "Malformed pieces", 400)
+		writeError(w, "Malformed pieces", http.StatusBadRequest)
 		return
 	}
 
-	file, _, err := req.FormFile("file")
+	file, _, err := req.FormFile("Source")
 	if err != nil {
-		writeError(w, "Malformed/missing file: "+err.Error(), 400)
+		writeError(w, "Malformed/missing file: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -55,7 +53,7 @@ func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 		Pieces:   pieces,
 	})
 	if err != nil {
-		writeError(w, "Upload failed: "+err.Error(), 500)
+		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -67,14 +65,14 @@ func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Request) {
 	pieces, err := strconv.Atoi(req.FormValue("Pieces"))
 	if err != nil {
-		writeError(w, "Malformed pieces", 400)
+		writeError(w, "Malformed pieces", http.StatusBadRequest)
 		return
 	}
 
 	// open the file
 	file, err := os.Open(req.FormValue("Source"))
 	if err != nil {
-		writeError(w, "Couldn't open file: "+err.Error(), 400)
+		writeError(w, "Couldn't open file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -85,7 +83,7 @@ func (d *daemon) renterUploadPathHandler(w http.ResponseWriter, req *http.Reques
 		Pieces:   pieces,
 	})
 	if err != nil {
-		writeError(w, "Upload failed: "+err.Error(), 500)
+		writeError(w, "Upload failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

@@ -14,6 +14,9 @@ import (
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
+// DaemonConfig is a struct containing the daemon configuration variables. It
+// is only used when calling 'newDaemon', but is it's own struct because there
+// are many values.
 type DaemonConfig struct {
 	// Network Variables
 	APIAddr string
@@ -32,6 +35,8 @@ type DaemonConfig struct {
 	WalletDir string
 }
 
+// The daemon is essentially a collection of moduels and an api server to talk
+// to them all.
 type daemon struct {
 	state   *consensus.State
 	gateway modules.Gateway
@@ -47,6 +52,8 @@ type daemon struct {
 	apiServer *graceful.Server
 }
 
+// newDaemon will take the config struct and create a new daemon based on the
+// parameters.
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
