@@ -103,14 +103,12 @@ func (r *Renter) Download(nickname, filename string) error {
 
 	// We only need one piece, so iterate through the hosts until a download
 	// succeeds.
-	//
-	// TODO: Multiple opportunities for optimization here but we should wait
-	// until we're actually erasure coding.
 	for _, piece := range pieces {
 		downloadErr := r.downloadPiece(piece, filename)
 		if downloadErr == nil {
 			return nil
 		} else {
+			// log error
 		}
 		// r.hostDB.FlagHost(piece.Host.IPAddress)
 	}
@@ -149,13 +147,6 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	// Upload a piece to every host on the network.
 	r.files[up.Nickname] = make([]FilePiece, up.Pieces)
 	for i := range r.files[up.Nickname] {
-		// TODO: Eventually, each piece is likely to have different
-		// requirements. Erasure coding, index, etc. There will likely need to
-		// be a 'filePieceParameters' struct which is more complicated than the
-		// 'uploadParameters' struct. For now, because we're using perfect
-		// redundancy, it is sufficient to just tell the uploading thread what
-		// index it's using.
-
 		// threadedUploadPiece will change the memory that the piece points to,
 		// which is useful because it means the file itself can be renamed but
 		// will still point to the same underlying pieces.

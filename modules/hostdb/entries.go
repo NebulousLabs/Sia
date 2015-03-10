@@ -156,8 +156,8 @@ func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 
 // NumHosts returns the number of hosts in the active database.
 func (hdb *HostDB) NumHosts() int {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	hdb.update()
 
 	if hdb.hostTree == nil {
@@ -169,8 +169,8 @@ func (hdb *HostDB) NumHosts() int {
 // RandomHost pulls a random host from the hostdb weighted according to the
 // internal metrics of the hostdb.
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
-	hdb.mu.RLock()
-	defer hdb.mu.RUnlock()
+	hdb.mu.Lock()
+	defer hdb.mu.Unlock()
 	hdb.update()
 
 	if len(hdb.activeHosts) == 0 {

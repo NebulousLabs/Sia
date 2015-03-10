@@ -281,7 +281,7 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 // terminations act on existing outputs and contracts. This function is
 // primarily for the transaction pool, which has access to unconfirmed
 // transactions. ValidTransactionComponents will not return an error simply
-// because there are missing inputs. ValidTransactionComponenets will return an
+// because there are missing inputs. ValidTransactionComponents will return an
 // error if the state height is not sufficient to fulfill all of the
 // requirements of the transaction.
 func (s *State) ValidTransactionComponents(t Transaction) (err error) {
