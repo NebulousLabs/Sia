@@ -3,10 +3,10 @@ package consensus
 // notifySubscribers sends an empty struct to every single remaining
 // subscriber, indicating that the consensus set has changed.
 func (s *State) notifySubscribers() {
-	for _, sub := range s.subscriptions {
+	for _, subscriber := range s.subscriptions {
 		// If the channel is already full, don't block.
 		select {
-		case sub <- struct{}{}:
+		case subscriber <- struct{}{}:
 		default:
 		}
 	}
@@ -18,7 +18,6 @@ func (s *State) SubscribeToConsensusChanges() <-chan struct{} {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := make(chan struct{}, 1)
-	s.subscriptions[s.subscriptionCounter] = c
-	s.subscriptionCounter++
+	s.subscriptions = append(s.subscriptions, c)
 	return c
 }

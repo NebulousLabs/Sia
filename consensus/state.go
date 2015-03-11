@@ -51,8 +51,7 @@ type State struct {
 	// listend on by modules. An empty struct is thrown down the channel any
 	// time that the consensus set of the state changes. subscriptionCounter
 	// only ever increments, and prevents collisions in the map.
-	subscriptions       map[int]chan struct{}
-	subscriptionCounter int
+	subscriptions []chan struct{}
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -77,8 +76,6 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		fileContracts:         make(map[FileContractID]FileContract),
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
-
-		subscriptions: make(map[int]chan struct{}),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
