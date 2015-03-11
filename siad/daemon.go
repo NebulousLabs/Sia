@@ -46,7 +46,7 @@ type daemon struct {
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
 	d.state = consensus.CreateGenesisState()
-	d.gateway, err = gateway.New(config.RPCAddr, d.state)
+	d.gateway, err = gateway.New(config.RPCAddr, d.state, filepath.Join(config.SiaDir, "gateway"))
 	if err != nil {
 		return
 	}
