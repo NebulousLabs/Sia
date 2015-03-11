@@ -38,10 +38,6 @@ func (c *Config) expand() (err error) {
 	if err != nil {
 		return
 	}
-	c.Siad.DownloadDirectory, err = homedir.Expand(c.Siad.DownloadDirectory)
-	if err != nil {
-		return
-	}
 
 	return
 }
@@ -80,8 +76,6 @@ func startEnvironment(*cobra.Command, []string) {
 		RPCAddr: config.Siacore.RPCaddr,
 
 		SiaDir: siaDir,
-
-		DownloadDir: config.Siad.DownloadDirectory,
 	}
 	err := config.expand()
 	if err != nil {
@@ -129,12 +123,10 @@ func main() {
 
 	// Set default values, which have the lowest priority.
 	defaultConfigFile := filepath.Join(siaDir, "config")
-	defaultDownloadDir := "~/Downloads"
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
 	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port is used when talking to other nodes on the network")
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
 	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "location of the siad config file")
-	root.PersistentFlags().StringVarP(&config.Siad.DownloadDirectory, "download-dir", "d", defaultDownloadDir, "location of downloaded files")
 
 	// Create a Logger for this package
 	logFile, err := os.OpenFile(filepath.Join(siaDir, "info.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)

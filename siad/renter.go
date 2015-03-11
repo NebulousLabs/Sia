@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
@@ -23,8 +22,7 @@ type FileInfo struct {
 
 // renterDownloadHandler handles the API call to download a file.
 func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	path := filepath.Join(d.downloadDir, req.FormValue("destination"))
-	err := d.renter.Download(req.FormValue("nickname"), path)
+	err := d.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
 		return

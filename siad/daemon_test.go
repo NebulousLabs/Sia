@@ -27,14 +27,10 @@ func newDaemonTester(t *testing.T) *daemonTester {
 		APIAddr: ":" + strconv.Itoa(APIPort),
 		RPCAddr: ":" + strconv.Itoa(RPCPort),
 
-		HostDir: "hostDir",
-
-		Threads: 1,
-
-		DownloadDir: "downloadDir",
-
-		WalletDir: "walletDir" + strconv.Itoa(APIPort),
+		SiaDir: "testdir" + strconv.Itoa(APIPort),
 	}
+	APIPort++
+	RPCPort++
 
 	d, err := newDaemon(dc)
 	if err != nil {
@@ -48,8 +44,6 @@ func newDaemonTester(t *testing.T) *daemonTester {
 			t.Fatal("API server quit:", listenErr)
 		}
 	}()
-	APIPort++
-	RPCPort++
 
 	// Give the daemon some money.
 	dt.mineMoney()

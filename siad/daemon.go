@@ -24,8 +24,6 @@ type DaemonConfig struct {
 	RPCAddr string
 
 	SiaDir string
-
-	DownloadDir string
 }
 
 // The daemon is essentially a collection of modules and an API server to talk
@@ -40,8 +38,6 @@ type daemon struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	downloadDir string
-
 	apiServer *graceful.Server
 }
 
@@ -49,10 +45,8 @@ type daemon struct {
 // parameters.
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
-	d.downloadDir = config.DownloadDir
-
 	d.state = consensus.CreateGenesisState()
-	d.gateway, err = gateway.New(config.RPCAddr, d.state, filepath.Join(config.SiaDir, "gateway"))
+	d.gateway, err = gateway.New(config.RPCAddr, d.state)
 	if err != nil {
 		return
 	}
