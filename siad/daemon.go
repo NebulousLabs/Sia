@@ -35,7 +35,7 @@ type DaemonConfig struct {
 	WalletDir string
 }
 
-// The daemon is essentially a collection of moduels and an api server to talk
+// The daemon is essentially a collection of moduels and an API server to talk
 // to them all.
 type daemon struct {
 	state   *consensus.State

@@ -7,7 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// walletAddressHandler handles the api request for a new address.
+// walletAddressHandler handles the API request for a new address.
 func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	coinAddress, _, err := d.wallet.CoinAddress()
 	if err != nil {
@@ -23,7 +23,7 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 	}{fmt.Sprintf("%x", coinAddress)})
 }
 
-// walletSendHandler handles the api call to send coins to another address.
+// walletSendHandler handles the API call to send coins to another address.
 func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
@@ -53,7 +53,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// walletStatusHandler handles the api call querying the status of the wallet.
+// walletStatusHandler handles the API call querying the status of the wallet.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.wallet.Info())
 }

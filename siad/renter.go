@@ -13,7 +13,7 @@ const (
 	redundancy = 15   // Redundancy of files uploaded to the network.
 )
 
-// renterDownloadHandler handles the api call to download a file.
+// renterDownloadHandler handles the API call to download a file.
 func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	path := filepath.Join(d.downloadDir, req.FormValue("destination"))
 	err := d.renter.Download(req.FormValue("nickname"), path)
@@ -25,12 +25,12 @@ func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request)
 	writeSuccess(w)
 }
 
-// renterStatusHandler handles the api call querying the renter's status.
+// renterStatusHandler handles the API call querying the renter's status.
 func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.renter.Info())
 }
 
-// renterUploadHandler handles the api call to upload a file using a
+// renterUploadHandler handles the API call to upload a file using a
 // filepath.
 func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	// open the file

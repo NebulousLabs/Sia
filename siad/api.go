@@ -15,7 +15,7 @@ const (
 )
 
 // handleHTTPRequest is a wrapper function that logs and then handles all
-// incoming calls to the api.
+// incoming calls to the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
 		log.Printf("%s %s", req.Method, req.URL)
@@ -23,7 +23,7 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 	})
 }
 
-// initAPI determines which functions handle each api call.
+// initAPI determines which functions handle each API call.
 func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
@@ -76,7 +76,7 @@ func (d *daemon) initAPI(addr string) {
 	}
 }
 
-// listen starts listening on the port for api calls.
+// listen starts listening on the port for API calls.
 func (d *daemon) listen() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.
@@ -88,7 +88,7 @@ func (d *daemon) listen() error {
 	return err
 }
 
-// writeError logs an writes an error to the api caller.
+// writeError logs an writes an error to the API caller.
 func writeError(w http.ResponseWriter, msg string, err int) {
 	log.Printf("%d HTTP ERROR: %s", err, msg)
 	http.Error(w, msg, err)

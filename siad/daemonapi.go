@@ -98,7 +98,7 @@ func applyUpdate(version string) (err error) {
 	return
 }
 
-// daemonStopHandler handles the api call to stop the daemon cleanly.
+// daemonStopHandler handles the API call to stop the daemon cleanly.
 func (d *daemon) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 
@@ -106,7 +106,7 @@ func (d *daemon) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	d.apiServer.Stop(time.Second)
 }
 
-// daemonUpdateCheckHandler handles the api call to check for daemon updates.
+// daemonUpdateCheckHandler handles the API call to check for daemon updates.
 func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
@@ -120,7 +120,7 @@ func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Reque
 	}{available, version})
 }
 
-// daemonUpdateApplyHandler handles the api call to apply daemon updates.
+// daemonUpdateApplyHandler handles the API call to apply daemon updates.
 func (d *daemon) daemonUpdateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
