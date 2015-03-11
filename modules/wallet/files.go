@@ -27,16 +27,17 @@ func (w *Wallet) save() (err error) {
 	for _, key := range w.keys {
 		keySlice = append(keySlice, savedKey{key.secretKey, key.unlockConditions})
 	}
+	walletData := encoding.Marshal(keySlice)
 
-	// Write the data to a temp file
-	err = ioutil.WriteFile(w.filename+"_temp", encoding.Marshal(keySlice), 0666)
+	// Write the wallet data to a backup file, in case something goes wrong
+	err = ioutil.WriteFile(w.filename+".backup", walletData, 0666)
 	if err != nil {
 		return
 	}
-	// Atomically overwrite the old wallet file with the new wallet file.
-	err = os.Rename(w.filename+"_temp", w.filename)
+	// Overwrite the wallet file.
+	err = ioutil.WriteFile(w.filename, walletData, 0666)
 	if err != nil {
-		// TODO: instruct user to recover wallet from w.filename+"_temp"
+		// TODO: instruct user to recover wallet from w.filename+".backup"
 		return
 	}
 
