@@ -41,9 +41,6 @@ func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry
 // for host announcements. The threading is careful to avoid holding a lock
 // while network communication is happening.
 func (hdb *HostDB) update() {
-	hdb.state.RLock()
-	defer hdb.state.RUnlock()
-
 	// Get the blocks that have been added since the previous update.
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {
@@ -52,7 +49,6 @@ func (hdb *HostDB) update() {
 			panic("hostdb got an error when calling hdb.state.BlocksSince")
 		}
 	}
-	hdb.recentBlock = hdb.state.CurrentBlock().ID()
 
 	// Add hosts announced in blocks that were applied.
 	for _, blockID := range appliedBlocks {
@@ -66,6 +62,7 @@ func (hdb *HostDB) update() {
 		for _, entry := range findHostAnnouncements(block) {
 			hdb.insert(entry)
 		}
+		hdb.recentBlock = blockID
 	}
 
 	return
