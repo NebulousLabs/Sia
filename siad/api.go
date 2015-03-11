@@ -5,13 +5,13 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/stretchr/graceful"
 )
 
 const (
-	// TODO: docstring
-	apiTimeout = 5e9 // 5 seconds
+	apiTimeout = 5 * time.Second
 )
 
 // handleHTTPRequest is a wrapper function that logs and then handles all
@@ -61,7 +61,6 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/download", d.renterDownloadHandler)
 	handleHTTPRequest(mux, "/renter/status", d.renterStatusHandler)
 	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)
-	handleHTTPRequest(mux, "/renter/uploadpath", d.renterUploadPathHandler)
 
 	// TransactionPool API Calls
 
@@ -89,7 +88,7 @@ func (d *daemon) listen() error {
 	return err
 }
 
-// writeError logs an writes an error to the API caller.
+// writeError logs an writes an error to the api caller.
 func writeError(w http.ResponseWriter, msg string, err int) {
 	log.Printf("%d HTTP ERROR: %s", err, msg)
 	http.Error(w, msg, err)

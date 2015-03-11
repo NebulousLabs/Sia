@@ -23,13 +23,14 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
-		"TotalStorage": &config.TotalStorage,
-		"MinFilesize":  &config.MinFilesize,
-		"MaxFilesize":  &config.MaxFilesize,
-		"MinDuration":  &config.MinDuration,
-		"MaxDuration":  &config.MaxDuration,
-		"Price":        &config.Price,
-		"Collateral":   &config.Collateral,
+		"totalStorage": &config.TotalStorage,
+		"minFilesize":  &config.MinFilesize,
+		"maxFilesize":  &config.MaxFilesize,
+		"minDuration":  &config.MinDuration,
+		"maxDuration":  &config.MaxDuration,
+		"windowSize":   &config.WindowSize,
+		"price":        &config.Price,
+		"collateral":   &config.Collateral,
 	}
 
 	for qs := range qsVars {

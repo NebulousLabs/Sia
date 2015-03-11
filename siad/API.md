@@ -3,7 +3,7 @@ Siad API
 
 All API calls return JSON objects. If there is an error, the error is returned
 in plaintext. The standard response is { "Success": true}. In this document,
-the API responses are defined as go structs. The go structs will get encoded to
+the API responses are defined as Go structs. The Go structs will get encoded to
 JSON before being sent. Go structs are used here to provide type information.
 
 At version 0.4, the API will be locked into forwards compatibility. This means
@@ -117,11 +117,10 @@ Function: Will add a peer to the gateway.
 
 Parameters:
 ```
-struct {
-	Address string
-}
+address string
 ```
-Address should be an IP address of the form: "a.b.c.d:port"
+address should be a reachable hostname + port number. typically of the form
+"a.b.c.d:xxxx".
 
 Response: standard
 
@@ -131,11 +130,10 @@ Function: Will remove a peer from the gateway.
 
 Parameters:
 ```
-struct {
-	Address string
-}
+address string
 ```
-Address should be an IP address of the form: "a.b.c.d:port"
+address should be a reachable hostname + port number. typically of the form
+"a.b.c.d:xxxx".
 
 Response: standard
 
@@ -163,32 +161,30 @@ Function: Sets the configuration of the host.
 
 Parameters:
 ```
-struct {
-	TotalStorage int
-	MinFilesize  int
-	MaxFilesize  int
-	MinDuration  int
-	MaxDuration  int
-	WindowSize   int
-	Price        int
-	Collateral   int
-}
+totalStorage int
+minFilesize  int
+maxFilesize  int
+minDuration  int
+maxDuration  int
+windowSize   int
+price        int
+collateral   int
 ```
-TotalStorage (in bytes) is how much storage the host will rent to the network.
+totalStorage (in bytes) is how much storage the host will rent to the network.
 
-MinFilesize is the minimum allowed file size.
+minFilesize is the minimum allowed file size.
 
-MaxFilesize is the maximum allowed file size.
+maxFilesize is the maximum allowed file size.
 
-MinDuration is the minimum amount of time a contract is allowed to last.
+minDuration is the minimum amount of time a contract is allowed to last.
 
-MaxDuration is the maximum amount of time a contract is allowed to last.
+maxDuration is the maximum amount of time a contract is allowed to last.
 
-WindowSize is the number of blocks a host has to prove they are holding the file.
+windowSize is the number of blocks a host has to prove they are holding the file.
 
-Price is the cost in Hastings per byte per block of hosting files on the network.
+price is the cost in Hastings per byte per block of hosting files on the network.
 
-Collateral is the amount of collateral the host will offer in Hastings per byte
+collateral is the amount of collateral the host will offer in Hastings per byte
 per block for losing files on the network.
 
 Response: standard
@@ -272,14 +268,12 @@ Function: Starts a file download.
 
 Parameters:
 ```
-struct {
-	Nickname    string
-	Destination string
-}
+nickname    string
+destination string
 ```
-Nickname is the nickname of the file that has been uploaded to the network.
+nickname is the nickname of the file that has been uploaded to the network.
 
-Destination is the filepath that the file should be downloaded to.
+destination is the filepath that the file should be downloaded to.
 
 Response: standard
 
@@ -303,14 +297,12 @@ Function: Upload a file using a filepath.
 
 Parameters:
 ```
-struct {
-	Source   string
-	Nickname string
-}
+source   string
+nickname string
 ```
-Source is a filename.
+source is a filename.
 
-Nickname is the name the renter uses for the file.
+nickname is the name the renter uses for the file.
 
 Response: standard.
 
@@ -343,14 +335,12 @@ Function: Sends coins to a destination address.
 
 Parameters:
 ```
-struct {
-	Amount      int
-	Destination string
-}
+amount      int
+destination string
 ```
-Amount is a volume of Hastings.
+amount is a volume of Hastings.
 
-Destination is an address represented in hex.
+destination is an address represented in hex.
 
 Response: standard
 
@@ -363,7 +353,7 @@ Parameters: none
 Response:
 ```
 struct {
-	Balance      int
+	Balance int
 }
 ```
 Balance is the spendable balance of the wallet.

@@ -15,8 +15,8 @@ const (
 
 // renterDownloadHandler handles the api call to download a file.
 func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	path := filepath.Join(d.downloadDir, req.FormValue("Destination"))
-	err := d.renter.Download(req.FormValue("Nickname"), path)
+	path := filepath.Join(d.downloadDir, req.FormValue("destination"))
+	err := d.renter.Download(req.FormValue("nickname"), path)
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -34,7 +34,7 @@ func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 // filepath.
 func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	// open the file
-	file, err := os.Open(req.FormValue("Source"))
+	file, err := os.Open(req.FormValue("source"))
 	if err != nil {
 		writeError(w, "Couldn't open file: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -43,7 +43,7 @@ func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
 	err = d.renter.Upload(modules.UploadParams{
 		Data:     file,
 		Duration: duration,
-		Nickname: req.FormValue("Nickname"),
+		Nickname: req.FormValue("nickname"),
 		Pieces:   redundancy,
 	})
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/inconshreveable/go-update"
 )
@@ -102,7 +103,7 @@ func (d *daemon) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 
 	// send stop signal
-	d.apiServer.Stop(1e9) // TODO: What's with the constant?
+	d.apiServer.Stop(time.Second)
 }
 
 // daemonUpdateCheckHandler handles the api call to check for daemon updates.

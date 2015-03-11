@@ -21,7 +21,7 @@ func TestSendCoins(t *testing.T) {
 	receiver.getAPI("/wallet/status", &oldReceiverStatus)
 
 	// send 3 coins from the sender to the receiver
-	sender.callAPI("/wallet/send?Amount=3&Destination=" + receiver.coinAddress())
+	sender.callAPI("/wallet/send?amount=3&destination=" + receiver.coinAddress())
 
 	// get updated balances
 	var newSenderStatus modules.WalletInfo

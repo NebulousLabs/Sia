@@ -66,7 +66,7 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	// FileContractConfirmWindow blocks.
 	for _, fc := range t.FileContracts {
 		if fc.Start < tp.state.Height()+FileContractConfirmWindow {
-			return errors.New("file contract cannot start so close to the current height...")
+			return errors.New("file contract cannot start so close to the current height")
 		}
 	}
 

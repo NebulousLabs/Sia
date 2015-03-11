@@ -28,7 +28,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
 	var dest consensus.UnlockHash
-	_, err := fmt.Sscan(req.FormValue("Amount"), &amount)
+	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		writeError(w, "Malformed amount", http.StatusBadRequest)
 		return
@@ -36,7 +36,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 
 	// Parse the string into an address.
 	var destAddressBytes []byte
-	_, err = fmt.Sscanf(req.FormValue("Destination"), "%x", &destAddressBytes)
+	_, err = fmt.Sscanf(req.FormValue("destination"), "%x", &destAddressBytes)
 	if err != nil {
 		writeError(w, "Malformed coin address", http.StatusBadRequest)
 		return
