@@ -6,8 +6,8 @@ import (
 
 // Info fills out and returns a WalletInfo struct.
 func (w *Wallet) Info() modules.WalletInfo {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	counter := w.mu.RLock("wallet Info")
+	defer w.mu.RUnlock("wallet Info", counter)
 
 	return modules.WalletInfo{
 		Balance:      w.Balance(false),

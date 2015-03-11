@@ -26,8 +26,8 @@ type openTransaction struct {
 // then be used to modify and sign the transaction. An empty transaction is
 // legal input.
 func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet RegisterTransaction")
+	defer w.mu.Unlock("wallet RegisterTransaction", counter)
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
@@ -42,8 +42,8 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 // of outputs that add up to at least the desired amount, and then creates a
 // single output of the exact amount and a second refund output.
 func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consensus.Transaction, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet FundTransaction")
+	defer w.mu.Unlock("wallet FundTransaction", counter)
 
 	// Create a parent transaction and supply it with enough inputs to cover
 	// 'amount'.
@@ -147,8 +147,8 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 // index of the input within the transaction and the transaction itself. When
 // 'SignTransaction' is called, this input will not be signed.
 func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t consensus.Transaction, inputIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddSiacoinInput")
+	defer w.mu.Unlock("wallet AddSiacoinInput", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -166,8 +166,8 @@ func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t con
 // inputs. The transaction and the index of the new miner fee within the
 // transaction are returned.
 func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Transaction, feeIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddMinerFee")
+	defer w.mu.Unlock("wallet AddMinerFee", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -185,8 +185,8 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Tra
 // AddOutput returns the transaction and the index of the new output within the
 // transaction.
 func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consensus.Transaction, outputIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddOutput")
+	defer w.mu.Unlock("wallet AddOutput", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -204,8 +204,8 @@ func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consens
 // the transaction and the index of the new file contract within the
 // transaction.
 func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consensus.Transaction, fcIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddFileContract")
+	defer w.mu.Unlock("wallet AddFileContract", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -223,8 +223,8 @@ func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consen
 // the transaction and the index of the new storage proof within the
 // transaction.
 func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consensus.Transaction, spIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddStorageProof")
+	defer w.mu.Unlock("wallet AddStorageProof", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -241,8 +241,8 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consen
 // AddArbitraryData adds arbitrary data to the transaction, returning a copy of
 // the transaction and the index of the new data within the transaction.
 func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transaction, adIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddArbitraryData")
+	defer w.mu.Unlock("wallet AddArbitraryData", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -259,8 +259,8 @@ func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transactio
 // SignTransaction signs the transaction, then deletes the transaction from the
 // wallet's internal memory, then returns the transaction.
 func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensus.Transaction, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet SignTransaction")
+	defer w.mu.Unlock("wallet SignTransaction", counter)
 
 	// Fetch the transaction.
 	openTxn, exists := w.transactions[id]
@@ -334,8 +334,8 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 // useful for dealing with multiparty signatures, or for staged negotiations
 // which involve sending the transaction first and the signature later.
 func (w *Wallet) AddSignature(id string, sig consensus.TransactionSignature) (t consensus.Transaction, sigIndex uint64, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	counter := w.mu.Lock("wallet AddSignature")
+	defer w.mu.Unlock("wallet AddSignature", counter)
 
 	openTxn, exists := w.transactions[id]
 	if !exists {

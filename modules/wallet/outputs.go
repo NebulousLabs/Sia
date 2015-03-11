@@ -72,8 +72,8 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
 func (w *Wallet) Balance(full bool) (total consensus.Currency) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	counter := w.mu.RLock("wallet Balance")
+	defer w.mu.RUnlock("wallet Balance", counter)
 	w.update()
 
 	// Iterate through all outputs and tally them up.
