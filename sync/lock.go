@@ -1,4 +1,4 @@
-package lock
+package sync
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// Lock provides locking functions, and an ability to detect and mitigate
+// RWMutex provides locking functions, and an ability to detect and mitigate
 // deadlocks.
-type Lock struct {
+type RWMutex struct {
 	openLocks        map[int]string
 	openLocksCounter int
 	openLocksMutex   sync.Mutex
@@ -21,36 +21,36 @@ type Lock struct {
 // New takes a maxLockTime and returns a lock. The lock will never stay locked
 // for more than maxLockTime, instead printing an error and unlocking after
 // maxLockTime has passed.
-func New(maxLockTime time.Duration) *Lock {
-	return &Lock{
+func New(maxLockTime time.Duration) *RWMutex {
+	return &RWMutex{
 		openLocks:   make(map[int]string),
 		maxLockTime: maxLockTime,
 	}
 }
 
-// RLock will read lock the Lock. The id is so that if there is a problem, the
+// RLock will read lock the RWMutex. The id is so that if there is a problem, the
 // dev can easily figure out which caller caused the problem. The return value
 // is important for correctly managing unlocks.
-func (l *Lock) RLock(id string) int {
-	l.openLocksMutex.Lock()
-	counter := l.openLocksCounter
-	l.openLocks[counter] = id
-	l.openLocksCounter++
-	l.openLocksMutex.Unlock()
+func (rwm *RWMutex) RLock(id string) int {
+	rwm.openLocksMutex.Lock()
+	counter := rwm.openLocksCounter
+	rwm.openLocks[counter] = id
+	rwm.openLocksCounter++
+	rwm.openLocksMutex.Unlock()
 
-	l.mu.RLock()
+	rwm.mu.RLock()
 
 	go func() {
-		time.Sleep(l.maxLockTime)
+		time.Sleep(rwm.maxLockTime)
 
-		l.openLocksMutex.Lock()
-		_, exists := l.openLocks[counter]
+		rwm.openLocksMutex.Lock()
+		_, exists := rwm.openLocks[counter]
 		if exists {
 			fmt.Printf("RLock held for too long, using id %v and counter %v\n", id, counter)
-			delete(l.openLocks, counter)
-			l.mu.RUnlock()
+			delete(rwm.openLocks, counter)
+			rwm.mu.RUnlock()
 		}
-		l.openLocksMutex.Unlock()
+		rwm.openLocksMutex.Unlock()
 	}()
 
 	return counter
@@ -59,41 +59,41 @@ func (l *Lock) RLock(id string) int {
 // RUnlock will read unlock the lock. The id is so devs can easily figure out
 // which caller is causing problems. The counter is important for knowing which
 // instance was holding the lock.
-func (l *Lock) RUnlock(id string, counter int) {
-	l.openLocksMutex.Lock()
-	_, exists := l.openLocks[counter]
+func (rwm *RWMutex) RUnlock(id string, counter int) {
+	rwm.openLocksMutex.Lock()
+	_, exists := rwm.openLocks[counter]
 	if !exists {
 		fmt.Printf("RUnlock called too late, using id %v and counter %v\n", id, counter)
 	} else {
-		delete(l.openLocks, counter)
-		l.mu.RUnlock()
+		delete(rwm.openLocks, counter)
+		rwm.mu.RUnlock()
 	}
-	l.openLocksMutex.Unlock()
+	rwm.openLocksMutex.Unlock()
 }
 
-// Lock will lock the Lock. The id is so that if there is a problem, the dev
+// Lock will lock the RWMutex. The id is so that if there is a problem, the dev
 // can easily figure out which caller caused the problem. The return value is
 // important for correctly managing unlocks.
-func (l *Lock) Lock(id string) int {
-	l.openLocksMutex.Lock()
-	counter := l.openLocksCounter
-	l.openLocks[counter] = id
-	l.openLocksCounter++
-	l.openLocksMutex.Unlock()
+func (rwm *RWMutex) Lock(id string) int {
+	rwm.openLocksMutex.Lock()
+	counter := rwm.openLocksCounter
+	rwm.openLocks[counter] = id
+	rwm.openLocksCounter++
+	rwm.openLocksMutex.Unlock()
 
-	l.mu.Lock()
+	rwm.mu.Lock()
 
 	go func() {
-		time.Sleep(l.maxLockTime)
+		time.Sleep(rwm.maxLockTime)
 
-		l.openLocksMutex.Lock()
-		_, exists := l.openLocks[counter]
+		rwm.openLocksMutex.Lock()
+		_, exists := rwm.openLocks[counter]
 		if exists {
 			fmt.Printf("Lock held for too long, using id %v and counter %v\n", id, counter)
-			delete(l.openLocks, counter)
-			l.mu.Unlock()
+			delete(rwm.openLocks, counter)
+			rwm.mu.Unlock()
 		}
-		l.openLocksMutex.Unlock()
+		rwm.openLocksMutex.Unlock()
 	}()
 
 	return counter
@@ -102,14 +102,14 @@ func (l *Lock) Lock(id string) int {
 // Unlock will unlock the lock. The id is so devs can easily figure out which
 // caller is causing problems. The counter is important for knowing which
 // instance was holding the lock.
-func (l *Lock) Unlock(id string, counter int) {
-	l.openLocksMutex.Lock()
-	_, exists := l.openLocks[counter]
+func (rwm *RWMutex) Unlock(id string, counter int) {
+	rwm.openLocksMutex.Lock()
+	_, exists := rwm.openLocks[counter]
 	if !exists {
 		fmt.Printf("RUnlock called too late, using id %v and counter %v\n", id, counter)
 	} else {
-		delete(l.openLocks, counter)
-		l.mu.Unlock()
+		delete(rwm.openLocks, counter)
+		rwm.mu.Unlock()
 	}
-	l.openLocksMutex.Unlock()
+	rwm.openLocksMutex.Unlock()
 }

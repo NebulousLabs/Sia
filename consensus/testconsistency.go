@@ -10,8 +10,8 @@ import (
 // that every block from current to genesis matches the block listed in
 // currentPath.
 func (ct *ConsensusTester) CurrentPathCheck() {
-	ct.mu.RLock()
-	defer ct.mu.RUnlock()
+	counter := ct.mu.RLock("state CurrentPathCheck")
+	defer ct.mu.RUnlock("state CurrentPathCheck", counter)
 
 	currentNode := ct.currentBlockNode()
 	for i := ct.Height(); i != 0; i-- {
@@ -38,8 +38,8 @@ func (ct *ConsensusTester) CurrentPathCheck() {
 // Then the state moves forwards to the initial starting place and verifies
 // that the state hash is the same.
 func (ct *ConsensusTester) RewindApplyCheck() {
-	ct.mu.Lock()
-	defer ct.mu.Unlock()
+	counter := ct.mu.Lock("state RewindApplyCheck")
+	defer ct.mu.Unlock("state RewindApplyCheck", counter)
 
 	csh := ct.consensusSetHash()
 	cn := ct.currentBlockNode()
@@ -54,8 +54,8 @@ func (ct *ConsensusTester) RewindApplyCheck() {
 // should be in the system, and then tallys up the outputs to see if that is
 // the case.
 func (ct *ConsensusTester) CurrencyCheck() {
-	ct.mu.RLock()
-	defer ct.mu.RUnlock()
+	counter := ct.mu.RLock("state CurrencyCheck")
+	defer ct.mu.RUnlock("state CurrencyCheck", counter)
 
 	siafunds := NewCurrency64(0)
 	for _, siafundOutput := range ct.siafundOutputs {
@@ -168,7 +168,7 @@ func (s *State) consensusSetHash() crypto.Hash {
 
 // StateHash returns the markle root of the current state of consensus.
 func (s *State) StateHash() crypto.Hash {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock("state StateHash")
+	defer s.mu.RUnlock("state StateHash", counter)
 	return s.consensusSetHash()
 }
