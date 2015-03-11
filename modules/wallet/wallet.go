@@ -70,7 +70,7 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	mu *sync.RWMutex
+	mu sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file

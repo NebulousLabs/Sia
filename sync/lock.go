@@ -21,8 +21,8 @@ type RWMutex struct {
 // New takes a maxLockTime and returns a lock. The lock will never stay locked
 // for more than maxLockTime, instead printing an error and unlocking after
 // maxLockTime has passed.
-func New(maxLockTime time.Duration) *RWMutex {
-	return &RWMutex{
+func New(maxLockTime time.Duration) RWMutex {
+	return RWMutex{
 		openLocks:   make(map[int]string),
 		maxLockTime: maxLockTime,
 	}
