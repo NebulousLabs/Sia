@@ -7,6 +7,7 @@ whitepaper.aux
 whitepaper.log
 whitepaper.pdf
 *_test
+testdir*
 *.wallet*
 walletDir*
 *.swp

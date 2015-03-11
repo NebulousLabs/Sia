@@ -23,11 +23,16 @@ type daemonTester struct {
 }
 
 func newDaemonTester(t *testing.T) *daemonTester {
+	testdir, err := ioutil.TempDir("..", "testdir")
+	if err != nil {
+		t.Fatal("Could not create testing dir:", err)
+	}
+
 	dc := DaemonConfig{
 		APIAddr: ":" + strconv.Itoa(APIPort),
 		RPCAddr: ":" + strconv.Itoa(RPCPort),
 
-		SiaDir: "testdir" + strconv.Itoa(APIPort),
+		SiaDir: testdir,
 	}
 	APIPort++
 	RPCPort++
