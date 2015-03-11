@@ -7,11 +7,11 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// walletAddressHandler manages requests for CoinAddresses from the wallet.
+// walletAddressHandler handles the API request for a new address.
 func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	coinAddress, _, err := d.wallet.CoinAddress()
 	if err != nil {
-		writeError(w, "Failed to get a coin address", 500)
+		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
 		return
 	}
 
@@ -23,22 +23,22 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 	}{fmt.Sprintf("%x", coinAddress)})
 }
 
-// walletSendHandler manages 'send' requests that are made to the wallet.
+// walletSendHandler handles the API call to send coins to another address.
 func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
 	var dest consensus.UnlockHash
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
-		writeError(w, "Malformed amount", 400)
+		writeError(w, "Malformed amount", http.StatusBadRequest)
 		return
 	}
 
 	// Parse the string into an address.
 	var destAddressBytes []byte
-	_, err = fmt.Sscanf(req.FormValue("dest"), "%x", &destAddressBytes)
+	_, err = fmt.Sscanf(req.FormValue("destination"), "%x", &destAddressBytes)
 	if err != nil {
-		writeError(w, "Malformed coin address", 400)
+		writeError(w, "Malformed coin address", http.StatusBadRequest)
 		return
 	}
 	copy(dest[:], destAddressBytes)
@@ -46,15 +46,14 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Spend the coins.
 	_, err = d.wallet.SpendCoins(amount, dest)
 	if err != nil {
-		writeError(w, "Failed to create transaction: "+err.Error(), 500)
+		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeSuccess(w)
 }
 
-// walletStatusHandler returns a struct containing wallet information, like the
-// balance.
+// walletStatusHandler handles the API call querying the status of the wallet.
 func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.wallet.Info())
 }

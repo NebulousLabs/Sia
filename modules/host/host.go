@@ -74,7 +74,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 			TotalStorage: 2e9,                                    // 2 GB
 			MaxFilesize:  300e6,                                  // 300 MB
 			MaxDuration:  5e3,                                    // Just over a month.
-			MinWindow:    288,                                    // 48 hours.
+			WindowSize:   288,                                    // 48 hours.
 			Price:        consensus.NewCurrency64(1000000000000), // 10^12
 			Collateral:   consensus.NewCurrency64(0),
 			UnlockHash:   addr,

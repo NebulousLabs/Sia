@@ -25,11 +25,15 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Upload to the host.
-	dt.callAPI("/renter/uploadpath?pieces=1&filename=api.go&nickname=first&pieces=1")
+	dt.callAPI("/renter/upload?pieces=1&source=api.go&nickname=first")
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
-	time.Sleep(consensus.RenterZeroConfDelay + 1e9)
+	//
+	// TODO: There should be some way to just spinblock until the download
+	// completes. Except there's no exported function in the renter that will
+	// indicate if a download has completed or not.
+	time.Sleep(consensus.RenterZeroConfDelay + time.Second*10)
 
 	rentInfo := dt.renter.Info()
 	if len(rentInfo.Files) != 1 {
@@ -37,7 +41,7 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Try to download the file.
-	dt.callAPI("/renter/download?filename=renterTestDL_test&nickname=first")
+	dt.callAPI("/renter/download?destination=renterTestDL_test&nickname=first")
 	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.

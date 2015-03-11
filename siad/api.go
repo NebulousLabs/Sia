@@ -5,17 +5,17 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/stretchr/graceful"
 )
 
-const apiTimeout = 5e9 // 5 seconds
+const (
+	apiTimeout = 5 * time.Second
+)
 
-func writeError(w http.ResponseWriter, msg string, err int) {
-	log.Printf("%d HTTP ERROR: %s", err, msg)
-	http.Error(w, msg, err)
-}
-
+// handleHTTPRequest is a wrapper function that logs and then handles all
+// incoming calls to the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
 		log.Printf("%s %s", req.Method, req.URL)
@@ -23,26 +23,31 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 	})
 }
 
+// initAPI determines which functions handle each API call.
 func (d *daemon) initAPI(addr string) {
 	mux := http.NewServeMux()
 
-	// Daemon API Calls
-	handleHTTPRequest(mux, "/daemon/stop", d.stopHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", d.updateCheckHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", d.updateApplyHandler)
-
 	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus/status", d.statusHandler)
+	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)
+
+	// Daemon API Calls
+	handleHTTPRequest(mux, "/daemon/stop", d.daemonStopHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", d.daemonUpdateApplyHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", d.daemonUpdateCheckHandler)
+
+	// Debugging API Calls
+	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
+	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
 
 	// Gateway API Calls
-	handleHTTPRequest(mux, "/gateway/status", d.peerStatusHandler)
-	handleHTTPRequest(mux, "/gateway/synchronize", d.syncHandler)
-	handleHTTPRequest(mux, "/gateway/peer/add", d.peerAddHandler)
-	handleHTTPRequest(mux, "/gateway/peer/remove", d.peerRemoveHandler)
+	handleHTTPRequest(mux, "/gateway/status", d.gatewayStatusHandler)
+	handleHTTPRequest(mux, "/gateway/synchronize", d.gatewaySynchronizeHandler)
+	handleHTTPRequest(mux, "/gateway/peer/add", d.gatewayPeerAddHandler)
+	handleHTTPRequest(mux, "/gateway/peer/remove", d.gatewayPeerRemoveHandler)
 
 	// Host API Calls
-	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
 	handleHTTPRequest(mux, "/host/announce", d.hostAnnounceHandler)
+	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
 	handleHTTPRequest(mux, "/host/status", d.hostStatusHandler)
 
 	// HostDB API Calls
@@ -53,10 +58,9 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/stop", d.minerStopHandler)
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/upload", d.fileUploadHandler)
-	handleHTTPRequest(mux, "/renter/uploadpath", d.fileUploadPathHandler)
-	handleHTTPRequest(mux, "/renter/download", d.fileDownloadHandler)
-	handleHTTPRequest(mux, "/renter/status", d.fileStatusHandler)
+	handleHTTPRequest(mux, "/renter/download", d.renterDownloadHandler)
+	handleHTTPRequest(mux, "/renter/status", d.renterStatusHandler)
+	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)
 
 	// TransactionPool API Calls
 
@@ -65,10 +69,6 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/send", d.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", d.walletStatusHandler)
 
-	// Debugging API Calls
-	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
-
 	// create graceful HTTP server
 	d.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
@@ -76,6 +76,7 @@ func (d *daemon) initAPI(addr string) {
 	}
 }
 
+// listen starts listening on the port for API calls.
 func (d *daemon) listen() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.
@@ -87,11 +88,17 @@ func (d *daemon) listen() error {
 	return err
 }
 
+// writeError logs an writes an error to the API caller.
+func writeError(w http.ResponseWriter, msg string, err int) {
+	log.Printf("%d HTTP ERROR: %s", err, msg)
+	http.Error(w, msg, err)
+}
+
 // writeJSON writes the object to the ResponseWriter. If the encoding fails, an
 // error is written instead.
 func writeJSON(w http.ResponseWriter, obj interface{}) {
 	if json.NewEncoder(w).Encode(obj) != nil {
-		http.Error(w, "Failed to encode response", 500)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 

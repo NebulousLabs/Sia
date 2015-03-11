@@ -43,7 +43,7 @@ func TestPeering(t *testing.T) {
 	// Create to peers and add the first to the second.
 	peer1 := newDaemonTester(t)
 	peer2 := newDaemonTester(t)
-	peer1.callAPI("/gateway/peer/add?addr=" + string(peer2.netAddress()))
+	peer1.callAPI("/gateway/peer/add?address=" + string(peer2.netAddress()))
 
 	// Check that the first has the second as a peer.
 	var info modules.GatewayInfo
@@ -95,7 +95,7 @@ func TestTransactionRelay(t *testing.T) {
 	// Create a transaction in the first daemon and check that it propagates to
 	// the second. The check is done via spinning because network propagation
 	// will take an unknown amount of time.
-	dt.callAPI("/wallet/send?amount=15&dest=" + dt2.coinAddress())
+	dt.callAPI("/wallet/send?amount=15&destination=" + dt2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
 		tset, err = dt.tpool.TransactionSet()
 		if err != nil {
@@ -116,10 +116,10 @@ func TestTransactionRelay(t *testing.T) {
 		t.Error(dt.wallet.Balance(false).Big())
 		t.Error("balances are incorrect for 0-conf transaction")
 	}
-	if origBal2.Add(consensus.NewCurrency64(15)).Cmp(dt2.wallet.Balance(false)) != 0 {
-		t.Error(origBal2.Big())
-		t.Error(dt2.wallet.Balance(false).Big())
-		t.Error("balances are incorrect for 0-conf transaction")
+	for origBal2.Add(consensus.NewCurrency64(15)).Cmp(dt2.wallet.Balance(false)) != 0 {
+		// t.Error(origBal2.Big())
+		// t.Error(dt2.wallet.Balance(false).Big())
+		// t.Error("balances are incorrect for 0-conf transaction")
 	}
 }
 

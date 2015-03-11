@@ -29,7 +29,7 @@ type HostSettings struct {
 	MaxFilesize  uint64
 	MinDuration  consensus.BlockHeight
 	MaxDuration  consensus.BlockHeight
-	MinWindow    consensus.BlockHeight
+	WindowSize   consensus.BlockHeight
 	Price        consensus.Currency
 	Collateral   consensus.Currency
 	UnlockHash   consensus.UnlockHash

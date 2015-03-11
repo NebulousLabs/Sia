@@ -116,7 +116,8 @@ func (dt *daemonTester) get(call string) (resp *http.Response) {
 	if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
-		dt.Fatalf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
+		dt.Errorf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
+		panic("the panic is placed here so we get the call stack.")
 	}
 	return
 }

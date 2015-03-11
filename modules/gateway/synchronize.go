@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -12,11 +13,24 @@ const (
 	MaxCatchUpBlocks = 50
 )
 
+// threadedResynchronize continuously calls Synchronize on a random peer every
+// few minutes. This helps prevent unintentional desychronization in the event
+// that broadcasts start failing.
+func (g *Gateway) threadedResynchronize() {
+	for {
+		g.Synchronize()
+		time.Sleep(time.Minute * 2)
+	}
+}
+
 // Synchronize synchronizes the local consensus set (i.e. the blockchain) with
 // the network consensus set.
 //
 // TODO: don't run two Synchronize threads at the same time
 func (g *Gateway) Synchronize() (err error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
 	peer, err := g.randomPeer()
 	if err != nil {
 		return

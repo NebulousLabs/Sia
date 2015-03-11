@@ -52,7 +52,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.DurationStart >= h.state.Height():
 		return errors.New("duration cannot start in the future")
 
-	case terms.WindowSize < h.MinWindow:
+	case terms.WindowSize < h.WindowSize:
 		return errors.New("challenge window is not large enough")
 
 	case terms.Price.Cmp(h.Price) < 0:
@@ -182,6 +182,8 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// rollback everything if something goes wrong
 	defer func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
 		if err != nil {
 			h.deallocate(terms.FileSize, path)
 		}

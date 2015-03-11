@@ -52,7 +52,7 @@ func (ht *HostTester) testConsiderTerms() {
 		FileSize:      4e3,
 		Duration:      12,
 		DurationStart: 0,
-		WindowSize:    ht.MinWindow,
+		WindowSize:    ht.WindowSize,
 		Price:         ht.Price,
 		Collateral:    ht.Collateral,
 		ValidProofOutputs: []consensus.SiacoinOutput{

@@ -26,7 +26,9 @@ func get(call string) (resp *http.Response, err error) {
 		return nil, errors.New("no response from daemon")
 	}
 	// check error code
-	if resp.StatusCode != 200 {
+	if resp.StatusCode == http.StatusNotFound {
+		err = errors.New("API call not recognized: " + call)
+	} else if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		err = errors.New(strings.TrimSpace(string(errResp)))
 	}
@@ -105,7 +107,7 @@ func main() {
 	})
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostSetCmd, hostAnnounceCmd, hostStatusCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
 
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
@@ -113,16 +115,16 @@ func main() {
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)
 
-	root.AddCommand(fileCmd)
-	fileCmd.AddCommand(fileUploadCmd, fileDownloadCmd, fileStatusCmd)
+	root.AddCommand(renterCmd)
+	renterCmd.AddCommand(renterUploadCmd, renterDownloadCmd, renterStatusCmd)
 
-	root.AddCommand(peerCmd)
-	peerCmd.AddCommand(peerAddCmd, peerRemoveCmd, peerStatusCmd)
+	root.AddCommand(gatewayCmd)
+	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewaySynchronizeCmd, gatewayStatusCmd)
 
 	root.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
-	root.AddCommand(statusCmd, stopCmd, syncCmd)
+	root.AddCommand(statusCmd, stopCmd)
 
 	// run
 	root.Execute()
