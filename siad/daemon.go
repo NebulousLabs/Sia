@@ -1,6 +1,8 @@
 package main
 
 import (
+	"path/filepath"
+
 	"github.com/stretchr/graceful"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -18,24 +20,15 @@ import (
 // is only used when calling 'newDaemon', but is it's own struct because there
 // are many values.
 type DaemonConfig struct {
-	// Network Variables
 	APIAddr string
 	RPCAddr string
 
-	// Host Variables
-	HostDir string
+	SiaDir string
 
-	// Miner Variables
-	Threads int
-
-	// Renter Variables
 	DownloadDir string
-
-	// Wallet Variables
-	WalletDir string
 }
 
-// The daemon is essentially a collection of moduels and an API server to talk
+// The daemon is essentially a collection of modules and an API server to talk
 // to them all.
 type daemon struct {
 	state   *consensus.State
@@ -56,8 +49,10 @@ type daemon struct {
 // parameters.
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
+	d.downloadDir = config.DownloadDir
+
 	d.state = consensus.CreateGenesisState()
-	d.gateway, err = gateway.New(config.RPCAddr, d.state)
+	d.gateway, err = gateway.New(config.RPCAddr, d.state, filepath.Join(config.SiaDir, "gateway"))
 	if err != nil {
 		return
 	}
@@ -65,7 +60,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.wallet, err = wallet.New(d.state, d.tpool, config.WalletDir)
+	d.wallet, err = wallet.New(d.state, d.tpool, filepath.Join(config.SiaDir, "wallet"))
 	if err != nil {
 		return
 	}
@@ -73,7 +68,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.host, err = host.New(d.state, d.tpool, d.wallet, config.HostDir)
+	d.host, err = host.New(d.state, d.tpool, d.wallet, filepath.Join(config.SiaDir, "host"))
 	if err != nil {
 		return
 	}
