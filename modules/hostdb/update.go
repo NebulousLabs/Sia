@@ -70,3 +70,15 @@ func (hdb *HostDB) update() {
 
 	return
 }
+
+// threadedConsensusListen listens on a state subscription and updates every
+// time that there's a new block.
+func (hdb *HostDB) threadedConsensusListen() {
+	sub := hdb.state.SubscribeToConsensusChanges()
+	for {
+		hdb.mu.Lock()
+		hdb.update()
+		hdb.mu.Unlock()
+		<-sub
+	}
+}

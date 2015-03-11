@@ -158,7 +158,6 @@ func (hdb *HostDB) Insert(entry modules.HostEntry) error {
 func (hdb *HostDB) NumHosts() int {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	hdb.update()
 
 	if hdb.hostTree == nil {
 		return 0
@@ -171,7 +170,6 @@ func (hdb *HostDB) NumHosts() int {
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 	hdb.mu.Lock()
 	defer hdb.mu.Unlock()
-	hdb.update()
 
 	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
