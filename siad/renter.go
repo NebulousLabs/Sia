@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -12,6 +13,13 @@ const (
 	duration   = 2000 // Duration that hosts will hold onto the file.
 	redundancy = 15   // Redundancy of files uploaded to the network.
 )
+
+type FileInfo struct {
+	Available     bool
+	Nickname      string
+	Repairing     bool
+	TimeRemaining consensus.BlockHeight
+}
 
 // renterDownloadHandler handles the API call to download a file.
 func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
@@ -23,6 +31,22 @@ func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request)
 	}
 
 	writeSuccess(w)
+}
+
+// renterFilesHandler handles the API call to list all of the files.
+func (d *daemon) renterFilesHandler(w http.ResponseWriter, req *http.Request) {
+	files := d.renter.FileList()
+	fileSet := make([]FileInfo, 0, len(files))
+	for _, file := range files {
+		fileSet = append(fileSet, FileInfo{
+			Available:     file.Available(),
+			Nickname:      file.Nickname(),
+			Repairing:     file.Repairing(),
+			TimeRemaining: file.TimeRemaining(),
+		})
+	}
+
+	writeJSON(w, fileSet)
 }
 
 // renterStatusHandler handles the API call querying the renter's status.

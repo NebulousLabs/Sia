@@ -78,6 +78,7 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 			ContractID: contractID,
 			Active:     true,
 		}
+		r.save()
 		r.mu.Unlock()
 		return
 	}
@@ -94,7 +95,7 @@ func (r *Renter) Download(nickname, filename string) error {
 		r.mu.RUnlock()
 		return errors.New("no file of that nickname")
 	}
-	for _, piece := range r.files[nickname] {
+	for _, piece := range r.files[nickname].pieces {
 		if piece.Active {
 			pieces = append(pieces, piece)
 		}
@@ -137,21 +138,20 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 		return errors.New("not enough hosts on the network to upload a file :( - maybe you need to upgrade your software")
 	}
 
-	// TODO: Have some sort of rolling estimate for how much the upload is
-	// going to cost. Right now we just run in blind, with maybe not enough to
-	// upload more than a few pieces. Not having enough money won't cause us to
-	// get stuck, but it may confuse the user since there was no warning. Also,
-	// depending on how long it takes to negotiate contracts, the balance may
-	// not drop immediately.
-
 	// Upload a piece to every host on the network.
-	r.files[up.Nickname] = make([]FilePiece, up.Pieces)
-	for i := range r.files[up.Nickname] {
+	r.files[up.Nickname] = File{
+		nickname:    up.Nickname,
+		pieces:      make([]FilePiece, up.Pieces),
+		startHeight: r.state.Height() + up.Duration,
+		renter:      r,
+	}
+	for i := range r.files[up.Nickname].pieces {
 		// threadedUploadPiece will change the memory that the piece points to,
 		// which is useful because it means the file itself can be renamed but
 		// will still point to the same underlying pieces.
-		go r.threadedUploadPiece(up, &r.files[up.Nickname][i])
+		go r.threadedUploadPiece(up, &r.files[up.Nickname].pieces[i])
 	}
+	r.save()
 
 	return nil
 }

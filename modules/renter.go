@@ -15,13 +15,44 @@ type UploadParams struct {
 	Pieces   int
 }
 
+// FileInfo is an interface providing information about a file.
+type FileInfo interface {
+	// Available indicates whether the file is available for downloading or
+	// not.
+	Available() bool
+
+	// Nickname gives the nickname of the file.
+	Nickname() string
+
+	// Repairing indicates whether the file is actively being repaired. If
+	// there are files being repaired, it is best to let them finish before
+	// shutting down the program.
+	Repairing() bool
+
+	// TimeRemaining indicates how many blocks remain before the file expires.
+	TimeRemaining() consensus.BlockHeight
+}
+
+// RentInfo contains a list of all files by nickname. (deprecated)
 type RentInfo struct {
 	Files []string
 }
 
+// A Renter uploads, tracks, repairs, and downloads a set of files for the
+// user.
 type Renter interface {
-	Upload(UploadParams) error
+	// Download downloads a file to the given filepath.
 	Download(nickname, filepath string) error
-	Rename(currentName, newName string) error
+
+	// FileList returns information on all of the files stored by the renter.
+	FileList() []FileInfo
+
+	// Info returns the list of all files by nickname. (deprecated)
 	Info() RentInfo
+
+	// Rename changes the nickname of a file.
+	Rename(currentName, newName string) error
+
+	// Upload uploads a file using the input parameters.
+	Upload(UploadParams) error
 }
