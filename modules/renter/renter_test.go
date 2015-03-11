@@ -61,7 +61,8 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 // TODO: expand this once Renter testing is fleshed out.
 func TestSaveLoad(t *testing.T) {
 	rt := CreateRenterTester(t)
-	err := rt.save("../../renterdata_test")
+	rt.persistentFile = "../../renterdata_test"
+	err := rt.save()
 	if err != nil {
 		rt.Fatal(err)
 	}

@@ -259,6 +259,7 @@ Renter
 Queries:
 
 * /renter/download
+* /renter/files
 * /renter/status
 * /renter/upload
 
@@ -276,6 +277,34 @@ nickname is the nickname of the file that has been uploaded to the network.
 destination is the filepath that the file should be downloaded to.
 
 Response: standard
+
+#### /renter/files
+
+Function: Lists the status of all files.
+
+Parameters: none
+
+Response:
+```
+struct {
+	FileInfo []struct {
+		Available bool
+		Nickname  string
+		Repairing bool
+		TimeRemaining int
+	}
+}
+```
+Available indicates whether or not the file can be downloaded immediately.
+
+Files is a type.
+
+Nickname is the name the renter uses for the file.
+
+Repairing indicates whether the file is currently being repaired. It is
+typically best not to shut down siad until files are no longer being repaired.
+
+TimeRemaining indicates how many blocks the file will be available for.
 
 #### /renter/status
 

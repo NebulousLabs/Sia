@@ -8,24 +8,16 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// A FilePiece contains information about an individual file piece that has
-// been uploaded to a host, including information about the host and the health
-// of the file piece.
-type FilePiece struct {
-	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
-	Contract   consensus.FileContract   // The contract being enforced.
-	ContractID consensus.FileContractID // The ID of the contract.
-	HostIP     modules.NetAddress       // Where to find the file.
-}
-
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	state   *consensus.State
 	gateway modules.Gateway
-	files   map[string][]FilePiece
 	hostDB  modules.HostDB
 	wallet  modules.Wallet
+
+	files          map[string]File
+	persistentFile string
 
 	mu sync.RWMutex
 }
@@ -54,8 +46,11 @@ func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wa
 		gateway: gateway,
 		hostDB:  hdb,
 		wallet:  wallet,
-		files:   make(map[string][]FilePiece),
+		files:   make(map[string]File),
 	}
+
+	r.load(r.persistentFile)
+
 	return
 }
 
@@ -78,7 +73,10 @@ func (r *Renter) Rename(currentName, newName string) error {
 
 	// Do the renaming.
 	delete(r.files, currentName)
+	entry.nickname = newName
 	r.files[newName] = entry
+
+	r.save()
 	return nil
 }
 
