@@ -27,7 +27,7 @@ type HostTester struct {
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(t *testing.T) (ht *HostTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}

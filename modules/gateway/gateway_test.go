@@ -11,7 +11,7 @@ import (
 var port = 9001
 
 func newTestGateway(t *testing.T) *Gateway {
-	g, err := New(":"+strconv.Itoa(port), consensus.CreateGenesisState())
+	g, err := New(":"+strconv.Itoa(port), consensus.CreateGenesisState(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

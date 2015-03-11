@@ -22,7 +22,7 @@ type HostDBTester struct {
 // CreateHostDBTester initializes a hostdb tester.
 func CreateHostDBTester(t *testing.T) (hdbt *HostDBTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,7 +23,7 @@ type TpoolTester struct {
 // CreateTpoolTester initializes a TpoolTester.
 func CreateTpoolTester(t *testing.T) (tpt *TpoolTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}

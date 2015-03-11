@@ -28,7 +28,7 @@ type RenterTester struct {
 func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
 
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}

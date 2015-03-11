@@ -14,7 +14,7 @@ import (
 func TestMiner(t *testing.T) {
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	g, err := gateway.New(":8900", s)
+	g, err := gateway.New(":8900", s, "")
 	if err != nil {
 		t.Fatal(err)
 	}
