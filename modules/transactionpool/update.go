@@ -123,8 +123,8 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 // transactions that are in conflict with new transactions, and also removing
 // any transactions that have entered the blockchain.
 func (tp *TransactionPool) update() {
-	counter := tp.state.RLock("tpool update")
-	defer tp.state.RUnlock("tpool update", counter)
+	counter := tp.state.RLock()
+	defer tp.state.RUnlock(counter)
 
 	// Get the block diffs since the previous update.
 	var removedBlocks, addedBlocks []consensus.Block

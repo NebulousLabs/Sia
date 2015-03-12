@@ -79,7 +79,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 
-		mu: sync.New(5 * time.Second),
+		mu: sync.New(5*time.Second, 1),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
@@ -116,11 +116,11 @@ func CreateGenesisState() (s *State) {
 }
 
 // RLock will readlock the state.
-func (s *State) RLock(id string) int {
-	return s.mu.RLock(id)
+func (s *State) RLock() int {
+	return s.mu.RLock()
 }
 
 // RUnlock will readunlock the state.
-func (s *State) RUnlock(id string, counter int) {
-	s.mu.RUnlock(id, counter)
+func (s *State) RUnlock(counter int) {
+	s.mu.RUnlock(counter)
 }

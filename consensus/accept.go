@@ -116,8 +116,8 @@ func (s *State) addBlockToTree(b Block) (err error) {
 // AcceptBlock will add blocks to the state, forking the blockchain if they are
 // on a fork that is heavier than the current fork.
 func (s *State) AcceptBlock(b Block) (err error) {
-	counter := s.mu.Lock("state AcceptBlock")
-	defer s.mu.Unlock("state AcceptBlock", counter)
+	counter := s.mu.Lock()
+	defer s.mu.Unlock(counter)
 
 	// Check maps for information about the block.
 	_, exists := s.badBlocks[b.ID()]

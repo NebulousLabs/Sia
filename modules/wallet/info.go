@@ -11,8 +11,8 @@ func (w *Wallet) Info() modules.WalletInfo {
 		FullBalance: w.Balance(true),
 	}
 
-	counter := w.mu.RLock("wallet Info")
+	counter := w.mu.RLock()
 	wi.NumAddresses = len(w.keys)
-	w.mu.RUnlock("wallet Info", counter)
+	w.mu.RUnlock(counter)
 	return wi
 }

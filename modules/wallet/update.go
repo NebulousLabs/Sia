@@ -52,10 +52,10 @@ func (w *Wallet) update() error {
 	// Because we were running into problems, the amount of time that the state
 	// lock is held has been minimized. Grab all of the necessary diffs under a
 	// lock before doing any computation.
-	counter := w.state.RLock("wallet update")
-	newUnconfirmedDiffs := w.tpool.UnconfirmedSiacoinOutputDiffs()
+	counter := w.state.RLock()
+	defer w.state.RUnlock(counter)
+
 	removedBlocks, addedBlocks, err := w.state.BlocksSince(w.recentBlock)
-	w.state.RUnlock("wallet update", counter)
 	if err != nil {
 		return err
 	}
@@ -92,16 +92,15 @@ func (w *Wallet) update() error {
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffApply)
 		}
+		w.recentBlock = id
 	}
 
 	// Get, apply, and store the unconfirmed diffs currently available in the
 	// transaction pool.
-	w.unconfirmedDiffs = newUnconfirmedDiffs
+	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
 	for _, scod := range w.unconfirmedDiffs {
 		w.applyDiff(scod, consensus.DiffApply)
 	}
-
-	w.recentBlock = w.state.CurrentBlock().ID()
 
 	return nil
 }
