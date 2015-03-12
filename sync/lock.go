@@ -112,7 +112,7 @@ func (rwm *RWMutex) safeUnlock(read bool, counter int) {
 		} else {
 			lockType = ""
 		}
-		fmt.Printf("A %v lock was held until deadlock, subsequent call to %v unlock failed. id '%v'. Call stack:\n", lockType, lockType, counter)
+		fmt.Printf("A%v lock was held until deadlock, subsequent call to%v unlock failed. id '%v'. Call stack:\n", lockType, lockType, counter)
 		for i := 0; i <= rwm.callDepth; i++ {
 			fmt.Printf("\tFile '%v', Line '%v'\n", callingFiles[i], callingLines[i])
 		}
