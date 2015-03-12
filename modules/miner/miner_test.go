@@ -22,7 +22,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(s, tpool, "../../miner_test.wallet")
+	w, err := wallet.New(s, tpool, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestManyBlocks(t *testing.T) {
 
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	g, err := gateway.New(":8600", s)
+	g, err := gateway.New(":8600", s, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(s, tpool, "../../miner_test.wallet")
+	w, err := wallet.New(s, tpool, "")
 	if err != nil {
 		t.Fatal(err)
 	}

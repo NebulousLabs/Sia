@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -20,7 +21,7 @@ const (
 )
 
 // A Wallet uses the state and transaction pool to track the unconfirmed
-// balance of a user. All of the keys are stored in the file 'filename'.
+// balance of a user. All of the keys are stored in 'saveDir'/wallet.dat.
 //
 // One feature of the wallet is preventing accidental double spends. The wallet
 // will block an output from being spent if it has been spent in the last
@@ -42,8 +43,8 @@ type Wallet struct {
 	recentBlock      consensus.BlockID
 	unconfirmedDiffs []consensus.SiacoinOutputDiff
 
-	// Location of the wallet's file, for saving and loading keys.
-	filename string
+	// Location of the wallet directory, for saving and loading keys.
+	saveDir string
 
 	// A key contains all the information necessary to spend a particular
 	// address, as well as all the known outputs that use the address.
@@ -75,7 +76,7 @@ type Wallet struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(state *consensus.State, tpool modules.TransactionPool, filename string) (w *Wallet, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) (w *Wallet, err error) {
 	if state == nil {
 		err = errors.New("wallet cannot use a nil state")
 		return
@@ -97,7 +98,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		tpool:       tpool,
 		recentBlock: genesisBlock.ID(),
 
-		filename: filename,
+		saveDir: saveDir,
 
 		age:            AgeDelay + 100,
 		keys:           make(map[consensus.UnlockHash]*key),
@@ -108,15 +109,16 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		mu: sync.New(5*time.Second, 0),
 	}
 
-	// If the wallet file already exists, try to load it.
+	// Try to load a previously saved wallet file. If it doesn't exist, assume
+	// that we're creating a new wallet file.
 	// TODO: log warning if no file found?
-	if fileExists(filename) {
-		// lock not necessary here because no one else has access to w
-		err = w.load(filename)
-		if err != nil {
-			err = fmt.Errorf("couldn't load wallet file %s: %v", filename, err)
-			return
-		}
+	err = w.load()
+	if os.IsNotExist(err) {
+		err = nil
+	}
+	if err != nil {
+		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
+		return
 	}
 
 	return

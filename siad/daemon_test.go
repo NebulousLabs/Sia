@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -23,9 +25,18 @@ type daemonTester struct {
 }
 
 func newDaemonTester(t *testing.T) *daemonTester {
+	// create testing directory structure
 	testdir, err := ioutil.TempDir("..", "testdir")
 	if err != nil {
 		t.Fatal("Could not create testing dir:", err)
+	}
+
+	// create subfolders
+	for _, folder := range []string{"gateway", "wallet", "host"} {
+		err := os.MkdirAll(filepath.Join(testdir, folder), 0777)
+		if err != nil {
+			t.Fatal("could not create directory structure:", err)
+		}
 	}
 
 	dc := DaemonConfig{

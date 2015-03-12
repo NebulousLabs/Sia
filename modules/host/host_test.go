@@ -36,7 +36,7 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "../../host_test"+strconv.Itoa(walletNum)+".wallet")
+	w, err := wallet.New(ct.State, tp, "")
 	if err != nil {
 		t.Fatal(err)
 	}

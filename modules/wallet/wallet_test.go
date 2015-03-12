@@ -35,7 +35,7 @@ func NewWalletTester(t *testing.T) (wt *WalletTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.Wallet, err = New(wt.State, tpool, "../../wallet_test"+strconv.Itoa(walletNum)+".wallet")
+	wt.Wallet, err = New(wt.State, tpool, "")
 	if err != nil {
 		t.Fatal(err)
 	}

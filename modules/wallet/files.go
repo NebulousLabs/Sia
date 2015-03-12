@@ -3,17 +3,12 @@ package wallet
 import (
 	"errors"
 	"io/ioutil"
-	"os"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
-
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return !os.IsNotExist(err)
-}
 
 type savedKey struct {
 	SecretKey        crypto.SecretKey
@@ -30,14 +25,14 @@ func (w *Wallet) save() (err error) {
 	walletData := encoding.Marshal(keySlice)
 
 	// Write the wallet data to a backup file, in case something goes wrong
-	err = ioutil.WriteFile(w.filename+".backup", walletData, 0666)
+	err = ioutil.WriteFile(filepath.Join(w.saveDir, "wallet.backup"), walletData, 0666)
 	if err != nil {
 		return
 	}
 	// Overwrite the wallet file.
-	err = ioutil.WriteFile(w.filename, walletData, 0666)
+	err = ioutil.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), walletData, 0666)
 	if err != nil {
-		// TODO: instruct user to recover wallet from w.filename+".backup"
+		// TODO: instruct user to recover wallet from the backup file
 		return
 	}
 
@@ -45,8 +40,8 @@ func (w *Wallet) save() (err error) {
 }
 
 // load reads the contents of a wallet from a file.
-func (w *Wallet) load(filename string) (err error) {
-	contents, err := ioutil.ReadFile(filename)
+func (w *Wallet) load() (err error) {
+	contents, err := ioutil.ReadFile(filepath.Join(w.saveDir, "wallet.dat"))
 	if err != nil {
 		return
 	}
