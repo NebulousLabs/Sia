@@ -1,53 +1,16 @@
 package renter
 
 import (
+	"crypto/rand"
 	"errors"
-	"io"
-	"os"
+	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
 const (
-	maxUploadAttempts = 5
+	maxUploadAttempts = 8
 )
-
-// downloadPiece attempts to retrieve a file from a host.
-func (r *Renter) downloadPiece(piece FilePiece, path string) error {
-	return r.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) (err error) {
-		// Send the id of the contract for the file piece we're requesting. The
-		// response will be the file piece contents.
-		if err = conn.WriteObject(piece.ContractID); err != nil {
-			return
-		}
-
-		// Create the file on disk.
-		file, err := os.Create(path)
-		if err != nil {
-			return
-		}
-		defer file.Close()
-
-		// Simultaneously download file and calculate its Merkle root.
-		tee := io.TeeReader(
-			// use a LimitedReader to ensure we don't read indefinitely
-			io.LimitReader(conn, int64(piece.Contract.FileSize)),
-			// each byte we read from tee will also be written to file
-			file,
-		)
-		merkleRoot, err := crypto.ReaderMerkleRoot(tee)
-		if err != nil {
-			return
-		}
-
-		if merkleRoot != piece.Contract.FileMerkleRoot {
-			return errors.New("host provided a file that's invalid")
-		}
-
-		return
-	})
-}
 
 // threadedUploadPiece will upload the piece of a file to a randomly chosen
 // host. If the wallet has insufficient balance to support uploading,
@@ -55,6 +18,11 @@ func (r *Renter) downloadPiece(piece FilePiece, path string) error {
 // tool. Upon completion, the memory containg the piece's information is
 // updated.
 func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) {
+	// Set 'Repairing' for the piece to true.
+	r.mu.Lock()
+	piece.Repairing = true
+	r.mu.Unlock()
+
 	// Try 'maxUploadAttempts' hosts before giving up.
 	for attempts := 0; attempts < maxUploadAttempts; attempts++ {
 		// Select a host. An error here is unrecoverable.
@@ -68,53 +36,28 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 		// file will be uploaded and we'll be done.
 		contract, contractID, err := r.negotiateContract(host, up)
 		if err != nil {
+			// The previous attempt didn't work. We will try again after
+			// sleeping for a randomized amount of time to increase our chances
+			// of success. This will help spread things out if there are
+			// problems with network congestion or other randomized issues.
+			randSource := make([]byte, 1)
+			rand.Read(randSource)
+			time.Sleep(time.Duration(attempts) * time.Duration(attempts) * 250 * time.Millisecond * time.Duration(randSource[0]))
 			continue
 		}
 
 		r.mu.Lock()
 		*piece = FilePiece{
-			HostIP:     host.IPAddress,
+			Active:     true,
+			Repairing:  false,
 			Contract:   contract,
 			ContractID: contractID,
-			Active:     true,
+			HostIP:     host.IPAddress,
 		}
 		r.save()
 		r.mu.Unlock()
 		return
 	}
-}
-
-// Download downloads a file. Mutex conventions are broken to prevent doing
-// network communication with io in place.
-func (r *Renter) Download(nickname, filename string) error {
-	// Grab the set of pieces we're downloading.
-	r.mu.RLock()
-	var pieces []FilePiece
-	_, exists := r.files[nickname]
-	if !exists {
-		r.mu.RUnlock()
-		return errors.New("no file of that nickname")
-	}
-	for _, piece := range r.files[nickname].pieces {
-		if piece.Active {
-			pieces = append(pieces, piece)
-		}
-	}
-	r.mu.RUnlock()
-
-	// We only need one piece, so iterate through the hosts until a download
-	// succeeds.
-	for _, piece := range pieces {
-		downloadErr := r.downloadPiece(piece, filename)
-		if downloadErr == nil {
-			return nil
-		} else {
-			// log error
-		}
-		// r.hostDB.FlagHost(piece.Host.IPAddress)
-	}
-
-	return errors.New("Too many hosts returned errors - could not recover the file")
 }
 
 // Upload takes an upload parameters, which contain a file to upload, and then
