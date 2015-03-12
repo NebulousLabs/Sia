@@ -55,7 +55,7 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 			if time.Now().Sub(info.lockTime) > rwm.maxLockTime {
 				fmt.Printf("A lock was held for too long, id '%v'. Call stack:\n", id)
 				for i := 0; i <= rwm.callDepth; i++ {
-					fmt.Printf("\tFile '%v', Line '%v'\n", info.callingFiles[i], info.callingLines[i])
+					fmt.Printf("\tFile: '%v:%v'\n", info.callingFiles[i], info.callingLines[i])
 				}
 			}
 		}
@@ -110,15 +110,9 @@ func (rwm *RWMutex) safeUnlock(read bool, counter int) {
 	// Check if a deadlock has been detected and fixed manually.
 	_, exists := rwm.openLocks[counter]
 	if !exists {
-		var lockType string
-		if read {
-			lockType = "read "
-		} else {
-			lockType = ""
-		}
-		fmt.Printf("A%v lock was held until deadlock, subsequent call to%v unlock failed. id '%v'. Call stack:\n", lockType, lockType, counter)
+		fmt.Printf("A lock was held until deadlock, subsequent call to unlock failed. id '%v'. Call stack:\n", counter)
 		for i := 0; i <= rwm.callDepth; i++ {
-			fmt.Printf("\tFile '%v', Line '%v'\n", callingFiles[i], callingLines[i])
+			fmt.Printf("\tFile: '%v:%v'\n", callingFiles[i], callingLines[i])
 		}
 		return
 	}
