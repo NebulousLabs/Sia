@@ -38,7 +38,7 @@ type Gateway struct {
 	// removed.
 	peers map[modules.NetAddress]int
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.

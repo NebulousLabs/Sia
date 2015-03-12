@@ -60,7 +60,7 @@ type TransactionPool struct {
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // New creates a transaction pool that's ready to receive transactions.

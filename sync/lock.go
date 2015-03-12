@@ -10,7 +10,7 @@ import (
 // RWMutex provides locking functions, and an ability to detect and remove
 // deadlocks.
 type RWMutex struct {
-	openLocks        map[int]struct{}
+	openLocks        map[int]lockInfo
 	openLocksCounter int
 	openLocksMutex   sync.Mutex
 
@@ -20,14 +20,48 @@ type RWMutex struct {
 	mu sync.RWMutex
 }
 
+// lockInfo contains information about when and how a lock call was made.
+type lockInfo struct {
+	// When the lock was called.
+	lockTime time.Time
+
+	// Call stack of the caller.
+	callingFiles []string
+	callingLines []int
+}
+
 // New takes a maxLockTime and returns a lock. The lock will never stay locked
 // for more than maxLockTime, instead printing an error and unlocking after
 // maxLockTime has passed.
-func New(maxLockTime time.Duration, callDepth int) RWMutex {
-	return RWMutex{
-		openLocks:   make(map[int]struct{}),
+func New(maxLockTime time.Duration, callDepth int) *RWMutex {
+	rwm := &RWMutex{
+		openLocks:   make(map[int]lockInfo),
 		maxLockTime: maxLockTime,
 		callDepth:   callDepth,
+	}
+
+	go rwm.threadedDeadlockFinder()
+
+	return rwm
+}
+
+// threadedDeadlockFinder occasionally freezes the mutexes and scans all open mutexes,
+// reporting any that have exceeded their time limit.
+func (rwm *RWMutex) threadedDeadlockFinder() {
+	for {
+		rwm.openLocksMutex.Lock()
+		for id, info := range rwm.openLocks {
+			// Check if the lock has been held for longer than 'maxLockTime'.
+			if time.Now().Sub(info.lockTime) > rwm.maxLockTime {
+				fmt.Printf("A lock was held for too long, id '%v'. Call stack:\n", id)
+				for i := 0; i <= rwm.callDepth; i++ {
+					fmt.Printf("\tFile '%v', Line '%v'\n", info.callingFiles[i], info.callingLines[i])
+				}
+			}
+		}
+		rwm.openLocksMutex.Unlock()
+
+		time.Sleep(rwm.maxLockTime)
 	}
 }
 
@@ -35,16 +69,18 @@ func New(maxLockTime time.Duration, callDepth int) RWMutex {
 // set, then a readlock will be used, otherwise a lock will be used.
 func (rwm *RWMutex) safeLock(read bool) int {
 	// Get the call stack.
-	callingFiles := make([]string, rwm.callDepth+1)
-	callingLines := make([]int, rwm.callDepth+1)
+	var li lockInfo
+	li.lockTime = time.Now()
+	li.callingFiles = make([]string, rwm.callDepth+1)
+	li.callingLines = make([]int, rwm.callDepth+1)
 	for i := 0; i <= rwm.callDepth; i++ {
-		_, callingFiles[i], callingLines[i], _ = runtime.Caller(2 + i)
+		_, li.callingFiles[i], li.callingLines[i], _ = runtime.Caller(2 + i)
 	}
 
 	// Safely register that a lock has been triggered.
 	rwm.openLocksMutex.Lock()
 	counter := rwm.openLocksCounter
-	rwm.openLocks[counter] = struct{}{}
+	rwm.openLocks[counter] = li
 	rwm.openLocksCounter++
 	rwm.openLocksMutex.Unlock()
 
@@ -54,38 +90,6 @@ func (rwm *RWMutex) safeLock(read bool) int {
 	} else {
 		rwm.mu.Lock()
 	}
-
-	// Create the function that will wait for 'maxLockTime' and then check that
-	// the lock has been disabled.
-
-	go func() {
-		time.Sleep(rwm.maxLockTime)
-
-		rwm.openLocksMutex.Lock()
-		defer rwm.openLocksMutex.Unlock()
-
-		// Check that the lock has been removed and if it hasn't, remove it.
-		_, exists := rwm.openLocks[counter]
-		if exists {
-			delete(rwm.openLocks, counter)
-			if read {
-				rwm.mu.RUnlock()
-			} else {
-				rwm.mu.Unlock()
-			}
-
-			var lockType string
-			if read {
-				lockType = "read lock"
-			} else {
-				lockType = "lock"
-			}
-			fmt.Printf("A %v was held for too long, id '%v'. Call stack:\n", lockType, counter)
-			for i := 0; i <= rwm.callDepth; i++ {
-				fmt.Printf("\tFile '%v', Line '%v'\n", callingFiles[i], callingLines[i])
-			}
-		}
-	}()
 
 	return counter
 }

@@ -196,10 +196,10 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	// and the unconfirmed set of the transaction pool.
 	counter := tp.mu.RLock()
 	err = tp.validUnconfirmedTransaction(t)
+	tp.mu.RUnlock(counter)
 	if err != nil {
 		return
 	}
-	tp.mu.RUnlock(counter)
 
 	// direction is set to true because a new transaction has been added and it
 	// may depend on existing unconfirmed transactions.

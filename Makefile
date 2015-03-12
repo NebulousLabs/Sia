@@ -26,13 +26,13 @@ clean:
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
 test: clean fmt REBUILD
-	go test -short -tags=test -timeout=35s ./...
+	go test -short -tags=test -timeout=1s ./...
 
 # test-long does a forced rebuild of all packages, and then runs all tests
 # with the race libraries enabled. test-long aims to be
 # thorough.
 test-long: clean fmt REBUILD
-	go test -v -race -tags=test -timeout=240s ./...
+	go test -v -race -tags=test -timeout=180s ./...
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.

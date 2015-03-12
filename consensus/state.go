@@ -61,7 +61,7 @@ type State struct {
 	// mutex, as opposed to putting frequently accessed fields under separate
 	// mutexes. The performance advantage was decided to be not worth the
 	// complexity tradeoff.
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // createGenesisState returns a State containing only the genesis block. It
