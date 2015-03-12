@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"sync"
+	"time"
 )
 
 // The ZeroUnlockHash and ZeroCurrency are convenience variables.
@@ -51,8 +52,7 @@ type State struct {
 	// listend on by modules. An empty struct is thrown down the channel any
 	// time that the consensus set of the state changes. subscriptionCounter
 	// only ever increments, and prevents collisions in the map.
-	subscriptions       map[int]chan struct{}
-	subscriptionCounter int
+	subscriptions []chan struct{}
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -61,6 +61,11 @@ type State struct {
 	// mutexes. The performance advantage was decided to be not worth the
 	// complexity tradeoff.
 	mu sync.RWMutex
+
+	// These tools help track misuse of the state lock.
+	openLocks        map[int]string
+	openLocksCounter int
+	openLocksMutex   sync.Mutex
 }
 
 // createGenesisState returns a State containing only the genesis block. It
@@ -78,7 +83,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 
-		subscriptions: make(map[int]chan struct{}),
+		openLocks: make(map[int]string),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
@@ -115,17 +120,44 @@ func CreateGenesisState() (s *State) {
 }
 
 // RLock will readlock the state.
-//
-// TODO: Add a safety timer which will auto-unlock if the readlock is held for
-// more than a second. (panic in debug mode)
-func (s *State) RLock() {
+func (s *State) RLock(id string) int {
+	s.openLocksMutex.Lock()
+	counter := s.openLocksCounter
+	s.openLocks[counter] = id
+	s.openLocksCounter++
+	s.openLocksMutex.Unlock()
+
 	s.mu.RLock()
+
+	go func() {
+		time.Sleep(time.Second * 2)
+
+		s.openLocksMutex.Lock()
+		_, exists := s.openLocks[counter]
+		if exists {
+			if DEBUG {
+				panic("Externally enforced deadlock by " + id)
+			}
+			delete(s.openLocks, counter)
+			s.mu.RUnlock()
+		}
+		s.openLocksMutex.Unlock()
+	}()
+
+	return counter
 }
 
 // RUnlock will readunlock the state.
-//
-// TODO: when the safety timer is added to RLock, add a timer disabler to
-// RUnlock to prevent too many unlocks from being called.
-func (s *State) RUnlock() {
-	s.mu.RUnlock()
+func (s *State) RUnlock(id string, counter int) {
+	s.openLocksMutex.Lock()
+	_, exists := s.openLocks[counter]
+	if !exists {
+		if DEBUG {
+			panic("unlock called, but after waiting too long, using id " + id)
+		}
+	} else {
+		delete(s.openLocks, counter)
+		s.mu.RUnlock()
+	}
+	s.openLocksMutex.Unlock()
 }

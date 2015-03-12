@@ -2,6 +2,7 @@ package hostdb
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -14,7 +15,6 @@ func TestFindHostAnnouncements(t *testing.T) {
 	hdbt := CreateHostDBTester(t)
 
 	// Call update and check the size of the hostdb, size should be 0.
-	hdbt.update()
 	if hdbt.NumHosts() != 0 {
 		t.Error("host found after initialization")
 	}
@@ -25,7 +25,6 @@ func TestFindHostAnnouncements(t *testing.T) {
 		ArbitraryData: []string{"bad data"},
 	}
 	hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{noAnnouncementTxn})
-	hdbt.update()
 	if len(hdbt.allHosts) != 0 {
 		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
 	}
@@ -37,10 +36,11 @@ func TestFindHostAnnouncements(t *testing.T) {
 		ArbitraryData: []string{modules.PrefixHostAnnouncement},
 	}
 	hdbt.MineAndSubmitCurrentBlock([]consensus.Transaction{dirtyAnnouncementTxn})
-	hdbt.update()
+	hdbt.mu.Lock()
 	if len(hdbt.allHosts) != 0 {
 		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
 	}
+	hdbt.mu.Unlock()
 
 	// Submit a host announcement to the blockchain for a host that won't
 	// respond.
@@ -54,8 +54,12 @@ func TestFindHostAnnouncements(t *testing.T) {
 
 	// Update the host db and check that the announcement made it to the
 	// inactive set of hosts.
-	hdbt.update()
-	if len(hdbt.allHosts) != 1 {
-		t.Error("expecting 1 host in allHosts, got:", len(hdbt.allHosts))
+	for {
+		hdbt.mu.RLock()
+		if len(hdbt.allHosts) == 1 {
+			break
+		}
+		hdbt.mu.RUnlock()
+		time.Sleep(time.Millisecond)
 	}
 }

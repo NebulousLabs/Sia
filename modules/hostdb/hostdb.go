@@ -51,5 +51,8 @@ func New(s *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		activeHosts: make(map[string]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*modules.HostEntry),
 	}
+
+	go hdb.threadedConsensusListen()
+
 	return
 }

@@ -49,8 +49,8 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 // the transaction pool will update it's own understanding of the consensus
 // set. (This is currently true).
 func (w *Wallet) update() error {
-	w.state.RLock()
-	defer w.state.RUnlock()
+	counter := w.state.RLock("wallet update")
+	defer w.state.RUnlock("wallet update", counter)
 
 	// Remove all of the diffs that have been applied by the unconfirmed set of
 	// transactions.

@@ -36,12 +36,7 @@ func TestMiner(t *testing.T) {
 		t.Fatal("expecting initial wallet balance to be zero")
 	}
 
-	// Mine enough blocks for outputs to mature and check that the wallet
-	// balance updates accordingly.
-	_, solved, err := m.SolveBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var solved bool
 	for i := 0; i <= consensus.MaturityDelay; i++ {
 		for !solved {
 			_, solved, err = m.SolveBlock()
@@ -57,5 +52,43 @@ func TestMiner(t *testing.T) {
 	}
 	if w.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
 		t.Error("expecting mining nonfull balance to not be zero")
+	}
+}
+
+// TestManyBlocks creates a miner, mines a bunch of blocks, and checks that
+// nothing goes wrong. This test is here because previously, mining many blocks
+// resulted in the state deadlocking.
+func TestManyBlocks(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// Create the miner and all of it's dependencies.
+	s := consensus.CreateGenesisState()
+	g, err := gateway.New(":8600", s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpool, err := transactionpool.New(s, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := wallet.New(s, tpool, "../../miner_test.wallet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(s, g, tpool, w)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 200; i++ {
+		var solved bool
+		for !solved {
+			_, solved, err = m.SolveBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }

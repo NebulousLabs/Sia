@@ -76,7 +76,7 @@ func (dt *daemonTester) mineBlock() {
 	for {
 		_, solved, err := dt.miner.SolveBlock()
 		if err != nil {
-			dt.Fatal("Mining faild:", err)
+			dt.Fatal("Mining failed:", err)
 		} else if solved {
 			// SolveBlock automatically puts the block into the consensus set.
 			break
