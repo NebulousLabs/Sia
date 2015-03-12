@@ -260,7 +260,6 @@ Queries:
 
 * /renter/download
 * /renter/files
-* /renter/status
 * /renter/upload
 
 #### /renter/download
@@ -305,20 +304,6 @@ Repairing indicates whether the file is currently being repaired. It is
 typically best not to shut down siad until files are no longer being repaired.
 
 TimeRemaining indicates how many blocks the file will be available for.
-
-#### /renter/status
-
-Function: Returns the status of the renter.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Files []string
-}
-```
-Files is a list of all the files by their nickname.
 
 #### /renter/upload
 
