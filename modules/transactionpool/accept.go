@@ -192,8 +192,8 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, directi
 // AcceptTransaction takes a new transaction from the network and puts it in
 // the transaction pool after checking it for legality and consistency.
 func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error) {
-	tp.mu.Lock()
-	defer tp.mu.Unlock()
+	counter := tp.mu.Lock()
+	defer tp.mu.Unlock(counter)
 
 	// Check that the transaction is legal given the consensus set of the state
 	// and the unconfirmed set of the transaction pool.

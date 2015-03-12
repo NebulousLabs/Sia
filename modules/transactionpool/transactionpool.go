@@ -2,11 +2,12 @@ package transactionpool
 
 import (
 	"errors"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // The current transaction pool code is blind to miner fees, and will not
@@ -89,6 +90,8 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 		fileContractTerminations: make(map[consensus.FileContractID]*unconfirmedTransaction),
 		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
 		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
+
+		mu: sync.New(3*time.Second, 0),
 	}
 
 	return
