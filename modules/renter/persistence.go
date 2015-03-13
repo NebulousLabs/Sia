@@ -2,6 +2,7 @@ package renter
 
 import (
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -23,7 +24,7 @@ func (r *Renter) save() (err error) {
 		savedPieces = append(savedPieces, savedFiles{file.pieces, nickname, file.startHeight})
 	}
 
-	err = ioutil.WriteFile(r.persistentFile, encoding.Marshal(savedPieces), 0666)
+	err = ioutil.WriteFile(filepath.Join(r.saveDir, "files.dat"), encoding.Marshal(savedPieces), 0666)
 	if err != nil {
 		return
 	}
@@ -32,8 +33,8 @@ func (r *Renter) save() (err error) {
 }
 
 // load loads all of the files from disk.
-func (r *Renter) load(filename string) (err error) {
-	contents, err := ioutil.ReadFile(filename)
+func (r *Renter) load() (err error) {
+	contents, err := ioutil.ReadFile(filepath.Join(r.saveDir, "files.dat"))
 	if err != nil {
 		return
 	}

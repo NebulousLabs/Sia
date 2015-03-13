@@ -70,7 +70,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	d.renter, err = renter.New(d.state, d.gateway, d.hostdb, d.wallet)
+	d.renter, err = renter.New(d.state, d.gateway, d.hostdb, d.wallet, filepath.Join(config.SiaDir, "renter"))
 	if err != nil {
 		return
 	}
