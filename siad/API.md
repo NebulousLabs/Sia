@@ -259,6 +259,7 @@ Renter
 Queries:
 
 * /renter/download
+* /renter/downloadqueue
 * /renter/files
 * /renter/upload
 
@@ -277,6 +278,26 @@ destination is the filepath that the file should be downloaded to.
 
 Response: standard
 
+#### /renter/downloadqueue
+
+Function: Lists all files in the download queue.
+
+Parameters: none
+
+Response:
+```
+[]struct{
+	Completed   bool
+	Destination string
+	Nickname    string
+}
+```
+Destination is the filepath that the file was downloaded to.
+
+Nickname is the name of the file that was downloaded according to the renter.
+
+Completed is true when the download has finished.
+
 #### /renter/files
 
 Function: Lists the status of all files.
@@ -286,9 +307,9 @@ Parameters: none
 Response:
 ```
 []struct {
-	Available bool
-	Nickname  string
-	Repairing bool
+	Available     bool
+	Nickname      string
+	Repairing     bool
 	TimeRemaining int
 }
 ```

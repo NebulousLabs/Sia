@@ -11,6 +11,15 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// A Download is a download that has been queued by the renter.
+type Download struct {
+	completed   bool
+	destination string
+	nickname    string
+
+	renter *Renter
+}
+
 var (
 	downloadAttempts = 5
 )
@@ -69,6 +78,18 @@ func (r *Renter) Download(nickname, filename string) error {
 	}
 	r.mu.RUnlock()
 
+	// Create an object for the download in the download queue.
+	r.mu.Lock()
+	downloadIndex := len(r.downloadQueue)
+	r.downloadQueue = append(r.downloadQueue, Download{
+		completed:   false,
+		destination: filename,
+		nickname:    nickname,
+
+		renter: r,
+	})
+	r.mu.Unlock()
+
 	// We only need one piece, so iterate through the hosts until a download
 	// succeeds.
 	go func() {
@@ -76,9 +97,16 @@ func (r *Renter) Download(nickname, filename string) error {
 			for _, piece := range pieces {
 				downloadErr := r.downloadPiece(piece, filename)
 				if downloadErr == nil {
+					// Mark the download as complete.
+					r.mu.Lock()
+					r.downloadQueue[downloadIndex].completed = true
+					r.mu.Unlock()
 					return
 				}
 			}
+
+			// This iteration failed, no hosts returned the piece. Try again
+			// after waiting a random amount of time.
 			randSource := make([]byte, 1)
 			rand.Read(randSource)
 			time.Sleep(time.Second * time.Duration(i) * time.Duration(i) * time.Duration(randSource[0]))
@@ -86,4 +114,37 @@ func (r *Renter) Download(nickname, filename string) error {
 	}()
 
 	return nil
+}
+
+// DownloadQueue returns the list of downloads in the queue.
+func (r *Renter) DownloadQueue() []modules.DownloadInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
+	for i := 0; i < len(r.downloadQueue); i++ {
+		downloads[i] = &r.downloadQueue[i]
+	}
+	return downloads
+}
+
+// Getter for the completed status of the download.
+func (d *Download) Completed() bool {
+	d.renter.mu.RLock()
+	defer d.renter.mu.RUnlock()
+	return d.completed
+}
+
+// Getter for the destination of the download.
+func (d *Download) Destination() string {
+	d.renter.mu.RLock()
+	defer d.renter.mu.RUnlock()
+	return d.destination
+}
+
+// Getter for the nickname of the download.
+func (d *Download) Nickname() string {
+	d.renter.mu.RLock()
+	defer d.renter.mu.RUnlock()
+	return d.nickname
 }

@@ -59,6 +59,7 @@ func (d *daemon) initAPI(addr string) {
 
 	// Renter API Calls
 	handleHTTPRequest(mux, "/renter/download", d.renterDownloadHandler)
+	handleHTTPRequest(mux, "/renter/downloadqueue", d.renterDownloadqueueHandler)
 	handleHTTPRequest(mux, "/renter/files", d.renterFilesHandler)
 	handleHTTPRequest(mux, "/renter/status", d.renterStatusHandler)
 	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)

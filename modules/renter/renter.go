@@ -16,8 +16,9 @@ type Renter struct {
 	hostDB  modules.HostDB
 	wallet  modules.Wallet
 
-	files   map[string]File
-	saveDir string
+	files          map[string]File
+	downloadQueue  []Download
+	saveDir        string
 
 	mu sync.RWMutex
 }
