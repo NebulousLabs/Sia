@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/stretchr/graceful"
@@ -45,6 +46,13 @@ type daemon struct {
 // parameters.
 func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d = new(daemon)
+
+	// Create a folder for each module in siaDir.
+	err = createSubdirs(config.SiaDir)
+	if err != nil {
+		return
+	}
+
 	d.state = consensus.CreateGenesisState()
 	d.gateway, err = gateway.New(config.RPCAddr, d.state, filepath.Join(config.SiaDir, "gateway"))
 	if err != nil {
@@ -85,6 +93,17 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d.initAPI(config.APIAddr)
 
 	return
+}
+
+func createSubdirs(rootDir string) error {
+	subdirs := []string{"gateway", "wallet", "host", "renter"}
+	for _, subdir := range subdirs {
+		err := os.MkdirAll(filepath.Join(rootDir, subdir), 0777)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TODO: move this to the state module?
