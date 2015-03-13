@@ -285,15 +285,15 @@ Parameters: none
 
 Response:
 ```
-struct {
-	FileInfo []struct {
-		Available bool
-		Nickname  string
-		Repairing bool
-		TimeRemaining int
-	}
+[]struct {
+	Available bool
+	Nickname  string
+	Repairing bool
+	TimeRemaining int
 }
 ```
+The above is an array of objects, where each object represents a singe file.
+
 Available indicates whether or not the file can be downloaded immediately.
 
 Files is a type.
