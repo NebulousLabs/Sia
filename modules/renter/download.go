@@ -1,12 +1,18 @@
 package renter
 
 import (
+	"crypto/rand"
 	"errors"
 	"io"
 	"os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+)
+
+var (
+	downloadAttempts = 5
 )
 
 // downloadPiece attempts to retrieve a file from a host.
@@ -65,15 +71,19 @@ func (r *Renter) Download(nickname, filename string) error {
 
 	// We only need one piece, so iterate through the hosts until a download
 	// succeeds.
-	for _, piece := range pieces {
-		downloadErr := r.downloadPiece(piece, filename)
-		if downloadErr == nil {
-			return nil
-		} else {
-			// log error
+	go func() {
+		for i := 0; i < downloadAttempts; i++ {
+			for _, piece := range pieces {
+				downloadErr := r.downloadPiece(piece, filename)
+				if downloadErr == nil {
+					return
+				}
+			}
+			randSource := make([]byte, 1)
+			rand.Read(randSource)
+			time.Sleep(time.Second * time.Duration(i) * time.Duration(i) * time.Duration(randSource[0]))
 		}
-		// r.hostDB.FlagHost(piece.Host.IPAddress)
-	}
+	}()
 
-	return errors.New("Too many hosts returned errors - could not recover the file")
+	return nil
 }
