@@ -33,6 +33,20 @@ type FileInfo interface {
 	TimeRemaining() consensus.BlockHeight
 }
 
+// DownloadInfo is an interface providing information about a file that has
+// been requested for download.
+type DownloadInfo interface {
+	// Completed indicates whether the download has finished or not.
+	Completed() bool
+
+	// Destination is the filepath that the file was downloaded into.
+	Destination() string
+
+	// Nickname gives the name of the file according to the renter. Nickname
+	// may be different from Destination.
+	Nickname() string
+}
+
 // RentInfo contains a list of all files by nickname. (deprecated)
 type RentInfo struct {
 	Files []string
@@ -43,6 +57,9 @@ type RentInfo struct {
 type Renter interface {
 	// Download downloads a file to the given filepath.
 	Download(nickname, filepath string) error
+
+	// DownloadQueue lists all the files that have been scheduled for download.
+	DownloadQueue() []DownloadInfo
 
 	// FileList returns information on all of the files stored by the renter.
 	FileList() []FileInfo

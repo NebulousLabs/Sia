@@ -259,8 +259,8 @@ Renter
 Queries:
 
 * /renter/download
+* /renter/downloadqueue
 * /renter/files
-* /renter/status
 * /renter/upload
 
 #### /renter/download
@@ -278,6 +278,26 @@ destination is the filepath that the file should be downloaded to.
 
 Response: standard
 
+#### /renter/downloadqueue
+
+Function: Lists all files in the download queue.
+
+Parameters: none
+
+Response:
+```
+[]struct{
+	Completed   bool
+	Destination string
+	Nickname    string
+}
+```
+Destination is the filepath that the file was downloaded to.
+
+Nickname is the name of the file that was downloaded according to the renter.
+
+Completed is true when the download has finished.
+
 #### /renter/files
 
 Function: Lists the status of all files.
@@ -286,15 +306,15 @@ Parameters: none
 
 Response:
 ```
-struct {
-	FileInfo []struct {
-		Available bool
-		Nickname  string
-		Repairing bool
-		TimeRemaining int
-	}
+[]struct {
+	Available     bool
+	Nickname      string
+	Repairing     bool
+	TimeRemaining int
 }
 ```
+The above is an array of objects, where each object represents a singe file.
+
 Available indicates whether or not the file can be downloaded immediately.
 
 Files is a type.
@@ -305,20 +325,6 @@ Repairing indicates whether the file is currently being repaired. It is
 typically best not to shut down siad until files are no longer being repaired.
 
 TimeRemaining indicates how many blocks the file will be available for.
-
-#### /renter/status
-
-Function: Returns the status of the renter.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Files []string
-}
-```
-Files is a list of all the files by their nickname.
 
 #### /renter/upload
 

@@ -13,6 +13,14 @@ const (
 	redundancy = 15   // Redundancy of files uploaded to the network.
 )
 
+// DownloadInfo is a helper struct for the downloadqueue API call.
+type DownloadInfo struct {
+	Completed   bool
+	Destination string
+	Nickname    string
+}
+
+// FileInfo is a helper struct for the files API call.
 type FileInfo struct {
 	Available     bool
 	Nickname      string
@@ -29,6 +37,22 @@ func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request)
 	}
 
 	writeSuccess(w)
+}
+
+// renterDownloadqueueHandler handles the API call to request the download
+// queue.
+func (d *daemon) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request) {
+	downloads := d.renter.DownloadQueue()
+	downloadSet := make([]DownloadInfo, 0, len(downloads))
+	for _, dl := range downloads {
+		downloadSet = append(downloadSet, DownloadInfo{
+			Completed:   dl.Completed(),
+			Destination: dl.Destination(),
+			Nickname:    dl.Nickname(),
+		})
+	}
+
+	writeJSON(w, downloadSet)
 }
 
 // renterFilesHandler handles the API call to list all of the files.
