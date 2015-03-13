@@ -23,7 +23,7 @@ func (ht *HostTester) testAllocation() {
 	file.Close()
 
 	// Check that the file has a real name and that it exists on disk.
-	fullpath := filepath.Join(ht.Host.hostDir, path)
+	fullpath := filepath.Join(ht.Host.saveDir, path)
 	_, err = os.Stat(fullpath)
 	if os.IsNotExist(err) {
 		ht.Fatal("file does not exist on disk")

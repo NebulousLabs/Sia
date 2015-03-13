@@ -8,11 +8,12 @@ import (
 // TODO: expand this once Host testing is fleshed out.
 func TestSaveLoad(t *testing.T) {
 	ht := CreateHostTester(t)
-	err := ht.save("../../hostdata_test")
+	ht.testObligation()
+	err := ht.save()
 	if err != nil {
 		ht.Fatal(err)
 	}
-	err = ht.load("../../hostdata_test")
+	err = ht.load()
 	if err != nil {
 		ht.Fatal(err)
 	}

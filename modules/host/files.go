@@ -2,6 +2,7 @@ package host
 
 import (
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -14,7 +15,7 @@ type savedHost struct {
 	HostSettings   modules.HostSettings
 }
 
-func (h *Host) save(filename string) (err error) {
+func (h *Host) save() (err error) {
 	sHost := savedHost{
 		SpaceRemaining: h.spaceRemaining,
 		FileCounter:    h.fileCounter,
@@ -24,8 +25,7 @@ func (h *Host) save(filename string) (err error) {
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
 	}
-
-	err = ioutil.WriteFile(filename, encoding.Marshal(sHost), 0666)
+	err = ioutil.WriteFile(filepath.Join(h.saveDir, "settings.dat"), encoding.Marshal(sHost), 0666)
 	if err != nil {
 		return
 	}
@@ -33,8 +33,8 @@ func (h *Host) save(filename string) (err error) {
 	return
 }
 
-func (h *Host) load(filename string) (err error) {
-	contents, err := ioutil.ReadFile(filename)
+func (h *Host) load() (err error) {
+	contents, err := ioutil.ReadFile(filepath.Join(h.saveDir, "settings.dat"))
 	if err != nil {
 		return
 	}
