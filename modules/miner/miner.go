@@ -106,8 +106,8 @@ func (m *Miner) updateBlockInfo() {
 // had actually changed, but this greatly increased the complexity of the code,
 // and I'm not even sure it made things run faster.
 func (m *Miner) update() {
-	counter := m.state.RLock("miner update")
-	defer m.state.RUnlock("miner update", counter)
+	counter := m.state.RLock()
+	defer m.state.RUnlock(counter)
 	m.updateTransactionSet()
 	m.updateBlockInfo()
 }

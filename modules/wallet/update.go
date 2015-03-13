@@ -49,8 +49,16 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 // the transaction pool will update it's own understanding of the consensus
 // set. (This is currently true).
 func (w *Wallet) update() error {
-	counter := w.state.RLock("wallet update")
-	defer w.state.RUnlock("wallet update", counter)
+	// Because we were running into problems, the amount of time that the state
+	// lock is held has been minimized. Grab all of the necessary diffs under a
+	// lock before doing any computation.
+	counter := w.state.RLock()
+	defer w.state.RUnlock(counter)
+
+	removedBlocks, addedBlocks, err := w.state.BlocksSince(w.recentBlock)
+	if err != nil {
+		return err
+	}
 
 	// Remove all of the diffs that have been applied by the unconfirmed set of
 	// transactions.
@@ -58,13 +66,9 @@ func (w *Wallet) update() error {
 		w.applyDiff(w.unconfirmedDiffs[i], consensus.DiffRevert)
 	}
 
-	// Apply the diffs in the state that have happened since the last update.
-	removedBlocks, addedBlocks, err := w.state.BlocksSince(w.recentBlock)
-	if err != nil {
-		return err
-	}
+	// Apply the diffs in the consensus set that have happened since the last
+	// update.
 	for _, id := range removedBlocks {
-		// Decrement the age of the wallet.
 		w.age--
 
 		scods, err := w.state.BlockOutputDiffs(id)
@@ -76,7 +80,6 @@ func (w *Wallet) update() error {
 		}
 	}
 	for _, id := range addedBlocks {
-		// Increment the age of the wallet.
 		w.age++
 
 		scods, err := w.state.BlockOutputDiffs(id)
@@ -89,15 +92,15 @@ func (w *Wallet) update() error {
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffApply)
 		}
+		w.recentBlock = id
 	}
 
-	// Get, apply, and store the unconfirmed diffs currently available in the transaction pool.
+	// Get, apply, and store the unconfirmed diffs currently available in the
+	// transaction pool.
 	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
 	for _, scod := range w.unconfirmedDiffs {
 		w.applyDiff(scod, consensus.DiffApply)
 	}
-
-	w.recentBlock = w.state.CurrentBlock().ID()
 
 	return nil
 }

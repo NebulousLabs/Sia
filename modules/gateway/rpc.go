@@ -24,9 +24,9 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	// if something goes wrong, give the peer a strike
 	defer func() {
 		if err != nil {
-			g.mu.Lock()
+			counter := g.mu.Lock()
 			g.addStrike(addr)
-			g.mu.Unlock()
+			g.mu.Unlock(counter)
 		}
 	}()
 
@@ -47,8 +47,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 // To call an RPC, use gateway.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	counter := g.mu.Lock()
+	defer g.mu.Unlock(counter)
 	g.handlerMap[handlerName(name)] = fn
 }
 
@@ -103,9 +103,9 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 		return
 	}
 	// call registered handler for this ID
-	g.mu.RLock()
+	counter := g.mu.RLock()
 	fn, ok := g.handlerMap[id]
-	g.mu.RUnlock()
+	g.mu.RUnlock(counter)
 	if ok {
 		fn(conn)
 		// TODO: log error
@@ -118,7 +118,7 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
-	g.mu.RLock()
+	counter := g.mu.RLock()
 	for peer := range g.peers {
 		// contact each peer in a separate thread
 		go func(peer modules.NetAddress) {
@@ -126,6 +126,6 @@ func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
 			wg.Done()
 		}(peer)
 	}
-	g.mu.RUnlock()
+	g.mu.RUnlock(counter)
 	wg.Wait()
 }

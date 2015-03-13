@@ -1,8 +1,9 @@
 package consensus
 
 import (
-	"sync"
 	"time"
+
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // The ZeroUnlockHash and ZeroCurrency are convenience variables.
@@ -60,12 +61,7 @@ type State struct {
 	// mutex, as opposed to putting frequently accessed fields under separate
 	// mutexes. The performance advantage was decided to be not worth the
 	// complexity tradeoff.
-	mu sync.RWMutex
-
-	// These tools help track misuse of the state lock.
-	openLocks        map[int]string
-	openLocksCounter int
-	openLocksMutex   sync.Mutex
+	mu *sync.RWMutex
 }
 
 // createGenesisState returns a State containing only the genesis block. It
@@ -83,7 +79,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 
-		openLocks: make(map[int]string),
+		mu: sync.New(5*time.Second, 1),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
@@ -120,44 +116,11 @@ func CreateGenesisState() (s *State) {
 }
 
 // RLock will readlock the state.
-func (s *State) RLock(id string) int {
-	s.openLocksMutex.Lock()
-	counter := s.openLocksCounter
-	s.openLocks[counter] = id
-	s.openLocksCounter++
-	s.openLocksMutex.Unlock()
-
-	s.mu.RLock()
-
-	go func() {
-		time.Sleep(time.Second * 2)
-
-		s.openLocksMutex.Lock()
-		_, exists := s.openLocks[counter]
-		if exists {
-			if DEBUG {
-				panic("Externally enforced deadlock by " + id)
-			}
-			delete(s.openLocks, counter)
-			s.mu.RUnlock()
-		}
-		s.openLocksMutex.Unlock()
-	}()
-
-	return counter
+func (s *State) RLock() int {
+	return s.mu.RLock()
 }
 
 // RUnlock will readunlock the state.
-func (s *State) RUnlock(id string, counter int) {
-	s.openLocksMutex.Lock()
-	_, exists := s.openLocks[counter]
-	if !exists {
-		if DEBUG {
-			panic("unlock called, but after waiting too long, using id " + id)
-		}
-	} else {
-		delete(s.openLocks, counter)
-		s.mu.RUnlock()
-	}
-	s.openLocksMutex.Unlock()
+func (s *State) RUnlock(counter int) {
+	s.mu.RUnlock(counter)
 }

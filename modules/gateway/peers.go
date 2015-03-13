@@ -55,15 +55,15 @@ func (g *Gateway) addStrike(peer modules.NetAddress) {
 
 // AddPeer adds a peer to the Gateway's peer list.
 func (g *Gateway) AddPeer(peer modules.NetAddress) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	counter := g.mu.Lock()
+	defer g.mu.Unlock(counter)
 	return g.addPeer(peer)
 }
 
 // RemovePeer removes a peer from the Gateway's peer list.
 func (g *Gateway) RemovePeer(peer modules.NetAddress) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	counter := g.mu.Lock()
+	defer g.mu.Unlock(counter)
 	return g.removePeer(peer)
 }
 
@@ -84,8 +84,8 @@ func (g *Gateway) addMe(conn modules.NetConn) error {
 
 // sharePeers is an RPC that returns up to 10 randomly selected peers.
 func (g *Gateway) sharePeers(conn modules.NetConn) error {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	counter := g.mu.RLock()
+	defer g.mu.RUnlock(counter)
 
 	var peers []modules.NetAddress
 	for peer := range g.peers {

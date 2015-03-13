@@ -28,8 +28,8 @@ func (g *Gateway) threadedResynchronize() {
 //
 // TODO: don't run two Synchronize threads at the same time
 func (g *Gateway) Synchronize() (err error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	counter := g.mu.RLock()
+	defer g.mu.RUnlock(counter)
 
 	peer, err := g.randomPeer()
 	if err != nil {

@@ -3,10 +3,11 @@ package gateway
 import (
 	"errors"
 	"net"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 const (
@@ -37,13 +38,13 @@ type Gateway struct {
 	// removed.
 	peers map[modules.NetAddress]int
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
 func (g *Gateway) Address() modules.NetAddress {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	counter := g.mu.RLock()
+	defer g.mu.RUnlock(counter)
 	return g.myAddr
 }
 
@@ -61,9 +62,9 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	if !g.Ping(bootstrapPeer) {
 		return errUnreachable
 	}
-	g.mu.Lock()
+	counter := g.mu.Lock()
 	g.addPeer(bootstrapPeer)
-	g.mu.Unlock()
+	g.mu.Unlock(counter)
 
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
@@ -122,8 +123,8 @@ func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
 
 // Info returns metadata about the Gateway.
 func (g *Gateway) Info() (info modules.GatewayInfo) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	counter := g.mu.RLock()
+	defer g.mu.RUnlock(counter)
 	info.Address = g.myAddr
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
@@ -143,6 +144,8 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		myAddr:     modules.NetAddress(addr),
 		handlerMap: make(map[rpcID]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]int),
+
+		mu: sync.New(time.Second*2, 0),
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))

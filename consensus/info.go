@@ -99,15 +99,15 @@ func (s *State) sortedUsfoSet() []SiafundOutput {
 
 // BlockAtHeight returns the block on the current path with the given height.
 func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.blockAtHeight(height)
 }
 
 // Block returns the block associated with the given id.
 func (s *State) Block(id BlockID) (b Block, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	node, exists := s.blockMap[id]
 	if !exists {
@@ -120,8 +120,8 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 // BlockRange returns a slice of the blocks that fall within the given range
 // [start, stop].
 func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	if start > stop || stop > s.height() {
 		return nil, errors.New("invalid range")
@@ -143,8 +143,8 @@ func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
 
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
 func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	node, exists := s.blockMap[id]
 	if !exists {
@@ -163,8 +163,8 @@ func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err err
 // has changed since block 'id'. OutputDiffsSince will flip the `new` value for
 // diffs that got reversed.
 func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	node, exists := s.blockMap[id]
 	if !exists {
@@ -186,8 +186,8 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 // FileContract returns the file contract associated with the 'id'. If the
 // contract does not exist, exists will be false.
 func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	fc, exists = s.fileContracts[id]
 	return
@@ -195,38 +195,38 @@ func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
 
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() Block {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.currentBlockNode().block
 }
 
 // CurrentTarget returns the target of the next block that needs to be
 // submitted to the state.
 func (s *State) CurrentTarget() Target {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.currentBlockNode().target
 }
 
 // EarliestTimestamp returns the earliest timestamp that the next block can
 // have in order for it to be considered valid.
 func (s *State) EarliestTimestamp() Timestamp {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // Height returns the height of the current blockchain (the longest fork).
 func (s *State) Height() BlockHeight {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.height()
 }
 
 // HeightOfBlock returns the height of the block with the given ID.
 func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	bn, exists := s.blockMap[bid]
 	if !exists {
@@ -238,15 +238,15 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 
 // SiacoinOutput returns the siacoin output associated with the given ID.
 func (s *State) SiacoinOutput(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.output(id)
 }
 
 // SiafundOutput returns the siafund output associated with the given ID.
 func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	output, exists = s.siafundOutputs[id]
 	return
 }
@@ -254,24 +254,24 @@ func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists 
 // SortedUtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
 func (s *State) SortedUtxoSet() []SiacoinOutput {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.sortedUscoSet()
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
 func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.storageProofSegment(fcid)
 }
 
 // ValidTransaction checks that a transaction is valid within the context of
 // the current consensus set.
 func (s *State) ValidTransaction(t Transaction) (err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.validTransaction(t)
 }
 
@@ -285,8 +285,8 @@ func (s *State) ValidTransaction(t Transaction) (err error) {
 // error if the state height is not sufficient to fulfill all of the
 // requirements of the transaction.
 func (s *State) ValidTransactionComponents(t Transaction) (err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 
 	// This will stop too-large transactions from accidentally being validated.
 	// This check doesn't happen when checking blocks, because the size of the
@@ -317,7 +317,7 @@ func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 
 // ValidUnlockConditions checks that the conditions of uc have been met.
 func (s *State) ValidUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	counter := s.mu.RLock()
+	defer s.mu.RUnlock(counter)
 	return s.validUnlockConditions(uc, uh)
 }

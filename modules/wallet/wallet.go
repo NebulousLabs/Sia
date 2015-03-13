@@ -3,10 +3,11 @@ package wallet
 import (
 	"errors"
 	"fmt"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 const (
@@ -69,7 +70,7 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -103,6 +104,8 @@ func New(state *consensus.State, tpool modules.TransactionPool, filename string)
 		timelockedKeys: make(map[consensus.BlockHeight][]consensus.UnlockHash),
 
 		transactions: make(map[string]*openTransaction),
+
+		mu: sync.New(5*time.Second, 0),
 	}
 
 	// If the wallet file already exists, try to load it.
