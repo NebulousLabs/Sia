@@ -21,7 +21,7 @@ install: fmt REBUILD
 clean:
 	rm -rf hostdir release whitepaper.aux whitepaper.log whitepaper.pdf         \
 		*.wallet* *_test testdir* */*_test hostdir* siad/walletDir*             \
-		siad/hostDir* info.log
+		siad/hostDir* info.log modules/*/*.dat modules/*/*.backup
 
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
