@@ -12,14 +12,14 @@ import (
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
 func (h *Host) createStorageProof(obligation contractObligation, heightForProof consensus.BlockHeight) (err error) {
-	fullpath := filepath.Join(h.hostDir, obligation.path)
+	fullpath := filepath.Join(h.saveDir, obligation.Path)
 	file, err := os.Open(fullpath)
 	if err != nil {
 		return
 	}
 	defer file.Close()
 
-	segmentIndex, err := h.state.StorageProofSegment(obligation.id)
+	segmentIndex, err := h.state.StorageProofSegment(obligation.ID)
 	if err != nil {
 		return
 	}
@@ -28,7 +28,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 		return
 	}
 
-	sp := consensus.StorageProof{obligation.id, base, hashSet}
+	sp := consensus.StorageProof{obligation.ID, base, hashSet}
 
 	// Create and send the transaction.
 	id, err := h.wallet.RegisterTransaction(consensus.Transaction{})
@@ -91,15 +91,15 @@ func (h *Host) update() {
 			}
 
 			// Delete the obligation.
-			fullpath := filepath.Join(h.hostDir, obligation.path)
+			fullpath := filepath.Join(h.saveDir, obligation.Path)
 			stat, err := os.Stat(fullpath)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-			h.deallocate(uint64(stat.Size()), obligation.path) // TODO: file might actually be the wrong size.
+			h.deallocate(uint64(stat.Size()), obligation.Path) // TODO: file might actually be the wrong size.
 
-			delete(h.obligationsByID, obligation.id)
+			delete(h.obligationsByID, obligation.ID)
 		}
 		delete(h.obligationsByHeight, height)
 	}

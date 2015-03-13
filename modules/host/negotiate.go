@@ -268,9 +268,9 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	fc := signedTxn.FileContracts[0]
 	proofHeight := fc.Expiration + StorageProofReorgDepth
 	co := contractObligation{
-		id:           fcid,
-		fileContract: fc,
-		path:         path,
+		ID:           fcid,
+		FileContract: fc,
+		Path:         path,
 	}
 	h.mu.Lock()
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)

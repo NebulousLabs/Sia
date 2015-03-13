@@ -49,9 +49,9 @@ func (h *Host) load(filename string) (err error) {
 	h.HostSettings = sHost.HostSettings
 	// recreate maps
 	for _, obligation := range sHost.Obligations {
-		height := obligation.fileContract.Start + StorageProofReorgDepth
+		height := obligation.FileContract.Start + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
-		h.obligationsByID[obligation.id] = obligation
+		h.obligationsByID[obligation.ID] = obligation
 	}
 
 	return

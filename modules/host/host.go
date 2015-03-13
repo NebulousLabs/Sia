@@ -20,9 +20,9 @@ const (
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
-	id           consensus.FileContractID
-	fileContract consensus.FileContract
-	path         string // Where on disk the file is stored.
+	ID           consensus.FileContractID
+	FileContract consensus.FileContract
+	Path         string // Where on disk the file is stored.
 }
 
 // A Host contains all the fields necessary for storing files for clients and

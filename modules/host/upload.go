@@ -34,14 +34,14 @@ func (h *Host) RetrieveFile(conn modules.NetConn) (err error) {
 	}
 
 	// Open the file.
-	file, err := os.Open(filepath.Join(h.hostDir, contractObligation.path))
+	file, err := os.Open(filepath.Join(h.saveDir, contractObligation.Path))
 	if err != nil {
 		return
 	}
 	defer file.Close()
 
 	// Transmit the file.
-	_, err = io.CopyN(conn, file, int64(contractObligation.fileContract.FileSize))
+	_, err = io.CopyN(conn, file, int64(contractObligation.FileContract.FileSize))
 	if err != nil {
 		return
 	}

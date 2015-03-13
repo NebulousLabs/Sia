@@ -9,7 +9,7 @@ import (
 )
 
 // testObligation adds a file obligation to the host's set of obligations, then
-// mies blocks and updates the host, causing the host to submit a storage
+// mines blocks and updates the host, causing the host to submit a storage
 // proof. Then the storage proof is mined and a check is made to see that the
 // host gets the payout.
 func (ht *HostTester) testObligation() {
@@ -56,9 +56,9 @@ func (ht *HostTester) testObligation() {
 	// Add the obligation for the file to the host.
 	fcid := txn.FileContractID(0)
 	co := contractObligation{
-		id:           fcid,
-		fileContract: fc,
-		path:         path,
+		ID:           fcid,
+		FileContract: fc,
+		Path:         path,
 	}
 	ht.mu.Lock()
 	ht.obligationsByHeight[ht.Height()+1] = append(ht.obligationsByHeight[ht.Height()+1], co)
