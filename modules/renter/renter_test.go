@@ -28,7 +28,7 @@ type RenterTester struct {
 func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
 
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,12 +41,12 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "../../renter_test"+strconv.Itoa(walletNum)+".wallet")
+	w, err := wallet.New(ct.State, tp, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	walletNum++
-	r, err := New(ct.State, g, hdb, w)
+	r, err := New(ct.State, g, hdb, w, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +61,11 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 // TODO: expand this once Renter testing is fleshed out.
 func TestSaveLoad(t *testing.T) {
 	rt := CreateRenterTester(t)
-	rt.persistentFile = "../../renterdata_test"
 	err := rt.save()
 	if err != nil {
 		rt.Fatal(err)
 	}
-	err = rt.load("../../renterdata_test")
+	err = rt.load()
 	if err != nil {
 		rt.Fatal(err)
 	}

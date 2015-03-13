@@ -16,14 +16,14 @@ type Renter struct {
 	hostDB  modules.HostDB
 	wallet  modules.Wallet
 
-	files          map[string]File
-	persistentFile string
+	files   map[string]File
+	saveDir string
 
 	mu sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet) (r *Renter, err error) {
+func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (r *Renter, err error) {
 	if state == nil {
 		err = errors.New("renter.New: cannot have nil state")
 		return
@@ -47,9 +47,10 @@ func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wa
 		hostDB:  hdb,
 		wallet:  wallet,
 		files:   make(map[string]File),
+		saveDir: saveDir,
 	}
 
-	r.load(r.persistentFile)
+	r.load()
 
 	return
 }

@@ -18,6 +18,7 @@ func (g *Gateway) addPeer(peer modules.NetAddress) error {
 		return errors.New("peer already added")
 	}
 	g.peers[peer] = 0
+	g.save()
 	return nil
 }
 
@@ -26,6 +27,7 @@ func (g *Gateway) removePeer(peer modules.NetAddress) error {
 		return errors.New("no record of that peer")
 	}
 	delete(g.peers, peer)
+	g.save()
 	return nil
 }
 

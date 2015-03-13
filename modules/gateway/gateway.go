@@ -38,6 +38,9 @@ type Gateway struct {
 	// removed.
 	peers map[modules.NetAddress]int
 
+	// saveDir is the path used to save/load peers.
+	saveDir string
+
 	mu *sync.RWMutex
 }
 
@@ -80,6 +83,8 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 
 	// request peers from the bootstrap
 	g.requestPeers(bootstrapPeer)
+	// save new peers
+	g.save()
 
 	// announce ourselves to the new peers
 	go g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
@@ -133,7 +138,7 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, s *consensus.State) (g *Gateway, err error) {
+func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error) {
 	if s == nil {
 		err = errors.New("gateway cannot use nil state")
 		return
@@ -144,8 +149,8 @@ func New(addr string, s *consensus.State) (g *Gateway, err error) {
 		myAddr:     modules.NetAddress(addr),
 		handlerMap: make(map[rpcID]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]int),
-
-		mu: sync.New(time.Second*2, 0),
+		saveDir:    saveDir,
+		mu:         sync.New(time.Second*2, 0),
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))

@@ -6,7 +6,10 @@ renterDownload
 whitepaper.aux
 whitepaper.log
 whitepaper.pdf
+modules/*/*.dat
+modules/*/*.backup
 *_test
+testdir*
 *.wallet*
 walletDir*
 *.swp

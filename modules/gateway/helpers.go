@@ -1,11 +1,9 @@
 package gateway
 
 import (
-	"io/ioutil"
 	"net"
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -54,26 +52,5 @@ func (g *Gateway) getExternalIP() (err error) {
 	hostname := string(buf[:n-1]) // trim newline
 	// TODO: try to ping ourselves
 	g.setHostname(hostname)
-	return
-}
-
-func (g *Gateway) save(filename string) error {
-	peers := g.Info().Peers
-	return ioutil.WriteFile(filename, encoding.Marshal(peers), 0666)
-}
-
-func (g *Gateway) load(filename string) (err error) {
-	contents, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return
-	}
-	var peers []modules.NetAddress
-	err = encoding.Unmarshal(contents, &peers)
-	if err != nil {
-		return
-	}
-	for _, peer := range peers {
-		g.addPeer(peer)
-	}
 	return
 }

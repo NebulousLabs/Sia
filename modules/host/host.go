@@ -20,9 +20,9 @@ const (
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
-	id           consensus.FileContractID
-	fileContract consensus.FileContract
-	path         string // Where on disk the file is stored.
+	ID           consensus.FileContractID
+	FileContract consensus.FileContract
+	Path         string // Where on disk the file is stored.
 }
 
 // A Host contains all the fields necessary for storing files for clients and
@@ -33,7 +33,7 @@ type Host struct {
 	wallet      modules.Wallet
 	latestBlock consensus.BlockID
 
-	hostDir        string
+	saveDir        string
 	spaceRemaining int64
 	fileCounter    int
 
@@ -46,7 +46,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, dir string) (h *Host, err error) {
+func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
 	if state == nil {
 		err = errors.New("host cannot use a nil state")
 		return
@@ -80,7 +80,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 			UnlockHash:   addr,
 		},
 
-		hostDir:        dir,
+		saveDir:        saveDir,
 		spaceRemaining: 2e9,
 
 		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
@@ -93,7 +93,10 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 	}
 	h.latestBlock = block.ID()
 
-	err = os.MkdirAll(dir, 0755)
+	err = h.load()
+	if os.IsNotExist(err) {
+		err = nil
+	}
 	if err != nil {
 		return
 	}
@@ -110,6 +113,7 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.HostSettings = settings
+	h.save()
 }
 
 // Settings is an RPC used to request the settings of a host.

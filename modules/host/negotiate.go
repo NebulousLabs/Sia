@@ -21,7 +21,7 @@ func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error)
 	h.spaceRemaining -= int64(filesize)
 	h.fileCounter++
 	path = strconv.Itoa(h.fileCounter)
-	fullpath := filepath.Join(h.hostDir, path)
+	fullpath := filepath.Join(h.saveDir, path)
 	file, err = os.Create(fullpath)
 	if err != nil {
 		return
@@ -31,7 +31,7 @@ func (h *Host) allocate(filesize uint64) (file *os.File, path string, err error)
 
 // deallocate deletes a file and restores its allocated space.
 func (h *Host) deallocate(filesize uint64, path string) {
-	fullpath := filepath.Join(h.hostDir, path)
+	fullpath := filepath.Join(h.saveDir, path)
 	os.Remove(fullpath)
 	h.spaceRemaining += int64(filesize)
 }
@@ -268,13 +268,14 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	fc := signedTxn.FileContracts[0]
 	proofHeight := fc.Expiration + StorageProofReorgDepth
 	co := contractObligation{
-		id:           fcid,
-		fileContract: fc,
-		path:         path,
+		ID:           fcid,
+		FileContract: fc,
+		Path:         path,
 	}
 	h.mu.Lock()
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[fcid] = co
+	h.save()
 	h.mu.Unlock()
 
 	// TODO: we don't currently watch the blockchain to make sure that the

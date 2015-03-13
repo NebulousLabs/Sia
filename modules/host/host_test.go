@@ -27,7 +27,7 @@ type HostTester struct {
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(t *testing.T) (ht *HostTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State)
+	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,12 +36,12 @@ func CreateHostTester(t *testing.T) (ht *HostTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "../../host_test"+strconv.Itoa(walletNum)+".wallet")
+	w, err := wallet.New(ct.State, tp, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	walletNum++
-	h, err := New(ct.State, tp, w, "../../hostdir"+strconv.Itoa(hostNum))
+	h, err := New(ct.State, tp, w, "")
 	if err != nil {
 		t.Fatal(err)
 	}
