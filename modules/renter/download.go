@@ -109,7 +109,7 @@ func (r *Renter) Download(nickname, filename string) error {
 			// after waiting a random amount of time.
 			randSource := make([]byte, 1)
 			rand.Read(randSource)
-			time.Sleep(time.Second * time.Duration(i) * time.Duration(i) * time.Duration(randSource[0]))
+			time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
 		}
 	}()
 
@@ -122,7 +122,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	defer r.mu.RUnlock()
 
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
-	for i := 0; i < len(r.downloadQueue); i++ {
+	for i := range r.downloadQueue {
 		downloads[i] = &r.downloadQueue[i]
 	}
 	return downloads
