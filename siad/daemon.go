@@ -118,6 +118,7 @@ func (d *daemon) acceptBlock(conn modules.NetConn) error {
 	err = d.state.AcceptBlock(b)
 	if err == consensus.ErrOrphan {
 		go d.gateway.Synchronize(conn.Addr())
+		return err
 	} else if err != nil {
 		return err
 	}
