@@ -18,40 +18,32 @@ const (
 // that broadcasts start failing.
 func (g *Gateway) threadedResynchronize() {
 	for {
-		g.Synchronize()
+		peer, err := g.randomPeer()
+		if err != nil {
+			// fatal error
+			return
+		}
+		go g.Synchronize(peer)
 		time.Sleep(time.Minute * 2)
 	}
 }
 
 // Synchronize synchronizes the local consensus set (i.e. the blockchain) with
-// the network consensus set.
+// the network consensus set. The process is as follows: synchronize asks a
+// peer for new blocks. The requester sends 32 block IDs, starting with the 12
+// most recent and then progressing exponentially backwards to the genesis
+// block. The receiver uses these blocks to find the most recent block seen by
+// both peers. From this starting height, it transmits blocks sequentially.
+// The requester then integrates these blocks into its consensus set. Multiple
+// such transmissions may be required to fully synchronize.
 //
 // TODO: don't run two Synchronize threads at the same time
-func (g *Gateway) Synchronize() (err error) {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
-
-	peer, err := g.randomPeer()
-	if err != nil {
-		return
-	}
-	go g.synchronize(peer)
-	return
-}
-
-// synchronize asks a peer for new blocks. The requester sends 32 block IDs,
-// starting with the 12 most recent and then progressing exponentially
-// backwards to the genesis block. The receiver uses these blocks to find the
-// most recent block seen by both peers. From this starting height, it
-// transmits blocks sequentially. Multiple such transmissions may be required
-// to fully synchronize.
-func (g *Gateway) synchronize(peer modules.NetAddress) {
+func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 	for {
 		var newBlocks []consensus.Block
 		newBlocks, moreAvailable, err := g.requestBlocks(peer)
 		if err != nil {
-			// TODO: try a different peer?
-			return
+			return err
 		}
 		for _, block := range newBlocks {
 			acceptErr := g.state.AcceptBlock(block)
@@ -66,6 +58,7 @@ func (g *Gateway) synchronize(peer modules.NetAddress) {
 			break
 		}
 	}
+	return nil
 }
 
 // sendBlocks returns a sequential set of blocks based on the 32 input block

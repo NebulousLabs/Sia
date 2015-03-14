@@ -31,8 +31,7 @@ func (dt *daemonTester) addPeer() *daemonTester {
 	// force synchronization to dt, in case newPeer tried to synchronize to
 	// one of dt's peers.
 	for dt.state.Height() != newPeer.state.Height() {
-		newPeer.gateway.Synchronize()
-		time.Sleep(10 * time.Millisecond)
+		newPeer.gateway.Synchronize(dt.netAddress())
 	}
 	return newPeer
 }

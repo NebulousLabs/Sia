@@ -117,7 +117,7 @@ func TestBootstrap(t *testing.T) {
 	if g.state.Height() != bootstrap.state.Height() {
 		// g may have tried to synchronize to the other peer, so try manually
 		// synchronizing to the bootstrap
-		g.synchronize(bootstrap.Address())
+		g.Synchronize(bootstrap.Address())
 		if g.state.Height() != bootstrap.state.Height() {
 			t.Fatalf("gateway height %v does not match bootstrap height %v", g.state.Height(), bootstrap.state.Height())
 		}

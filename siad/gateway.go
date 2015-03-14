@@ -14,11 +14,12 @@ func (d *daemon) gatewayStatusHandler(w http.ResponseWriter, req *http.Request) 
 // gatewaySynchronizeHandler handles the API call asking for the gateway to
 // synchronize with other peers.
 func (d *daemon) gatewaySynchronizeHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.gateway.Synchronize()
+	peer, err := d.gateway.RandomPeer()
 	if err != nil {
 		writeError(w, "No peers available for syncing", http.StatusInternalServerError)
 		return
 	}
+	go d.gateway.Synchronize(peer)
 
 	writeSuccess(w)
 }

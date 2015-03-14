@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -84,7 +85,7 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	}
 
 	// Register RPCs for each module
-	d.gateway.RegisterRPC("RelayBlock", d.relayBlock)
+	d.gateway.RegisterRPC("AcceptBlock", d.acceptBlock)
 	d.gateway.RegisterRPC("AcceptTransaction", d.acceptTransaction)
 	d.gateway.RegisterRPC("HostSettings", d.host.Settings)
 	d.gateway.RegisterRPC("NegotiateContract", d.host.NegotiateContract)
@@ -107,13 +108,36 @@ func createSubdirs(rootDir string) error {
 }
 
 // TODO: move this to the state module?
-func (d *daemon) relayBlock(conn modules.NetConn) error {
+func (d *daemon) acceptBlock(conn modules.NetConn) error {
 	var b consensus.Block
 	err := conn.ReadObject(&b, consensus.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
-	return d.gateway.RelayBlock(b)
+
+	err = d.state.AcceptBlock(b)
+	if err == consensus.ErrOrphan {
+		go d.gateway.Synchronize(conn.Addr())
+		return err
+	} else if err != nil {
+		return err
+	}
+
+	// Check if b is in the current path.
+	height, exists := d.state.HeightOfBlock(b.ID())
+	if !exists {
+		if consensus.DEBUG {
+			panic("could not get the height of a block that did not return an error when being accepted into the state")
+		}
+		return errors.New("state malfunction")
+	}
+	currentPathBlock, exists := d.state.BlockAtHeight(height)
+	if !exists || b.ID() != currentPathBlock.ID() {
+		return errors.New("block added, but it does not extend the state height")
+	}
+
+	d.gateway.RelayBlock(b)
+	return nil
 }
 
 // TODO: move this to the tpool module?
