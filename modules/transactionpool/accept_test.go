@@ -65,3 +65,17 @@ func TestAddDependentSiacoinTransactionToPool(t *testing.T) {
 	tpt := CreateTpoolTester(t)
 	tpt.addDependentSiacoinTransactionToPool()
 }
+
+// TestDuplicateTransaction checks that a duplicate transaction error is
+// triggered when duplicate transactions are added to the transaction pool.
+// This test won't be needed after the duplication prevention mechanism is
+// removed, and that will be removed after fees are required in all
+// transactions submitted to the pool.
+func TestDuplicateTransaction(t *testing.T) {
+	tpt := CreateTpoolTester(t)
+	txn := tpt.addSiacoinTransactionToPool()
+	err := tpt.AcceptTransaction(txn)
+	if err != ErrDuplicate {
+		t.Fatal("expecting ErrDuplicatem got:", err)
+	}
+}

@@ -60,6 +60,11 @@ type TransactionPool struct {
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
 
+	// Transactions we've already seen, used for preventing duplicates. This
+	// will become unnecessary once all transactions are required to have fees
+	// to be in the transaction pool.
+	seenTransactions map[crypto.Hash]struct{}
+
 	mu *sync.RWMutex
 }
 
@@ -91,7 +96,9 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
 		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
 
-		mu: sync.New(3*time.Second, 0),
+		seenTransactions: make(map[crypto.Hash]struct{}),
+
+		mu: sync.New(1*time.Second, 0),
 	}
 
 	return

@@ -79,7 +79,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
 		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
 
-		mu: sync.New(5*time.Second, 1),
+		mu: sync.New(1*time.Second, 1),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.

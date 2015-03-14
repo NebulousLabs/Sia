@@ -10,6 +10,7 @@ import (
 func (tpt *TpoolTester) addConflictingSiacoinTransactionToPool() {
 	// Put a siacoin transaction in to the transaciton pool.
 	txn := tpt.addSiacoinTransactionToPool()
+	txn.ArbitraryData = append(txn.ArbitraryData, "NonSia: this stops the transaction from being a duplicate")
 
 	// Try to add the same transaction to the transaction pool.
 	err := tpt.AcceptTransaction(txn)

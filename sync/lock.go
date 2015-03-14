@@ -25,6 +25,9 @@ type lockInfo struct {
 	// When the lock was called.
 	lockTime time.Time
 
+	// Whether it was a RLock or a Lock.
+	read bool
+
 	// Call stack of the caller.
 	callingFiles []string
 	callingLines []int
@@ -57,6 +60,14 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 				for i := 0; i <= rwm.callDepth; i++ {
 					fmt.Printf("\tFile: '%v:%v'\n", info.callingFiles[i], info.callingLines[i])
 				}
+
+				// Undo the deadlock and delete the entry from the map.
+				if info.read {
+					rwm.mu.RUnlock()
+				} else {
+					rwm.mu.Unlock()
+				}
+				delete(rwm.openLocks, id)
 			}
 		}
 		rwm.openLocksMutex.Unlock()
@@ -70,19 +81,12 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 func (rwm *RWMutex) safeLock(read bool) int {
 	// Get the call stack.
 	var li lockInfo
-	li.lockTime = time.Now()
+	li.read = read
 	li.callingFiles = make([]string, rwm.callDepth+1)
 	li.callingLines = make([]int, rwm.callDepth+1)
 	for i := 0; i <= rwm.callDepth; i++ {
 		_, li.callingFiles[i], li.callingLines[i], _ = runtime.Caller(2 + i)
 	}
-
-	// Safely register that a lock has been triggered.
-	rwm.openLocksMutex.Lock()
-	counter := rwm.openLocksCounter
-	rwm.openLocks[counter] = li
-	rwm.openLocksCounter++
-	rwm.openLocksMutex.Unlock()
 
 	// Lock the mutex.
 	if read {
@@ -90,6 +94,14 @@ func (rwm *RWMutex) safeLock(read bool) int {
 	} else {
 		rwm.mu.Lock()
 	}
+
+	// Safely register that a lock has been triggered.
+	rwm.openLocksMutex.Lock()
+	li.lockTime = time.Now()
+	counter := rwm.openLocksCounter
+	rwm.openLocks[counter] = li
+	rwm.openLocksCounter++
+	rwm.openLocksMutex.Unlock()
 
 	return counter
 }
@@ -117,13 +129,13 @@ func (rwm *RWMutex) safeUnlock(read bool, counter int) {
 		return
 	}
 
-	// Remove the lock.
-	delete(rwm.openLocks, counter)
+	// Remove the lock and delete the netry from the map.
 	if read {
 		rwm.mu.RUnlock()
 	} else {
 		rwm.mu.Unlock()
 	}
+	delete(rwm.openLocks, counter)
 }
 
 // RLock will read lock the RWMutex. The return value must be used as input
