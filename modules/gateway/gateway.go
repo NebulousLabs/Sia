@@ -89,8 +89,8 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// announce ourselves to the new peers
 	go g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
 
-	// synchronize to a random peer
-	g.Synchronize()
+	// spawn synchronizer
+	go g.threadedResynchronize()
 
 	return
 }

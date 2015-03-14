@@ -77,9 +77,9 @@ type Gateway interface {
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
 
-	// Synchronize synchronizes the local consensus set with the sets of known
-	// peers.
-	Synchronize() error
+	// Synchronize synchronizes the local consensus set with the set of the
+	// given peer.
+	Synchronize(NetAddress) error
 
 	// RelayBlock accepts a block and submits it to the state, broadcasting it
 	// to the network if it's valid and on the current longest fork.
