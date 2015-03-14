@@ -5,18 +5,16 @@ import (
 	"net"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // A NetConn is a monitored network connection.
 type NetConn interface {
 	io.ReadWriteCloser
 
-	// ReadObject reads and decodes an object from the NetConn. It takes a
-	// maximum length, which the encoded object must not exceed.
-	ReadObject(interface{}, uint64) error
-
-	// WriteObject encodes an object and writes it to the connection.
-	WriteObject(interface{}) error
+	// ReadWriters support reading and writing objects, which are encoded and
+	// decoded via the encoding package.
+	encoding.ReadWriter
 
 	// Addr returns the NetAddress of the remote end of the connection.
 	Addr() NetAddress

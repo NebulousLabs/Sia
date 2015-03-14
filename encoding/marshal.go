@@ -133,9 +133,7 @@ func Unmarshal(b []byte, v interface{}) (err error) {
 
 func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	// check for UnmarshalSia interface first
-	if u, ok := val.Interface().(SiaUnmarshaler); ok {
-		return u.UnmarshalSia(b)
-	} else if val.CanAddr() {
+	if val.CanAddr() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
 			return u.UnmarshalSia(b)
 		}
@@ -153,7 +151,13 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 		}
 		return unmarshal(b[1:], val.Elem()) + 1
 	case reflect.Bool:
-		val.SetBool(b[0] != 0)
+		if b[0] == 0 {
+			val.SetBool(false)
+		} else if b[0] == 1 {
+			val.SetBool(true)
+		} else {
+			panic("boolean value was not 0 or 1")
+		}
 		return 1
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val.SetInt(DecInt64(b[:8]))
