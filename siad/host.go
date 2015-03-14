@@ -33,6 +33,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		"collateral":   &config.Collateral,
 	}
 
+	any := false
 	for qs := range qsVars {
 		// only modify supplied values
 		if req.FormValue(qs) != "" {
@@ -41,7 +42,12 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 				writeError(w, "Malformed "+qs, http.StatusBadRequest)
 				return
 			}
+			any = true
 		}
+	}
+	if !any {
+		writeError(w, "No valid configuration fields specified", http.StatusBadRequest)
+		return
 	}
 
 	d.host.SetSettings(config)

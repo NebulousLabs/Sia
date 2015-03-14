@@ -27,12 +27,7 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 
 // minerStatusHandler handles the API call that queries the miner's status.
 func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	mInfo, err := d.miner.Info()
-	if err != nil {
-		writeError(w, "Failed to encode status object", http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, mInfo)
+	writeJSON(w, d.miner.Info())
 }
 
 // minerStopHandler handles the API call to stop the miner.
