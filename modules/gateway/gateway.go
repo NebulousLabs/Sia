@@ -95,35 +95,14 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	return
 }
 
-// RelayBlock relays a block, both locally and to the network.
-func (g *Gateway) RelayBlock(b consensus.Block) (err error) {
-	err = g.state.AcceptBlock(b)
-	if err != nil {
-		return
-	}
-
-	// Check if b is in the current path.
-	height, exists := g.state.HeightOfBlock(b.ID())
-	if !exists {
-		if consensus.DEBUG {
-			panic("could not get the height of a block that did not return an error when being accepted into the state")
-		}
-		return errors.New("state malfunction")
-	}
-	currentPathBlock, exists := g.state.BlockAtHeight(height)
-	if !exists || b.ID() != currentPathBlock.ID() {
-		return errors.New("block added, but it does not extend the state height")
-	}
-
-	go g.threadedBroadcast("RelayBlock", writerRPC(b))
-	return
+// RelayBlock relays a block to the network.
+func (g *Gateway) RelayBlock(b consensus.Block) {
+	go g.threadedBroadcast("AcceptBlock", writerRPC(b))
 }
 
-// RelayTransaction relays a transaction, both locally and to the network.
-func (g *Gateway) RelayTransaction(t consensus.Transaction) (err error) {
-	// no locking necessary
+// RelayTransaction relays a transaction to the network.
+func (g *Gateway) RelayTransaction(t consensus.Transaction) {
 	go g.threadedBroadcast("AcceptTransaction", writerRPC(t))
-	return
 }
 
 // Info returns metadata about the Gateway.

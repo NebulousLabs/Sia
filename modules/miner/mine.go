@@ -109,12 +109,13 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
-			err = m.gateway.RelayBlock(b)
+			err = m.state.AcceptBlock(b)
 			if consensus.DEBUG {
 				if err != nil {
 					// Log Error
 				}
 			}
+			m.gateway.RelayBlock(b)
 
 			solved = true
 

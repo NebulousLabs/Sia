@@ -84,13 +84,11 @@ type Gateway interface {
 	// given peer.
 	Synchronize(NetAddress) error
 
-	// RelayBlock accepts a block and submits it to the state, broadcasting it
-	// to the network if it's valid and on the current longest fork.
-	RelayBlock(consensus.Block) error
+	// RelayBlock broadcasts a block to the Gateway's peers.
+	RelayBlock(consensus.Block)
 
-	// RelayTransaction announces a transaction to all of the Gateway's
-	// known peers.
-	RelayTransaction(consensus.Transaction) error
+	// RelayTransaction broadcasts a transaction to the Gateway's peers.
+	RelayTransaction(consensus.Transaction)
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
