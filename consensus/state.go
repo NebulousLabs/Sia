@@ -53,6 +53,8 @@ type State struct {
 	// listend on by modules. An empty struct is thrown down the channel any
 	// time that the consensus set of the state changes. subscriptionCounter
 	// only ever increments, and prevents collisions in the map.
+	revertUpdates [][]*blockNode
+	applyUpdates  [][]*blockNode
 	subscriptions []chan struct{}
 
 	// Per convention, all exported functions in the consensus package can be

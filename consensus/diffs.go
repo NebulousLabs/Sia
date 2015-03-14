@@ -188,7 +188,8 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
-			s.invalidateNode(bn)
+			s.badBlocks[bn.block.ID()] = struct{}{}
+			s.deleteNode(bn)
 			s.commitDiffSet(bn, DiffRevert)
 			return
 		}

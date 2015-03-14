@@ -43,7 +43,7 @@ func (ct *ConsensusTester) RewindApplyCheck() {
 
 	csh := ct.consensusSetHash()
 	cn := ct.currentBlockNode()
-	ct.rewindToNode(ct.blockRoot)
+	ct.revertToNode(ct.blockRoot)
 	ct.applyUntilNode(cn)
 	if csh != ct.consensusSetHash() {
 		ct.Error("state hash is not consistent after rewinding and applying all the way through")
