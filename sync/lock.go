@@ -70,19 +70,11 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 func (rwm *RWMutex) safeLock(read bool) int {
 	// Get the call stack.
 	var li lockInfo
-	li.lockTime = time.Now()
 	li.callingFiles = make([]string, rwm.callDepth+1)
 	li.callingLines = make([]int, rwm.callDepth+1)
 	for i := 0; i <= rwm.callDepth; i++ {
 		_, li.callingFiles[i], li.callingLines[i], _ = runtime.Caller(2 + i)
 	}
-
-	// Safely register that a lock has been triggered.
-	rwm.openLocksMutex.Lock()
-	counter := rwm.openLocksCounter
-	rwm.openLocks[counter] = li
-	rwm.openLocksCounter++
-	rwm.openLocksMutex.Unlock()
 
 	// Lock the mutex.
 	if read {
@@ -90,6 +82,14 @@ func (rwm *RWMutex) safeLock(read bool) int {
 	} else {
 		rwm.mu.Lock()
 	}
+
+	// Safely register that a lock has been triggered.
+	rwm.openLocksMutex.Lock()
+	li.lockTime = time.Now()
+	counter := rwm.openLocksCounter
+	rwm.openLocks[counter] = li
+	rwm.openLocksCounter++
+	rwm.openLocksMutex.Unlock()
 
 	return counter
 }
