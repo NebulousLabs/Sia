@@ -49,10 +49,12 @@ func (c *conn) Close() error {
 	return c.nc.Close()
 }
 
+// ReadObject implements the encoding.Reader interface.
 func (c *conn) ReadObject(obj interface{}, maxLen uint64) error {
 	return encoding.ReadObject(c, obj, maxLen)
 }
 
+// WriteObject implements the encoding.Writer interface.
 func (c *conn) WriteObject(obj interface{}) error {
 	return encoding.WriteObject(c, obj)
 }
