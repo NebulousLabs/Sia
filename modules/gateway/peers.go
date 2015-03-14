@@ -69,6 +69,13 @@ func (g *Gateway) RemovePeer(peer modules.NetAddress) error {
 	return g.removePeer(peer)
 }
 
+// RandomPeer returns a random peer from the Gateway's peer list.
+func (g *Gateway) RandomPeer() (modules.NetAddress, error) {
+	counter := g.mu.RLock()
+	defer g.mu.RUnlock(counter)
+	return g.randomPeer()
+}
+
 // addMe is an RPC that requests that the Gateway add a peer to its peer
 // list. The supplied peer is assumed to be the peer making the RPC.
 func (g *Gateway) addMe(conn modules.NetConn) error {

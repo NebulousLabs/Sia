@@ -68,6 +68,9 @@ type Gateway interface {
 	// RemovePeer removes a peer from the Gateway's peer list.
 	RemovePeer(NetAddress) error
 
+	// RandomPeer returns a random peer from the Gateway's peer list.
+	RandomPeer() (NetAddress, error)
+
 	// RPC establishes a connection to the supplied address and writes the RPC
 	// header, indicating which function will handle the connection. The
 	// supplied function takes over from there.
