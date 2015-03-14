@@ -1,8 +1,14 @@
 package transactionpool
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+)
+
+var (
+	ErrDuplicate = errors.New("transaction is a duplicate")
 )
 
 // applySiacoinInputs adds every siacoin input to the transaction pool by
@@ -192,21 +198,35 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, directi
 // AcceptTransaction takes a new transaction from the network and puts it in
 // the transaction pool after checking it for legality and consistency.
 func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error) {
+	// Check that the transaction has not been seen before.
+	id := tp.mu.Lock()
+	txnHash := crypto.HashObject(t)
+	_, exists := tp.seenTransactions[txnHash]
+	if exists {
+		tp.mu.Unlock(id)
+		return ErrDuplicate
+	}
+	if len(tp.seenTransactions) > 1200 {
+		tp.seenTransactions = make(map[crypto.Hash]struct{})
+	}
+	tp.seenTransactions[txnHash] = struct{}{}
+	tp.mu.Unlock(id)
+
 	// Check that the transaction is legal given the consensus set of the state
 	// and the unconfirmed set of the transaction pool.
-	counter := tp.mu.RLock()
+	id = tp.mu.RLock()
 	err = tp.validUnconfirmedTransaction(t)
-	tp.mu.RUnlock(counter)
+	tp.mu.RUnlock(id)
 	if err != nil {
 		return
 	}
 
 	// direction is set to true because a new transaction has been added and it
 	// may depend on existing unconfirmed transactions.
-	counter = tp.mu.Lock()
+	id = tp.mu.Lock()
 	direction := true
 	tp.addTransactionToPool(t, direction)
-	tp.mu.Unlock(counter)
+	tp.mu.Unlock(id)
 
 	tp.gateway.RelayTransaction(t) // error is not checked
 	return
