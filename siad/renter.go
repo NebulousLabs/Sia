@@ -23,7 +23,7 @@ type FileInfo struct {
 
 // renterDownloadHandler handles the API call to download a file.
 func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	path := filepath.Join(d.downloadDir, req.FormValue("destination"))
+	path := filepath.Join(req.FormValue("destination"))
 	err := d.renter.Download(req.FormValue("nickname"), path)
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
