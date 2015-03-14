@@ -47,7 +47,7 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	d.host.SetSettings(config)
 	err := d.host.Announce(d.gateway.Info().Address)
 	if err != nil {
-		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
+		writeError(w, "Could not announce host: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)

@@ -54,7 +54,7 @@ func walletaddresscmd() {
 }
 
 func walletsendcmd(amount, dest string) {
-	err := callAPI(fmt.Sprintf("/wallet/send?amount=%s&dest=%s", amount, dest))
+	err := callAPI(fmt.Sprintf("/wallet/send?amount=%s&destination=%s", amount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return

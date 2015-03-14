@@ -24,7 +24,7 @@ var (
 	}
 
 	renterDownloadCmd = &cobra.Command{
-		Use:   "download [nickname] [filename]",
+		Use:   "download [nickname] [destination]",
 		Short: "Download a file",
 		Long:  "Download a previously-uploaded file to a specified destination.",
 		Run:   wrap(renterdownloadcmd),
@@ -38,23 +38,22 @@ var (
 	}
 )
 
-// siac does not support /renter/upload, only /renter/uploadpath
-func renteruploadcmd(filename, nickname, pieces string) {
-	err := callAPI(fmt.Sprintf("/renter/uploadpath?filename=%s&nickname=%s&pieces=%s", filename, nickname, pieces))
+func renteruploadcmd(source, nickname, pieces string) {
+	err := callAPI(fmt.Sprintf("/renter/upload?source=%s&nickname=%s&pieces=%s", source, nickname, pieces))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Println("Uploaded", filename, "as", nickname)
+	fmt.Println("Uploaded", source, "as", nickname)
 }
 
-func renterdownloadcmd(nickname, filename string) {
-	err := callAPI(fmt.Sprintf("/renter/download?nickname=%s&filename=%s", nickname, filename))
+func renterdownloadcmd(nickname, destination string) {
+	err := callAPI(fmt.Sprintf("/renter/download?nickname=%s&destination=%s", nickname, destination))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
 	}
-	fmt.Println("Downloaded", nickname, "to", filename)
+	fmt.Println("Downloaded", nickname, "to", destination)
 }
 
 func renterstatuscmd() {
@@ -65,7 +64,7 @@ func renterstatuscmd() {
 		return
 	}
 	if len(status.Files) == 0 {
-		fmt.Println("Not files have been uploaded.")
+		fmt.Println("No files have been uploaded.")
 		return
 	}
 	fmt.Println("Uploaded", len(status.Files), "files:")
