@@ -38,7 +38,13 @@ func (r *Renter) downloadPiece(piece FilePiece, path string) error {
 		if err != nil {
 			return
 		}
-		defer file.Close()
+		defer func() {
+			file.Close()
+			// If something goes wrong, delete the file.
+			if err != nil {
+				os.Remove(path)
+			}
+		}()
 
 		// Simultaneously download file and calculate its Merkle root.
 		tee := io.TeeReader(
