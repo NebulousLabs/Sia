@@ -129,7 +129,7 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 		handlerMap: make(map[rpcID]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]int),
 		saveDir:    saveDir,
-		mu:         sync.New(time.Second*2, 0),
+		mu:         sync.New(time.Second*1, 0),
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))

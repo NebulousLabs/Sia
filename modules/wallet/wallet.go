@@ -106,7 +106,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 
 		transactions: make(map[string]*openTransaction),
 
-		mu: sync.New(5*time.Second, 0),
+		mu: sync.New(1*time.Second, 0),
 	}
 
 	// Try to load a previously saved wallet file. If it doesn't exist, assume
