@@ -30,6 +30,13 @@ var (
 		Run:   wrap(renterdownloadcmd),
 	}
 
+	renterDownloadQueueCmd = &cobra.Command{
+		Use:   "queue",
+		Short: "View the download queue",
+		Long:  "View the list of files that have been downloaded.",
+		Run:   wrap(renterdownloadqueuecmd),
+	}
+
 	renterStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "View a list of uploaded files",
@@ -44,7 +51,7 @@ func renteruploadcmd(source, nickname, pieces string) {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Println("Uploaded", source, "as", nickname)
+	fmt.Printf("Uploaded %s as '%s'.\n", source, nickname)
 }
 
 func renterdownloadcmd(nickname, destination string) {
@@ -53,7 +60,35 @@ func renterdownloadcmd(nickname, destination string) {
 		fmt.Println("Could not download file:", err)
 		return
 	}
-	fmt.Println("Downloaded", nickname, "to", destination)
+	fmt.Printf("Started downloading '%s' to %s.\n", nickname, destination)
+}
+
+// TODO: this should be defined elsewhere
+type downloadInfo struct {
+	Completed   bool
+	Destination string
+	Nickname    string
+}
+
+func renterdownloadqueuecmd() {
+	var queue []downloadInfo
+	err := getAPI("/renter/downloadqueue", &queue)
+	if err != nil {
+		fmt.Println("Could not get download queue:", err)
+		return
+	}
+	if len(queue) == 0 {
+		fmt.Println("No downloads to show.")
+		return
+	}
+	fmt.Println("Download Queue:")
+	for _, file := range queue {
+		done := "Done"
+		if !file.Completed {
+			done = "... "
+		}
+		fmt.Printf("%s %s -> %s\n", done, file.Nickname, file.Destination)
+	}
 }
 
 func renterstatuscmd() {

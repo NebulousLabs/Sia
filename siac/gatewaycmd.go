@@ -79,6 +79,10 @@ func gatewaystatuscmd() {
 		fmt.Println("Could not get gateway status:", err)
 		return
 	}
+	if len(info.Peers) == 0 {
+		fmt.Println("No peers to show.")
+		return
+	}
 	fmt.Println(len(info.Peers), "active peers:")
 	for _, peer := range info.Peers {
 		fmt.Println("\t", peer)
