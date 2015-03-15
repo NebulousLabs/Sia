@@ -74,3 +74,28 @@ func TestRPC(t *testing.T) {
 		t.Fatal("Foo gave wrong response:", foo)
 	}
 }
+
+// TestTimeout tests that connections time out properly.
+func TestTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	g := newTestGateway(t)
+	defer g.Close()
+
+	// create unresponsive peer
+	badpeer := newTestGateway(t)
+	// overwrite badpeer's Ping RPC with an incorrect one
+	// since g is expecting 4 bytes, it will time out.
+	badpeer.RegisterRPC("Ping", func(conn modules.NetConn) error {
+		// write a length prefix, but no actual data
+		conn.Write([]byte{1, 0, 0, 0, 0, 0, 0, 0})
+		select {}
+	})
+
+	err := g.RPC(badpeer.Address(), "Ping", readerRPC([1]byte{}, 1))
+	if err != ErrTimeout {
+		t.Fatalf("Got wrong error: expected %v, got %v", ErrTimeout, err)
+	}
+}
