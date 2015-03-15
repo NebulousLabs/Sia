@@ -78,8 +78,8 @@ func (s *State) SubscribeToConsensusChanges() <-chan struct{} {
 
 // Subscribe accepts a new subscriber.
 func (s *State) Subscribe(subscriber Subscriber) {
-	id := s.mu.Lock()
 	c := make(chan struct{}, 1)
+	id := s.mu.Lock()
 	s.subscriptions = append(s.subscriptions, c)
 	s.mu.Unlock(id)
 	go s.threadedSendUpdates(c, subscriber)
