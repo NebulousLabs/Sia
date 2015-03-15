@@ -65,8 +65,8 @@ func hostannouncecmd() {
 }
 
 func hoststatuscmd() {
-	config := new(modules.HostInfo)
-	err := getAPI("/host/status", config)
+	info := new(modules.HostInfo)
+	err := getAPI("/host/status", info)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)
 		return
@@ -77,5 +77,6 @@ Price:        %v coins
 Collateral:   %v
 Max Filesize: %v
 Max Duration: %v
-`, config.TotalStorage, config.StorageRemaining, config.Price, config.Collateral, config.MaxFilesize, config.MaxDuration)
+Contracts:    %v
+`, info.TotalStorage, info.StorageRemaining, info.Price, info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
 }
