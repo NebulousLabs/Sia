@@ -149,11 +149,21 @@ func (m *Miner) FindBlock() (consensus.Block, bool, error) {
 
 // SolveBlock attempts to solve a block, returning the solved block without
 // submitting it to the state.
-func (m *Miner) SolveBlock(b consensus.Block, target consensus.Target) (consensus.Block, bool, error) {
-	m.mu.Lock()
+func (m *Miner) SolveBlock(blockForWork consensus.Block, target consensus.Target) (b consensus.Block, solved bool) {
+	m.mu.RLock()
 	iterations := m.iterationsPerAttempt
-	m.mu.Unlock()
-	return m.solveBlock(b, target, iterations)
+	m.mu.RUnlock()
+
+	// Iterate through a bunch of nonces (from a random starting point) and try
+	// to find a winnning solution.
+	b = blockForWork
+	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
+		if b.CheckTarget(target) {
+			solved = true
+			return
+		}
+	}
+	return
 }
 
 // StartMining spawns a bunch of mining threads which will mine until stop is
