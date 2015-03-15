@@ -3,6 +3,7 @@ package renter
 import (
 	"errors"
 	"io"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -64,11 +65,17 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract consensus.FileContract, fcid consensus.FileContractID, err error) {
 	height := r.state.Height()
 
-	// Get the filesize by seeking to the end, grabbing the index, then seeking
-	// back to the beginning. These calls are guaranteed not to return errors.
-	n, _ := up.Data.Seek(0, 2)
-	filesize := uint64(n)
-	up.Data.Seek(0, 0)
+	file, err := os.Open(up.Filename)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return
+	}
+	filesize := uint64(info.Size())
 
 	// Get the price and payout.
 	sizeCurrency := consensus.NewCurrency64(filesize)
@@ -104,15 +111,15 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	// transaction is created sooner, which will impact the user's wallet
 	// balance faster vs. waiting for the whole thing to upload before
 	// affecting the user's balance.
-	merkleRoot, err := crypto.ReaderMerkleRoot(up.Data)
+	merkleRoot, err := crypto.ReaderMerkleRoot(file)
 	if err != nil {
 		return
 	}
+	file.Seek(0, 0) // reset read position
 	unsignedTxn, txnRef, err := r.createContractTransaction(terms, merkleRoot)
 	if err != nil {
 		return
 	}
-	up.Data.Seek(0, 0)
 
 	// TODO: This is a hackish sleep, we need to be certain that all dependent
 	// transactions have propgated to the host's transaction pool. Instead,
@@ -135,7 +142,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		}
 
 		// write file data
-		_, err = io.CopyN(conn, up.Data, int64(filesize))
+		_, err = io.CopyN(conn, file, int64(filesize))
 		if err != nil {
 			return
 		}
