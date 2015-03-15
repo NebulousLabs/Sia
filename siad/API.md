@@ -2,14 +2,15 @@ Siad API
 ========
 
 All API calls return JSON objects. If there is an error, the error is returned
-in plaintext. The standard response is { "Success": true}. In this document,
-the API responses are defined as Go structs. The Go structs will get encoded to
-JSON before being sent. Go structs are used here to provide type information.
+in plaintext with an appropriate HTTP error code. The standard response is {
+"Success": true }. In this document, the API responses are defined as Go
+structs. The structs will be encoded to JSON before being sent; they are used
+here to provide type information.
 
 At version 0.4, the API will be locked into forwards compatibility. This means
-that we will not remove elements from the responses (but we may add additional
-elements), and we will not add any required parameters (though we may add
-optional parameters, and we may disable parameters).
+that we will not add new required parameters or remove response fields. We
+may, however, add additional fields and optional parameters, and we may
+disable parameters.
 
 There may be functional API calls which are not documented. These are not
 guaranteed to be supported beyond the current release, and should not be used
@@ -34,9 +35,12 @@ Response: standard
 
 #### /daemon/update/apply:
 
-Function: Applies any updates that are available.
+Function: Applies the update specified by `version`.
 
-Parameters: none
+Parameters:
+```
+version string
+```
 
 Response: standard
 
@@ -73,8 +77,8 @@ Response:
 ```
 struct {
 	Height       int
-	CurrentBlock string
-	Target       string
+	CurrentBlock [32]byte
+	Target       [32]byte
 }
 ```
 
@@ -103,13 +107,12 @@ struct {
 
 #### /gateway/synchronize
 
-Function: Will synchronize the daemon + consensus to the rest of the network.
-Effects may take a few minutes to set in. Should only be necessary for
-debugging.
+Function: Will force synchronization of the local node and the rest of the
+network. May take a while. Should only be necessary for debugging.
 
 Parameters: none
 
-Reponse: none
+Reponse: standard
 
 #### /gateway/peer/add
 
@@ -119,7 +122,7 @@ Parameters:
 ```
 address string
 ```
-address should be a reachable hostname + port number. typically of the form
+`address` should be a reachable hostname + port number, typically of the form
 "a.b.c.d:xxxx".
 
 Response: standard
@@ -132,7 +135,7 @@ Parameters:
 ```
 address string
 ```
-address should be a reachable hostname + port number. typically of the form
+`address` should be a reachable hostname + port number, typically of the form
 "a.b.c.d:xxxx".
 
 Response: standard
@@ -170,28 +173,31 @@ windowSize   int
 price        int
 collateral   int
 ```
-totalStorage (in bytes) is how much storage the host will rent to the network.
+`totalStorage` is how much storage (in bytes) the host will rent to the
+network.
 
-minFilesize is the minimum allowed file size.
+`minFilesize` is the minimum allowed file size.
 
-maxFilesize is the maximum allowed file size.
+`maxFilesize` is the maximum allowed file size.
 
-minDuration is the minimum amount of time a contract is allowed to last.
+`minDuration` is the minimum amount of time a contract is allowed to last.
 
-maxDuration is the maximum amount of time a contract is allowed to last.
+`maxDuration` is the maximum amount of time a contract is allowed to last.
 
-windowSize is the number of blocks a host has to prove they are holding the file.
+`windowSize` is the number of blocks a host has to prove they are holding the
+file.
 
-price is the cost in Hastings per byte per block of hosting files on the network.
+`price` is the cost (in Hastings per byte) of data stored.
 
-collateral is the amount of collateral the host will offer in Hastings per byte
-per block for losing files on the network.
+`collateral` is the amount of collateral the host will offer (in Hastings per
+byte per block) for losing files on the network.
 
 Response: standard
 
 #### /host/status
 
-Function: Queries the host for general information.
+Function: Queries the host for its configuration values, as well as the amount
+of storage remaining and the number of contracts formed.
 
 Parameters: none
 
@@ -227,9 +233,12 @@ Queries:
 
 #### /miner/start
 
-Function: Starts the miner.
+Function: Tells the miner to begin mining on `threads` threads.
 
-Parameters: none
+Parameters:
+```
+threads int
+```
 
 Response: standard
 
@@ -240,10 +249,24 @@ Parameters: none
 Response:
 ```
 struct {
-	Mining bool
+	Mining         bool
+	State          string
+	Threads        int
+	RunningThreads int
+	Address        [32]byte
 }
 ```
-If the Mining flag is set, the miner is currently mining. Otherwise it is not.
+If the `Mining` flag is set, the miner is currently mining. Otherwise it is
+not.
+
+`State` gives a more nuanced description of the miner, including
+transitional states.
+
+`Threads` indicates the number of desired threads, while
+`RunningThreads` is the number of currently active threads. If the miner finds
+a block,
+
+`Address` is the address that will receive the coinbase.
 
 #### /miner/stop
 
@@ -272,9 +295,9 @@ Parameters:
 nickname    string
 destination string
 ```
-nickname is the nickname of the file that has been uploaded to the network.
+`nickname` is the nickname of the file that has been uploaded to the network.
 
-destination is the filepath that the file should be downloaded to.
+`destination` is the path that the file will be downloaded to.
 
 Response: standard
 
@@ -292,11 +315,13 @@ Response:
 	Nickname    string
 }
 ```
-Destination is the filepath that the file was downloaded to.
+Each file in the queue is represented by the above struct.
 
-Nickname is the name of the file that was downloaded according to the renter.
+`Destination` is the path that the file was downloaded to.
 
-Completed is true when the download has finished.
+`Nickname` is the nickname given to the file when it was uploaded.
+
+`Completed` indicates whether the download has finished.
 
 #### /renter/files
 
@@ -313,31 +338,29 @@ Response:
 	TimeRemaining int
 }
 ```
-The above is an array of objects, where each object represents a singe file.
+Each uploaded file is represented by the above struct.
 
-Available indicates whether or not the file can be downloaded immediately.
+`Available` indicates whether or not the file can be downloaded immediately.
 
-Files is a type.
+`Nickname` is the nickname given to the file when it was uploaded.
 
-Nickname is the name the renter uses for the file.
-
-Repairing indicates whether the file is currently being repaired. It is
+`Repairing` indicates whether the file is currently being repaired. It is
 typically best not to shut down siad until files are no longer being repaired.
 
-TimeRemaining indicates how many blocks the file will be available for.
+`TimeRemaining` indicates how many blocks the file will be available for.
 
 #### /renter/upload
 
-Function: Upload a file using a filepath.
+Function: Upload a file.
 
 Parameters:
 ```
 source   string
 nickname string
 ```
-source is a filename.
+`source` is the path to the file to be uploaded.
 
-nickname is the name the renter uses for the file.
+`nickname` is the name that will be used to reference the file.
 
 Response: standard.
 
@@ -362,7 +385,7 @@ struct {
 	Address string
 }
 ```
-Address is a hex representation of a wallet address.
+`Address` is the hex representation of a wallet address.
 
 #### /wallet/send
 
@@ -373,9 +396,9 @@ Parameters:
 amount      int
 destination string
 ```
-amount is a volume of Hastings.
+`amount` is a volume of coins to send, in Hastings.
 
-destination is an address represented in hex.
+`destination` is the hex representation of the recipient address.
 
 Response: standard
 
@@ -388,7 +411,13 @@ Parameters: none
 Response:
 ```
 struct {
-	Balance int
+	Balance      int
+	FullBalance  int
+	NumAddresses int
 }
 ```
-Balance is the spendable balance of the wallet.
+`Balance` is the spendable balance of the wallet.
+
+`FullBalance` is the balance of the wallet, including unconfirmed coins.
+
+`NumAddresses` is the number of addresses controlled by the wallet.

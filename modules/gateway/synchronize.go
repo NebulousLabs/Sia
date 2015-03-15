@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"errors"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -66,7 +65,7 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 // 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
 // sends a boolean indicating whether more blocks are available.
 func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
-	// read known blocks
+	// Read known blocks.
 	var knownBlocks [32]consensus.BlockID
 	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
 	if err != nil {
@@ -83,14 +82,21 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 			break
 		}
 	}
-	if !found {
-		// The genesis block should be included in knownBlocks - if no matching
-		// blocks are found, the caller is probably on a different blockchain
-		// altogether.
-		return errors.New("no matching block found")
+	// If we didn't find any matching blocks, or if we're already
+	// synchronized, don't send any blocks. The genesis block should be
+	// included in knownBlocks, so if no matching blocks are found, the caller
+	// is probably on a different blockchain altogether.
+	if !found || start > g.state.Height() {
+		// Send 0 blocks.
+		err = conn.WriteObject([]consensus.Block{})
+		if err != nil {
+			return
+		}
+		// Indicate that no more blocks are available.
+		return conn.WriteObject(false)
 	}
 
-	// Send blocks, starting with the child of the most recent known block.
+	// Determine range of blocks to send.
 	stop := start + MaxCatchUpBlocks
 	if stop > g.state.Height() {
 		stop = g.state.Height()

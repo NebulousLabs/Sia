@@ -26,7 +26,7 @@ type MinerInfo struct {
 // RunningThreads is the number of threads that the miner currently has.
 //
 // Address is the current address that is receiving block payouts.
-func (m *Miner) Info() (MinerInfo, error) {
+func (m *Miner) Info() MinerInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -54,7 +54,7 @@ func (m *Miner) Info() (MinerInfo, error) {
 		info.State = "Miner is in an ERROR state!"
 	}
 
-	return info, nil
+	return info
 }
 
 // Threads returns the number of threads being used by the miner.

@@ -17,14 +17,16 @@ var (
 	}
 
 	hostConfigCmd = &cobra.Command{
-		Use:   "set [setting] [value]",
+		Use:   "config [setting] [value]",
 		Short: "Modify host settings",
 		Long: `Modify host settings.
 Available settings:
-	totalstorage
-	maxfilesize
-	mintolerance
-	maxduration
+	totalStorage
+	minFilesize
+	maxFilesize
+	minDuration
+	maxDuration
+	windowSize
 	price
 	collateral`,
 		Run: wrap(hostconfigcmd),
@@ -64,7 +66,7 @@ func hostannouncecmd() {
 
 func hoststatuscmd() {
 	config := new(modules.HostInfo)
-	err := getAPI("/host/config", config)
+	err := getAPI("/host/status", config)
 	if err != nil {
 		fmt.Println("Could not fetch host settings:", err)
 		return

@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -56,10 +57,12 @@ func (rwm *RWMutex) threadedDeadlockFinder() {
 		for id, info := range rwm.openLocks {
 			// Check if the lock has been held for longer than 'maxLockTime'.
 			if time.Now().Sub(info.lockTime) > rwm.maxLockTime {
-				fmt.Printf("A lock was held for too long, id '%v'. Call stack:\n", id)
+				str := fmt.Sprintf("A lock was held for too long, id '%v'. Call stack:\n", id)
 				for i := 0; i <= rwm.callDepth; i++ {
-					fmt.Printf("\tFile: '%v:%v'\n", info.callingFiles[i], info.callingLines[i])
+					str += fmt.Sprintf("\tFile: '%v:%v'\n", info.callingFiles[i], info.callingLines[i])
 				}
+				os.Stderr.WriteString(str)
+				os.Stderr.Sync()
 
 				// Undo the deadlock and delete the entry from the map.
 				if info.read {

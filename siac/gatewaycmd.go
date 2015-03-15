@@ -17,14 +17,14 @@ var (
 	}
 
 	gatewayAddCmd = &cobra.Command{
-		Use:   "add [addr]",
+		Use:   "add [address]",
 		Short: "Add a peer",
 		Long:  "Add a new peer to the peer list.",
 		Run:   wrap(gatewayaddcmd),
 	}
 
 	gatewayRemoveCmd = &cobra.Command{
-		Use:   "remove [addr]",
+		Use:   "remove [address]",
 		Short: "Remove a peer",
 		Long:  "Remove a peer from the peer list.",
 		Run:   wrap(gatewayremovecmd),
@@ -77,6 +77,10 @@ func gatewaystatuscmd() {
 	err := getAPI("/gateway/status", &info)
 	if err != nil {
 		fmt.Println("Could not get gateway status:", err)
+		return
+	}
+	if len(info.Peers) == 0 {
+		fmt.Println("No peers to show.")
 		return
 	}
 	fmt.Println(len(info.Peers), "active peers:")
