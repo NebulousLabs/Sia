@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
@@ -76,18 +75,10 @@ func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, d.renter.Info())
 }
 
-// renterUploadHandler handles the API call to upload a file using a
-// filepath.
+// renterUploadHandler handles the API call to upload a file.
 func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
-	// open the file
-	file, err := os.Open(req.FormValue("source"))
-	if err != nil {
-		writeError(w, "Couldn't open file: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = d.renter.Upload(modules.UploadParams{
-		Data:     file,
+	err := d.renter.Upload(modules.UploadParams{
+		Filename: req.FormValue("source"),
 		Duration: duration,
 		Nickname: req.FormValue("nickname"),
 		Pieces:   redundancy,

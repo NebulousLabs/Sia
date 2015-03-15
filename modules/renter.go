@@ -1,15 +1,12 @@
 package modules
 
 import (
-	"io"
-
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
-// UploadParams contains the information used by the Renter to upload a file,
-// including the file contents and the duration for which it is to be stored.
+// UploadParams contains the information used by the Renter to upload a file.
 type UploadParams struct {
-	Data     io.ReadSeeker
+	Filename string
 	Duration consensus.BlockHeight
 	Nickname string
 	Pieces   int
