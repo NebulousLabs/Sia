@@ -36,8 +36,8 @@ type unconfirmedTransaction struct {
 // unconfirmed transactions.
 type TransactionPool struct {
 	state       *consensus.State
-	recentBlock consensus.BlockID
 	gateway     modules.Gateway
+	stateHeight consensus.BlockHeight
 
 	// Linked list variables.
 	head *unconfirmedTransaction
@@ -65,6 +65,13 @@ type TransactionPool struct {
 	// to be in the transaction pool.
 	seenTransactions map[crypto.Hash]struct{}
 
+	// Subscriber variables
+	revertBlocksUpdates [][]consensus.Block
+	applyBlocksUpdates  [][]consensus.Block
+	revertTxnsUpdates   [][]consensus.Transaction
+	applyTxnsUpdates    [][]consensus.Transaction
+	subscribers         []chan struct{}
+
 	mu *sync.RWMutex
 }
 
@@ -81,9 +88,8 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 	// Return a transaction pool with no transactions and a recentBlock
 	// pointing to the state's current block.
 	tp = &TransactionPool{
-		state:       s,
-		recentBlock: s.CurrentBlock().ID(),
-		gateway:     g,
+		state:   s,
+		gateway: g,
 
 		transactions:   make(map[crypto.Hash]*unconfirmedTransaction),
 		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
@@ -100,6 +106,8 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 
 		mu: sync.New(1*time.Second, 0),
 	}
+
+	s.Subscribe(tp)
 
 	return
 }

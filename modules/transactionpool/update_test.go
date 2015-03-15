@@ -15,12 +15,14 @@ func (tpt *TpoolTester) testUpdateTransactionRemoval() {
 	// Add some transactions to the pool and then get the transaction set.
 	tpt.addDependentSiacoinTransactionToPool()
 	tset, err := tpt.TransactionSet()
+	id := tpt.mu.RLock()
 	if err != nil {
 		tpt.Error(err)
 	}
 	if len(tset) == 0 {
 		tpt.Error("tset should have some transacitons")
 	}
+	tpt.mu.RUnlock(id)
 
 	// TODO: Add all other types of transactions.
 
@@ -32,16 +34,18 @@ func (tpt *TpoolTester) testUpdateTransactionRemoval() {
 	}
 
 	// Call update and verify that the new transaction set is empty.
-	tpt.update()
 	tset, err = tpt.TransactionSet()
 	if err != nil {
 		tpt.Error(err)
 	}
+	id = tpt.mu.RLock()
 	if len(tset) != 0 {
 		tpt.Error("tset should not have any transactions")
 	}
+	tpt.mu.RUnlock(id)
 
 	// Check that all of the internal maps are also empty.
+	id = tpt.mu.RLock()
 	if len(tpt.transactions) != 0 {
 		tpt.Error("a field wasn't properly emptied out")
 	}
@@ -72,6 +76,7 @@ func (tpt *TpoolTester) testUpdateTransactionRemoval() {
 	if len(tpt.usedSiafundOutputs) != 0 {
 		tpt.Error("a field wasn't properly emptied out")
 	}
+	tpt.mu.RUnlock(id)
 }
 
 // testBlockConflicts adds a transaction and a dependent transaction to the
@@ -106,7 +111,6 @@ func (tpt *TpoolTester) testBlockConflicts() {
 	// Update the transaction pool and check that both the parent and dependent
 	// have been removed as a result of the conflict making it into the
 	// blockchain.
-	tpt.update()
 	tset, err = tpt.TransactionSet()
 	if err != nil {
 		tpt.Error(err)
@@ -141,7 +145,6 @@ func (tpt *TpoolTester) testDependentUpdates() {
 
 	// Update the transaction pool and check that only the dependent
 	// transaction remains.
-	tpt.update()
 	tset, err = tpt.TransactionSet()
 	if err != nil {
 		tpt.Error(err)
@@ -178,9 +181,7 @@ func (tpt *TpoolTester) testRewinding() {
 
 	// Rewind the block, update the transaction pool, and check that the
 	// transaction was added to the transaction pool.
-	tpt.update()
 	tpt.RewindABlock()
-	tpt.update()
 	tset, err = tpt.TransactionSet()
 	if err != nil {
 		tpt.Error(err)

@@ -13,7 +13,6 @@ import (
 func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction, err error) {
 	counter := tp.mu.Lock()
 	defer tp.mu.Unlock(counter)
-	tp.update()
 
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
@@ -46,7 +45,6 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 	counter := tp.mu.Lock()
 	defer tp.mu.Unlock(counter)
-	tp.update()
 
 	// For each transaction in the linked list, grab the siacoin output diffs
 	// that would be created by the transaction.

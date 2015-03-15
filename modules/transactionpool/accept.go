@@ -210,22 +210,19 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 		tp.seenTransactions = make(map[crypto.Hash]struct{})
 	}
 	tp.seenTransactions[txnHash] = struct{}{}
-	tp.mu.Unlock(id)
 
 	// Check that the transaction is legal given the consensus set of the state
 	// and the unconfirmed set of the transaction pool.
-	id = tp.mu.RLock()
 	err = tp.validUnconfirmedTransaction(t)
-	tp.mu.RUnlock(id)
 	if err != nil {
 		return
 	}
 
 	// direction is set to true because a new transaction has been added and it
 	// may depend on existing unconfirmed transactions.
-	id = tp.mu.Lock()
 	direction := true
 	tp.addTransactionToPool(t, direction)
+	tp.updateSubscribers(nil, nil, nil, []consensus.Transaction{t})
 	tp.mu.Unlock(id)
 
 	tp.gateway.RelayTransaction(t) // error is not checked

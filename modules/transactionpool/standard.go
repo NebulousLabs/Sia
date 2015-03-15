@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	FileContractConfirmWindow = 10
+	FileContractConfirmWindow = 6
 	TransactionSizeLimit      = 16 * 1024
 
 	PrefixNonSia = "NonSia"
