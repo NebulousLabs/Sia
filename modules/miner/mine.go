@@ -134,14 +134,9 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	return
 }
 
-// SolveBlock is an exported function which will attempt to solve a block to
-// add to the state. SolveBlock is less efficient than StartMining(), but is
-// guaranteed to solve at most one block (useful for testing).
-//
-// solveBlock is both blocking and takes a long time to complete, therefore
-// needs to be called without the miner being locked. For this reason,
-// SolveBlock breaks typical mutex conventions and unlocks before returning.
-func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
+// FindBlock will attempt to solve a block and add it to the state. While less
+// efficient than StartMining, it is guaranteed to find at most one block.
+func (m *Miner) FindBlock() (consensus.Block, bool, error) {
 	m.mu.Lock()
 	m.update()
 	bfw := m.blockForWork()
@@ -150,6 +145,15 @@ func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
 	m.mu.Unlock()
 
 	return m.solveBlock(bfw, target, iterations)
+}
+
+// SolveBlock attempts to solve a block, returning the solved block without
+// submitting it to the state.
+func (m *Miner) SolveBlock(b consensus.Block, target consensus.Target) (consensus.Block, bool, error) {
+	m.mu.Lock()
+	iterations := m.iterationsPerAttempt
+	m.mu.Unlock()
+	return m.solveBlock(b, target, iterations)
 }
 
 // StartMining spawns a bunch of mining threads which will mine until stop is
