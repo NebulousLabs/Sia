@@ -1,10 +1,13 @@
 package miner
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
@@ -12,9 +15,13 @@ import (
 // TestMiner creates a miner, mines a few blocks, and checks that the wallet
 // balance is updating as the blocks get mined.
 func TestMiner(t *testing.T) {
+	directory := "TestMiner"
+
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	g, err := gateway.New(":8900", s, "")
+
+	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	g, err := gateway.New(":0", s, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +29,8 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(s, tpool, "")
+	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	w, err := wallet.New(s, tpool, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +47,7 @@ func TestMiner(t *testing.T) {
 	var solved bool
 	for i := 0; i <= consensus.MaturityDelay; i++ {
 		for !solved {
-			_, solved, err = m.SolveBlock()
+			_, solved, err = m.FindBlock()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,10 +70,12 @@ func TestManyBlocks(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	directory := "TestManyBlocks"
 
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	g, err := gateway.New(":8600", s, "")
+	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	g, err := gateway.New(":0", s, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +83,8 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(s, tpool, "")
+	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	w, err := wallet.New(s, tpool, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +96,7 @@ func TestManyBlocks(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		var solved bool
 		for !solved {
-			_, solved, err = m.SolveBlock()
+			_, solved, err = m.FindBlock()
 			if err != nil {
 				t.Fatal(err)
 			}

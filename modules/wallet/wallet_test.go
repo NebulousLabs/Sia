@@ -1,17 +1,17 @@
 package wallet
 
 import (
-	"strconv"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 )
 
-// global variables used to prevent conflicts
 var (
-	rpcPort   int = 10000
 	walletNum int = 0
 )
 
@@ -23,19 +23,20 @@ type WalletTester struct {
 }
 
 // NewWalletTester takes a testing.T and creates a WalletTester.
-func NewWalletTester(t *testing.T) (wt *WalletTester) {
+func NewWalletTester(directory string, t *testing.T) (wt *WalletTester) {
 	wt = new(WalletTester)
 	wt.ConsensusTester = consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), wt.State, "")
+	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	g, err := gateway.New(":0", wt.State, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rpcPort++
 	tpool, err := transactionpool.New(wt.State, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt.Wallet, err = New(wt.State, tpool, "")
+	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	wt.Wallet, err = New(wt.State, tpool, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}

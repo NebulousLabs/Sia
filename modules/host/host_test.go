@@ -1,17 +1,18 @@
 package host
 
 import (
-	"strconv"
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
 var (
-	rpcPort   int = 10500
 	walletNum int = 0
 	hostNum   int = 0
 )
@@ -25,22 +26,26 @@ type HostTester struct {
 }
 
 // CreateHostTester initializes a HostTester.
-func CreateHostTester(t *testing.T) (ht *HostTester) {
+func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
+	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rpcPort++
+
 	tp, err := transactionpool.New(ct.State, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "")
+
+	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	w, err := wallet.New(ct.State, tp, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	walletNum++
+
 	h, err := New(ct.State, tp, w, "")
 	if err != nil {
 		t.Fatal(err)

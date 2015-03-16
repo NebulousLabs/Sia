@@ -38,6 +38,6 @@ func (wt *WalletTester) testCoinAddress() {
 // TestCoinAddress creates a new wallet tester and uses it to call
 // testCoinAddress.
 func TestCoinAddress(t *testing.T) {
-	wt := NewWalletTester(t)
+	wt := NewWalletTester("TestCoinAddress", t)
 	wt.testCoinAddress()
 }

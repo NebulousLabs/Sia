@@ -12,7 +12,7 @@ import (
 // TestFindHostAnnouncements checks that host announcements are being found and
 // then correctly added to the host database.
 func TestFindHostAnnouncements(t *testing.T) {
-	hdbt := CreateHostDBTester(t)
+	hdbt := CreateHostDBTester("TestFindHostAnnouncements", t)
 
 	// Call update and check the size of the hostdb, size should be 0.
 	if hdbt.NumHosts() != 0 {

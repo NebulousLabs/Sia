@@ -75,12 +75,12 @@ func (ht *HostTester) testConsiderTerms() {
 
 // TestAllocation creates a host tester and calls testAllocation.
 func TestAllocation(t *testing.T) {
-	ht := CreateHostTester(t)
+	ht := CreateHostTester("TestAllocation", t)
 	ht.testAllocation()
 }
 
 // TestConsiderTerms creates a host tester and calls testConsiderTerms.
 func TestConsiderTerms(t *testing.T) {
-	ht := CreateHostTester(t)
+	ht := CreateHostTester("TestConsiderTerms", t)
 	ht.testConsiderTerms()
 }

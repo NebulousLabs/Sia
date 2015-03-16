@@ -41,6 +41,6 @@ func (wt *WalletTester) testUnconfirmedTransaction() {
 // TestUnconfirmedTransaction creates a wallet tester and uses it to call
 // testUnconfirmedTransaction.
 func TestUnconfirmedTransaction(t *testing.T) {
-	wt := NewWalletTester(t)
+	wt := NewWalletTester("Wallet - TestUnconfirmedTransaction", t)
 	wt.testUnconfirmedTransaction()
 }

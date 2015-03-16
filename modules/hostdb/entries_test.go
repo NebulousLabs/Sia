@@ -52,7 +52,7 @@ func TestEntryWeight(t *testing.T) {
 // TestInsertAllHosts inserts a few items into the hostdb and checks that
 // allHosts updates as expected.
 func TestInsertAllHosts(t *testing.T) {
-	hdbt := CreateHostDBTester(t)
+	hdbt := CreateHostDBTester("TestInsertAllHosts", t)
 
 	// Insert a standard entry using the exported function.
 	normalEntry := modules.HostEntry{

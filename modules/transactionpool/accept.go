@@ -198,12 +198,13 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, directi
 // AcceptTransaction takes a new transaction from the network and puts it in
 // the transaction pool after checking it for legality and consistency.
 func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error) {
-	// Check that the transaction has not been seen before.
 	id := tp.mu.Lock()
+	defer tp.mu.Unlock(id)
+
+	// Check that the transaction has not been seen before.
 	txnHash := crypto.HashObject(t)
 	_, exists := tp.seenTransactions[txnHash]
 	if exists {
-		tp.mu.Unlock(id)
 		return ErrDuplicate
 	}
 	if len(tp.seenTransactions) > 1200 {
@@ -223,7 +224,6 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	direction := true
 	tp.addTransactionToPool(t, direction)
 	tp.updateSubscribers(nil, nil, nil, []consensus.Transaction{t})
-	tp.mu.Unlock(id)
 
 	tp.gateway.RelayTransaction(t) // error is not checked
 	return
