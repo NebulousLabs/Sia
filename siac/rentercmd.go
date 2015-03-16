@@ -51,7 +51,7 @@ func renteruploadcmd(source, nickname string) {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Printf("Uploaded %s as '%s'.\n", source, nickname)
+	fmt.Println("Upload initiated.")
 }
 
 func renterdownloadcmd(nickname, destination string) {
