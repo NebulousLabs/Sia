@@ -12,7 +12,7 @@ import (
 	"github.com/inconshreveable/go-update"
 )
 
-const VERSION = "0.2.0"
+const VERSION = "0.3.0"
 
 // TODO: Updates need to be signed!
 // TODO: Updating on Windows may not work correctly.
