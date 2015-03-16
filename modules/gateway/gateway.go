@@ -134,7 +134,7 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	// Create the directory if it doesn't exist.
-	err = os.MkdirAll(saveDir, 0666)
+	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return
 	}

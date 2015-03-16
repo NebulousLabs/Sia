@@ -14,5 +14,5 @@ type Miner interface {
 	// SolveBlock will have the miner make 1 attempt to solve the input block.
 	// It will give up after a few seconds, returning the block, a bool
 	// indicating whether it has been solved, and an error.
-	SolveBlock(consensus.Block) (consensus.Block, bool, error)
+	SolveBlock(consensus.Block, consensus.Target) (consensus.Block, bool)
 }

@@ -3,6 +3,7 @@ package tester
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/NebulousLabs/Sia/sync"
 )
@@ -14,8 +15,8 @@ const (
 var (
 	// The ports used during testing start at 12e3 and increment as new ports
 	// are requested. This is to prevent port collisions during testing.
-	availablePort      int = 12e3
-	availablePortMutex sync.RWMutex
+	availablePort      int           = 12e3
+	availablePortMutex *sync.RWMutex = sync.New(1*time.Second, 0)
 )
 
 // NewPort returns a new, unique port number.

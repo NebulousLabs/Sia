@@ -109,6 +109,12 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 		mu: sync.New(1*time.Second, 0),
 	}
 
+	// Create the wallet folder.
+	err = os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return
+	}
+
 	// Try to load a previously saved wallet file. If it doesn't exist, assume
 	// that we're creating a new wallet file.
 	// TODO: log warning if no file found?
@@ -125,12 +131,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 }
 
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
-// is submitted to the miner pool, but is also returned.
-//
-// TODO: Since the style of FundTransaction has changed to work with untrusted
-// parties, SpendCoins has actually become inefficient, creating 2 transactions
-// and extra outputs where something slimmer would do the same job just as
-// well.
+// is submitted to the transaction pool and is also returned.
 func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
 	// Create and send the transaction.
 	output := consensus.SiacoinOutput{

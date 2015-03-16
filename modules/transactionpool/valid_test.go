@@ -1,5 +1,6 @@
 package transactionpool
 
+/*
 import (
 	"testing"
 )
@@ -25,3 +26,4 @@ func TestAddConflictingSiacoinTransactionToPool(t *testing.T) {
 	tpt := CreateTpoolTester(t)
 	tpt.addConflictingSiacoinTransactionToPool()
 }
+*/

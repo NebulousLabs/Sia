@@ -1,5 +1,6 @@
 package transactionpool
 
+/*
 import (
 	"testing"
 )
@@ -55,3 +56,4 @@ func TestUnconfirmedSiacoinOutputDiffs(t *testing.T) {
 	tpt := CreateTpoolTester(t)
 	tpt.testUnconfirmedSiacoinOutputDiffs()
 }
+*/
