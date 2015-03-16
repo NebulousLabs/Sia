@@ -1,4 +1,4 @@
-Sia 0.2.0
+Sia 0.3.0
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -8,7 +8,8 @@ Binaries can be found at [our website](http://siacoin.com).
 Sia is a new cryptosystem designed to enable incentivized, decentralized
 storage in a byzantine environment. The consensus protocol has been finished
 and is partially explained in Consensus.md. There is a working reference
-implementation in the consensus folder.
+implementation in the consensus folder. The reference implementation has a
+minimal amount of testing and may have severe bugs.
 
 While many of the components of Sia are well understood and trusted
 cryptographic ideas, Sia itself has not had a lot of academic review. As such,
@@ -18,14 +19,12 @@ warranty, and the developers cannot be held responsible for any damages that
 occur. We encourage you to use Sia, but only with files and money that you are
 comfortable losing.
 
-This distribution is an early beta release. It is likely to have many bugs,
-some of which may be severe. Please use with caution.
-
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon", that runs the Sia protocol, and siac is a client that is
-used to interact with siad. siad also exposes a web interface, which can be
-viewed in your browser at `http://localhost:9980` while siad is running. This is the
-preferred way of interacting with siad.
+used to interact with siad. Siad exposes an api on 'localhost:9980' which can
+be used to interact with the daemon. There is a front-end program called Sia-UI
+which can be used to interact with the daemon in a more user-friendly way.
+Documentation on the API can be found in API.md.
 
 Usage
 -----
@@ -41,16 +40,6 @@ access." You can now run `siac` in a separate command prompt to interact with
 siad, or navigate your browser to `http://localhost:9980` to use siad's web
 interface. From here, you can send money, mine blocks, upload and download
 files, and advertise yourself as a host.
-
-A note on hosting: when you announce yourself as a host, you have to put up
-coins ("freeze" them) to show that you're serious. This helps to mitiage Sybil
-attacks. After 'freeze duration' blocks, you will get the coins back.
-
-When someone makes a contract with you, you put up security coins. If you're a
-good host, you'll eventually get these coins back, but if you lose the file
-you'll lose the security too. So when people make contracts with you, your
-balance will initially go down. Rest assured, once you start submitting storage
-proofs, you'll start making money.
 
 Troubleshooting
 ---------------
@@ -83,7 +72,7 @@ If your issue is not addressed above, you can get in touch with us personally:
   
   luke@nebulouslabs.com
   
-  IRC:   #siacoin on freenode
+  IRC:   #siacoin on freenode (response may take a few days)
 
 Version Information
 -------------------
@@ -102,6 +91,8 @@ on what we do in the next few months. Thank you!
 Version History
 ---------------
 
-v0.2.0: Open beta release.
+v0.3.0: User non-hostile beta release. (sometimes confusing to use)
+
+v0.2.0: Open beta release. (difficult to use)
 
 v0.1.0: Initial (closed) beta release.
