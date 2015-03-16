@@ -17,9 +17,9 @@ var (
 	}
 
 	renterUploadCmd = &cobra.Command{
-		Use:   "upload [filename] [nickname] [pieces]",
+		Use:   "upload [filename] [nickname]",
 		Short: "Upload a file",
-		Long:  "Upload a file using a given nickname and split across 'pieces' hosts.",
+		Long:  "Upload a file using a given nickname.",
 		Run:   wrap(renteruploadcmd),
 	}
 
@@ -45,8 +45,8 @@ var (
 	}
 )
 
-func renteruploadcmd(source, nickname, pieces string) {
-	err := callAPI(fmt.Sprintf("/renter/upload?source=%s&nickname=%s&pieces=%s", source, nickname, pieces))
+func renteruploadcmd(source, nickname string) {
+	err := callAPI(fmt.Sprintf("/renter/upload?source=%s&nickname=%s", source, nickname))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
