@@ -107,7 +107,7 @@ Target: %v
 }
 
 func stopcmd() {
-	err := callAPI("/stop/stop")
+	err := callAPI("/daemon/stop")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
