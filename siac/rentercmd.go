@@ -64,30 +64,27 @@ func renterdownloadcmd(nickname, destination string) {
 }
 
 // TODO: this should be defined elsewhere
-type downloadInfo struct {
-	Completed   bool
+type queue []struct {
+	Filesize    uint64
+	Received    uint64
 	Destination string
 	Nickname    string
 }
 
 func renterdownloadqueuecmd() {
-	var queue []downloadInfo
-	err := getAPI("/renter/downloadqueue", &queue)
+	var q queue
+	err := getAPI("/renter/downloadqueue", &q)
 	if err != nil {
 		fmt.Println("Could not get download queue:", err)
 		return
 	}
-	if len(queue) == 0 {
+	if len(q) == 0 {
 		fmt.Println("No downloads to show.")
 		return
 	}
 	fmt.Println("Download Queue:")
-	for _, file := range queue {
-		done := "Done"
-		if !file.Completed {
-			done = "... "
-		}
-		fmt.Printf("%s %s -> %s\n", done, file.Nickname, file.Destination)
+	for _, file := range q {
+		fmt.Printf("%5.1f %s -> %s\n", 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }
 

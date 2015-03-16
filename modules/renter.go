@@ -33,14 +33,16 @@ type FileInfo interface {
 // DownloadInfo is an interface providing information about a file that has
 // been requested for download.
 type DownloadInfo interface {
-	// Completed indicates whether the download has finished or not.
-	Completed() bool
+	// Filesize is the size of the file being downloaded.
+	Filesize() uint64
+
+	// Received is the number of bytes downloaded so far.
+	Received() uint64
 
 	// Destination is the filepath that the file was downloaded into.
 	Destination() string
 
-	// Nickname gives the name of the file according to the renter. Nickname
-	// may be different from Destination.
+	// Nickname is the identifier assigned to the file when it was uploaded.
 	Nickname() string
 }
 

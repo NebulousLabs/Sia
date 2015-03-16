@@ -11,114 +11,161 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// A Download is a download that has been queued by the renter.
-type Download struct {
-	completed   bool
-	destination string
-	nickname    string
-
-	renter *Renter
-}
-
 var (
 	downloadAttempts = 5
 )
 
-// downloadPiece attempts to retrieve a file from a host.
-func (r *Renter) downloadPiece(piece FilePiece, path string) error {
-	return r.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) (err error) {
-		// Send the id of the contract for the file piece we're requesting. The
-		// response will be the file piece contents.
-		if err = conn.WriteObject(piece.ContractID); err != nil {
-			return
+// A Download is a file download that has been queued by the renter.
+type Download struct {
+	filesize    uint64
+	received    uint64
+	destination string
+	nickname    string
+
+	pieces  []FilePiece
+	file    *os.File
+	gateway modules.Gateway
+}
+
+// Filesize returns the size of the file.
+func (d *Download) Filesize() uint64 {
+	return d.filesize
+}
+
+// Received returns the number of bytes downloaded so far.
+func (d *Download) Received() uint64 {
+	return d.received
+}
+
+// Destination returns the file's location on disk.
+func (d *Download) Destination() string {
+	return d.destination
+}
+
+// Nickname returns the identifier assigned to the file when it was uploaded.
+func (d *Download) Nickname() string {
+	return d.nickname
+}
+
+// Write implements the io.Writer interface. Each write updates the Download's
+// received field. This allows download progress to be monitored in real-time.
+func (d *Download) Write(b []byte) (int, error) {
+	n, err := d.file.Write(b)
+	d.received += uint64(n)
+	return n, err
+}
+
+// downloadPiece attempts to retrieve a file piece from a host.
+func (d *Download) downloadPiece(piece FilePiece) error {
+	return d.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) error {
+		// Send the ID of the contract for the file piece we're requesting.
+		if err := conn.WriteObject(piece.ContractID); err != nil {
+			return err
 		}
 
-		// Create the file on disk.
-		file, err := os.Create(path)
-		if err != nil {
-			return
-		}
-		defer func() {
-			file.Close()
-			// If something goes wrong, delete the file.
-			if err != nil {
-				os.Remove(path)
-			}
-		}()
-
-		// Simultaneously download file and calculate its Merkle root.
+		// Simultaneously download the file and calculate its Merkle root.
 		tee := io.TeeReader(
-			// use a LimitedReader to ensure we don't read indefinitely
+			// Use a LimitedReader to ensure we don't read indefinitely.
 			io.LimitReader(conn, int64(piece.Contract.FileSize)),
-			// each byte we read from tee will also be written to file
-			file,
+			// Each byte we read from tee will also be written to file.
+			d,
 		)
 		merkleRoot, err := crypto.ReaderMerkleRoot(tee)
 		if err != nil {
-			return
+			return err
 		}
 
 		if merkleRoot != piece.Contract.FileMerkleRoot {
 			return errors.New("host provided a file that's invalid")
 		}
 
-		return
+		return nil
 	})
 }
 
-// Download downloads a file. Mutex conventions are broken to prevent doing
-// network communication with io in place.
-func (r *Renter) Download(nickname, filename string) error {
-	// Grab the set of pieces we're downloading.
-	r.mu.RLock()
-	var pieces []FilePiece
-	_, exists := r.files[nickname]
-	if !exists {
-		r.mu.RUnlock()
-		return errors.New("no file of that nickname")
-	}
-	for _, piece := range r.files[nickname].pieces {
-		if piece.Active {
-			pieces = append(pieces, piece)
-		}
-	}
-	r.mu.RUnlock()
-
-	// Create an object for the download in the download queue.
-	r.mu.Lock()
-	downloadIndex := len(r.downloadQueue)
-	r.downloadQueue = append(r.downloadQueue, Download{
-		completed:   false,
-		destination: filename,
-		nickname:    nickname,
-
-		renter: r,
-	})
-	r.mu.Unlock()
-
+// start initiates the download of a File.
+func (d *Download) start() {
 	// We only need one piece, so iterate through the hosts until a download
 	// succeeds.
-	go func() {
-		for i := 0; i < downloadAttempts; i++ {
-			for _, piece := range pieces {
-				downloadErr := r.downloadPiece(piece, filename)
-				if downloadErr == nil {
-					// Mark the download as complete.
-					r.mu.Lock()
-					r.downloadQueue[downloadIndex].completed = true
-					r.mu.Unlock()
-					return
-				}
+	for i := 0; i < downloadAttempts; i++ {
+		for _, piece := range d.pieces {
+			downloadErr := d.downloadPiece(piece)
+			if downloadErr == nil {
+				d.file.Close()
+				return
 			}
-
-			// This iteration failed, no hosts returned the piece. Try again
-			// after waiting a random amount of time.
-			randSource := make([]byte, 1)
-			rand.Read(randSource)
-			time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
+			// Reset seek, since the file may have been partially written. The
+			// next attempt will overwrite these bytes.
+			d.file.Seek(0, 0)
 		}
-	}()
 
+		// This iteration failed, no hosts returned the piece. Try again
+		// after waiting a random amount of time.
+		randSource := make([]byte, 1)
+		rand.Read(randSource)
+		time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
+	}
+
+	// File could not be downloaded; delete the copy on disk.
+	d.file.Close()
+	os.Remove(d.destination)
+
+	// TODO: log?
+}
+
+// newDownload initializes a new Download object.
+func newDownload(file File, destination string) (*Download, error) {
+	// Create the download destination file.
+	handle, err := os.Create(destination)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out the inactive pieces.
+	var activePieces []FilePiece
+	for _, piece := range file.pieces {
+		if piece.Active {
+			activePieces = append(activePieces, piece)
+		}
+	}
+	if len(activePieces) == 0 {
+		return nil, errors.New("no active pieces")
+	}
+
+	return &Download{
+		// for now, all the pieces are equivalent
+		filesize:    file.pieces[0].Contract.FileSize,
+		received:    0,
+		destination: destination,
+		nickname:    file.nickname,
+
+		pieces:  activePieces,
+		file:    handle,
+		gateway: file.renter.gateway,
+	}, nil
+}
+
+// Download downloads a file, identified by its nickname, to the destination
+// specified.
+func (r *Renter) Download(nickname, destination string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Lookup the File associated with the nickname.
+	file, exists := r.files[nickname]
+	if !exists {
+		return errors.New("no file of that nickname")
+	}
+
+	// Create the download object and spawn the download process.
+	d, err := newDownload(file, destination)
+	if err != nil {
+		return err
+	}
+	go d.start()
+
+	// Add the download to the download queue.
+	r.downloadQueue = append(r.downloadQueue, d)
 	return nil
 }
 
@@ -129,28 +176,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
-		downloads[i] = &r.downloadQueue[i]
+		downloads[i] = r.downloadQueue[i]
 	}
 	return downloads
-}
-
-// Getter for the completed status of the download.
-func (d *Download) Completed() bool {
-	d.renter.mu.RLock()
-	defer d.renter.mu.RUnlock()
-	return d.completed
-}
-
-// Getter for the destination of the download.
-func (d *Download) Destination() string {
-	d.renter.mu.RLock()
-	defer d.renter.mu.RUnlock()
-	return d.destination
-}
-
-// Getter for the nickname of the download.
-func (d *Download) Nickname() string {
-	d.renter.mu.RLock()
-	defer d.renter.mu.RUnlock()
-	return d.nickname
 }
