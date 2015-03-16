@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -17,9 +18,13 @@ var (
 
 // A Download is a file download that has been queued by the renter.
 type Download struct {
+	// Implementation note: received is declared first to ensure that it is
+	// 64-bit aligned. This is necessary to ensure that atomic operations work
+	// correctly on ARM and x86-32.
+	received uint64
+
 	complete    bool
 	filesize    uint64
-	received    uint64
 	destination string
 	nickname    string
 
@@ -57,7 +62,8 @@ func (d *Download) Nickname() string {
 // received field. This allows download progress to be monitored in real-time.
 func (d *Download) Write(b []byte) (int, error) {
 	n, err := d.file.Write(b)
-	d.received += uint64(n)
+	// atomically update d.received
+	atomic.AddUint64(&d.received, uint64(n))
 	return n, err
 }
 
