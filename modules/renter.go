@@ -33,6 +33,12 @@ type FileInfo interface {
 // DownloadInfo is an interface providing information about a file that has
 // been requested for download.
 type DownloadInfo interface {
+	// Complete returns whether the file is ready to be used. Note that
+	// Received == Filesize does not imply Complete, because the file may
+	// require additional processing (e.g. decryption) after all of the raw
+	// bytes have been downloaded.
+	Complete() bool
+
 	// Filesize is the size of the file being downloaded.
 	Filesize() uint64
 

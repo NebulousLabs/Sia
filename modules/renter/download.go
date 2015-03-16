@@ -17,6 +17,7 @@ var (
 
 // A Download is a file download that has been queued by the renter.
 type Download struct {
+	complete    bool
 	filesize    uint64
 	received    uint64
 	destination string
@@ -25,6 +26,11 @@ type Download struct {
 	pieces  []FilePiece
 	file    *os.File
 	gateway modules.Gateway
+}
+
+// Complete returns whether the file is ready to be used.
+func (d *Download) Complete() bool {
+	return d.complete
 }
 
 // Filesize returns the size of the file.
@@ -91,6 +97,7 @@ func (d *Download) start() {
 		for _, piece := range d.pieces {
 			downloadErr := d.downloadPiece(piece)
 			if downloadErr == nil {
+				d.complete = true
 				d.file.Close()
 				return
 			}
@@ -133,6 +140,7 @@ func newDownload(file File, destination string) (*Download, error) {
 	}
 
 	return &Download{
+		complete: false,
 		// for now, all the pieces are equivalent
 		filesize:    file.pieces[0].Contract.FileSize,
 		received:    0,

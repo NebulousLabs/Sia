@@ -65,6 +65,7 @@ func renterdownloadcmd(nickname, destination string) {
 
 // TODO: this should be defined elsewhere
 type queue []struct {
+	Complete    bool
 	Filesize    uint64
 	Received    uint64
 	Destination string
@@ -84,7 +85,7 @@ func renterdownloadqueuecmd() {
 	}
 	fmt.Println("Download Queue:")
 	for _, file := range q {
-		fmt.Printf("%5.1f %s -> %s\n", 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
+		fmt.Printf("%5.1f%% %s -> %s\n", 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }
 
