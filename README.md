@@ -68,6 +68,10 @@ Troubleshooting
   automatically attempt to resynchronize every two minutes. You can also
   manually resynchronize by running `siac gateway sync`.
 
+- siad complains about "locks held too long."
+
+  This is debugging output and can be safely ignored.
+
 If your issue is not addressed above, you can get in touch with us personally:
 
   email:

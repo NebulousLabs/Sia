@@ -33,8 +33,7 @@ var (
 
 	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
 
-	// TODO: Pick more reasonable values for these constants.
-	GenesisTimestamp         = Timestamp(1417070299) // Approx. 1:47pm EST Nov. 13th, 2014
+	GenesisTimestamp         = Timestamp(1426537000) // Approx. 4:16pm EST Mar. 16th, 2015
 	GenesisSiafundUnlockHash = ZeroUnlockHash
 	GenesisClaimUnlockHash   = ZeroUnlockHash
 )
