@@ -310,18 +310,27 @@ Parameters: none
 Response:
 ```
 []struct{
-	Completed   bool
+	Complete    bool
+	Filesize    uint64
+	Received    uint64
 	Destination string
 	Nickname    string
 }
 ```
 Each file in the queue is represented by the above struct.
 
+`Complete` indicates whether the file is ready to be used. Note that `Received
+== Filesize` does not imply `Complete`, because the file may require
+additional processing (e.g. decryption) after all of the raw bytes have been
+downloaded.
+
+`Filesize` is the size of the file being download.
+
+`Received` is the number of bytes downloaded thus far.
+
 `Destination` is the path that the file was downloaded to.
 
 `Nickname` is the nickname given to the file when it was uploaded.
-
-`Completed` indicates whether the download has finished.
 
 #### /renter/files
 
