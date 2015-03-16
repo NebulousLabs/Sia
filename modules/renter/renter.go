@@ -17,7 +17,7 @@ type Renter struct {
 	wallet  modules.Wallet
 
 	files         map[string]File
-	downloadQueue []Download
+	downloadQueue []*Download
 	saveDir       string
 
 	mu sync.RWMutex

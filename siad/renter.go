@@ -14,7 +14,9 @@ const (
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
 type DownloadInfo struct {
-	Completed   bool
+	Complete    bool
+	Filesize    uint64
+	Received    uint64
 	Destination string
 	Nickname    string
 }
@@ -45,7 +47,9 @@ func (d *daemon) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Req
 	downloadSet := make([]DownloadInfo, 0, len(downloads))
 	for _, dl := range downloads {
 		downloadSet = append(downloadSet, DownloadInfo{
-			Completed:   dl.Completed(),
+			Complete:    dl.Complete(),
+			Filesize:    dl.Filesize(),
+			Received:    dl.Received(),
 			Destination: dl.Destination(),
 			Nickname:    dl.Nickname(),
 		})
