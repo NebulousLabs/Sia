@@ -16,6 +16,10 @@ const (
 	PrefixNonSia = "NonSia"
 )
 
+var (
+	errLargeTransaction = errors.New("transaction is too large")
+)
+
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
 // public keys are recognized. Unrecognized public keys are automatically
 // accpeted as valid by the state, but should be rejected by miners.
@@ -37,7 +41,7 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md
 	if len(encoding.Marshal(t)) > TransactionSizeLimit {
-		return errors.New("transaction is too large")
+		return errLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all

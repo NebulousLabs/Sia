@@ -42,6 +42,8 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 // UnconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
 // would be created immediately if all of the unconfirmed transactions were
 // added to the blockchain.
+//
+// TODO: Deprecate.
 func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
 	counter := tp.mu.Lock()
 	defer tp.mu.Unlock(counter)
