@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	RootTarget = Target{0, 0, 0, 1}
+	RootTarget = Target{0, 0, 0, 64}
 	RootDepth  = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
 	MaxAdjustmentUp   = big.NewRat(1001, 1000)
