@@ -49,10 +49,9 @@ type State struct {
 	siafundOutputs        map[SiafundOutputID]SiafundOutput
 	delayedSiacoinOutputs map[BlockHeight]map[SiacoinOutputID]SiacoinOutput
 
-	// subscriptions is a map containing a bunch of channels that are being
-	// listend on by modules. An empty struct is thrown down the channel any
-	// time that the consensus set of the state changes. subscriptionCounter
-	// only ever increments, and prevents collisions in the map.
+	// Updates to the state are stored as a list, pointing to the block nodes
+	// that were added and removed at each step. Modules subscribed to the
+	// state will receive the changes in order that they occur.
 	revertUpdates [][]*blockNode
 	applyUpdates  [][]*blockNode
 	subscriptions []chan struct{}

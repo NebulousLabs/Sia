@@ -3,8 +3,11 @@ package consensus
 // A Subscriber is an object that receives updates to the consensus set every
 // time there is a change in consensus.
 type Subscriber interface {
-	// ReceiveConsensusUpdate notifies subscribers that there has been a change in the
-	// consensus set, and provides an enumeration of the changes.
+	// ReceiveConsensusUpdate sends a consensus update to a module through a
+	// function call. Updates will always be sent in the correct order.
+	// Usually, the function receiving the updates will also process the
+	// changes. If the function blocks indefinitely, the state will still
+	// function.
 	ReceiveConsensusUpdate(revertedBlocks []Block, appliedBlocks []Block)
 }
 
