@@ -28,14 +28,33 @@ type tpoolTester struct {
 	t *testing.T
 }
 
-// emptyUpdateChan will empty the update channel of the tpoolTester. Because
-// the channel is only buffered 1 deep, a single pull from the channel is
-// sufficient.
-func (tpt *tpoolTester) emptyUpdateChan() {
-	select {
-	case <-tpt.updateChan:
-	default:
+// emptyUnlockTransaction creates a transaction with empty UnlockConditions,
+// meaning it's trivial to spend the output.
+func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
+	// Send money to an anyone-can-spend address.
+	emptyHash := consensus.UnlockConditions{}.UnlockHash()
+	txn, err := tpt.wallet.SpendCoins(consensus.NewCurrency64(1), emptyHash)
+	if err != nil {
+		tpt.t.Fatal(err)
 	}
+	outputID := txn.SiacoinOutputID(0)
+
+	// Create a transaction spending the coins.
+	txn = consensus.Transaction{
+		SiacoinInputs: []consensus.SiacoinInput{
+			consensus.SiacoinInput{
+				ParentID: outputID,
+			},
+		},
+		SiacoinOutputs: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{
+				Value:      consensus.NewCurrency64(1),
+				UnlockHash: emptyHash,
+			},
+		},
+	}
+
+	return txn
 }
 
 // CreatetpoolTester initializes a tpoolTester.
@@ -94,6 +113,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 				t.Fatal(err)
 			}
 			if found {
+				<-updateChan
 				break
 			}
 		}

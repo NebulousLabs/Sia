@@ -97,8 +97,6 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
 		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
 
-		seenTransactions: make(map[crypto.Hash]struct{}),
-
 		mu: sync.New(1*time.Second, 0),
 	}
 

@@ -9,18 +9,12 @@ import (
 // addSiacoinTransactionToPool creates a transaction with siacoin outputs and
 // adds them to the pool, returning the transaction.
 func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction) {
-	// Clear the update channel to prevent accidentally getting the wrong
-	// update.
-	tpt.emptyUpdateChan()
-
 	// SpendCoins will automatically add transaction(s) to the transaction pool.
 	// They will contain siacoin output(s).
 	txn, err := tpt.wallet.SpendCoins(consensus.NewCurrency64(1), consensus.ZeroUnlockHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-
-	// Block until an update is posted.
 	<-tpt.updateChan
 
 	return
@@ -30,10 +24,6 @@ func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction
 // siacoin output, and then adds a second transaction to the pool that requires
 // the unconfirmed siacoin output.
 func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, dependentTxn consensus.Transaction) {
-	// Clear the update channel to prevent accidentally getting the wrong
-	// update.
-	tpt.emptyUpdateChan()
-
 	// Get an address to receive coins.
 	addr, _, err := tpt.wallet.CoinAddress()
 	if err != nil {
@@ -49,7 +39,6 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-
 	<-tpt.updateChan
 
 	// Send the full balance to ourselves again. The second transaction will
@@ -59,7 +48,6 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-
 	<-tpt.updateChan
 
 	return
