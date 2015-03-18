@@ -84,7 +84,7 @@ func (dt *daemonTester) coinAddress() string {
 // mineBlock mines a block and puts it into the consensus set.
 func (dt *daemonTester) mineBlock() {
 	for {
-		_, solved, err := dt.miner.SolveBlock()
+		_, solved, err := dt.miner.FindBlock()
 		if err != nil {
 			dt.Fatal("Mining failed:", err)
 		} else if solved {

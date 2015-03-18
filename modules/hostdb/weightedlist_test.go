@@ -65,7 +65,7 @@ func (hdbt *HostDBTester) uniformTreeVerification(numEntries int) {
 // verifies that the tree stays consistent through the adjustments.
 func TestWeightedList(t *testing.T) {
 	// Create a hostdb and 3 equal entries to insert.
-	hdbt := CreateHostDBTester(t)
+	hdbt := CreateHostDBTester("TestWeightedList", t)
 
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64

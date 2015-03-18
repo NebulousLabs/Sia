@@ -8,6 +8,17 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+const (
+	GatewayDir = "gateway"
+)
+
+// TODO: Move this and it's functionality into the gateway package.
+var (
+	BootstrapPeers = []NetAddress{
+		"23.239.14.98:9988",
+	}
+)
+
 // A NetConn is a monitored network connection.
 type NetConn interface {
 	io.ReadWriteCloser
@@ -30,13 +41,6 @@ type GatewayInfo struct {
 	Address NetAddress
 	Peers   []NetAddress
 }
-
-// TODO: Move this and it's functionality into the gateway package.
-var (
-	BootstrapPeers = []NetAddress{
-		"23.239.14.98:9988",
-	}
-)
 
 // Host returns the NetAddress' IP.
 func (na NetAddress) Host() string {

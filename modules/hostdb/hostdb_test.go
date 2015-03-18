@@ -1,15 +1,12 @@
 package hostdb
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-)
-
-var (
-	rpcPort int = 9700
+	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
 // A HostDBTester is a consensus tester that contains a hostdb and has
@@ -20,13 +17,14 @@ type HostDBTester struct {
 }
 
 // CreateHostDBTester initializes a hostdb tester.
-func CreateHostDBTester(t *testing.T) (hdbt *HostDBTester) {
+func CreateHostDBTester(directory string, t *testing.T) (hdbt *HostDBTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
+	gDir := tester.TempDir(directory, modules.GatewayDir)
+	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rpcPort++
+
 	hdb, err := New(ct.State, g)
 	if err != nil {
 		t.Fatal(err)

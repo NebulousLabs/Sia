@@ -1,18 +1,18 @@
 package renter
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
 var (
-	rpcPort   int = 11000
 	walletNum int = 0
 )
 
@@ -25,14 +25,14 @@ type RenterTester struct {
 }
 
 // CreateHostTester initializes a HostTester.
-func CreateRenterTester(t *testing.T) (rt *RenterTester) {
+func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
 
-	g, err := gateway.New(":"+strconv.Itoa(rpcPort), ct.State, "")
+	gDir := tester.TempDir(directory, modules.GatewayDir)
+	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rpcPort++
 	hdb, err := hostdb.New(ct.State, g)
 	if err != nil {
 		t.Fatal(err)
@@ -41,12 +41,14 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := wallet.New(ct.State, tp, "")
+	wDir := tester.TempDir(directory, modules.WalletDir)
+	w, err := wallet.New(ct.State, tp, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	walletNum++
-	r, err := New(ct.State, g, hdb, w, "")
+	rDir := tester.TempDir(directory, modules.RenterDir)
+	r, err := New(ct.State, g, hdb, w, rDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +60,8 @@ func CreateRenterTester(t *testing.T) (rt *RenterTester) {
 }
 
 // TestSaveLoad tests that saving and loading a Renter restores its data.
-// TODO: expand this once Renter testing is fleshed out.
 func TestSaveLoad(t *testing.T) {
-	rt := CreateRenterTester(t)
+	rt := CreateRenterTester("Renter - TestSaveLoad", t)
 	err := rt.save()
 	if err != nil {
 		rt.Fatal(err)

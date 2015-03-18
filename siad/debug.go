@@ -101,7 +101,7 @@ func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.HostDB = true
 	}()
 	go func() {
-		d.miner.SolveBlock()
+		d.miner.FindBlock()
 		mds.Miner = true
 	}()
 	go func() {

@@ -40,14 +40,6 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	// timestamp equal to the earliest legal timestamp.
 	if b.Timestamp < m.earliestTimestamp {
 		b.Timestamp = m.earliestTimestamp
-
-		// TODO: Add a single transaction that's just arbitrary data - a bunch
-		// of randomly generated arbitrary data. This will provide entropy to
-		// the block even though the timestamp isn't changing at all.
-		//
-		// This is going to require a transaction pool that can dump a smart
-		// number of bytes. Having a transaction pool that dumps a requested
-		// number of bytes is good anyway.
 	}
 
 	return
@@ -134,14 +126,9 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	return
 }
 
-// SolveBlock is an exported function which will attempt to solve a block to
-// add to the state. SolveBlock is less efficient than StartMining(), but is
-// guaranteed to solve at most one block (useful for testing).
-//
-// solveBlock is both blocking and takes a long time to complete, therefore
-// needs to be called without the miner being locked. For this reason,
-// SolveBlock breaks typical mutex conventions and unlocks before returning.
-func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
+// FindBlock will attempt to solve a block and add it to the state. While less
+// efficient than StartMining, it is guaranteed to find at most one block.
+func (m *Miner) FindBlock() (consensus.Block, bool, error) {
 	m.mu.Lock()
 	m.update()
 	bfw := m.blockForWork()
@@ -150,6 +137,25 @@ func (m *Miner) SolveBlock() (consensus.Block, bool, error) {
 	m.mu.Unlock()
 
 	return m.solveBlock(bfw, target, iterations)
+}
+
+// SolveBlock attempts to solve a block, returning the solved block without
+// submitting it to the state.
+func (m *Miner) SolveBlock(blockForWork consensus.Block, target consensus.Target) (b consensus.Block, solved bool) {
+	m.mu.RLock()
+	iterations := m.iterationsPerAttempt
+	m.mu.RUnlock()
+
+	// Iterate through a bunch of nonces (from a random starting point) and try
+	// to find a winnning solution.
+	b = blockForWork
+	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
+		if b.CheckTarget(target) {
+			solved = true
+			return
+		}
+	}
+	return
 }
 
 // StartMining spawns a bunch of mining threads which will mine until stop is

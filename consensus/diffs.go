@@ -128,14 +128,26 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 	}
 
 	// Apply each of the diffs.
-	for _, scod := range bn.siacoinOutputDiffs {
-		s.commitSiacoinOutputDiff(scod, dir)
-	}
-	for _, fcd := range bn.fileContractDiffs {
-		s.commitFileContractDiff(fcd, dir)
-	}
-	for _, sfod := range bn.siafundOutputDiffs {
-		s.commitSiafundOutputDiff(sfod, dir)
+	if dir == DiffApply {
+		for _, scod := range bn.siacoinOutputDiffs {
+			s.commitSiacoinOutputDiff(scod, dir)
+		}
+		for _, fcd := range bn.fileContractDiffs {
+			s.commitFileContractDiff(fcd, dir)
+		}
+		for _, sfod := range bn.siafundOutputDiffs {
+			s.commitSiafundOutputDiff(sfod, dir)
+		}
+	} else {
+		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
+			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
+		}
+		for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
+			s.commitFileContractDiff(bn.fileContractDiffs[i], dir)
+		}
+		for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
+			s.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
+		}
 	}
 	s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 
@@ -188,7 +200,8 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	for _, txn := range bn.block.Transactions {
 		err = s.validTransaction(txn)
 		if err != nil {
-			s.invalidateNode(bn)
+			s.badBlocks[bn.block.ID()] = struct{}{}
+			s.deleteNode(bn)
 			s.commitDiffSet(bn, DiffRevert)
 			return
 		}

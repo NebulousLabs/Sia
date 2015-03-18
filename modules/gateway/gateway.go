@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -130,6 +131,12 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 		peers:      make(map[modules.NetAddress]int),
 		saveDir:    saveDir,
 		mu:         sync.New(time.Second*1, 0),
+	}
+
+	// Create the directory if it doesn't exist.
+	err = os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))

@@ -4,21 +4,12 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// invalidateNode moves 'node' to the set of bad blocks and recursively deletes
-// its children from the set of known blocks. This means that the child blocks
-// may be accepted if they are resubmitted to the State.
-func (s *State) invalidateNode(node *blockNode) {
-	s.badBlocks[node.block.ID()] = struct{}{}
-
-	// recursively delete node and its children from the blockMap.
-	var recDelete func(*blockNode)
-	recDelete = func(child *blockNode) {
-		for i := range child.children {
-			recDelete(child.children[i])
-		}
-		delete(s.blockMap, child.block.ID())
+// deleteNode recursively deletes its children from the set of known blocks.
+func (s *State) deleteNode(node *blockNode) {
+	for i := range node.children {
+		s.deleteNode(node.children[i])
 	}
-	recDelete(node)
+	delete(s.blockMap, node.block.ID())
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
@@ -48,26 +39,28 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	return path
 }
 
-// rewindToNode will rewind blocks from the State's current path until 'bn' is
+// revertToNode will revert blocks from the State's current path until 'bn' is
 // the current block.
-func (s *State) rewindToNode(bn *blockNode) {
+func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if DEBUG {
 		if s.currentPath[bn.height] != bn.block.ID() {
-			panic("can't rewind to node not in current path")
+			panic("can't revert to node not in current path")
 		}
 	}
 
 	// Rewind blocks until we reach 'bn'.
 	for s.currentBlockID() != bn.block.ID() {
-		cur := s.currentBlockNode()
-		s.commitDiffSet(cur, DiffRevert)
+		node := s.currentBlockNode()
+		s.commitDiffSet(node, DiffRevert)
+		revertedNodes = append(revertedNodes, node)
 	}
+	return
 }
 
 // applyUntilNode will successively apply the blocks between the state's
 // currentPath and 'bn'.
-func (s *State) applyUntilNode(bn *blockNode) (err error) {
+func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
 	// Backtrack to the common parent of 'bn' and currentPath.
 	newPath := s.backtrackToCurrentPath(bn)
 
@@ -83,6 +76,7 @@ func (s *State) applyUntilNode(bn *blockNode) (err error) {
 				break
 			}
 		}
+		appliedNodes = append(appliedNodes, node)
 	}
 
 	return
@@ -101,22 +95,22 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	}
 	oldHead := s.currentBlockNode()
 
-	// rewind to the common parent
+	// revert to the common parent
 	commonParent := s.backtrackToCurrentPath(newNode)[0]
-	s.rewindToNode(commonParent)
+	revertedNodes := s.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	err = s.applyUntilNode(newNode)
+	appliedNodes, err := s.applyUntilNode(newNode)
 	if err == nil {
 		// If application succeeded, notify the subscribers and return. Error
 		// handling happens outside this if statement.
-		s.notifySubscribers()
+		s.updateSubscribers(revertedNodes, appliedNodes)
 		return
 	}
 
 	// restore old path
-	s.rewindToNode(commonParent)
-	errReapply := s.applyUntilNode(oldHead)
+	s.revertToNode(commonParent)
+	_, errReapply := s.applyUntilNode(oldHead)
 	if DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")

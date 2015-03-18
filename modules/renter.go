@@ -4,6 +4,10 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+var (
+	RenterDir = "renter"
+)
+
 // UploadParams contains the information used by the Renter to upload a file.
 type UploadParams struct {
 	Filename string

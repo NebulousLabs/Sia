@@ -89,6 +89,6 @@ func (wt *WalletTester) testFundTransaction() {
 // TestFundTransaction creates a wallet tester and uses it to call
 // testFundTransaction.
 func TestFundTransaction(t *testing.T) {
-	wt := NewWalletTester(t)
+	wt := NewWalletTester("Wallet - TestFundTransaction", t)
 	wt.testFundTransaction()
 }

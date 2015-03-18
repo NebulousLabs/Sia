@@ -10,10 +10,14 @@ import (
 )
 
 const (
-	FileContractConfirmWindow = 10
+	FileContractConfirmWindow = 6
 	TransactionSizeLimit      = 16 * 1024
 
 	PrefixNonSia = "NonSia"
+)
+
+var (
+	errLargeTransaction = errors.New("transaction is too large")
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -37,7 +41,7 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md
 	if len(encoding.Marshal(t)) > TransactionSizeLimit {
-		return errors.New("transaction is too large")
+		return errLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all

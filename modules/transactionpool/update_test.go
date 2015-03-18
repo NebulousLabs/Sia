@@ -2,220 +2,337 @@ package transactionpool
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// testUpdateTransactionRemoval puts several transactions into the transaction
-// pool, and then into a block, then puts the block into the state. After the
-// transaction pool updates, the transactions should have been removed from the
-// transaction pool.
-func (tpt *TpoolTester) testUpdateTransactionRemoval() {
-	// Add some transactions to the pool and then get the transaction set.
+// testUpdateTransactionRemoval checks that when a transaction moves from the
+// unconfirmed set into the confirmed set, the transaction gets correctly
+// removed from the unconfirmed set.
+func (tpt *tpoolTester) testUpdateTransactionRemoval() {
+	// Create some unconfirmed transactions.
 	tpt.addDependentSiacoinTransactionToPool()
-	tset, err := tpt.TransactionSet()
+	tset, err := tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Error(err)
 	}
 	if len(tset) == 0 {
-		tpt.Error("tset should have some transacitons")
+		tpt.t.Error("tset should have some transacitons")
 	}
 
-	// TODO: Add all other types of transactions.
-
-	// Mine a block that has the transactions.
-	b := tpt.MineCurrentBlock(tset)
-	err = tpt.AcceptBlock(b)
-	if err != nil {
-		tpt.Error(err)
+	// Mine a block to put the transactions into the confirmed set.
+	for {
+		_, found, err := tpt.miner.FindBlock()
+		if err != nil {
+			tpt.t.Fatal(err)
+		}
+		if found {
+			break
+		}
 	}
-
-	// Call update and verify that the new transaction set is empty.
-	tpt.update()
-	tset, err = tpt.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Error(err)
+	}
+	<-tpt.updateChan
+
+	// Check that the transactions have been removed from the unconfirmed set.
+	tset, err = tpt.tpool.TransactionSet()
+	if err != nil {
+		tpt.t.Error(err)
 	}
 	if len(tset) != 0 {
-		tpt.Error("tset should not have any transactions")
+		tpt.t.Error("unconfirmed transaction set is not empty")
 	}
 
-	// Check that all of the internal maps are also empty.
-	if len(tpt.transactions) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	// Check that all of the internal maps are empty.
+	id := tpt.tpool.mu.RLock()
+	if len(tpt.tpool.transactions) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.siacoinOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.siacoinOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.fileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.fileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.siafundOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.siafundOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.usedSiacoinOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.newFileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.newFileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.newFileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.newFileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.fileContractTerminations) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.fileContractTerminations) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.storageProofs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.storageProofs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.usedSiafundOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.usedSiafundOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
+	tpt.tpool.mu.RUnlock(id)
 }
 
-// testBlockConflicts adds a transaction and a dependent transaction to the
-// transaction pool, and then adds a transaction to the blockchain that is in
-// conflict with the first transaction. This should result in both the first
-// transaction and the dependent transaction being removed from the transaction
-// pool.
-func (tpt *TpoolTester) testBlockConflicts() {
-	// Prerequisite/TODO: transaction pool should be empty at this point.
-	tset, err := tpt.TransactionSet()
-	if err != nil {
-		tpt.Error(err)
-	}
-	if len(tset) != 0 {
-		tpt.Error("need tset length to be 0 for this test")
-	}
-
+// testBlockConflicts adds a transaction to the unconfirmed set, and then adds
+// a conflicting transaction to the confirmed set, checking that the conflict
+// is properly handled by the pool.
+func (tpt *tpoolTester) testBlockConflicts() {
 	// Put two transactions, a parent and a dependent, into the transaction
 	// pool. Then create a transaction that is in conflict with the parent.
-	parentTxn, _ := tpt.addDependentSiacoinTransactionToPool()
-	conflictTxn := parentTxn
-	conflictTxn.MinerFees = append(conflictTxn.MinerFees, conflictTxn.SiacoinOutputs[0].Value)
-	conflictTxn.SiacoinOutputs = nil
-
-	// Mine a block with the conflict transaction and put it in the state.
-	block := tpt.MineCurrentBlock([]consensus.Transaction{conflictTxn})
-	err = tpt.AcceptBlock(block)
+	parent := tpt.emptyUnlockTransaction()
+	dependent := consensus.Transaction{
+		SiacoinInputs: []consensus.SiacoinInput{
+			consensus.SiacoinInput{
+				ParentID: parent.SiacoinOutputID(0),
+			},
+		},
+		MinerFees: []consensus.Currency{
+			parent.SiacoinOutputs[0].Value,
+		},
+	}
+	err := tpt.tpool.AcceptTransaction(parent)
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
+	}
+	<-tpt.updateChan
+	err = tpt.tpool.AcceptTransaction(dependent)
+	if err != nil {
+		tpt.t.Fatal(err)
+	}
+	<-tpt.updateChan
+
+	// Create a transaction that is in conflict with the parent.
+	parentValue := parent.SiacoinOutputSum()
+	conflict := consensus.Transaction{
+		SiacoinInputs: parent.SiacoinInputs,
+		MinerFees: []consensus.Currency{
+			parentValue,
+		},
 	}
 
-	// Update the transaction pool and check that both the parent and dependent
-	// have been removed as a result of the conflict making it into the
-	// blockchain.
-	tpt.update()
-	tset, err = tpt.TransactionSet()
+	// Mine a block to put the conflict into the confirmed set. 'parent' has
+	// dependencies of it's own, and 'conflict' has the same dependencies as
+	// 'parent'. So the block we mine needs to include all of the dependencies
+	// without including 'parent' or 'dependent'.
+	tset, err := tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
+	}
+	tset = tset[:len(tset)-2]     // strip 'parent' and 'dependent'
+	tset = append(tset, conflict) // add 'conflict'
+	target := tpt.cs.CurrentTarget()
+	block := consensus.Block{
+		ParentID:  tpt.cs.CurrentBlock().ID(),
+		Timestamp: consensus.Timestamp(time.Now().Unix()),
+		MinerPayouts: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{Value: parentValue.Add(consensus.CalculateCoinbase(tpt.cs.Height() + 1))},
+		},
+		Transactions: tset,
+	}
+	for {
+		block, found := tpt.miner.SolveBlock(block, target)
+		if found {
+			err = tpt.cs.AcceptBlock(block)
+			if err != nil {
+				tpt.t.Fatal(err)
+			}
+			break
+		}
+	}
+	<-tpt.updateChan
+
+	// Check that 'parent' and 'dependent' have been removed from the
+	// transaction set, since conflict has made the confirmed set.
+	tset, err = tpt.tpool.TransactionSet()
+	if err != nil {
+		tpt.t.Fatal(err)
 	}
 	if len(tset) != 0 {
-		tpt.Error("conflict transactions not all cleared from transaction pool")
+		tpt.t.Error("parent and dependent transaction are still in the pool after a conflict has been introduced, have", len(tset))
 	}
 }
 
-// testDependentUpdates adds a transaction and a dependent transaction to the
-// transaction pool, and then adds the first transaction to the blockchain. The
-// dependent transaction should be the only transaction in the transaction pool
-// after that point.
-func (tpt *TpoolTester) testDependentUpdates() {
-	// Prerequisite/TODO: transaction pool should be empty at this point.
-	tset, err := tpt.TransactionSet()
-	if err != nil {
-		tpt.Error(err)
+// testDependentUpdates adds a parent transaction and a dependent transaction
+// to the unconfirmed set. Then the parent transaction is added to the
+// confirmed set but the dependent is not. A check is made to see that the
+// dependent is still in the unconfirmed set.
+func (tpt *tpoolTester) testDependentUpdates() {
+	// Put two transactions, a parent and a dependent, into the transaction
+	// pool. Then create a transaction that is in conflict with the parent.
+	parent := tpt.emptyUnlockTransaction()
+	dependent := consensus.Transaction{
+		SiacoinInputs: []consensus.SiacoinInput{
+			consensus.SiacoinInput{
+				ParentID: parent.SiacoinOutputID(0),
+			},
+		},
+		MinerFees: []consensus.Currency{
+			parent.SiacoinOutputs[0].Value,
+		},
 	}
-	if len(tset) != 0 {
-		tpt.Error("need tset length to be 0 for this test")
-	}
-
-	parentTxn, dependentTxn := tpt.addDependentSiacoinTransactionToPool()
-
-	// Mine a block with the parent transaction but not the dependent.
-	block := tpt.MineCurrentBlock([]consensus.Transaction{parentTxn})
-	err = tpt.AcceptBlock(block)
+	err := tpt.tpool.AcceptTransaction(parent)
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
 	}
-
-	// Update the transaction pool and check that only the dependent
-	// transaction remains.
-	tpt.update()
-	tset, err = tpt.TransactionSet()
+	<-tpt.updateChan
+	err = tpt.tpool.AcceptTransaction(dependent)
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
+	}
+	<-tpt.updateChan
+
+	// Mine a block to put the parent into the confirmed set.
+	tset, err := tpt.tpool.TransactionSet()
+	if err != nil {
+		tpt.t.Fatal(err)
+	}
+	tset = tset[:len(tset)-1] // strip 'dependent'
+	target := tpt.cs.CurrentTarget()
+	block := consensus.Block{
+		ParentID:  tpt.cs.CurrentBlock().ID(),
+		Timestamp: consensus.Timestamp(time.Now().Unix()),
+		MinerPayouts: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		},
+		Transactions: tset,
+	}
+	for {
+		var found bool
+		block, found = tpt.miner.SolveBlock(block, target)
+		if found {
+			err = tpt.cs.AcceptBlock(block)
+			if err != nil {
+				tpt.t.Fatal(err)
+			}
+			break
+		}
+	}
+	<-tpt.updateChan
+
+	// Check that 'parent' and 'dependent' have been removed from the
+	// transaction set, since conflict has made the confirmed set.
+	tset, err = tpt.tpool.TransactionSet()
+	if err != nil {
+		tpt.t.Fatal(err)
 	}
 	if len(tset) != 1 {
-		tpt.Error("conflict transactions not all cleared from transaction pool")
-	}
-	if crypto.HashObject(tset[0]) != crypto.HashObject(dependentTxn) {
-		tpt.Error("dependent transaction is not the transaction that remains")
+		tpt.t.Error("dependent transaction does not remain unconfirmed after parent has been confirmed:", len(tset))
 	}
 }
 
 // testRewinding adds transactions in a block, then removes the block and
 // verifies that the transaction pool adds the block transactions.
-func (tpt *TpoolTester) testRewinding() {
-	// Prerequisite/TODO: transaction pool should be empty at this point.
-	tset, err := tpt.TransactionSet()
+func (tpt *tpoolTester) testRewinding() {
+	// Put some transactions into the unconfirmed set.
+	tpt.addSiacoinTransactionToPool()
+	tset, err := tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
+	}
+	if len(tset) == 0 {
+		tpt.t.Fatal("transaction pool has no transactions")
+	}
+
+	// Prepare an empty block to cause a rewind (by forking).
+	target := tpt.cs.CurrentTarget()
+	forkStart := consensus.Block{
+		ParentID:  tpt.cs.CurrentBlock().ID(),
+		Timestamp: consensus.Timestamp(time.Now().Unix()),
+		MinerPayouts: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		},
+	}
+	for {
+		var found bool
+		forkStart, found = tpt.miner.SolveBlock(forkStart, target)
+		if found {
+			break
+		}
+	}
+
+	// Mine a block with the transaction.
+	for {
+		_, found, err := tpt.miner.FindBlock()
+		if err != nil {
+			tpt.t.Fatal(err)
+		}
+		if found {
+			break
+		}
+	}
+	<-tpt.updateChan
+	tset, err = tpt.tpool.TransactionSet()
+	if err != nil {
+		tpt.t.Fatal(err)
 	}
 	if len(tset) != 0 {
-		tpt.Error("need tset length to be 0 for this test")
+		tpt.t.Fatal("tset should be empty after FindBlock()")
 	}
 
-	// Mine a block with a transaction.
-	sci, value := tpt.FindSpendableSiacoinInput()
-	txn := tpt.AddSiacoinInputToTransaction(consensus.Transaction{}, sci)
-	txn.MinerFees = append(txn.MinerFees, value)
-	block := tpt.MineCurrentBlock([]consensus.Transaction{txn})
-	err = tpt.AcceptBlock(block)
+	// Fork around the block with the transaction.
+	err = tpt.cs.AcceptBlock(forkStart)
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
 	}
+	target = tpt.cs.CurrentTarget()
+	forkCommit := consensus.Block{
+		ParentID:  forkStart.ID(),
+		Timestamp: consensus.Timestamp(time.Now().Unix()),
+		MinerPayouts: []consensus.SiacoinOutput{
+			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		},
+	}
+	for {
+		var found bool
+		forkCommit, found = tpt.miner.SolveBlock(forkCommit, target)
+		if found {
+			tpt.cs.AcceptBlock(forkCommit)
+			break
+		}
+	}
+	<-tpt.updateChan
 
-	// Rewind the block, update the transaction pool, and check that the
-	// transaction was added to the transaction pool.
-	tpt.update()
-	tpt.RewindABlock()
-	tpt.update()
-	tset, err = tpt.TransactionSet()
+	// Check that the transaction which was once confirmed but no longer is
+	// confirmed is now unconfirmed.
+	tset, err = tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Fatal(err)
 	}
-	if len(tset) != 1 {
-		tpt.Fatal("expecting new transaction after rewind")
-	}
-	if crypto.HashObject(tset[0]) != crypto.HashObject(txn) {
-		tpt.Error("dependent transaction is not the transaction that remains")
+	if len(tset) == 0 {
+		tpt.t.Error("tset should contain transactions that used to be confirmed but no longer are")
 	}
 }
 
-// TestUpdateTransactionRemoval creates a TpoolTester and uses it to call
+// TestUpdateTransactionRemoval creates a tpoolTester and uses it to call
 // tetsUpdateTransactionRemoval.
 func TestUpdateTransactionRemoval(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestUpdateTransactionRemoval", t)
 	tpt.testUpdateTransactionRemoval()
 }
 
-// TestBlockConflicts creates a TpoolTester and uses it to call
+// TestBlockConflicts creates a tpoolTester and uses it to call
 // testBlockConflicts.
 func TestBlockConflicts(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestBlockConflicts", t)
 	tpt.testBlockConflicts()
 }
 
-// TestDependentUpdates creates a TpoolTester and uses it to call
+// TestDependentUpdates creates a tpoolTester and uses it to call
 // testDependentUpdates.
 func TestDependentUpdates(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestDependentUpdates", t)
 	tpt.testDependentUpdates()
 }
 
-// TestRewinding creates a TpoolTester and uses it to call testRewinding.
+// TestRewinding creates a tpoolTester and uses it to call testRewinding.
 func TestRewinding(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestRewinding", t)
 	tpt.testRewinding()
 }

@@ -11,7 +11,7 @@ import (
 // TestAnnouncement has a host announce itself to the blockchain and then
 // checks that the announcement makes it correctly.
 func TestAnnouncement(t *testing.T) {
-	ht := CreateHostTester(t)
+	ht := CreateHostTester("TestAnnouncement", t)
 
 	// Place the announcement.
 	originalAddress := modules.NetAddress(":1111")

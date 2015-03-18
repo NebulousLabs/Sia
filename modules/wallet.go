@@ -6,6 +6,10 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+const (
+	WalletDir = "wallet"
+)
+
 var (
 	LowBalanceErr = errors.New("Insufficient Balance")
 )
