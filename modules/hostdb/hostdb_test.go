@@ -1,7 +1,6 @@
 package hostdb
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -20,7 +19,7 @@ type HostDBTester struct {
 // CreateHostDBTester initializes a hostdb tester.
 func CreateHostDBTester(directory string, t *testing.T) (hdbt *HostDBTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)

@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -16,7 +15,7 @@ var (
 
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(directory string, t *testing.T) *Gateway {
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := New(":"+strconv.Itoa(rpcPort), consensus.CreateGenesisState(), gDir)
 	rpcPort++
 	if err != nil {

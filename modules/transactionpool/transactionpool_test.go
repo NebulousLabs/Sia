@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -45,7 +44,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	cs := consensus.CreateGenesisState()
 
 	// Create the gateway.
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := gateway.New(":0", cs, gDir)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +57,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Create the wallet.
-	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	wDir := tester.TempDir(directory, modules.WalletDir)
 	w, err := wallet.New(cs, tp, wDir)
 	if err != nil {
 		t.Fatal(err)

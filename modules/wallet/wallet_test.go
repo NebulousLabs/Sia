@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -26,7 +25,7 @@ type WalletTester struct {
 func NewWalletTester(directory string, t *testing.T) (wt *WalletTester) {
 	wt = new(WalletTester)
 	wt.ConsensusTester = consensus.NewTestingEnvironment(t)
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := gateway.New(":0", wt.State, gDir)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +34,7 @@ func NewWalletTester(directory string, t *testing.T) (wt *WalletTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	wDir := tester.TempDir(directory, modules.WalletDir)
 	wt.Wallet, err = New(wt.State, tpool, wDir)
 	if err != nil {
 		t.Fatal(err)

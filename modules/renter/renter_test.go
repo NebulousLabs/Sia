@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -29,7 +28,7 @@ type RenterTester struct {
 func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
 
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)
@@ -42,13 +41,13 @@ func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	wDir := tester.TempDir(directory, modules.WalletDir)
 	w, err := wallet.New(ct.State, tp, wDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	walletNum++
-	rDir := filepath.Join(tester.TempDir(directory), modules.RenterDir)
+	rDir := tester.TempDir(directory, modules.RenterDir)
 	r, err := New(ct.State, g, hdb, w, rDir)
 	if err != nil {
 		t.Fatal(err)

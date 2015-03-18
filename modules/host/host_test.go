@@ -1,7 +1,6 @@
 package host
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -28,7 +27,7 @@ type HostTester struct {
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	gDir := filepath.Join(tester.TempDir(directory), modules.GatewayDir)
+	gDir := tester.TempDir(directory, modules.GatewayDir)
 	g, err := gateway.New(":0", ct.State, gDir)
 	if err != nil {
 		t.Fatal(err)
@@ -39,7 +38,7 @@ func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
 		t.Fatal(err)
 	}
 
-	wDir := filepath.Join(tester.TempDir(directory), modules.WalletDir)
+	wDir := tester.TempDir(directory, modules.WalletDir)
 	w, err := wallet.New(ct.State, tp, wDir)
 	if err != nil {
 		t.Fatal(err)
