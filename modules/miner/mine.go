@@ -40,14 +40,6 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	// timestamp equal to the earliest legal timestamp.
 	if b.Timestamp < m.earliestTimestamp {
 		b.Timestamp = m.earliestTimestamp
-
-		// TODO: Add a single transaction that's just arbitrary data - a bunch
-		// of randomly generated arbitrary data. This will provide entropy to
-		// the block even though the timestamp isn't changing at all.
-		//
-		// This is going to require a transaction pool that can dump a smart
-		// number of bytes. Having a transaction pool that dumps a requested
-		// number of bytes is good anyway.
 	}
 
 	return
