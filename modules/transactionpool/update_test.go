@@ -1,91 +1,90 @@
 package transactionpool
 
-/*
 import (
 	"testing"
-
-	"github.com/NebulousLabs/Sia/consensus"
-	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// testUpdateTransactionRemoval puts several transactions into the transaction
-// pool, and then into a block, then puts the block into the state. After the
-// transaction pool updates, the transactions should have been removed from the
-// transaction pool.
-func (tpt *TpoolTester) testUpdateTransactionRemoval() {
-	// Add some transactions to the pool and then get the transaction set.
+// testUpdateTransactionRemoval checks that when a transaction moves from the
+// unconfirmed set into the confirmed set, the transaction gets correctly
+// removed from the unconfirmed set.
+func (tpt *tpoolTester) testUpdateTransactionRemoval() {
+	// Create some unconfirmed transactions.
 	tpt.addDependentSiacoinTransactionToPool()
-	tset, err := tpt.TransactionSet()
-	id := tpt.mu.RLock()
+	tset, err := tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Error(err)
 	}
 	if len(tset) == 0 {
-		tpt.Error("tset should have some transacitons")
+		tpt.t.Error("tset should have some transacitons")
 	}
-	tpt.mu.RUnlock(id)
 
-	// TODO: Add all other types of transactions.
-
-	// Mine a block that has the transactions.
-	b := tpt.MineCurrentBlock(tset)
-	err = tpt.AcceptBlock(b)
+	// Mine a block to put the transactions into the confirmed set.
+	for {
+		_, found, err := tpt.miner.FindBlock()
+		if err != nil {
+			tpt.t.Fatal(err)
+		}
+		if found {
+			break
+		}
+	}
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Error(err)
 	}
 
-	// Call update and verify that the new transaction set is empty.
-	tset, err = tpt.TransactionSet()
+	<-tpt.updateChan
+
+	// Check that the transactions have been removed from the unconfirmed set.
+	tset, err = tpt.tpool.TransactionSet()
 	if err != nil {
-		tpt.Error(err)
+		tpt.t.Error(err)
 	}
-	id = tpt.mu.RLock()
 	if len(tset) != 0 {
-		tpt.Error("tset should not have any transactions")
+		tpt.t.Error("unconfirmed transaction set is not empty")
 	}
-	tpt.mu.RUnlock(id)
 
-	// Check that all of the internal maps are also empty.
-	id = tpt.mu.RLock()
-	if len(tpt.transactions) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	// Check that all of the internal maps are empty.
+	id := tpt.tpool.mu.RLock()
+	if len(tpt.tpool.transactions) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.siacoinOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.siacoinOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.fileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.fileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.siafundOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.siafundOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.usedSiacoinOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.newFileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.newFileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.newFileContracts) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.newFileContracts) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.fileContractTerminations) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.fileContractTerminations) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.storageProofs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.storageProofs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.usedSiafundOutputs) != 0 {
-		tpt.Error("a field wasn't properly emptied out")
+	if len(tpt.tpool.usedSiafundOutputs) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	tpt.mu.RUnlock(id)
+	tpt.tpool.mu.RUnlock(id)
 }
 
+/*
 // testBlockConflicts adds a transaction and a dependent transaction to the
 // transaction pool, and then adds a transaction to the blockchain that is in
 // conflict with the first transaction. This should result in both the first
 // transaction and the dependent transaction being removed from the transaction
 // pool.
-func (tpt *TpoolTester) testBlockConflicts() {
+func (tpt *tpoolTester) testBlockConflicts() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.TransactionSet()
 	if err != nil {
@@ -125,7 +124,7 @@ func (tpt *TpoolTester) testBlockConflicts() {
 // transaction pool, and then adds the first transaction to the blockchain. The
 // dependent transaction should be the only transaction in the transaction pool
 // after that point.
-func (tpt *TpoolTester) testDependentUpdates() {
+func (tpt *tpoolTester) testDependentUpdates() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.TransactionSet()
 	if err != nil {
@@ -160,7 +159,7 @@ func (tpt *TpoolTester) testDependentUpdates() {
 
 // testRewinding adds transactions in a block, then removes the block and
 // verifies that the transaction pool adds the block transactions.
-func (tpt *TpoolTester) testRewinding() {
+func (tpt *tpoolTester) testRewinding() {
 	// Prerequisite/TODO: transaction pool should be empty at this point.
 	tset, err := tpt.TransactionSet()
 	if err != nil {
@@ -194,31 +193,33 @@ func (tpt *TpoolTester) testRewinding() {
 		tpt.Error("dependent transaction is not the transaction that remains")
 	}
 }
+*/
 
-// TestUpdateTransactionRemoval creates a TpoolTester and uses it to call
+// TestUpdateTransactionRemoval creates a tpoolTester and uses it to call
 // tetsUpdateTransactionRemoval.
 func TestUpdateTransactionRemoval(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestUpdateTransactionRemoval", t)
 	tpt.testUpdateTransactionRemoval()
 }
 
-// TestBlockConflicts creates a TpoolTester and uses it to call
+/*
+// TestBlockConflicts creates a tpoolTester and uses it to call
 // testBlockConflicts.
 func TestBlockConflicts(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestBlockConflicts", t)
 	tpt.testBlockConflicts()
 }
 
-// TestDependentUpdates creates a TpoolTester and uses it to call
+// TestDependentUpdates creates a tpoolTester and uses it to call
 // testDependentUpdates.
 func TestDependentUpdates(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestDependentUpdates", t)
 	tpt.testDependentUpdates()
 }
 
-// TestRewinding creates a TpoolTester and uses it to call testRewinding.
+// TestRewinding creates a tpoolTester and uses it to call testRewinding.
 func TestRewinding(t *testing.T) {
-	tpt := CreateTpoolTester(t)
+	tpt := newTpoolTester("Transaction Pool - TestRewinding", t)
 	tpt.testRewinding()
 }
 */

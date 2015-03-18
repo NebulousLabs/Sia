@@ -2,7 +2,7 @@ package host
 
 import (
 	"crypto/rand"
-	"testing"
+	// "testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"

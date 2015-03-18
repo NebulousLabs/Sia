@@ -60,11 +60,6 @@ type TransactionPool struct {
 	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
 
-	// Transactions we've already seen, used for preventing duplicates. This
-	// will become unnecessary once all transactions are required to have fees
-	// to be in the transaction pool.
-	seenTransactions map[crypto.Hash]struct{}
-
 	// Subscriber variables
 	revertBlocksUpdates [][]consensus.Block
 	applyBlocksUpdates  [][]consensus.Block

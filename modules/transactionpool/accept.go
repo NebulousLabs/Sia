@@ -203,14 +203,10 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 
 	// Check that the transaction has not been seen before.
 	txnHash := crypto.HashObject(t)
-	_, exists := tp.seenTransactions[txnHash]
+	_, exists := tp.transactions[txnHash]
 	if exists {
 		return ErrDuplicate
 	}
-	if len(tp.seenTransactions) > 1200 {
-		tp.seenTransactions = make(map[crypto.Hash]struct{})
-	}
-	tp.seenTransactions[txnHash] = struct{}{}
 
 	// Check that the transaction is legal given the consensus set of the state
 	// and the unconfirmed set of the transaction pool.
