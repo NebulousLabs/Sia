@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+/*
 // TestSaveLoad tests that saving and loading a Host restores its data.
 func TestSaveLoad(t *testing.T) {
 	ht := CreateHostTester("TestSaveLoad", t)
@@ -17,3 +18,4 @@ func TestSaveLoad(t *testing.T) {
 		ht.Fatal(err)
 	}
 }
+*/

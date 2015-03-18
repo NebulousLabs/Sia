@@ -84,8 +84,10 @@ func (ht *HostTester) testObligation() {
 	}
 }
 
+/*
 // TestObligation creates a host tester and calls testObligation.
 func TestObligation(t *testing.T) {
 	ht := CreateHostTester("TestObligation", t)
 	ht.testObligation()
 }
+*/
