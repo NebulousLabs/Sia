@@ -63,17 +63,25 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	return
 }
 
-// validUnlockConditions checks that the unlock conditions have been met
-// (signatures are checked elsewhere).
-func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
+// ValidUnlockConditions checks that the conditions of uc have been met. The
+// height is taken as input so that modules who might be at a different height
+// can do the verification without needing to use their own function.
+// Additionally, it means that the function does not need to be a method of the
+// consensus set.
+func ValidUnlockConditions(uc UnlockConditions, uh UnlockHash, currentHeight BlockHeight) (err error) {
 	if uc.UnlockHash() != uh {
 		return errors.New("unlock conditions do not match unlock hash")
 	}
-	if uc.Timelock > s.height() {
+	if uc.Timelock > currentHeight {
 		return errors.New("unlock condition timelock has not been met")
 	}
-
 	return
+}
+
+// validUnlockConditions checks that the unlock conditions have been met
+// (signatures are checked elsewhere).
+func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
+	return ValidUnlockConditions(uc, uh, s.height())
 }
 
 // validSiacoins iterates through the inputs of a transaction, summing the

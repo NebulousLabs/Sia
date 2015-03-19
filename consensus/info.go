@@ -314,10 +314,3 @@ func (s *State) ValidTransactionComponents(t Transaction) (err error) {
 
 	return
 }
-
-// ValidUnlockConditions checks that the conditions of uc have been met.
-func (s *State) ValidUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.validUnlockConditions(uc, uh)
-}
