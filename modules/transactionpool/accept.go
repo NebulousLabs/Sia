@@ -82,15 +82,6 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 // applyFileContractTerminations deletes consumed file contracts from the
 // consensus set and pints to the transaction that consumed them.
 func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction, ut *unconfirmedTransaction) {
-	// Sanity check - check the validity of the file contracts in this
-	// transaction.
-	if consensus.DEBUG {
-		err := tp.validUnconfirmedFileContractTerminations(t)
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	for _, fct := range t.FileContractTerminations {
 		delete(tp.fileContracts, fct.ParentID)
 		tp.fileContractTerminations[fct.ParentID] = ut

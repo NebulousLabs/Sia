@@ -158,6 +158,13 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 			return ErrMissingFileContract
 		}
 
+		// Check that the height is less than fc.Start - terminations are not
+		// allowed to be submitted once the storage proof window has opened.
+		// This reduces complexity for unconfirmed transactions.
+		if s.height() >= fc.Start {
+			return errors.New("contract termination submitted too late")
+		}
+
 		// Check that the unlock conditions are reasonable.
 		err = s.validUnlockConditions(fct.TerminationConditions, fc.TerminationHash)
 		if err != nil {
