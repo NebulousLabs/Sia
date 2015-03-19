@@ -88,6 +88,7 @@ func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err e
 // value of the inputs and checking that the inputs are legal.
 func (s *State) validSiacoins(t Transaction) (err error) {
 	var inputSum Currency
+	spentIDs := make(map[SiacoinOutputID]struct{})
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output, and that the
 		// UnlockConditions are legal (signatures checked elsewhere).
@@ -95,6 +96,13 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 		if !exists {
 			return ErrMissingSiacoinOutput
 		}
+
+		// Check that the output has not been spent twice this transaction.
+		_, exists = spentIDs[sci.ParentID]
+		if exists {
+			return errors.New("output spent twice in the same transaction")
+		}
+		spentIDs[sci.ParentID] = struct{}{}
 
 		// Check that the unlock conditions are reasonable.
 		err = s.validUnlockConditions(sci.UnlockConditions, sco.UnlockHash)
@@ -157,6 +165,7 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 // validFileContractTerminations checks that each termination in a transaction
 // is legal.
 func (s *State) validFileContractTerminations(t Transaction) (err error) {
+	terminatedFileContracts := make(map[FileContractID]struct{})
 	for _, fct := range t.FileContractTerminations {
 		// Check that the FileContractTermination terminates an existing
 		// FileContract.
@@ -164,6 +173,14 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 		if !exists {
 			return ErrMissingFileContract
 		}
+
+		// Check that the contract has not been terminated earlier in this
+		// transaction.
+		_, exists = terminatedFileContracts[fct.ParentID]
+		if exists {
+			return errors.New("multiple terminations for the same contract in transaction")
+		}
+		terminatedFileContracts[fct.ParentID] = struct{}{}
 
 		// Check that the height is less than fc.Start - terminations are not
 		// allowed to be submitted once the storage proof window has opened.
@@ -228,6 +245,7 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 // validStorageProofs iterates through the storage proofs of a transaction and
 // checks that each is legal.
 func (s *State) validStorageProofs(t Transaction) error {
+	provenFileContracts := make(map[FileContractID]struct{})
 	for _, sp := range t.StorageProofs {
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
@@ -239,6 +257,14 @@ func (s *State) validStorageProofs(t Transaction) error {
 		if err != nil {
 			return err
 		}
+
+		// Check that a storage proof for this file contract has not been
+		// submitted earlier this transaction.
+		_, exists = provenFileContracts[sp.ParentID]
+		if exists {
+			return errors.New("storage proof submitted earlier this transaction")
+		}
+		provenFileContracts[sp.ParentID] = struct{}{}
 
 		verified := crypto.VerifySegment(
 			sp.Segment,
@@ -260,14 +286,21 @@ func (s *State) validStorageProofs(t Transaction) error {
 func (s *State) validSiafunds(t Transaction) (err error) {
 	// Check that all siafund inputs are valid, and get the total number of
 	// input siafunds.
+	spentFunds := make(map[SiafundOutputID]struct{})
 	var siafundInputSum Currency
 	for _, sfi := range t.SiafundInputs {
 		// Check that the siafund output being spent exists.
 		sfo, exists := s.siafundOutputs[sfi.ParentID]
 		if !exists {
-			err = ErrMissingSiafundOutput
-			return
+			return ErrMissingSiafundOutput
 		}
+
+		// Check that this output was not spent earlier this transaction.
+		_, exists = spentFunds[sfi.ParentID]
+		if exists {
+			return errors.New("siafund output spent twice in the same transaction")
+		}
+		spentFunds[sfi.ParentID] = struct{}{}
 
 		// Check that the unlock conditions are reasonable.
 		err = s.validUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash)
