@@ -22,7 +22,7 @@ func (t Transaction) FollowsStorageProofRules() error {
 	}
 
 	// If there are storage proofs, there can be no siacoin outputs, siafund
-	// outputs, or new file contracts.
+	// outputs, new file contracts, or file contract terminations.
 	if len(t.SiacoinOutputs) != 0 {
 		return errors.New("transaction contains storage proofs and siacoin outputs")
 	}
@@ -93,8 +93,7 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 		// UnlockConditions are legal (signatures checked elsewhere).
 		sco, exists := s.siacoinOutputs[sci.ParentID]
 		if !exists {
-			err = ErrMissingSiacoinOutput
-			return
+			return ErrMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions are reasonable.
@@ -105,6 +104,11 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 
 		// Add the input value to the sum.
 		inputSum = inputSum.Add(sco.Value)
+	}
+	for _, sco := range t.SiacoinOutputs {
+		if sco.Value.Cmp(ZeroCurrency) <= 0 {
+			return errors.New("Output must have at least one coin")
+		}
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
 		return errors.New("inputs do not equal outputs for transaction")
@@ -129,6 +133,9 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 		// siafund fee has been applied, and check that the missed proof
 		// outputs sum to the full payout.
 		var validProofOutputSum, missedProofOutputSum Currency
+		if fc.Payout.Cmp(ZeroCurrency) <= 0 {
+			return errors.New("file contract must have non-zero payout")
+		}
 		for _, output := range fc.ValidProofOutputs {
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
@@ -276,10 +283,14 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 	// is equal to the siafund input sum.
 	var siafundOutputSum Currency
 	for _, sfo := range t.SiafundOutputs {
-		// Check that the claimStart is set to 0. Type safety should enforce
-		// this, but check anyway.
+		// Check that the claimStart is set to 0.
 		if sfo.ClaimStart.Cmp(ZeroCurrency) != 0 {
 			return errors.New("invalid siafund output presented")
+		}
+
+		// Outputs must all be at least 1.
+		if sfo.Value.Cmp(ZeroCurrency) <= 0 {
+			return errors.New("siafund outputs must have at least 1 siafund")
 		}
 
 		// Add this output's value.
