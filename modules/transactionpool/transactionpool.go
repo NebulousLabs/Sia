@@ -49,16 +49,16 @@ type TransactionPool struct {
 	fileContracts  map[consensus.FileContractID]consensus.FileContract
 	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
 
-	// These maps point from objects to the unconfirmed transactions that
-	// resulted in the objects creation. This is a superset of the unconfirmed
-	// consensus set, for example a newFileContract will not necessarily be in
-	// the list of fileContracts if an unconfirmed termination has appeared for
-	// the unconfirmed file contract.
-	usedSiacoinOutputs       map[consensus.SiacoinOutputID]*unconfirmedTransaction
-	newFileContracts         map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
-	fileContractTerminations map[consensus.FileContractID]*unconfirmedTransaction
-	storageProofs            map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction
-	usedSiafundOutputs       map[consensus.SiafundOutputID]*unconfirmedTransaction
+	// There may be elements in this set that are not a part of the unconfirmed
+	// set. For example, a siacoin output can be created and spent by
+	// unconfirmed transactions, which would put it in this set, but not in the
+	// unconfirmed set.
+	usedSiacoinOutputs        map[consensus.SiacoinOutputID]*unconfirmedTransaction
+	newFileContracts          map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
+	fileContractTerminations  map[consensus.FileContractID]*unconfirmedTransaction
+	storageProofsByStart      map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
+	storageProofsByExpiration map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
+	usedSiafundOutputs        map[consensus.SiafundOutputID]*unconfirmedTransaction
 
 	// Subscriber variables
 	revertBlocksUpdates [][]consensus.Block
@@ -91,11 +91,12 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 		fileContracts:  make(map[consensus.FileContractID]consensus.FileContract),
 		siafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),
 
-		usedSiacoinOutputs:       make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
-		newFileContracts:         make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
-		fileContractTerminations: make(map[consensus.FileContractID]*unconfirmedTransaction),
-		storageProofs:            make(map[consensus.BlockID]map[consensus.FileContractID]*unconfirmedTransaction),
-		usedSiafundOutputs:       make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
+		usedSiacoinOutputs:        make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
+		newFileContracts:          make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
+		fileContractTerminations:  make(map[consensus.FileContractID]*unconfirmedTransaction),
+		storageProofsByStart:      make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
+		storageProofsByExpiration: make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
+		usedSiafundOutputs:        make(map[consensus.SiafundOutputID]*unconfirmedTransaction),
 
 		mu: sync.New(1*time.Second, 0),
 	}

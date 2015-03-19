@@ -26,8 +26,8 @@ func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransacti
 	}
 	for _, sp := range t.StorageProofs {
 		fc, _ := tp.state.FileContract(sp.ParentID)
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
-		delete(tp.storageProofs[triggerBlock.ID()], sp.ParentID)
+		delete(tp.storageProofsByStart[fc.Start], sp.ParentID)
+		delete(tp.storageProofsByExpiration[fc.Expiration], sp.ParentID)
 	}
 	for _, sfi := range t.SiafundInputs {
 		delete(tp.usedSiafundOutputs, sfi.ParentID)
@@ -50,13 +50,8 @@ func (tp *TransactionPool) removeDependentTransactions(t consensus.Transaction) 
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
 	}
-	for i, fc := range t.FileContracts {
+	for i, _ := range t.FileContracts {
 		dependent, exists := tp.fileContractTerminations[t.FileContractID(i)]
-		if exists {
-			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
-		}
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
-		dependent, exists = tp.storageProofs[triggerBlock.ID()][t.FileContractID(i)]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
@@ -93,12 +88,6 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
-		fc, _ := tp.state.FileContract(fct.ParentID)
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
-		conflict, exists = tp.storageProofs[triggerBlock.ID()][fct.ParentID]
-		if exists {
-			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
-		}
 	}
 	for _, sp := range t.StorageProofs {
 		conflict, exists := tp.fileContractTerminations[sp.ParentID]
@@ -106,8 +95,7 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
 		fc, _ := tp.state.FileContract(sp.ParentID)
-		triggerBlock, _ := tp.state.BlockAtHeight(fc.Start - 1)
-		conflict, exists = tp.storageProofs[triggerBlock.ID()][sp.ParentID]
+		conflict, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
@@ -126,20 +114,26 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 
+	// TODO TODO TODO: We don't track which transactions unlock at which
+	// height. This is a problem if the height goes down for any reason. That
+	// is pretty unlikely. Instead of tracking the height of every important
+	// unlock condition, we'll just delete all transactions in the pool any
+	// time the height goes down. This should never happen in a real world
+	// environment.
+
 	// Handle reverted blocks.
 	var revertedTxns, appliedTxns []consensus.Transaction
 	for _, block := range revertedBlocks {
-		tp.stateHeight--
-
 		// Remove all transactions that have been invalidated by the
 		// elimination of this block id - storage proofs are dependent on a
 		// specific block id.
-		dependentTxns, exists := tp.storageProofs[block.ID()]
+		dependentTxns, exists := tp.storageProofsByStart[tp.stateHeight]
 		if exists {
 			for _, txn := range dependentTxns {
 				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
 			}
 		}
+		delete(tp.storageProofsByStart, tp.stateHeight)
 
 		// Add all transactions that got removed to the unconfirmed consensus
 		// set, add them in reverse order to preserve any dependencies.
@@ -157,10 +151,11 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 			// set `direction` to false because reversed transactions need to
 			// be added to the beginning of the linked list - existing
 			// unconfirmed transactions may depend on this rewound transaction.
-			direction := false
-			tp.addTransactionToPool(txn, direction)
+			tp.addTransactionToPool(txn, PriorTransaction)
 			appliedTxns = append(appliedTxns, txn)
 		}
+
+		tp.stateHeight--
 	}
 
 	// Handle applied blocks.
@@ -189,7 +184,13 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 
 		// Handle any storage proofs that have been invalidated because the
 		// cooresponding file contract has expired.
-		// TODO TODO TODO
+		expiredTxns, exists := tp.storageProofsByExpiration[tp.stateHeight]
+		if exists {
+			for _, txn := range expiredTxns {
+				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
+			}
+		}
+		delete(tp.storageProofsByExpiration, tp.stateHeight)
 	}
 
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, revertedTxns, appliedTxns)

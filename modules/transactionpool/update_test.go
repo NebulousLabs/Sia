@@ -71,7 +71,10 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	if len(tpt.tpool.fileContractTerminations) != 0 {
 		tpt.t.Error("a field wasn't properly emptied out")
 	}
-	if len(tpt.tpool.storageProofs) != 0 {
+	if len(tpt.tpool.storageProofsByStart) != 0 {
+		tpt.t.Error("a field wasn't properly emptied out")
+	}
+	if len(tpt.tpool.storageProofsByExpiration) != 0 {
 		tpt.t.Error("a field wasn't properly emptied out")
 	}
 	if len(tpt.tpool.usedSiafundOutputs) != 0 {
