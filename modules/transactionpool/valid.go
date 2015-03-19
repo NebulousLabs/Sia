@@ -35,7 +35,7 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 		}
 
 		// Check that the unlock conditions are reasonable.
-		err = tp.state.ValidUnlockConditions(sci.UnlockConditions, sco.UnlockHash)
+		err = consensus.ValidUnlockConditions(sci.UnlockConditions, sco.UnlockHash, tp.stateHeight)
 		if err != nil {
 			return
 		}
@@ -74,7 +74,7 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 		}
 
 		// Check that the unlock conditions are resonable.
-		err = tp.state.ValidUnlockConditions(fct.TerminationConditions, fc.TerminationHash)
+		err = consensus.ValidUnlockConditions(fct.TerminationConditions, fc.TerminationHash, tp.stateHeight)
 		if err != nil {
 			return
 		}
@@ -116,7 +116,7 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 		}
 
 		// Check that the unlock conditions are reasonable.
-		err = tp.state.ValidUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash)
+		err = consensus.ValidUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash, tp.stateHeight)
 		if err != nil {
 			return
 		}

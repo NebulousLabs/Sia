@@ -15,17 +15,15 @@ var (
 // marking the consumed outputs and pointing to the transaction that consumed
 // them.
 func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *unconfirmedTransaction) {
-	for _, sci := range t.SiacoinInputs {
-		// Sanity check - this input should not already be in the usedOutputs
-		// list.
-		if consensus.DEBUG {
-			_, exists := tp.usedSiacoinOutputs[sci.ParentID]
-			if exists {
-				panic("addTransaction called on invalid transaction")
-			}
+	// Sanity check - check the validity of the siacoins in this transaction.
+	if consensus.DEBUG {
+		err := tp.validUnconfirmedSiacoins(t)
+		if err != nil {
+			panic("apply called on invalid transaction")
 		}
+	}
 
-		// Add this output to the list of spent outputs.
+	for _, sci := range t.SiacoinInputs {
 		tp.usedSiacoinOutputs[sci.ParentID] = ut
 	}
 }
