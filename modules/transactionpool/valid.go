@@ -34,16 +34,8 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 			}
 		}
 
-		// Check that the unlock conditions are reasonable.
-		err = consensus.ValidUnlockConditions(sci.UnlockConditions, sco.UnlockHash, tp.stateHeight)
-		if err != nil {
-			return
-		}
-
 		inputSum = inputSum.Add(sco.Value)
 	}
-
-	// Check that the inputs equal the outputs.
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
 		return errors.New("input sum does not equal output sum")
 	}
@@ -51,20 +43,25 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 	return
 }
 
-// validUnconfirmedStorageProofs just checks that there are no duplicate
-// storage proofs already in the transaction pool.
+// validUnconfirmedStorageProofs checks that a storage proof is valid in the
+// context of the confirmed and unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction) (err error) {
+	// Check that this is not a repeat storage proof.
 	for _, sp := range t.StorageProofs {
 		fc, exists := tp.state.FileContract(sp.ParentID)
-		if consensus.DEBUG {
-			if !exists {
-				panic("storage proof submitted for a file contract that's not in the confirmed set")
-			}
+		if !exists {
+			return errors.New("storage proof submitted for file contract not in confirmed consensus set")
 		}
 		_, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
 		if exists {
 			return errors.New("storage proof already exists for this file contract")
 		}
+	}
+
+	// Check that all of the storage proofs are valid.
+	err = tp.state.ValidStorageProofs(t)
+	if err != nil {
+		return
 	}
 	return
 }
@@ -75,26 +72,22 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 // the validity of the termination payouts.
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
-		// Check that the file contract has not already been terminated.
+		// Check that the file contract has not already been terminated in the
+		// unconfirmed set.
 		_, exists := tp.fileContractTerminations[fct.ParentID]
 		if exists {
 			return errors.New("termination given for an already terminated file contract")
 		}
 
-		// Check for the corresponding FileContract in both the confirmed and
-		// unconfirmed set.
+		// Check for the corresponding FileContract in the confirmed set.
 		fc, exists := tp.state.FileContract(fct.ParentID)
 		if !exists {
-			fc, exists = tp.fileContracts[fct.ParentID]
-			if !exists {
-				return errors.New("termination given for unrecognized file contract")
-			}
+			return errors.New("termination given for unrecognized file contract")
 		}
 
-		// Check that the unlock conditions are resonable.
-		err = consensus.ValidUnlockConditions(fct.TerminationConditions, fc.TerminationHash, tp.stateHeight)
-		if err != nil {
-			return
+		// Check that the termination has been submitted in time.
+		if fc.Start < tp.stateHeight-FileContractConfirmWindow {
+			return errors.New("termination submitted too late")
 		}
 
 		// Check that the payouts in the termination add up to the payout of
@@ -133,12 +126,6 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 			}
 		}
 
-		// Check that the unlock conditions are reasonable.
-		err = consensus.ValidUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash, tp.stateHeight)
-		if err != nil {
-			return
-		}
-
 		// Add this input's value to the inputSum.
 		inputSum = inputSum.Add(sfo.Value)
 	}
@@ -147,11 +134,6 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 	// of funds allocated.
 	var outputSum consensus.Currency
 	for _, sfo := range t.SiafundOutputs {
-		if sfo.ClaimStart.Cmp(consensus.ZeroCurrency) != 0 {
-			return errors.New("invalid siafund output presented")
-		}
-
-		// Add this output's value
 		outputSum = outputSum.Add(sfo.Value)
 	}
 	if outputSum.Cmp(inputSum) != 0 {
@@ -173,33 +155,25 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t consensus.Transaction) 
 	// Check that the transaction follows general rules - this check looks at
 	// rules for transactions contianing storage proofs, the rules for file
 	// contracts, and the rules for signatures.
-	err = tp.state.ValidTransactionComponents(t)
+	err = t.StandaloneValid(tp.stateHeight)
 	if err != nil {
 		return
 	}
 
-	// Check the validity of the siacoin inputs and outputs in the context of
-	// the unconfirmed transactions.
+	// Check the validity of the componenets in the context of the confirmed
+	// and unconfirmed set.
 	err = tp.validUnconfirmedSiacoins(t)
 	if err != nil {
 		return
 	}
-
-	// Check that there are no repeat storage proofs.
 	err = tp.validUnconfirmedStorageProofs(t)
 	if err != nil {
 		return
 	}
-
-	// Check the validity of the file contract terminations in the context of
-	// the unconfirmed transactions.
 	err = tp.validUnconfirmedFileContractTerminations(t)
 	if err != nil {
 		return
 	}
-
-	// Check the validity of the siafund inputs and outputs in the context of
-	// the unconfirmed transactions.
 	err = tp.validUnconfirmedSiafunds(t)
 	if err != nil {
 		return

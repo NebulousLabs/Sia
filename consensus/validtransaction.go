@@ -267,38 +267,6 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 	return
 }
 
-// validFileContractTerminations checks that each file contract termination is
-// valid in the context of the current consensus set.
-func (s *State) validFileContractTerminations(t Transaction) (err error) {
-	for _, fct := range t.FileContractTerminations {
-		// Check that the FileContractTermination terminates an existing
-		// FileContract.
-		fc, exists := s.fileContracts[fct.ParentID]
-		if !exists {
-			return ErrMissingFileContract
-		}
-
-		// Check that the height is less than fc.Start - terminations are not
-		// allowed to be submitted once the storage proof window has opened.
-		// This reduces complexity for unconfirmed transactions.
-		if s.height() >= fc.Start {
-			return errors.New("contract termination submitted too late")
-		}
-
-		// Check that the payouts in the termination add up to the payout of the
-		// contract.
-		var payoutSum Currency
-		for _, payout := range fct.Payouts {
-			payoutSum = payoutSum.Add(payout.Value)
-		}
-		if payoutSum.Cmp(fc.Payout) != 0 {
-			return errors.New("contract termination has incorrect payouts")
-		}
-	}
-
-	return
-}
-
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
 func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
@@ -336,7 +304,6 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 // of the consensus set.
 func (s *State) validStorageProofs(t Transaction) error {
 	for _, sp := range t.StorageProofs {
-		// Each
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
 			return errors.New("unrecognized file contract ID in storage proof")
@@ -361,6 +328,38 @@ func (s *State) validStorageProofs(t Transaction) error {
 	}
 
 	return nil
+}
+
+// validFileContractTerminations checks that each file contract termination is
+// valid in the context of the current consensus set.
+func (s *State) validFileContractTerminations(t Transaction) (err error) {
+	for _, fct := range t.FileContractTerminations {
+		// Check that the FileContractTermination terminates an existing
+		// FileContract.
+		fc, exists := s.fileContracts[fct.ParentID]
+		if !exists {
+			return ErrMissingFileContract
+		}
+
+		// Check that the height is less than fc.Start - terminations are not
+		// allowed to be submitted once the storage proof window has opened.
+		// This reduces complexity for unconfirmed transactions.
+		if fc.Start < s.height() {
+			return errors.New("contract termination submitted too late")
+		}
+
+		// Check that the payouts in the termination add up to the payout of the
+		// contract.
+		var payoutSum Currency
+		for _, payout := range fct.Payouts {
+			payoutSum = payoutSum.Add(payout.Value)
+		}
+		if payoutSum.Cmp(fc.Payout) != 0 {
+			return errors.New("contract termination has incorrect payouts")
+		}
+	}
+
+	return
 }
 
 // validSiafunds checks that the siafund portions of the transaction are valid
@@ -414,5 +413,13 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		return
 	}
 
+	return
+}
+
+// ValidStorageProofs is the exported version of validStorageProofs.
+func (s *State) ValidStorageProofs(t Transaction) (err error) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
+	err = s.validStorageProofs(t)
 	return
 }
