@@ -65,6 +65,7 @@ func (d *daemon) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)
 
 	// TransactionPool API Calls
+	handleHTTPRequest(mux, "/transactionpool/transactions", d.transactionpoolTransactionsHandler)
 
 	// Wallet API Calls
 	handleHTTPRequest(mux, "/wallet/address", d.walletAddressHandler)
