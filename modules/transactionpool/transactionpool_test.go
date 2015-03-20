@@ -163,3 +163,17 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 
 	return
 }
+
+// TestNewNilInputs tries to trigger a panic with nil inputs.
+func TestNewNilInputs(t *testing.T) {
+	// Create a consensus set and gateway.
+	cs := consensus.CreateGenesisState()
+	gDir := tester.TempDir("Transaction Pool - TestNewNilInputs", modules.GatewayDir)
+	g, err := gateway.New(":0", cs, gDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	New(nil, nil)
+	New(cs, nil)
+	New(nil, g)
+}

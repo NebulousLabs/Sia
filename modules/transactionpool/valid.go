@@ -7,7 +7,10 @@ import (
 )
 
 var (
-	ErrDoubleSpend = errors.New("transaction spends an output that was spent by another transaction in the pool")
+	ErrBadUnlockConditions      = errors.New("siacoin unlock conditions do not meet required unlock hash")
+	ErrSiacoinOverspend         = errors.New("transaction has more siacoin outputs than inputs")
+	ErrDoubleSpend              = errors.New("transaction spends an output that was spent by another transaction in the pool")
+	ErrUnrecognizedSiacoinInput = errors.New("unrecognized siacoin input in transaction")
 )
 
 // validUnconfirmedSiacoins checks that the inputs are all valid in the context
@@ -30,19 +33,19 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 		if !exists {
 			sco, exists = tp.siacoinOutputs[sci.ParentID]
 			if !exists {
-				return errors.New("unrecognized siacoin input in transaction")
+				return ErrUnrecognizedSiacoinInput
 			}
 		}
 
 		// Check that the unlock conditions meet the required unlock hash.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return errors.New("siacoin unlock conditions do not meet required unlock hash")
+			return ErrBadUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return errors.New("input sum does not equal output sum")
+		return ErrSiacoinOverspend
 	}
 
 	return
