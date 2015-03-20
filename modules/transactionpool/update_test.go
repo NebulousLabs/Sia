@@ -45,42 +45,10 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 		tpt.t.Error("unconfirmed transaction set is not empty")
 	}
 
-	// Check that all of the internal maps are empty.
-	id := tpt.tpool.mu.RLock()
-	if len(tpt.tpool.transactions) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
+	err = tpt.checkEmpty()
+	if err != nil {
+		tpt.t.Error(err)
 	}
-	if len(tpt.tpool.siacoinOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.fileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.siafundOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.newFileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.newFileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.fileContractTerminations) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.storageProofsByStart) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.storageProofsByExpiration) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.usedSiafundOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	tpt.tpool.mu.RUnlock(id)
 }
 
 // testBlockConflicts adds a transaction to the unconfirmed set, and then adds

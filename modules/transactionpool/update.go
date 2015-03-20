@@ -1,6 +1,8 @@
 package transactionpool
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -134,17 +136,18 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 	return
 }
 
+// purge removes all transactions from the transaction pool.
+func (tp *TransactionPool) purge() (revertedTxns []consensus.Transaction) {
+	for tp.head != nil {
+		revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(tp.head)...)
+	}
+	return
+}
+
 // ReceiveConsensusUpdate gets called any time that consensus changes.
 func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks []consensus.Block) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
-
-	// TODO TODO TODO: We don't track which transactions unlock at which
-	// height. This is a problem if the height goes down for any reason. That
-	// is pretty unlikely. Instead of tracking the height of every important
-	// unlock condition, we'll just delete all transactions in the pool any
-	// time the height goes down. This should never happen in a real world
-	// environment.
 
 	// Handle reverted blocks.
 	var revertedTxns, appliedTxns []consensus.Transaction
@@ -226,6 +229,12 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 			}
 		}
 		delete(tp.fileContractTerminations, tp.stateHeight)
+	}
+
+	// Do a purge if the height has decreased after a fork.
+	if len(revertedBlocks) > len(appliedBlocks) {
+		fmt.Println("Doing a transaction pool purge")
+		revertedTxns = append(revertedTxns, tp.purge()...)
 	}
 
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, revertedTxns, appliedTxns)
