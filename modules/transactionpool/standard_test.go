@@ -30,11 +30,7 @@ func TestLargeTransaction(t *testing.T) {
 	if err != errLargeTransaction {
 		t.Error("expecting errLargeTransaction, got:", err)
 	}
-	tset, err := tpt.tpool.TransactionSet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tset) != 0 {
+	if len(tpt.tpool.FullTransactionSet()) != 0 {
 		t.Error("tpool is not empty after accepting a bad transaction")
 	}
 }

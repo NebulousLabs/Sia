@@ -75,14 +75,8 @@ func TestTransactionRelay(t *testing.T) {
 	dt2 := dt.addPeer()
 
 	// Make sure both daemons have empty transaction pools.
-	tset, err := dt.tpool.TransactionSet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tset2, err := dt2.tpool.TransactionSet()
-	if err != nil {
-		t.Fatal(err)
-	}
+	tset := dt.tpool.TransactionSet()
+	tset2 := dt2.tpool.TransactionSet()
 	if len(tset) != 0 || len(tset2) != 0 {
 		t.Fatal("transaction set is not empty after creating new daemon tester")
 	}
@@ -96,15 +90,8 @@ func TestTransactionRelay(t *testing.T) {
 	// will take an unknown amount of time.
 	dt.callAPI("/wallet/send?amount=15&destination=" + dt2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
-		tset, err = dt.tpool.TransactionSet()
-		if err != nil {
-			t.Fatal(err)
-		}
-		tset2, err = dt2.tpool.TransactionSet()
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		tset = dt.tpool.TransactionSet()
+		tset2 = dt2.tpool.TransactionSet()
 		time.Sleep(time.Millisecond)
 	}
 

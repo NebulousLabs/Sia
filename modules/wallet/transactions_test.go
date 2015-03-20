@@ -65,10 +65,7 @@ func (wt *WalletTester) testFundTransaction() {
 
 	// Dump the transaction pool into a block and see that the balance still
 	// registers correctly.
-	txns, err := wt.tpool.TransactionSet()
-	if err != nil {
-		wt.Error(err)
-	}
+	txns := wt.tpool.TransactionSet()
 	block = wt.MineCurrentBlock(txns)
 	err = wt.State.AcceptBlock(block)
 	if err != nil {

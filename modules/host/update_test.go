@@ -71,10 +71,7 @@ func (ht *HostTester) testObligation() {
 	startingBalance := ht.wallet.Balance(true)
 	for i := 0; i < 3+consensus.MaturityDelay; i++ {
 		ht.Host.update()
-		tSet, err := ht.Host.tpool.TransactionSet()
-		if err != nil {
-			ht.Error(err)
-		}
+		tSet := ht.Host.tpool.TransactionSet()
 		ht.MineAndSubmitCurrentBlock(tSet)
 	}
 	if startingBalance.Cmp(ht.wallet.Balance(true)) >= 0 {

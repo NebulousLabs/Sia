@@ -86,11 +86,7 @@ func (m *Miner) SetThreads(threads int) error {
 }
 
 func (m *Miner) updateTransactionSet() {
-	tset, err := m.tpool.TransactionSet()
-	if err != nil {
-		tset = nil
-	}
-	m.transactions = tset
+	m.transactions = m.tpool.TransactionSet()
 }
 
 func (m *Miner) updateBlockInfo() {
@@ -106,8 +102,8 @@ func (m *Miner) updateBlockInfo() {
 // had actually changed, but this greatly increased the complexity of the code,
 // and I'm not even sure it made things run faster.
 func (m *Miner) update() {
-	counter := m.state.RLock()
-	defer m.state.RUnlock(counter)
+	id := m.state.RLock()
+	defer m.state.RUnlock(id)
 	m.updateTransactionSet()
 	m.updateBlockInfo()
 }
