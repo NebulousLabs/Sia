@@ -259,6 +259,12 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 		if !exists {
 			return ErrMissingSiacoinOutput
 		}
+
+		// Check that the unlock conditions match the required unlock hash.
+		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
+			return errors.New("siacoin unlock conditions do not meet required unlock hash")
+		}
+
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
@@ -348,6 +354,11 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 			return errors.New("contract termination submitted too late")
 		}
 
+		// Check that the unlock conditions match the unlock hash.
+		if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
+			return errors.New("termination conditions don't match required termination hash")
+		}
+
 		// Check that the payouts in the termination add up to the payout of the
 		// contract.
 		var payoutSum Currency
@@ -373,6 +384,12 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 		if !exists {
 			return ErrMissingSiafundOutput
 		}
+
+		// Check the unlock conditions match the unlock hash.
+		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
+			return errors.New("unlock conditions don't match required unlock hash")
+		}
+
 		siafundInputSum = siafundInputSum.Add(sfo.Value)
 	}
 	for _, sfo := range t.SiafundOutputs {

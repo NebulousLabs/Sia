@@ -34,6 +34,11 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 			}
 		}
 
+		// Check that the unlock conditions meet the required unlock hash.
+		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
+			return errors.New("siacoin unlock conditions do not meet required unlock hash")
+		}
+
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
@@ -85,6 +90,11 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 			return errors.New("termination given for unrecognized file contract")
 		}
 
+		// Check that the termination conditions match the termination hash.
+		if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
+			return errors.New("termination conditions do not meet required termination hash")
+		}
+
 		// Check that the termination has been submitted in time.
 		if fc.Start < tp.stateHeight-FileContractConfirmWindow {
 			return errors.New("termination submitted too late")
@@ -124,6 +134,11 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 			if !exists {
 				return errors.New("transaction spends unrecognized siafund output")
 			}
+		}
+
+		// Check that the unlock conditions match the spend conditions.
+		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
+			return errors.New("transaction contains invalid unlock conditions (hash mismatch)")
 		}
 
 		// Add this input's value to the inputSum.
