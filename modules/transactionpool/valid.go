@@ -77,17 +77,21 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 // the validity of the termination payouts.
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
-		// Check that the file contract has not already been terminated in the
+		// Check for the corresponding FileContract in the confirmed and
 		// unconfirmed set.
-		_, exists := tp.fileContractTerminations[fct.ParentID]
-		if exists {
-			return errors.New("termination given for an already terminated file contract")
-		}
-
-		// Check for the corresponding FileContract in the confirmed set.
 		fc, exists := tp.state.FileContract(fct.ParentID)
 		if !exists {
-			return errors.New("termination given for unrecognized file contract")
+			fc, exists = tp.fileContracts[fct.ParentID]
+			if !exists {
+				return errors.New("termination given for unrecognized file contract")
+			}
+		}
+
+		// Check that the file contract has not already been terminated in the
+		// unconfirmed set.
+		_, exists = tp.fileContractTerminations[fc.Start][fct.ParentID]
+		if exists {
+			return errors.New("termination given for an already terminated file contract")
 		}
 
 		// Check that the termination conditions match the termination hash.
@@ -95,8 +99,10 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 			return errors.New("termination conditions do not meet required termination hash")
 		}
 
-		// Check that the termination has been submitted in time.
-		if fc.Start < tp.stateHeight-FileContractConfirmWindow {
+		// Check that the termination has been submitted in time. This overlaps
+		// with IsStandard, but allows the IsStardard rules to be listed or
+		// altered without breaking anything.
+		if fc.Start < tp.stateHeight {
 			return errors.New("termination submitted too late")
 		}
 

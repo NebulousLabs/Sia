@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	FileContractConfirmWindow = 6
+	FileContractConfirmWindow = 3
 	TransactionSizeLimit      = 16 * 1024
 
 	PrefixNonSia = "NonSia"
@@ -71,6 +71,23 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 	for _, fc := range t.FileContracts {
 		if fc.Start < tp.state.Height()+FileContractConfirmWindow {
 			return errors.New("file contract cannot start so close to the current height")
+		}
+	}
+
+	// Check that any terminations do not become invalid for at least
+	// FileContractConfirmWindow blocks.
+	for _, fct := range t.FileContractTerminations {
+		// Check for the corresponding file contract in the confirmed and
+		// unconfirmed sets.
+		fc, exists := tp.state.FileContract(fct.ParentID)
+		if !exists {
+			fc, exists = tp.fileContracts[fct.ParentID]
+			if !exists {
+				return errors.New("termination submitted for unknown file contract.")
+			}
+		}
+		if fc.Start < tp.stateHeight-FileContractConfirmWindow {
+			return errors.New("termination submitted too late")
 		}
 	}
 

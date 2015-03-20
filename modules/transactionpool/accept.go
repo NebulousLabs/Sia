@@ -80,11 +80,23 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *uncon
 }
 
 // applyFileContractTerminations deletes consumed file contracts from the
-// consensus set and pints to the transaction that consumed them.
+// consensus set and points to the transaction that consumed them.
 func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction, ut *unconfirmedTransaction) {
 	for _, fct := range t.FileContractTerminations {
+		// Get the file contract to know the starting height.
+		fc, exists := tp.fileContracts[fct.ParentID]
+		if !exists {
+			fc, exists = tp.state.FileContract(fct.ParentID)
+			if !exists {
+				if consensus.DEBUG {
+					panic("misuse of applyFileContractTerminations")
+				}
+			}
+		}
+
 		delete(tp.fileContracts, fct.ParentID)
-		tp.fileContractTerminations[fct.ParentID] = ut
+		tp.fileContractTerminations[fc.Start][fct.ParentID] = ut
+		tp.referenceFileContracts[fct.ParentID] = fc
 	}
 }
 
@@ -127,6 +139,7 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *uncon
 			tp.storageProofsByExpiration[fc.Expiration] = make(map[consensus.FileContractID]*unconfirmedTransaction)
 		}
 		tp.storageProofsByExpiration[fc.Expiration][sp.ParentID] = ut
+		tp.referenceFileContracts[sp.ParentID] = fc
 	}
 }
 

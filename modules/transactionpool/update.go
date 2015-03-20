@@ -22,12 +22,25 @@ func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransacti
 		delete(tp.newFileContracts[fc.Start], fcid)
 	}
 	for _, fct := range t.FileContractTerminations {
-		delete(tp.fileContractTerminations, fct.ParentID)
+		fc, exists := tp.referenceFileContracts[fct.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("cannot locate file contract to delete storage proof transaction")
+			}
+		}
+		delete(tp.fileContractTerminations[fc.Start], fct.ParentID)
+		delete(tp.referenceFileContracts, fct.ParentID)
 	}
 	for _, sp := range t.StorageProofs {
-		fc, _ := tp.state.FileContract(sp.ParentID)
+		fc, exists := tp.referenceFileContracts[sp.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("cannot locate file contract to delete storage proof transaction")
+			}
+		}
 		delete(tp.storageProofsByStart[fc.Start], sp.ParentID)
 		delete(tp.storageProofsByExpiration[fc.Expiration], sp.ParentID)
+		delete(tp.referenceFileContracts, sp.ParentID)
 	}
 	for _, sfi := range t.SiafundInputs {
 		delete(tp.usedSiafundOutputs, sfi.ParentID)
@@ -50,8 +63,8 @@ func (tp *TransactionPool) removeDependentTransactions(t consensus.Transaction) 
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
 	}
-	for i, _ := range t.FileContracts {
-		dependent, exists := tp.fileContractTerminations[t.FileContractID(i)]
+	for i, fc := range t.FileContracts {
+		dependent, exists := tp.fileContractTerminations[fc.Start][t.FileContractID(i)]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
@@ -84,17 +97,29 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 		}
 	}
 	for _, fct := range t.FileContractTerminations {
-		conflict, exists := tp.fileContractTerminations[fct.ParentID]
+		// Check for the corresponding file contract.
+		fc, exists := tp.referenceFileContracts[fct.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("could not locate file contract")
+			}
+		}
+		conflict, exists := tp.fileContractTerminations[fc.Start][fct.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
 	}
 	for _, sp := range t.StorageProofs {
-		conflict, exists := tp.fileContractTerminations[sp.ParentID]
+		fc, exists := tp.referenceFileContracts[sp.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("could not locate file contract")
+			}
+		}
+		conflict, exists := tp.fileContractTerminations[fc.Start][sp.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
-		fc, _ := tp.state.FileContract(sp.ParentID)
 		conflict, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
@@ -175,22 +200,32 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 
 		// Handle any unconfirmed file contracts that have been invalidated due
 		// to the state height increasing.
-		invalidContracts, exists := tp.newFileContracts[tp.stateHeight]
+		expiredTxns, exists := tp.newFileContracts[tp.stateHeight]
 		if exists {
-			for _, txn := range invalidContracts {
+			for _, txn := range expiredTxns {
 				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
 			}
 		}
 
 		// Handle any storage proofs that have been invalidated because the
 		// cooresponding file contract has expired.
-		expiredTxns, exists := tp.storageProofsByExpiration[tp.stateHeight]
+		expiredTxns, exists = tp.storageProofsByExpiration[tp.stateHeight]
 		if exists {
 			for _, txn := range expiredTxns {
 				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
 			}
 		}
 		delete(tp.storageProofsByExpiration, tp.stateHeight)
+
+		// Handle any terminations that have been invalidated because the
+		// corresponding file contract has started.
+		expiredTxns, exists = tp.fileContractTerminations[tp.stateHeight]
+		if exists {
+			for _, txn := range expiredTxns {
+				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
+			}
+		}
+		delete(tp.fileContractTerminations, tp.stateHeight)
 	}
 
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, revertedTxns, appliedTxns)
