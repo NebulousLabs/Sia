@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 var (
@@ -12,32 +13,6 @@ var (
 	ErrMissingFileContract  = errors.New("transaction terminates a nonexisting file contract")
 	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
 )
-
-// FollowsStorageProofRules checks that a transaction follows the limitations
-// placed on transactions that have storage proofs.
-func (t Transaction) FollowsStorageProofRules() error {
-	// No storage proofs, no problems.
-	if len(t.StorageProofs) == 0 {
-		return nil
-	}
-
-	// If there are storage proofs, there can be no siacoin outputs, siafund
-	// outputs, new file contracts, or file contract terminations.
-	if len(t.SiacoinOutputs) != 0 {
-		return errors.New("transaction contains storage proofs and siacoin outputs")
-	}
-	if len(t.FileContracts) != 0 {
-		return errors.New("transaction contains storage proofs and file contracts")
-	}
-	if len(t.FileContractTerminations) != 0 {
-		return errors.New("transaction contains storage proofs and file contract terminations")
-	}
-	if len(t.SiafundOutputs) != 0 {
-		return errors.New("transaction contains storage proofs and siafund outputs")
-	}
-
-	return nil
-}
 
 // SiacoinOutputSum returns the sum of all the siacoin outputs in the
 // transaction, which must match the sum of all the siacoin inputs. Siacoin
@@ -63,74 +38,25 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	return
 }
 
-// ValidUnlockConditions checks that the conditions of uc have been met. The
+// validUnlockConditions checks that the conditions of uc have been met. The
 // height is taken as input so that modules who might be at a different height
 // can do the verification without needing to use their own function.
 // Additionally, it means that the function does not need to be a method of the
 // consensus set.
-func ValidUnlockConditions(uc UnlockConditions, uh UnlockHash, currentHeight BlockHeight) (err error) {
-	if uc.UnlockHash() != uh {
-		return errors.New("unlock conditions do not match unlock hash")
-	}
+func validUnlockConditions(uc UnlockConditions, currentHeight BlockHeight) (err error) {
 	if uc.Timelock > currentHeight {
 		return errors.New("unlock condition timelock has not been met")
 	}
 	return
 }
 
-// validUnlockConditions checks that the unlock conditions have been met
-// (signatures are checked elsewhere).
-func (s *State) validUnlockConditions(uc UnlockConditions, uh UnlockHash) (err error) {
-	return ValidUnlockConditions(uc, uh, s.height())
-}
-
-// validSiacoins iterates through the inputs of a transaction, summing the
-// value of the inputs and checking that the inputs are legal.
-func (s *State) validSiacoins(t Transaction) (err error) {
-	var inputSum Currency
-	spentIDs := make(map[SiacoinOutputID]struct{})
-	for _, sci := range t.SiacoinInputs {
-		// Check that the input spends an existing output, and that the
-		// UnlockConditions are legal (signatures checked elsewhere).
-		sco, exists := s.siacoinOutputs[sci.ParentID]
-		if !exists {
-			return ErrMissingSiacoinOutput
-		}
-
-		// Check that the output has not been spent twice this transaction.
-		_, exists = spentIDs[sci.ParentID]
-		if exists {
-			return errors.New("output spent twice in the same transaction")
-		}
-		spentIDs[sci.ParentID] = struct{}{}
-
-		// Check that the unlock conditions are reasonable.
-		err = s.validUnlockConditions(sci.UnlockConditions, sco.UnlockHash)
-		if err != nil {
-			return
-		}
-
-		// Add the input value to the sum.
-		inputSum = inputSum.Add(sco.Value)
-	}
-	for _, sco := range t.SiacoinOutputs {
-		if sco.Value.Cmp(ZeroCurrency) <= 0 {
-			return errors.New("Output must have at least one coin")
-		}
-	}
-	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return errors.New("inputs do not equal outputs for transaction")
-	}
-
-	return
-}
-
-// validFileContracts iterates through the file contracts of a transaction and
-// makes sure that each is legal.
-func (s *State) validFileContracts(t Transaction) (err error) {
+// correctFileContracts checks that the file contracts adhere to the file
+// contract rules.
+func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
+	// Check that FileContract rules are being followed.
 	for _, fc := range t.FileContracts {
 		// Check that start and expiration are reasonable values.
-		if fc.Start <= s.height() {
+		if fc.Start <= currentHeight {
 			return errors.New("contract must start in the future")
 		}
 		if fc.Expiration <= fc.Start {
@@ -141,9 +67,6 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 		// siafund fee has been applied, and check that the missed proof
 		// outputs sum to the full payout.
 		var validProofOutputSum, missedProofOutputSum Currency
-		if fc.Payout.Cmp(ZeroCurrency) <= 0 {
-			return errors.New("file contract must have non-zero payout")
-		}
 		for _, output := range fc.ValidProofOutputs {
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
 		}
@@ -158,14 +81,195 @@ func (s *State) validFileContracts(t Transaction) (err error) {
 			return errors.New("contract missed proof outputs do not sum to the payout")
 		}
 	}
+	return nil
+}
 
+// fitsInABlock checks if the transaction is likely to fit in a block.
+// Currently there is no limitation on transaction size other than it must fit
+// in a block.
+func (t Transaction) fitsInABlock() error {
+	// Check that the transaction will fit inside of a block, leaving 5kb for
+	// overhead.
+	if len(encoding.Marshal(t)) > BlockSizeLimit-5e3 {
+		return errors.New("transaction is too large to fit in a block")
+	}
+	return nil
+}
+
+// FollowsStorageProofRules checks that a transaction follows the limitations
+// placed on transactions that have storage proofs.
+func (t Transaction) followsStorageProofRules() error {
+	// No storage proofs, no problems.
+	if len(t.StorageProofs) == 0 {
+		return nil
+	}
+
+	// If there are storage proofs, there can be no siacoin outputs, siafund
+	// outputs, new file contracts, or file contract terminations.
+	if len(t.SiacoinOutputs) != 0 {
+		return errors.New("transaction contains storage proofs and siacoin outputs")
+	}
+	if len(t.FileContracts) != 0 {
+		return errors.New("transaction contains storage proofs and file contracts")
+	}
+	if len(t.FileContractTerminations) != 0 {
+		return errors.New("transaction contains storage proofs and file contract terminations")
+	}
+	if len(t.SiafundOutputs) != 0 {
+		return errors.New("transaction contains storage proofs and siafund outputs")
+	}
+
+	return nil
+}
+
+// followsMinimumValues checks that all outputs adhere to the rules for the
+// minimum allowed value (generally 1).
+func (t Transaction) followsMinimumValues() error {
+	for _, sco := range t.SiacoinOutputs {
+		if sco.Value.Cmp(ZeroCurrency) < 1 {
+			return errors.New("empty siacoin output not allowed")
+		}
+	}
+	for _, fc := range t.FileContracts {
+		if fc.Payout.Cmp(ZeroCurrency) < 1 {
+			return errors.New("file contract must have non-zero payout")
+		}
+	}
+	for _, sfo := range t.SiafundOutputs {
+		// Check that the claimStart is set to 0.
+		if sfo.ClaimStart.Cmp(ZeroCurrency) != 0 {
+			return errors.New("invalid siafund output presented")
+		}
+
+		// Outputs must all be at least 1.
+		if sfo.Value.Cmp(ZeroCurrency) < 1 {
+			return errors.New("siafund outputs must have at least 1 siafund")
+		}
+	}
+	return nil
+}
+
+// noRepeats checks that a transaction does not spend multiple outputs twice,
+// submit two valid storage proofs for the same file contract, etc.
+func (t Transaction) noRepeats() error {
+	// Check that there are no repeat instances of siacoin outputs, storage
+	// proofs, contract terminations, or siafund outputs.
+	siacoinInputs := make(map[SiacoinOutputID]struct{})
+	for _, sci := range t.SiacoinInputs {
+		_, exists := siacoinInputs[sci.ParentID]
+		if exists {
+			return errors.New("output spent twice in the same transaction")
+		}
+		siacoinInputs[sci.ParentID] = struct{}{}
+	}
+	storageProofs := make(map[FileContractID]struct{})
+	for _, sp := range t.StorageProofs {
+		_, exists := storageProofs[sp.ParentID]
+		if exists {
+			return errors.New("storage proof submitted earlier this transaction")
+		}
+		storageProofs[sp.ParentID] = struct{}{}
+	}
+	terminations := make(map[FileContractID]struct{})
+	for _, fct := range t.FileContractTerminations {
+		_, exists := terminations[fct.ParentID]
+		if exists {
+			return errors.New("multiple terminations for the same contract in transaction")
+		}
+		terminations[fct.ParentID] = struct{}{}
+	}
+	siafundInputs := make(map[SiafundOutputID]struct{})
+	for _, sfi := range t.SiafundInputs {
+		_, exists := siafundInputs[sfi.ParentID]
+		if exists {
+			return errors.New("siafund output spent twice in the same transaction")
+		}
+		siafundInputs[sfi.ParentID] = struct{}{}
+	}
+	return nil
+}
+
+// validUnlockConditions checks that all of the unlock conditions in the
+// transaction are valid.
+func (t Transaction) validUnlockConditions(currentHeight BlockHeight) (err error) {
+	for _, sci := range t.SiacoinInputs {
+		err = validUnlockConditions(sci.UnlockConditions, currentHeight)
+		if err != nil {
+			return
+		}
+	}
+	for _, fct := range t.FileContractTerminations {
+		err = validUnlockConditions(fct.TerminationConditions, currentHeight)
+		if err != nil {
+			return
+		}
+	}
+	for _, sfi := range t.SiafundInputs {
+		err = validUnlockConditions(sfi.UnlockConditions, currentHeight)
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
-// validFileContractTerminations checks that each termination in a transaction
-// is legal.
+// StandaloneValid returns an error if a transaction is not valid in any
+// context, for example if the same output is spent twice in the same
+// transaction. StandaloneValid will not check that all outputs being spent are
+// legal outputs, as it has no confirmed or unconfirmed set to look at.
+func (t Transaction) StandaloneValid(currentHeight BlockHeight) (err error) {
+	err = t.fitsInABlock()
+	if err != nil {
+		return
+	}
+	err = t.followsStorageProofRules()
+	if err != nil {
+		return
+	}
+	err = t.noRepeats()
+	if err != nil {
+		return
+	}
+	err = t.followsMinimumValues()
+	if err != nil {
+		return
+	}
+	err = t.correctFileContracts(currentHeight)
+	if err != nil {
+		return
+	}
+	err = t.validUnlockConditions(currentHeight)
+	if err != nil {
+		return
+	}
+	err = t.validSignatures(currentHeight)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// validSiacoins checks that the siacoin inputs and outputs are valid in the
+// context of the current consensus set.
+func (s *State) validSiacoins(t Transaction) (err error) {
+	var inputSum Currency
+	for _, sci := range t.SiacoinInputs {
+		// Check that the input spends an existing output.
+		sco, exists := s.siacoinOutputs[sci.ParentID]
+		if !exists {
+			return ErrMissingSiacoinOutput
+		}
+		inputSum = inputSum.Add(sco.Value)
+	}
+	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
+		return errors.New("inputs do not equal outputs for transaction")
+	}
+	return
+}
+
+// validFileContractTerminations checks that each file contract termination is
+// valid in the context of the current consensus set.
 func (s *State) validFileContractTerminations(t Transaction) (err error) {
-	terminatedFileContracts := make(map[FileContractID]struct{})
 	for _, fct := range t.FileContractTerminations {
 		// Check that the FileContractTermination terminates an existing
 		// FileContract.
@@ -174,25 +278,11 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 			return ErrMissingFileContract
 		}
 
-		// Check that the contract has not been terminated earlier in this
-		// transaction.
-		_, exists = terminatedFileContracts[fct.ParentID]
-		if exists {
-			return errors.New("multiple terminations for the same contract in transaction")
-		}
-		terminatedFileContracts[fct.ParentID] = struct{}{}
-
 		// Check that the height is less than fc.Start - terminations are not
 		// allowed to be submitted once the storage proof window has opened.
 		// This reduces complexity for unconfirmed transactions.
 		if s.height() >= fc.Start {
 			return errors.New("contract termination submitted too late")
-		}
-
-		// Check that the unlock conditions are reasonable.
-		err = s.validUnlockConditions(fct.TerminationConditions, fc.TerminationHash)
-		if err != nil {
-			return
 		}
 
 		// Check that the payouts in the termination add up to the payout of the
@@ -242,11 +332,11 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 	return
 }
 
-// validStorageProofs iterates through the storage proofs of a transaction and
-// checks that each is legal.
+// validStorageProofs checks that the storage proofs are valid in the context
+// of the consensus set.
 func (s *State) validStorageProofs(t Transaction) error {
-	provenFileContracts := make(map[FileContractID]struct{})
 	for _, sp := range t.StorageProofs {
+		// Each
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
 			return errors.New("unrecognized file contract ID in storage proof")
@@ -257,14 +347,6 @@ func (s *State) validStorageProofs(t Transaction) error {
 		if err != nil {
 			return err
 		}
-
-		// Check that a storage proof for this file contract has not been
-		// submitted earlier this transaction.
-		_, exists = provenFileContracts[sp.ParentID]
-		if exists {
-			return errors.New("storage proof submitted earlier this transaction")
-		}
-		provenFileContracts[sp.ParentID] = struct{}{}
 
 		verified := crypto.VerifySegment(
 			sp.Segment,
@@ -281,77 +363,41 @@ func (s *State) validStorageProofs(t Transaction) error {
 	return nil
 }
 
-// validSiafunds checks that the transaction has valid siafund inputs and
-// outputs, and that the sum of the inputs matches the sum of the outputs.
+// validSiafunds checks that the siafund portions of the transaction are valid
+// in the context of the consensus set.
 func (s *State) validSiafunds(t Transaction) (err error) {
-	// Check that all siafund inputs are valid, and get the total number of
-	// input siafunds.
-	spentFunds := make(map[SiafundOutputID]struct{})
+	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum Currency
+	var siafundOutputSum Currency
 	for _, sfi := range t.SiafundInputs {
-		// Check that the siafund output being spent exists.
 		sfo, exists := s.siafundOutputs[sfi.ParentID]
 		if !exists {
 			return ErrMissingSiafundOutput
 		}
-
-		// Check that this output was not spent earlier this transaction.
-		_, exists = spentFunds[sfi.ParentID]
-		if exists {
-			return errors.New("siafund output spent twice in the same transaction")
-		}
-		spentFunds[sfi.ParentID] = struct{}{}
-
-		// Check that the unlock conditions are reasonable.
-		err = s.validUnlockConditions(sfi.UnlockConditions, sfo.UnlockHash)
-		if err != nil {
-			return
-		}
-
-		// Add this input's value
 		siafundInputSum = siafundInputSum.Add(sfo.Value)
 	}
-
-	// Check that all siafund outputs are valid and that the siafund output sum
-	// is equal to the siafund input sum.
-	var siafundOutputSum Currency
 	for _, sfo := range t.SiafundOutputs {
-		// Check that the claimStart is set to 0.
-		if sfo.ClaimStart.Cmp(ZeroCurrency) != 0 {
-			return errors.New("invalid siafund output presented")
-		}
-
-		// Outputs must all be at least 1.
-		if sfo.Value.Cmp(ZeroCurrency) <= 0 {
-			return errors.New("siafund outputs must have at least 1 siafund")
-		}
-
-		// Add this output's value.
 		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
 	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
 		return errors.New("siafund inputs do not equal siafund outpus within transaction")
 	}
-
 	return
 }
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
 func (s *State) validTransaction(t Transaction) (err error) {
-	// Check that the storage proof rules are followed.
-	err = t.FollowsStorageProofRules()
+	// StandaloneValid will check things like signatures and properties that
+	// should be inherent to the transaction. (storage proof rules, etc.)
+	err = t.StandaloneValid(s.height())
 	if err != nil {
 		return
 	}
 
-	// Check that each general component of the transaction is valid, without
-	// checking signatures.
+	// Check that each portion of the transaction is legal given the current
+	// consensus set.
 	err = s.validSiacoins(t)
-	if err != nil {
-		return
-	}
-	err = s.validFileContracts(t)
 	if err != nil {
 		return
 	}
@@ -364,12 +410,6 @@ func (s *State) validTransaction(t Transaction) (err error) {
 		return
 	}
 	err = s.validSiafunds(t)
-	if err != nil {
-		return
-	}
-
-	// Check all of the signatures for validity.
-	err = s.validSignatures(t)
 	if err != nil {
 		return
 	}
