@@ -10,7 +10,7 @@ import (
 type TransactionPoolSubscriber interface {
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, revertedTxns, appliedTxns []consensus.Transaction)
+	ReceiveTransactionPoolUpdate(revertedTxns []consensus.Transaction, revertedBlocks, appliedBlocks []consensus.Block, appliedTxns []consensus.Transaction)
 }
 
 type TransactionPool interface {

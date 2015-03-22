@@ -20,7 +20,7 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 			revertTxns := tp.revertTxnsUpdates[i]
 			applyTxns := tp.applyTxnsUpdates[i]
 			tp.mu.RUnlock(id)
-			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, revertTxns, applyTxns)
+			subscriber.ReceiveTransactionPoolUpdate(revertTxns, revertBlocks, applyBlocks, applyTxns)
 			i++
 		}
 

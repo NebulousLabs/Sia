@@ -67,14 +67,7 @@ func (w *Wallet) load() (err error) {
 		}
 	}
 
-	// To calculate the outputs for each key, we need to scan the entire
-	// blockchain. This is done by setting w.recentBlock to the genesis block
-	// and calling w.update.
-	genesisBlock, exists := w.state.BlockAtHeight(0)
-	if !exists {
-		return errors.New("could not fetch genesis block")
-	}
-	w.recentBlock = genesisBlock.ID()
-	w.update()
+	// TODO TODO TODO: Need a scan or 're-scan' function.
+
 	return
 }

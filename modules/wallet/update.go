@@ -40,49 +40,39 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 	}
 }
 
-// update will synchronize the wallet to the latest set of outputs in the
-// consensus set and unconfirmed consensus set. It does this by first removing
-// all of the diffs from the previous unconfirmed consensus set, then applying
-// all of the diffs between the previous consensus set and current consensus
-// set, and then grabbing the current diffs for the unconfirmed consensus set.
-// This is only safe if calling tpool.UnconfirmedSiacoinOutputDiffs means that
-// the transaction pool will update it's own understanding of the consensus
-// set. (This is currently true).
-func (w *Wallet) update() error {
-	// Because we were running into problems, the amount of time that the state
-	// lock is held has been minimized. Grab all of the necessary diffs under a
-	// lock before doing any computation.
-	counter := w.state.RLock()
-	defer w.state.RUnlock(counter)
-
-	removedBlocks, addedBlocks, err := w.state.BlocksSince(w.recentBlock)
-	if err != nil {
-		return err
-	}
-
-	// Remove all of the diffs that have been applied by the unconfirmed set of
-	// transactions.
-	for i := len(w.unconfirmedDiffs) - 1; i >= 0; i-- {
-		w.applyDiff(w.unconfirmedDiffs[i], consensus.DiffRevert)
-	}
+// ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
+// unconfirmed set and uses them to update the balance and transaction history
+// of the wallet.
+func (w *Wallet) ReceiveTransactionPoolUpdate(revertedTxns []consensus.Transaction, revertedBlocks, appliedBlocks []consensus.Block, appliedTxns []consensus.Transaction) {
+	id := w.mu.Lock()
+	defer w.mu.Unlock(id)
 
 	// Apply the diffs in the consensus set that have happened since the last
 	// update.
-	for _, id := range removedBlocks {
+	for _, txn := range revertedTxns {
+		for _, sci := range txn.SiacoinInputs {
+		}
+		for _, sco := range txn.SiacoinOutputs {
+		}
+	}
+	for _, block := range revertedBlocks {
 		w.age--
 
-		scods, err := w.state.BlockOutputDiffs(id)
+		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			return err
+			if consensus.DEBUG {
+				panic(err)
+			}
+			continue
 		}
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffRevert)
 		}
 	}
-	for _, id := range addedBlocks {
+	for _, block := range appliedBlocks {
 		w.age++
 
-		scods, err := w.state.BlockOutputDiffs(id)
+		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
 			if consensus.DEBUG {
 				panic(err)
@@ -92,15 +82,11 @@ func (w *Wallet) update() error {
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffApply)
 		}
-		w.recentBlock = id
 	}
-
-	// Get, apply, and store the unconfirmed diffs currently available in the
-	// transaction pool.
-	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
-	for _, scod := range w.unconfirmedDiffs {
-		w.applyDiff(scod, consensus.DiffApply)
+	for _, txn := range appliedTxns {
+		for _, sci := range txn.SiacoinInputs {
+		}
+		for _, sco := range txn.SiacoinOutputs {
+		}
 	}
-
-	return nil
 }
