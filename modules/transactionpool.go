@@ -10,7 +10,7 @@ import (
 type TransactionPoolSubscriber interface {
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(revertedTxns []consensus.Transaction, revertedBlocks, appliedBlocks []consensus.Block, appliedTxns []consensus.Transaction)
+	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedSiacoinOutputDiffs []consensus.SiacoinOutputDiff)
 }
 
 type TransactionPool interface {
@@ -36,8 +36,4 @@ type TransactionPool interface {
 	// TransactionPoolSubscribe will subscribe the input object to the changes
 	// in the transaction pool.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
-
-	// OutputDiffs returns the set of diffs that are in the transaction pool
-	// but haven't been confirmed by a block yet.
-	UnconfirmedSiacoinOutputDiffs() []consensus.SiacoinOutputDiff
 }

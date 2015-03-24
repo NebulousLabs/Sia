@@ -40,7 +40,6 @@ const (
 type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
-	recentBlock      consensus.BlockID
 	unconfirmedDiffs []consensus.SiacoinOutputDiff
 
 	// Location of the wallet directory, for saving and loading keys.
@@ -86,17 +85,9 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 		return
 	}
 
-	// Get the genesis block to set as 'recent block'.
-	genesisBlock, exists := state.BlockAtHeight(0)
-	if !exists {
-		err = errors.New("could not fetch genesis block")
-		return
-	}
-
 	w = &Wallet{
-		state:       state,
-		tpool:       tpool,
-		recentBlock: genesisBlock.ID(),
+		state: state,
+		tpool: tpool,
 
 		saveDir: saveDir,
 
@@ -126,6 +117,8 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
 		return
 	}
+
+	w.tpool.TransactionPoolSubscribe(w)
 
 	return
 }

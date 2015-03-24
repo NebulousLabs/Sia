@@ -234,7 +234,7 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	// direction is set to true because a new transaction has been added and it
 	// may depend on existing unconfirmed transactions.
 	tp.addTransactionToPool(t, NewTransaction)
-	tp.updateSubscribers(nil, nil, nil, []consensus.Transaction{t})
+	tp.updateSubscribers(nil, nil, tp.unconfirmedSiacoinOutputDiffs())
 
 	tp.gateway.RelayTransaction(t) // error is not checked
 	return

@@ -17,10 +17,9 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 			id := tp.mu.RLock()
 			revertBlocks := tp.revertBlocksUpdates[i]
 			applyBlocks := tp.applyBlocksUpdates[i]
-			revertTxns := tp.revertTxnsUpdates[i]
-			applyTxns := tp.applyTxnsUpdates[i]
+			unconfirmedDiffs := tp.unconfirmedSiacoinDiffs[i]
 			tp.mu.RUnlock(id)
-			subscriber.ReceiveTransactionPoolUpdate(revertTxns, revertBlocks, applyBlocks, applyTxns)
+			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, unconfirmedDiffs)
 			i++
 		}
 
@@ -31,12 +30,11 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
-func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, revertedTxns, appliedTxns []consensus.Transaction) {
+func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, diffs []consensus.SiacoinOutputDiff) {
 	// Add the changes to the update set.
 	tp.revertBlocksUpdates = append(tp.revertBlocksUpdates, revertedBlocks)
 	tp.applyBlocksUpdates = append(tp.applyBlocksUpdates, appliedBlocks)
-	tp.revertTxnsUpdates = append(tp.revertTxnsUpdates, revertedTxns)
-	tp.applyTxnsUpdates = append(tp.applyTxnsUpdates, appliedTxns)
+	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 
 	for _, subscriber := range tp.subscribers {
 		// If the channel is already full, don't block.

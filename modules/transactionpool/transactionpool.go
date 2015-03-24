@@ -65,11 +65,10 @@ type TransactionPool struct {
 	usedSiafundOutputs        map[consensus.SiafundOutputID]*unconfirmedTransaction
 
 	// Subscriber variables
-	revertBlocksUpdates [][]consensus.Block
-	applyBlocksUpdates  [][]consensus.Block
-	revertTxnsUpdates   [][]consensus.Transaction
-	applyTxnsUpdates    [][]consensus.Transaction
-	subscribers         []chan struct{}
+	revertBlocksUpdates     [][]consensus.Block
+	applyBlocksUpdates      [][]consensus.Block
+	unconfirmedSiacoinDiffs [][]consensus.SiacoinOutputDiff
+	subscribers             []chan struct{}
 
 	mu *sync.RWMutex
 }

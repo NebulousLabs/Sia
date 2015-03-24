@@ -237,5 +237,5 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		revertedTxns = append(revertedTxns, tp.purge()...)
 	}
 
-	tp.updateSubscribers(revertedBlocks, appliedBlocks, revertedTxns, appliedTxns)
+	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.unconfirmedSiacoinOutputDiffs())
 }
