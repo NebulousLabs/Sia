@@ -43,11 +43,15 @@ type TransactionPool struct {
 	head *unconfirmedTransaction
 	tail *unconfirmedTransaction
 
-	// These maps are essentially equivalent to the unconfirmed consensus set.
-	transactions   map[crypto.Hash]*unconfirmedTransaction
-	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
-	fileContracts  map[consensus.FileContractID]consensus.FileContract
-	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
+	// These maps contain all objects that the tpool may need to reference. The
+	// first maps contain just the unconfirmed set. The reference map contains
+	// elements which may or may not be confirmed or unconfirmed but are
+	// required for maintenance.
+	transactions           map[crypto.Hash]*unconfirmedTransaction
+	siacoinOutputs         map[consensus.SiacoinOutputID]consensus.SiacoinOutput
+	fileContracts          map[consensus.FileContractID]consensus.FileContract
+	siafundOutputs         map[consensus.SiafundOutputID]consensus.SiafundOutput
+	referenceFileContracts map[consensus.FileContractID]consensus.FileContract
 
 	// There may be elements in this set that are not a part of the unconfirmed
 	// set. For example, a siacoin output can be created and spent by
@@ -55,7 +59,7 @@ type TransactionPool struct {
 	// unconfirmed set.
 	usedSiacoinOutputs        map[consensus.SiacoinOutputID]*unconfirmedTransaction
 	newFileContracts          map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
-	fileContractTerminations  map[consensus.FileContractID]*unconfirmedTransaction
+	fileContractTerminations  map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofsByStart      map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
 	storageProofsByExpiration map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction
 	usedSiafundOutputs        map[consensus.SiafundOutputID]*unconfirmedTransaction
@@ -93,7 +97,7 @@ func New(s *consensus.State, g modules.Gateway) (tp *TransactionPool, err error)
 
 		usedSiacoinOutputs:        make(map[consensus.SiacoinOutputID]*unconfirmedTransaction),
 		newFileContracts:          make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
-		fileContractTerminations:  make(map[consensus.FileContractID]*unconfirmedTransaction),
+		fileContractTerminations:  make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
 		storageProofsByStart:      make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
 		storageProofsByExpiration: make(map[consensus.BlockHeight]map[consensus.FileContractID]*unconfirmedTransaction),
 		usedSiafundOutputs:        make(map[consensus.SiafundOutputID]*unconfirmedTransaction),

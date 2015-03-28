@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -26,6 +27,47 @@ type tpoolTester struct {
 	updateChan chan struct{}
 
 	t *testing.T
+}
+
+// checkEmpty checks that all of the internal objects to the transaction pool
+// have been emptied.
+func (tpt *tpoolTester) checkEmpty() error {
+	id := tpt.tpool.mu.RLock()
+	if len(tpt.tpool.transactions) != 0 {
+		return errors.New("tpool.transactions isn't empty")
+	}
+	if len(tpt.tpool.siacoinOutputs) != 0 {
+		return errors.New("tpool.siacoinOutputs isn't empty")
+	}
+	if len(tpt.tpool.fileContracts) != 0 {
+		return errors.New("tpool.fileContracts isn't empty")
+	}
+	if len(tpt.tpool.siafundOutputs) != 0 {
+		return errors.New("tpool.siafundOuptuts isn't empty")
+	}
+	if len(tpt.tpool.referenceFileContracts) != 0 {
+		return errors.New("tpool.referenceFileContracts isn't empty")
+	}
+	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
+		return errors.New("tpool.usedSiacoinOutputs wasn't properly emtied out.")
+	}
+	if len(tpt.tpool.newFileContracts) != 0 {
+		return errors.New("tpool.newFileContracts isn't empty")
+	}
+	if len(tpt.tpool.fileContractTerminations) != 0 {
+		return errors.New("tpool.fileContractTerminations isn't empty")
+	}
+	if len(tpt.tpool.storageProofsByStart) != 0 {
+		return errors.New("tpool.storageProofsByStart isn't empty")
+	}
+	if len(tpt.tpool.storageProofsByExpiration) != 0 {
+		return errors.New("tpool.storageProofsByExipration isn't empty")
+	}
+	if len(tpt.tpool.usedSiafundOutputs) != 0 {
+		return errors.New("tpool.usedSiafundOutputs isn't empty")
+	}
+	tpt.tpool.mu.RUnlock(id)
+	return nil
 }
 
 // emptyUnlockTransaction creates a transaction with empty UnlockConditions,
@@ -120,4 +162,18 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	return
+}
+
+// TestNewNilInputs tries to trigger a panic with nil inputs.
+func TestNewNilInputs(t *testing.T) {
+	// Create a consensus set and gateway.
+	cs := consensus.CreateGenesisState()
+	gDir := tester.TempDir("Transaction Pool - TestNewNilInputs", modules.GatewayDir)
+	g, err := gateway.New(":0", cs, gDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	New(nil, nil)
+	New(cs, nil)
+	New(nil, g)
 }

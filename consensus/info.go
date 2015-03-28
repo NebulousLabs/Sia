@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // StateInfo contains basic information about the State.
@@ -265,52 +264,4 @@ func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err erro
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.storageProofSegment(fcid)
-}
-
-// ValidTransaction checks that a transaction is valid within the context of
-// the current consensus set.
-func (s *State) ValidTransaction(t Transaction) (err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.validTransaction(t)
-}
-
-// ValidTransactionComponents checks that a transaction follows basic rules,
-// such as the storage proof rules, and it checks that all of the signatures
-// are valid, but it does not check that all of the inputs, storage proofs, and
-// terminations act on existing outputs and contracts. This function is
-// primarily for the transaction pool, which has access to unconfirmed
-// transactions. ValidTransactionComponents will not return an error simply
-// because there are missing inputs. ValidTransactionComponents will return an
-// error if the state height is not sufficient to fulfill all of the
-// requirements of the transaction.
-func (s *State) ValidTransactionComponents(t Transaction) (err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-
-	// This will stop too-large transactions from accidentally being validated.
-	// This check doesn't happen when checking blocks, because the size of the
-	// block was already checked.
-	if len(encoding.Marshal(t)) > BlockSizeLimit-5e3 {
-		return errors.New("transaction is too large")
-	}
-
-	err = t.FollowsStorageProofRules()
-	if err != nil {
-		return
-	}
-	err = s.validFileContracts(t)
-	if err != nil {
-		return
-	}
-	err = s.validStorageProofs(t)
-	if err != nil {
-		return
-	}
-	err = s.validSignatures(t)
-	if err != nil {
-		return
-	}
-
-	return
 }

@@ -21,10 +21,7 @@ func TestAnnouncement(t *testing.T) {
 	}
 
 	// Check that the announcement made it into the transaction pool correctly.
-	txns, err := ht.tpool.TransactionSet()
-	if err != nil {
-		t.Fatal(err)
-	}
+	txns := ht.tpool.TransactionSet()
 	if len(txns) != 1 {
 		t.Error("Expecting 1 transaction in transaction pool, instead there was", len(txns))
 	}

@@ -1,6 +1,8 @@
 package transactionpool
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -22,12 +24,25 @@ func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransacti
 		delete(tp.newFileContracts[fc.Start], fcid)
 	}
 	for _, fct := range t.FileContractTerminations {
-		delete(tp.fileContractTerminations, fct.ParentID)
+		fc, exists := tp.referenceFileContracts[fct.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("cannot locate file contract to delete storage proof transaction")
+			}
+		}
+		delete(tp.fileContractTerminations[fc.Start], fct.ParentID)
+		delete(tp.referenceFileContracts, fct.ParentID)
 	}
 	for _, sp := range t.StorageProofs {
-		fc, _ := tp.state.FileContract(sp.ParentID)
+		fc, exists := tp.referenceFileContracts[sp.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("cannot locate file contract to delete storage proof transaction")
+			}
+		}
 		delete(tp.storageProofsByStart[fc.Start], sp.ParentID)
 		delete(tp.storageProofsByExpiration[fc.Expiration], sp.ParentID)
+		delete(tp.referenceFileContracts, sp.ParentID)
 	}
 	for _, sfi := range t.SiafundInputs {
 		delete(tp.usedSiafundOutputs, sfi.ParentID)
@@ -50,8 +65,8 @@ func (tp *TransactionPool) removeDependentTransactions(t consensus.Transaction) 
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
 	}
-	for i, _ := range t.FileContracts {
-		dependent, exists := tp.fileContractTerminations[t.FileContractID(i)]
+	for i, fc := range t.FileContracts {
+		dependent, exists := tp.fileContractTerminations[fc.Start][t.FileContractID(i)]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(dependent)...)
 		}
@@ -84,17 +99,29 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 		}
 	}
 	for _, fct := range t.FileContractTerminations {
-		conflict, exists := tp.fileContractTerminations[fct.ParentID]
+		// Check for the corresponding file contract.
+		fc, exists := tp.referenceFileContracts[fct.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("could not locate file contract")
+			}
+		}
+		conflict, exists := tp.fileContractTerminations[fc.Start][fct.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
 	}
 	for _, sp := range t.StorageProofs {
-		conflict, exists := tp.fileContractTerminations[sp.ParentID]
+		fc, exists := tp.referenceFileContracts[sp.ParentID]
+		if consensus.DEBUG {
+			if !exists {
+				panic("could not locate file contract")
+			}
+		}
+		conflict, exists := tp.fileContractTerminations[fc.Start][sp.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
 		}
-		fc, _ := tp.state.FileContract(sp.ParentID)
 		conflict, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
 		if exists {
 			revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(conflict)...)
@@ -109,17 +136,18 @@ func (tp *TransactionPool) removeConflictingTransactions(t consensus.Transaction
 	return
 }
 
+// purge removes all transactions from the transaction pool.
+func (tp *TransactionPool) purge() (revertedTxns []consensus.Transaction) {
+	for tp.head != nil {
+		revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(tp.head)...)
+	}
+	return
+}
+
 // ReceiveConsensusUpdate gets called any time that consensus changes.
 func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks []consensus.Block) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
-
-	// TODO TODO TODO: We don't track which transactions unlock at which
-	// height. This is a problem if the height goes down for any reason. That
-	// is pretty unlikely. Instead of tracking the height of every important
-	// unlock condition, we'll just delete all transactions in the pool any
-	// time the height goes down. This should never happen in a real world
-	// environment.
 
 	// Handle reverted blocks.
 	var revertedTxns, appliedTxns []consensus.Transaction
@@ -175,22 +203,38 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 
 		// Handle any unconfirmed file contracts that have been invalidated due
 		// to the state height increasing.
-		invalidContracts, exists := tp.newFileContracts[tp.stateHeight]
+		expiredTxns, exists := tp.newFileContracts[tp.stateHeight]
 		if exists {
-			for _, txn := range invalidContracts {
+			for _, txn := range expiredTxns {
 				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
 			}
 		}
 
 		// Handle any storage proofs that have been invalidated because the
 		// cooresponding file contract has expired.
-		expiredTxns, exists := tp.storageProofsByExpiration[tp.stateHeight]
+		expiredTxns, exists = tp.storageProofsByExpiration[tp.stateHeight]
 		if exists {
 			for _, txn := range expiredTxns {
 				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
 			}
 		}
 		delete(tp.storageProofsByExpiration, tp.stateHeight)
+
+		// Handle any terminations that have been invalidated because the
+		// corresponding file contract has started.
+		expiredTxns, exists = tp.fileContractTerminations[tp.stateHeight]
+		if exists {
+			for _, txn := range expiredTxns {
+				revertedTxns = append(revertedTxns, tp.purgeUnconfirmedTransaction(txn)...)
+			}
+		}
+		delete(tp.fileContractTerminations, tp.stateHeight)
+	}
+
+	// Do a purge if the height has decreased after a fork.
+	if len(revertedBlocks) > len(appliedBlocks) {
+		fmt.Println("Doing a transaction pool purge")
+		revertedTxns = append(revertedTxns, tp.purge()...)
 	}
 
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, revertedTxns, appliedTxns)

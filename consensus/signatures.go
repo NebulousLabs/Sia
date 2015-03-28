@@ -87,7 +87,7 @@ func (t Transaction) validCoveredFields() error {
 }
 
 // validSignatures checks the validaty of all signatures in a transaction.
-func (s *State) validSignatures(t Transaction) error {
+func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	// Check that all covered fields objects follow the rules.
 	err := t.validCoveredFields()
 	if err != nil {
@@ -149,7 +149,7 @@ func (s *State) validSignatures(t Transaction) error {
 			return errors.New("one public key was used twice while signing an input")
 		}
 		// Check that the timelock has expired.
-		if sig.Timelock > s.height() {
+		if sig.Timelock > currentHeight {
 			return errors.New("signature used before timelock expiration")
 		}
 

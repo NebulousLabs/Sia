@@ -373,6 +373,28 @@ nickname string
 
 Response: standard.
 
+Transaction Pool
+----------------
+
+Queries:
+
+* /transactionpool/transactions
+
+#### /transactionpool/transactions
+
+Function: Returns all of the transactions in the transaction pool.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Transactions []consensus.Transaction
+}
+```
+Please see consensus/types.go for a more detailed explanation on what a
+transaction looks like. There are many fields.
+
 Wallet
 ------
 

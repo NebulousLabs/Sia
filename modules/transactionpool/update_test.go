@@ -13,11 +13,7 @@ import (
 func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	// Create some unconfirmed transactions.
 	tpt.addDependentSiacoinTransactionToPool()
-	tset, err := tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Error(err)
-	}
-	if len(tset) == 0 {
+	if len(tpt.tpool.FullTransactionSet()) == 0 {
 		tpt.t.Error("tset should have some transacitons")
 	}
 
@@ -31,56 +27,17 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 			break
 		}
 	}
-	if err != nil {
-		tpt.t.Error(err)
-	}
 	<-tpt.updateChan
 
 	// Check that the transactions have been removed from the unconfirmed set.
-	tset, err = tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Error(err)
-	}
-	if len(tset) != 0 {
+	if len(tpt.tpool.FullTransactionSet()) != 0 {
 		tpt.t.Error("unconfirmed transaction set is not empty")
 	}
 
-	// Check that all of the internal maps are empty.
-	id := tpt.tpool.mu.RLock()
-	if len(tpt.tpool.transactions) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
+	err := tpt.checkEmpty()
+	if err != nil {
+		tpt.t.Error(err)
 	}
-	if len(tpt.tpool.siacoinOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.fileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.siafundOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.newFileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.newFileContracts) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.fileContractTerminations) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.storageProofsByStart) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.storageProofsByExpiration) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	if len(tpt.tpool.usedSiafundOutputs) != 0 {
-		tpt.t.Error("a field wasn't properly emptied out")
-	}
-	tpt.tpool.mu.RUnlock(id)
 }
 
 // testBlockConflicts adds a transaction to the unconfirmed set, and then adds
@@ -124,10 +81,7 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	// dependencies of it's own, and 'conflict' has the same dependencies as
 	// 'parent'. So the block we mine needs to include all of the dependencies
 	// without including 'parent' or 'dependent'.
-	tset, err := tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
+	tset := tpt.tpool.FullTransactionSet()
 	tset = tset[:len(tset)-2]     // strip 'parent' and 'dependent'
 	tset = append(tset, conflict) // add 'conflict'
 	target := tpt.cs.CurrentTarget()
@@ -153,11 +107,7 @@ func (tpt *tpoolTester) testBlockConflicts() {
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
-	tset, err = tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	if len(tset) != 0 {
+	if len(tpt.tpool.FullTransactionSet()) != 0 {
 		tpt.t.Error("parent and dependent transaction are still in the pool after a conflict has been introduced, have", len(tset))
 	}
 }
@@ -192,10 +142,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	<-tpt.updateChan
 
 	// Mine a block to put the parent into the confirmed set.
-	tset, err := tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
+	tset := tpt.tpool.FullTransactionSet()
 	tset = tset[:len(tset)-1] // strip 'dependent'
 	target := tpt.cs.CurrentTarget()
 	block := consensus.Block{
@@ -221,11 +168,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
-	tset, err = tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	if len(tset) != 1 {
+	if len(tpt.tpool.FullTransactionSet()) != 1 {
 		tpt.t.Error("dependent transaction does not remain unconfirmed after parent has been confirmed:", len(tset))
 	}
 }
@@ -235,11 +178,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 func (tpt *tpoolTester) testRewinding() {
 	// Put some transactions into the unconfirmed set.
 	tpt.addSiacoinTransactionToPool()
-	tset, err := tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	if len(tset) == 0 {
+	if len(tpt.tpool.FullTransactionSet()) == 0 {
 		tpt.t.Fatal("transaction pool has no transactions")
 	}
 
@@ -271,16 +210,12 @@ func (tpt *tpoolTester) testRewinding() {
 		}
 	}
 	<-tpt.updateChan
-	tset, err = tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	if len(tset) != 0 {
+	if len(tpt.tpool.FullTransactionSet()) != 0 {
 		tpt.t.Fatal("tset should be empty after FindBlock()")
 	}
 
 	// Fork around the block with the transaction.
-	err = tpt.cs.AcceptBlock(forkStart)
+	err := tpt.cs.AcceptBlock(forkStart)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -304,11 +239,7 @@ func (tpt *tpoolTester) testRewinding() {
 
 	// Check that the transaction which was once confirmed but no longer is
 	// confirmed is now unconfirmed.
-	tset, err = tpt.tpool.TransactionSet()
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	if len(tset) == 0 {
+	if len(tpt.tpool.FullTransactionSet()) == 0 {
 		tpt.t.Error("tset should contain transactions that used to be confirmed but no longer are")
 	}
 }

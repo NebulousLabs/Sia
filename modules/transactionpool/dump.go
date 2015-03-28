@@ -5,14 +5,31 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
+// FullTransactionSet returns the list of all transactions in the transaction
+// pool, in the order that they could be put into blocks. FullTransactionSet
+// will return all of the transactions, and not just the ones that will fit
+// into a block.
+func (tp *TransactionPool) FullTransactionSet() (transactionSet []consensus.Transaction) {
+	id := tp.mu.RLock()
+	defer tp.mu.RUnlock(id)
+
+	// Iterate through the transactions in the list.
+	currentTxn := tp.head
+	for currentTxn != nil {
+		transactionSet = append(transactionSet, currentTxn.transaction)
+		currentTxn = currentTxn.next
+	}
+	return
+}
+
 // TransactionSet will return a list of transactions that can be put in a block
 // in order, and will not result in the block being too large. TransactionSet
 // prioritizes transactions that have already been in a block (on another
 // fork), and then treats remaining transactions in a first come first serve
 // manner.
-func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction, err error) {
-	counter := tp.mu.Lock()
-	defer tp.mu.Unlock(counter)
+func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transaction) {
+	id := tp.mu.RLock()
+	defer tp.mu.RUnlock(id)
 
 	// Add transactions from the head of the linked list until there are no
 	// more transactions or until the size limit has been reached.
@@ -45,8 +62,8 @@ func (tp *TransactionPool) TransactionSet() (transactionSet []consensus.Transact
 //
 // TODO: Deprecate.
 func (tp *TransactionPool) UnconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
-	counter := tp.mu.Lock()
-	defer tp.mu.Unlock(counter)
+	id := tp.mu.Lock()
+	defer tp.mu.Unlock(id)
 
 	// For each transaction in the linked list, grab the siacoin output diffs
 	// that would be created by the transaction.
