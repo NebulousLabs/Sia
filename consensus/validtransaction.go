@@ -436,10 +436,10 @@ func (s *State) validTransaction(t Transaction) (err error) {
 	return
 }
 
-// ValidStorageProofs is the exported version of validStorageProofs.
+// ValidStorageProofs checks that the storage proofs are valid in the context
+// of the consensus set.
 func (s *State) ValidStorageProofs(t Transaction) (err error) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
-	err = s.validStorageProofs(t)
-	return
+	return s.validStorageProofs(t)
 }
