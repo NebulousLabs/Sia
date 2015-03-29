@@ -63,8 +63,8 @@ func TestAddSiacoinTransactionToPool(t *testing.T) {
 // TestAddDependentSiacoinTransactionToPool creates a tpoolTester and uses it
 // to cal addDependentSiacoinTransactionToPool.
 func TestAddDependentSiacoinTransactionToPool(t *testing.T) {
-	// tpt := newTpoolTester("TransactionPool - TestAddDependentSiacoinTransactionToPool", t)
-	// tpt.addDependentSiacoinTransactionToPool()
+	tpt := newTpoolTester("TransactionPool - TestAddDependentSiacoinTransactionToPool", t)
+	tpt.addDependentSiacoinTransactionToPool()
 }
 
 // TestDuplicateTransaction checks that a duplicate transaction error is

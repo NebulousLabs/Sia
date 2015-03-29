@@ -30,6 +30,6 @@ func (tpt *tpoolTester) testSiacoinTransactionDump() {
 // TestSiacoinTransactionDump creates a tpoolTester and uses it to call
 // testSiacoinTransactionDump.
 func TestSiacoinTransactionDump(t *testing.T) {
-	// tpt := newTpoolTester("Transaction Pool - TetstSiacoinTransactionDump", t)
-	// tpt.testSiacoinTransactionDump()
+	tpt := newTpoolTester("Transaction Pool - TetstSiacoinTransactionDump", t)
+	tpt.testSiacoinTransactionDump()
 }
