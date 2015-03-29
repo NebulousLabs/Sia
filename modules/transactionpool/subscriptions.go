@@ -5,6 +5,53 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// UnconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
+// would be created immediately if all of the unconfirmed transactions were
+// added to the blockchain.
+func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
+	// Grab the diffs by iterating through the transactions in the transaction
+	// pool in order and grabbing the siacoin diffs that would be created by
+	// each.
+	currentTxn := tp.head
+	for currentTxn != nil {
+		// Produce diffs for the siacoin outputs consumed by this transaction.
+		txn := currentTxn.transaction
+		for _, input := range txn.SiacoinInputs {
+			// Grab the output for the diff.
+			output, exists := tp.siacoinOutputs[input.ParentID]
+			if !exists {
+				output, exists = tp.referenceSiacoinOutputs[input.ParentID]
+				if consensus.DEBUG {
+					if !exists {
+						panic("could not find siacoin output")
+					}
+				}
+			}
+
+			scod := consensus.SiacoinOutputDiff{
+				Direction:     consensus.DiffRevert,
+				ID:            input.ParentID,
+				SiacoinOutput: output,
+			}
+			scods = append(scods, scod)
+		}
+
+		// Produce diffs for the siacoin outputs created by this transaction.
+		for i, output := range txn.SiacoinOutputs {
+			scod := consensus.SiacoinOutputDiff{
+				Direction:     consensus.DiffApply,
+				ID:            txn.SiacoinOutputID(i),
+				SiacoinOutput: output,
+			}
+			scods = append(scods, scod)
+		}
+
+		currentTxn = currentTxn.next
+	}
+
+	return
+}
+
 // threadedSendUpdates sends updates to a specific subscriber as they become
 // available. Greater information can be found in consensus/subscribers.go
 func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber modules.TransactionPoolSubscriber) {

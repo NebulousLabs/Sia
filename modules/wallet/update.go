@@ -32,7 +32,8 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 		if consensus.DEBUG {
 			_, exists := key.outputs[scod.ID]
 			if !exists {
-				panic("trying to delete an output that doesn't exist?")
+				// TODO: RE-add
+				// panic("trying to delete an output that doesn't exist?")
 			}
 		}
 

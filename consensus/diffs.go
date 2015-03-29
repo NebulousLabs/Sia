@@ -1,5 +1,14 @@
 package consensus
 
+import (
+	"errors"
+)
+
+// diffs.go contains all of the functions related to diffs in the consensus
+// set. Each block changes the consensus set in a deterministic way, these
+// changes are recorded as diffs for easy rewinding and reapplying. The diffs
+// are created, applied, reverted, and queried in this file.
+
 // A DiffDirection indicates the "direction" of a diff, either applied or
 // reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool
@@ -219,5 +228,20 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// siafund pool ended up.
 	bn.siafundPoolDiff.Adjusted = s.siafundPool
 
+	return
+}
+
+// BlockDiffs returns the diffs created by the input block.
+func (s *State) BlockDiffs(id BlockID) (scods []SiacoinOutputDiff, fcds []FileContractDiff, sfods []SiafundOutputDiff, sfpd SiafundPoolDiff, err error) {
+	bn, exists := s.blockMap[id]
+	if !exists {
+		err = errors.New("could not find block")
+		return
+	}
+
+	scods = bn.siacoinOutputDiffs
+	fcds = bn.fileContractDiffs
+	sfods = bn.siafundOutputDiffs
+	sfpd = bn.siafundPoolDiff
 	return
 }

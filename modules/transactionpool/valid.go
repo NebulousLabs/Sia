@@ -20,21 +20,10 @@ var (
 func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sci := range t.SiacoinInputs {
-		// Check that this output has not already been spent by an unconfirmed
-		// transaction.
-		_, exists := tp.usedSiacoinOutputs[sci.ParentID]
-		if exists {
-			return ErrDoubleSpend
-		}
-
-		// Check for the output in the confirmed and then unconfirmed output
-		// set.
-		sco, exists := tp.state.SiacoinOutput(sci.ParentID)
+		// Check that the output exists in the unconfirmed set.
+		sco, exists := tp.siacoinOutputs[sci.ParentID]
 		if !exists {
-			sco, exists = tp.siacoinOutputs[sci.ParentID]
-			if !exists {
-				return ErrUnrecognizedSiacoinInput
-			}
+			return ErrUnrecognizedSiacoinInput
 		}
 
 		// Check that the unlock conditions meet the required unlock hash.
@@ -47,22 +36,17 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
 		return ErrSiacoinOverspend
 	}
-
 	return
 }
 
 // validUnconfirmedStorageProofs checks that a storage proof is valid in the
 // context of the confirmed and unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction) (err error) {
-	// Check that this is not a repeat storage proof.
+	// Check that the file contract is in the unconfirmed set.
 	for _, sp := range t.StorageProofs {
-		fc, exists := tp.state.FileContract(sp.ParentID)
+		_, exists := tp.state.FileContract(sp.ParentID)
 		if !exists {
-			return errors.New("storage proof submitted for file contract not in confirmed consensus set")
-		}
-		_, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
-		if exists {
-			return errors.New("storage proof already exists for this file contract")
+			return errors.New("storage proof submitted for file contract not in confirmed set.")
 		}
 	}
 
@@ -80,21 +64,10 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 // the validity of the termination payouts.
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
-		// Check for the corresponding FileContract in the confirmed and
-		// unconfirmed set.
-		fc, exists := tp.state.FileContract(fct.ParentID)
+		// Check for the corresponding file contract in the unconfirmed set.
+		fc, exists := tp.fileContracts[fct.ParentID]
 		if !exists {
-			fc, exists = tp.fileContracts[fct.ParentID]
-			if !exists {
-				return errors.New("termination given for unrecognized file contract")
-			}
-		}
-
-		// Check that the file contract has not already been terminated in the
-		// unconfirmed set.
-		_, exists = tp.fileContractTerminations[fc.Start][fct.ParentID]
-		if exists {
-			return errors.New("termination given for an already terminated file contract")
+			return errors.New("termination given for unrecognized file contract")
 		}
 
 		// Check that the termination conditions match the termination hash.
@@ -102,9 +75,7 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 			return errors.New("termination conditions do not meet required termination hash")
 		}
 
-		// Check that the termination has been submitted in time. This overlaps
-		// with IsStandard, but allows the IsStardard rules to be listed or
-		// altered without breaking anything.
+		// Check that the termination has been submitted in time.
 		if fc.Start < tp.stateHeight {
 			return errors.New("termination submitted too late")
 		}
@@ -119,7 +90,6 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 			return errors.New("contract termination has incorrect payouts")
 		}
 	}
-
 	return
 }
 
@@ -130,19 +100,10 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sfi := range t.SiafundInputs {
-		// Check that the siafund output has not already been spent.
-		_, exists := tp.usedSiafundOutputs[sfi.ParentID]
-		if exists {
-			return errors.New("siafund output has already been spent")
-		}
-
 		// Check that the siafund output being spent exists.
-		sfo, exists := tp.state.SiafundOutput(sfi.ParentID)
+		sfo, exists := tp.siafundOutputs[sfi.ParentID]
 		if !exists {
-			sfo, exists = tp.siafundOutputs[sfi.ParentID]
-			if !exists {
-				return errors.New("transaction spends unrecognized siafund output")
-			}
+			return errors.New("transaction spends unrecognized siafund output")
 		}
 
 		// Check that the unlock conditions match the spend conditions.
@@ -154,8 +115,7 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 		inputSum = inputSum.Add(sfo.Value)
 	}
 
-	// Go through the outputs, making sure each is valid and summing the number
-	// of funds allocated.
+	// Check that the value of the outputs equal the value of the inputs.
 	var outputSum consensus.Currency
 	for _, sfo := range t.SiafundOutputs {
 		outputSum = outputSum.Add(sfo.Value)

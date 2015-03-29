@@ -35,6 +35,9 @@ test: clean fmt REBUILD
 test-long: clean fmt REBUILD
 	go test -v -race -tags=test -timeout=180s ./...
 
+test-tpool: clean fmt REBUILD
+	go test -v -race -tags=test -timeout=8s github.com/NebulousLabs/Sia/modules/transactionpool
+
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
 coverpackages = consensus crypto encoding modules/gateway modules/host          \

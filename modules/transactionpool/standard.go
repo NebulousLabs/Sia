@@ -9,6 +9,10 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// IsStandardTransaction adds an extra set of rules to transactions which help
+// to preserve network health and help with forwards compatibility in the event
+// of a soft fork.
+
 const (
 	FileContractConfirmWindow = 3
 	TransactionSizeLimit      = 16 * 1024
