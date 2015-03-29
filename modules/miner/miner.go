@@ -9,10 +9,11 @@ import (
 )
 
 type Miner struct {
-	state   *consensus.State
-	gateway modules.Gateway
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	state       *consensus.State
+	gateway     modules.Gateway
+	tpool       modules.TransactionPool
+	wallet      modules.Wallet
+	stateHeight consensus.BlockHeight
 
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
@@ -26,8 +27,7 @@ type Miner struct {
 	runningThreads       int
 	iterationsPerAttempt uint64
 
-	stateSubscription chan struct{}
-	tpoolSubscription chan struct{}
+	subscribers []chan struct{}
 
 	mu sync.RWMutex
 }
@@ -52,10 +52,15 @@ func New(s *consensus.State, g modules.Gateway, tpool modules.TransactionPool, w
 	}
 
 	m = &Miner{
-		state:                s,
-		gateway:              g,
-		tpool:                tpool,
-		wallet:               w,
+		state:   s,
+		gateway: g,
+		tpool:   tpool,
+		wallet:  w,
+
+		parent:            s.CurrentBlock().ID(),
+		target:            s.CurrentTarget(),
+		earliestTimestamp: s.EarliestTimestamp(),
+
 		threads:              1,
 		iterationsPerAttempt: 16 * 1024,
 	}
@@ -66,9 +71,7 @@ func New(s *consensus.State, g modules.Gateway, tpool modules.TransactionPool, w
 	}
 	m.address = addr
 
-	// Update the miner.
-	m.update()
-
+	m.tpool.TransactionPoolSubscribe(m)
 	return
 }
 
@@ -83,27 +86,4 @@ func (m *Miner) SetThreads(threads int) error {
 	m.threads = threads
 
 	return nil
-}
-
-func (m *Miner) updateTransactionSet() {
-	m.transactions = m.tpool.TransactionSet()
-}
-
-func (m *Miner) updateBlockInfo() {
-	m.parent = m.state.CurrentBlock().ID()
-	m.target = m.state.CurrentTarget()
-	m.earliestTimestamp = m.state.EarliestTimestamp()
-}
-
-// update will update the mining variables to match the most recent changes in
-// the blockchain and the transaction pool.
-//
-// Previously, these changes were only called if the state or transaction pool
-// had actually changed, but this greatly increased the complexity of the code,
-// and I'm not even sure it made things run faster.
-func (m *Miner) update() {
-	id := m.state.RLock()
-	defer m.state.RUnlock(id)
-	m.updateTransactionSet()
-	m.updateBlockInfo()
 }

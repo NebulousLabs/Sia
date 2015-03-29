@@ -71,6 +71,7 @@ type TransactionPool struct {
 	// is always fully synchronized to the transaction pool.
 	revertBlocksUpdates     [][]consensus.Block
 	applyBlocksUpdates      [][]consensus.Block
+	unconfirmedTransactions [][]consensus.Transaction
 	unconfirmedSiacoinDiffs [][]consensus.SiacoinOutputDiff
 	subscribers             []chan struct{}
 

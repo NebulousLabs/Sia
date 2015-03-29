@@ -64,9 +64,10 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 			id := tp.mu.RLock()
 			revertBlocks := tp.revertBlocksUpdates[i]
 			applyBlocks := tp.applyBlocksUpdates[i]
+			unconfirmedTransactions := tp.unconfirmedTransactions[i]
 			unconfirmedDiffs := tp.unconfirmedSiacoinDiffs[i]
 			tp.mu.RUnlock(id)
-			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, unconfirmedDiffs)
+			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, unconfirmedTransactions, unconfirmedDiffs)
 			i++
 		}
 
@@ -77,10 +78,11 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
-func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, diffs []consensus.SiacoinOutputDiff) {
+func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedTransactions []consensus.Transaction, diffs []consensus.SiacoinOutputDiff) {
 	// Add the changes to the update set.
 	tp.revertBlocksUpdates = append(tp.revertBlocksUpdates, revertedBlocks)
 	tp.applyBlocksUpdates = append(tp.applyBlocksUpdates, appliedBlocks)
+	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
 	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 
 	for _, subscriber := range tp.subscribers {
@@ -92,7 +94,7 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []con
 	}
 }
 
-// Subscribe adds a subscriber to the transaction pool.
+// TransactionPoolSubscribe adds a subscriber to the transaction pool.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	c := make(chan struct{}, 1)
 	id := tp.mu.Lock()

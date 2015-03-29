@@ -13,7 +13,7 @@ import (
 func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	// Create some unconfirmed transactions.
 	tpt.addDependentSiacoinTransactionToPool()
-	if len(tpt.tpool.FullTransactionSet()) == 0 {
+	if len(tpt.tpool.TransactionSet()) == 0 {
 		tpt.t.Error("tset should have some transacitons")
 	}
 
@@ -22,10 +22,10 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Check that the transactions have been removed from the unconfirmed set.
-	if len(tpt.tpool.FullTransactionSet()) != 0 {
+	if len(tpt.tpool.TransactionSet()) != 0 {
 		tpt.t.Error("unconfirmed transaction set is not empty")
 	}
 }
@@ -51,12 +51,12 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 	err = tpt.tpool.AcceptTransaction(dependent)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Create a transaction that is in conflict with the parent.
 	parentValue := parent.SiacoinOutputSum()
@@ -71,7 +71,7 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	// dependencies of it's own, and 'conflict' has the same dependencies as
 	// 'parent'. So the block we mine needs to include all of the dependencies
 	// without including 'parent' or 'dependent'.
-	tset := tpt.tpool.FullTransactionSet()
+	tset := tpt.tpool.TransactionSet()
 	tset = tset[:len(tset)-2]     // strip 'parent' and 'dependent'
 	tset = append(tset, conflict) // add 'conflict'
 	target := tpt.cs.CurrentTarget()
@@ -93,11 +93,11 @@ func (tpt *tpoolTester) testBlockConflicts() {
 			break
 		}
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
-	if len(tpt.tpool.FullTransactionSet()) != 0 {
+	if len(tpt.tpool.TransactionSet()) != 0 {
 		tpt.t.Error("parent and dependent transaction are still in the pool after a conflict has been introduced, have", len(tset))
 	}
 }
@@ -124,15 +124,15 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 	err = tpt.tpool.AcceptTransaction(dependent)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Mine a block to put the parent into the confirmed set.
-	tset := tpt.tpool.FullTransactionSet()
+	tset := tpt.tpool.TransactionSet()
 	tset = tset[:len(tset)-1] // strip 'dependent'
 	target := tpt.cs.CurrentTarget()
 	block := consensus.Block{
@@ -154,11 +154,11 @@ func (tpt *tpoolTester) testDependentUpdates() {
 			break
 		}
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
-	if len(tpt.tpool.FullTransactionSet()) != 1 {
+	if len(tpt.tpool.TransactionSet()) != 1 {
 		tpt.t.Error("dependent transaction does not remain unconfirmed after parent has been confirmed:", len(tset))
 	}
 }
@@ -168,7 +168,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 func (tpt *tpoolTester) testRewinding() {
 	// Put some transactions into the unconfirmed set.
 	tpt.addSiacoinTransactionToPool()
-	if len(tpt.tpool.FullTransactionSet()) == 0 {
+	if len(tpt.tpool.TransactionSet()) == 0 {
 		tpt.t.Fatal("transaction pool has no transactions")
 	}
 
@@ -199,8 +199,8 @@ func (tpt *tpoolTester) testRewinding() {
 			break
 		}
 	}
-	<-tpt.updateChan
-	if len(tpt.tpool.FullTransactionSet()) != 0 {
+	tpt.updateWait()
+	if len(tpt.tpool.TransactionSet()) != 0 {
 		tpt.t.Fatal("tset should be empty after FindBlock()")
 	}
 
@@ -225,11 +225,11 @@ func (tpt *tpoolTester) testRewinding() {
 			break
 		}
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Check that the transaction which was once confirmed but no longer is
 	// confirmed is now unconfirmed.
-	if len(tpt.tpool.FullTransactionSet()) == 0 {
+	if len(tpt.tpool.TransactionSet()) == 0 {
 		tpt.t.Error("tset should contain transactions that used to be confirmed but no longer are")
 	}
 }

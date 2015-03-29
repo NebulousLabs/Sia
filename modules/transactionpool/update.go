@@ -182,14 +182,15 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 	// Grab the set of transactions in the transaction pool, then remove them
 	// all. Then apply the consensus updates, then add back whatever
 	// transactions are still valid.
-	unconfirmedTxnSet := tp.fullTransactionSet()
+	unconfirmedTxnSet := tp.transactionSet()
 	tp.purge()
 
 	// Add all transactions that got removed to the transaction pool, so long
 	// as they conform to IsStandard rules.
 	for i := len(revertedBlocks) - 1; i >= 0; i-- {
 		block := revertedBlocks[i]
-		for _, txn := range block.Transactions {
+		for j := len(block.Transactions) - 1; j >= 0; j-- {
+			txn := block.Transactions[j]
 			err := tp.IsStandardTransaction(txn)
 			if err != nil {
 				continue
@@ -235,5 +236,5 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		tp.addTransactionToPool(txn)
 	}
 
-	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.unconfirmedSiacoinOutputDiffs())
+	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionSet(), tp.unconfirmedSiacoinOutputDiffs())
 }

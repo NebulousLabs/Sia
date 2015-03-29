@@ -15,7 +15,7 @@ func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	return
 }
@@ -39,7 +39,7 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	// Send the full balance to ourselves again. The second transaction will
 	// necesarily require the first transaction as a dependency, since we're
@@ -48,7 +48,7 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	<-tpt.updateChan
+	tpt.updateWait()
 
 	return
 }

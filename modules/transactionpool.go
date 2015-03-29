@@ -10,7 +10,7 @@ import (
 type TransactionPoolSubscriber interface {
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedSiacoinOutputDiffs []consensus.SiacoinOutputDiff)
+	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedTransactions []consensus.Transaction, unconfirmedSiacoinOutputDiffs []consensus.SiacoinOutputDiff)
 }
 
 type TransactionPool interface {
@@ -19,18 +19,11 @@ type TransactionPool interface {
 	// transaction is rejected.
 	AcceptTransaction(consensus.Transaction) error
 
-	// FullTransactionSet returns all of the transactions in the transaction
-	// pool, ordered such that any dependencies always come after their
-	// requirements. The list of transactions returned may not fit inside of a
-	// single block.
-	FullTransactionSet() []consensus.Transaction
-
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
 	IsStandardTransaction(consensus.Transaction) error
 
-	// TransactionSet will return a set of transactions not exceeding the block
-	// size that can be inserted into a block in order.
+	// TransactionSet returns the set of unconfirmed transactions.
 	TransactionSet() []consensus.Transaction
 
 	// TransactionPoolSubscribe will subscribe the input object to the changes

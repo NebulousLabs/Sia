@@ -232,8 +232,11 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 }
 
 // BlockDiffs returns the diffs created by the input block.
-func (s *State) BlockDiffs(id BlockID) (scods []SiacoinOutputDiff, fcds []FileContractDiff, sfods []SiafundOutputDiff, sfpd SiafundPoolDiff, err error) {
-	bn, exists := s.blockMap[id]
+func (s *State) BlockDiffs(bid BlockID) (scods []SiacoinOutputDiff, fcds []FileContractDiff, sfods []SiafundOutputDiff, sfpd SiafundPoolDiff, err error) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
+
+	bn, exists := s.blockMap[bid]
 	if !exists {
 		err = errors.New("could not find block")
 		return

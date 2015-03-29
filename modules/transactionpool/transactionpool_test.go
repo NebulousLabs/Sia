@@ -23,7 +23,8 @@ type tpoolTester struct {
 	miner  modules.Miner
 	wallet modules.Wallet
 
-	updateChan chan struct{}
+	tpoolUpdateChan chan struct{}
+	minerUpdateChan <-chan struct{}
 
 	t *testing.T
 }
@@ -55,6 +56,12 @@ func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
 	}
 
 	return txn
+}
+
+// updateWait blocks while an update propagates through the modules.
+func (tpt *tpoolTester) updateWait() {
+	<-tpt.tpoolUpdateChan
+	<-tpt.minerUpdateChan
 }
 
 // CreatetpoolTester initializes a tpoolTester.
@@ -89,19 +96,22 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Subscribe to the updates of the transaction pool.
-	updateChan := make(chan struct{}, 1)
+	tpoolUpdateChan := make(chan struct{}, 1)
 	id := tp.mu.Lock()
-	tp.subscribers = append(tp.subscribers, updateChan)
+	tp.subscribers = append(tp.subscribers, tpoolUpdateChan)
 	tp.mu.Unlock(id)
 
 	// Assebmle all of the objects in to a tpoolTester
 	tpt = &tpoolTester{
-		cs:         cs,
-		tpool:      tp,
-		miner:      m,
-		wallet:     w,
-		updateChan: updateChan,
-		t:          t,
+		cs:     cs,
+		tpool:  tp,
+		miner:  m,
+		wallet: w,
+
+		tpoolUpdateChan: tpoolUpdateChan,
+		minerUpdateChan: m.MinerSubscribe(),
+
+		t: t,
 	}
 
 	// Mine blocks until there is money in the wallet.
@@ -113,7 +123,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 				t.Fatal(err)
 			}
 			if found {
-				<-updateChan
+				tpt.updateWait()
 				break
 			}
 		}

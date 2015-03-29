@@ -44,7 +44,7 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 // ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
-func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedSiacoinDiffs []consensus.SiacoinOutputDiff) {
+func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, _ []consensus.Transaction, unconfirmedSiacoinDiffs []consensus.SiacoinOutputDiff) {
 	id := w.mu.Lock()
 	defer w.mu.Unlock(id)
 

@@ -12,6 +12,10 @@ type Miner interface {
 	// sovled, and an error.
 	FindBlock() (consensus.Block, bool, error)
 
+	// MinerSubscribe is a channel to inform subscribers of when the miner has
+	// updated. This is primarily used for synchronization during testing.
+	MinerSubscribe() <-chan struct{}
+
 	// SolveBlock will have the miner make 1 attempt to solve the input block.
 	// It will give up after a few seconds, returning the block, a bool
 	// indicating whether it has been solved, and an error.
