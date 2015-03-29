@@ -199,20 +199,42 @@ func (s *State) CurrentBlock() Block {
 	return s.currentBlockNode().block
 }
 
-// CurrentTarget returns the target of the next block that needs to be
-// submitted to the state.
+func (s *State) ChildTarget(bid BlockID) (target Target, exists bool) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
+	bn, exists := s.blockMap[bid]
+	if !exists {
+		return
+	}
+	target = bn.target
+	return
+}
+
+// CurrentTarget returns the target of the next block that needs to be submitted
+// to the state.
 func (s *State) CurrentTarget() Target {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
 	return s.currentBlockNode().target
+}
+
+func (s *State) EarliestTimestamp() Timestamp {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
+	return s.currentBlockNode().earliestChildTimestamp()
 }
 
 // EarliestTimestamp returns the earliest timestamp that the next block can
 // have in order for it to be considered valid.
-func (s *State) EarliestTimestamp() Timestamp {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.currentBlockNode().earliestChildTimestamp()
+func (s *State) EarliestChildTimestamp(bid BlockID) (timestamp Timestamp, exists bool) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
+	bn, exists := s.blockMap[bid]
+	if !exists {
+		return
+	}
+	timestamp = bn.earliestChildTimestamp()
+	return
 }
 
 // Height returns the height of the current blockchain (the longest fork).

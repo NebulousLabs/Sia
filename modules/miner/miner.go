@@ -9,11 +9,10 @@ import (
 )
 
 type Miner struct {
-	state       *consensus.State
-	gateway     modules.Gateway
-	tpool       modules.TransactionPool
-	wallet      modules.Wallet
-	stateHeight consensus.BlockHeight
+	state   *consensus.State
+	gateway modules.Gateway
+	tpool   modules.TransactionPool
+	wallet  modules.Wallet
 
 	// Block variables - helps the miner construct the next block.
 	parent            consensus.BlockID
