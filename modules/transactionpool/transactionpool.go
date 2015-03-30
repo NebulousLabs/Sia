@@ -57,8 +57,8 @@ type TransactionPool struct {
 	// this order ensures that dependencies always appear earlier in the linked
 	// list, so a call to TransactionSet() will never dump out-of-order
 	// transactions.
-	transactions    map[crypto.Hash]*consensus.Transaction
-	transactionList []*consensus.Transaction
+	transactions    map[crypto.Hash]struct{}
+	transactionList []consensus.Transaction
 
 	// The unconfirmed set of contracts and outputs. The unconfirmed set
 	// includes the confirmed set, except for elements that have been spent by
@@ -106,7 +106,7 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 		consensusSet: cs,
 		gateway:      g,
 
-		transactions:   make(map[crypto.Hash]*consensus.Transaction),
+		transactions:   make(map[crypto.Hash]struct{}),
 		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
 		fileContracts:  make(map[consensus.FileContractID]consensus.FileContract),
 		siafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),

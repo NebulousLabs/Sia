@@ -163,7 +163,7 @@ func (tp *TransactionPool) removeTailTransaction() {
 
 	// Grab the most recent transaction and remove it from the unconfirmed
 	// consensus set piecemeal.
-	t := *tp.transactionList[len(tp.transactionList)-1]
+	t := tp.transactionList[len(tp.transactionList)-1]
 	tp.removeSiacoinInputs(t)
 	tp.removeSiacoinOutputs(t)
 	tp.removeFileContracts(t)
@@ -320,7 +320,7 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 	for _, block := range revertedBlocks {
 		unconfirmedTxns = append(unconfirmedTxns, block.Transactions...)
 	}
-	unconfirmedTxns = append(unconfirmedTxns, tp.transactionSet()...)
+	unconfirmedTxns = append(unconfirmedTxns, tp.transactionList...)
 
 	// Purge the pool of unconfirmed transactions so that there is no
 	// interference from unconfirmed transactions during the application of
@@ -371,5 +371,5 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 	}
 
 	// Inform the subscribers that an update has executed.
-	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionSet(), tp.unconfirmedSiacoinOutputDiffs())
+	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 }

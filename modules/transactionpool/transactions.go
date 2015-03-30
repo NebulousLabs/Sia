@@ -14,7 +14,7 @@ import (
 // volume of transactions to fit in a single block.
 func (tp *TransactionPool) transactionSet() (set []consensus.Transaction) {
 	for _, txn := range tp.transactionList {
-		set = append(set, *txn)
+		set = append(set, txn)
 	}
 	return
 }

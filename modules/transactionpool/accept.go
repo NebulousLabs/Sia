@@ -181,8 +181,8 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 	tp.applySiafundOutputs(t)
 
 	// Add the transaction to the list of transactions.
-	tp.transactions[crypto.HashObject(t)] = &t
-	tp.transactionList = append(tp.transactionList, &t)
+	tp.transactions[crypto.HashObject(t)] = struct{}{}
+	tp.transactionList = append(tp.transactionList, t)
 }
 
 // AcceptTransaction adds a transaction to the unconfirmed set of transactions.
@@ -208,7 +208,7 @@ func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error
 	// Add the transaction to the pool, notify all subscribers, and broadcast
 	// the transaction.
 	tp.addTransactionToPool(t)
-	tp.updateSubscribers(nil, nil, tp.transactionSet(), tp.unconfirmedSiacoinOutputDiffs())
+	tp.updateSubscribers(nil, nil, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 	tp.gateway.RelayTransaction(t) // error is not checked
 	return
 }
