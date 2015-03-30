@@ -28,7 +28,6 @@ func (wt *WalletTester) testFundTransaction() {
 	if err != nil {
 		wt.Fatal(err)
 	}
-	wt.update()
 
 	// Build a transaction that intentionally needs a refund.
 	id, err := wt.RegisterTransaction(consensus.Transaction{})
@@ -51,7 +50,6 @@ func (wt *WalletTester) testFundTransaction() {
 	if err != nil {
 		wt.Fatal(err)
 	}
-	wt.update()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1.

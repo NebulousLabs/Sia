@@ -31,7 +31,6 @@ func (wt *WalletTester) testUnconfirmedTransaction() {
 	}
 
 	// Update the wallet and check that the balance has increased by value.
-	wt.update()
 	expectedBal := initialBal.Add(value)
 	if expectedBal.Cmp(wt.Balance(false)) != 0 {
 		wt.Error("unexpected balance after adding unconfirmed transaction")

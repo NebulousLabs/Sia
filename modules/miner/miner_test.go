@@ -37,21 +37,19 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	minerChan := m.MinerSubscribe()
 
 	// Check that the wallet balance starts at 0.
 	if w.Balance(true).Cmp(consensus.ZeroCurrency) != 0 {
 		t.Fatal("expecting initial wallet balance to be zero")
 	}
 
-	var solved bool
 	for i := 0; i <= consensus.MaturityDelay; i++ {
-		for !solved {
-			_, solved, err = m.FindBlock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		_, _, err = m.FindBlock()
+		if err != nil {
+			t.Fatal(err)
 		}
-		solved = false
+		<-minerChan
 	}
 
 	if w.Balance(true).Cmp(consensus.ZeroCurrency) == 0 {
@@ -91,14 +89,13 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	minerChan := m.MinerSubscribe()
 
 	for i := 0; i < 200; i++ {
-		var solved bool
-		for !solved {
-			_, solved, err = m.FindBlock()
-			if err != nil {
-				t.Fatal(err)
-			}
+		_, _, err = m.FindBlock()
+		if err != nil {
+			t.Fatal(err)
 		}
+		<-minerChan
 	}
 }
