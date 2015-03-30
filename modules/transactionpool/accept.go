@@ -8,7 +8,10 @@ import (
 )
 
 // accept.go is responsible for applying a transaction to the transaction pool.
-// Validation is handled by valid.go.
+// Validation is handled by valid.go. The componenets of the transcation are
+// added to the unconfirmed consensus set piecemeal, and then the transaction
+// itself is appended to the linked list of transactions, such that any
+// dependecies will appear earlier in the list.
 
 var (
 	ErrDuplicate = errors.New("transaction is a duplicate")
@@ -178,13 +181,9 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 	tp.applySiafundInputs(t)
 	tp.applySiafundOutputs(t)
 
-	// Add the unconfirmed transaction to the end of the linked list of
-	// transactions.
-	ut := &unconfirmedTransaction{
-		transaction: t,
-	}
-	tp.appendUnconfirmedTransaction(ut)
-	tp.transactions[crypto.HashObject(t)] = ut
+	// Add the transaction to the list of transactions.
+	tp.transactions[crypto.HashObject(t)] = &t
+	tp.transactionList = append(tp.transactionList, &t)
 }
 
 // AcceptTransaction adds a transaction to the unconfirmed set of transactions.

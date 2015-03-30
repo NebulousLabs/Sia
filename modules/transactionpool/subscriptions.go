@@ -5,22 +5,32 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// UnconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
-// would be created immediately if all of the unconfirmed transactions were
-// added to the blockchain.
+// subscriptions.go manages subscriptions to the transaction pool. Every time
+// there is a change in the transaction pool, subscribers are sent info about
+// the changes, in the form of all of the blocks that have been applied or
+// reverted in the consensus set, the current set of unconfirmed transactions,
+// and the set of siacoin output diffs that result from the unconfirmed
+// transactions.
+//
+// Subscriptions are set up to isolate the transaction pool from problems that
+// occur with the subscriber. Each subscriber gets a gothread that calls
+// 'update' in the correct order. If a subscriber crashes or deadlocks, the
+// transcation pool will be unaffected.
+
+// unconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
+// are created by the unconfirmed set of transactions.
 func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
-	// Grab the diffs by iterating through the transactions in the transaction
-	// pool in order and grabbing the siacoin diffs that would be created by
-	// each.
-	currentTxn := tp.head
-	for currentTxn != nil {
+	// Iterate through the unconfirmed transactions in order and record the
+	// siacoin output diffs created.
+	for _, txn := range tp.transactionList {
 		// Produce diffs for the siacoin outputs consumed by this transaction.
-		txn := currentTxn.transaction
 		for _, input := range txn.SiacoinInputs {
-			// Grab the output for the diff.
+			// Grab the output from the unconfirmed or reference set.
 			output, exists := tp.siacoinOutputs[input.ParentID]
 			if !exists {
 				output, exists = tp.referenceSiacoinOutputs[input.ParentID]
+				// Sanity check - output should exist in either the unconfirmed
+				// or reference set.
 				if consensus.DEBUG {
 					if !exists {
 						panic("could not find siacoin output")
@@ -45,21 +55,28 @@ func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.Si
 			}
 			scods = append(scods, scod)
 		}
-
-		currentTxn = currentTxn.next
 	}
 
 	return
 }
 
-// threadedSendUpdates sends updates to a specific subscriber as they become
-// available. Greater information can be found in consensus/subscribers.go
+// threadedSendUpdates sends updates to a specific subscriber as updates become
+// available. If the subscriber deadlocks, this thread will deadlock, however
+// that will not affect any of the other threads in the transaction pool.
 func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber modules.TransactionPoolSubscriber) {
+	// Updates must be sent in order. This is achieved by having all of the
+	// updates stored in the transaction pool in a specific order, and then
+	// making blocking calls to 'ReceiveTransactionPoolUpates' until all of the
+	// updates have been sent.
 	i := 0
 	for {
+		// Determine how many total updates there are to send.
 		id := tp.mu.RLock()
 		updateCount := len(tp.revertBlocksUpdates)
 		tp.mu.RUnlock(id)
+
+		// Send each of the updates in order, starting from the first update
+		// that has not yet been sent to the subscriber.
 		for i < updateCount {
 			id := tp.mu.RLock()
 			revertBlocks := tp.revertBlocksUpdates[i]
@@ -85,6 +102,7 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []con
 	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
 	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 
+	// Notify every subscriber.
 	for _, subscriber := range tp.subscribers {
 		// If the channel is already full, don't block.
 		select {

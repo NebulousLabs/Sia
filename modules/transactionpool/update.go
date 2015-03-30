@@ -7,8 +7,15 @@ import (
 
 // removeUnconfirmedTransaction takes an unconfirmed transaction and removes it
 // from the transaction pool, but leaves behind all dependencies.
-func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransaction) {
-	t := ut.transaction
+func (tp *TransactionPool) removeTailTransaction() {
+	if len(tp.transactionList) == 0 {
+		if consensus.DEBUG {
+			panic("calling removeTailTransaction when transaction list is empty")
+		}
+		return
+	}
+
+	t := *tp.transactionList[len(tp.transactionList)-1]
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - check that the maps are in the expected state.
 		if consensus.DEBUG {
@@ -84,18 +91,27 @@ func (tp *TransactionPool) removeUnconfirmedTransaction(ut *unconfirmedTransacti
 		sfoid := t.SiafundOutputID(i)
 		delete(tp.siafundOutputs, sfoid)
 	}
+
 	delete(tp.transactions, crypto.HashObject(t))
-	tp.removeUnconfirmedTransactionFromList(ut)
+	tp.transactionList = tp.transactionList[:len(tp.transactionList)-1]
+
+	// Sanity check - the lengths of the transactions by hash vs. the ordered
+	// set of transactions should always be the same.
+	if len(tp.transactions) != len(tp.transactionList) {
+		panic("length mismatch for transactions and transactionList")
+	}
+
 	return
 }
 
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
-	for tp.tail != nil {
-		tp.removeUnconfirmedTransaction(tp.tail)
+	for len(tp.transactions) != 0 {
+		tp.removeTailTransaction()
 	}
 
-	// Sanity check - all reference objects should have been deleted.
+	// Sanity check - all reference objects should have been deleted, and the
+	// list of unconfirmed transactions should be empty.
 	if consensus.DEBUG {
 		if len(tp.referenceSiacoinOutputs) != 0 {
 			panic("referenceSiacoinOutputs is not empty")
@@ -108,6 +124,9 @@ func (tp *TransactionPool) purge() {
 		}
 		if len(tp.transactions) != 0 {
 			panic("transactions is not empty")
+		}
+		if len(tp.transactionList) != 0 {
+			panic("transactionList is not empty")
 		}
 	}
 
@@ -202,7 +221,7 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		}
 
 		// Add all of the diffs to the unconfirmed set.
-		scods, fcds, sfods, _, err := tp.state.BlockDiffs(block.ID())
+		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
 			if consensus.DEBUG {
 				panic(err)
@@ -210,16 +229,16 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		}
 		tp.applyDiffs(scods, fcds, sfods, consensus.DiffRevert)
 
-		tp.stateHeight--
+		tp.consensusSetHeight--
 	}
 
-	// Handle applied blocks. The state height needs to be incremented at the
-	// beginning so that all of the invalidations are looking at the correct
-	// height. The diffs need to be applied at the end so that removing
+	// Handle applied blocks. The consensus set height needs to be incremented
+	// at the beginning so that all of the invalidations are looking at the
+	// correct height. The diffs need to be applied at the end so that removing
 	// unconfirmed transactions don't result in diff conflicts.
 	for _, block := range appliedBlocks {
 		// Add all of the diffs to the unconfirmed set.
-		scods, fcds, sfods, _, err := tp.state.BlockDiffs(block.ID())
+		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
 			if consensus.DEBUG {
 				panic(err)
@@ -227,7 +246,7 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		}
 		tp.applyDiffs(scods, fcds, sfods, consensus.DiffApply)
 
-		tp.stateHeight++
+		tp.consensusSetHeight++
 	}
 
 	// Add back all of the unconfirmed transactions that are still valid.

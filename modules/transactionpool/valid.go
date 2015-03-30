@@ -43,14 +43,14 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction) (err error) {
 	// Check that the file contract is in the unconfirmed set.
 	for _, sp := range t.StorageProofs {
-		_, exists := tp.state.FileContract(sp.ParentID)
+		_, exists := tp.consensusSet.FileContract(sp.ParentID)
 		if !exists {
 			return errors.New("storage proof submitted for file contract not in confirmed set.")
 		}
 	}
 
 	// Check that all of the storage proofs are valid.
-	err = tp.state.ValidStorageProofs(t)
+	err = tp.consensusSet.ValidStorageProofs(t)
 	if err != nil {
 		return
 	}
@@ -75,7 +75,7 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 		}
 
 		// Check that the termination has been submitted in time.
-		if fc.Start < tp.stateHeight {
+		if fc.Start < tp.consensusSetHeight {
 			return errors.New("termination submitted too late")
 		}
 
@@ -138,7 +138,7 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t consensus.Transaction) 
 	// Check that the transaction follows general rules - this check looks at
 	// rules for transactions contianing storage proofs, the rules for file
 	// contracts, and the rules for signatures.
-	err = t.StandaloneValid(tp.stateHeight)
+	err = t.StandaloneValid(tp.consensusSetHeight)
 	if err != nil {
 		return
 	}

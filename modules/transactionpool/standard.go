@@ -11,13 +11,15 @@ import (
 
 // standard.go adds extra rules to transactions which help preserve network
 // health and provides flexibility for future soft forks and tweaks to the
-// network.
+// network. Specifically, the transaction size is limited to minimize DOS
+// vectors but maximize future flexibility, foreign signature algorithms are
+// ignored to prevent violating future rules wehre new signature algorithms are
+// added, and the types of allowed arbitrary data are limited to leave room for
+// more involved soft-forks in the future.
 
 const (
-	FileContractConfirmWindow = 8
-	TransactionSizeLimit      = 16 * 1024
-
-	PrefixNonSia = "NonSia"
+	PrefixNonSia         = "NonSia"
+	TransactionSizeLimit = 16 * 1024
 )
 
 var (
@@ -75,36 +77,6 @@ func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err e
 		err = tp.checkUnlockConditions(sfi.UnlockConditions)
 		if err != nil {
 			return
-		}
-	}
-
-	// Check that any file contracts do not start for at least
-	// FileContractConfirmWindow blocks. By having a largeish confirm window,
-	// the probability of a file contract making it into the unconfirmed set
-	// but then becoming invalid before making the confirmed set is reduced.
-	// The transaction pool is still stable if this happens, but 0-confirmation
-	// hosts may respond poorly.
-	for _, fc := range t.FileContracts {
-		if fc.Start < tp.state.Height()+FileContractConfirmWindow {
-			return errors.New("file contract cannot start so close to the current height")
-		}
-	}
-
-	// Check that any terminations do not become invalid for at least
-	// FileContractConfirmWindow blocks.
-	for _, fct := range t.FileContractTerminations {
-		// Because the validity of the transaction has not yet been checked,
-		// there must be a check that the corresponding file contract
-		// termination is in the unconfirmed set.
-		fc, exists := tp.state.FileContract(fct.ParentID)
-		if !exists {
-			fc, exists = tp.fileContracts[fct.ParentID]
-			if !exists {
-				return errors.New("termination submitted for unknown file contract.")
-			}
-		}
-		if fc.Start < tp.stateHeight-FileContractConfirmWindow {
-			return errors.New("termination submitted too late")
 		}
 	}
 
