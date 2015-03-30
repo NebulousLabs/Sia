@@ -9,7 +9,6 @@ import (
 var (
 	ErrBadUnlockConditions      = errors.New("siacoin unlock conditions do not meet required unlock hash")
 	ErrSiacoinOverspend         = errors.New("transaction has more siacoin outputs than inputs")
-	ErrDoubleSpend              = errors.New("transaction spends an output that was spent by another transaction in the pool")
 	ErrUnrecognizedSiacoinInput = errors.New("unrecognized siacoin input in transaction")
 )
 

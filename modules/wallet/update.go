@@ -16,28 +16,37 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 	}
 
 	if scod.Direction == dir {
-		// If the output is already known, ignore it.
-		_, exists := key.outputs[scod.ID]
+		// FundTransaction creates outputs and adds them immediately. They will
+		// also show up from the transaction pool, occasionally causing
+		// repeats. Additionally, outputs that used to exist are not deleted.
+		// If they get re-added, we need to know the age of the output.
+		output, exists := key.outputs[scod.ID]
 		if exists {
+			if !output.spendable {
+				output.spendable = true
+			}
 			return
 		}
 
-		// Add the output.
+		// Add the output. Age is set to 0 because the output has not been
+		// spent yet.
 		ko := &knownOutput{
 			id:     scod.ID,
 			output: scod.SiacoinOutput,
+
+			spendable: true,
+			age:       0,
 		}
 		key.outputs[scod.ID] = ko
 	} else {
 		if consensus.DEBUG {
 			_, exists := key.outputs[scod.ID]
 			if !exists {
-				// TODO: RE-add
-				// panic("trying to delete an output that doesn't exist?")
+				panic("trying to delete an output that doesn't exist?")
 			}
 		}
 
-		delete(key.outputs, scod.ID)
+		key.outputs[scod.ID].spendable = false
 	}
 }
 

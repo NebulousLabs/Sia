@@ -29,12 +29,44 @@ type tpoolTester struct {
 	t *testing.T
 }
 
+// SpendCoins sends the desired amount of coins to the desired address, calling
+// wait at all of the appropriate places to assist synchronization.
+func (tpt *tpoolTester) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
+	output := consensus.SiacoinOutput{
+		Value:      amount,
+		UnlockHash: dest,
+	}
+	id, err := tpt.wallet.RegisterTransaction(t)
+	if err != nil {
+		return
+	}
+	_, err = tpt.wallet.FundTransaction(id, amount)
+	if err != nil {
+		return
+	}
+	tpt.updateWait()
+	_, _, err = tpt.wallet.AddOutput(id, output)
+	if err != nil {
+		return
+	}
+	t, err = tpt.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
+	err = tpt.tpool.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
+	tpt.updateWait()
+	return
+}
+
 // emptyUnlockTransaction creates a transaction with empty UnlockConditions,
 // meaning it's trivial to spend the output.
 func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
 	// Send money to an anyone-can-spend address.
 	emptyHash := consensus.UnlockConditions{}.UnlockHash()
-	txn, err := tpt.wallet.SpendCoins(consensus.NewCurrency64(1), emptyHash)
+	txn, err := tpt.SpendCoins(consensus.NewCurrency64(1), emptyHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}

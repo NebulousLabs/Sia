@@ -26,7 +26,7 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 
 	// Check that the transactions have been removed from the unconfirmed set.
 	if len(tpt.tpool.TransactionSet()) != 0 {
-		tpt.t.Error("unconfirmed transaction set is not empty")
+		tpt.t.Error("unconfirmed transaction set is not empty, len", len(tpt.tpool.TransactionSet()))
 	}
 }
 

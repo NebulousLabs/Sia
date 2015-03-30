@@ -17,7 +17,9 @@ import (
 type knownOutput struct {
 	id     consensus.SiacoinOutputID
 	output consensus.SiacoinOutput
-	age    int
+
+	spendable bool
+	age       int
 }
 
 // openOutput contains an output and the conditions needed to spend the output,
@@ -46,6 +48,9 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			continue
 		}
 		for _, knownOutput := range key.outputs {
+			if !knownOutput.spendable {
+				continue
+			}
 			if knownOutput.age > w.age-AgeDelay {
 				continue
 			}
@@ -75,10 +80,13 @@ func (w *Wallet) Balance(full bool) (total consensus.Currency) {
 
 	// Iterate through all outputs and tally them up.
 	for _, key := range w.keys {
-		if !key.spendable && !full {
+		if !key.spendable {
 			continue
 		}
 		for _, knownOutput := range key.outputs {
+			if !knownOutput.spendable {
+				continue
+			}
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
