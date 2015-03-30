@@ -6,32 +6,41 @@ import (
 	"github.com/NebulousLabs/Sia/consensus"
 )
 
+// valid.go checks that transactions are valid. The majority of the checking is
+// done by the consensus package, using the call StandaloneValid. To minimize
+// the potential for validation to break with the state, the only validation
+// done by the transaction pool involves the unconfirmed consensus set and the
+// IsStandard rules. It is imperative that if a transaction would be invalid
+// according to the consensus package (after the dependency transactions have
+// been confirmed) that it is also invalid according to the transaction pool.
+
 var (
 	ErrBadUnlockConditions      = errors.New("siacoin unlock conditions do not meet required unlock hash")
 	ErrSiacoinOverspend         = errors.New("transaction has more siacoin outputs than inputs")
 	ErrUnrecognizedSiacoinInput = errors.New("unrecognized siacoin input in transaction")
 )
 
-// validUnconfirmedSiacoins checks that the inputs are all valid in the context
-// of the unconfirmed consensus set and that the value of the inputs is equal
-// to the value of the outputs. There is an additional check on the unlock
-// conditions to see that the hash matches and that the timelock has expired.
+// validUnconfirmedSiacoins checks that all siacoin inputs and outputs are
+// valid in the context of the unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sci := range t.SiacoinInputs {
-		// Check that the output exists in the unconfirmed set.
+		// All inputs must have corresponding outputs in the unconfirmed set.
 		sco, exists := tp.siacoinOutputs[sci.ParentID]
 		if !exists {
 			return ErrUnrecognizedSiacoinInput
 		}
 
-		// Check that the unlock conditions meet the required unlock hash.
+		// The unlock conditions provided must match the unlock hash of the
+		// corresponding output.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
 			return ErrBadUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
 	}
+
+	// The sum of all inputs must equal the sum of all outputs.
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
 		return ErrSiacoinOverspend
 	}
@@ -39,9 +48,9 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 }
 
 // validUnconfirmedStorageProofs checks that a storage proof is valid in the
-// context of the confirmed and unconfirmed consensus set.
+// context of the unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction) (err error) {
-	// Check that the file contract is in the unconfirmed set.
+	// Check that the corresponding file contract is in the unconfirmed set.
 	for _, sp := range t.StorageProofs {
 		_, exists := tp.consensusSet.FileContract(sp.ParentID)
 		if !exists {
@@ -49,7 +58,7 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 		}
 	}
 
-	// Check that all of the storage proofs are valid.
+	// Check that the storage proof is valid using the consensus set.
 	err = tp.consensusSet.ValidStorageProofs(t)
 	if err != nil {
 		return
@@ -58,9 +67,7 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 }
 
 // validUnconfirmedFileContractTerminations checks that all file contract
-// terminations are valid in the context of the unconfirmed consensus set.
-// There is an additional check for the validity of the unlock conditions and
-// the validity of the termination payouts.
+// terminations are valid within the context of the unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
 		// Check for the corresponding file contract in the unconfirmed set.
@@ -69,12 +76,14 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 			return errors.New("termination given for unrecognized file contract")
 		}
 
-		// Check that the termination conditions match the termination hash.
+		// Check that the termination conditions match the termination hash of
+		// the corresponding file contract.
 		if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
 			return errors.New("termination conditions do not meet required termination hash")
 		}
 
-		// Check that the termination has been submitted in time.
+		// Check that the termination was submitted before the storage proof
+		// window opened.
 		if fc.Start < tp.consensusSetHeight {
 			return errors.New("termination submitted too late")
 		}
@@ -92,20 +101,19 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 	return
 }
 
-// validUnconfirmedSiafunds checks that all siafund inputs are valid in the
-// context of the unconfirmed consensus set and that the value of the siafund
-// inputs matches the value of the siafund outputs. There is also a check on
-// the unlock conditions.
+// validUnconfirmedSiafunds checks that all siafund inputs and outputs are
+// valid within the context of the unconfirmed consensus set.
 func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (err error) {
 	var inputSum consensus.Currency
 	for _, sfi := range t.SiafundInputs {
-		// Check that the siafund output being spent exists.
+		// Check that the corresponding siafund output being spent exists.
 		sfo, exists := tp.siafundOutputs[sfi.ParentID]
 		if !exists {
 			return errors.New("transaction spends unrecognized siafund output")
 		}
 
-		// Check that the unlock conditions match the spend conditions.
+		// Check that the unlock conditions match the unlock hash of the
+		// corresponding output.
 		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
 			return errors.New("transaction contains invalid unlock conditions (hash mismatch)")
 		}
@@ -153,6 +161,9 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t consensus.Transaction) 
 	if err != nil {
 		return
 	}
+	// File contracts don't need to be checked as all potential problems are
+	// checked by a combination of StandaloneValid and
+	// ValidUnconfirmedSiacoins.
 	err = tp.validUnconfirmedFileContractTerminations(t)
 	if err != nil {
 		return
