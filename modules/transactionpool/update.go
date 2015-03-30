@@ -5,19 +5,20 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// removeUnconfirmedTransaction takes an unconfirmed transaction and removes it
-// from the transaction pool, but leaves behind all dependencies.
-func (tp *TransactionPool) removeTailTransaction() {
-	if len(tp.transactionList) == 0 {
-		if consensus.DEBUG {
-			panic("calling removeTailTransaction when transaction list is empty")
-		}
-		return
-	}
+// update.go listens for changes from the consensus set and integrates them
+// into the unconfirmed set. Each time there is a change in the consensus set,
+// all transactions are removed from the unconfirmed set, the changes are
+// implemented, and then all transactions are verified and then re-added.
+// Re-verifying the transactions ensures that no requirements (such as
+// expirations and timelocks) are missed, and that no dependencies are missed.
+// While computationally expensive, it achieves correctness with less code.
 
-	t := *tp.transactionList[len(tp.transactionList)-1]
+// removeSiacoinInputs removes all of the siacoin inputs of a transaction from
+// the unconfirmed consensus set.
+func (tp *TransactionPool) removeSiacoinInputs(t consensus.Transaction) {
 	for _, sci := range t.SiacoinInputs {
-		// Sanity check - check that the maps are in the expected state.
+		// Sanity check - the corresponding output should be in the reference
+		// set and absent from the unconfirmed set.
 		if consensus.DEBUG {
 			_, exists := tp.referenceSiacoinOutputs[sci.ParentID]
 			if !exists {
@@ -28,52 +29,91 @@ func (tp *TransactionPool) removeTailTransaction() {
 				panic("unexpected presense of a siacoin output")
 			}
 		}
+
 		tp.siacoinOutputs[sci.ParentID] = tp.referenceSiacoinOutputs[sci.ParentID]
 		delete(tp.referenceSiacoinOutputs, sci.ParentID)
 	}
+}
+
+// removeSiacoinOutputs removes all of the siacoin outputs of a transaction
+// from the unconfirmed consensus set.
+func (tp *TransactionPool) removeSiacoinOutputs(t consensus.Transaction) {
 	for i, _ := range t.SiacoinOutputs {
 		scoid := t.SiacoinOutputID(i)
-		// Sanity check - output should exist.
+		// Sanity check - the output should exist in the unconfirmed set as
+		// there should be no transaction dependents who have spent the output.
 		if consensus.DEBUG {
 			_, exists := tp.siacoinOutputs[scoid]
 			if !exists {
 				panic("trying to delete missing siacoin output")
 			}
 		}
+
 		delete(tp.siacoinOutputs, scoid)
 	}
+}
+
+// removeFileContracts removes all of the file contracts of a transaction from
+// the unconfirmed consensus set.
+func (tp *TransactionPool) removeFileContracts(t consensus.Transaction) {
 	for i, _ := range t.FileContracts {
 		fcid := t.FileContractID(i)
-		// Sanity check - file contract should exist.
+		// Sanity check - file contract should be in the unconfirmed set as
+		// there should be no dependent transactions who have terminated the
+		// contract.
 		if consensus.DEBUG {
 			_, exists := tp.fileContracts[fcid]
 			if !exists {
 				panic("trying to remove missing file contract")
 			}
 		}
+
 		delete(tp.fileContracts, fcid)
 	}
+}
+
+// removeFileContractTerminations removes all of the file contract terminations
+// of a transaction from the unconfirmed consensus set.
+func (tp *TransactionPool) removeFileContractTerminations(t consensus.Transaction) {
 	for _, fct := range t.FileContractTerminations {
-		_, exists := tp.referenceFileContracts[fct.ParentID]
+		// Sanity check - the corresponding file contract should be in the
+		// reference set.
 		if consensus.DEBUG {
+			_, exists := tp.referenceFileContracts[fct.ParentID]
 			if !exists {
 				panic("cannot locate file contract to delete storage proof transaction")
 			}
 		}
+
 		tp.fileContracts[fct.ParentID] = tp.referenceFileContracts[fct.ParentID]
 		delete(tp.referenceFileContracts, fct.ParentID)
 	}
+}
+
+// removeStorageProofs removes all of the storage proofs of a transaction from
+// the unconfirmed consensus set.
+func (tp *TransactionPool) removeStorageProofs(t consensus.Transaction) {
 	for _, sp := range t.StorageProofs {
-		_, exists := tp.referenceFileContracts[sp.ParentID]
+		// Sanity check - the corresponding file contract should be in the
+		// reference set.
 		if consensus.DEBUG {
+			_, exists := tp.referenceFileContracts[sp.ParentID]
 			if !exists {
 				panic("cannot locate file contract to delete storage proof transaction")
 			}
 		}
+
+		tp.fileContracts[sp.ParentID] = tp.referenceFileContracts[sp.ParentID]
 		delete(tp.referenceFileContracts, sp.ParentID)
 	}
+}
+
+// removeSiafundInputs removes all of the siafund inputs of a transaction from
+// the unconfirmed consensus set.
+func (tp *TransactionPool) removeSiafundInputs(t consensus.Transaction) {
 	for _, sfi := range t.SiafundInputs {
-		// Sanity check - maps should not reflect reverted siafund input.
+		// Sanity check - the corresponding siafund output should be in the
+		// reference set and absent from the unconfirmed set.
 		if consensus.DEBUG {
 			_, exists := tp.siafundOutputs[sfi.ParentID]
 			if exists {
@@ -84,14 +124,55 @@ func (tp *TransactionPool) removeTailTransaction() {
 				panic("trying to remove missing reference siafund output")
 			}
 		}
+
 		tp.siafundOutputs[sfi.ParentID] = tp.referenceSiafundOutputs[sfi.ParentID]
 		delete(tp.referenceSiafundOutputs, sfi.ParentID)
 	}
+}
+
+// removeSiafundOutputs removes all of the siafund outputs of a transaction
+// from the unconfirmed consensus set.
+func (tp *TransactionPool) removeSiafundOutputs(t consensus.Transaction) {
 	for i, _ := range t.SiafundOutputs {
+		// Sanity check - the output should exist in the unconfirmed set as
+		// there is no dependent transaction which could have spent the output.
 		sfoid := t.SiafundOutputID(i)
+		if consensus.DEBUG {
+			_, exists := tp.siafundOutputs[sfoid]
+			if !exists {
+				panic("trying to remove nonexisting siafund output from unconfirmed set")
+			}
+		}
+
 		delete(tp.siafundOutputs, sfoid)
 	}
+}
 
+// removeTailTransaction removes the most recent transaction from the pool. The
+// most recent transaction is guaranteed not to have any dependents or
+// children.
+func (tp *TransactionPool) removeTailTransaction() {
+	// Sanity check - the transaction list should not be empty if
+	// removeTailTransaction has been called.
+	if len(tp.transactionList) == 0 {
+		if consensus.DEBUG {
+			panic("calling removeTailTransaction when transaction list is empty")
+		}
+		return
+	}
+
+	// Grab the most recent transaction and remove it from the unconfirmed
+	// consensus set piecemeal.
+	t := *tp.transactionList[len(tp.transactionList)-1]
+	tp.removeSiacoinInputs(t)
+	tp.removeSiacoinOutputs(t)
+	tp.removeFileContracts(t)
+	tp.removeFileContractTerminations(t)
+	tp.removeStorageProofs(t)
+	tp.removeSiafundInputs(t)
+	tp.removeSiafundOutputs(t)
+
+	// Remove the transaction from the transaction lists.
 	delete(tp.transactions, crypto.HashObject(t))
 	tp.transactionList = tp.transactionList[:len(tp.transactionList)-1]
 
@@ -106,6 +187,7 @@ func (tp *TransactionPool) removeTailTransaction() {
 
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
+	// Remove the tail transaction repeatedly until no transactions remain.
 	for len(tp.transactions) != 0 {
 		tp.removeTailTransaction()
 	}
@@ -133,9 +215,32 @@ func (tp *TransactionPool) purge() {
 	return
 }
 
-// applyDiffs takes consensus set diffs and applies them to the unconfirmed
-// consensus set.
+// applyDiffs takes a set of diffs from a block and applies them to the
+// unconfirmed consensus set.
 func (tp *TransactionPool) applyDiffs(scods []consensus.SiacoinOutputDiff, fcds []consensus.FileContractDiff, sfods []consensus.SiafundOutputDiff, dir consensus.DiffDirection) {
+	// If the block is being reverted, the diffs need to be reverted in the
+	// reverse order that they were applied.
+	if dir == consensus.DiffRevert {
+		var tmpScods []consensus.SiacoinOutputDiff
+		for i := len(scods) - 1; i >= 0; i-- {
+			tmpScods = append(tmpScods, scods[i])
+		}
+		scods = tmpScods
+
+		var tmpFcds []consensus.FileContractDiff
+		for i := len(fcds) - 1; i >= 0; i-- {
+			tmpFcds = append(tmpFcds, fcds[i])
+		}
+		fcds = tmpFcds
+
+		var tmpSfods []consensus.SiafundOutputDiff
+		for i := len(sfods) - 1; i >= 0; i-- {
+			tmpSfods = append(tmpSfods, sfods[i])
+		}
+		sfods = tmpSfods
+	}
+
+	// Apply all of the siacoin output changes.
 	for _, scod := range scods {
 		if dir == scod.Direction {
 			if consensus.DEBUG {
@@ -155,6 +260,8 @@ func (tp *TransactionPool) applyDiffs(scods []consensus.SiacoinOutputDiff, fcds 
 			delete(tp.siacoinOutputs, scod.ID)
 		}
 	}
+
+	// Apply all of the file contract changes.
 	for _, fcd := range fcds {
 		if dir == fcd.Direction {
 			if consensus.DEBUG {
@@ -174,6 +281,8 @@ func (tp *TransactionPool) applyDiffs(scods []consensus.SiacoinOutputDiff, fcds 
 			delete(tp.fileContracts, fcd.ID)
 		}
 	}
+
+	// Apply all of the siafund output changes.
 	for _, sfod := range sfods {
 		if dir == sfod.Direction {
 			if consensus.DEBUG {
@@ -201,26 +310,28 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 
-	// Grab the set of transactions in the transaction pool, then remove them
-	// all. Then apply the consensus updates, then add back whatever
-	// transactions are still valid.
-	unconfirmedTxnSet := tp.transactionSet()
+	// Save all of the reverted transactions. When the existing unconfirmed
+	// transactions are added back to the pool, these previously confirmed
+	// transactions will also be added to the pool. Because the transactions
+	// get added in order, they need to be saved in order. After grabbing the
+	// set of reverted transactions, also grab the set of unconfirmed
+	// transactions.
+	var unconfirmedTxns []consensus.Transaction
+	for _, block := range revertedBlocks {
+		unconfirmedTxns = append(unconfirmedTxns, block.Transactions...)
+	}
+	unconfirmedTxns = append(unconfirmedTxns, tp.transactionSet()...)
+
+	// Purge the pool of unconfirmed transactions so that there is no
+	// interference from unconfirmed transactions during the application of
+	// potentially conflicting transactions that have been added to the
+	// blockchain.
 	tp.purge()
 
-	// Add all transactions that got removed to the transaction pool, so long
-	// as they conform to IsStandard rules.
+	// Apply all of the reverted diffs to the unconfirmed set. The diffs need
+	// to be applied in the inverse order of how they were applied.
 	for i := len(revertedBlocks) - 1; i >= 0; i-- {
 		block := revertedBlocks[i]
-		for j := len(block.Transactions) - 1; j >= 0; j-- {
-			txn := block.Transactions[j]
-			err := tp.IsStandardTransaction(txn)
-			if err != nil {
-				continue
-			}
-			tp.addTransactionToPool(txn)
-		}
-
-		// Add all of the diffs to the unconfirmed set.
 		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
 			if consensus.DEBUG {
@@ -249,8 +360,9 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		tp.consensusSetHeight++
 	}
 
-	// Add back all of the unconfirmed transactions that are still valid.
-	for _, txn := range unconfirmedTxnSet {
+	// Add all potential unconfirmed transactions back into the pool after
+	// checking that they are still valid.
+	for _, txn := range unconfirmedTxns {
 		err := tp.validUnconfirmedTransaction(txn)
 		if err != nil {
 			continue
@@ -258,5 +370,6 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		tp.addTransactionToPool(txn)
 	}
 
+	// Inform the subscribers that an update has executed.
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionSet(), tp.unconfirmedSiacoinOutputDiffs())
 }

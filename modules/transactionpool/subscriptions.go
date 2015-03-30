@@ -104,7 +104,8 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []con
 
 	// Notify every subscriber.
 	for _, subscriber := range tp.subscribers {
-		// If the channel is already full, don't block.
+		// If the channel is already full, don't block. This will prevent a
+		// deadlocked subscriber from also deadlocking the transaction pool.
 		select {
 		case subscriber <- struct{}{}:
 		default:

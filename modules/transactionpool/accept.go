@@ -120,7 +120,6 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction) {
 			}
 		}
 
-		// Add the storage proof to the set of storage proofs.
 		tp.referenceFileContracts[sp.ParentID] = fc
 		delete(tp.fileContracts, sp.ParentID)
 	}
