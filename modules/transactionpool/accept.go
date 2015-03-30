@@ -7,6 +7,9 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+// accept.go is responsible for applying a transaction to the transaction pool.
+// Validation is handled by valid.go.
+
 var (
 	ErrDuplicate = errors.New("transaction is a duplicate")
 )
