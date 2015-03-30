@@ -106,6 +106,9 @@ func (tp *TransactionPool) purge() {
 		if len(tp.referenceSiafundOutputs) != 0 {
 			panic("referenceSiafundOuptuts is not empty")
 		}
+		if len(tp.transactions) != 0 {
+			panic("transactions is not empty")
+		}
 	}
 
 	return
