@@ -35,7 +35,7 @@ type daemon struct {
 	gateway modules.Gateway
 	host    modules.Host
 	hostdb  modules.HostDB
-	miner   *miner.Miner
+	miner   modules.Miner
 	renter  modules.Renter
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
