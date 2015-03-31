@@ -40,6 +40,9 @@ type daemon struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
+	minerUpdates  <-chan struct{}
+	walletUpdates <-chan struct{}
+
 	apiServer *graceful.Server
 }
 
@@ -84,6 +87,11 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
+	// Subscribe to the miner and wallet to keep all parts of the daemon
+	// synchronized.
+	d.minerUpdates = d.miner.MinerSubscribe()
+	d.walletUpdates = d.wallet.WalletSubscribe()
+
 	// Register RPCs for each module
 	d.gateway.RegisterRPC("AcceptBlock", d.acceptBlock)
 	d.gateway.RegisterRPC("AcceptTransaction", d.acceptTransaction)
@@ -94,6 +102,11 @@ func newDaemon(config DaemonConfig) (d *daemon, err error) {
 	d.initAPI(config.APIAddr)
 
 	return
+}
+
+func (d *daemon) updateWait() {
+	<-d.minerUpdates
+	<-d.walletUpdates
 }
 
 func createSubdirs(rootDir string) error {
