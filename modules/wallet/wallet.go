@@ -70,6 +70,8 @@ type Wallet struct {
 	transactionCounter int
 	transactions       map[string]*openTransaction
 
+	subscribers []chan struct{}
+
 	mu *sync.RWMutex
 }
 

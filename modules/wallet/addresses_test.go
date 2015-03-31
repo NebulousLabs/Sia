@@ -9,29 +9,19 @@ import (
 // TestCoinAddress fetches a coin address from the wallet and then spends an
 // output to the coin address to verify that the wallet is correctly
 // recognizing coins sent to itself.
-func (wt *WalletTester) testCoinAddress() {
+func (wt *walletTester) testCoinAddress() {
 	// Get an address.
-	walletAddress, _, err := wt.CoinAddress()
+	walletAddress, _, err := wt.wallet.CoinAddress()
 	if err != nil {
-		wt.Fatal(err)
+		wt.t.Fatal(err)
 	}
 
-	// Send coins to the address, in a mined block.
-	siacoinInput, value := wt.FindSpendableSiacoinInput()
-	txn := wt.AddSiacoinInputToTransaction(consensus.Transaction{}, siacoinInput)
-	txn.SiacoinOutputs = append(txn.SiacoinOutputs, consensus.SiacoinOutput{
-		Value:      value,
-		UnlockHash: walletAddress,
-	})
-	block := wt.MineCurrentBlock([]consensus.Transaction{txn})
-	err = wt.State.AcceptBlock(block)
-	if err != nil {
-		wt.Fatal(err)
-	}
+	// Send all of the wallets coins to itself.
+	wt.spendCoins(wt.wallet.Balance(false), walletAddress)
 
 	// Check that the wallet sees the coins.
-	if wt.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
-		wt.Error("wallet didn't get the coins sent to it.")
+	if wt.wallet.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
+		wt.t.Error("wallet didn't get the coins sent to it.")
 	}
 }
 
