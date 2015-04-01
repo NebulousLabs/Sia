@@ -41,7 +41,7 @@ func (wt *walletTester) testFundTransaction() {
 		wt.t.Error("more than zero siacoin outputs created in custom transaction")
 	}
 	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
-		wt.t.Error(wt.wallet.Balance(true).MarshalJSON())
+		wt.t.Error(wt.wallet.Balance(true))
 		wt.t.Error("wallet balance not reporting at one?")
 	}
 
@@ -58,7 +58,7 @@ func (wt *walletTester) testFundTransaction() {
 		wt.t.Error("more than zero siacoin outputs created in custom transaction")
 	}
 	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
-		wt.t.Error(wt.wallet.Balance(true).MarshalJSON())
+		wt.t.Error(wt.wallet.Balance(true))
 		wt.t.Error("wallet balance not reporting at one?")
 	}
 }
