@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -30,6 +30,16 @@ type Config struct {
 		ConfigFilename    string
 		DownloadDirectory string
 	}
+}
+
+// expand all ~ characters in Config values
+func (c *Config) expand() (err error) {
+	c.Siad.ConfigFilename, err = homedir.Expand(c.Siad.ConfigFilename)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // Helper function for determining existence of a file. Technically, err != nil
@@ -79,14 +89,14 @@ func startEnvironment(*cobra.Command, []string) {
 	}
 
 	// join the network
-	// TODO: better bootstrapping semantics. Instead of providing a bootstrap
-	// peer, just have the gateway load an initial peer list.
+	//
+	// TODO: This should proabably happen in newDaemon.
 	if !config.Siacore.NoBootstrap {
-		go d.srv.Bootstrap(modules.BootstrapPeers[0])
+		go d.gateway.Bootstrap(modules.BootstrapPeers[0])
 	}
 
-	// serve API requests
-	err = d.srv.Serve()
+	// listen for API requests
+	err = d.listen()
 	if err != nil {
 		fmt.Println("API server quit unexpectedly:", err)
 	}
@@ -130,12 +140,7 @@ func main() {
 
 	// Load the config file, which will overwrite the default values.
 	if exists(config.Siad.ConfigFilename) {
-		configFilename, err = homedir.Expand(config.Siad.ConfigFilename)
-		if err != nil {
-			fmt.Println("Failed to load config file:", err)
-			return
-		}
-		if err := gcfg.ReadFileInto(&config, configFilename); err != nil {
+		if err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename); err != nil {
 			fmt.Println("Failed to load config file:", err)
 			return
 		}
