@@ -1,18 +1,12 @@
 package consensus
 
 import (
-	"bytes"
-	"math/big"
-	"time"
-
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 )
 
 type (
-	Timestamp   uint64
-	BlockHeight uint64
-	Siafund     Currency // arbitrary-precision unsigned integer
+	Siafund Currency // arbitrary-precision unsigned integer
 
 	// A Specifier is a fixed-length string that serves two purposes. In the
 	// wire protocol, they are used to identify a particular encoding
@@ -26,15 +20,10 @@ type (
 	// guarantee that distinct types will never produce the same hash.
 	Specifier [16]byte
 
-	// The Signature type is arbitrary-length to enable a variety of signature
-	// algorithms.
-	Signature string
-
 	// IDs are used to refer to a type without revealing its contents. They
 	// are constructed by hashing specific fields of the type, along with a
 	// Specifier. While all of these types are hashes, defining type aliases
 	// gives us type safety and makes the code more readable.
-	BlockID         crypto.Hash
 	SiacoinOutputID crypto.Hash
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
@@ -44,13 +33,6 @@ type (
 	// that hash to a given UnlockHash. See SpendConditions.UnlockHash for
 	// details on how the UnlockHash is constructed.
 	UnlockHash crypto.Hash
-
-	// A Target is a hash that a block's ID must be "less than" in order for
-	// the block to be considered valid. Miners vary the block's 'Nonce' field
-	// in order to brute-force such an ID. The inverse of a Target is called
-	// the "difficulty," because it is proportional to the amount of time
-	// required to brute-force the Target.
-	Target crypto.Hash
 )
 
 // These Specifiers are used internally when calculating a type's ID. See
@@ -62,30 +44,6 @@ var (
 	SpecifierStorageProofOutput            = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
 	SpecifierSiafundOutput                 = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 )
-
-// These Specifiers enumerate the types of signatures that are recognized by
-// this implementation. If a signature's type is unrecognized, the signature
-// is treated as valid. Signatures using the special "entropy" type are always
-// treated as invalid; see Consensus.md for more details.
-var (
-	SignatureEntropy = Specifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
-	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
-)
-
-// A Block is a summary of changes to the state that have occurred since the
-// previous block. Blocks reference the ID of the previous block (their
-// "parent"), creating the linked-list commonly known as the blockchain. Their
-// primary function is to bundle together transactions on the network. Blocks
-// are created by "miners," who collect transactions from other nodes, and
-// then try to pick a Nonce that results in a block whose BlockID is below a
-// given Target.
-type Block struct {
-	ParentID     BlockID
-	Nonce        uint64
-	Timestamp    Timestamp
-	MinerPayouts []SiacoinOutput
-	Transactions []Transaction
-}
 
 // A Transaction is an atomic component of a block. Transactions can contain
 // inputs and outputs, file contracts, storage proofs, and even arbitrary
@@ -295,60 +253,6 @@ type CoveredFields struct {
 	Signatures               []uint64
 }
 
-// CurrentTimestamp returns the current time as a Timestamp.
-func CurrentTimestamp() Timestamp {
-	return Timestamp(time.Now().Unix())
-}
-
-// CalculateCoinbase calculates the coinbase for a given height. The coinbase
-// equation is:
-//
-//     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * CoinbaseAugment
-func CalculateCoinbase(height BlockHeight) (c Currency) {
-	base := InitialCoinbase - uint64(height)
-	if base < MinimumCoinbase {
-		base = MinimumCoinbase
-	}
-
-	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
-}
-
-// Int converts a Target to a big.Int.
-func (t Target) Int() *big.Int {
-	return new(big.Int).SetBytes(t[:])
-}
-
-// Rat converts a Target to a big.Rat.
-func (t Target) Rat() *big.Rat {
-	return new(big.Rat).SetInt(t.Int())
-}
-
-// Inverse returns the inverse of a Target as a big.Rat
-func (t Target) Inverse() *big.Rat {
-	return new(big.Rat).Inv(t.Rat())
-}
-
-// IntToTarget converts a big.Int to a Target.
-func IntToTarget(i *big.Int) (t Target) {
-	// i may overflow the maximum target.
-	// In the event of overflow, return the maximum.
-	if i.BitLen() > 256 {
-		return RootDepth
-	}
-	b := i.Bytes()
-	// need to preserve big-endianness
-	offset := len(t[:]) - len(b)
-	copy(t[offset:], b)
-	return
-}
-
-// RatToTarget converts a big.Rat to a Target.
-func RatToTarget(r *big.Rat) Target {
-	// conversion to big.Int truncates decimal
-	i := new(big.Int).Div(r.Num(), r.Denom())
-	return IntToTarget(i)
-}
-
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
 	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
@@ -368,47 +272,6 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 	}
 	tree.PushObject(uc.NumSignatures)
 	return UnlockHash(tree.Root())
-}
-
-// ID returns the ID of a Block, which is calculated by hashing the
-// concatenation of the block's parent ID, nonce, and Merkle root.
-func (b Block) ID() BlockID {
-	return BlockID(crypto.HashAll(
-		b.ParentID,
-		b.Nonce,
-		b.MerkleRoot(),
-	))
-}
-
-// CheckTarget returns true if the block's ID meets the given target.
-func (b Block) CheckTarget(target Target) bool {
-	blockHash := b.ID()
-	return bytes.Compare(target[:], blockHash[:]) >= 0
-}
-
-// MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
-// tree are composed of the Timestamp, the miner outputs (one leaf per
-// payout), and the transactions (one leaf per transaction).
-func (b Block) MerkleRoot() crypto.Hash {
-	tree := crypto.NewTree()
-	tree.PushObject(b.Timestamp)
-	for _, payout := range b.MinerPayouts {
-		tree.PushObject(payout)
-	}
-	for _, txn := range b.Transactions {
-		tree.PushObject(txn)
-	}
-	return tree.Root()
-}
-
-// MinerPayoutID returns the ID of the miner payout at the given index, which
-// is calculated by hashing the concatenation of the BlockID and the payout
-// index.
-func (b Block) MinerPayoutID(i int) SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		b.ID(),
-		i,
-	))
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,

@@ -6,12 +6,6 @@ import (
 	"github.com/NebulousLabs/Sia/sync"
 )
 
-// The ZeroUnlockHash and ZeroCurrency are convenience variables.
-var (
-	ZeroUnlockHash = UnlockHash{0}
-	ZeroCurrency   = NewCurrency64(0)
-)
-
 // The State is the object responsible for tracking the current status of the
 // blockchain. Broadly speaking, it is responsible for maintaining consensus.
 // It accepts blocks and constructs a blockchain, forking when necessary.

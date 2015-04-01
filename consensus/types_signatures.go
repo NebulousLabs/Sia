@@ -8,7 +8,20 @@ import (
 )
 
 var (
+	// These Specifiers enumerate the types of signatures that are recognized
+	// by this implementation. If a signature's type is unrecognized, the
+	// signature is treated as valid. Signatures using the special "entropy"
+	// type are always treated as invalid; see Consensus.md for more details.
+	SignatureEntropy = Specifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
+	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
+
 	ErrMissingSignatures = errors.New("transaction has inputs with missing signatures")
+
+	ZeroUnlockHash = UnlockHash{0}
+)
+
+type (
+	Signature string
 )
 
 // Each input has a list of public keys and a required number of signatures.

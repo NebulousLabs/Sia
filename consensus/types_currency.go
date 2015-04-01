@@ -7,6 +7,10 @@ import (
 	"math/big"
 )
 
+var (
+	ZeroCurrency = NewCurrency64(0)
+)
+
 // currency.go defines the internal currency object. One major design goal of
 // the currency type is immutability. Another is non-negativity: the currency
 // object should never have a negative value.
