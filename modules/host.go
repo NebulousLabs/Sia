@@ -6,6 +6,7 @@ import (
 
 const (
 	AcceptTermsResponse = "accept"
+	HostDir             = "host"
 )
 
 // ContractTerms are the parameters agreed upon by a client and a host when
