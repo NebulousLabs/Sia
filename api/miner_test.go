@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -25,7 +26,7 @@ func (st *serverTester) testMining() {
 	// check balance
 	var walletstatus modules.WalletInfo
 	st.getAPI("/wallet/status", &walletstatus)
-	if walletstatus.FullBalance.Sign() <= 0 {
+	if walletstatus.FullBalance.Cmp(consensus.ZeroCurrency) <= 0 {
 		st.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
 	}
 }
