@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"errors"
@@ -99,15 +99,15 @@ func applyUpdate(version string) (err error) {
 }
 
 // daemonStopHandler handles the API call to stop the daemon cleanly.
-func (d *daemon) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 
 	// send stop signal
-	d.apiServer.Stop(time.Second)
+	srv.apiServer.Stop(time.Second)
 }
 
 // daemonUpdateCheckHandler handles the API call to check for daemon updates.
-func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
@@ -121,7 +121,7 @@ func (d *daemon) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Reque
 }
 
 // daemonUpdateApplyHandler handles the API call to apply daemon updates.
-func (d *daemon) daemonUpdateApplyHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) daemonUpdateApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)

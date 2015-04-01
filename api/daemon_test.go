@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -55,7 +55,7 @@ func newDaemonTester(t *testing.T) *daemonTester {
 	dt := &daemonTester{d, t, make(chan struct{})}
 
 	go func() {
-		listenErr := d.listen()
+		listenErr := srv.listen()
 		if listenErr != nil {
 			t.Fatal("API server quit:", listenErr)
 		}

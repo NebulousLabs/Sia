@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -30,8 +30,8 @@ type FileInfo struct {
 }
 
 // renterDownloadHandler handles the API call to download a file.
-func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
+func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -42,8 +42,8 @@ func (d *daemon) renterDownloadHandler(w http.ResponseWriter, req *http.Request)
 
 // renterDownloadqueueHandler handles the API call to request the download
 // queue.
-func (d *daemon) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request) {
-	downloads := d.renter.DownloadQueue()
+func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Request) {
+	downloads := srv.renter.DownloadQueue()
 	downloadSet := make([]DownloadInfo, 0, len(downloads))
 	for _, dl := range downloads {
 		downloadSet = append(downloadSet, DownloadInfo{
@@ -59,8 +59,8 @@ func (d *daemon) renterDownloadqueueHandler(w http.ResponseWriter, req *http.Req
 }
 
 // renterFilesHandler handles the API call to list all of the files.
-func (d *daemon) renterFilesHandler(w http.ResponseWriter, req *http.Request) {
-	files := d.renter.FileList()
+func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request) {
+	files := srv.renter.FileList()
 	fileSet := make([]FileInfo, 0, len(files))
 	for _, file := range files {
 		fileSet = append(fileSet, FileInfo{
@@ -75,13 +75,13 @@ func (d *daemon) renterFilesHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // renterStatusHandler handles the API call querying the renter's status.
-func (d *daemon) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.renter.Info())
+func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.renter.Info())
 }
 
 // renterUploadHandler handles the API call to upload a file.
-func (d *daemon) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.renter.Upload(modules.UploadParams{
+func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.Upload(modules.UploadParams{
 		Filename: req.FormValue("source"),
 		Duration: duration,
 		Nickname: req.FormValue("nickname"),

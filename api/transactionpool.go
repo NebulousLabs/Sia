@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -6,6 +6,6 @@ import (
 
 // transactionpoolTransactionsHandler handles the API call to get the
 // transaction pool trasactions.
-func (d *daemon) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.tpool.TransactionSet())
+func (srv *Server) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.tpool.TransactionSet())
 }

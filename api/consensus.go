@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -7,15 +7,15 @@ import (
 )
 
 // consensusStatusHandler handles the API call asking for the consensus status.
-func (d *daemon) consensusStatusHandler(w http.ResponseWriter, req *http.Request) {
-	currentBlock := d.state.CurrentBlock().ID()
-	target := d.state.CurrentTarget()
+func (srv *Server) consensusStatusHandler(w http.ResponseWriter, req *http.Request) {
+	currentBlock := srv.state.CurrentBlock().ID()
+	target := srv.state.CurrentTarget()
 	writeJSON(w, struct {
 		Height       consensus.BlockHeight
 		CurrentBlock consensus.BlockID
 		Target       consensus.Target
 	}{
-		d.state.Height(),
+		srv.state.Height(),
 		currentBlock,
 		target,
 	})

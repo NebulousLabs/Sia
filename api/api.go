@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -24,66 +24,66 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 }
 
 // initAPI determines which functions handle each API call.
-func (d *daemon) initAPI(addr string) {
+func (srv *Server) initAPI(addr string) {
 	mux := http.NewServeMux()
 
 	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus/status", d.consensusStatusHandler)
+	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
 
-	// Daemon API Calls
-	handleHTTPRequest(mux, "/daemon/stop", d.daemonStopHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", d.daemonUpdateApplyHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", d.daemonUpdateCheckHandler)
+	// Server API Calls
+	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", srv.daemonUpdateApplyHandler)
+	handleHTTPRequest(mux, "/daemon/update/check", srv.daemonUpdateCheckHandler)
 
 	// Debugging API Calls
-	handleHTTPRequest(mux, "/debug/constants", d.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", d.mutexTestHandler)
+	handleHTTPRequest(mux, "/debug/constants", srv.debugConstantsHandler)
+	handleHTTPRequest(mux, "/debug/mutextest", srv.mutexTestHandler)
 
 	// Gateway API Calls
-	handleHTTPRequest(mux, "/gateway/status", d.gatewayStatusHandler)
-	handleHTTPRequest(mux, "/gateway/synchronize", d.gatewaySynchronizeHandler)
-	handleHTTPRequest(mux, "/gateway/peer/add", d.gatewayPeerAddHandler)
-	handleHTTPRequest(mux, "/gateway/peer/remove", d.gatewayPeerRemoveHandler)
+	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
+	handleHTTPRequest(mux, "/gateway/synchronize", srv.gatewaySynchronizeHandler)
+	handleHTTPRequest(mux, "/gateway/peer/add", srv.gatewayPeerAddHandler)
+	handleHTTPRequest(mux, "/gateway/peer/remove", srv.gatewayPeerRemoveHandler)
 
 	// Host API Calls
-	handleHTTPRequest(mux, "/host/announce", d.hostAnnounceHandler)
-	handleHTTPRequest(mux, "/host/config", d.hostConfigHandler)
-	handleHTTPRequest(mux, "/host/status", d.hostStatusHandler)
+	handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
+	handleHTTPRequest(mux, "/host/config", srv.hostConfigHandler)
+	handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 
 	// HostDB API Calls
 
 	// Miner API Calls
-	handleHTTPRequest(mux, "/miner/start", d.minerStartHandler)
-	handleHTTPRequest(mux, "/miner/status", d.minerStatusHandler)
-	handleHTTPRequest(mux, "/miner/stop", d.minerStopHandler)
+	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
+	handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
+	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/download", d.renterDownloadHandler)
-	handleHTTPRequest(mux, "/renter/downloadqueue", d.renterDownloadqueueHandler)
-	handleHTTPRequest(mux, "/renter/files", d.renterFilesHandler)
-	handleHTTPRequest(mux, "/renter/status", d.renterStatusHandler)
-	handleHTTPRequest(mux, "/renter/upload", d.renterUploadHandler)
+	handleHTTPRequest(mux, "/renter/download", srv.renterDownloadHandler)
+	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
+	handleHTTPRequest(mux, "/renter/files", srv.renterFilesHandler)
+	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
+	handleHTTPRequest(mux, "/renter/upload", srv.renterUploadHandler)
 
 	// TransactionPool API Calls
-	handleHTTPRequest(mux, "/transactionpool/transactions", d.transactionpoolTransactionsHandler)
+	handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 
 	// Wallet API Calls
-	handleHTTPRequest(mux, "/wallet/address", d.walletAddressHandler)
-	handleHTTPRequest(mux, "/wallet/send", d.walletSendHandler)
-	handleHTTPRequest(mux, "/wallet/status", d.walletStatusHandler)
+	handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
+	handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
+	handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
 
 	// create graceful HTTP server
-	d.apiServer = &graceful.Server{
+	srv.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
 	}
 }
 
-// listen starts listening on the port for API calls.
-func (d *daemon) listen() error {
+// Serve listens for and handles API calls. It a blocking function.
+func (srv *Server) Serve() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.
-	err := d.apiServer.ListenAndServe()
+	err := srv.apiServer.ListenAndServe()
 	// despite its name, graceful still propogates this benign error
 	if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
 		err = nil
@@ -108,7 +108,5 @@ func writeJSON(w http.ResponseWriter, obj interface{}) {
 // writeSuccess writes the success json object ({"Success":true}) to the
 // ResponseWriter
 func writeSuccess(w http.ResponseWriter) {
-	writeJSON(w, struct {
-		Success bool
-	}{true})
+	writeJSON(w, struct{ Success bool }{true})
 }

@@ -29,42 +29,45 @@ type daemon struct {
 	srv *api.Server
 }
 
-// newDaemon will take the config struct and create a new daemon based on the
-// parameters.
-func newDaemon(config DaemonConfig) (d *daemon, err error) {
-	state = consensus.CreateGenesisState()
-	gateway, err = gateway.New(config.RPCAddr, state, filepath.Join(config.SiaDir, "gateway"))
+// newDaemon initializes modules using the config parameters and uses them to
+// create an api.Server.
+func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
+	state := consensus.CreateGenesisState()
+	gateway, err := gateway.New(cfg.RPCAddr, state, filepath.Join(cfg.SiaDir, "gateway"))
 	if err != nil {
 		return
 	}
-	tpool, err = transactionpool.New(state, gateway)
+	tpool, err := transactionpool.New(state, gateway)
 	if err != nil {
 		return
 	}
-	wallet, err = wallet.New(state, tpool, filepath.Join(config.SiaDir, "wallet"))
+	wallet, err := wallet.New(state, tpool, filepath.Join(cfg.SiaDir, "wallet"))
 	if err != nil {
 		return
 	}
-	miner, err = miner.New(state, gateway, tpool, wallet)
+	miner, err := miner.New(state, gateway, tpool, wallet)
 	if err != nil {
 		return
 	}
-	host, err = host.New(state, tpool, wallet, filepath.Join(config.SiaDir, "host"))
+	host, err := host.New(state, tpool, wallet, filepath.Join(cfg.SiaDir, "host"))
 	if err != nil {
 		return
 	}
-	hostdb, err = hostdb.New(state, gateway)
+	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
 		return
 	}
-	renter, err = renter.New(state, gateway, hostdb, wallet, filepath.Join(config.SiaDir, "renter"))
+	renter, err := renter.New(state, gateway, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
 	if err != nil {
 		return
 	}
 
-	d = new(daemon)
-	d.srv, err = api.NewServer(config.APIAddr, state, gateway, tpool, wallet, miner, host, hostdb, renter)
-	if err != nil {
-		return
+	// bootstrap to the network
+	// TODO: probably a better way of doing this.
+	if !config.Siacore.NoBootstrap {
+		go gateway.Bootstrap(modules.BootstrapPeers[0])
 	}
+
+	d = &daemon{api.NewServer(cfg.APIAddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)}
+	return
 }

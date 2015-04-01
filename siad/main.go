@@ -67,22 +67,10 @@ func startEnvironment(*cobra.Command, []string) {
 
 		SiaDir: siaDir,
 	}
-	err := config.expand()
-	if err != nil {
-		fmt.Println("Bad config value:", err)
-		return
-	}
 	d, err := newDaemon(daemonConfig)
 	if err != nil {
 		fmt.Println("Failed to create daemon:", err)
 		return
-	}
-
-	// join the network
-	// TODO: better bootstrapping semantics. Instead of providing a bootstrap
-	// peer, just have the gateway load an initial peer list.
-	if !config.Siacore.NoBootstrap {
-		go d.srv.Bootstrap(modules.BootstrapPeers[0])
 	}
 
 	// serve API requests
@@ -93,14 +81,14 @@ func startEnvironment(*cobra.Command, []string) {
 }
 
 func version(*cobra.Command, []string) {
-	fmt.Println("Sia Daemon v" + VERSION)
+	fmt.Println("Sia Daemon v" + api.VERSION)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Daemon v" + VERSION,
-		Long:  "Sia Daemon v" + VERSION,
+		Short: "Sia Daemon v" + api.VERSION,
+		Long:  "Sia Daemon v" + api.VERSION,
 		Run:   startEnvironment,
 	}
 
@@ -130,7 +118,7 @@ func main() {
 
 	// Load the config file, which will overwrite the default values.
 	if exists(config.Siad.ConfigFilename) {
-		configFilename, err = homedir.Expand(config.Siad.ConfigFilename)
+		configFilename, err := homedir.Expand(config.Siad.ConfigFilename)
 		if err != nil {
 			fmt.Println("Failed to load config file:", err)
 			return
