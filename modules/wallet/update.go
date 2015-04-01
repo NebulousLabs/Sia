@@ -94,4 +94,6 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []co
 	for _, diff := range w.unconfirmedDiffs {
 		w.applyDiff(diff, consensus.DiffApply)
 	}
+
+	w.notifySubscribers()
 }

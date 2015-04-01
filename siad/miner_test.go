@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/miner"
 )
 
 func (dt *daemonTester) testMining() {
@@ -16,7 +15,7 @@ func (dt *daemonTester) testMining() {
 	// start miner
 	dt.callAPI("/miner/start?threads=1")
 	// check that miner has started
-	var minerstatus miner.MinerInfo
+	var minerstatus modules.MinerInfo
 	dt.getAPI("/miner/status", &minerstatus)
 	if minerstatus.State != "On" {
 		dt.Fatal("Miner did not start")

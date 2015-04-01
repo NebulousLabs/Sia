@@ -104,6 +104,7 @@ func (dt *daemonTester) mineMoney() {
 	// Mine enough blocks to overcome the maturity delay and receive coins.
 	for i := 0; i < 1+consensus.MaturityDelay; i++ {
 		dt.mineBlock()
+		dt.updateWait()
 	}
 
 	// Compare new balance to old balance.
