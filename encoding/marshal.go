@@ -5,20 +5,17 @@ import (
 	"reflect"
 )
 
-// A Marshaler can be encoded as a byte slice. Marshaler and Unmarshaler are
-// separate interfaces because Unmarshaler must have a pointer receiver, while
-// Marshaler does not.
+// A Marshaler can be encoded as a byte slice. (Note that Marshaler and
+// Unmarshaler are separate interfaces because Unmarshaler must have a pointer
+// receiver, while Marshaler does not.)
 type SiaMarshaler interface {
 	MarshalSia() []byte
 }
 
-// An Unmarshaler can be decoded from a byte slice. UnmarshalSia may be passed
-// a byte slice containing more than one encoded type. It should return the
-// number of bytes used to decode itself. UnmarshalSia can panic; the panic
-// will be caught by Unmarshal. Alternatively, if UnmarshalSia returns a
-// negative value, Unmarshal will always fail.
+// An Unmarshaler can be decoded from a byte slice. If a decoding error occurs,
+// UnmarshalSia should panic.
 type SiaUnmarshaler interface {
-	UnmarshalSia([]byte) int
+	UnmarshalSia([]byte)
 }
 
 // Marshal encodes a value as a byte slice. The encoding rules are as follows:
@@ -46,6 +43,11 @@ type SiaUnmarshaler interface {
 //   type foo struct { S string I int }
 //
 //   Marshal(foo{"bar", 3}) = append(Marshal("bar"), Marshal(3)...)
+//
+// Finally, if a type implements the SiaMarshaler interface, its MarshalSia
+// method will be used to encode the type. The resulting byte slice will be
+// length-prefixed like any other variable-length types. During decoding, this
+// prefix is used to determine how many bytes should be passed to UnmarshalSia.
 func Marshal(v interface{}) []byte {
 	return marshal(reflect.ValueOf(v))
 }
@@ -53,10 +55,12 @@ func Marshal(v interface{}) []byte {
 func marshal(val reflect.Value) (b []byte) {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
-		return m.MarshalSia()
+		data := m.MarshalSia()
+		return append(EncUint64(uint64(len(data))), data...)
 	} else if val.CanAddr() {
 		if m, ok := val.Addr().Interface().(SiaMarshaler); ok {
-			return m.MarshalSia()
+			data := m.MarshalSia()
+			return append(EncUint64(uint64(len(data))), data...)
 		}
 	}
 
@@ -135,7 +139,10 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			return u.UnmarshalSia(b)
+			var dataLen int
+			dataLen, b = int(DecUint64(b[:8])), b[8:]
+			u.UnmarshalSia(b[:dataLen])
+			return dataLen + 8
 		}
 	}
 

@@ -66,37 +66,10 @@ func TestMarshalSia(t *testing.T) {
 	c := NewCurrency64(1656)
 	cMar := c.MarshalSia()
 	var cUmar Currency
-	n := cUmar.UnmarshalSia(cMar)
+	cUmar.UnmarshalSia(cMar)
 	if c.Cmp(cUmar) != 0 {
 		t.Error("marshal and unmarshal mismatch for currency type")
 	}
-	if n != len(cMar) {
-		t.Fatal("unmarshal sia is returning the wrong length")
-	}
-}
-
-// TestMarshalSiaOverflow checks behavior when marshalling a value too large to
-// fit inside of the currency type's encoding scheme.
-func TestMarshalSiaOverflow(t *testing.T) {
-	// In debug mode, attempting to get a negative currency results in a panic.
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("no panic occured when trying to create a negative currency")
-		}
-	}()
-
-	// Get a currency that's going to be more than 255 bytes. This is achieved
-	// by squaring a 200 byte currency.
-	large := make([]byte, 201)
-	large[0] = 200 // provide a prefix indicating the length of the remaining slice.
-	large[1] = 1   // set the first value to '1' so the number isn't just 0.
-	var largeC Currency
-	_ = largeC.UnmarshalSia(large)
-	largeC = largeC.Mul(largeC)
-
-	// Try to marshal the large currency.
-	_ = largeC.MarshalSia()
 }
 
 // TestNegativeCurrencyMulFloat checks that negative numbers are rejected when

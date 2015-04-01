@@ -145,30 +145,16 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalSia implements the encoding.SiaMarshaler interface. It returns the
-// byte-slice representation of the Currency's internal big.Int, prepended
-// with a single byte indicating the length of the slice.
+// byte-slice representation of the Currency's internal big.Int.  Note that as
+// the bytes of the big.Int correspond to the absolute value of the integer,
+// there is no way to marshal a negative Currency.
 func (c Currency) MarshalSia() []byte {
-	b := c.i.Bytes()
-	if len(b) > 255 {
-		if DEBUG {
-			panic("attempting to marshal a too-big currency type")
-		}
-		return nil
-	}
-
-	return append(
-		[]byte{byte(len(b))},
-		b...,
-	)
+	return c.i.Bytes()
 }
 
-// UnmarshalSia implements the encoding.SiaUnmarshaler interface. See
-// MarshalSia for a description of how Currency values are marshalled.
-func (c *Currency) UnmarshalSia(b []byte) int {
-	var n int
-	n, b = int(b[0]), b[1:]
-	c.i.SetBytes(b[:n])
-	return 1 + n
+// UnmarshalSia implements the encoding.SiaUnmarshaler interface.
+func (c *Currency) UnmarshalSia(b []byte) {
+	c.i.SetBytes(b)
 }
 
 // String implements the fmt.Stringer interface.
