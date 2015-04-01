@@ -53,6 +53,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 		return
 	}
 	for _, output := range fundingOutputs {
+		output.age = w.age
 		key := w.keys[output.output.UnlockHash]
 		newInput := consensus.SiacoinInput{
 			ParentID:         output.id,
@@ -115,7 +116,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	key.outputs[parentTxn.SiacoinOutputID(0)] = &knownOutput{
 		id:     parentTxn.SiacoinOutputID(0),
 		output: exactOutput,
-		age:    w.age,
+
+		spendable: true,
+		age:       w.age,
 	}
 
 	// Send the transaction to the transaction pool.

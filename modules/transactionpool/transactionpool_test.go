@@ -1,7 +1,6 @@
 package transactionpool
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -24,50 +23,10 @@ type tpoolTester struct {
 	miner  modules.Miner
 	wallet modules.Wallet
 
-	updateChan chan struct{}
+	tpoolUpdateChan chan struct{}
+	minerUpdateChan <-chan struct{}
 
 	t *testing.T
-}
-
-// checkEmpty checks that all of the internal objects to the transaction pool
-// have been emptied.
-func (tpt *tpoolTester) checkEmpty() error {
-	id := tpt.tpool.mu.RLock()
-	if len(tpt.tpool.transactions) != 0 {
-		return errors.New("tpool.transactions isn't empty")
-	}
-	if len(tpt.tpool.siacoinOutputs) != 0 {
-		return errors.New("tpool.siacoinOutputs isn't empty")
-	}
-	if len(tpt.tpool.fileContracts) != 0 {
-		return errors.New("tpool.fileContracts isn't empty")
-	}
-	if len(tpt.tpool.siafundOutputs) != 0 {
-		return errors.New("tpool.siafundOuptuts isn't empty")
-	}
-	if len(tpt.tpool.referenceFileContracts) != 0 {
-		return errors.New("tpool.referenceFileContracts isn't empty")
-	}
-	if len(tpt.tpool.usedSiacoinOutputs) != 0 {
-		return errors.New("tpool.usedSiacoinOutputs wasn't properly emtied out.")
-	}
-	if len(tpt.tpool.newFileContracts) != 0 {
-		return errors.New("tpool.newFileContracts isn't empty")
-	}
-	if len(tpt.tpool.fileContractTerminations) != 0 {
-		return errors.New("tpool.fileContractTerminations isn't empty")
-	}
-	if len(tpt.tpool.storageProofsByStart) != 0 {
-		return errors.New("tpool.storageProofsByStart isn't empty")
-	}
-	if len(tpt.tpool.storageProofsByExpiration) != 0 {
-		return errors.New("tpool.storageProofsByExipration isn't empty")
-	}
-	if len(tpt.tpool.usedSiafundOutputs) != 0 {
-		return errors.New("tpool.usedSiafundOutputs isn't empty")
-	}
-	tpt.tpool.mu.RUnlock(id)
-	return nil
 }
 
 // emptyUnlockTransaction creates a transaction with empty UnlockConditions,
@@ -75,7 +34,7 @@ func (tpt *tpoolTester) checkEmpty() error {
 func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
 	// Send money to an anyone-can-spend address.
 	emptyHash := consensus.UnlockConditions{}.UnlockHash()
-	txn, err := tpt.wallet.SpendCoins(consensus.NewCurrency64(1), emptyHash)
+	txn, err := tpt.spendCoins(consensus.NewCurrency64(1), emptyHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -97,6 +56,44 @@ func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
 	}
 
 	return txn
+}
+
+// updateWait blocks while an update propagates through the modules.
+func (tpt *tpoolTester) updateWait() {
+	<-tpt.tpoolUpdateChan
+	<-tpt.minerUpdateChan
+}
+
+// spendCoins sends the desired amount of coins to the desired address, calling
+// wait at all of the appropriate places to assist synchronization.
+func (tpt *tpoolTester) spendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
+	output := consensus.SiacoinOutput{
+		Value:      amount,
+		UnlockHash: dest,
+	}
+	id, err := tpt.wallet.RegisterTransaction(t)
+	if err != nil {
+		return
+	}
+	_, err = tpt.wallet.FundTransaction(id, amount)
+	if err != nil {
+		return
+	}
+	tpt.updateWait()
+	_, _, err = tpt.wallet.AddOutput(id, output)
+	if err != nil {
+		return
+	}
+	t, err = tpt.wallet.SignTransaction(id, true)
+	if err != nil {
+		return
+	}
+	err = tpt.tpool.AcceptTransaction(t)
+	if err != nil {
+		return
+	}
+	tpt.updateWait()
+	return
 }
 
 // CreatetpoolTester initializes a tpoolTester.
@@ -131,34 +128,31 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Subscribe to the updates of the transaction pool.
-	updateChan := make(chan struct{}, 1)
+	tpoolUpdateChan := make(chan struct{}, 1)
 	id := tp.mu.Lock()
-	tp.subscribers = append(tp.subscribers, updateChan)
+	tp.subscribers = append(tp.subscribers, tpoolUpdateChan)
 	tp.mu.Unlock(id)
 
 	// Assebmle all of the objects in to a tpoolTester
 	tpt = &tpoolTester{
-		cs:         cs,
-		tpool:      tp,
-		miner:      m,
-		wallet:     w,
-		updateChan: updateChan,
-		t:          t,
+		cs:     cs,
+		tpool:  tp,
+		miner:  m,
+		wallet: w,
+
+		tpoolUpdateChan: tpoolUpdateChan,
+		minerUpdateChan: m.MinerSubscribe(),
+
+		t: t,
 	}
 
 	// Mine blocks until there is money in the wallet.
 	for i := 0; i <= consensus.MaturityDelay; i++ {
-		for {
-			var found bool
-			_, found, err = tpt.miner.FindBlock()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if found {
-				<-updateChan
-				break
-			}
+		_, _, err = tpt.miner.FindBlock()
+		if err != nil {
+			t.Fatal(err)
 		}
+		tpt.updateWait()
 	}
 
 	return

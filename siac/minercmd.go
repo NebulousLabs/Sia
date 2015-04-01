@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -48,7 +48,7 @@ func minerstartcmd(threads string) {
 }
 
 func minerstatuscmd() {
-	status := new(miner.MinerInfo)
+	status := new(modules.MinerInfo)
 	err := getAPI("/miner/status", status)
 	if err != nil {
 		fmt.Println("Could not get miner status:", err)

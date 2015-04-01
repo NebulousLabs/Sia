@@ -19,7 +19,7 @@ func (tpt *tpoolTester) addConflictingSiacoinTransaction() {
 	}
 	txn.ArbitraryData = append(txn.ArbitraryData, "NonSia: this stops the transaction from being a duplicate")
 	err = tpt.tpool.AcceptTransaction(txn)
-	if err != ErrDoubleSpend {
+	if err != ErrUnrecognizedSiacoinInput {
 		tpt.t.Error(err)
 	}
 }

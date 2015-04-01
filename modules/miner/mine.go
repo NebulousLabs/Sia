@@ -8,9 +8,6 @@ import (
 
 // Creates a block that is ready for nonce grinding.
 func (m *Miner) blockForWork() (b consensus.Block) {
-	// Check for updates from the state.
-	m.update()
-
 	// Fill out the block with potentially ready values.
 	b = consensus.Block{
 		ParentID:     m.parent,
@@ -104,7 +101,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 			err = m.state.AcceptBlock(b)
 			if consensus.DEBUG {
 				if err != nil {
-					// Log Error
+					println(err.Error())
 				}
 			}
 			m.gateway.RelayBlock(b)
@@ -130,7 +127,6 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 // efficient than StartMining, it is guaranteed to find at most one block.
 func (m *Miner) FindBlock() (consensus.Block, bool, error) {
 	m.mu.Lock()
-	m.update()
 	bfw := m.blockForWork()
 	target := m.target
 	iterations := m.iterationsPerAttempt

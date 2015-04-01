@@ -1,18 +1,8 @@
 package miner
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 )
-
-// MinerStatus is the information that gets returned to the front end. Each
-// item is returned in the format that it's meant to be displayed.
-type MinerInfo struct {
-	State          string
-	Mining         bool
-	Threads        int
-	RunningThreads int
-	Address        consensus.UnlockHash
-}
 
 // Info() returns a MinerInfo struct which can be converted to JSON to be
 // parsed by frontends for displaying information to the user.
@@ -26,11 +16,11 @@ type MinerInfo struct {
 // RunningThreads is the number of threads that the miner currently has.
 //
 // Address is the current address that is receiving block payouts.
-func (m *Miner) Info() MinerInfo {
+func (m *Miner) MinerInfo() modules.MinerInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	info := MinerInfo{
+	info := modules.MinerInfo{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,

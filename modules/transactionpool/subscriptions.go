@@ -2,32 +2,89 @@ package transactionpool
 
 import (
 	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-// A Subscriber is an object that receives updates to the unconfirmed set every
-// time there is a change in consensus or a change in the unconfirmed set.
-type Subscriber interface {
-	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
-	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, revertedTxns, appliedTxns []consensus.Transaction)
+// subscriptions.go manages subscriptions to the transaction pool. Every time
+// there is a change in the transaction pool, subscribers are sent info about
+// the changes, in the form of all of the blocks that have been applied or
+// reverted in the consensus set, the current set of unconfirmed transactions,
+// and the set of siacoin output diffs that result from the unconfirmed
+// transactions.
+//
+// Subscriptions are set up to isolate the transaction pool from problems that
+// occur with the subscriber. Each subscriber gets a gothread that calls
+// 'update' in the correct order. If a subscriber crashes or deadlocks, the
+// transcation pool will be unaffected.
+
+// unconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
+// are created by the unconfirmed set of transactions.
+func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
+	// Iterate through the unconfirmed transactions in order and record the
+	// siacoin output diffs created.
+	for _, txn := range tp.transactionList {
+		// Produce diffs for the siacoin outputs consumed by this transaction.
+		for _, input := range txn.SiacoinInputs {
+			// Grab the output from the unconfirmed or reference set.
+			output, exists := tp.siacoinOutputs[input.ParentID]
+			if !exists {
+				output, exists = tp.referenceSiacoinOutputs[input.ParentID]
+				// Sanity check - output should exist in either the unconfirmed
+				// or reference set.
+				if consensus.DEBUG {
+					if !exists {
+						panic("could not find siacoin output")
+					}
+				}
+			}
+
+			scod := consensus.SiacoinOutputDiff{
+				Direction:     consensus.DiffRevert,
+				ID:            input.ParentID,
+				SiacoinOutput: output,
+			}
+			scods = append(scods, scod)
+		}
+
+		// Produce diffs for the siacoin outputs created by this transaction.
+		for i, output := range txn.SiacoinOutputs {
+			scod := consensus.SiacoinOutputDiff{
+				Direction:     consensus.DiffApply,
+				ID:            txn.SiacoinOutputID(i),
+				SiacoinOutput: output,
+			}
+			scods = append(scods, scod)
+		}
+	}
+
+	return
 }
 
-// threadedSendUpdates sends updates to a specific subscriber as they become
-// available. Greater information can be found in consensus/subscribers.go
-func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber Subscriber) {
+// threadedSendUpdates sends updates to a specific subscriber as updates become
+// available. If the subscriber deadlocks, this thread will deadlock, however
+// that will not affect any of the other threads in the transaction pool.
+func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber modules.TransactionPoolSubscriber) {
+	// Updates must be sent in order. This is achieved by having all of the
+	// updates stored in the transaction pool in a specific order, and then
+	// making blocking calls to 'ReceiveTransactionPoolUpates' until all of the
+	// updates have been sent.
 	i := 0
 	for {
+		// Determine how many total updates there are to send.
 		id := tp.mu.RLock()
 		updateCount := len(tp.revertBlocksUpdates)
 		tp.mu.RUnlock(id)
+
+		// Send each of the updates in order, starting from the first update
+		// that has not yet been sent to the subscriber.
 		for i < updateCount {
 			id := tp.mu.RLock()
 			revertBlocks := tp.revertBlocksUpdates[i]
 			applyBlocks := tp.applyBlocksUpdates[i]
-			revertTxns := tp.revertTxnsUpdates[i]
-			applyTxns := tp.applyTxnsUpdates[i]
+			unconfirmedTransactions := tp.unconfirmedTransactions[i]
+			unconfirmedDiffs := tp.unconfirmedSiacoinDiffs[i]
 			tp.mu.RUnlock(id)
-			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, revertTxns, applyTxns)
+			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, unconfirmedTransactions, unconfirmedDiffs)
 			i++
 		}
 
@@ -38,15 +95,17 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
-func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, revertedTxns, appliedTxns []consensus.Transaction) {
+func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedTransactions []consensus.Transaction, diffs []consensus.SiacoinOutputDiff) {
 	// Add the changes to the update set.
 	tp.revertBlocksUpdates = append(tp.revertBlocksUpdates, revertedBlocks)
 	tp.applyBlocksUpdates = append(tp.applyBlocksUpdates, appliedBlocks)
-	tp.revertTxnsUpdates = append(tp.revertTxnsUpdates, revertedTxns)
-	tp.applyTxnsUpdates = append(tp.applyTxnsUpdates, appliedTxns)
+	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
+	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 
+	// Notify every subscriber.
 	for _, subscriber := range tp.subscribers {
-		// If the channel is already full, don't block.
+		// If the channel is already full, don't block. This will prevent a
+		// deadlocked subscriber from also deadlocking the transaction pool.
 		select {
 		case subscriber <- struct{}{}:
 		default:
@@ -54,8 +113,8 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []con
 	}
 }
 
-// Subscribe adds a subscriber to the transaction pool.
-func (tp *TransactionPool) Subscribe(subscriber Subscriber) {
+// TransactionPoolSubscribe adds a subscriber to the transaction pool.
+func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	c := make(chan struct{}, 1)
 	id := tp.mu.Lock()
 	tp.subscribers = append(tp.subscribers, c)

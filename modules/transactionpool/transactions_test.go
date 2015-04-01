@@ -8,11 +8,11 @@ import (
 // block that gets submitted to the state. If there is an error, the
 // transaction set is known to be invalid.
 func (tpt *tpoolTester) testSiacoinTransactionDump() {
-	tlen := len(tpt.tpool.FullTransactionSet())
+	tlen := len(tpt.tpool.TransactionSet())
 
 	tpt.addDependentSiacoinTransactionToPool()
-	if tlen >= len(tpt.tpool.FullTransactionSet()) {
-		tpt.t.Error("wrong number of transactions in transaction dump, expecting mor than", tlen, "got", len(tpt.tpool.FullTransactionSet()))
+	if tlen >= len(tpt.tpool.TransactionSet()) {
+		tpt.t.Error("wrong number of transactions in transaction dump, expecting mor than", tlen, "got", len(tpt.tpool.TransactionSet()))
 	}
 
 	// Add the transaction set to a block and check that it is valid in the
@@ -21,9 +21,9 @@ func (tpt *tpoolTester) testSiacoinTransactionDump() {
 	if err != nil {
 		tpt.t.Error(err)
 	}
-	<-tpt.updateChan
-	if len(tpt.tpool.FullTransactionSet()) != 0 {
-		tpt.t.Error("Transaction set should be empty after mining a block, instead is size", len(tpt.tpool.FullTransactionSet()))
+	tpt.updateWait()
+	if len(tpt.tpool.TransactionSet()) != 0 {
+		tpt.t.Error("Transaction set should be empty after mining a block, instead is size", len(tpt.tpool.TransactionSet()))
 	}
 }
 

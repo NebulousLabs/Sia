@@ -7,43 +7,51 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-type TransactionDirection bool
-
-const (
-	NewTransaction   TransactionDirection = true
-	PriorTransaction TransactionDirection = false
-)
+// accept.go is responsible for applying a transaction to the transaction pool.
+// Validation is handled by valid.go. The componenets of the transcation are
+// added to the unconfirmed consensus set piecemeal, and then the transaction
+// itself is appended to the linked list of transactions, such that any
+// dependecies will appear earlier in the list.
 
 var (
 	ErrDuplicate = errors.New("transaction is a duplicate")
 )
 
-// applySiacoinInputs adds every siacoin input to the transaction pool by
-// marking the consumed outputs and pointing to the transaction that consumed
-// them.
-func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction, ut *unconfirmedTransaction) {
+// applySiacoinInputs incorporates all of the siacoin inputs of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction) {
+	// For each siacoin input, remove the output from the unconfirmed set and
+	// add the output to the reference set.
 	for _, sci := range t.SiacoinInputs {
-		tp.usedSiacoinOutputs[sci.ParentID] = ut
+		// Sanity check - input should be in the unconfirmed set and absent
+		// from the reference set.
+		if consensus.DEBUG {
+			_, exists := tp.referenceSiacoinOutputs[sci.ParentID]
+			if exists {
+				panic("applying a siacoin output that's already in the reference set")
+			}
+			_, exists = tp.siacoinOutputs[sci.ParentID]
+			if !exists {
+				panic("applying a siacoin input that spends an unrecognized siacoin output")
+			}
+		}
+
+		tp.referenceSiacoinOutputs[sci.ParentID] = tp.siacoinOutputs[sci.ParentID]
+		delete(tp.siacoinOutputs, sci.ParentID)
 	}
 }
 
-// applySiacoinOutputs adds every new siacoin output to the unconfirmed
-// consensus set.
-func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction, ut *unconfirmedTransaction) {
-	// Add each new siacoin output to the list of siacoinOutputs and newSiacoinOutputs.
+// applySiacoinOutputs incorporates all of the siacoin outputs of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction) {
+	// For each siacoin output, add the output to the unconfirmed set.
 	for i, sco := range t.SiacoinOutputs {
-		// Sanity check - output should not exist in the unconfirmed or
-		// confirmed set.
+		// Sanity check - output should not exist in the unconfirmed set.
 		scoid := t.SiacoinOutputID(i)
 		if consensus.DEBUG {
 			_, exists := tp.siacoinOutputs[scoid]
 			if exists {
 				panic("trying to add an output that already exists?")
-			} else {
-				_, exists = tp.state.SiacoinOutput(scoid)
-				if exists {
-					panic("adding a transaction that's already confirmed")
-				}
 			}
 		}
 
@@ -51,123 +59,102 @@ func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction, ut *unco
 	}
 }
 
-// applyFileContracts adds every file contract in a transaction to the
-// unconfirmed set.
-func (tp *TransactionPool) applyFileContracts(t consensus.Transaction, ut *unconfirmedTransaction) {
+// applyFileContracts incorporates all of the file contracts of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applyFileContracts(t consensus.Transaction) {
+	// For each file contract, add the contract to the unconfirmed set.
 	for i, fc := range t.FileContracts {
-		// Sanity check - file contract should not exist in the confirmed or
-		// unconfirmed set.
+		// Sanity check - file contract should be in the unconfirmed set.
 		fcid := t.FileContractID(i)
 		if consensus.DEBUG {
 			_, exists := tp.fileContracts[fcid]
 			if exists {
 				panic("trying to add a file contract that's already in the unconfirmed set")
-			} else {
-				_, exists = tp.state.FileContract(fcid)
-				if exists {
-					panic("trying to add a file contract that's already in the confirmed set")
-				}
 			}
 		}
 
-		_, exists := tp.newFileContracts[fc.Start]
-		if !exists {
-			tp.newFileContracts[fc.Start] = make(map[consensus.FileContractID]*unconfirmedTransaction)
-		}
 		tp.fileContracts[fcid] = fc
-		tp.newFileContracts[fc.Start][fcid] = ut
 	}
 }
 
-// applyFileContractTerminations deletes consumed file contracts from the
-// consensus set and points to the transaction that consumed them.
-func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction, ut *unconfirmedTransaction) {
+// applyFileContractTerminations incorporates all of the file contract
+// terminations of a transaction into the unconfirmed set.
+func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction) {
+	// For each file contract termination, delete the corresponding file
+	// contract from the unconfirmed set and add it to the reference set.
 	for _, fct := range t.FileContractTerminations {
-		// Get the file contract to know the starting height.
+		// Sanity check - file contract should be in the unconfirmed set and
+		// absent from the reference set.
 		fc, exists := tp.fileContracts[fct.ParentID]
-		if !exists {
-			fc, exists = tp.state.FileContract(fct.ParentID)
+		if consensus.DEBUG {
 			if !exists {
-				if consensus.DEBUG {
-					panic("misuse of applyFileContractTerminations")
-				}
+				panic("could not find file contract")
+			}
+			_, exists = tp.referenceFileContracts[fct.ParentID]
+			if exists {
+				panic("reference contract already exists")
 			}
 		}
 
 		delete(tp.fileContracts, fct.ParentID)
-		tp.fileContractTerminations[fc.Start][fct.ParentID] = ut
 		tp.referenceFileContracts[fct.ParentID] = fc
 	}
 }
 
-// applyStorageProof deletes any file contracts that have been consumed and
-// points to the transaction that consumed them. A log is kept of all the
-// storage proofs according to their trigger block. The storage proofs are
-// removed from the transaction pool if the trigger block changes.
-func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction, ut *unconfirmedTransaction) {
+// applyStorageProofs incorporates all of the storage proofs of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction) {
+	// For each storage proof, delete the corresponding file contract from the
+	// unconfirmed set and add it to the reference set
 	for _, sp := range t.StorageProofs {
-		fc, _ := tp.state.FileContract(sp.ParentID)
-
-		// Sanity check - a storage proof for this file contract should not
-		// already exist.
+		// Sanity check - file contract should be in the unconfirmed set and
+		// not in the reference set.
+		fc, exists := tp.fileContracts[sp.ParentID]
 		if consensus.DEBUG {
-			_, exists := tp.storageProofsByStart[fc.Start]
-			if exists {
-				_, exists = tp.storageProofsByStart[fc.Start][sp.ParentID]
-				if exists {
-					panic("storage proof for this contract exists in the by-start map")
-				}
+			if !exists {
+				panic("could not find file contract in unconfirmed set")
 			}
-			_, exists = tp.storageProofsByExpiration[fc.Expiration]
+			_, exists = tp.referenceFileContracts[sp.ParentID]
 			if exists {
-				_, exists = tp.storageProofsByExpiration[fc.Expiration][sp.ParentID]
-				if exists {
-					panic("storage proof for this file contract already exists in pool")
-				}
+				panic("file contract is in both unconfirmed set and reference set")
 			}
 		}
 
-		// Add the storage proof to the set of storage proofs.
-		_, exists := tp.storageProofsByStart[fc.Start]
-		if !exists {
-			tp.storageProofsByStart[fc.Start] = make(map[consensus.FileContractID]*unconfirmedTransaction)
-		}
-		tp.storageProofsByStart[fc.Start][sp.ParentID] = ut
-
-		_, exists = tp.storageProofsByExpiration[fc.Expiration]
-		if !exists {
-			tp.storageProofsByExpiration[fc.Expiration] = make(map[consensus.FileContractID]*unconfirmedTransaction)
-		}
-		tp.storageProofsByExpiration[fc.Expiration][sp.ParentID] = ut
 		tp.referenceFileContracts[sp.ParentID] = fc
+		delete(tp.fileContracts, sp.ParentID)
 	}
 }
 
-// applySiafundInputs marks every siafund output that has been consumed and
-// points to the transaction that consumed the output.
-func (tp *TransactionPool) applySiafundInputs(t consensus.Transaction, ut *unconfirmedTransaction) {
+// applySiafundInputs incorporates all of the siafund inputs of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applySiafundInputs(t consensus.Transaction) {
+	// For each siafund input, delete the corresponding siafund output from the
+	// unconfirmed set and add it to the reference set.
 	for _, sfi := range t.SiafundInputs {
-		// Sanity check - this input should not already be in the usedOutputs
-		// list.
+		// Sanity check - the corresponding siafund output should be in the
+		// unconfirmed set and absent from the reference set.
 		if consensus.DEBUG {
-			_, exists := tp.usedSiafundOutputs[sfi.ParentID]
+			_, exists := tp.referenceSiafundOutputs[sfi.ParentID]
 			if exists {
-				panic("addTransaction called on invalid transaction")
+				panic("applying a siafund output that's already in the reference set")
+			}
+			_, exists = tp.siafundOutputs[sfi.ParentID]
+			if !exists {
+				panic("applying a siafund input that spends an unrecognized siafund output")
 			}
 		}
 
+		tp.referenceSiafundOutputs[sfi.ParentID] = tp.siafundOutputs[sfi.ParentID]
 		delete(tp.siafundOutputs, sfi.ParentID)
-		tp.usedSiafundOutputs[sfi.ParentID] = ut
 	}
 }
 
-// applySiafundOutputs adds all of the siafund outputs to the unconfirmed
-// consensus set.
-func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction, ut *unconfirmedTransaction) {
-	// Add each new siafund output to the list of siafundOutputs and newSiafundOutputs.
+// applySiafundOutputs incorporates all of the siafund outputs of a transaction
+// into the unconfirmed set.
+func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction) {
+	// For each siafund output, add the output to the unconfirmed set.
 	for i, sfo := range t.SiafundOutputs {
-		// Sanity check - this output should not already exist in the
-		// unconfirmed consensus set.
+		// Sanity check - output should not already be in the unconfirmed set.
 		sfoid := t.SiafundOutputID(i)
 		if consensus.DEBUG {
 			_, exists := tp.siafundOutputs[sfoid]
@@ -180,62 +167,48 @@ func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction, ut *unco
 	}
 }
 
-// addTransactionToPool takes a transaction and creates an
-// unconfirmedTransaction object for the transaction, updating the pool to
-// indicate the resources that have been created and consumed. Then the
-// unconfirmedTransaction is appended or prepended to the linked list of
-// transactions depending on the value of `direction`, false means prepend,
-// true means append.
-func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction, source TransactionDirection) {
-	ut := &unconfirmedTransaction{
-		transaction: t,
-	}
-
+// addTransactionToPool puts a transaction into the transaction pool, changing
+// the unconfirmed set and the transaction linked list to reflect the new
+// transaction.
+func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 	// Apply each individual part of the transaction to the transaction pool.
-	tp.applySiacoinInputs(t, ut)
-	tp.applySiacoinOutputs(t, ut)
-	tp.applyFileContracts(t, ut)
-	tp.applyFileContractTerminations(t, ut)
-	tp.applyStorageProofs(t, ut)
-	tp.applySiafundInputs(t, ut)
-	tp.applySiafundOutputs(t, ut)
+	tp.applySiacoinInputs(t)
+	tp.applySiacoinOutputs(t)
+	tp.applyFileContracts(t)
+	tp.applyFileContractTerminations(t)
+	tp.applyStorageProofs(t)
+	tp.applySiafundInputs(t)
+	tp.applySiafundOutputs(t)
 
-	// Add the unconfirmed transaction to the end of the linked list of
-	// transactions.
-	if source == NewTransaction {
-		tp.appendUnconfirmedTransaction(ut)
-	} else {
-		tp.prependUnconfirmedTransaction(ut)
-	}
-
-	tp.transactions[crypto.HashObject(t)] = ut
+	// Add the transaction to the list of transactions.
+	tp.transactions[crypto.HashObject(t)] = struct{}{}
+	tp.transactionList = append(tp.transactionList, t)
 }
 
-// AcceptTransaction takes a new transaction from the network and puts it in
-// the transaction pool after checking it for legality and consistency.
+// AcceptTransaction adds a transaction to the unconfirmed set of transactions.
+// An error is returned if the transaction cannot be accepted.
 func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 
-	// Check that the transaction has not been seen before.
+	// Check that the transaction is not currently in the unconfirmed set.
 	txnHash := crypto.HashObject(t)
 	_, exists := tp.transactions[txnHash]
 	if exists {
 		return ErrDuplicate
 	}
 
-	// Check that the transaction is legal given the consensus set of the state
-	// and the unconfirmed set of the transaction pool.
+	// Check that the transaction is legal given the unconfirmed consensus set
+	// and the settings of the transaction pool.
 	err = tp.validUnconfirmedTransaction(t)
 	if err != nil {
 		return
 	}
 
-	// direction is set to true because a new transaction has been added and it
-	// may depend on existing unconfirmed transactions.
-	tp.addTransactionToPool(t, NewTransaction)
-	tp.updateSubscribers(nil, nil, nil, []consensus.Transaction{t})
-
+	// Add the transaction to the pool, notify all subscribers, and broadcast
+	// the transaction.
+	tp.addTransactionToPool(t)
+	tp.updateSubscribers(nil, nil, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 	tp.gateway.RelayTransaction(t) // error is not checked
 	return
 }

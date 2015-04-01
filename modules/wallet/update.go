@@ -16,16 +16,26 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 	}
 
 	if scod.Direction == dir {
-		// If the output is already known, ignore it.
-		_, exists := key.outputs[scod.ID]
+		// FundTransaction creates outputs and adds them immediately. They will
+		// also show up from the transaction pool, occasionally causing
+		// repeats. Additionally, outputs that used to exist are not deleted.
+		// If they get re-added, we need to know the age of the output.
+		output, exists := key.outputs[scod.ID]
 		if exists {
+			if !output.spendable {
+				output.spendable = true
+			}
 			return
 		}
 
-		// Add the output.
+		// Add the output. Age is set to 0 because the output has not been
+		// spent yet.
 		ko := &knownOutput{
 			id:     scod.ID,
 			output: scod.SiacoinOutput,
+
+			spendable: true,
+			age:       0,
 		}
 		key.outputs[scod.ID] = ko
 	} else {
@@ -36,53 +46,39 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 			}
 		}
 
-		delete(key.outputs, scod.ID)
+		key.outputs[scod.ID].spendable = false
 	}
 }
 
-// update will synchronize the wallet to the latest set of outputs in the
-// consensus set and unconfirmed consensus set. It does this by first removing
-// all of the diffs from the previous unconfirmed consensus set, then applying
-// all of the diffs between the previous consensus set and current consensus
-// set, and then grabbing the current diffs for the unconfirmed consensus set.
-// This is only safe if calling tpool.UnconfirmedSiacoinOutputDiffs means that
-// the transaction pool will update it's own understanding of the consensus
-// set. (This is currently true).
-func (w *Wallet) update() error {
-	// Because we were running into problems, the amount of time that the state
-	// lock is held has been minimized. Grab all of the necessary diffs under a
-	// lock before doing any computation.
-	counter := w.state.RLock()
-	defer w.state.RUnlock(counter)
+// ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
+// unconfirmed set and uses them to update the balance and transaction history
+// of the wallet.
+func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, _ []consensus.Transaction, unconfirmedSiacoinDiffs []consensus.SiacoinOutputDiff) {
+	id := w.mu.Lock()
+	defer w.mu.Unlock(id)
 
-	removedBlocks, addedBlocks, err := w.state.BlocksSince(w.recentBlock)
-	if err != nil {
-		return err
+	for _, diff := range w.unconfirmedDiffs {
+		w.applyDiff(diff, consensus.DiffRevert)
 	}
 
-	// Remove all of the diffs that have been applied by the unconfirmed set of
-	// transactions.
-	for i := len(w.unconfirmedDiffs) - 1; i >= 0; i-- {
-		w.applyDiff(w.unconfirmedDiffs[i], consensus.DiffRevert)
-	}
-
-	// Apply the diffs in the consensus set that have happened since the last
-	// update.
-	for _, id := range removedBlocks {
+	for _, block := range revertedBlocks {
 		w.age--
 
-		scods, err := w.state.BlockOutputDiffs(id)
+		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			return err
+			if consensus.DEBUG {
+				panic(err)
+			}
+			continue
 		}
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffRevert)
 		}
 	}
-	for _, id := range addedBlocks {
+	for _, block := range appliedBlocks {
 		w.age++
 
-		scods, err := w.state.BlockOutputDiffs(id)
+		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
 			if consensus.DEBUG {
 				panic(err)
@@ -92,15 +88,12 @@ func (w *Wallet) update() error {
 		for _, scod := range scods {
 			w.applyDiff(scod, consensus.DiffApply)
 		}
-		w.recentBlock = id
 	}
 
-	// Get, apply, and store the unconfirmed diffs currently available in the
-	// transaction pool.
-	w.unconfirmedDiffs = w.tpool.UnconfirmedSiacoinOutputDiffs()
-	for _, scod := range w.unconfirmedDiffs {
-		w.applyDiff(scod, consensus.DiffApply)
+	w.unconfirmedDiffs = unconfirmedSiacoinDiffs
+	for _, diff := range w.unconfirmedDiffs {
+		w.applyDiff(diff, consensus.DiffApply)
 	}
 
-	return nil
+	w.notifySubscribers()
 }

@@ -89,4 +89,8 @@ type Wallet interface {
 	Info() WalletInfo
 
 	SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (consensus.Transaction, error)
+
+	// WalletSubscribe will push a struct down the channel any time that the
+	// wallet updates.
+	WalletSubscribe() <-chan struct{}
 }

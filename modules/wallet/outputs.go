@@ -17,7 +17,9 @@ import (
 type knownOutput struct {
 	id     consensus.SiacoinOutputID
 	output consensus.SiacoinOutput
-	age    int
+
+	spendable bool
+	age       int
 }
 
 // openOutput contains an output and the conditions needed to spend the output,
@@ -35,8 +37,6 @@ type key struct {
 // `total`, which is the sum of all the outputs that were found, since it's
 // unlikely that it will equal amount exaclty.
 func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
-	w.update()
-
 	if amount.Sign() <= 0 {
 		err = errors.New("cannot fund amount <= 0")
 		return
@@ -48,6 +48,9 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 			continue
 		}
 		for _, knownOutput := range key.outputs {
+			if !knownOutput.spendable {
+				continue
+			}
 			if knownOutput.age > w.age-AgeDelay {
 				continue
 			}
@@ -72,16 +75,18 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
 func (w *Wallet) Balance(full bool) (total consensus.Currency) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
-	w.update()
+	id := w.mu.RLock()
+	defer w.mu.RUnlock(id)
 
 	// Iterate through all outputs and tally them up.
 	for _, key := range w.keys {
-		if !key.spendable && !full {
+		if !key.spendable {
 			continue
 		}
 		for _, knownOutput := range key.outputs {
+			if !knownOutput.spendable {
+				continue
+			}
 			if !full && knownOutput.age > w.age-AgeDelay {
 				continue
 			}
