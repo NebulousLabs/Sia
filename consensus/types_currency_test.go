@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 )
@@ -14,6 +15,23 @@ func TestCurrencyToBig(t *testing.T) {
 
 	if b.Cmp(cb) != 0 {
 		t.Error("currency to big has failed")
+	}
+}
+
+// TestCurrencyDiv checks that the div function has been correctly implemented.
+func TestCurrencyDiv(t *testing.T) {
+	c9 := NewCurrency64(9)
+	c10 := NewCurrency64(10)
+	c90 := NewCurrency64(90)
+	c97 := NewCurrency64(97)
+
+	c90D10 := c90.Div(c10)
+	if c90D10.Cmp(c9) != 0 {
+		t.Error("Dividing 90 by 10 should produce 9")
+	}
+	c97D10 := c97.Div(c10)
+	if c97D10.Cmp(c9) != 0 {
+		t.Error("Dividing 97 by 10 should produce 9")
 	}
 }
 
@@ -34,8 +52,9 @@ func TestCurrencySqrt(t *testing.T) {
 	}
 }
 
-// TestMarshalJSON probes the MarshalJSON and UnmarshalJSON functions.
-func TestMarshalJSON(t *testing.T) {
+// TestCurrencyMarshalJSON probes the MarshalJSON and UnmarshalJSON functions
+// of the currency type.
+func TestCurrencyMarshalJSON(t *testing.T) {
 	b30 := big.NewInt(30)
 	c30 := NewCurrency64(30)
 
@@ -59,16 +78,49 @@ func TestMarshalJSON(t *testing.T) {
 	if c30.Cmp(cUmar30) != 0 {
 		t.Error("Incorrect unmarshalling of currency type.")
 	}
+
+	cMar30[0] = 0
+	err = cUmar30.UnmarshalJSON(cMar30)
+	if err == nil {
+		t.Error("JSON decoded nonsense input")
+	}
 }
 
-// TestMarshalSia probes the MarshalSia and UnmarshalSia functions.
-func TestMarshalSia(t *testing.T) {
+// TestCurrencyMarshalSia probes the MarshalSia and UnmarshalSia functions of
+// the currency type.
+func TestCurrencyMarshalSia(t *testing.T) {
 	c := NewCurrency64(1656)
 	cMar := c.MarshalSia()
 	var cUmar Currency
 	cUmar.UnmarshalSia(cMar)
 	if c.Cmp(cUmar) != 0 {
 		t.Error("marshal and unmarshal mismatch for currency type")
+	}
+}
+
+// TestCurrencyString probes the String function of the currency type.
+func TestCurrencyString(t *testing.T) {
+	b := big.NewInt(7135)
+	c := NewCurrency64(7135)
+	if b.String() != c.String() {
+		t.Error("string function not behaving as expected")
+	}
+}
+
+// TestCurrencyScan probes the Scan function of the currency type.
+func TestCurrencyScan(t *testing.T) {
+	var c0 Currency
+	c1 := NewCurrency64(81293)
+	_, err := fmt.Sscan("81293", &c0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c0.Cmp(c1) != 0 {
+		t.Error("scanned number does not equal expected value")
+	}
+	_, err = fmt.Sscan("z", &c0)
+	if err == nil {
+		t.Fatal("scan is accepting garbage input")
 	}
 }
 
@@ -124,6 +176,16 @@ func TestNegativeCurrencyUnmarshalJSON(t *testing.T) {
 	}
 	if cNeg.Cmp(ZeroCurrency) < 0 {
 		t.Error("negative currency returned")
+	}
+}
+
+// TestNegativeCurrencyScan tries to scan in a negative number and checks for
+// an error.
+func TestNegativeCurrencyScan(t *testing.T) {
+	var c Currency
+	_, err := fmt.Sscan("-23", &c)
+	if err != ErrNegativeCurrency {
+		t.Error("expecting ErrNegativeCurrency:", err)
 	}
 }
 

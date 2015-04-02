@@ -34,10 +34,10 @@ type Currency struct {
 func NewCurrency(b *big.Int) (c Currency) {
 	c.i = *b
 	if c.Cmp(ZeroCurrency) < 0 {
+		c = Currency{}
 		if DEBUG {
 			panic("cannot have a negative currency")
 		}
-		c = Currency{}
 	}
 	return
 }
@@ -85,14 +85,13 @@ func (c Currency) MulFloat(x float64) (y Currency) {
 		if DEBUG {
 			panic("cannot multiple currency by a negative number")
 		}
-		return
+	} else {
+		yRat := new(big.Rat).Mul(
+			new(big.Rat).SetInt(&c.i),
+			new(big.Rat).SetFloat64(x),
+		)
+		y.i.Div(yRat.Num(), yRat.Denom())
 	}
-
-	yRat := new(big.Rat).Mul(
-		new(big.Rat).SetInt(&c.i),
-		new(big.Rat).SetFloat64(x),
-	)
-	y.i.Div(yRat.Num(), yRat.Denom())
 	return
 }
 
@@ -112,17 +111,18 @@ func (c Currency) Sqrt() (y Currency) {
 	return
 }
 
-// Sub returns a new Currency value y = c - x.
-func (c Currency) Sub(x Currency) Currency {
-	var y Currency
-	y.i.Sub(&c.i, &x.i)
-	if y.Cmp(ZeroCurrency) < 0 {
+// Sub returns a new Currency value y = c - x. Behavior is undefined when
+// c < x.
+func (c Currency) Sub(x Currency) (y Currency) {
+	if c.Cmp(x) < 0 {
+		y = c
 		if DEBUG {
 			panic("subtraction resulted in negative currency")
 		}
-		return x
+	} else {
+		y.i.Sub(&c.i, &x.i)
 	}
-	return y
+	return
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -170,7 +170,7 @@ func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
 		return err
 	}
 	if c.Cmp(ZeroCurrency) < 0 {
-		return errors.New("cannot have a negative currency")
+		return ErrNegativeCurrency
 	}
 	return nil
 }
