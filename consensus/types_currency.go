@@ -9,11 +9,16 @@ import (
 
 var (
 	ZeroCurrency = NewCurrency64(0)
+
+	ErrNegativeCurrency = errors.New("negative currency not allowed")
 )
 
-// currency.go defines the internal currency object. One major design goal of
-// the currency type is immutability. Another is non-negativity: the currency
-// object should never have a negative value.
+// currency.go defines the internal currency object. One design goal of the
+// currency type is immutability: the currency type should be safe to pass
+// directly to other objects and packages. The currency object should never
+// have a negative value. The currency should never overflow. There is a
+// maximum size value that can be encoded (around 10^600), however exceeding
+// this value will not result in overflow.
 
 // A Currency represents a number of siacoins or siafunds. Internally, a
 // Currency value is unbounded; however, Currency values sent over the wire
@@ -24,9 +29,16 @@ type Currency struct {
 	i big.Int
 }
 
-// NewCurrency creates a Currency value from a big.Int.
+// NewCurrency creates a Currency value from a big.Int. Undefined behavior
+// occurs if a negative input is used.
 func NewCurrency(b *big.Int) (c Currency) {
 	c.i = *b
+	if c.Cmp(ZeroCurrency) < 0 {
+		if DEBUG {
+			panic("cannot have a negative currency")
+		}
+		c = Currency{}
+	}
 	return
 }
 
@@ -67,7 +79,15 @@ func (c Currency) Mul(x Currency) (y Currency) {
 }
 
 // MulFloat returns a new Currency value y = c * x, where x is a float64.
+// Behavior is undefined when x is negative.
 func (c Currency) MulFloat(x float64) (y Currency) {
+	if x < 0 {
+		if DEBUG {
+			panic("cannot multiple currency by a negative number")
+		}
+		return
+	}
+
 	yRat := new(big.Rat).Mul(
 		new(big.Rat).SetInt(&c.i),
 		new(big.Rat).SetFloat64(x),
@@ -83,7 +103,8 @@ func (c Currency) RoundDown(n uint64) (y Currency) {
 	return
 }
 
-// Sqrt returns a new Currency value y = sqrt(c)
+// Sqrt returns a new Currency value y = sqrt(c). Result is rounded down to the
+// nearest integer.
 func (c Currency) Sqrt() (y Currency) {
 	f, _ := new(big.Rat).SetInt(&c.i).Float64()
 	sqrt := new(big.Rat).SetFloat64(math.Sqrt(f))
@@ -92,9 +113,16 @@ func (c Currency) Sqrt() (y Currency) {
 }
 
 // Sub returns a new Currency value y = c - x.
-func (c Currency) Sub(x Currency) (y Currency) {
+func (c Currency) Sub(x Currency) Currency {
+	var y Currency
 	y.i.Sub(&c.i, &x.i)
-	return
+	if y.Cmp(ZeroCurrency) < 0 {
+		if DEBUG {
+			panic("subtraction resulted in negative currency")
+		}
+		return x
+	}
+	return y
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -102,14 +130,16 @@ func (c Currency) MarshalJSON() ([]byte, error) {
 	return c.i.MarshalJSON()
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface.
+// UnmarshalJSON implements the json.Unmarshaler interface. An error is
+// returned if a negative number is provided.
 func (c *Currency) UnmarshalJSON(b []byte) error {
 	err := c.i.UnmarshalJSON(b)
 	if err != nil {
 		return err
 	}
 	if c.Cmp(ZeroCurrency) < 0 {
-		return errors.New("cannot have a negative currency")
+		c.i = *big.NewInt(0)
+		return ErrNegativeCurrency
 	}
 	return nil
 }
@@ -119,11 +149,11 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 // with a single byte indicating the length of the slice.
 func (c Currency) MarshalSia() []byte {
 	b := c.i.Bytes()
-	if DEBUG {
-		if len(b) > 255 {
-			panic(len(b))
+	if len(b) > 255 {
+		if DEBUG {
 			panic("attempting to marshal a too-big currency type")
 		}
+		return nil
 	}
 
 	return append(
