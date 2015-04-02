@@ -72,11 +72,11 @@ test-wallet: clean fmt REBUILD
 # have been hit during testing and how many times each line has been hit.
 coverpackages = consensus crypto encoding modules/gateway modules/host          \
 	modules/hostdb modules/miner modules/renter modules/transactionpool         \
-	modules/wallet siad
+	modules/wallet api
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \
-		go test -v -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
+		go test -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
 		rm cover/$$package.out ; \
 	done
