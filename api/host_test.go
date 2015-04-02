@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"testing"
@@ -6,18 +6,18 @@ import (
 )
 
 // announceHost puts a host announcement for the host into the blockchain.
-func (dt *daemonTester) announceHost() {
-	dt.callAPI("/host/announce")
-	dt.mineBlock()
+func (st *serverTester) announceHost() {
+	st.callAPI("/host/announce")
+	st.mineBlock()
 }
 
 // TestHostAnnouncement checks that calling '/host/announce' results in an
 // announcement that makes it into the blockchain.
 func TestHostAnnouncement(t *testing.T) {
-	// Create the daemon tester and check that the initial hostdb is empty.
-	dt := newDaemonTester(t)
-	if dt.hostdb.NumHosts() != 0 {
-		t.Fatal("hostdb needs to be empty after calling newDaemonTester")
+	// Create the server tester and check that the initial hostdb is empty.
+	st := newServerTester(t)
+	if st.hostdb.NumHosts() != 0 {
+		t.Fatal("hostdb needs to be empty after calling newServerTester")
 	}
 
 	// Announce the host and check that the announcement makes it into the
@@ -25,8 +25,8 @@ func TestHostAnnouncement(t *testing.T) {
 	// happens in a separate goroutine. Since there's not a good way to figure
 	// out when the call will finish, we spin until the update has finished. If
 	// the update never finishes, the test environment should timeout.
-	dt.announceHost()
-	for dt.hostdb.NumHosts() != 1 {
+	st.announceHost()
+	for st.hostdb.NumHosts() != 1 {
 		time.Sleep(time.Millisecond)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 )
 
 // minerStartHandler handles the API call that starts the miner.
-func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan for the number of threads.
 	var threads int
 	_, err := fmt.Sscan(req.FormValue("threads"), &threads)
@@ -15,8 +15,8 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	d.miner.SetThreads(threads)
-	err = d.miner.StartMining()
+	srv.miner.SetThreads(threads)
+	err = srv.miner.StartMining()
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -26,12 +26,12 @@ func (d *daemon) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // minerStatusHandler handles the API call that queries the miner's status.
-func (d *daemon) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.miner.MinerInfo())
+func (srv *Server) minerStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.miner.MinerInfo())
 }
 
 // minerStopHandler handles the API call to stop the miner.
-func (d *daemon) minerStopHandler(w http.ResponseWriter, req *http.Request) {
-	d.miner.StopMining()
+func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
+	srv.miner.StopMining()
 	writeSuccess(w)
 }

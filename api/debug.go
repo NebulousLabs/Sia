@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"math/big"
@@ -46,7 +46,7 @@ type ModuleDeadlockStatus struct {
 }
 
 // debugConstantsHandler prints a json file containing all of the constants.
-func (d *daemon) debugConstantsHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) debugConstantsHandler(w http.ResponseWriter, req *http.Request) {
 	sc := SiaConstants{
 		GenesisTimestamp:      consensus.GenesisTimestamp,
 		BlockSizeLimit:        consensus.BlockSizeLimit,
@@ -80,40 +80,40 @@ func (d *daemon) debugConstantsHandler(w http.ResponseWriter, req *http.Request)
 // 'false' may merely indicate that it's taking longer than 3 seconds to
 // acquire a lock. For our purposes, this is deadlock, even if it may
 // eventually resolve.
-func (d *daemon) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 	// Call functions that result in locks but use inputs that don't result in
 	// changes. After the blocking function unlocks, set the value to true.
 	var mds ModuleDeadlockStatus
 	go func() {
-		d.state.AcceptBlock(consensus.Block{})
+		srv.state.AcceptBlock(consensus.Block{})
 		mds.State = true
 	}()
 	go func() {
-		d.gateway.RemovePeer("")
+		srv.gateway.RemovePeer("")
 		mds.Gateway = true
 	}()
 	go func() {
-		d.host.Info()
+		srv.host.Info()
 		mds.Host = true
 	}()
 	go func() {
-		d.hostdb.Remove("")
+		srv.hostdb.Remove("")
 		mds.HostDB = true
 	}()
 	go func() {
-		d.miner.FindBlock()
+		srv.miner.FindBlock()
 		mds.Miner = true
 	}()
 	go func() {
-		d.renter.Rename("", "")
+		srv.renter.Rename("", "")
 		mds.Renter = true
 	}()
 	go func() {
-		d.tpool.AcceptTransaction(consensus.Transaction{})
+		srv.tpool.AcceptTransaction(consensus.Transaction{})
 		mds.TransactionPool = true
 	}()
 	go func() {
-		d.wallet.CoinAddress()
+		srv.wallet.CoinAddress()
 		mds.Wallet = true
 	}()
 	time.Sleep(time.Second * 3)

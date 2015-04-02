@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 // The first balance should decrease, and the second balance should increase
 // proportionally.
 func TestSendCoins(t *testing.T) {
-	sender := newDaemonTester(t)
+	sender := newServerTester(t)
 	receiver := sender.addPeer()
 
 	// get current balances

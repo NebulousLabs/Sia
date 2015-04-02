@@ -45,7 +45,7 @@ func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
 	}
 	walletNum++
 
-	h, err := New(ct.State, tp, w, "")
+	h, err := New(ct.State, tp, w, modules.HostDir)
 	if err != nil {
 		t.Fatal(err)
 	}

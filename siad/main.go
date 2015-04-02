@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -30,16 +30,6 @@ type Config struct {
 		ConfigFilename    string
 		DownloadDirectory string
 	}
-}
-
-// expand all ~ characters in Config values
-func (c *Config) expand() (err error) {
-	c.Siad.ConfigFilename, err = homedir.Expand(c.Siad.ConfigFilename)
-	if err != nil {
-		return
-	}
-
-	return
 }
 
 // Helper function for determining existence of a file. Technically, err != nil
@@ -77,40 +67,28 @@ func startEnvironment(*cobra.Command, []string) {
 
 		SiaDir: siaDir,
 	}
-	err := config.expand()
-	if err != nil {
-		fmt.Println("Bad config value:", err)
-		return
-	}
 	d, err := newDaemon(daemonConfig)
 	if err != nil {
 		fmt.Println("Failed to create daemon:", err)
 		return
 	}
 
-	// join the network
-	//
-	// TODO: This should proabably happen in newDaemon.
-	if !config.Siacore.NoBootstrap {
-		go d.gateway.Bootstrap(modules.BootstrapPeers[0])
-	}
-
-	// listen for API requests
-	err = d.listen()
+	// serve API requests
+	err = d.srv.Serve()
 	if err != nil {
 		fmt.Println("API server quit unexpectedly:", err)
 	}
 }
 
 func version(*cobra.Command, []string) {
-	fmt.Println("Sia Daemon v" + VERSION)
+	fmt.Println("Sia Daemon v" + api.VERSION)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Daemon v" + VERSION,
-		Long:  "Sia Daemon v" + VERSION,
+		Short: "Sia Daemon v" + api.VERSION,
+		Long:  "Sia Daemon v" + api.VERSION,
 		Run:   startEnvironment,
 	}
 
@@ -140,7 +118,12 @@ func main() {
 
 	// Load the config file, which will overwrite the default values.
 	if exists(config.Siad.ConfigFilename) {
-		if err := gcfg.ReadFileInto(&config, config.Siad.ConfigFilename); err != nil {
+		configFilename, err := homedir.Expand(config.Siad.ConfigFilename)
+		if err != nil {
+			fmt.Println("Failed to load config file:", err)
+			return
+		}
+		if err := gcfg.ReadFileInto(&config, configFilename); err != nil {
 			fmt.Println("Failed to load config file:", err)
 			return
 		}

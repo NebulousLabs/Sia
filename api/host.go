@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
-func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := d.host.Announce(d.gateway.Info().Address)
+func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.host.Announce(srv.gateway.Info().Address)
 	if err != nil {
 		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
 		return
@@ -17,9 +17,9 @@ func (d *daemon) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // hostConfigHandler handles the API call to set the host configuration.
-func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
-	config := d.host.Info().HostSettings
+	config := srv.host.Info().HostSettings
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
@@ -50,8 +50,8 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	d.host.SetSettings(config)
-	err := d.host.Announce(d.gateway.Info().Address)
+	srv.host.SetSettings(config)
+	err := srv.host.Announce(srv.gateway.Info().Address)
 	if err != nil {
 		writeError(w, "Could not announce host: "+err.Error(), http.StatusBadRequest)
 		return
@@ -60,6 +60,6 @@ func (d *daemon) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // hostStatusHandler handles the API call that queries the host status.
-func (d *daemon) hostStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.host.Info())
+func (srv *Server) hostStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.host.Info())
 }

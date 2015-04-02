@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 )
 
 // walletAddressHandler handles the API request for a new address.
-func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, _, err := d.wallet.CoinAddress()
+func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
+	coinAddress, _, err := srv.wallet.CoinAddress()
 	if err != nil {
 		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
 		return
@@ -24,7 +24,7 @@ func (d *daemon) walletAddressHandler(w http.ResponseWriter, req *http.Request) 
 }
 
 // walletSendHandler handles the API call to send coins to another address.
-func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
 	var amount consensus.Currency
 	var dest consensus.UnlockHash
@@ -44,7 +44,7 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	copy(dest[:], destAddressBytes)
 
 	// Spend the coins.
-	_, err = d.wallet.SpendCoins(amount, dest)
+	_, err = srv.wallet.SpendCoins(amount, dest)
 	if err != nil {
 		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -54,6 +54,6 @@ func (d *daemon) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // walletStatusHandler handles the API call querying the status of the wallet.
-func (d *daemon) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, d.wallet.Info())
+func (srv *Server) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.wallet.Info())
 }

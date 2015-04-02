@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"os"
@@ -16,16 +16,16 @@ func TestUploadAndDownload(t *testing.T) {
 		t.Skip()
 	}
 
-	// Create a daemon and add a host to the network.
-	dt := newDaemonTester(t)
-	dt.announceHost()
+	// Create a server and add a host to the network.
+	st := newServerTester(t)
+	st.announceHost()
 
-	for dt.hostdb.NumHosts() == 0 {
+	for st.hostdb.NumHosts() == 0 {
 		time.Sleep(time.Millisecond)
 	}
 
 	// Upload to the host.
-	dt.callAPI("/renter/upload?pieces=1&source=api.go&nickname=first")
+	st.callAPI("/renter/upload?pieces=1&source=api.go&nickname=first")
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
@@ -35,13 +35,13 @@ func TestUploadAndDownload(t *testing.T) {
 	// indicate if a download has completed or not.
 	time.Sleep(consensus.RenterZeroConfDelay + time.Second*10)
 
-	rentInfo := dt.renter.Info()
-	if len(rentInfo.Files) != 1 {
-		t.Error("file is not uploaded")
+	files := st.renter.FileList()
+	if len(files) != 1 || !files[0].Available() {
+		t.Fatal("file is not uploaded")
 	}
 
 	// Try to download the file.
-	dt.callAPI("/renter/download?destination=renterTestDL_test&nickname=first")
+	st.callAPI("/renter/download?destination=renterTestDL_test&nickname=first")
 	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"testing"
@@ -9,29 +9,29 @@ import (
 	"github.com/NebulousLabs/Sia/modules/gateway"
 )
 
-// addPeer creates a new daemonTester and bootstraps it to dt. It returns the
+// addPeer creates a new serverTester and bootstraps it to st. It returns the
 // new peer.
-func (dt *daemonTester) addPeer() *daemonTester {
-	// Mine a block on dt, in the event that both dt and newPeer are new, they
-	// will be at the same height unless we mine a block on dt.
-	dt.mineBlock()
+func (st *serverTester) addPeer() *serverTester {
+	// Mine a block on st, in the event that both st and newPeer are new, they
+	// will be at the same height unless we mine a block on st.
+	st.mineBlock()
 
-	// Create a new peer and bootstrap it to dt.
-	newPeer := newDaemonTester(dt.T)
-	err := newPeer.gateway.Bootstrap(dt.netAddress())
+	// Create a new peer and bootstrap it to st.
+	newPeer := newServerTester(st.T)
+	err := newPeer.gateway.Bootstrap(st.netAddress())
 	if err != nil {
-		dt.Fatal("bootstrap failed:", err)
+		st.Fatal("bootstrap failed:", err)
 	}
 
 	// Wait for bootstrapping to finish, then check that each has the same
 	// number of peers and blocks.
-	for len(dt.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
+	for len(st.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
 		time.Sleep(time.Millisecond)
 	}
-	// force synchronization to dt, in case newPeer tried to synchronize to
-	// one of dt's peers.
-	for dt.state.Height() != newPeer.state.Height() {
-		newPeer.gateway.Synchronize(dt.netAddress())
+	// force synchronization to st, in case newPeer tried to synchronize to
+	// one of st's peers.
+	for st.state.Height() != newPeer.state.Height() {
+		newPeer.gateway.Synchronize(st.netAddress())
 	}
 	return newPeer
 }
@@ -40,8 +40,8 @@ func (dt *daemonTester) addPeer() *daemonTester {
 // the network.
 func TestPeering(t *testing.T) {
 	// Create to peers and add the first to the second.
-	peer1 := newDaemonTester(t)
-	peer2 := newDaemonTester(t)
+	peer1 := newServerTester(t)
+	peer2 := newServerTester(t)
 	peer1.callAPI("/gateway/peer/add?address=" + string(peer2.netAddress()))
 
 	// Check that the first has the second as a peer.
@@ -70,41 +70,41 @@ func TestPeering(t *testing.T) {
 // TestTransactionRelay checks that an unconfirmed transaction is relayed to
 // all peers.
 func TestTransactionRelay(t *testing.T) {
-	// Create a daemon tester and give it a peer.
-	dt := newDaemonTester(t)
-	dt2 := dt.addPeer()
+	// Create a server tester and give it a peer.
+	st := newServerTester(t)
+	st2 := st.addPeer()
 
-	// Make sure both daemons have empty transaction pools.
-	tset := dt.tpool.TransactionSet()
-	tset2 := dt2.tpool.TransactionSet()
+	// Make sure both servers have empty transaction pools.
+	tset := st.tpool.TransactionSet()
+	tset2 := st2.tpool.TransactionSet()
 	if len(tset) != 0 || len(tset2) != 0 {
-		t.Fatal("transaction set is not empty after creating new daemon tester")
+		t.Fatal("transaction set is not empty after creating new server tester")
 	}
 
-	// Get the original balances of each daemon for later comparison.
-	origBal := dt.wallet.Balance(false)
-	origBal2 := dt2.wallet.Balance(false)
+	// Get the original balances of each server for later comparison.
+	origBal := st.wallet.Balance(false)
+	origBal2 := st2.wallet.Balance(false)
 
-	// Create a transaction in the first daemon and check that it propagates to
+	// Create a transaction in the first server and check that it propagates to
 	// the second. The check is done via spinning because network propagation
 	// will take an unknown amount of time.
-	dt.callAPI("/wallet/send?amount=15&destination=" + dt2.coinAddress())
+	st.callAPI("/wallet/send?amount=15&destination=" + st2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
-		tset = dt.tpool.TransactionSet()
-		tset2 = dt2.tpool.TransactionSet()
+		tset = st.tpool.TransactionSet()
+		tset2 = st2.tpool.TransactionSet()
 		time.Sleep(time.Millisecond)
 	}
 
 	// Check that the balances of each have updated appropriately, in
 	// accordance with 0-conf.
-	if origBal.Sub(consensus.NewCurrency64(15)).Cmp(dt.wallet.Balance(false)) != 0 {
+	if origBal.Sub(consensus.NewCurrency64(15)).Cmp(st.wallet.Balance(false)) != 0 {
 		t.Error(origBal.Big())
-		t.Error(dt.wallet.Balance(false).Big())
+		t.Error(st.wallet.Balance(false).Big())
 		t.Error("balances are incorrect for 0-conf transaction")
 	}
-	for origBal2.Add(consensus.NewCurrency64(15)).Cmp(dt2.wallet.Balance(false)) != 0 {
+	for origBal2.Add(consensus.NewCurrency64(15)).Cmp(st2.wallet.Balance(false)) != 0 {
 		// t.Error(origBal2.Big())
-		// t.Error(dt2.wallet.Balance(false).Big())
+		// t.Error(st2.wallet.Balance(false).Big())
 		// t.Error("balances are incorrect for 0-conf transaction")
 	}
 }
@@ -116,16 +116,16 @@ func TestBlockBootstrap(t *testing.T) {
 		t.Skip()
 	}
 
-	// Create a daemon and give it 2500 blocks.
-	dt := newDaemonTester(t)
+	// Create a server and give it 2500 blocks.
+	st := newServerTester(t)
 	for i := 0; i < 2*gateway.MaxCatchUpBlocks+1; i++ {
-		dt.mineBlock()
+		st.mineBlock()
 	}
 
 	// Add a peer and spin until the peer is caught up. addPeer() already does
 	// this check, but it's left here to be explict anyway.
-	dt2 := dt.addPeer()
-	for dt.state.Height() != dt2.state.Height() {
+	st2 := st.addPeer()
+	for st.state.Height() != st2.state.Height() {
 		time.Sleep(time.Millisecond)
 	}
 }
