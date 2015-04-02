@@ -179,99 +179,9 @@ type SiafundOutput struct {
 	ClaimStart      Currency
 }
 
-// UnlockConditions are a set of conditions which must be met to execute
-// certain actions, such as spending a SiacoinOutput or terminating a
-// FileContract.
-//
-// The simplest requirement is that the block containing the UnlockConditions
-// must have a height >= 'Timelock'.
-//
-// 'PublicKeys' specifies the set of keys that can be used to satisfy the
-// UnlockConditions; of these, at least 'NumSignatures' unique keys must sign
-// the transaction. The keys that do not need to use the same cryptographic
-// algorithm.
-//
-// If 'NumSignatures' == 0, the UnlockConditions are effectively "anyone can
-// unlock." If 'NumSignatures' > len('PublicKeys'), then the UnlockConditions
-// cannot be fulfilled under any circumstances.
-type UnlockConditions struct {
-	Timelock      BlockHeight
-	PublicKeys    []SiaPublicKey
-	NumSignatures uint64
-}
-
-// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
-// indicates the algorithm used for signing and verification. Unrecognized
-// algorithms will always verify, which allows new algorithms to be added to
-// the protocol via a soft-fork.
-type SiaPublicKey struct {
-	Algorithm Specifier
-	Key       string
-}
-
-// A TransactionSignature is a signature that is included in the transaction.
-// The signature should correspond to a public key in one of the
-// UnlockConditions of the transaction. This key is specified first by
-// 'ParentID', which specifies the UnlockConditions, and then
-// 'PublicKeyIndex', which indicates the key in the UnlockConditions. There
-// are three types that use UnlockConditions: SiacoinInputs, SiafundInputs,
-// and FileContractTerminations. Each of these types also references a
-// ParentID, and this is the hash that 'ParentID' must match. The 'Timelock'
-// prevents the signature from being used until a certain height.
-// 'CoveredFields' indicates which parts of the transaction are being signed;
-// see CoveredFields.
-type TransactionSignature struct {
-	ParentID       crypto.Hash
-	PublicKeyIndex uint64
-	Timelock       BlockHeight
-	CoveredFields  CoveredFields
-	Signature      Signature
-}
-
-// CoveredFields indicates which fields in a transaction have been covered by
-// the signature. (Note that the signature does not sign the fields
-// themselves, but rather their combined hash; see SigHash.) Each slice
-// corresponds to a slice in the Transaction type, indicating which indices of
-// the slice have been signed. The indices must be valid, i.e. within the
-// bounds of the slice. In addition, they must be sorted and unique.
-//
-// As a convenience, a signature of the entire transaction can be indicated by
-// the 'WholeTransaction' field. If 'WholeTransaction' == true, all other
-// fields must be empty (except for the Signatures field, since a signature
-// cannot sign itself).
-type CoveredFields struct {
-	WholeTransaction         bool
-	SiacoinInputs            []uint64
-	SiacoinOutputs           []uint64
-	FileContracts            []uint64
-	FileContractTerminations []uint64
-	StorageProofs            []uint64
-	SiafundInputs            []uint64
-	SiafundOutputs           []uint64
-	MinerFees                []uint64
-	ArbitraryData            []uint64
-	Signatures               []uint64
-}
-
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
 	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
-}
-
-// UnlockHash calculates the root hash of a Merkle tree of the
-// UnlockConditions object. The leaves of this tree are formed by taking the
-// hash of the timelock, the hash of the public keys (one leaf each), and the
-// hash of the number of signatures. The keys are put in the middle because
-// Timelock and NumSignatures are both low entropy fields; they can be
-// protected by having random public keys next to them.
-func (uc UnlockConditions) UnlockHash() UnlockHash {
-	tree := crypto.NewTree()
-	tree.PushObject(uc.Timelock)
-	for i := range uc.PublicKeys {
-		tree.PushObject(uc.PublicKeys[i])
-	}
-	tree.PushObject(uc.NumSignatures)
-	return UnlockHash(tree.Root())
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
@@ -366,63 +276,6 @@ func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 // the siafund output is spent. The ID is the hash the SiafundOutputID.
 func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashObject(id))
-}
-
-// SigHash returns the hash of the fields in a transaction covered by a given
-// signature. See CoveredFields for more details.
-func (t Transaction) SigHash(i int) crypto.Hash {
-	cf := t.Signatures[i].CoveredFields
-	var signedData []byte
-	if cf.WholeTransaction {
-		signedData = encoding.MarshalAll(
-			t.SiacoinInputs,
-			t.SiacoinOutputs,
-			t.FileContracts,
-			t.FileContractTerminations,
-			t.StorageProofs,
-			t.SiafundInputs,
-			t.SiafundOutputs,
-			t.MinerFees,
-			t.ArbitraryData,
-			t.Signatures[i].ParentID,
-			t.Signatures[i].PublicKeyIndex,
-			t.Signatures[i].Timelock,
-		)
-	} else {
-		for _, input := range cf.SiacoinInputs {
-			signedData = append(signedData, encoding.Marshal(t.SiacoinInputs[input])...)
-		}
-		for _, output := range cf.SiacoinOutputs {
-			signedData = append(signedData, encoding.Marshal(t.SiacoinOutputs[output])...)
-		}
-		for _, contract := range cf.FileContracts {
-			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
-		}
-		for _, termination := range cf.FileContractTerminations {
-			signedData = append(signedData, encoding.Marshal(t.FileContractTerminations[termination])...)
-		}
-		for _, storageProof := range cf.StorageProofs {
-			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
-		}
-		for _, siafundInput := range cf.SiafundInputs {
-			signedData = append(signedData, encoding.Marshal(t.SiafundInputs[siafundInput])...)
-		}
-		for _, siafundOutput := range cf.SiafundOutputs {
-			signedData = append(signedData, encoding.Marshal(t.SiafundOutputs[siafundOutput])...)
-		}
-		for _, minerFee := range cf.MinerFees {
-			signedData = append(signedData, encoding.Marshal(t.MinerFees[minerFee])...)
-		}
-		for _, arbData := range cf.ArbitraryData {
-			signedData = append(signedData, encoding.Marshal(t.ArbitraryData[arbData])...)
-		}
-	}
-
-	for _, sig := range cf.Signatures {
-		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
-	}
-
-	return crypto.HashBytes(signedData)
 }
 
 // ID returns the id of a transaction, which is taken by marshalling all of the
