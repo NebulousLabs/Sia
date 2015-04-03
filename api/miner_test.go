@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 func (st *serverTester) testMining() {
