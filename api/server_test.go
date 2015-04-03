@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
@@ -17,6 +17,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -123,7 +124,7 @@ func (st *serverTester) mineMoney() {
 	st.getAPI("/wallet/status", &info)
 
 	// Mine enough blocks to overcome the maturity delay and receive coins.
-	for i := 0; i < 1+consensus.MaturityDelay; i++ {
+	for i := 0; i < 1+types.MaturityDelay; i++ {
 		st.mineBlock()
 		st.updateWait()
 	}

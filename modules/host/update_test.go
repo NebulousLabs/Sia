@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	// "testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testObligation adds a file obligation to the host's set of obligations, then
@@ -30,28 +30,28 @@ func (ht *HostTester) testObligation() {
 	// Create, finance, and mine a transaction with a file contract in it using
 	// the data's merkle root.
 	input, value := ht.FindSpendableSiacoinInput()
-	txn := ht.AddSiacoinInputToTransaction(consensus.Transaction{}, input)
+	txn := ht.AddSiacoinInputToTransaction(types.Transaction{}, input)
 	merkleRoot, err := crypto.ReaderMerkleRoot(file)
 	if err != nil {
 		ht.Fatal(err)
 	}
 	file.Close()
-	fc := consensus.FileContract{
+	fc := types.FileContract{
 		FileSize:       filesize,
 		FileMerkleRoot: merkleRoot,
 		Start:          ht.State.Height() + 2,
 		Expiration:     ht.State.Height() + 3,
 		Payout:         value,
-		ValidProofOutputs: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: value, UnlockHash: ht.Host.UnlockHash},
+		ValidProofOutputs: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: value, UnlockHash: ht.Host.UnlockHash},
 		},
-		MissedProofOutputs: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: value, UnlockHash: consensus.ZeroUnlockHash},
+		MissedProofOutputs: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: value, UnlockHash: types.ZeroUnlockHash},
 		},
 	}
 	fc.ValidProofOutputs[0].Value = fc.ValidProofOutputs[0].Value.Sub(fc.Tax())
 	txn.FileContracts = append(txn.FileContracts, fc)
-	ht.MineAndSubmitCurrentBlock([]consensus.Transaction{txn})
+	ht.MineAndSubmitCurrentBlock([]types.Transaction{txn})
 
 	// Add the obligation for the file to the host.
 	fcid := txn.FileContractID(0)
@@ -69,7 +69,7 @@ func (ht *HostTester) testObligation() {
 	// have the proof submitted, then check that the balance experienced an
 	// increase.
 	startingBalance := ht.wallet.Balance(true)
-	for i := 0; i < 3+consensus.MaturityDelay; i++ {
+	for i := 0; i < 3+types.MaturityDelay; i++ {
 		ht.Host.update()
 		tSet := ht.Host.tpool.TransactionSet()
 		ht.MineAndSubmitCurrentBlock(tSet)

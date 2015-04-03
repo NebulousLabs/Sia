@@ -3,8 +3,8 @@ package gateway
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 )
 
 // TestPeerSharing tests that peers are correctly shared.

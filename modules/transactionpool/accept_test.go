@@ -3,15 +3,15 @@ package transactionpool
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // addSiacoinTransactionToPool creates a transaction with siacoin outputs and
 // adds them to the pool, returning the transaction.
-func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction) {
+func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn types.Transaction) {
 	// spendCoins will automatically add transaction(s) to the transaction pool.
 	// They will contain siacoin output(s).
-	txn, err := tpt.spendCoins(consensus.NewCurrency64(1), consensus.ZeroUnlockHash)
+	txn, err := tpt.spendCoins(types.NewCurrency64(1), types.ZeroUnlockHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn consensus.Transaction
 // addDependentSiacoinTransactionToPool adds a transaction to the pool with a
 // siacoin output, and then adds a second transaction to the pool that requires
 // the unconfirmed siacoin output.
-func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, dependentTxn consensus.Transaction) {
+func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, dependentTxn types.Transaction) {
 	// Get an address to receive coins.
 	addr, _, err := tpt.wallet.CoinAddress()
 	if err != nil {

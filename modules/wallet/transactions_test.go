@@ -3,7 +3,7 @@ package wallet
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testFundTransaction funds and completes a transaction using the
@@ -11,8 +11,8 @@ import (
 // is created that is valid.
 func (wt *walletTester) testFundTransaction() {
 	// Build a transaction that intentionally needs a refund.
-	id, err := wt.wallet.RegisterTransaction(consensus.Transaction{})
-	fund := wt.wallet.Balance(false).Sub(consensus.NewCurrency64(1))
+	id, err := wt.wallet.RegisterTransaction(types.Transaction{})
+	fund := wt.wallet.Balance(false).Sub(types.NewCurrency64(1))
 	if err != nil {
 		wt.t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func (wt *walletTester) testFundTransaction() {
 	if len(t.SiacoinOutputs) != 0 {
 		wt.t.Error("more than zero siacoin outputs created in custom transaction")
 	}
-	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
+	if wt.wallet.Balance(true).Cmp(types.NewCurrency64(1)) != 0 {
 		wt.t.Error(wt.wallet.Balance(true))
 		wt.t.Error("wallet balance not reporting at one?")
 	}
@@ -57,7 +57,7 @@ func (wt *walletTester) testFundTransaction() {
 	if len(t.SiacoinOutputs) != 0 {
 		wt.t.Error("more than zero siacoin outputs created in custom transaction")
 	}
-	if wt.wallet.Balance(true).Cmp(consensus.NewCurrency64(1)) != 0 {
+	if wt.wallet.Balance(true).Cmp(types.NewCurrency64(1)) != 0 {
 		wt.t.Error(wt.wallet.Balance(true))
 		wt.t.Error("wallet balance not reporting at one?")
 	}

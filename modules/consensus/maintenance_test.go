@@ -2,13 +2,15 @@ package consensus
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testApplyMissedProof creates a contract and puts it into the blockchain, and
 // then checks that the payouts were added.
 func (ct *ConsensusTester) testApplyMissedProof() {
 	txn, _ := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
-	block := ct.MineCurrentBlock([]Transaction{txn})
+	block := ct.MineCurrentBlock([]types.Transaction{txn})
 	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)

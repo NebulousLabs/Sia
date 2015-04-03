@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testAllocation allocates and then deallocates a file, checking that the
@@ -55,14 +55,14 @@ func (ht *HostTester) testConsiderTerms() {
 		WindowSize:    ht.WindowSize,
 		Price:         ht.Price,
 		Collateral:    ht.Collateral,
-		ValidProofOutputs: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{
+		ValidProofOutputs: []types.SiacoinOutput{
+			types.SiacoinOutput{
 				UnlockHash: ht.Host.UnlockHash,
 			},
 		},
-		MissedProofOutputs: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{
-				UnlockHash: consensus.ZeroUnlockHash,
+		MissedProofOutputs: []types.SiacoinOutput{
+			types.SiacoinOutput{
+				UnlockHash: types.ZeroUnlockHash,
 			},
 		},
 	}
