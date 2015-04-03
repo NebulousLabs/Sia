@@ -106,7 +106,7 @@ func TestBadPeer(t *testing.T) {
 // TestBootstrap tests the bootstrapping process, including synchronization.
 func TestBootstrap(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// create bootstrap peer
