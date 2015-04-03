@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -85,7 +86,7 @@ func (hn *hostNode) remove() {
 func (hn *hostNode) entryAtWeight(weight types.Currency) (entry modules.HostEntry, err error) {
 	// Sanity check - entryAtWeight should never be called with a too-large
 	// weight.
-	if types.DEBUG {
+	if build.DEBUG {
 		if weight.Cmp(hn.weight) > 0 {
 			panic("entryAtWeight called with an input exceeding the size of the database.")
 		}
@@ -103,7 +104,7 @@ func (hn *hostNode) entryAtWeight(weight types.Currency) (entry modules.HostEntr
 	}
 
 	// Sanity check
-	if types.DEBUG {
+	if build.DEBUG {
 		if !hn.taken {
 			panic("should not be returning a nil entry")
 		}

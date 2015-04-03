@@ -26,11 +26,11 @@ fmt:
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
 # a rebuild when build tags have been changed.
 REBUILD:
-	@touch types/build*.go
+	@touch build/*.go
 
 # install builds and installs developer binaries.
 install: fmt REBUILD
-	go install -tags=dev ./...
+	go install -tags='dev debug' ./...
 
 # release builds and installs release binaries.
 release: dependencies test-long REBUILD
@@ -54,19 +54,19 @@ clean:
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
 test: clean fmt REBUILD
-	go test -short -tags=test -timeout=1s ./...
+	go test -short -tags='debug testing' -timeout=1s ./...
 
 # test-long does a forced rebuild of all packages, and then runs all tests
 # with the race libraries enabled. test-long aims to be
 # thorough.
 test-long: clean fmt REBUILD
-	go test -v -race -tags=test -timeout=180s ./...
+	go test -v -race -tags='testing debug' -timeout=180s ./...
 
 # Testing for each package individually. Packages are added to this set as needed.
 test-tpool: clean fmt REBUILD
-	go test -v -race -tags=test -timeout=8s ./modules/transactionpool
+	go test -v -race -tags='testing debug' -timeout=8s ./modules/transactionpool
 test-wallet: clean fmt REBUILD
-	go test -v -race -tags=test -timeout=8s ./modules/wallet
+	go test -v -race -tags='testing debug' -timeout=8s ./modules/wallet
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
@@ -76,7 +76,7 @@ coverpackages = api crypto encoding modules/consensus modules/gateway           
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \
-		go test -tags=test -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
+		go test -tags='testing debug' -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
 		rm cover/$$package.out ; \
 	done

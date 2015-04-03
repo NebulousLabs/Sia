@@ -3,6 +3,7 @@ package consensus
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,7 +25,7 @@ func (s *State) checkMinerPayouts(b types.Block) (err error) {
 	// Sanity check - the block's parent needs to exist and be known.
 	parentNode, exists := s.blockMap[b.ParentID]
 	if !exists {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("misuse of checkMinerPayouts - block has no known parent")
 		}
 		return ErrOrphan
@@ -71,7 +72,7 @@ func (s *State) validHeader(b types.Block) (err error) {
 	}
 
 	// Check that the block is the correct size.
-	if len(encoding.Marshal(b)) > types.BlockSizeLimit {
+	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
 		return ErrLargeBlock
 	}
 

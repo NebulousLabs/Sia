@@ -69,7 +69,7 @@ func (ht *HostTester) testObligation() {
 	// have the proof submitted, then check that the balance experienced an
 	// increase.
 	startingBalance := ht.wallet.Balance(true)
-	for i := 0; i < 3+types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i < 3+types.MaturityDelay; i++ {
 		ht.Host.update()
 		tSet := ht.Host.tpool.TransactionSet()
 		ht.MineAndSubmitCurrentBlock(tSet)

@@ -45,7 +45,7 @@ func TestMiner(t *testing.T) {
 		t.Fatal("expecting initial wallet balance to be zero")
 	}
 
-	for i := 0; i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		_, _, err = m.FindBlock()
 		if err != nil {
 			t.Fatal(err)

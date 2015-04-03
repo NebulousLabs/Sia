@@ -3,6 +3,7 @@ package consensus
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -16,7 +17,7 @@ import (
 func (s *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
-	if types.DEBUG {
+	if build.DEBUG {
 		_, exists := s.siacoinOutputs[scod.ID]
 		if exists == (scod.Direction == dir) {
 			panic("rogue siacoin output in commitSiacoinOutputDiff")
@@ -34,7 +35,7 @@ func (s *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modu
 func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
-	if types.DEBUG {
+	if build.DEBUG {
 		_, exists := s.fileContracts[fcd.ID]
 		if exists == (fcd.Direction == dir) {
 			panic("rogue file contract in commitFileContractDiff")
@@ -52,7 +53,7 @@ func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules
 func (s *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
-	if types.DEBUG {
+	if build.DEBUG {
 		_, exists := s.siafundOutputs[sfod.ID]
 		if exists == (sfod.Direction == dir) {
 			panic("rogue siafund output in commitSiafundOutputDiff")
@@ -78,7 +79,7 @@ func (s *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.
 // commitDiffSet applies or reverts the diffs in a blockNode.
 func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 	// Sanity check
-	if types.DEBUG {
+	if build.DEBUG {
 		// Diffs should have already been generated for this node.
 		if !bn.diffsGenerated {
 			panic("misuse of applyDiffSet - diffs have not been generated!")
@@ -138,7 +139,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 // in the block, which means we need to apply while we verify.
 func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Sanity check
-	if types.DEBUG {
+	if build.DEBUG {
 		// Generate should only be called if the diffs have not yet been
 		// generated.
 		if bn.diffsGenerated {

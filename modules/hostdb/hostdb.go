@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/types"
@@ -38,7 +39,7 @@ func New(s *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 
 	genesisBlock, exists := s.BlockAtHeight(0)
 	if !exists {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic(ErrMissingGenesisBlock)
 		}
 		err = ErrMissingGenesisBlock

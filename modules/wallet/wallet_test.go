@@ -113,7 +113,7 @@ func NewWalletTester(directory string, t *testing.T) (wt *walletTester) {
 	}
 
 	// Mine blocks until there is money in the wallet.
-	for i := 0; i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		_, _, err = wt.miner.FindBlock()
 		if err != nil {
 			t.Fatal(err)

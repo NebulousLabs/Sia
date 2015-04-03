@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -87,7 +88,7 @@ func (s *State) sortedUsfoSet() []types.SiafundOutput {
 	for i, outputID := range outputIDs {
 		// Sanity check - the output should exist.
 		output, exists := s.siafundOutputs[types.SiafundOutputID(outputID)]
-		if types.DEBUG {
+		if build.DEBUG {
 			if !exists {
 				panic("output doesn't exist")
 			}
@@ -132,7 +133,7 @@ func (s *State) BlockRange(start, stop types.BlockHeight) ([]types.Block, error)
 	for i, id := range s.currentPath[start : stop+1] {
 		node, exists := s.blockMap[id]
 		if !exists {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic("blockMap is missing a block whose ID is in the currentPath")
 			}
 			return nil, errors.New("State is inconsistent")

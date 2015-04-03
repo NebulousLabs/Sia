@@ -10,25 +10,30 @@ import (
 
 // SiaConstants is a struct listing all of the constants in use.
 type SiaConstants struct {
-	GenesisTimestamp      types.Timestamp
-	BlockSizeLimit        int
-	BlockFrequency        int
-	TargetWindow          int
+	BlockSizeLimit        uint64
+	BlockFrequency        types.BlockHeight
+	TargetWindow          types.BlockHeight
 	MedianTimestampWindow int
-	FutureThreshold       int
-	SiafundCount          int
-	MaturityDelay         int
+	FutureThreshold       types.Timestamp
+	SiafundCount          uint64
 	SiafundPortion        float64
 
-	InitialCoinbase int
-	MinimumCoinbase int
-	CoinbaseAugment *big.Int
+	InitialCoinbase uint64
+	MinimumCoinbase uint64
+
+	MaturityDelay types.BlockHeight
+
+	GenesisTimestamp         types.Timestamp
+	GenesisSiafundUnlockHash types.UnlockHash
+	GenesisClaimUnlockHash   types.UnlockHash
 
 	RootTarget types.Target
 	RootDepth  types.Target
 
 	MaxAdjustmentUp   *big.Rat
 	MaxAdjustmentDown *big.Rat
+
+	CoinbaseAugment *big.Int
 }
 
 // ModuleDeadlockStatus is a struct containing a bool for each module, 'false'

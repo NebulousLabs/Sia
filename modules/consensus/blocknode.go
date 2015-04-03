@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -87,7 +88,7 @@ func (bn *blockNode) earliestChildTimestamp() types.Timestamp {
 // children. The new node is also returned.
 func (bn *blockNode) newChild(b types.Block) *blockNode {
 	// Sanity check - parent can't be nil.
-	if types.DEBUG {
+	if build.DEBUG {
 		if bn == nil {
 			panic("can't create blockNode with nil parent")
 		}

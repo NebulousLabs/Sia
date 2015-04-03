@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -12,7 +13,7 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 		// Sanity check - the output should not already be in
 		// delayedSiacoinOutputs, and should also not be in siacoinOutputs.
 		id := bn.block.MinerPayoutID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.delayedSiacoinOutputs[s.height()][id]
 			if exists {
 				panic("miner subsidy already in delayed outputs")
@@ -34,7 +35,7 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 func (s *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 	for id, sco := range s.delayedSiacoinOutputs[bn.height-types.MaturityDelay] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.siacoinOutputs[id]
 			if exists {
 				panic("trying to add a delayed output when the output is already there")
@@ -57,7 +58,7 @@ func (s *State) applyMissedProof(bn *blockNode, fcid types.FileContractID) {
 	// Sanity check - the id must correspond to an existing contract.
 	fc, exists := s.fileContracts[fcid]
 	if !exists {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("misuse of applyMissedProof")
 		}
 		return
@@ -67,7 +68,7 @@ func (s *State) applyMissedProof(bn *blockNode, fcid types.FileContractID) {
 	for i, output := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
 		outputID := fcid.StorageProofOutputID(false, i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.delayedSiacoinOutputs[s.height()][outputID]
 			if exists {
 				panic("missed proof output already exists in the delayed outputs set")

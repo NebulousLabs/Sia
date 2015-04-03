@@ -88,7 +88,7 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 func (t Transaction) fitsInABlock() error {
 	// Check that the transaction will fit inside of a block, leaving 5kb for
 	// overhead.
-	if len(encoding.Marshal(t)) > BlockSizeLimit-5e3 {
+	if uint64(len(encoding.Marshal(t))) > BlockSizeLimit-5e3 {
 		return errors.New("transaction is too large to fit in a block")
 	}
 	return nil

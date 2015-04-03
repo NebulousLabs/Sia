@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -40,7 +41,7 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 		}
 		key.outputs[scod.ID] = ko
 	} else {
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := key.outputs[scod.ID]
 			if !exists {
 				panic("trying to delete an output that doesn't exist?")
@@ -67,7 +68,7 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []ty
 
 		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic(err)
 			}
 			continue
@@ -81,7 +82,7 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []ty
 
 		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic(err)
 			}
 			continue

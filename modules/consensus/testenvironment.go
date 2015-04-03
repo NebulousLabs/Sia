@@ -143,7 +143,7 @@ func NewTestingEnvironment(t *testing.T) (ct *ConsensusTester) {
 
 	// Mine enough blocks that the first miner payouts come to maturity. The
 	// assistant will then be ready to spend at least a few outputs.
-	for i := 0; i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		ct.MineAndApplyValidBlock()
 	}
 
