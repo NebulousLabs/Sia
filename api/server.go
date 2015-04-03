@@ -5,8 +5,9 @@ import (
 
 	"github.com/stretchr/graceful"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Server is essentially a collection of modules and an API server to talk
@@ -64,8 +65,8 @@ func (srv *Server) updateWait() {
 
 // TODO: move this to the state module?
 func (srv *Server) acceptBlock(conn modules.NetConn) error {
-	var b consensus.Block
-	err := conn.ReadObject(&b, consensus.BlockSizeLimit)
+	var b types.Block
+	err := conn.ReadObject(&b, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
@@ -81,7 +82,7 @@ func (srv *Server) acceptBlock(conn modules.NetConn) error {
 	// Check if b is in the current path.
 	height, exists := srv.state.HeightOfBlock(b.ID())
 	if !exists {
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic("could not get the height of a block that did not return an error when being accepted into the state")
 		}
 		return errors.New("state malfunction")
@@ -97,8 +98,8 @@ func (srv *Server) acceptBlock(conn modules.NetConn) error {
 
 // TODO: move this to the tpool module?
 func (srv *Server) acceptTransaction(conn modules.NetConn) error {
-	var t consensus.Transaction
-	err := conn.ReadObject(&t, consensus.BlockSizeLimit)
+	var t types.Transaction
+	err := conn.ReadObject(&t, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}

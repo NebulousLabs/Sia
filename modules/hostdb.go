@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -27,12 +27,12 @@ type HostSettings struct {
 	TotalStorage int64 // Can go negative.
 	MinFilesize  uint64
 	MaxFilesize  uint64
-	MinDuration  consensus.BlockHeight
-	MaxDuration  consensus.BlockHeight
-	WindowSize   consensus.BlockHeight
-	Price        consensus.Currency
-	Collateral   consensus.Currency
-	UnlockHash   consensus.UnlockHash
+	MinDuration  types.BlockHeight
+	MaxDuration  types.BlockHeight
+	WindowSize   types.BlockHeight
+	Price        types.Currency
+	Collateral   types.Currency
+	UnlockHash   types.UnlockHash
 }
 
 // A HostEntry is an entry in the HostDB. It contains the HostSettings, as

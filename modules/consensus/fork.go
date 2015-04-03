@@ -2,6 +2,8 @@ package consensus
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
@@ -30,7 +32,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 		// genesis block, and this loop should break before reaching the
 		// genesis block.
 		if bn == nil {
-			if DEBUG {
+			if types.DEBUG {
 				panic("backtrack hit a nil node?")
 			}
 			break
@@ -43,7 +45,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 // the current block.
 func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
-	if DEBUG {
+	if types.DEBUG {
 		if s.currentPath[bn.height] != bn.block.ID() {
 			panic("can't revert to node not in current path")
 		}
@@ -52,7 +54,7 @@ func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Rewind blocks until we reach 'bn'.
 	for s.currentBlockID() != bn.block.ID() {
 		node := s.currentBlockNode()
-		s.commitDiffSet(node, DiffRevert)
+		s.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
@@ -69,7 +71,7 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.diffsGenerated {
-			s.commitDiffSet(node, DiffApply)
+			s.commitDiffSet(node, modules.DiffApply)
 		} else {
 			err = s.generateAndApplyDiff(node)
 			if err != nil {
@@ -90,7 +92,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
-	if DEBUG {
+	if types.DEBUG {
 		oldHash = s.consensusSetHash()
 	}
 	oldHead := s.currentBlockNode()
@@ -111,7 +113,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// restore old path
 	s.revertToNode(commonParent)
 	_, errReapply := s.applyUntilNode(oldHead)
-	if DEBUG {
+	if types.DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")
 		} else if s.consensusSetHash() != oldHash {

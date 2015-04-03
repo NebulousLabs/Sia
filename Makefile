@@ -26,7 +26,7 @@ fmt:
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
 # a rebuild when build tags have been changed.
 REBUILD:
-	@touch consensus/build*.go
+	@touch types/build*.go
 
 # install builds and installs developer binaries.
 install: fmt REBUILD

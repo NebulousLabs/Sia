@@ -1,15 +1,15 @@
 package renter
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A file is a single file that has been uploaded to the network.
 type File struct {
 	nickname    string
 	pieces      []FilePiece
-	startHeight consensus.BlockHeight
+	startHeight types.BlockHeight
 
 	renter *Renter
 }
@@ -18,11 +18,11 @@ type File struct {
 // been uploaded to a host, including information about the host and the health
 // of the file piece.
 type FilePiece struct {
-	Active     bool                     // Set to true if the host is online and has the file, false otherwise.
-	Repairing  bool                     // Set to true if there's an upload happening for the piece at the moment.
-	Contract   consensus.FileContract   // The contract being enforced.
-	ContractID consensus.FileContractID // The ID of the contract.
-	HostIP     modules.NetAddress       // Where to find the file.
+	Active     bool                 // Set to true if the host is online and has the file, false otherwise.
+	Repairing  bool                 // Set to true if there's an upload happening for the piece at the moment.
+	Contract   types.FileContract   // The contract being enforced.
+	ContractID types.FileContractID // The ID of the contract.
+	HostIP     modules.NetAddress   // Where to find the file.
 }
 
 // Available indicates whether the file is ready to be downloaded.
@@ -59,7 +59,7 @@ func (f *File) Repairing() bool {
 }
 
 // TimeRemaining returns the amount of time until the file's contracts expire.
-func (f *File) TimeRemaining() consensus.BlockHeight {
+func (f *File) TimeRemaining() types.BlockHeight {
 	f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock()
 	return f.startHeight - f.renter.state.Height()

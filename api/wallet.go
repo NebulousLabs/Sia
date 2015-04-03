@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // walletAddressHandler handles the API request for a new address.
@@ -26,8 +26,8 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the inputs.
-	var amount consensus.Currency
-	var dest consensus.UnlockHash
+	var amount types.Currency
+	var dest types.UnlockHash
 	_, err := fmt.Sscan(req.FormValue("amount"), &amount)
 	if err != nil {
 		writeError(w, "Malformed amount", http.StatusBadRequest)

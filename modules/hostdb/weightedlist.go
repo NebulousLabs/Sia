@@ -1,8 +1,8 @@
 package hostdb
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
@@ -11,8 +11,8 @@ import (
 // not reorganized.
 type hostNode struct {
 	parent *hostNode
-	weight consensus.Currency // cumulative weight of this node and all children.
-	count  int                // cumulative count of all children.
+	weight types.Currency // cumulative weight of this node and all children.
+	count  int            // cumulative count of all children.
 
 	left  *hostNode
 	right *hostNode
@@ -82,10 +82,10 @@ func (hn *hostNode) remove() {
 // weight. Though the tree has an arbitrary sorting, a sufficiently random
 // weight will pull a random element. The tree is searched through in a
 // post-ordered way.
-func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.HostEntry, err error) {
+func (hn *hostNode) entryAtWeight(weight types.Currency) (entry modules.HostEntry, err error) {
 	// Sanity check - entryAtWeight should never be called with a too-large
 	// weight.
-	if consensus.DEBUG {
+	if types.DEBUG {
 		if weight.Cmp(hn.weight) > 0 {
 			panic("entryAtWeight called with an input exceeding the size of the database.")
 		}
@@ -103,7 +103,7 @@ func (hn *hostNode) entryAtWeight(weight consensus.Currency) (entry modules.Host
 	}
 
 	// Sanity check
-	if consensus.DEBUG {
+	if types.DEBUG {
 		if !hn.taken {
 			panic("should not be returning a nil entry")
 		}

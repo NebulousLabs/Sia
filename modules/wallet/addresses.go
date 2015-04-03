@@ -1,25 +1,25 @@
 package wallet
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.UnlockHash, unlockConditions consensus.UnlockConditions, err error) {
+func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	// Create the address + spend conditions.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
-	unlockConditions = consensus.UnlockConditions{
+	unlockConditions = types.UnlockConditions{
 		Timelock:      unlockHeight,
 		NumSignatures: 1,
-		PublicKeys: []consensus.SiaPublicKey{
-			consensus.SiaPublicKey{
-				Algorithm: consensus.SignatureEd25519,
+		PublicKeys: []types.SiaPublicKey{
+			types.SiaPublicKey{
+				Algorithm: types.SignatureEd25519,
 				Key:       string(encoding.Marshal(pk)),
 			},
 		},
@@ -36,7 +36,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 		unlockConditions: unlockConditions,
 		secretKey:        sk,
 
-		outputs: make(map[consensus.SiacoinOutputID]*knownOutput),
+		outputs: make(map[types.SiacoinOutputID]*knownOutput),
 	}
 
 	// Add this key to the list of addresses that get unlocked at
@@ -53,17 +53,17 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight consensus.BlockHeight) (coin
 }
 
 // coinAddress returns a new address for receiving coins.
-func (w *Wallet) coinAddress() (coinAddress consensus.UnlockHash, unlockConditions consensus.UnlockConditions, err error) {
+func (w *Wallet) coinAddress() (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	// Create the keys and address.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return
 	}
-	unlockConditions = consensus.UnlockConditions{
+	unlockConditions = types.UnlockConditions{
 		NumSignatures: 1,
-		PublicKeys: []consensus.SiaPublicKey{
-			consensus.SiaPublicKey{
-				Algorithm: consensus.SignatureEd25519,
+		PublicKeys: []types.SiaPublicKey{
+			types.SiaPublicKey{
+				Algorithm: types.SignatureEd25519,
 				Key:       string(encoding.Marshal(pk)),
 			},
 		},
@@ -76,7 +76,7 @@ func (w *Wallet) coinAddress() (coinAddress consensus.UnlockHash, unlockConditio
 		unlockConditions: unlockConditions,
 		secretKey:        sk,
 
-		outputs: make(map[consensus.SiacoinOutputID]*knownOutput),
+		outputs: make(map[types.SiacoinOutputID]*knownOutput),
 	}
 	w.keys[coinAddress] = newKey
 
@@ -91,14 +91,14 @@ func (w *Wallet) coinAddress() (coinAddress consensus.UnlockHash, unlockConditio
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) TimelockedCoinAddress(unlockHeight consensus.BlockHeight) (coinAddress consensus.UnlockHash, unlockConditions consensus.UnlockConditions, err error) {
+func (w *Wallet) TimelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 	return w.timelockedCoinAddress(unlockHeight)
 }
 
 // CoinAddress implements the core.Wallet interface.
-func (w *Wallet) CoinAddress() (coinAddress consensus.UnlockHash, unlockConditions consensus.UnlockConditions, err error) {
+func (w *Wallet) CoinAddress() (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 	return w.coinAddress()

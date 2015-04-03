@@ -4,8 +4,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -87,10 +87,10 @@ type Gateway interface {
 	Synchronize(NetAddress) error
 
 	// RelayBlock broadcasts a block to the Gateway's peers.
-	RelayBlock(consensus.Block)
+	RelayBlock(types.Block)
 
 	// RelayTransaction broadcasts a transaction to the Gateway's peers.
-	RelayTransaction(consensus.Transaction)
+	RelayTransaction(types.Transaction)
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo

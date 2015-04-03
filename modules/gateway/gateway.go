@@ -6,9 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -97,12 +98,12 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 }
 
 // RelayBlock relays a block to the network.
-func (g *Gateway) RelayBlock(b consensus.Block) {
+func (g *Gateway) RelayBlock(b types.Block) {
 	go g.threadedBroadcast("AcceptBlock", writerRPC(b))
 }
 
 // RelayTransaction relays a transaction to the network.
-func (g *Gateway) RelayTransaction(t consensus.Transaction) {
+func (g *Gateway) RelayTransaction(t types.Transaction) {
 	go g.threadedBroadcast("AcceptTransaction", writerRPC(t))
 }
 

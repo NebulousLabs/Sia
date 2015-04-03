@@ -1,9 +1,9 @@
 package host
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Announce creates a host announcement transaction, adding information to the
@@ -14,7 +14,7 @@ func (h *Host) Announce(addr modules.NetAddress) (err error) {
 	defer h.mu.Unlock()
 
 	// create the transaction that will hold the announcement
-	var t consensus.Transaction
+	var t types.Transaction
 	id, err := h.wallet.RegisterTransaction(t)
 	if err != nil {
 		return

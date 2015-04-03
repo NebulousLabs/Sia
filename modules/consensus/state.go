@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // The State is the object responsible for tracking the current status of the
@@ -16,11 +17,11 @@ type State struct {
 	// blockMap and badBlocks keep track of seen blocks. blockMap holds all
 	// valid blocks, including those not on the main blockchain. badBlocks
 	// is a "blacklist" of blocks known to be invalid.
-	blockMap  map[BlockID]*blockNode
-	badBlocks map[BlockID]struct{}
+	blockMap  map[types.BlockID]*blockNode
+	badBlocks map[types.BlockID]struct{}
 
 	// The currentPath is the longest known blockchain.
-	currentPath []BlockID
+	currentPath []types.BlockID
 
 	// These are the consensus variables, referred to as the "consensus set."
 	// All nodes with the same current path must have the same consensus set.
@@ -37,11 +38,11 @@ type State struct {
 	// delayedSiacoinOutputs are siacoin outputs that have been created in a
 	// block, but are not allowed to be spent until a certain height. When
 	// that height is reached, they are moved to the siacoinOutputs map.
-	siafundPool           Currency
-	siacoinOutputs        map[SiacoinOutputID]SiacoinOutput
-	fileContracts         map[FileContractID]FileContract
-	siafundOutputs        map[SiafundOutputID]SiafundOutput
-	delayedSiacoinOutputs map[BlockHeight]map[SiacoinOutputID]SiacoinOutput
+	siafundPool           types.Currency
+	siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
+	fileContracts         map[types.FileContractID]types.FileContract
+	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
+	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
 	// Updates to the state are stored as a list, pointing to the block nodes
 	// that were added and removed at each step. Modules subscribed to the
@@ -61,30 +62,30 @@ type State struct {
 
 // createGenesisState returns a State containing only the genesis block. It
 // takes arguments instead of using global constants to make testing easier.
-func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimUnlockHash UnlockHash) (s *State) {
+func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.UnlockHash, claimUnlockHash types.UnlockHash) (s *State) {
 	// Create a new state and initialize the maps.
 	s = &State{
-		blockMap:  make(map[BlockID]*blockNode),
-		badBlocks: make(map[BlockID]struct{}),
+		blockMap:  make(map[types.BlockID]*blockNode),
+		badBlocks: make(map[types.BlockID]struct{}),
 
-		currentPath: make([]BlockID, 1),
+		currentPath: make([]types.BlockID, 1),
 
-		siacoinOutputs:        make(map[SiacoinOutputID]SiacoinOutput),
-		fileContracts:         make(map[FileContractID]FileContract),
-		siafundOutputs:        make(map[SiafundOutputID]SiafundOutput),
-		delayedSiacoinOutputs: make(map[BlockHeight]map[SiacoinOutputID]SiacoinOutput),
+		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		fileContracts:         make(map[types.FileContractID]types.FileContract),
+		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
+		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
 
 		mu: sync.New(1*time.Second, 1),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
-	genesisBlock := Block{
+	genesisBlock := types.Block{
 		Timestamp: genesisTime,
 	}
 	s.blockRoot = &blockNode{
 		block:  genesisBlock,
-		target: RootTarget,
-		depth:  RootDepth,
+		target: types.RootTarget,
+		depth:  types.RootDepth,
 
 		diffsGenerated: true,
 	}
@@ -92,12 +93,12 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 
 	// Fill out the consensus information for the genesis block.
 	s.currentPath[0] = genesisBlock.ID()
-	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = SiacoinOutput{
-		Value:      CalculateCoinbase(0),
-		UnlockHash: ZeroUnlockHash,
+	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
+		Value:      types.CalculateCoinbase(0),
+		UnlockHash: types.ZeroUnlockHash,
 	}
-	s.siafundOutputs[SiafundOutputID{0}] = SiafundOutput{
-		Value:           NewCurrency64(SiafundCount),
+	s.siafundOutputs[types.SiafundOutputID{0}] = types.SiafundOutput{
+		Value:           types.NewCurrency64(types.SiafundCount),
 		UnlockHash:      fundUnlockHash,
 		ClaimUnlockHash: claimUnlockHash,
 	}
@@ -107,7 +108,7 @@ func createGenesisState(genesisTime Timestamp, fundUnlockHash UnlockHash, claimU
 
 // CreateGenesisState returns a State containing only the genesis block.
 func CreateGenesisState() (s *State) {
-	return createGenesisState(GenesisTimestamp, GenesisSiafundUnlockHash, GenesisClaimUnlockHash)
+	return createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
 }
 
 // RLock will readlock the state.
@@ -116,6 +117,6 @@ func (s *State) RLock() int {
 }
 
 // RUnlock will readunlock the state.
-func (s *State) RUnlock(counter int) {
-	s.mu.RUnlock(counter)
+func (s *State) RUnlock(id int) {
+	s.mu.RUnlock(id)
 }

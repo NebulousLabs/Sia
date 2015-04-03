@@ -1,5 +1,9 @@
 package consensus
 
+import (
+	"github.com/NebulousLabs/Sia/types"
+)
+
 // A Subscriber is an object that receives updates to the consensus set every
 // time there is a change in consensus.
 type Subscriber interface {
@@ -8,7 +12,7 @@ type Subscriber interface {
 	// Usually, the function receiving the updates will also process the
 	// changes. If the function blocks indefinitely, the state will still
 	// function.
-	ReceiveConsensusUpdate(revertedBlocks []Block, appliedBlocks []Block)
+	ReceiveConsensusUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
 }
 
 // threadedSendUpdates sends updates to a specific subscriber as they become
@@ -33,7 +37,7 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber Subscriber)
 		for i < updateCount {
 			// Get the set of blocks that changed since the previous update.
 			id := s.mu.RLock()
-			var revertedBlocks, appliedBlocks []Block
+			var revertedBlocks, appliedBlocks []types.Block
 			for _, node := range s.revertUpdates[i] {
 				revertedBlocks = append(revertedBlocks, node.block)
 			}

@@ -6,9 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -40,7 +41,7 @@ const (
 type Wallet struct {
 	state            *consensus.State
 	tpool            modules.TransactionPool
-	unconfirmedDiffs []consensus.SiacoinOutputDiff
+	unconfirmedDiffs []modules.SiacoinOutputDiff
 
 	// Location of the wallet directory, for saving and loading keys.
 	saveDir string
@@ -61,8 +62,8 @@ type Wallet struct {
 	// spent until a certain height. The wallet will use `timelockedKeys` to
 	// mark keys as unspendable until the timelock has lifted.
 	age            int
-	keys           map[consensus.UnlockHash]*key
-	timelockedKeys map[consensus.BlockHeight][]consensus.UnlockHash
+	keys           map[types.UnlockHash]*key
+	timelockedKeys map[types.BlockHeight][]types.UnlockHash
 
 	// transactions is a list of transactions that are currently being built by
 	// the wallet. Each transaction has a unique id, which is enforced by the
@@ -94,8 +95,8 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 		saveDir: saveDir,
 
 		age:            AgeDelay + 100,
-		keys:           make(map[consensus.UnlockHash]*key),
-		timelockedKeys: make(map[consensus.BlockHeight][]consensus.UnlockHash),
+		keys:           make(map[types.UnlockHash]*key),
+		timelockedKeys: make(map[types.BlockHeight][]types.UnlockHash),
 
 		transactions: make(map[string]*openTransaction),
 
@@ -127,9 +128,9 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SpendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
+func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	// Create and send the transaction.
-	output := consensus.SiacoinOutput{
+	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}

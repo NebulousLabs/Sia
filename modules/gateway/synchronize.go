@@ -3,9 +3,9 @@ package gateway
 import (
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -39,7 +39,7 @@ func (g *Gateway) threadedResynchronize() {
 // TODO: don't run two Synchronize threads at the same time
 func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 	for {
-		var newBlocks []consensus.Block
+		var newBlocks []types.Block
 		newBlocks, moreAvailable, err := g.requestBlocks(peer)
 		if err != nil {
 			return err
@@ -66,7 +66,7 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 // sends a boolean indicating whether more blocks are available.
 func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	// Read known blocks.
-	var knownBlocks [32]consensus.BlockID
+	var knownBlocks [32]types.BlockID
 	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
 	if err != nil {
 		return
@@ -74,7 +74,7 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 
 	// Find the most recent block from knownBlocks that is in our current path.
 	found := false
-	var start consensus.BlockHeight
+	var start types.BlockHeight
 	for _, id := range knownBlocks {
 		if height, exists := g.state.HeightOfBlock(id); exists {
 			found = true
@@ -88,7 +88,7 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	// is probably on a different blockchain altogether.
 	if !found || start > g.state.Height() {
 		// Send 0 blocks.
-		err = conn.WriteObject([]consensus.Block{})
+		err = conn.WriteObject([]types.Block{})
 		if err != nil {
 			return
 		}
@@ -115,14 +115,14 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	return conn.WriteObject(more)
 }
 
-func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.Block, moreAvailable bool, err error) {
+func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []types.Block, moreAvailable bool, err error) {
 	history := g.blockHistory()
 	err = g.RPC(peer, "SendBlocks", func(conn modules.NetConn) error {
 		err := conn.WriteObject(history)
 		if err != nil {
 			return err
 		}
-		err = conn.ReadObject(&newBlocks, MaxCatchUpBlocks*consensus.BlockSizeLimit)
+		err = conn.ReadObject(&newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit)
 		if err != nil {
 			return err
 		}
@@ -135,9 +135,9 @@ func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []consensus.
 // BlockIDs and then doubling in step size until the genesis block is reached.
 // The genesis block is always included. This array of BlockIDs is used to
 // establish a shared commonality between peers during synchronization.
-func (g *Gateway) blockHistory() (blockIDs [32]consensus.BlockID) {
-	knownBlocks := make([]consensus.BlockID, 0, 32)
-	step := consensus.BlockHeight(1)
+func (g *Gateway) blockHistory() (blockIDs [32]types.BlockID) {
+	knownBlocks := make([]types.BlockID, 0, 32)
+	step := types.BlockHeight(1)
 	for height := g.state.Height(); ; height -= step {
 		block, exists := g.state.BlockAtHeight(height)
 		if !exists {

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // CurrentPathCheck looks at every block listed in currentPath and verifies
@@ -57,17 +58,17 @@ func (ct *ConsensusTester) CurrencyCheck() {
 	counter := ct.mu.RLock()
 	defer ct.mu.RUnlock(counter)
 
-	siafunds := NewCurrency64(0)
+	siafunds := types.NewCurrency64(0)
 	for _, siafundOutput := range ct.siafundOutputs {
 		siafunds = siafunds.Add(siafundOutput.Value)
 	}
-	if siafunds.Cmp(NewCurrency64(SiafundCount)) != 0 {
+	if siafunds.Cmp(types.NewCurrency64(types.SiafundCount)) != 0 {
 		ct.Error("siafunds inconsistency")
 	}
 
-	expectedSiacoins := NewCurrency64(0)
-	for i := BlockHeight(0); i <= ct.Height(); i++ {
-		expectedSiacoins = expectedSiacoins.Add(CalculateCoinbase(i))
+	expectedSiacoins := types.NewCurrency64(0)
+	for i := types.BlockHeight(0); i <= ct.Height(); i++ {
+		expectedSiacoins = expectedSiacoins.Add(types.CalculateCoinbase(i))
 	}
 	siacoins := ct.siafundPool
 	for _, output := range ct.siacoinOutputs {
@@ -77,15 +78,15 @@ func (ct *ConsensusTester) CurrencyCheck() {
 		siacoins = siacoins.Add(contract.Payout)
 	}
 	for height, dsoMap := range ct.delayedSiacoinOutputs {
-		if height+MaturityDelay > ct.Height() {
+		if height+types.MaturityDelay > ct.Height() {
 			for _, dso := range dsoMap {
 				siacoins = siacoins.Add(dso.Value)
 			}
 		}
 	}
 	if siacoins.Cmp(expectedSiacoins) != 0 {
-		ct.Error(siacoins.i.String())
-		ct.Error(expectedSiacoins.i.String())
+		ct.Error(siacoins.String())
+		ct.Error(expectedSiacoins.String())
 		ct.Error("siacoins inconsistency")
 	}
 }
@@ -123,7 +124,7 @@ func (s *State) consensusSetHash() crypto.Hash {
 
 	// Add all the blocks in the current path.
 	for i := 0; i < len(s.currentPath); i++ {
-		tree.PushObject(s.currentPath[BlockHeight(i)])
+		tree.PushObject(s.currentPath[types.BlockHeight(i)])
 	}
 
 	// Get the set of siacoin outputs in sorted order and add them.
@@ -151,7 +152,7 @@ func (s *State) consensusSetHash() crypto.Hash {
 
 	// Get the set of delayed siacoin outputs, sorted by maturity height then
 	// sorted by id and add them.
-	for i := BlockHeight(0); i <= s.height(); i++ {
+	for i := types.BlockHeight(0); i <= s.height(); i++ {
 		var delayedOutputs crypto.HashSlice
 		for id := range s.delayedSiacoinOutputs[i] {
 			delayedOutputs = append(delayedOutputs, crypto.Hash(id))

@@ -4,8 +4,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 type HostDB struct {
 	state       *consensus.State
 	gateway     modules.Gateway
-	recentBlock consensus.BlockID
+	recentBlock types.BlockID
 
 	hostTree    *hostNode
 	activeHosts map[string]*hostNode
@@ -37,7 +38,7 @@ func New(s *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 
 	genesisBlock, exists := s.BlockAtHeight(0)
 	if !exists {
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic(ErrMissingGenesisBlock)
 		}
 		err = ErrMissingGenesisBlock

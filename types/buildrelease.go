@@ -1,6 +1,6 @@
 // +build !test,!dev
 
-package consensus
+package types
 
 import (
 	"math/big"

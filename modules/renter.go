@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -11,7 +11,7 @@ var (
 // UploadParams contains the information used by the Renter to upload a file.
 type UploadParams struct {
 	Filename string
-	Duration consensus.BlockHeight
+	Duration types.BlockHeight
 	Nickname string
 	Pieces   int
 }
@@ -31,7 +31,7 @@ type FileInfo interface {
 	Repairing() bool
 
 	// TimeRemaining indicates how many blocks remain before the file expires.
-	TimeRemaining() consensus.BlockHeight
+	TimeRemaining() types.BlockHeight
 }
 
 // DownloadInfo is an interface providing information about a file that has

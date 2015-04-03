@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // RetrieveFile is an RPC that uploads a specified file to a client.
@@ -19,7 +19,7 @@ import (
 // once.
 func (h *Host) RetrieveFile(conn modules.NetConn) (err error) {
 	// Get the filename.
-	var contractID consensus.FileContractID
+	var contractID types.FileContractID
 	err = conn.ReadObject(&contractID, crypto.HashSize)
 	if err != nil {
 		return

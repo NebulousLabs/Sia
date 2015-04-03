@@ -5,27 +5,27 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to 10^30 to give ourselves lots of precision when determing an
 	// entries weight.
-	baseWeight = consensus.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil))
 
 	// Convenience variables for doing currency math. Originally we were just
 	// using MulFloat but this was causing precision problems during testing.
 	// The actual functionality of the program isn't affected by loss of
 	// precision, it just makes testing simpler.
-	currencyZero     = consensus.NewCurrency64(0)
-	currencyOne      = consensus.NewCurrency64(1)
-	currencyTwo      = consensus.NewCurrency64(2)
-	currencyFive     = consensus.NewCurrency64(5)
-	currencyTen      = consensus.NewCurrency64(10)
-	currencyTwenty   = consensus.NewCurrency64(20)
-	currencyThousand = consensus.NewCurrency64(1e3)
+	currencyZero     = types.NewCurrency64(0)
+	currencyOne      = types.NewCurrency64(1)
+	currencyTwo      = types.NewCurrency64(2)
+	currencyFive     = types.NewCurrency64(5)
+	currencyTen      = types.NewCurrency64(10)
+	currencyTwenty   = types.NewCurrency64(20)
+	currencyThousand = types.NewCurrency64(1e3)
 )
 
 // entryWeight returns the weight of an entry according to the price and
@@ -34,7 +34,7 @@ var (
 //
 // The collateral is clamped so that it is not treated as being less than 0.5x
 // the price or more than 2x the price.
-func entryWeight(entry modules.HostEntry) (weight consensus.Currency) {
+func entryWeight(entry modules.HostEntry) (weight types.Currency) {
 	// Clamp the collateral to between 0.5x and 2x the price.
 	collateral := entry.Collateral
 	if collateral.Cmp(entry.Price.Mul(currencyTwo)) > 0 {
@@ -182,7 +182,7 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 	if err != nil {
 		return
 	}
-	return hdb.hostTree.entryAtWeight(consensus.NewCurrency(randWeight))
+	return hdb.hostTree.entryAtWeight(types.NewCurrency(randWeight))
 }
 
 // Remove is the thread-safe version of remove.

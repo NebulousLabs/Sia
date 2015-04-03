@@ -3,15 +3,15 @@ package miner
 import (
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork() (b consensus.Block) {
+func (m *Miner) blockForWork() (b types.Block) {
 	// Fill out the block with potentially ready values.
-	b = consensus.Block{
+	b = types.Block{
 		ParentID:     m.parent,
-		Timestamp:    consensus.CurrentTimestamp(),
+		Timestamp:    types.CurrentTimestamp(),
 		Nonce:        uint64(rand.Int()),
 		Transactions: m.transactions,
 	}
@@ -19,19 +19,19 @@ func (m *Miner) blockForWork() (b consensus.Block) {
 	// Calculate the subsidy and create the miner payout.
 	height, exists := m.state.HeightOfBlock(m.parent)
 	if !exists {
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic("parent is not in state?")
 		}
 		return
 	}
-	subsidy := consensus.CalculateCoinbase(height + 1)
+	subsidy := types.CalculateCoinbase(height + 1)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
 			subsidy = subsidy.Add(fee)
 		}
 	}
-	output := consensus.SiacoinOutput{Value: subsidy, UnlockHash: m.address}
-	b.MinerPayouts = []consensus.SiacoinOutput{output}
+	output := types.SiacoinOutput{Value: subsidy, UnlockHash: m.address}
+	b.MinerPayouts = []types.SiacoinOutput{output}
 
 	// If we've got a time earlier than the earliest legal timestamp, set the
 	// timestamp equal to the earliest legal timestamp.
@@ -89,7 +89,7 @@ func (m *Miner) threadedMine() {
 // solveBlock takes a block, target, and number of iterations as input and
 // tries to find a block that meets the target. This function can take a long
 // time to complete, and should not be called with a lock.
-func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target, iterations uint64) (b consensus.Block, solved bool, err error) {
+func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterations uint64) (b types.Block, solved bool, err error) {
 	// solveBlock could operate on a pointer, but it's not strictly necessary
 	// and it makes calling weirder/more opaque.
 	b = blockForWork
@@ -99,7 +99,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
 			err = m.state.AcceptBlock(b)
-			if consensus.DEBUG {
+			if types.DEBUG {
 				if err != nil {
 					println(err.Error())
 				}
@@ -110,7 +110,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 
 			// Grab a new address for the miner.
 			m.mu.Lock()
-			var addr consensus.UnlockHash
+			var addr types.UnlockHash
 			addr, _, err = m.wallet.CoinAddress()
 			if err == nil { // Special case: only update the address if there was no error.
 				m.address = addr
@@ -125,7 +125,7 @@ func (m *Miner) solveBlock(blockForWork consensus.Block, target consensus.Target
 
 // FindBlock will attempt to solve a block and add it to the state. While less
 // efficient than StartMining, it is guaranteed to find at most one block.
-func (m *Miner) FindBlock() (consensus.Block, bool, error) {
+func (m *Miner) FindBlock() (types.Block, bool, error) {
 	m.mu.Lock()
 	bfw := m.blockForWork()
 	target := m.target
@@ -137,7 +137,7 @@ func (m *Miner) FindBlock() (consensus.Block, bool, error) {
 
 // SolveBlock attempts to solve a block, returning the solved block without
 // submitting it to the state.
-func (m *Miner) SolveBlock(blockForWork consensus.Block, target consensus.Target) (b consensus.Block, solved bool) {
+func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b types.Block, solved bool) {
 	m.mu.RLock()
 	iterations := m.iterationsPerAttempt
 	m.mu.RUnlock()

@@ -1,14 +1,15 @@
 package wallet
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // applyDiff will take the output and either add or delete it from the set of
 // outputs known to the wallet. If adding is true, then new outputs will be
 // added and expired outputs will be deleted. If adding is false, then new
 // outputs will be deleted and expired outputs will be added.
-func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffDirection) {
+func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// See if the output in the diff is known to the wallet.
 	key, exists := w.keys[scod.SiacoinOutput.UnlockHash]
 	if !exists {
@@ -39,7 +40,7 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 		}
 		key.outputs[scod.ID] = ko
 	} else {
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := key.outputs[scod.ID]
 			if !exists {
 				panic("trying to delete an output that doesn't exist?")
@@ -53,12 +54,12 @@ func (w *Wallet) applyDiff(scod consensus.SiacoinOutputDiff, dir consensus.DiffD
 // ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
-func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, _ []consensus.Transaction, unconfirmedSiacoinDiffs []consensus.SiacoinOutputDiff) {
+func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, _ []types.Transaction, unconfirmedSiacoinDiffs []modules.SiacoinOutputDiff) {
 	id := w.mu.Lock()
 	defer w.mu.Unlock(id)
 
 	for _, diff := range w.unconfirmedDiffs {
-		w.applyDiff(diff, consensus.DiffRevert)
+		w.applyDiff(diff, modules.DiffRevert)
 	}
 
 	for _, block := range revertedBlocks {
@@ -66,13 +67,13 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []co
 
 		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			if consensus.DEBUG {
+			if types.DEBUG {
 				panic(err)
 			}
 			continue
 		}
 		for _, scod := range scods {
-			w.applyDiff(scod, consensus.DiffRevert)
+			w.applyDiff(scod, modules.DiffRevert)
 		}
 	}
 	for _, block := range appliedBlocks {
@@ -80,19 +81,19 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []co
 
 		scods, err := w.state.BlockOutputDiffs(block.ID())
 		if err != nil {
-			if consensus.DEBUG {
+			if types.DEBUG {
 				panic(err)
 			}
 			continue
 		}
 		for _, scod := range scods {
-			w.applyDiff(scod, consensus.DiffApply)
+			w.applyDiff(scod, modules.DiffApply)
 		}
 	}
 
 	w.unconfirmedDiffs = unconfirmedSiacoinDiffs
 	for _, diff := range w.unconfirmedDiffs {
-		w.applyDiff(diff, consensus.DiffApply)
+		w.applyDiff(diff, modules.DiffApply)
 	}
 
 	w.notifySubscribers()

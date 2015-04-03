@@ -3,9 +3,9 @@ package wallet
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // spendableOutput keeps track of an output, it's id, and whether or not it's
@@ -15,8 +15,8 @@ import (
 // indicates whether the output has been spent or not. If it's equal to the
 // wallet's spent counter, then it has been spent since the previous reset.
 type knownOutput struct {
-	id     consensus.SiacoinOutputID
-	output consensus.SiacoinOutput
+	id     types.SiacoinOutputID
+	output types.SiacoinOutput
 
 	spendable bool
 	age       int
@@ -26,18 +26,18 @@ type knownOutput struct {
 // including secret keys.
 type key struct {
 	spendable        bool
-	unlockConditions consensus.UnlockConditions
+	unlockConditions types.UnlockConditions
 	secretKey        crypto.SecretKey
 
-	outputs map[consensus.SiacoinOutputID]*knownOutput
+	outputs map[types.SiacoinOutputID]*knownOutput
 }
 
 // findOutputs returns a set of spendable outputs that add up to at least
 // `amount` of coins, returning an error if it cannot. It also returns the
 // `total`, which is the sum of all the outputs that were found, since it's
 // unlikely that it will equal amount exaclty.
-func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOutput, total consensus.Currency, err error) {
-	if amount.Cmp(consensus.ZeroCurrency) <= 0 {
+func (w *Wallet) findOutputs(amount types.Currency) (knownOutputs []*knownOutput, total types.Currency, err error) {
+	if amount.Cmp(types.ZeroCurrency) <= 0 {
 		err = errors.New("cannot fund amount <= 0")
 		return
 	}
@@ -74,7 +74,7 @@ func (w *Wallet) findOutputs(amount consensus.Currency) (knownOutputs []*knownOu
 // Otherwise, all coins that could be spent are counted (including those that
 // have already been spent but the transactions haven't been added to the
 // transaction pool or blockchain)
-func (w *Wallet) Balance(full bool) (total consensus.Currency) {
+func (w *Wallet) Balance(full bool) (total types.Currency) {
 	id := w.mu.RLock()
 	defer w.mu.RUnlock(id)
 

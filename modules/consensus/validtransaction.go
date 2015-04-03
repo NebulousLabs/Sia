@@ -5,17 +5,18 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (s *State) validSiacoins(t Transaction) (err error) {
-	var inputSum Currency
+func (s *State) validSiacoins(t types.Transaction) (err error) {
+	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
 		sco, exists := s.siacoinOutputs[sci.ParentID]
 		if !exists {
-			return ErrMissingSiacoinOutput
+			return types.ErrMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions match the required unlock hash.
@@ -33,7 +34,7 @@ func (s *State) validSiacoins(t Transaction) (err error) {
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err error) {
+func (s *State) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	// Get the file contract associated with the input id.
 	fc, exists := s.fileContracts[fcid]
 	if !exists {
@@ -66,7 +67,7 @@ func (s *State) storageProofSegment(fcid FileContractID) (index uint64, err erro
 
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (s *State) validStorageProofs(t Transaction) error {
+func (s *State) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
@@ -96,13 +97,13 @@ func (s *State) validStorageProofs(t Transaction) error {
 
 // validFileContractTerminations checks that each file contract termination is
 // valid in the context of the current consensus set.
-func (s *State) validFileContractTerminations(t Transaction) (err error) {
+func (s *State) validFileContractTerminations(t types.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
 		// Check that the FileContractTermination terminates an existing
 		// FileContract.
 		fc, exists := s.fileContracts[fct.ParentID]
 		if !exists {
-			return ErrMissingFileContract
+			return types.ErrMissingFileContract
 		}
 
 		// Check that the height is less than fc.Start - terminations are not
@@ -119,7 +120,7 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 
 		// Check that the payouts in the termination add up to the payout of the
 		// contract.
-		var payoutSum Currency
+		var payoutSum types.Currency
 		for _, payout := range fct.Payouts {
 			payoutSum = payoutSum.Add(payout.Value)
 		}
@@ -133,14 +134,14 @@ func (s *State) validFileContractTerminations(t Transaction) (err error) {
 
 // validSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func (s *State) validSiafunds(t Transaction) (err error) {
+func (s *State) validSiafunds(t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
-	var siafundInputSum Currency
-	var siafundOutputSum Currency
+	var siafundInputSum types.Currency
+	var siafundOutputSum types.Currency
 	for _, sfi := range t.SiafundInputs {
 		sfo, exists := s.siafundOutputs[sfi.ParentID]
 		if !exists {
-			return ErrMissingSiafundOutput
+			return types.ErrMissingSiafundOutput
 		}
 
 		// Check the unlock conditions match the unlock hash.
@@ -161,7 +162,7 @@ func (s *State) validSiafunds(t Transaction) (err error) {
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func (s *State) validTransaction(t Transaction) (err error) {
+func (s *State) validTransaction(t types.Transaction) (err error) {
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
 	err = t.StandaloneValid(s.height())
@@ -193,7 +194,7 @@ func (s *State) validTransaction(t Transaction) (err error) {
 
 // ValidStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (s *State) ValidStorageProofs(t Transaction) (err error) {
+func (s *State) ValidStorageProofs(t types.Transaction) (err error) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	return s.validStorageProofs(t)
