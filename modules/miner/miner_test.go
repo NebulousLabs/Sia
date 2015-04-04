@@ -3,12 +3,13 @@ package miner
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestMiner creates a miner, mines a few blocks, and checks that the wallet
@@ -40,11 +41,11 @@ func TestMiner(t *testing.T) {
 	minerChan := m.MinerSubscribe()
 
 	// Check that the wallet balance starts at 0.
-	if w.Balance(true).Cmp(consensus.ZeroCurrency) != 0 {
+	if !w.Balance(true).IsZero() {
 		t.Fatal("expecting initial wallet balance to be zero")
 	}
 
-	for i := 0; i <= consensus.MaturityDelay; i++ {
+	for i := 0; i <= types.MaturityDelay; i++ {
 		_, _, err = m.FindBlock()
 		if err != nil {
 			t.Fatal(err)
@@ -52,10 +53,10 @@ func TestMiner(t *testing.T) {
 		<-minerChan
 	}
 
-	if w.Balance(true).Cmp(consensus.ZeroCurrency) == 0 {
+	if w.Balance(true).IsZero() {
 		t.Error("expecting mining full balance to not be zero")
 	}
-	if w.Balance(false).Cmp(consensus.ZeroCurrency) == 0 {
+	if w.Balance(false).IsZero() {
 		t.Error("expecting mining nonfull balance to not be zero")
 	}
 }

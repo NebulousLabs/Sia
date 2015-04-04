@@ -4,8 +4,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 type Miner struct {
@@ -15,11 +16,11 @@ type Miner struct {
 	wallet  modules.Wallet
 
 	// Block variables - helps the miner construct the next block.
-	parent            consensus.BlockID
-	transactions      []consensus.Transaction
-	target            consensus.Target
-	earliestTimestamp consensus.Timestamp
-	address           consensus.UnlockHash
+	parent            types.BlockID
+	transactions      []types.Transaction
+	target            types.Target
+	earliestTimestamp types.Timestamp
+	address           types.UnlockHash
 
 	threads              int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads       int // 0 if not mining.

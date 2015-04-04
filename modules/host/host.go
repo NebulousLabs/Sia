@@ -5,8 +5,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -20,8 +21,8 @@ const (
 // A contractObligation tracks a file contract that the host is obligated to
 // fulfill.
 type contractObligation struct {
-	ID           consensus.FileContractID
-	FileContract consensus.FileContract
+	ID           types.FileContractID
+	FileContract types.FileContract
 	Path         string // Where on disk the file is stored.
 }
 
@@ -31,14 +32,14 @@ type Host struct {
 	state       *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
-	latestBlock consensus.BlockID
+	latestBlock types.BlockID
 
 	saveDir        string
 	spaceRemaining int64
 	fileCounter    int
 
-	obligationsByID     map[consensus.FileContractID]contractObligation
-	obligationsByHeight map[consensus.BlockHeight][]contractObligation
+	obligationsByID     map[types.FileContractID]contractObligation
+	obligationsByHeight map[types.BlockHeight][]contractObligation
 
 	modules.HostSettings
 
@@ -71,20 +72,20 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 2e9,                          // 2 GB
-			MaxFilesize:  300e6,                        // 300 MB
-			MaxDuration:  5e3,                          // Just over a month.
-			WindowSize:   288,                          // 48 hours.
-			Price:        consensus.NewCurrency64(1e9), // 10^9
-			Collateral:   consensus.NewCurrency64(0),
+			TotalStorage: 2e9,                      // 2 GB
+			MaxFilesize:  300e6,                    // 300 MB
+			MaxDuration:  5e3,                      // Just over a month.
+			WindowSize:   288,                      // 48 hours.
+			Price:        types.NewCurrency64(1e9), // 10^9
+			Collateral:   types.NewCurrency64(0),
 			UnlockHash:   addr,
 		},
 
 		saveDir:        saveDir,
 		spaceRemaining: 2e9,
 
-		obligationsByID:     make(map[consensus.FileContractID]contractObligation),
-		obligationsByHeight: make(map[consensus.BlockHeight][]contractObligation),
+		obligationsByID:     make(map[types.FileContractID]contractObligation),
+		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
 	}
 	block, exists := state.BlockAtHeight(0)
 	if !exists {
@@ -99,8 +100,8 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 	}
 	h.load()
 
-	consensusChan := state.SubscribeToConsensusChanges()
-	go h.threadedConsensusListen(consensusChan)
+	typesChan := state.SubscribeToConsensusChanges()
+	go h.threadedConsensusListen(typesChan)
 
 	return
 }

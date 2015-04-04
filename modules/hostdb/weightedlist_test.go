@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // fakeAddr returns a modules.NetAddress to be used in a HostEntry. Such
@@ -25,7 +25,7 @@ func (hdbt *HostDBTester) uniformTreeVerification(numEntries int) {
 	if err != nil {
 		hdbt.Fatal(err)
 	}
-	expectedWeight := consensus.NewCurrency64(uint64(numEntries)).Mul(entryWeight(randomHost))
+	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(entryWeight(randomHost))
 	if hdbt.hostTree.weight.Cmp(expectedWeight) != 0 {
 		hdbt.Error("Expected weight is incorrect")
 	}
@@ -71,8 +71,8 @@ func TestWeightedList(t *testing.T) {
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
 		entry := new(modules.HostEntry)
-		entry.Collateral = consensus.NewCurrency64(10)
-		entry.Price = consensus.NewCurrency64(10)
+		entry.Collateral = types.NewCurrency64(10)
+		entry.Price = types.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
 		hdbt.insertCompleteHostEntry(entry)
 	}
@@ -110,8 +110,8 @@ func TestWeightedList(t *testing.T) {
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
 		entry := new(modules.HostEntry)
-		entry.Collateral = consensus.NewCurrency64(10)
-		entry.Price = consensus.NewCurrency64(10)
+		entry.Collateral = types.NewCurrency64(10)
+		entry.Price = types.NewCurrency64(10)
 		entry.IPAddress = fakeAddr(uint8(i))
 		hdbt.insertCompleteHostEntry(entry)
 	}

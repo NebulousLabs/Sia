@@ -1,6 +1,6 @@
 // +build test
 
-package consensus
+package types
 
 import (
 	"math/big"

@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -70,7 +70,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case len(terms.MissedProofOutputs) != 1:
 		return errors.New("refund len does not match host settings")
 
-	case terms.MissedProofOutputs[0].UnlockHash != consensus.ZeroUnlockHash:
+	case terms.MissedProofOutputs[0].UnlockHash != types.ZeroUnlockHash:
 		return errors.New("coins are not paying out to correct address")
 	}
 
@@ -80,7 +80,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 // verifyTransaction checks that the provided transaction matches the provided
 // contract terms, and that the Merkle root provided is equal to the merkle
 // root of the transaction file contract.
-func verifyTransaction(txn consensus.Transaction, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
+func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkleRoot crypto.Hash) error {
 	// Check that there is only one file contract.
 	if len(txn.FileContracts) != 1 {
 		return errors.New("transaction should have only one file contract.")
@@ -88,8 +88,8 @@ func verifyTransaction(txn consensus.Transaction, terms modules.ContractTerms, m
 	fc := txn.FileContracts[0]
 
 	// Get the expected payout.
-	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
-	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	sizeCurrency := types.NewCurrency64(terms.FileSize)
+	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
 	hostCollateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 	expectedPayout := clientCost.Add(hostCollateral)
@@ -122,7 +122,7 @@ func verifyTransaction(txn consensus.Transaction, terms modules.ContractTerms, m
 	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
 		return errors.New("bad file contract missed proof outputs")
 
-	case fc.TerminationHash != consensus.ZeroUnlockHash:
+	case fc.TerminationHash != types.ZeroUnlockHash:
 		return errors.New("bad file contract termination hash")
 	}
 	return nil
@@ -130,17 +130,17 @@ func verifyTransaction(txn consensus.Transaction, terms modules.ContractTerms, m
 
 // addCollateral takes a transaction and its contract terms and adds the host
 // collateral to the transaction.
-func (h *Host) addCollateral(txn consensus.Transaction, terms modules.ContractTerms) (fundedTxn consensus.Transaction, txnID string, err error) {
+func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms) (fundedTxn types.Transaction, txnID string, err error) {
 	// Determine the amount of colletaral the host needs to provide.
-	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
-	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	sizeCurrency := types.NewCurrency64(terms.FileSize)
+	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	collateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 
 	txnID, err = h.wallet.RegisterTransaction(txn)
 	if err != nil {
 		return
 	}
-	if collateral.Cmp(consensus.NewCurrency64(0)) == 0 {
+	if collateral.Cmp(types.NewCurrency64(0)) == 0 {
 		return txn, txnID, nil
 	}
 	fundedTxn, err = h.wallet.FundTransaction(txnID, collateral)
@@ -209,7 +209,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// Data has been sent, read in the unsigned transaction with the file
 	// contract.
-	var unsignedTxn consensus.Transaction
+	var unsignedTxn types.Transaction
 	err = conn.ReadObject(&unsignedTxn, maxContractLen)
 	if err != nil {
 		return
@@ -236,7 +236,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// Read in the renter-signed transaction and check that it matches the
 	// previously accepted transaction.
-	var signedTxn consensus.Transaction
+	var signedTxn types.Transaction
 	err = conn.ReadObject(&signedTxn, maxContractLen)
 	if err != nil {
 		return

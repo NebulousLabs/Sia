@@ -4,8 +4,8 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // savedFiles contains the list of all the files that have been saved by the
@@ -13,7 +13,7 @@ import (
 type savedFiles struct {
 	FilePieces  []FilePiece
 	Nickname    string
-	StartHeight consensus.BlockHeight
+	StartHeight types.BlockHeight
 }
 
 // save puts all of the files known to the renter on disk.

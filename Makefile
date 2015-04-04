@@ -26,7 +26,7 @@ fmt:
 # rebuilt. This is necessary because the go tool is not smart enough to trigger
 # a rebuild when build tags have been changed.
 REBUILD:
-	@touch consensus/build*.go
+	@touch types/build*.go
 
 # install builds and installs developer binaries.
 install: fmt REBUILD
@@ -70,9 +70,9 @@ test-wallet: clean fmt REBUILD
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
-coverpackages = consensus crypto encoding modules/gateway modules/host          \
-	modules/hostdb modules/miner modules/renter modules/transactionpool         \
-	modules/wallet api
+coverpackages = api crypto encoding modules/consensus modules/gateway           \
+	modules/host modules/hostdb modules/miner modules/renter                    \
+	modules/transactionpool modules/wallet types
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \

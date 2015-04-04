@@ -5,14 +5,14 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 type savedKey struct {
 	SecretKey        crypto.SecretKey
-	UnlockConditions consensus.UnlockConditions
+	UnlockConditions types.UnlockConditions
 }
 
 // save writes the contents of a wallet to a file.
@@ -58,7 +58,7 @@ func (w *Wallet) load() (err error) {
 			spendable:        height >= skey.UnlockConditions.Timelock,
 			unlockConditions: skey.UnlockConditions,
 			secretKey:        skey.SecretKey,
-			outputs:          make(map[consensus.SiacoinOutputID]*knownOutput),
+			outputs:          make(map[types.SiacoinOutputID]*knownOutput),
 		}
 
 		// If Timelock != 0, also add to set of timelockedKeys.

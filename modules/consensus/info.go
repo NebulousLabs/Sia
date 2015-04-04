@@ -6,17 +6,19 @@ import (
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // StateInfo contains basic information about the State.
 type StateInfo struct {
-	CurrentBlock BlockID
-	Height       BlockHeight
-	Target       Target
+	CurrentBlock types.BlockID
+	Height       types.BlockHeight
+	Target       types.Target
 }
 
 // blockAtHeight returns the block on the current path with the given height.
-func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
+func (s *State) blockAtHeight(height types.BlockHeight) (b types.Block, exists bool) {
 	exists = height <= s.height()
 	if exists {
 		b = s.blockMap[s.currentPath[height]].block
@@ -25,7 +27,7 @@ func (s *State) blockAtHeight(height BlockHeight) (b Block, exists bool) {
 }
 
 // currentBlockID returns the ID of the current block.
-func (s *State) currentBlockID() BlockID {
+func (s *State) currentBlockID() types.BlockID {
 	return s.currentPath[s.height()]
 }
 
@@ -40,20 +42,20 @@ func (s *State) currentBlockWeight() *big.Rat {
 }
 
 // height returns the current height of the state.
-func (s *State) height() BlockHeight {
-	return BlockHeight(len(s.currentPath) - 1)
+func (s *State) height() types.BlockHeight {
+	return types.BlockHeight(len(s.currentPath) - 1)
 }
 
 // output returns the unspent SiacoinOutput associated with the given ID. If
 // the output is not in the UTXO set, 'exists' will be false.
-func (s *State) output(id SiacoinOutputID) (sco SiacoinOutput, exists bool) {
+func (s *State) output(id types.SiacoinOutputID) (sco types.SiacoinOutput, exists bool) {
 	sco, exists = s.siacoinOutputs[id]
 	return
 }
 
 // sortedUscoSet returns all of the unspent siacoin outputs sorted
 // according to the numerical value of their id.
-func (s *State) sortedUscoSet() []SiacoinOutput {
+func (s *State) sortedUscoSet() []types.SiacoinOutput {
 	// Get all of the outputs in string form and sort the strings.
 	unspentOutputs := make(crypto.HashSlice, len(s.siacoinOutputs))
 	for outputID := range s.siacoinOutputs {
@@ -62,9 +64,9 @@ func (s *State) sortedUscoSet() []SiacoinOutput {
 	sort.Sort(unspentOutputs)
 
 	// Get the outputs in order according to their sorted form.
-	sortedOutputs := make([]SiacoinOutput, len(unspentOutputs))
+	sortedOutputs := make([]types.SiacoinOutput, len(unspentOutputs))
 	for i, outputID := range unspentOutputs {
-		output, _ := s.output(SiacoinOutputID(outputID))
+		output, _ := s.output(types.SiacoinOutputID(outputID))
 		sortedOutputs[i] = output
 	}
 	return sortedOutputs
@@ -72,7 +74,7 @@ func (s *State) sortedUscoSet() []SiacoinOutput {
 
 // Sorted UsfoSet returns all of the unspent siafund outputs sorted according
 // to the numerical value of their id.
-func (s *State) sortedUsfoSet() []SiafundOutput {
+func (s *State) sortedUsfoSet() []types.SiafundOutput {
 	// Get all of the outputs in string form and sort the strings.
 	outputIDs := make(crypto.HashSlice, len(s.siafundOutputs))
 	for outputID := range s.siafundOutputs {
@@ -81,11 +83,11 @@ func (s *State) sortedUsfoSet() []SiafundOutput {
 	sort.Sort(outputIDs)
 
 	// Get the outputs in order according to their sorted string form.
-	sortedOutputs := make([]SiafundOutput, len(outputIDs))
+	sortedOutputs := make([]types.SiafundOutput, len(outputIDs))
 	for i, outputID := range outputIDs {
 		// Sanity check - the output should exist.
-		output, exists := s.siafundOutputs[SiafundOutputID(outputID)]
-		if DEBUG {
+		output, exists := s.siafundOutputs[types.SiafundOutputID(outputID)]
+		if types.DEBUG {
 			if !exists {
 				panic("output doesn't exist")
 			}
@@ -97,18 +99,18 @@ func (s *State) sortedUsfoSet() []SiafundOutput {
 }
 
 // BlockAtHeight returns the block on the current path with the given height.
-func (s *State) BlockAtHeight(height BlockHeight) (b Block, exists bool) {
+func (s *State) BlockAtHeight(height types.BlockHeight) (b types.Block, exists bool) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.blockAtHeight(height)
 }
 
 // Block returns the block associated with the given id.
-func (s *State) Block(id BlockID) (b Block, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
+func (s *State) Block(bid types.BlockID) (b types.Block, exists bool) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
 
-	node, exists := s.blockMap[id]
+	node, exists := s.blockMap[bid]
 	if !exists {
 		return
 	}
@@ -118,19 +120,19 @@ func (s *State) Block(id BlockID) (b Block, exists bool) {
 
 // BlockRange returns a slice of the blocks that fall within the given range
 // [start, stop].
-func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
+func (s *State) BlockRange(start, stop types.BlockHeight) ([]types.Block, error) {
+	id := s.mu.RLock()
+	defer s.mu.RUnlock(id)
 
 	if start > stop || stop > s.height() {
 		return nil, errors.New("invalid range")
 	}
 
-	blocks := make([]Block, (stop-start)+1)
+	blocks := make([]types.Block, (stop-start)+1)
 	for i, id := range s.currentPath[start : stop+1] {
 		node, exists := s.blockMap[id]
 		if !exists {
-			if DEBUG {
+			if types.DEBUG {
 				panic("blockMap is missing a block whose ID is in the currentPath")
 			}
 			return nil, errors.New("State is inconsistent")
@@ -141,7 +143,7 @@ func (s *State) BlockRange(start, stop BlockHeight) ([]Block, error) {
 }
 
 // BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
-func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err error) {
+func (s *State) BlockOutputDiffs(id types.BlockID) (scods []modules.SiacoinOutputDiff, err error) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 
@@ -161,7 +163,7 @@ func (s *State) BlockOutputDiffs(id BlockID) (scods []SiacoinOutputDiff, err err
 // BlocksSince returns a set of output diffs representing how the state
 // has changed since block 'id'. OutputDiffsSince will flip the `new` value for
 // diffs that got reversed.
-func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, err error) {
+func (s *State) BlocksSince(id types.BlockID) (removedBlocks, addedBlocks []types.BlockID, err error) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 
@@ -184,7 +186,7 @@ func (s *State) BlocksSince(id BlockID) (removedBlocks, addedBlocks []BlockID, e
 
 // FileContract returns the file contract associated with the 'id'. If the
 // contract does not exist, exists will be false.
-func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
+func (s *State) FileContract(id types.FileContractID) (fc types.FileContract, exists bool) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 
@@ -193,13 +195,13 @@ func (s *State) FileContract(id FileContractID) (fc FileContract, exists bool) {
 }
 
 // CurrentBlock returns the highest block on the tallest fork.
-func (s *State) CurrentBlock() Block {
+func (s *State) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.currentBlockNode().block
 }
 
-func (s *State) ChildTarget(bid BlockID) (target Target, exists bool) {
+func (s *State) ChildTarget(bid types.BlockID) (target types.Target, exists bool) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	bn, exists := s.blockMap[bid]
@@ -212,13 +214,13 @@ func (s *State) ChildTarget(bid BlockID) (target Target, exists bool) {
 
 // CurrentTarget returns the target of the next block that needs to be submitted
 // to the state.
-func (s *State) CurrentTarget() Target {
+func (s *State) CurrentTarget() types.Target {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	return s.currentBlockNode().target
 }
 
-func (s *State) EarliestTimestamp() Timestamp {
+func (s *State) EarliestTimestamp() types.Timestamp {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	return s.currentBlockNode().earliestChildTimestamp()
@@ -226,7 +228,7 @@ func (s *State) EarliestTimestamp() Timestamp {
 
 // EarliestTimestamp returns the earliest timestamp that the next block can
 // have in order for it to be considered valid.
-func (s *State) EarliestChildTimestamp(bid BlockID) (timestamp Timestamp, exists bool) {
+func (s *State) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	bn, exists := s.blockMap[bid]
@@ -238,14 +240,14 @@ func (s *State) EarliestChildTimestamp(bid BlockID) (timestamp Timestamp, exists
 }
 
 // Height returns the height of the current blockchain (the longest fork).
-func (s *State) Height() BlockHeight {
+func (s *State) Height() types.BlockHeight {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.height()
 }
 
 // HeightOfBlock returns the height of the block with the given ID.
-func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
+func (s *State) HeightOfBlock(bid types.BlockID) (height types.BlockHeight, exists bool) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 
@@ -258,14 +260,14 @@ func (s *State) HeightOfBlock(bid BlockID) (height BlockHeight, exists bool) {
 }
 
 // SiacoinOutput returns the siacoin output associated with the given ID.
-func (s *State) SiacoinOutput(id SiacoinOutputID) (output SiacoinOutput, exists bool) {
+func (s *State) SiacoinOutput(id types.SiacoinOutputID) (output types.SiacoinOutput, exists bool) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.output(id)
 }
 
 // SiafundOutput returns the siafund output associated with the given ID.
-func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists bool) {
+func (s *State) SiafundOutput(id types.SiafundOutputID) (output types.SiafundOutput, exists bool) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	output, exists = s.siafundOutputs[id]
@@ -274,7 +276,7 @@ func (s *State) SiafundOutput(id SiafundOutputID) (output SiafundOutput, exists 
 
 // SortedUtxoSet returns all of the unspent transaction outputs sorted
 // according to the numerical value of their id.
-func (s *State) SortedUtxoSet() []SiacoinOutput {
+func (s *State) SortedUtxoSet() []types.SiacoinOutput {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.sortedUscoSet()
@@ -282,7 +284,7 @@ func (s *State) SortedUtxoSet() []SiacoinOutput {
 
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
-func (s *State) StorageProofSegment(fcid FileContractID) (index uint64, err error) {
+func (s *State) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
 	return s.storageProofSegment(fcid)

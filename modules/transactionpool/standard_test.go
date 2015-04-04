@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Try to add a transaction that is too large to the transaction pool.
@@ -15,7 +15,7 @@ func TestLargeTransaction(t *testing.T) {
 	largeArbitraryData := make([]byte, TransactionSizeLimit)
 	rand.Read(largeArbitraryData)
 	acceptableData := "NonSia" + string(largeArbitraryData)
-	txn := consensus.Transaction{
+	txn := types.Transaction{
 		ArbitraryData: []string{acceptableData},
 	}
 

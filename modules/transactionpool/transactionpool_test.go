@@ -3,12 +3,13 @@ package transactionpool
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A tpoolTester contains a consensus tester and a transaction pool, and
@@ -31,25 +32,25 @@ type tpoolTester struct {
 
 // emptyUnlockTransaction creates a transaction with empty UnlockConditions,
 // meaning it's trivial to spend the output.
-func (tpt *tpoolTester) emptyUnlockTransaction() consensus.Transaction {
+func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
 	// Send money to an anyone-can-spend address.
-	emptyHash := consensus.UnlockConditions{}.UnlockHash()
-	txn, err := tpt.spendCoins(consensus.NewCurrency64(1), emptyHash)
+	emptyHash := types.UnlockConditions{}.UnlockHash()
+	txn, err := tpt.spendCoins(types.NewCurrency64(1), emptyHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
 	outputID := txn.SiacoinOutputID(0)
 
 	// Create a transaction spending the coins.
-	txn = consensus.Transaction{
-		SiacoinInputs: []consensus.SiacoinInput{
-			consensus.SiacoinInput{
+	txn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{
+			types.SiacoinInput{
 				ParentID: outputID,
 			},
 		},
-		SiacoinOutputs: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{
-				Value:      consensus.NewCurrency64(1),
+		SiacoinOutputs: []types.SiacoinOutput{
+			types.SiacoinOutput{
+				Value:      types.NewCurrency64(1),
 				UnlockHash: emptyHash,
 			},
 		},
@@ -66,8 +67,8 @@ func (tpt *tpoolTester) updateWait() {
 
 // spendCoins sends the desired amount of coins to the desired address, calling
 // wait at all of the appropriate places to assist synchronization.
-func (tpt *tpoolTester) spendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
-	output := consensus.SiacoinOutput{
+func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
@@ -147,7 +148,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Mine blocks until there is money in the wallet.
-	for i := 0; i <= consensus.MaturityDelay; i++ {
+	for i := 0; i <= types.MaturityDelay; i++ {
 		_, _, err = tpt.miner.FindBlock()
 		if err != nil {
 			t.Fatal(err)

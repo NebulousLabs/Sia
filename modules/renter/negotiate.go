@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -19,20 +19,20 @@ const (
 // them to build a transaction containing a file contract that satisfies the
 // terms, including providing an input balance. The transaction does not get
 // signed.
-func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn consensus.Transaction, id string, err error) {
+func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, id string, err error) {
 	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
-	var payout consensus.Currency
+	var payout types.Currency
 	for _, output := range terms.MissedProofOutputs {
 		payout = payout.Add(output.Value)
 	}
 
 	// Get the cost to the client as per the terms in the contract.
-	sizeCurrency := consensus.NewCurrency64(terms.FileSize)
-	durationCurrency := consensus.NewCurrency64(uint64(terms.Duration))
+	sizeCurrency := types.NewCurrency64(terms.FileSize)
+	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
 
 	// Fill out the contract.
-	contract := consensus.FileContract{
+	contract := types.FileContract{
 		FileMerkleRoot:     merkleRoot,
 		FileSize:           terms.FileSize,
 		Start:              terms.DurationStart + terms.Duration,
@@ -62,7 +62,7 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 // negotiateContract creates a file contract for a host according to the
 // requests of the host. There is an assumption that only hosts with acceptable
 // terms will be put into the hostdb.
-func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract consensus.FileContract, fcid consensus.FileContractID, err error) {
+func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract types.FileContract, fcid types.FileContractID, err error) {
 	height := r.state.Height()
 
 	file, err := os.Open(up.Filename)
@@ -78,12 +78,12 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	filesize := uint64(info.Size())
 
 	// Get the price and payout.
-	sizeCurrency := consensus.NewCurrency64(filesize)
-	durationCurrency := consensus.NewCurrency64(uint64(up.Duration))
+	sizeCurrency := types.NewCurrency64(filesize)
+	durationCurrency := types.NewCurrency64(uint64(up.Duration))
 	clientCost := host.Price.Mul(sizeCurrency).Mul(durationCurrency)
 	hostCollateral := host.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 	payout := clientCost.Add(hostCollateral)
-	validOutputValue := payout.Sub(consensus.FileContract{Payout: payout}.Tax())
+	validOutputValue := payout.Sub(types.FileContract{Payout: payout}.Tax())
 
 	// Create the contract terms.
 	terms := modules.ContractTerms{
@@ -94,16 +94,16 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		Price:         host.Price,
 		Collateral:    host.Collateral,
 	}
-	terms.ValidProofOutputs = []consensus.SiacoinOutput{
-		consensus.SiacoinOutput{
+	terms.ValidProofOutputs = []types.SiacoinOutput{
+		types.SiacoinOutput{
 			Value:      validOutputValue,
 			UnlockHash: host.UnlockHash,
 		},
 	}
-	terms.MissedProofOutputs = []consensus.SiacoinOutput{
-		consensus.SiacoinOutput{
+	terms.MissedProofOutputs = []types.SiacoinOutput{
+		types.SiacoinOutput{
 			Value:      payout,
-			UnlockHash: consensus.ZeroUnlockHash,
+			UnlockHash: types.ZeroUnlockHash,
 		},
 	}
 
@@ -125,7 +125,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 	// transactions have propgated to the host's transaction pool. Instead,
 	// built into the protocol should be a step where any dependent
 	// transactions are automatically provided.
-	time.Sleep(consensus.RenterZeroConfDelay)
+	time.Sleep(types.RenterZeroConfDelay)
 
 	// Perform the negotiations with the host through a network call.
 	err = r.gateway.RPC(host.IPAddress, "NegotiateContract", func(conn modules.NetConn) (err error) {
@@ -156,7 +156,7 @@ func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadPara
 		// The host will respond with a transaction with the collateral added.
 		// Add the collateral inputs from the host to the original wallet
 		// transaction.
-		var collateralTxn consensus.Transaction
+		var collateralTxn types.Transaction
 		err = conn.ReadObject(&collateralTxn, 16e3)
 		if err != nil {
 			return

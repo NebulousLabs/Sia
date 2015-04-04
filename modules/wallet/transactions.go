@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -17,7 +17,7 @@ var (
 // in the transaction) that the wallet has added personally, so that the inputs
 // can be signed when SignTransaction() is called.
 type openTransaction struct {
-	transaction *consensus.Transaction
+	transaction *types.Transaction
 	inputs      []int
 }
 
@@ -25,7 +25,7 @@ type openTransaction struct {
 // transaction to the list of open transactions, returning an id. That id can
 // then be used to modify and sign the transaction. An empty transaction is
 // legal input.
-func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err error) {
+func (w *Wallet) RegisterTransaction(t types.Transaction) (id string, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -41,13 +41,13 @@ func (w *Wallet) RegisterTransaction(t consensus.Transaction) (id string, err er
 // creating two transactions. The first transaciton, the parent, spends a set
 // of outputs that add up to at least the desired amount, and then creates a
 // single output of the exact amount and a second refund output.
-func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consensus.Transaction, err error) {
+func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Transaction, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
 	// Create a parent transaction and supply it with enough inputs to cover
 	// 'amount'.
-	parentTxn := consensus.Transaction{}
+	parentTxn := types.Transaction{}
 	fundingOutputs, fundingTotal, err := w.findOutputs(amount)
 	if err != nil {
 		return
@@ -55,7 +55,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	for _, output := range fundingOutputs {
 		output.age = w.age
 		key := w.keys[output.output.UnlockHash]
-		newInput := consensus.SiacoinInput{
+		newInput := types.SiacoinInput{
 			ParentID:         output.id,
 			UnlockConditions: key.unlockConditions,
 		}
@@ -65,7 +65,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	// Create and add the output that will be used to fund the standard
 	// transaction.
 	parentDest, parentSpendConds, err := w.coinAddress()
-	exactOutput := consensus.SiacoinOutput{
+	exactOutput := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: parentDest,
 	}
@@ -73,12 +73,12 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 
 	// Create a refund output if needed.
 	if amount.Cmp(fundingTotal) != 0 {
-		var refundDest consensus.UnlockHash
+		var refundDest types.UnlockHash
 		refundDest, _, err = w.coinAddress()
 		if err != nil {
 			return
 		}
-		refundOutput := consensus.SiacoinOutput{
+		refundOutput := types.SiacoinOutput{
 			Value:      fundingTotal.Sub(amount),
 			UnlockHash: refundDest,
 		}
@@ -86,9 +86,9 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	}
 
 	// Sign all of the inputs to the parent trancstion.
-	coveredFields := consensus.CoveredFields{WholeTransaction: true}
+	coveredFields := types.CoveredFields{WholeTransaction: true}
 	for _, input := range parentTxn.SiacoinInputs {
-		sig := consensus.TransactionSignature{
+		sig := types.TransactionSignature{
 			ParentID:       crypto.Hash(input.ParentID),
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
@@ -107,7 +107,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 		if err != nil {
 			return
 		}
-		parentTxn.Signatures[sigIndex].Signature = consensus.Signature(encodedSig[:])
+		parentTxn.Signatures[sigIndex].Signature = types.Signature(encodedSig[:])
 	}
 
 	// Add the exact output to the wallet's knowledgebase before releasing the
@@ -136,7 +136,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 	txn := openTxn.transaction
 
 	// Add the exact output.
-	newInput := consensus.SiacoinInput{
+	newInput := types.SiacoinInput{
 		ParentID:         parentTxn.SiacoinOutputID(0),
 		UnlockConditions: parentSpendConds,
 	}
@@ -149,7 +149,7 @@ func (w *Wallet) FundTransaction(id string, amount consensus.Currency) (t consen
 // AddSiacoinInput will add a siacoin input to the transaction, returning the
 // index of the input within the transaction and the transaction itself. When
 // 'SignTransaction' is called, this input will not be signed.
-func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t consensus.Transaction, inputIndex uint64, err error) {
+func (w *Wallet) AddSiacoinInput(id string, input types.SiacoinInput) (t types.Transaction, inputIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -168,7 +168,7 @@ func (w *Wallet) AddSiacoinInput(id string, input consensus.SiacoinInput) (t con
 // AddMinerFee will add a miner fee to the transaction, but will not add any
 // inputs. The transaction and the index of the new miner fee within the
 // transaction are returned.
-func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Transaction, feeIndex uint64, err error) {
+func (w *Wallet) AddMinerFee(id string, fee types.Currency) (t types.Transaction, feeIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -187,7 +187,7 @@ func (w *Wallet) AddMinerFee(id string, fee consensus.Currency) (t consensus.Tra
 // AddOutput adds an output to the transaction, but will not add any inputs.
 // AddOutput returns the transaction and the index of the new output within the
 // transaction.
-func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consensus.Transaction, outputIndex uint64, err error) {
+func (w *Wallet) AddOutput(id string, output types.SiacoinOutput) (t types.Transaction, outputIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -206,7 +206,7 @@ func (w *Wallet) AddOutput(id string, output consensus.SiacoinOutput) (t consens
 // AddFileContract adds a file contract to the transaction, returning a copy of
 // the transaction and the index of the new file contract within the
 // transaction.
-func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consensus.Transaction, fcIndex uint64, err error) {
+func (w *Wallet) AddFileContract(id string, fc types.FileContract) (t types.Transaction, fcIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -225,7 +225,7 @@ func (w *Wallet) AddFileContract(id string, fc consensus.FileContract) (t consen
 // AddStorageProof adds a storage proof to the transaction, returning a copy of
 // the transaction and the index of the new storage proof within the
 // transaction.
-func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consensus.Transaction, spIndex uint64, err error) {
+func (w *Wallet) AddStorageProof(id string, sp types.StorageProof) (t types.Transaction, spIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -243,7 +243,7 @@ func (w *Wallet) AddStorageProof(id string, sp consensus.StorageProof) (t consen
 
 // AddArbitraryData adds arbitrary data to the transaction, returning a copy of
 // the transaction and the index of the new data within the transaction.
-func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transaction, adIndex uint64, err error) {
+func (w *Wallet) AddArbitraryData(id string, arb string) (t types.Transaction, adIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -261,7 +261,7 @@ func (w *Wallet) AddArbitraryData(id string, arb string) (t consensus.Transactio
 
 // SignTransaction signs the transaction, then deletes the transaction from the
 // wallet's internal memory, then returns the transaction.
-func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensus.Transaction, err error) {
+func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Transaction, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -274,9 +274,9 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	txn = *openTxn.transaction
 
 	// Get the coveredfields struct.
-	var coveredFields consensus.CoveredFields
+	var coveredFields types.CoveredFields
 	if wholeTransaction {
-		coveredFields = consensus.CoveredFields{WholeTransaction: true}
+		coveredFields = types.CoveredFields{WholeTransaction: true}
 	} else {
 		for i := range txn.MinerFees {
 			coveredFields.MinerFees = append(coveredFields.MinerFees, uint64(i))
@@ -304,7 +304,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 	// For each input in the transaction that we added, provide a signature.
 	for _, inputIndex := range openTxn.inputs {
 		input := txn.SiacoinInputs[inputIndex]
-		sig := consensus.TransactionSignature{
+		sig := types.TransactionSignature{
 			ParentID:       crypto.Hash(input.ParentID),
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
@@ -323,7 +323,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 		if err != nil {
 			return
 		}
-		txn.Signatures[sigIndex].Signature = consensus.Signature(encodedSig[:])
+		txn.Signatures[sigIndex].Signature = types.Signature(encodedSig[:])
 	}
 
 	// Delete the open transaction.
@@ -336,7 +336,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn consensu
 // the inputs that 'SignTransaction' will not sign automatically. This can be
 // useful for dealing with multiparty signatures, or for staged negotiations
 // which involve sending the transaction first and the signature later.
-func (w *Wallet) AddSignature(id string, sig consensus.TransactionSignature) (t consensus.Transaction, sigIndex uint64, err error) {
+func (w *Wallet) AddSignature(id string, sig types.TransactionSignature) (t types.Transaction, sigIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 

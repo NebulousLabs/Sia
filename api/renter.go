@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -26,7 +26,7 @@ type FileInfo struct {
 	Available     bool
 	Nickname      string
 	Repairing     bool
-	TimeRemaining consensus.BlockHeight
+	TimeRemaining types.BlockHeight
 }
 
 // renterDownloadHandler handles the API call to download a file.

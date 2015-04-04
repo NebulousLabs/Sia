@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -19,18 +20,18 @@ var (
 
 // checkMinerPayouts verifies that the sum of all the miner payouts is equal to
 // the block subsidy (which is the coinbase + miner fees).
-func (s *State) checkMinerPayouts(b Block) (err error) {
+func (s *State) checkMinerPayouts(b types.Block) (err error) {
 	// Sanity check - the block's parent needs to exist and be known.
 	parentNode, exists := s.blockMap[b.ParentID]
 	if !exists {
-		if DEBUG {
+		if types.DEBUG {
 			panic("misuse of checkMinerPayouts - block has no known parent")
 		}
 		return ErrOrphan
 	}
 
 	// Find the total subsidy for the miners: coinbase + fees.
-	subsidy := CalculateCoinbase(parentNode.height + 1)
+	subsidy := types.CalculateCoinbase(parentNode.height + 1)
 	for _, txn := range b.Transactions {
 		for _, fee := range txn.MinerFees {
 			subsidy = subsidy.Add(fee)
@@ -38,9 +39,9 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 	}
 
 	// Find the sum of the miner payouts.
-	var payoutSum Currency
+	var payoutSum types.Currency
 	for _, payout := range b.MinerPayouts {
-		if payout.Value.Cmp(ZeroCurrency) <= 0 {
+		if payout.Value.IsZero() {
 			return errors.New("cannot have zero or negative miner payout")
 		}
 		payoutSum = payoutSum.Add(payout.Value)
@@ -55,7 +56,7 @@ func (s *State) checkMinerPayouts(b Block) (err error) {
 }
 
 // validHeader does some early, low computation verification on the block.
-func (s *State) validHeader(b Block) (err error) {
+func (s *State) validHeader(b types.Block) (err error) {
 	// Grab the parent of the block.
 	parent, exists := s.blockMap[b.ParentID]
 	if !exists {
@@ -70,7 +71,7 @@ func (s *State) validHeader(b Block) (err error) {
 	}
 
 	// Check that the block is the correct size.
-	if len(encoding.Marshal(b)) > BlockSizeLimit {
+	if len(encoding.Marshal(b)) > types.BlockSizeLimit {
 		return ErrLargeBlock
 	}
 
@@ -82,7 +83,7 @@ func (s *State) validHeader(b Block) (err error) {
 	// Check that the block is not too far in the future. An external process
 	// will need to be responsible for resubmitting the block once it is no
 	// longer in the future.
-	if b.Timestamp > CurrentTimestamp()+FutureThreshold {
+	if b.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
 		return ErrFutureTimestamp
 	}
 
@@ -99,7 +100,7 @@ func (s *State) validHeader(b Block) (err error) {
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
 // parent's list of children. If the new blockNode is heavier than the current
 // node, the blockchain is forked.
-func (s *State) addBlockToTree(b Block) (err error) {
+func (s *State) addBlockToTree(b types.Block) (err error) {
 	parentNode := s.blockMap[b.ParentID]
 	newNode := parentNode.newChild(b)
 
@@ -118,7 +119,7 @@ func (s *State) addBlockToTree(b Block) (err error) {
 
 // AcceptBlock will add blocks to the state, forking the blockchain if they are
 // on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b Block) (err error) {
+func (s *State) AcceptBlock(b types.Block) (err error) {
 	counter := s.mu.Lock()
 	defer s.mu.Unlock(counter)
 

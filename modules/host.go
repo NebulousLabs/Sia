@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -12,14 +12,14 @@ const (
 // ContractTerms are the parameters agreed upon by a client and a host when
 // forming a FileContract.
 type ContractTerms struct {
-	FileSize           uint64                    // How large the file is.
-	Duration           consensus.BlockHeight     // How long the file is to be stored.
-	DurationStart      consensus.BlockHeight     // The block height that the storing starts (typically required to start immediately, unless it's a chained contract).
-	WindowSize         consensus.BlockHeight     // How long the host has to submit a proof of storage.
-	Price              consensus.Currency        // Client contribution towards payout each window
-	Collateral         consensus.Currency        // Host contribution towards payout each window
-	ValidProofOutputs  []consensus.SiacoinOutput // Where money goes if the storage proof is successful.
-	MissedProofOutputs []consensus.SiacoinOutput // Where the money goes if the storage proof fails.
+	FileSize           uint64                // How large the file is.
+	Duration           types.BlockHeight     // How long the file is to be stored.
+	DurationStart      types.BlockHeight     // The block height that the storing starts (typically required to start immediately, unless it's a chained contract).
+	WindowSize         types.BlockHeight     // How long the host has to submit a proof of storage.
+	Price              types.Currency        // Client contribution towards payout each window
+	Collateral         types.Currency        // Host contribution towards payout each window
+	ValidProofOutputs  []types.SiacoinOutput // Where money goes if the storage proof is successful.
+	MissedProofOutputs []types.SiacoinOutput // Where the money goes if the storage proof fails.
 }
 
 type HostInfo struct {

@@ -1,7 +1,7 @@
 package transactionpool
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // transactions.go is a temporary file filled with deprecated functions.
@@ -12,7 +12,7 @@ import (
 // transactionSet returns the set of unconfirmed transactions in the order
 // they are required to appear in a block. This function will not limit the
 // volume of transactions to fit in a single block.
-func (tp *TransactionPool) transactionSet() (set []consensus.Transaction) {
+func (tp *TransactionPool) transactionSet() (set []types.Transaction) {
 	for _, txn := range tp.transactionList {
 		set = append(set, txn)
 	}
@@ -22,7 +22,7 @@ func (tp *TransactionPool) transactionSet() (set []consensus.Transaction) {
 // TransactionSet returns the set of unconfirmed transactions in the order
 // they are required to appear in a block. This function will not limit the
 // volume of transactions to fit in a single block.
-func (tp *TransactionPool) TransactionSet() []consensus.Transaction {
+func (tp *TransactionPool) TransactionSet() []types.Transaction {
 	id := tp.mu.RLock()
 	defer tp.mu.RUnlock(id)
 	return tp.transactionSet()

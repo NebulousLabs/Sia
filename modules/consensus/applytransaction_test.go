@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testApplySiacoinOutput gets a transaction with a siacoin output and puts the
@@ -13,7 +14,7 @@ import (
 func (ct *ConsensusTester) testApplySiacoinOutput() {
 	// Grab a transcation with a siacoin output and put it into the blockchain.
 	txn := ct.SiacoinOutputTransaction()
-	block := ct.MineCurrentBlock([]Transaction{txn})
+	block := ct.MineCurrentBlock([]types.Transaction{txn})
 	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
@@ -32,7 +33,7 @@ func (ct *ConsensusTester) testApplySiacoinOutput() {
 func (ct *ConsensusTester) testApplyFileContract() {
 	// Grab a transction with a file contract and put it into the blockchain.
 	txn, _ := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
-	block := ct.MineCurrentBlock([]Transaction{txn})
+	block := ct.MineCurrentBlock([]types.Transaction{txn})
 	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
@@ -52,7 +53,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	// Grab a transction with a file contract and put it into the blockchain.
 	fcTxn, file := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
 	fcid := fcTxn.FileContractID(0)
-	block := ct.MineCurrentBlock([]Transaction{fcTxn})
+	block := ct.MineCurrentBlock([]types.Transaction{fcTxn})
 	err := ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)
@@ -77,12 +78,12 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	if err != nil {
 		ct.Fatal(err)
 	}
-	sp := StorageProof{fcid, base, hashSet}
+	sp := types.StorageProof{fcid, base, hashSet}
 
 	// Put the storage proof in the blockchain.
-	proofTxn := Transaction{}
+	proofTxn := types.Transaction{}
 	proofTxn.StorageProofs = append(proofTxn.StorageProofs, sp)
-	block = ct.MineCurrentBlock([]Transaction{proofTxn})
+	block = ct.MineCurrentBlock([]types.Transaction{proofTxn})
 	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Fatal(err)

@@ -3,12 +3,13 @@ package wallet
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -31,8 +32,8 @@ type walletTester struct {
 
 // spendCoins sends the desired amount of coins to the desired address, calling
 // wait at all of the appropriate places to assist synchronization.
-func (wt *walletTester) spendCoins(amount consensus.Currency, dest consensus.UnlockHash) (t consensus.Transaction, err error) {
-	output := consensus.SiacoinOutput{
+func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
@@ -112,7 +113,7 @@ func NewWalletTester(directory string, t *testing.T) (wt *walletTester) {
 	}
 
 	// Mine blocks until there is money in the wallet.
-	for i := 0; i <= consensus.MaturityDelay; i++ {
+	for i := 0; i <= types.MaturityDelay; i++ {
 		_, _, err = wt.miner.FindBlock()
 		if err != nil {
 			t.Fatal(err)

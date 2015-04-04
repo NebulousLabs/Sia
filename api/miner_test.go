@@ -25,7 +25,7 @@ func (st *serverTester) testMining() {
 	// check balance
 	var walletstatus modules.WalletInfo
 	st.getAPI("/wallet/status", &walletstatus)
-	if walletstatus.FullBalance.Sign() <= 0 {
+	if walletstatus.FullBalance.IsZero() {
 		st.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
 	}
 }

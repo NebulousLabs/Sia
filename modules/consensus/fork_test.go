@@ -5,23 +5,24 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // mineInvalidSignatureBlock will mine a block that is valid on the longest
 // fork except for having an illegal signature, and then will mine `i` more
 // blocks after that which are valid.
-func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []Block) {
+func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []types.Block) {
 	siacoinInput, value := ct.FindSpendableSiacoinInput()
-	txn := ct.AddSiacoinInputToTransaction(Transaction{}, siacoinInput)
+	txn := ct.AddSiacoinInputToTransaction(types.Transaction{}, siacoinInput)
 	txn.MinerFees = append(txn.MinerFees, value)
 
 	// Invalidate the signature.
 	byteSig := []byte(txn.Signatures[0].Signature)
 	byteSig[0]++
-	txn.Signatures[0].Signature = Signature(byteSig)
+	txn.Signatures[0].Signature = types.Signature(byteSig)
 
 	// Mine a block with this transcation.
-	block := ct.MineCurrentBlock([]Transaction{txn})
+	block := ct.MineCurrentBlock([]types.Transaction{txn})
 	blocks = append(blocks, block)
 
 	// Mine several more blocks.
@@ -29,7 +30,7 @@ func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []Blo
 	for i := 0; i < depth; i++ {
 		intTarget := ct.CurrentTarget().Int()
 		safeIntTarget := intTarget.Div(intTarget, big.NewInt(2))
-		block = MineTestingBlock(recentID, CurrentTimestamp(), ct.Payouts(ct.Height()+2+BlockHeight(i), nil), nil, IntToTarget(safeIntTarget))
+		block = MineTestingBlock(recentID, types.CurrentTimestamp(), ct.Payouts(ct.Height()+2+types.BlockHeight(i), nil), nil, types.IntToTarget(safeIntTarget))
 		blocks = append(blocks, block)
 		recentID = block.ID()
 	}
@@ -46,10 +47,10 @@ func TestComplexForking(t *testing.T) {
 
 	// Need to grab a single time to make sure that each state ends up with the
 	// same genesis hash.
-	time := CurrentTimestamp()
-	s1 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
-	s2 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
-	s3 := createGenesisState(time, ZeroUnlockHash, ZeroUnlockHash)
+	time := types.CurrentTimestamp()
+	s1 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
+	s2 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
+	s3 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
 	a1 := NewConsensusTester(t, s1)
 	a2 := NewConsensusTester(t, s2)
 	a3 := NewConsensusTester(t, s3)
@@ -118,7 +119,7 @@ func TestComplexForking(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := BlockHeight(1); i <= s2.Height(); i++ {
+	for i := types.BlockHeight(1); i <= s2.Height(); i++ {
 		b, exists := s2.BlockAtHeight(i)
 		if !exists {
 			t.Fatal("error when moving blocks from s2 to s1")

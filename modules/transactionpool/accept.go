@@ -3,8 +3,8 @@ package transactionpool
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // accept.go is responsible for applying a transaction to the transaction pool.
@@ -19,13 +19,13 @@ var (
 
 // applySiacoinInputs incorporates all of the siacoin inputs of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction) {
+func (tp *TransactionPool) applySiacoinInputs(t types.Transaction) {
 	// For each siacoin input, remove the output from the unconfirmed set and
 	// add the output to the reference set.
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - input should be in the unconfirmed set and absent
 		// from the reference set.
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := tp.referenceSiacoinOutputs[sci.ParentID]
 			if exists {
 				panic("applying a siacoin output that's already in the reference set")
@@ -43,12 +43,12 @@ func (tp *TransactionPool) applySiacoinInputs(t consensus.Transaction) {
 
 // applySiacoinOutputs incorporates all of the siacoin outputs of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction) {
+func (tp *TransactionPool) applySiacoinOutputs(t types.Transaction) {
 	// For each siacoin output, add the output to the unconfirmed set.
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - output should not exist in the unconfirmed set.
 		scoid := t.SiacoinOutputID(i)
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := tp.siacoinOutputs[scoid]
 			if exists {
 				panic("trying to add an output that already exists?")
@@ -61,12 +61,12 @@ func (tp *TransactionPool) applySiacoinOutputs(t consensus.Transaction) {
 
 // applyFileContracts incorporates all of the file contracts of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applyFileContracts(t consensus.Transaction) {
+func (tp *TransactionPool) applyFileContracts(t types.Transaction) {
 	// For each file contract, add the contract to the unconfirmed set.
 	for i, fc := range t.FileContracts {
 		// Sanity check - file contract should be in the unconfirmed set.
 		fcid := t.FileContractID(i)
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := tp.fileContracts[fcid]
 			if exists {
 				panic("trying to add a file contract that's already in the unconfirmed set")
@@ -79,14 +79,14 @@ func (tp *TransactionPool) applyFileContracts(t consensus.Transaction) {
 
 // applyFileContractTerminations incorporates all of the file contract
 // terminations of a transaction into the unconfirmed set.
-func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction) {
+func (tp *TransactionPool) applyFileContractTerminations(t types.Transaction) {
 	// For each file contract termination, delete the corresponding file
 	// contract from the unconfirmed set and add it to the reference set.
 	for _, fct := range t.FileContractTerminations {
 		// Sanity check - file contract should be in the unconfirmed set and
 		// absent from the reference set.
 		fc, exists := tp.fileContracts[fct.ParentID]
-		if consensus.DEBUG {
+		if types.DEBUG {
 			if !exists {
 				panic("could not find file contract")
 			}
@@ -103,14 +103,14 @@ func (tp *TransactionPool) applyFileContractTerminations(t consensus.Transaction
 
 // applyStorageProofs incorporates all of the storage proofs of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction) {
+func (tp *TransactionPool) applyStorageProofs(t types.Transaction) {
 	// For each storage proof, delete the corresponding file contract from the
 	// unconfirmed set and add it to the reference set
 	for _, sp := range t.StorageProofs {
 		// Sanity check - file contract should be in the unconfirmed set and
 		// not in the reference set.
 		fc, exists := tp.fileContracts[sp.ParentID]
-		if consensus.DEBUG {
+		if types.DEBUG {
 			if !exists {
 				panic("could not find file contract in unconfirmed set")
 			}
@@ -127,13 +127,13 @@ func (tp *TransactionPool) applyStorageProofs(t consensus.Transaction) {
 
 // applySiafundInputs incorporates all of the siafund inputs of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applySiafundInputs(t consensus.Transaction) {
+func (tp *TransactionPool) applySiafundInputs(t types.Transaction) {
 	// For each siafund input, delete the corresponding siafund output from the
 	// unconfirmed set and add it to the reference set.
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the corresponding siafund output should be in the
 		// unconfirmed set and absent from the reference set.
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := tp.referenceSiafundOutputs[sfi.ParentID]
 			if exists {
 				panic("applying a siafund output that's already in the reference set")
@@ -151,12 +151,12 @@ func (tp *TransactionPool) applySiafundInputs(t consensus.Transaction) {
 
 // applySiafundOutputs incorporates all of the siafund outputs of a transaction
 // into the unconfirmed set.
-func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction) {
+func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 	// For each siafund output, add the output to the unconfirmed set.
 	for i, sfo := range t.SiafundOutputs {
 		// Sanity check - output should not already be in the unconfirmed set.
 		sfoid := t.SiafundOutputID(i)
-		if consensus.DEBUG {
+		if types.DEBUG {
 			_, exists := tp.siafundOutputs[sfoid]
 			if exists {
 				panic("trying to add an output that already exists?")
@@ -170,7 +170,7 @@ func (tp *TransactionPool) applySiafundOutputs(t consensus.Transaction) {
 // addTransactionToPool puts a transaction into the transaction pool, changing
 // the unconfirmed set and the transaction linked list to reflect the new
 // transaction.
-func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
+func (tp *TransactionPool) addTransactionToPool(t types.Transaction) {
 	// Apply each individual part of the transaction to the transaction pool.
 	tp.applySiacoinInputs(t)
 	tp.applySiacoinOutputs(t)
@@ -187,7 +187,7 @@ func (tp *TransactionPool) addTransactionToPool(t consensus.Transaction) {
 
 // AcceptTransaction adds a transaction to the unconfirmed set of transactions.
 // An error is returned if the transaction cannot be accepted.
-func (tp *TransactionPool) AcceptTransaction(t consensus.Transaction) (err error) {
+func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 

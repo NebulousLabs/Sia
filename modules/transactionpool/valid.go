@@ -3,7 +3,7 @@ package transactionpool
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // valid.go checks that transactions are valid. The majority of the checking is
@@ -22,8 +22,8 @@ var (
 
 // validUnconfirmedSiacoins checks that all siacoin inputs and outputs are
 // valid in the context of the unconfirmed consensus set.
-func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (err error) {
-	var inputSum consensus.Currency
+func (tp *TransactionPool) validUnconfirmedSiacoins(t types.Transaction) (err error) {
+	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// All inputs must have corresponding outputs in the unconfirmed set.
 		sco, exists := tp.siacoinOutputs[sci.ParentID]
@@ -49,7 +49,7 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t consensus.Transaction) (er
 
 // validUnconfirmedStorageProofs checks that a storage proof is valid in the
 // context of the unconfirmed consensus set.
-func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction) (err error) {
+func (tp *TransactionPool) validUnconfirmedStorageProofs(t types.Transaction) (err error) {
 	// Check that the corresponding file contract is in the unconfirmed set.
 	for _, sp := range t.StorageProofs {
 		_, exists := tp.consensusSet.FileContract(sp.ParentID)
@@ -68,7 +68,7 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t consensus.Transaction
 
 // validUnconfirmedFileContractTerminations checks that all file contract
 // terminations are valid within the context of the unconfirmed consensus set.
-func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.Transaction) (err error) {
+func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t types.Transaction) (err error) {
 	for _, fct := range t.FileContractTerminations {
 		// Check for the corresponding file contract in the unconfirmed set.
 		fc, exists := tp.fileContracts[fct.ParentID]
@@ -90,7 +90,7 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 
 		// Check that the payouts in the termination add up to the payout of
 		// the contract.
-		var payoutSum consensus.Currency
+		var payoutSum types.Currency
 		for _, payout := range fct.Payouts {
 			payoutSum = payoutSum.Add(payout.Value)
 		}
@@ -103,8 +103,8 @@ func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t consensus.
 
 // validUnconfirmedSiafunds checks that all siafund inputs and outputs are
 // valid within the context of the unconfirmed consensus set.
-func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (err error) {
-	var inputSum consensus.Currency
+func (tp *TransactionPool) validUnconfirmedSiafunds(t types.Transaction) (err error) {
+	var inputSum types.Currency
 	for _, sfi := range t.SiafundInputs {
 		// Check that the corresponding siafund output being spent exists.
 		sfo, exists := tp.siafundOutputs[sfi.ParentID]
@@ -123,7 +123,7 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 	}
 
 	// Check that the value of the outputs equal the value of the inputs.
-	var outputSum consensus.Currency
+	var outputSum types.Currency
 	for _, sfo := range t.SiafundOutputs {
 		outputSum = outputSum.Add(sfo.Value)
 	}
@@ -136,7 +136,7 @@ func (tp *TransactionPool) validUnconfirmedSiafunds(t consensus.Transaction) (er
 
 // validUnconfirmedTransaction checks that the transaction would be valid in a
 // block that contained all of the other unconfirmed transactions.
-func (tp *TransactionPool) validUnconfirmedTransaction(t consensus.Transaction) (err error) {
+func (tp *TransactionPool) validUnconfirmedTransaction(t types.Transaction) (err error) {
 	// Check that the transaction follows 'Standard.md' guidelines.
 	err = tp.IsStandardTransaction(t)
 	if err != nil {

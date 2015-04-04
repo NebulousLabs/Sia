@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and
@@ -10,21 +10,21 @@ import (
 type TransactionPoolSubscriber interface {
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
 	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedTransactions []consensus.Transaction, unconfirmedSiacoinOutputDiffs []consensus.SiacoinOutputDiff)
+	ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, unconfirmedSiacoinOutputDiffs []SiacoinOutputDiff)
 }
 
 type TransactionPool interface {
 	// AcceptTransaction takes a transaction, analyzes it, and either rejects
 	// it or adds it to the transaction pool, returning an error if the
 	// transaction is rejected.
-	AcceptTransaction(consensus.Transaction) error
+	AcceptTransaction(types.Transaction) error
 
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
-	IsStandardTransaction(consensus.Transaction) error
+	IsStandardTransaction(types.Transaction) error
 
 	// TransactionSet returns the set of unconfirmed transactions.
-	TransactionSet() []consensus.Transaction
+	TransactionSet() []types.Transaction
 
 	// TransactionPoolSubscribe will subscribe the input object to the changes
 	// in the transaction pool.

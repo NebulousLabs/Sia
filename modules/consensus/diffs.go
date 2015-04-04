@@ -2,6 +2,9 @@ package consensus
 
 import (
 	"errors"
+
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // diffs.go contains all of the functions related to diffs in the consensus
@@ -9,53 +12,11 @@ import (
 // changes are recorded as diffs for easy rewinding and reapplying. The diffs
 // are created, applied, reverted, and queried in this file.
 
-// A DiffDirection indicates the "direction" of a diff, either applied or
-// reverted. A bool is used to restrict the value to these two possibilities.
-type DiffDirection bool
-
-const (
-	DiffApply  DiffDirection = true
-	DiffRevert DiffDirection = false
-)
-
-// A SiacoinOutputDiff indicates the addition or removal of a SiacoinOutput in
-// the consensus set.
-type SiacoinOutputDiff struct {
-	Direction     DiffDirection
-	ID            SiacoinOutputID
-	SiacoinOutput SiacoinOutput
-}
-
-// A FileContractDiff indicates the addition or removal of a FileContract in
-// the consensus set.
-type FileContractDiff struct {
-	Direction    DiffDirection
-	ID           FileContractID
-	FileContract FileContract
-}
-
-// A SiafundOutputDiff indicates the addition or removal of a SiafundOutput in
-// the consensus set.
-type SiafundOutputDiff struct {
-	Direction     DiffDirection
-	ID            SiafundOutputID
-	SiafundOutput SiafundOutput
-}
-
-// A SiafundPoolDiff contains the value of the siafundPool before the block
-// was applied, and after the block was applied. When applying the diff, set
-// siafundPool to 'Adjusted'. When reverting the diff, set siafundPool to
-// 'Previous'.
-type SiafundPoolDiff struct {
-	Previous Currency
-	Adjusted Currency
-}
-
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, dir DiffDirection) {
+func (s *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
-	if DEBUG {
+	if types.DEBUG {
 		_, exists := s.siacoinOutputs[scod.ID]
 		if exists == (scod.Direction == dir) {
 			panic("rogue siacoin output in commitSiacoinOutputDiff")
@@ -70,10 +31,10 @@ func (s *State) commitSiacoinOutputDiff(scod SiacoinOutputDiff, dir DiffDirectio
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
-func (s *State) commitFileContractDiff(fcd FileContractDiff, dir DiffDirection) {
+func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
-	if DEBUG {
+	if types.DEBUG {
 		_, exists := s.fileContracts[fcd.ID]
 		if exists == (fcd.Direction == dir) {
 			panic("rogue file contract in commitFileContractDiff")
@@ -88,10 +49,10 @@ func (s *State) commitFileContractDiff(fcd FileContractDiff, dir DiffDirection) 
 }
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
-func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, dir DiffDirection) {
+func (s *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
-	if DEBUG {
+	if types.DEBUG {
 		_, exists := s.siafundOutputs[sfod.ID]
 		if exists == (sfod.Direction == dir) {
 			panic("rogue siafund output in commitSiafundOutputDiff")
@@ -106,8 +67,8 @@ func (s *State) commitSiafundOutputDiff(sfod SiafundOutputDiff, dir DiffDirectio
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, dir DiffDirection) {
-	if dir == DiffApply {
+func (s *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+	if dir == modules.DiffApply {
 		s.siafundPool = sfpd.Adjusted
 	} else {
 		s.siafundPool = sfpd.Previous
@@ -115,9 +76,9 @@ func (s *State) commitSiafundPoolDiff(sfpd SiafundPoolDiff, dir DiffDirection) {
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
+func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 	// Sanity check
-	if DEBUG {
+	if types.DEBUG {
 		// Diffs should have already been generated for this node.
 		if !bn.diffsGenerated {
 			panic("misuse of applyDiffSet - diffs have not been generated!")
@@ -125,7 +86,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
-		if dir == DiffApply {
+		if dir == modules.DiffApply {
 			if bn.parent.block.ID() != s.currentBlockID() {
 				panic("applying a block node when it's not a valid successor")
 			}
@@ -137,7 +98,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 	}
 
 	// Apply each of the diffs.
-	if dir == DiffApply {
+	if dir == modules.DiffApply {
 		for _, scod := range bn.siacoinOutputDiffs {
 			s.commitSiacoinOutputDiff(scod, dir)
 		}
@@ -161,7 +122,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 	s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 
 	// Update the State's metadata
-	if dir == DiffApply {
+	if dir == modules.DiffApply {
 		s.currentPath = append(s.currentPath, bn.block.ID())
 		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
@@ -177,7 +138,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir DiffDirection) {
 // in the block, which means we need to apply while we verify.
 func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Sanity check
-	if DEBUG {
+	if types.DEBUG {
 		// Generate should only be called if the diffs have not yet been
 		// generated.
 		if bn.diffsGenerated {
@@ -192,7 +153,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 
 	// Update the state to point to the new block.
 	s.currentPath = append(s.currentPath, bn.block.ID())
-	s.delayedSiacoinOutputs[s.height()] = make(map[SiacoinOutputID]SiacoinOutput)
+	s.delayedSiacoinOutputs[s.height()] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
@@ -211,7 +172,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 		if err != nil {
 			s.badBlocks[bn.block.ID()] = struct{}{}
 			s.deleteNode(bn)
-			s.commitDiffSet(bn, DiffRevert)
+			s.commitDiffSet(bn, modules.DiffRevert)
 			return
 		}
 
@@ -232,7 +193,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 }
 
 // BlockDiffs returns the diffs created by the input block.
-func (s *State) BlockDiffs(bid BlockID) (scods []SiacoinOutputDiff, fcds []FileContractDiff, sfods []SiafundOutputDiff, sfpd SiafundPoolDiff, err error) {
+func (s *State) BlockDiffs(bid types.BlockID) (scods []modules.SiacoinOutputDiff, fcds []modules.FileContractDiff, sfods []modules.SiafundOutputDiff, sfpd modules.SiafundPoolDiff, err error) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 

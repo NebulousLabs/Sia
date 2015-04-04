@@ -4,10 +4,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // transactionpool.go contains the major objects used when working with the
@@ -48,7 +49,7 @@ type TransactionPool struct {
 	// synchronized to the state.
 	consensusSet       *consensus.State
 	gateway            modules.Gateway
-	consensusSetHeight consensus.BlockHeight
+	consensusSetHeight types.BlockHeight
 
 	// A linked list of transactions, with a map pointing to each. Incoming
 	// transactions are inserted at the tail if they do not conflict with
@@ -58,21 +59,21 @@ type TransactionPool struct {
 	// list, so a call to TransactionSet() will never dump out-of-order
 	// transactions.
 	transactions    map[crypto.Hash]struct{}
-	transactionList []consensus.Transaction
+	transactionList []types.Transaction
 
 	// The unconfirmed set of contracts and outputs. The unconfirmed set
 	// includes the confirmed set, except for elements that have been spent by
 	// the unconfirmed set.
-	siacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
-	fileContracts  map[consensus.FileContractID]consensus.FileContract
-	siafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
+	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
+	fileContracts  map[types.FileContractID]types.FileContract
+	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
 
 	// The reference set contains any objects that are not in the unconfirmed
 	// set, but may still need to be referenced when creating diffs or
 	// reverting unconfirmed transactions (due to conflicts).
-	referenceSiacoinOutputs map[consensus.SiacoinOutputID]consensus.SiacoinOutput
-	referenceFileContracts  map[consensus.FileContractID]consensus.FileContract
-	referenceSiafundOutputs map[consensus.SiafundOutputID]consensus.SiafundOutput
+	referenceSiacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
+	referenceFileContracts  map[types.FileContractID]types.FileContract
+	referenceSiafundOutputs map[types.SiafundOutputID]types.SiafundOutput
 
 	// The entire history of the transaction pool is kept. Each element
 	// represents an atomic change to the transaction pool. When a new
@@ -81,10 +82,10 @@ type TransactionPool struct {
 	// up. To prevent deadlocks in the transaction pool, subscribers are
 	// updated in a separate thread which does not guarantee that a subscriber
 	// is always fully synchronized to the transaction pool.
-	revertBlocksUpdates     [][]consensus.Block
-	applyBlocksUpdates      [][]consensus.Block
-	unconfirmedTransactions [][]consensus.Transaction
-	unconfirmedSiacoinDiffs [][]consensus.SiacoinOutputDiff
+	revertBlocksUpdates     [][]types.Block
+	applyBlocksUpdates      [][]types.Block
+	unconfirmedTransactions [][]types.Transaction
+	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
 	subscribers             []chan struct{}
 
 	mu *sync.RWMutex
@@ -107,13 +108,13 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 		gateway:      g,
 
 		transactions:   make(map[crypto.Hash]struct{}),
-		siacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
-		fileContracts:  make(map[consensus.FileContractID]consensus.FileContract),
-		siafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),
+		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		fileContracts:  make(map[types.FileContractID]types.FileContract),
+		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		referenceSiacoinOutputs: make(map[consensus.SiacoinOutputID]consensus.SiacoinOutput),
-		referenceFileContracts:  make(map[consensus.FileContractID]consensus.FileContract),
-		referenceSiafundOutputs: make(map[consensus.SiafundOutputID]consensus.SiafundOutput),
+		referenceSiacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		referenceFileContracts:  make(map[types.FileContractID]types.FileContract),
+		referenceSiafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		mu: sync.New(1*time.Second, 0),
 	}

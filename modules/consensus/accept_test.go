@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testBlockTimestamps submits a block to the state with a timestamp that is
@@ -18,7 +20,7 @@ func (ct *ConsensusTester) testBlockTimestamps() {
 	}
 
 	// Create a block with a timestamp that is too late.
-	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp()+10+FutureThreshold, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
+	block = MineTestingBlock(ct.CurrentBlock().ID(), types.CurrentTimestamp()+10+types.FutureThreshold, ct.Payouts(ct.Height()+1, nil), nil, ct.CurrentTarget())
 	err = ct.AcceptBlock(block)
 	if err != ErrFutureTimestamp {
 		ct.Error("unexpected error when submitting a too-early timestamp:", err)
@@ -62,11 +64,11 @@ func (ct *ConsensusTester) testEmptyBlock() {
 	// breaks proposed conventions. However, they provide useful information
 	// about the accuracy of invertRecentBlock and applyBlockNode.
 	cbn := ct.currentBlockNode()
-	ct.commitDiffSet(cbn, DiffRevert)
+	ct.commitDiffSet(cbn, modules.DiffRevert)
 	if beforeStateHash != ct.StateHash() {
 		ct.Error("state is different after applying and removing diffs")
 	}
-	ct.commitDiffSet(cbn, DiffApply)
+	ct.commitDiffSet(cbn, modules.DiffApply)
 	if afterStateHash != ct.StateHash() {
 		ct.Error("state is different after generateApply, remove, and applying diffs")
 	}
@@ -76,9 +78,9 @@ func (ct *ConsensusTester) testEmptyBlock() {
 // and checks that it actually gets rejected.
 func (ct *ConsensusTester) testLargeBlock() {
 	// Create a transaction that puts the block over the size limit.
-	txns := make([]Transaction, 1)
-	bigData := string(make([]byte, BlockSizeLimit))
-	txns[0] = Transaction{
+	txns := make([]types.Transaction, 1)
+	bigData := string(make([]byte, types.BlockSizeLimit))
+	txns[0] = types.Transaction{
 		ArbitraryData: []string{bigData},
 	}
 
@@ -96,8 +98,8 @@ func (ct *ConsensusTester) testSingleNoFeePayout() {
 	// Mine a block that has no fees, and an incorrect payout. Compare the
 	// before and after state hashes to see that they match.
 	beforeHash := ct.StateHash()
-	payouts := []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(ct.Height()), UnlockHash: ZeroUnlockHash}}
-	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
+	payouts := []types.SiacoinOutput{types.SiacoinOutput{Value: types.CalculateCoinbase(ct.Height()), UnlockHash: types.ZeroUnlockHash}}
+	block := MineTestingBlock(ct.CurrentBlock().ID(), types.CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
 	err := ct.AcceptBlock(block)
 	if err != ErrMinerPayout {
 		ct.Error("Expecting miner payout error:", err)
@@ -109,8 +111,8 @@ func (ct *ConsensusTester) testSingleNoFeePayout() {
 
 	// Mine a block that has no fees, and a correct payout, then check that the
 	// payout made it into the delayedOutputs list.
-	payouts = []SiacoinOutput{SiacoinOutput{Value: CalculateCoinbase(ct.Height() + 1), UnlockHash: ZeroUnlockHash}}
-	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
+	payouts = []types.SiacoinOutput{types.SiacoinOutput{Value: types.CalculateCoinbase(ct.Height() + 1), UnlockHash: types.ZeroUnlockHash}}
+	block = MineTestingBlock(ct.CurrentBlock().ID(), types.CurrentTimestamp(), payouts, nil, ct.CurrentTarget())
 	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Error("Expecting nil error:", err)
@@ -121,7 +123,7 @@ func (ct *ConsensusTester) testSingleNoFeePayout() {
 	if !exists {
 		ct.Error("could not find payout in delayedOutputs")
 	}
-	if output.Value.Cmp(CalculateCoinbase(ct.Height())) != 0 {
+	if output.Value.Cmp(types.CalculateCoinbase(ct.Height())) != 0 {
 		ct.Error("payout dooes not pay the correct amount")
 	}
 }
@@ -135,12 +137,12 @@ func (ct *ConsensusTester) testMultipleFeesMultiplePayouts() {
 	// everything matches.
 	siacoinInput, value := ct.FindSpendableSiacoinInput()
 	input2, value2 := ct.FindSpendableSiacoinInput()
-	txn := ct.AddSiacoinInputToTransaction(Transaction{}, siacoinInput)
-	txn2 := ct.AddSiacoinInputToTransaction(Transaction{}, input2)
+	txn := ct.AddSiacoinInputToTransaction(types.Transaction{}, siacoinInput)
+	txn2 := ct.AddSiacoinInputToTransaction(types.Transaction{}, input2)
 	txn.MinerFees = append(txn.MinerFees, value)
 	txn2.MinerFees = append(txn2.MinerFees, value2)
-	payouts := ct.Payouts(ct.Height()+1, []Transaction{txn, txn2})
-	block := MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn}, ct.CurrentTarget())
+	payouts := ct.Payouts(ct.Height()+1, []types.Transaction{txn, txn2})
+	block := MineTestingBlock(ct.CurrentBlock().ID(), types.CurrentTimestamp(), payouts, []types.Transaction{txn}, ct.CurrentTarget())
 	err := ct.AcceptBlock(block)
 	if err != ErrMinerPayout {
 		ct.Error("Expecting miner payout error:", err)
@@ -148,7 +150,7 @@ func (ct *ConsensusTester) testMultipleFeesMultiplePayouts() {
 
 	// Mine a block with mutliple fees and a correct payout to multiple
 	// addresses.
-	block = MineTestingBlock(ct.CurrentBlock().ID(), CurrentTimestamp(), payouts, []Transaction{txn, txn2}, ct.CurrentTarget())
+	block = MineTestingBlock(ct.CurrentBlock().ID(), types.CurrentTimestamp(), payouts, []types.Transaction{txn, txn2}, ct.CurrentTarget())
 	err = ct.AcceptBlock(block)
 	if err != nil {
 		ct.Error(err)

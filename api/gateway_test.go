@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // addPeer creates a new serverTester and bootstraps it to st. It returns the
@@ -97,12 +97,12 @@ func TestTransactionRelay(t *testing.T) {
 
 	// Check that the balances of each have updated appropriately, in
 	// accordance with 0-conf.
-	if origBal.Sub(consensus.NewCurrency64(15)).Cmp(st.wallet.Balance(false)) != 0 {
+	if origBal.Sub(types.NewCurrency64(15)).Cmp(st.wallet.Balance(false)) != 0 {
 		t.Error(origBal.Big())
 		t.Error(st.wallet.Balance(false).Big())
 		t.Error("balances are incorrect for 0-conf transaction")
 	}
-	for origBal2.Add(consensus.NewCurrency64(15)).Cmp(st2.wallet.Balance(false)) != 0 {
+	for origBal2.Add(types.NewCurrency64(15)).Cmp(st2.wallet.Balance(false)) != 0 {
 		// t.Error(origBal2.Big())
 		// t.Error(st2.wallet.Balance(false).Big())
 		// t.Error("balances are incorrect for 0-conf transaction")

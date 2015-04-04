@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // MinerStatus is the information that gets returned to the front end. Each
@@ -11,7 +11,7 @@ type MinerInfo struct {
 	Mining         bool
 	Threads        int
 	RunningThreads int
-	Address        consensus.UnlockHash
+	Address        types.UnlockHash
 }
 
 // The Miner interface provides access to mining features.
@@ -20,7 +20,7 @@ type Miner interface {
 	// builds on the current consensus set. It will give up after a few
 	// seconds, returning a block, a bool indicating whether the block is
 	// sovled, and an error.
-	FindBlock() (consensus.Block, bool, error)
+	FindBlock() (types.Block, bool, error)
 
 	// MinerInfo returns a MinerInfo struct, containing information about the
 	// miner.
@@ -36,7 +36,7 @@ type Miner interface {
 	// SolveBlock will have the miner make 1 attempt to solve the input block.
 	// It will give up after a few seconds, returning the block, a bool
 	// indicating whether it has been solved, and an error.
-	SolveBlock(consensus.Block, consensus.Target) (consensus.Block, bool)
+	SolveBlock(types.Block, types.Target) (types.Block, bool)
 
 	// StartMining turns on the miner, which will endlessly work for new
 	// blocks.

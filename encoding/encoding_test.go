@@ -38,13 +38,11 @@ type (
 
 // here we use a single length byte, unlike the standard marshalling scheme
 func (t test5) MarshalSia() []byte {
-	return append([]byte{byte(len(t.s))}, []byte(t.s)...)
+	return []byte(t.s)
 }
 
-func (t *test5) UnmarshalSia(b []byte) int {
-	n, b := int(b[0]), b[1:]
-	t.s = string(b[:n])
-	return n + 1
+func (t *test5) UnmarshalSia(b []byte) {
+	t.s = string(b)
 }
 
 var testStructs = []interface{}{

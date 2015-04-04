@@ -3,6 +3,8 @@ package consensus
 import (
 	"math/big"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestCeilingTarget submits block repeatedly until the ceiling target is
@@ -13,14 +15,14 @@ func TestCeilingTarget(t *testing.T) {
 		t.Skip()
 	}
 
-	oldMaxAdjustmentUp := MaxAdjustmentUp
-	oldMaxAdjustmentDown := MaxAdjustmentDown
-	MaxAdjustmentUp = big.NewRat(3, 1)
-	MaxAdjustmentDown = big.NewRat(1, 3)
-	defer func() { MaxAdjustmentUp = oldMaxAdjustmentUp }()
-	defer func() { MaxAdjustmentDown = oldMaxAdjustmentDown }()
+	oldMaxAdjustmentUp := types.MaxAdjustmentUp
+	oldMaxAdjustmentDown := types.MaxAdjustmentDown
+	types.MaxAdjustmentUp = big.NewRat(3, 1)
+	types.MaxAdjustmentDown = big.NewRat(1, 3)
+	defer func() { types.MaxAdjustmentUp = oldMaxAdjustmentUp }()
+	defer func() { types.MaxAdjustmentDown = oldMaxAdjustmentDown }()
 
-	s := createGenesisState(0, ZeroUnlockHash, ZeroUnlockHash)
+	s := createGenesisState(0, types.ZeroUnlockHash, types.ZeroUnlockHash)
 	ct := NewConsensusTester(t, s)
 
 	for i := 0; i < 20; i++ {
@@ -30,7 +32,7 @@ func TestCeilingTarget(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if s.CurrentTarget() != RootDepth {
+	if s.CurrentTarget() != types.RootDepth {
 		t.Error("ceiling target not reached:", s.CurrentTarget())
 	}
 }

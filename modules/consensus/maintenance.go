@@ -1,5 +1,10 @@
 package consensus
 
+import (
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
+)
+
 // applyMinerSubsidy adds a block's MinerPayouts to the State as delayed
 // siacoin outputs. They are also recorded in the blockNode itself.
 func (s *State) applyMinerSubsidy(bn *blockNode) {
@@ -7,7 +12,7 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 		// Sanity check - the output should not already be in
 		// delayedSiacoinOutputs, and should also not be in siacoinOutputs.
 		id := bn.block.MinerPayoutID(i)
-		if DEBUG {
+		if types.DEBUG {
 			_, exists := s.delayedSiacoinOutputs[s.height()][id]
 			if exists {
 				panic("miner subsidy already in delayed outputs")
@@ -27,9 +32,9 @@ func (s *State) applyMinerSubsidy(bn *blockNode) {
 // applyMaturedSiacoinOutputs goes through all of the outputs that
 // have matured and adds them to the list of siacoinOutputs.
 func (s *State) applyMaturedSiacoinOutputs(bn *blockNode) {
-	for id, sco := range s.delayedSiacoinOutputs[bn.height-MaturityDelay] {
+	for id, sco := range s.delayedSiacoinOutputs[bn.height-types.MaturityDelay] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
-		if DEBUG {
+		if types.DEBUG {
 			_, exists := s.siacoinOutputs[id]
 			if exists {
 				panic("trying to add a delayed output when the output is already there")
@@ -38,8 +43,8 @@ func (s *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 
 		// Add the output to the State and record the diff in the blockNode.
 		s.siacoinOutputs[id] = sco
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, SiacoinOutputDiff{
-			Direction:     DiffApply,
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, modules.SiacoinOutputDiff{
+			Direction:     modules.DiffApply,
 			ID:            id,
 			SiacoinOutput: sco,
 		})
@@ -48,11 +53,11 @@ func (s *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 
 // applyMissedProof adds the outputs and diffs that result from a contract
 // expiring.
-func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
+func (s *State) applyMissedProof(bn *blockNode, fcid types.FileContractID) {
 	// Sanity check - the id must correspond to an existing contract.
 	fc, exists := s.fileContracts[fcid]
 	if !exists {
-		if DEBUG {
+		if types.DEBUG {
 			panic("misuse of applyMissedProof")
 		}
 		return
@@ -62,7 +67,7 @@ func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
 	for i, output := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
 		outputID := fcid.StorageProofOutputID(false, i)
-		if DEBUG {
+		if types.DEBUG {
 			_, exists := s.delayedSiacoinOutputs[s.height()][outputID]
 			if exists {
 				panic("missed proof output already exists in the delayed outputs set")
@@ -79,8 +84,8 @@ func (s *State) applyMissedProof(bn *blockNode, fcid FileContractID) {
 
 	// Remove the contract from the State and record the diff in the blockNode.
 	delete(s.fileContracts, fcid)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, FileContractDiff{
-		Direction:    DiffRevert,
+	bn.fileContractDiffs = append(bn.fileContractDiffs, modules.FileContractDiff{
+		Direction:    modules.DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
 	})
@@ -96,7 +101,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	// we need to store it and deleted once we're done iterating through the
 	// map.
 	currentHeight := s.height()
-	var expiredFileContracts []FileContractID
+	var expiredFileContracts []types.FileContractID
 	for id, fc := range s.fileContracts {
 		if fc.Expiration == currentHeight {
 			expiredFileContracts = append(expiredFileContracts, id)

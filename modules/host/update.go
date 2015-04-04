@@ -5,13 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Create a proof of storage for a contract, using the state height to
 // determine the random seed. Create proof must be under a host and state lock.
-func (h *Host) createStorageProof(obligation contractObligation, heightForProof consensus.BlockHeight) (err error) {
+func (h *Host) createStorageProof(obligation contractObligation, heightForProof types.BlockHeight) (err error) {
 	fullpath := filepath.Join(h.saveDir, obligation.Path)
 	file, err := os.Open(fullpath)
 	if err != nil {
@@ -28,10 +28,10 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 		return
 	}
 
-	sp := consensus.StorageProof{obligation.ID, base, hashSet}
+	sp := types.StorageProof{obligation.ID, base, hashSet}
 
 	// Create and send the transaction.
-	id, err := h.wallet.RegisterTransaction(consensus.Transaction{})
+	id, err := h.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {
 		return
 	}
@@ -45,7 +45,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	}
 	err = h.tpool.AcceptTransaction(t)
 	if err != nil {
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic(err)
 		}
 	}
@@ -63,7 +63,7 @@ func (h *Host) update() {
 	_, appliedBlockIDs, err := h.state.BlocksSince(h.latestBlock)
 	if err != nil {
 		// The host has somehow desynchronized.
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic(err)
 		}
 	}
@@ -76,7 +76,7 @@ func (h *Host) update() {
 	// ready for storage proofs.
 	for _, blockID := range appliedBlockIDs {
 		height, exists := h.state.HeightOfBlock(blockID)
-		if consensus.DEBUG {
+		if types.DEBUG {
 			if !exists {
 				panic("a block returned by BlocksSince doesn't appear to exist")
 			}

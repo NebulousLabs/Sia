@@ -5,8 +5,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
 )
 
 // A Renter is responsible for tracking all of the files that a user has

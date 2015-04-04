@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // SiaConstants is a struct listing all of the constants in use.
 type SiaConstants struct {
-	GenesisTimestamp      consensus.Timestamp
+	GenesisTimestamp      types.Timestamp
 	BlockSizeLimit        int
 	BlockFrequency        int
 	TargetWindow          int
@@ -24,8 +24,8 @@ type SiaConstants struct {
 	MinimumCoinbase int
 	CoinbaseAugment *big.Int
 
-	RootTarget consensus.Target
-	RootDepth  consensus.Target
+	RootTarget types.Target
+	RootDepth  types.Target
 
 	MaxAdjustmentUp   *big.Rat
 	MaxAdjustmentDown *big.Rat
@@ -48,25 +48,25 @@ type ModuleDeadlockStatus struct {
 // debugConstantsHandler prints a json file containing all of the constants.
 func (srv *Server) debugConstantsHandler(w http.ResponseWriter, req *http.Request) {
 	sc := SiaConstants{
-		GenesisTimestamp:      consensus.GenesisTimestamp,
-		BlockSizeLimit:        consensus.BlockSizeLimit,
-		BlockFrequency:        consensus.BlockFrequency,
-		TargetWindow:          consensus.TargetWindow,
-		MedianTimestampWindow: consensus.MedianTimestampWindow,
-		FutureThreshold:       consensus.FutureThreshold,
-		SiafundCount:          consensus.SiafundCount,
-		MaturityDelay:         consensus.MaturityDelay,
-		SiafundPortion:        consensus.SiafundPortion,
+		GenesisTimestamp:      types.GenesisTimestamp,
+		BlockSizeLimit:        types.BlockSizeLimit,
+		BlockFrequency:        types.BlockFrequency,
+		TargetWindow:          types.TargetWindow,
+		MedianTimestampWindow: types.MedianTimestampWindow,
+		FutureThreshold:       types.FutureThreshold,
+		SiafundCount:          types.SiafundCount,
+		MaturityDelay:         types.MaturityDelay,
+		SiafundPortion:        types.SiafundPortion,
 
-		InitialCoinbase: consensus.InitialCoinbase,
-		MinimumCoinbase: consensus.MinimumCoinbase,
-		CoinbaseAugment: consensus.CoinbaseAugment,
+		InitialCoinbase: types.InitialCoinbase,
+		MinimumCoinbase: types.MinimumCoinbase,
+		CoinbaseAugment: types.CoinbaseAugment,
 
-		RootTarget: consensus.RootTarget,
-		RootDepth:  consensus.RootDepth,
+		RootTarget: types.RootTarget,
+		RootDepth:  types.RootDepth,
 
-		MaxAdjustmentUp:   consensus.MaxAdjustmentUp,
-		MaxAdjustmentDown: consensus.MaxAdjustmentDown,
+		MaxAdjustmentUp:   types.MaxAdjustmentUp,
+		MaxAdjustmentDown: types.MaxAdjustmentDown,
 	}
 
 	writeJSON(w, sc)
@@ -85,7 +85,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 	// changes. After the blocking function unlocks, set the value to true.
 	var mds ModuleDeadlockStatus
 	go func() {
-		srv.state.AcceptBlock(consensus.Block{})
+		srv.state.AcceptBlock(types.Block{})
 		mds.State = true
 	}()
 	go func() {
@@ -109,7 +109,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Renter = true
 	}()
 	go func() {
-		srv.tpool.AcceptTransaction(consensus.Transaction{})
+		srv.tpool.AcceptTransaction(types.Transaction{})
 		mds.TransactionPool = true
 	}()
 	go func() {

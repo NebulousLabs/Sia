@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // standard.go adds extra rules to transactions which help preserve network
@@ -31,10 +31,10 @@ var (
 // accpeted as valid by the state, but rejected by the transaction pool. This
 // allows new types of keys to be added via a softfork without alienating all
 // of the older nodes.
-func (tp *TransactionPool) checkUnlockConditions(uc consensus.UnlockConditions) error {
+func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) error {
 	for _, pk := range uc.PublicKeys {
-		if pk.Algorithm != consensus.SignatureEntropy &&
-			pk.Algorithm != consensus.SignatureEd25519 {
+		if pk.Algorithm != types.SignatureEntropy &&
+			pk.Algorithm != types.SignatureEd25519 {
 			return errors.New("unrecognized key type in transaction")
 		}
 	}
@@ -44,7 +44,7 @@ func (tp *TransactionPool) checkUnlockConditions(uc consensus.UnlockConditions) 
 
 // IsStandardTransaction enforces extra rules such as a transaction size limit.
 // These rules can be altered without disrupting consensus.
-func (tp *TransactionPool) IsStandardTransaction(t consensus.Transaction) (err error) {
+func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error) {
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md. Larger transactions are a DOS vector,
 	// because someone can fill a large transaction with a bunch of signatures

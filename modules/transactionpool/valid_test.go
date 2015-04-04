@@ -3,7 +3,7 @@ package transactionpool
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // addConflictingSiacoinTransactionToPool creates a valid transaction, adds it
@@ -42,7 +42,7 @@ func (tpt *tpoolTester) testBadSiacoinUnlock() {
 	// The empty unlock signature will still be valid, as the new conditions
 	// merely enforce a timelock. The unlock hash however will not match.
 	txn := tpt.emptyUnlockTransaction()
-	altConditions := consensus.UnlockConditions{
+	altConditions := types.UnlockConditions{
 		Timelock: 1,
 	}
 	txn.SiacoinInputs[0].UnlockConditions = altConditions
@@ -56,7 +56,7 @@ func (tpt *tpoolTester) testBadSiacoinUnlock() {
 // submission should be rejected.
 func (tpt *tpoolTester) testOverspend() {
 	txn := tpt.emptyUnlockTransaction()
-	txn.MinerFees = append(txn.MinerFees, consensus.NewCurrency64(1))
+	txn.MinerFees = append(txn.MinerFees, types.NewCurrency64(1))
 	err := tpt.tpool.AcceptTransaction(txn)
 	if err != ErrSiacoinOverspend {
 		tpt.t.Error(err)

@@ -3,15 +3,15 @@ package hostdb
 import (
 	"strings"
 
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // findHostAnnouncements returns a list of the host announcements found within
 // a given block. No check is made to see that the ip address found in the
 // announcement is actually a valid ip address.
-func findHostAnnouncements(b consensus.Block) (announcements []modules.HostEntry) {
+func findHostAnnouncements(b types.Block) (announcements []modules.HostEntry) {
 	for _, t := range b.Transactions {
 		for _, data := range t.ArbitraryData {
 			// the HostAnnouncement must be prefaced by the standard host announcement string
@@ -45,7 +45,7 @@ func (hdb *HostDB) update() {
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {
 		// Sanity check - err should be nil.
-		if consensus.DEBUG {
+		if types.DEBUG {
 			panic("hostdb got an error when calling hdb.state.BlocksSince")
 		}
 	}
@@ -54,7 +54,7 @@ func (hdb *HostDB) update() {
 	for _, blockID := range appliedBlocks {
 		block, exists := hdb.state.Block(blockID)
 		if !exists {
-			if consensus.DEBUG {
+			if types.DEBUG {
 				panic("state is telling us a block doesn't exist that got returned by BlocksSince")
 			}
 			continue

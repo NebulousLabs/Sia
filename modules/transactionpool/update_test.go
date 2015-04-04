@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testUpdateTransactionRemoval checks that when a transaction moves from the
@@ -37,13 +37,13 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	// Put two transactions, a parent and a dependent, into the transaction
 	// pool. Then create a transaction that is in conflict with the parent.
 	parent := tpt.emptyUnlockTransaction()
-	dependent := consensus.Transaction{
-		SiacoinInputs: []consensus.SiacoinInput{
-			consensus.SiacoinInput{
+	dependent := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{
+			types.SiacoinInput{
 				ParentID: parent.SiacoinOutputID(0),
 			},
 		},
-		MinerFees: []consensus.Currency{
+		MinerFees: []types.Currency{
 			parent.SiacoinOutputs[0].Value,
 		},
 	}
@@ -60,9 +60,9 @@ func (tpt *tpoolTester) testBlockConflicts() {
 
 	// Create a transaction that is in conflict with the parent.
 	parentValue := parent.SiacoinOutputSum()
-	conflict := consensus.Transaction{
+	conflict := types.Transaction{
 		SiacoinInputs: parent.SiacoinInputs,
-		MinerFees: []consensus.Currency{
+		MinerFees: []types.Currency{
 			parentValue,
 		},
 	}
@@ -75,11 +75,11 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	tset = tset[:len(tset)-2]     // strip 'parent' and 'dependent'
 	tset = append(tset, conflict) // add 'conflict'
 	target := tpt.cs.CurrentTarget()
-	block := consensus.Block{
+	block := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
-		Timestamp: consensus.Timestamp(time.Now().Unix()),
-		MinerPayouts: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: parentValue.Add(consensus.CalculateCoinbase(tpt.cs.Height() + 1))},
+		Timestamp: types.Timestamp(time.Now().Unix()),
+		MinerPayouts: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: parentValue.Add(types.CalculateCoinbase(tpt.cs.Height() + 1))},
 		},
 		Transactions: tset,
 	}
@@ -110,13 +110,13 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	// Put two transactions, a parent and a dependent, into the transaction
 	// pool. Then create a transaction that is in conflict with the parent.
 	parent := tpt.emptyUnlockTransaction()
-	dependent := consensus.Transaction{
-		SiacoinInputs: []consensus.SiacoinInput{
-			consensus.SiacoinInput{
+	dependent := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{
+			types.SiacoinInput{
 				ParentID: parent.SiacoinOutputID(0),
 			},
 		},
-		MinerFees: []consensus.Currency{
+		MinerFees: []types.Currency{
 			parent.SiacoinOutputs[0].Value,
 		},
 	}
@@ -135,11 +135,11 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	tset := tpt.tpool.TransactionSet()
 	tset = tset[:len(tset)-1] // strip 'dependent'
 	target := tpt.cs.CurrentTarget()
-	block := consensus.Block{
+	block := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
-		Timestamp: consensus.Timestamp(time.Now().Unix()),
-		MinerPayouts: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		Timestamp: types.Timestamp(time.Now().Unix()),
+		MinerPayouts: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: types.CalculateCoinbase(tpt.cs.Height() + 1)},
 		},
 		Transactions: tset,
 	}
@@ -174,11 +174,11 @@ func (tpt *tpoolTester) testRewinding() {
 
 	// Prepare an empty block to cause a rewind (by forking).
 	target := tpt.cs.CurrentTarget()
-	forkStart := consensus.Block{
+	forkStart := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
-		Timestamp: consensus.Timestamp(time.Now().Unix()),
-		MinerPayouts: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		Timestamp: types.Timestamp(time.Now().Unix()),
+		MinerPayouts: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: types.CalculateCoinbase(tpt.cs.Height() + 1)},
 		},
 	}
 	for {
@@ -210,11 +210,11 @@ func (tpt *tpoolTester) testRewinding() {
 		tpt.t.Fatal(err)
 	}
 	target = tpt.cs.CurrentTarget()
-	forkCommit := consensus.Block{
+	forkCommit := types.Block{
 		ParentID:  forkStart.ID(),
-		Timestamp: consensus.Timestamp(time.Now().Unix()),
-		MinerPayouts: []consensus.SiacoinOutput{
-			consensus.SiacoinOutput{Value: consensus.CalculateCoinbase(tpt.cs.Height() + 1)},
+		Timestamp: types.Timestamp(time.Now().Unix()),
+		MinerPayouts: []types.SiacoinOutput{
+			types.SiacoinOutput{Value: types.CalculateCoinbase(tpt.cs.Height() + 1)},
 		},
 	}
 	for {

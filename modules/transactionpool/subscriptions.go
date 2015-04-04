@@ -1,8 +1,8 @@
 package transactionpool
 
 import (
-	"github.com/NebulousLabs/Sia/consensus"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // subscriptions.go manages subscriptions to the transaction pool. Every time
@@ -19,7 +19,7 @@ import (
 
 // unconfirmedSiacoinOutputDiffs returns the set of siacoin output diffs that
 // are created by the unconfirmed set of transactions.
-func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.SiacoinOutputDiff) {
+func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []modules.SiacoinOutputDiff) {
 	// Iterate through the unconfirmed transactions in order and record the
 	// siacoin output diffs created.
 	for _, txn := range tp.transactionList {
@@ -31,15 +31,15 @@ func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.Si
 				output, exists = tp.referenceSiacoinOutputs[input.ParentID]
 				// Sanity check - output should exist in either the unconfirmed
 				// or reference set.
-				if consensus.DEBUG {
+				if types.DEBUG {
 					if !exists {
 						panic("could not find siacoin output")
 					}
 				}
 			}
 
-			scod := consensus.SiacoinOutputDiff{
-				Direction:     consensus.DiffRevert,
+			scod := modules.SiacoinOutputDiff{
+				Direction:     modules.DiffRevert,
 				ID:            input.ParentID,
 				SiacoinOutput: output,
 			}
@@ -48,8 +48,8 @@ func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []consensus.Si
 
 		// Produce diffs for the siacoin outputs created by this transaction.
 		for i, output := range txn.SiacoinOutputs {
-			scod := consensus.SiacoinOutputDiff{
-				Direction:     consensus.DiffApply,
+			scod := modules.SiacoinOutputDiff{
+				Direction:     modules.DiffApply,
 				ID:            txn.SiacoinOutputID(i),
 				SiacoinOutput: output,
 			}
@@ -95,7 +95,7 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
-func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []consensus.Block, unconfirmedTransactions []consensus.Transaction, diffs []consensus.SiacoinOutputDiff) {
+func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, diffs []modules.SiacoinOutputDiff) {
 	// Add the changes to the update set.
 	tp.revertBlocksUpdates = append(tp.revertBlocksUpdates, revertedBlocks)
 	tp.applyBlocksUpdates = append(tp.applyBlocksUpdates, appliedBlocks)
