@@ -64,11 +64,13 @@ test-long: clean fmt REBUILD
 
 # Testing for each package individually. Packages are added to this set as needed.
 test-types: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=6s ./types
+	go test -v -race -tags='testing debug' -timeout=5s ./types
+test-consensus:
+	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
 test-tpool: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=6s ./modules/transactionpool
+	go test -v -race -tags='testing debug' -timeout=5s ./modules/transactionpool
 test-wallet: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=6s ./modules/wallet
+	go test -v -race -tags='testing debug' -timeout=5s ./modules/wallet
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
