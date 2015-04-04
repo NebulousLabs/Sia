@@ -1,14 +1,14 @@
 package types
 
+// constants.go contains the Sia constants. Depending on which build tags are
+// used, the constants will be initialized to different values.
+
 import (
 	"math/big"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
-
-// constants.go contains the Sia constants. Depending on which build tags are
-// used, the constants will be initialized to different values.
 
 var (
 	BlockSizeLimit        uint64

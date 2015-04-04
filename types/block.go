@@ -1,5 +1,8 @@
 package types
 
+// block.go defines the Block type for Sia, and provides some helper functions
+// for working with blocks.
+
 import (
 	"bytes"
 
