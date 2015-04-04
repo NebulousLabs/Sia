@@ -1,5 +1,12 @@
 package types
 
+// currency.go defines the internal currency object. One design goal of the
+// currency type is immutability: the currency type should be safe to pass
+// directly to other objects and packages. The currency object should never
+// have a negative value. The currency should never overflow. There is a
+// maximum size value that can be encoded (around 10^10^20), however exceeding
+// this value will not result in overflow.
+
 import (
 	"errors"
 	"fmt"
@@ -9,27 +16,22 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 )
 
+type (
+	// A Currency represents a number of siacoins or siafunds. Internally, a
+	// Currency value is unbounded; however, Currency values sent over the wire
+	// protocol are subject to a maximum size of 255 bytes (approximately 10^614).
+	// Unlike the math/big library, whose methods modify their receiver, all
+	// arithmetic Currency methods return a new value. Currency cannot be negative.
+	Currency struct {
+		i big.Int
+	}
+)
+
 var (
 	ZeroCurrency = NewCurrency64(0)
 
 	ErrNegativeCurrency = errors.New("negative currency not allowed")
 )
-
-// currency.go defines the internal currency object. One design goal of the
-// currency type is immutability: the currency type should be safe to pass
-// directly to other objects and packages. The currency object should never
-// have a negative value. The currency should never overflow. There is a
-// maximum size value that can be encoded (around 10^10^20), however exceeding
-// this value will not result in overflow.
-
-// A Currency represents a number of siacoins or siafunds. Internally, a
-// Currency value is unbounded; however, Currency values sent over the wire
-// protocol are subject to a maximum size of 255 bytes (approximately 10^614).
-// Unlike the math/big library, whose methods modify their receiver, all
-// arithmetic Currency methods return a new value. Currency cannot be negative.
-type Currency struct {
-	i big.Int
-}
 
 // NewCurrency creates a Currency value from a big.Int. Undefined behavior
 // occurs if a negative input is used.
