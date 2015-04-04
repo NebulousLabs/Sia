@@ -11,11 +11,22 @@ import (
 const (
 	maxSharedPeers = 10
 	maxAddrLength  = 100
+	minPeers       = 3
 )
 
 func (g *Gateway) addPeer(peer modules.NetAddress) error {
 	if _, exists := g.peers[peer]; exists {
 		return errors.New("peer already added")
+	}
+	// If adding this peer brings us above minPeers, try to kick out a bad
+	// peer that we've been forced to keep.
+	if len(g.peers) == minPeers {
+		for peer, strikes := range g.peers {
+			if strikes > maxStrikes {
+				g.removePeer(peer)
+				break
+			}
+		}
 	}
 	g.peers[peer] = 0
 	g.save()
@@ -50,7 +61,8 @@ func (g *Gateway) addStrike(peer modules.NetAddress) {
 		return
 	}
 	g.peers[peer]++
-	if g.peers[peer] > maxStrikes {
+	// don't remove bad peers if we aren't well-connected
+	if g.peers[peer] > maxStrikes && len(g.peers) > minPeers {
 		g.removePeer(peer)
 	}
 }
@@ -63,6 +75,7 @@ func (g *Gateway) AddPeer(peer modules.NetAddress) error {
 }
 
 // RemovePeer removes a peer from the Gateway's peer list.
+// TODO: warn if less than minPeers?
 func (g *Gateway) RemovePeer(peer modules.NetAddress) error {
 	counter := g.mu.Lock()
 	defer g.mu.Unlock(counter)

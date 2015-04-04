@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/consensus"
@@ -84,16 +85,28 @@ func TestBadPeer(t *testing.T) {
 		g.Ping(badpeer.Address())
 	}
 
-	// badpeer should no longer be in our peer list
-	if len(g.peers) != 0 {
-		t.Fatal("gateway did not remove bad peer:", g.Info().Peers)
+	// since we are poorly-connected, badpeer should still be in our peer list
+	if len(g.peers) != 1 {
+		t.Fatal("gateway removed peer when poorly-connected:", g.Info().Peers)
+	}
+
+	// add minPeers more peers
+	for i := 0; i < minPeers; i++ {
+		g.AddPeer(modules.NetAddress("foo" + strconv.Itoa(i)))
+	}
+
+	// once we exceed minPeers, badpeer should be kicked out
+	if len(g.peers) != minPeers {
+		t.Fatal("gateway did not remove bad peer after becoming well-connected:", g.Info().Peers)
+	} else if _, ok := g.peers[badpeer.Address()]; ok {
+		t.Fatal("gateway removed wrong peer:", g.Info().Peers)
 	}
 }
 
 // TestBootstrap tests the bootstrapping process, including synchronization.
 func TestBootstrap(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// create bootstrap peer

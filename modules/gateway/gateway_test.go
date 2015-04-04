@@ -84,7 +84,7 @@ func TestRPC(t *testing.T) {
 // TestTimeout tests that connections time out properly.
 func TestTimeout(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	g := newTestingGateway("TestTimeout - Good Peer", t)
