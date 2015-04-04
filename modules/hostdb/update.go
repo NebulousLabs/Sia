@@ -3,6 +3,7 @@ package hostdb
 import (
 	"strings"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -45,7 +46,7 @@ func (hdb *HostDB) update() {
 	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
 	if err != nil {
 		// Sanity check - err should be nil.
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("hostdb got an error when calling hdb.state.BlocksSince")
 		}
 	}
@@ -54,7 +55,7 @@ func (hdb *HostDB) update() {
 	for _, blockID := range appliedBlocks {
 		block, exists := hdb.state.Block(blockID)
 		if !exists {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic("state is telling us a block doesn't exist that got returned by BlocksSince")
 			}
 			continue

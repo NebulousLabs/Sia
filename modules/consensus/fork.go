@@ -1,9 +1,9 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
@@ -32,7 +32,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 		// genesis block, and this loop should break before reaching the
 		// genesis block.
 		if bn == nil {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic("backtrack hit a nil node?")
 			}
 			break
@@ -45,7 +45,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 // the current block.
 func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
-	if types.DEBUG {
+	if build.DEBUG {
 		if s.currentPath[bn.height] != bn.block.ID() {
 			panic("can't revert to node not in current path")
 		}
@@ -92,7 +92,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
-	if types.DEBUG {
+	if build.DEBUG {
 		oldHash = s.consensusSetHash()
 	}
 	oldHead := s.currentBlockNode()
@@ -113,7 +113,7 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 	// restore old path
 	s.revertToNode(commonParent)
 	_, errReapply := s.applyUntilNode(oldHead)
-	if types.DEBUG {
+	if build.DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")
 		} else if s.consensusSetHash() != oldHash {

@@ -124,7 +124,7 @@ func (st *serverTester) mineMoney() {
 	st.getAPI("/wallet/status", &info)
 
 	// Mine enough blocks to overcome the maturity delay and receive coins.
-	for i := 0; i < 1+types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i < 1+types.MaturityDelay; i++ {
 		st.mineBlock()
 		st.updateWait()
 	}

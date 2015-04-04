@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -11,7 +12,7 @@ func (s *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.siacoinOutputs[sci.ParentID]
 			if !exists {
 				panic("Applying a transaction with an invalid unspent output!")
@@ -34,7 +35,7 @@ func (s *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
 		scoid := t.SiacoinOutputID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.siacoinOutputs[scoid]
 			if exists {
 				panic("applying a siacoin output when the output already exists")
@@ -57,7 +58,7 @@ func (s *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 	for i, fc := range t.FileContracts {
 		// Sanity check - the file contract should not exists within the state.
 		fcid := t.FileContractID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.fileContracts[fcid]
 			if exists {
 				panic("applying a file contract when the contract already exists")
@@ -82,7 +83,7 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t types.Transaction
 		// Sanity check - termination should affect an existing contract.
 		fc, exists := s.fileContracts[fct.ParentID]
 		if !exists {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic("file contract termination terminates a nonexisting contract")
 			}
 			continue
@@ -113,7 +114,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		// Sanity check - the file contract of the storage proof should exist.
 		fc, exists := s.fileContracts[sp.ParentID]
 		if !exists {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic("storage proof submitted for a file contract that doesn't exist?")
 			}
 			continue
@@ -127,7 +128,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		for i, output := range fc.ValidProofOutputs {
 			// Sanity check - output should not already exist.
 			id := sp.ParentID.StorageProofOutputID(true, i)
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := s.siacoinOutputs[id]
 				if exists {
 					panic("storage proof output already exists")
@@ -153,7 +154,7 @@ func (s *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 func (s *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the input should exist within the blockchain.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.siafundOutputs[sfi.ParentID]
 			if !exists {
 				panic("applying a transaction with an invalid unspent siafund output")
@@ -191,7 +192,7 @@ func (s *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		// Sanity check - the output should not exist within the blockchain.
 		sfoid := t.SiafundOutputID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := s.siafundOutputs[sfoid]
 			if exists {
 				panic("siafund being added to consensus set when it is already in the consensus set")
@@ -216,7 +217,7 @@ func (s *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 // transaction.
 func (s *State) applyTransaction(bn *blockNode, t types.Transaction) {
 	// Sanity check - the input transaction should be valid.
-	if types.DEBUG {
+	if build.DEBUG {
 		err := s.validTransaction(t)
 		if err != nil {
 			panic("applyTransaction called with an invalid transaction!")

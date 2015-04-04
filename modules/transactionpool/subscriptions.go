@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -31,7 +32,7 @@ func (tp *TransactionPool) unconfirmedSiacoinOutputDiffs() (scods []modules.Siac
 				output, exists = tp.referenceSiacoinOutputs[input.ParentID]
 				// Sanity check - output should exist in either the unconfirmed
 				// or reference set.
-				if types.DEBUG {
+				if build.DEBUG {
 					if !exists {
 						panic("could not find siacoin output")
 					}

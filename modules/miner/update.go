@@ -1,6 +1,7 @@
 package miner
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -33,7 +34,7 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 	// If no blocks have been applied, the block variables do not need to be
 	// updated.
 	if len(appliedBlocks) == 0 {
-		if types.DEBUG {
+		if build.DEBUG {
 			if len(revertedBlocks) != 0 {
 				panic("blocks reverted without being added")
 			}
@@ -45,7 +46,7 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 	m.parent = appliedBlocks[len(appliedBlocks)-1].ID()
 	target, exists1 := m.state.ChildTarget(m.parent)
 	timestamp, exists2 := m.state.EarliestChildTimestamp(m.parent)
-	if types.DEBUG {
+	if build.DEBUG {
 		if !exists1 {
 			panic("could not get child target")
 		}

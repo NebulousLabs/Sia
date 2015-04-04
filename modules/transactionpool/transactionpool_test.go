@@ -148,7 +148,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Mine blocks until there is money in the wallet.
-	for i := 0; i <= types.MaturityDelay; i++ {
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		_, _, err = tpt.miner.FindBlock()
 		if err != nil {
 			t.Fatal(err)

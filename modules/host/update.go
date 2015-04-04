@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -45,7 +46,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	}
 	err = h.tpool.AcceptTransaction(t)
 	if err != nil {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic(err)
 		}
 	}
@@ -63,7 +64,7 @@ func (h *Host) update() {
 	_, appliedBlockIDs, err := h.state.BlocksSince(h.latestBlock)
 	if err != nil {
 		// The host has somehow desynchronized.
-		if types.DEBUG {
+		if build.DEBUG {
 			panic(err)
 		}
 	}
@@ -76,7 +77,7 @@ func (h *Host) update() {
 	// ready for storage proofs.
 	for _, blockID := range appliedBlockIDs {
 		height, exists := h.state.HeightOfBlock(blockID)
-		if types.DEBUG {
+		if build.DEBUG {
 			if !exists {
 				panic("a block returned by BlocksSince doesn't appear to exist")
 			}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 var (
@@ -33,7 +35,7 @@ type Currency struct {
 // occurs if a negative input is used.
 func NewCurrency(b *big.Int) (c Currency) {
 	if b.Sign() < 0 {
-		if DEBUG {
+		if build.DEBUG {
 			panic(ErrNegativeCurrency)
 		}
 	} else {
@@ -82,7 +84,7 @@ func (c Currency) Mul(x Currency) (y Currency) {
 // Behavior is undefined when x is negative.
 func (c Currency) MulFloat(x float64) (y Currency) {
 	if x < 0 {
-		if DEBUG {
+		if build.DEBUG {
 			panic(ErrNegativeCurrency)
 		}
 	} else {
@@ -121,7 +123,7 @@ func (c Currency) Sqrt() (y Currency) {
 func (c Currency) Sub(x Currency) (y Currency) {
 	if c.Cmp(x) < 0 {
 		y = c
-		if DEBUG {
+		if build.DEBUG {
 			panic(ErrNegativeCurrency)
 		}
 	} else {

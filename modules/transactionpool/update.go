@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -20,7 +21,7 @@ func (tp *TransactionPool) removeSiacoinInputs(t types.Transaction) {
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the corresponding output should be in the reference
 		// set and absent from the unconfirmed set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.referenceSiacoinOutputs[sci.ParentID]
 			if !exists {
 				panic("unexpected absense of a reference siacoin output")
@@ -43,7 +44,7 @@ func (tp *TransactionPool) removeSiacoinOutputs(t types.Transaction) {
 		scoid := t.SiacoinOutputID(i)
 		// Sanity check - the output should exist in the unconfirmed set as
 		// there should be no transaction dependents who have spent the output.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.siacoinOutputs[scoid]
 			if !exists {
 				panic("trying to delete missing siacoin output")
@@ -62,7 +63,7 @@ func (tp *TransactionPool) removeFileContracts(t types.Transaction) {
 		// Sanity check - file contract should be in the unconfirmed set as
 		// there should be no dependent transactions who have terminated the
 		// contract.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.fileContracts[fcid]
 			if !exists {
 				panic("trying to remove missing file contract")
@@ -79,7 +80,7 @@ func (tp *TransactionPool) removeFileContractTerminations(t types.Transaction) {
 	for _, fct := range t.FileContractTerminations {
 		// Sanity check - the corresponding file contract should be in the
 		// reference set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.referenceFileContracts[fct.ParentID]
 			if !exists {
 				panic("cannot locate file contract to delete storage proof transaction")
@@ -97,7 +98,7 @@ func (tp *TransactionPool) removeStorageProofs(t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		// Sanity check - the corresponding file contract should be in the
 		// reference set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.referenceFileContracts[sp.ParentID]
 			if !exists {
 				panic("cannot locate file contract to delete storage proof transaction")
@@ -115,7 +116,7 @@ func (tp *TransactionPool) removeSiafundInputs(t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the corresponding siafund output should be in the
 		// reference set and absent from the unconfirmed set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.siafundOutputs[sfi.ParentID]
 			if exists {
 				panic("trying to add back existing siafund output")
@@ -138,7 +139,7 @@ func (tp *TransactionPool) removeSiafundOutputs(t types.Transaction) {
 		// Sanity check - the output should exist in the unconfirmed set as
 		// there is no dependent transaction which could have spent the output.
 		sfoid := t.SiafundOutputID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.siafundOutputs[sfoid]
 			if !exists {
 				panic("trying to remove nonexisting siafund output from unconfirmed set")
@@ -156,7 +157,7 @@ func (tp *TransactionPool) removeTailTransaction() {
 	// Sanity check - the transaction list should not be empty if
 	// removeTailTransaction has been called.
 	if len(tp.transactionList) == 0 {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("calling removeTailTransaction when transaction list is empty")
 		}
 		return
@@ -195,7 +196,7 @@ func (tp *TransactionPool) purge() {
 
 	// Sanity check - all reference objects should have been deleted, and the
 	// list of unconfirmed transactions should be empty.
-	if types.DEBUG {
+	if build.DEBUG {
 		if len(tp.referenceSiacoinOutputs) != 0 {
 			panic("referenceSiacoinOutputs is not empty")
 		}
@@ -244,7 +245,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 	// Apply all of the siacoin output changes.
 	for _, scod := range scods {
 		if dir == scod.Direction {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.siacoinOutputs[scod.ID]
 				if exists {
 					panic("adding an output that already exists")
@@ -252,7 +253,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 			}
 			tp.siacoinOutputs[scod.ID] = scod.SiacoinOutput
 		} else {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.siacoinOutputs[scod.ID]
 				if !exists {
 					panic("removing an output that doesn't exist")
@@ -265,7 +266,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 	// Apply all of the file contract changes.
 	for _, fcd := range fcds {
 		if dir == fcd.Direction {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.fileContracts[fcd.ID]
 				if exists {
 					panic("adding a contract that already exists")
@@ -273,7 +274,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 			}
 			tp.fileContracts[fcd.ID] = fcd.FileContract
 		} else {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.fileContracts[fcd.ID]
 				if !exists {
 					panic("removing a contract that doesn't exist")
@@ -286,7 +287,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 	// Apply all of the siafund output changes.
 	for _, sfod := range sfods {
 		if dir == sfod.Direction {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.siafundOutputs[sfod.ID]
 				if exists {
 					panic("adding an output that already exists")
@@ -294,7 +295,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 			}
 			tp.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 		} else {
-			if types.DEBUG {
+			if build.DEBUG {
 				_, exists := tp.siafundOutputs[sfod.ID]
 				if !exists {
 					panic("removing an output that doesn't exist")
@@ -335,7 +336,7 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		block := revertedBlocks[i]
 		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic(err)
 			}
 		}
@@ -352,7 +353,7 @@ func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks 
 		// Add all of the diffs to the unconfirmed set.
 		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
-			if types.DEBUG {
+			if build.DEBUG {
 				panic(err)
 			}
 		}

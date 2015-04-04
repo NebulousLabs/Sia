@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -25,7 +26,7 @@ func (tp *TransactionPool) applySiacoinInputs(t types.Transaction) {
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - input should be in the unconfirmed set and absent
 		// from the reference set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.referenceSiacoinOutputs[sci.ParentID]
 			if exists {
 				panic("applying a siacoin output that's already in the reference set")
@@ -48,7 +49,7 @@ func (tp *TransactionPool) applySiacoinOutputs(t types.Transaction) {
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - output should not exist in the unconfirmed set.
 		scoid := t.SiacoinOutputID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.siacoinOutputs[scoid]
 			if exists {
 				panic("trying to add an output that already exists?")
@@ -66,7 +67,7 @@ func (tp *TransactionPool) applyFileContracts(t types.Transaction) {
 	for i, fc := range t.FileContracts {
 		// Sanity check - file contract should be in the unconfirmed set.
 		fcid := t.FileContractID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.fileContracts[fcid]
 			if exists {
 				panic("trying to add a file contract that's already in the unconfirmed set")
@@ -86,7 +87,7 @@ func (tp *TransactionPool) applyFileContractTerminations(t types.Transaction) {
 		// Sanity check - file contract should be in the unconfirmed set and
 		// absent from the reference set.
 		fc, exists := tp.fileContracts[fct.ParentID]
-		if types.DEBUG {
+		if build.DEBUG {
 			if !exists {
 				panic("could not find file contract")
 			}
@@ -110,7 +111,7 @@ func (tp *TransactionPool) applyStorageProofs(t types.Transaction) {
 		// Sanity check - file contract should be in the unconfirmed set and
 		// not in the reference set.
 		fc, exists := tp.fileContracts[sp.ParentID]
-		if types.DEBUG {
+		if build.DEBUG {
 			if !exists {
 				panic("could not find file contract in unconfirmed set")
 			}
@@ -133,7 +134,7 @@ func (tp *TransactionPool) applySiafundInputs(t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the corresponding siafund output should be in the
 		// unconfirmed set and absent from the reference set.
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.referenceSiafundOutputs[sfi.ParentID]
 			if exists {
 				panic("applying a siafund output that's already in the reference set")
@@ -156,7 +157,7 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		// Sanity check - output should not already be in the unconfirmed set.
 		sfoid := t.SiafundOutputID(i)
-		if types.DEBUG {
+		if build.DEBUG {
 			_, exists := tp.siafundOutputs[sfoid]
 			if exists {
 				panic("trying to add an output that already exists?")

@@ -3,6 +3,7 @@ package miner
 import (
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -19,7 +20,7 @@ func (m *Miner) blockForWork() (b types.Block) {
 	// Calculate the subsidy and create the miner payout.
 	height, exists := m.state.HeightOfBlock(m.parent)
 	if !exists {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("parent is not in state?")
 		}
 		return
@@ -99,7 +100,7 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
 			err = m.state.AcceptBlock(b)
-			if types.DEBUG {
+			if build.DEBUG {
 				if err != nil {
 					println(err.Error())
 				}

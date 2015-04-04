@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/graceful"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/types"
@@ -82,7 +83,7 @@ func (srv *Server) acceptBlock(conn modules.NetConn) error {
 	// Check if b is in the current path.
 	height, exists := srv.state.HeightOfBlock(b.ID())
 	if !exists {
-		if types.DEBUG {
+		if build.DEBUG {
 			panic("could not get the height of a block that did not return an error when being accepted into the state")
 		}
 		return errors.New("state malfunction")
