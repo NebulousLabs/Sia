@@ -35,7 +35,7 @@ type Currency struct {
 // occurs if a negative input is used.
 func NewCurrency(b *big.Int) (c Currency) {
 	if b.Sign() < 0 {
-		if DEBUG {
+		if build.DEBUG {
 			panic(ErrNegativeCurrency)
 		}
 	} else {
@@ -84,13 +84,8 @@ func (c Currency) Mul(x Currency) (y Currency) {
 // Behavior is undefined when x is negative.
 func (c Currency) MulFloat(x float64) (y Currency) {
 	if x < 0 {
-<<<<<<< HEAD
-		if DEBUG {
-			panic(ErrNegativeCurrency)
-=======
 		if build.DEBUG {
-			panic("cannot multiple currency by a negative number")
->>>>>>> create a build package
+			panic(ErrNegativeCurrency)
 		}
 	} else {
 		yRat := new(big.Rat).Mul(
@@ -129,7 +124,7 @@ func (c Currency) Sub(x Currency) (y Currency) {
 	if c.Cmp(x) < 0 {
 		y = c
 		if build.DEBUG {
-			panic("subtraction resulted in negative currency")
+			panic(ErrNegativeCurrency)
 		}
 	} else {
 		y.i.Sub(&c.i, &x.i)

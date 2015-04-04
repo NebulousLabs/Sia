@@ -8,8 +8,7 @@ import (
 )
 
 // constants.go contains the Sia constants. Depending on which build tags are
-// used, the constants will be initialized to different values.  and therefore
-// cannot be declared as constants.
+// used, the constants will be initialized to different values.
 
 var (
 	BlockSizeLimit        uint64
