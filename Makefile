@@ -63,10 +63,12 @@ test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s ./...
 
 # Testing for each package individually. Packages are added to this set as needed.
+test-types: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=6s ./types
 test-tpool: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=8s ./modules/transactionpool
+	go test -v -race -tags='testing debug' -timeout=6s ./modules/transactionpool
 test-wallet: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=8s ./modules/wallet
+	go test -v -race -tags='testing debug' -timeout=6s ./modules/wallet
 
 # cover runs the long tests and creats html files that show you which lines
 # have been hit during testing and how many times each line has been hit.
@@ -76,7 +78,7 @@ coverpackages = api crypto encoding modules/consensus modules/gateway           
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \
-		go test -tags='testing debug' -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
+		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
 		rm cover/$$package.out ; \
 	done
