@@ -37,7 +37,7 @@ type key struct {
 // `total`, which is the sum of all the outputs that were found, since it's
 // unlikely that it will equal amount exaclty.
 func (w *Wallet) findOutputs(amount types.Currency) (knownOutputs []*knownOutput, total types.Currency, err error) {
-	if amount.Cmp(types.ZeroCurrency) <= 0 {
+	if amount.IsZero() {
 		err = errors.New("cannot fund amount <= 0")
 		return
 	}

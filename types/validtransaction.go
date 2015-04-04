@@ -124,23 +124,23 @@ func (t Transaction) followsStorageProofRules() error {
 // minimum allowed value (generally 1).
 func (t Transaction) followsMinimumValues() error {
 	for _, sco := range t.SiacoinOutputs {
-		if sco.Value.Cmp(ZeroCurrency) < 1 {
+		if sco.Value.IsZero() {
 			return errors.New("empty siacoin output not allowed")
 		}
 	}
 	for _, fc := range t.FileContracts {
-		if fc.Payout.Cmp(ZeroCurrency) < 1 {
+		if fc.Payout.IsZero() {
 			return errors.New("file contract must have non-zero payout")
 		}
 	}
 	for _, sfo := range t.SiafundOutputs {
-		// Check that the claimStart is set to 0.
-		if sfo.ClaimStart.Cmp(ZeroCurrency) != 0 {
+		// Check that the ClaimStart is set to 0.
+		if !sfo.ClaimStart.IsZero() {
 			return errors.New("invalid siafund output presented")
 		}
 
 		// Outputs must all be at least 1.
-		if sfo.Value.Cmp(ZeroCurrency) < 1 {
+		if sfo.Value.IsZero() {
 			return errors.New("siafund outputs must have at least 1 siafund")
 		}
 	}

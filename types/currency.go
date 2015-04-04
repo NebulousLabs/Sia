@@ -17,14 +17,14 @@ var (
 // currency type is immutability: the currency type should be safe to pass
 // directly to other objects and packages. The currency object should never
 // have a negative value. The currency should never overflow. There is a
-// maximum size value that can be encoded (around 10^600), however exceeding
+// maximum size value that can be encoded (around 10^10^20), however exceeding
 // this value will not result in overflow.
 
 // A Currency represents a number of siacoins or siafunds. Internally, a
 // Currency value is unbounded; however, Currency values sent over the wire
 // protocol are subject to a maximum size of 255 bytes (approximately 10^614).
 // Unlike the math/big library, whose methods modify their receiver, all
-// arithmetic Currency methods return a new value.
+// arithmetic Currency methods return a new value. Currency cannot be negative.
 type Currency struct {
 	i big.Int
 }
@@ -32,12 +32,12 @@ type Currency struct {
 // NewCurrency creates a Currency value from a big.Int. Undefined behavior
 // occurs if a negative input is used.
 func NewCurrency(b *big.Int) (c Currency) {
-	c.i = *b
-	if c.Cmp(ZeroCurrency) < 0 {
-		c = Currency{}
+	if b.Sign() < 0 {
 		if DEBUG {
-			panic("cannot have a negative currency")
+			panic(ErrNegativeCurrency)
 		}
+	} else {
+		c.i = *b
 	}
 	return
 }
@@ -83,7 +83,7 @@ func (c Currency) Mul(x Currency) (y Currency) {
 func (c Currency) MulFloat(x float64) (y Currency) {
 	if x < 0 {
 		if DEBUG {
-			panic("cannot multiple currency by a negative number")
+			panic(ErrNegativeCurrency)
 		}
 	} else {
 		yRat := new(big.Rat).Mul(
@@ -102,6 +102,11 @@ func (c Currency) RoundDown(n uint64) (y Currency) {
 	return
 }
 
+// IsZero returns true if the value is 0, false otherwise.
+func (c Currency) IsZero() bool {
+	return c.i.Sign() <= 0
+}
+
 // Sqrt returns a new Currency value y = sqrt(c). Result is rounded down to the
 // nearest integer.
 func (c Currency) Sqrt() (y Currency) {
@@ -117,7 +122,7 @@ func (c Currency) Sub(x Currency) (y Currency) {
 	if c.Cmp(x) < 0 {
 		y = c
 		if DEBUG {
-			panic("subtraction resulted in negative currency")
+			panic(ErrNegativeCurrency)
 		}
 	} else {
 		y.i.Sub(&c.i, &x.i)
@@ -137,7 +142,7 @@ func (c *Currency) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if c.Cmp(ZeroCurrency) < 0 {
+	if c.i.Sign() < 0 {
 		c.i = *big.NewInt(0)
 		return ErrNegativeCurrency
 	}
@@ -169,7 +174,7 @@ func (c *Currency) Scan(s fmt.ScanState, ch rune) error {
 	if err != nil {
 		return err
 	}
-	if c.Cmp(ZeroCurrency) < 0 {
+	if c.i.Sign() < 0 {
 		return ErrNegativeCurrency
 	}
 	return nil

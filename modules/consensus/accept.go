@@ -41,7 +41,7 @@ func (s *State) checkMinerPayouts(b types.Block) (err error) {
 	// Find the sum of the miner payouts.
 	var payoutSum types.Currency
 	for _, payout := range b.MinerPayouts {
-		if payout.Value.Cmp(types.ZeroCurrency) <= 0 {
+		if payout.Value.IsZero() {
 			return errors.New("cannot have zero or negative miner payout")
 		}
 		payoutSum = payoutSum.Add(payout.Value)
