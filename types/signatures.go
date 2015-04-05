@@ -21,9 +21,13 @@ var (
 	SignatureEntropy = Specifier{'e', 'n', 't', 'r', 'o', 'p', 'y'}
 	SignatureEd25519 = Specifier{'e', 'd', '2', '5', '5', '1', '9'}
 
+	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
+	ErrFrivilousSignature        = errors.New("transaction contains a frivilous siganture")
 	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
-	ErrWholeTransactionViolation = errors.New("covered fields violation")
+	ErrPrematureSignature        = errors.New("timelock on signature has not expired")
+	ErrPublicKeyOveruse          = errors.New("public key was used multiple times while signing transaction")
 	ErrSortedUniqueViolation     = errors.New("sorted unique violation")
+	ErrWholeTransactionViolation = errors.New("covered fields violation")
 
 	ZeroUnlockHash = UnlockHash{0}
 )
@@ -274,12 +278,13 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siacoin output spent twice in the same transaction")
+			return ErrDoubleSpend
 		}
 
 		sigMap[id] = &inputSignatures{
 			remainingSignatures: input.UnlockConditions.NumSignatures,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
+			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
 		}
 	}
@@ -287,12 +292,13 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		id := crypto.Hash(termination.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("file contract terminated twice in the same transaction")
+			return ErrDoubleSpend
 		}
 
 		sigMap[id] = &inputSignatures{
 			remainingSignatures: termination.TerminationConditions.NumSignatures,
 			possibleKeys:        termination.TerminationConditions.PublicKeys,
+			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
 		}
 	}
@@ -300,12 +306,13 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		id := crypto.Hash(input.ParentID)
 		_, exists := sigMap[id]
 		if exists {
-			return errors.New("siafund output spent twice in the same transaction")
+			return ErrDoubleSpend
 		}
 
 		sigMap[id] = &inputSignatures{
 			remainingSignatures: input.UnlockConditions.NumSignatures,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
+			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
 		}
 	}
@@ -315,16 +322,16 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		// check that sig corresponds to an entry in sigMap
 		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
 		if !exists || inSig.remainingSignatures == 0 {
-			return errors.New("frivolous signature in transaction")
+			return ErrFrivilousSignature
 		}
 		// check that sig's key hasn't already been used
 		_, exists = inSig.usedKeys[sig.PublicKeyIndex]
 		if exists {
-			return errors.New("one public key was used twice while signing an input")
+			return ErrPublicKeyOveruse
 		}
 		// Check that the timelock has expired.
 		if sig.Timelock > currentHeight {
-			return errors.New("signature used before timelock expiration")
+			return ErrPrematureSignature
 		}
 
 		// Check that the signature verifies. Multiple signature schemes are
@@ -332,7 +339,8 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		publicKey := inSig.possibleKeys[sig.PublicKeyIndex]
 		switch publicKey.Algorithm {
 		case SignatureEntropy:
-			return crypto.ErrInvalidSignature
+			// Entropy cannot ever be used to sign a transaction.
+			return ErrEntropyKey
 
 		case SignatureEd25519:
 			// Decode the public key and signature.
@@ -360,6 +368,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 			// forking.
 		}
 
+		inSig.usedKeys[sig.PublicKeyIndex] = struct{}{}
 		inSig.remainingSignatures--
 	}
 

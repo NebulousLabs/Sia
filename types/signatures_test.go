@@ -2,6 +2,8 @@ package types
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // TestUnlockHash runs the UnlockHash code.
@@ -178,5 +180,192 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 	err = txn.validCoveredFields()
 	if err != ErrSortedUniqueViolation {
 		t.Error("Expecting ErrSortedUniqueViolation, got", err)
+	}
+}
+
+// TestTransactionValidSignatures probes the validSignatures method of the
+// Transaction type.
+func TestTransactionValidSignatures(t *testing.T) {
+	// Create keys for use in signing and verifying.
+	sk, pk, err := crypto.GenerateSignatureKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create UnlockConditions with 3 keys, 2 of which are required. The first
+	// possible key is a standard signature. The second key is an unknown
+	// signature type, which should always be accepted. The final type is an
+	// entropy type, which should never be accepted.
+	uc := UnlockConditions{
+		PublicKeys: []SiaPublicKey{
+			SiaPublicKey{
+				Algorithm: SignatureEd25519,
+				Key:       string(pk[:]),
+			},
+			SiaPublicKey{},
+			SiaPublicKey{
+				Algorithm: SignatureEntropy,
+			},
+		},
+		NumSignatures: 2,
+	}
+
+	// Create a transaction with each type of spendable output.
+	txn := Transaction{
+		SiacoinInputs: []SiacoinInput{
+			SiacoinInput{UnlockConditions: uc},
+		},
+		FileContractTerminations: []FileContractTermination{
+			FileContractTermination{TerminationConditions: uc},
+		},
+		SiafundInputs: []SiafundInput{
+			SiafundInput{UnlockConditions: uc},
+		},
+	}
+	txn.FileContractTerminations[0].ParentID[0] = 1 // can't overlap with other objects
+	txn.SiafundInputs[0].ParentID[0] = 2            // can't overlap with other objects
+
+	// Create the signatures that spend the output.
+	txn.Signatures = []TransactionSignature{
+		// First signatures use cryptography.
+		TransactionSignature{
+			Timelock:      5,
+			CoveredFields: CoveredFields{WholeTransaction: true},
+		},
+		TransactionSignature{
+			CoveredFields: CoveredFields{WholeTransaction: true},
+		},
+		TransactionSignature{
+			CoveredFields: CoveredFields{WholeTransaction: true},
+		},
+
+		// The second signatures should always work for being unrecognized
+		// types.
+		TransactionSignature{PublicKeyIndex: 1},
+		TransactionSignature{PublicKeyIndex: 1},
+		TransactionSignature{PublicKeyIndex: 1},
+	}
+	txn.Signatures[1].ParentID[0] = 1
+	txn.Signatures[2].ParentID[0] = 2
+	txn.Signatures[4].ParentID[0] = 1
+	txn.Signatures[5].ParentID[0] = 2
+	sigHash0 := txn.SigHash(0)
+	sigHash1 := txn.SigHash(1)
+	sigHash2 := txn.SigHash(2)
+	sig0, err := crypto.SignHash(sigHash0, sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig1, err := crypto.SignHash(sigHash1, sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig2, err := crypto.SignHash(sigHash2, sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn.Signatures[0].Signature = Signature(sig0[:])
+	txn.Signatures[1].Signature = Signature(sig1[:])
+	txn.Signatures[2].Signature = Signature(sig2[:])
+
+	// Check that the signing was successful.
+	err = txn.validSignatures(10)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Corrupt one of the sigantures.
+	sig0[0]++
+	txn.Signatures[0].Signature = Signature(sig0[:])
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error("Corrupted a signature but the txn was still accepted as valid!")
+	}
+	sig0[0]--
+	txn.Signatures[0].Signature = Signature(sig0[:])
+
+	// Fail the validCoveredFields check.
+	txn.Signatures[0].CoveredFields.SiacoinInputs = []uint64{33}
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error("failed to flunk the validCoveredFields check")
+	}
+	txn.Signatures[0].CoveredFields.SiacoinInputs = nil
+
+	// Double spend a SiacoinInput, FileContractTermination, and SiafundInput.
+	txn.SiacoinInputs = append(txn.SiacoinInputs, SiacoinInput{UnlockConditions: UnlockConditions{}})
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error("failed to double spend a siacoin input")
+	}
+	txn.SiacoinInputs = txn.SiacoinInputs[:len(txn.SiacoinInputs)-1]
+	txn.FileContractTerminations = append(txn.FileContractTerminations, FileContractTermination{TerminationConditions: UnlockConditions{}})
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error("failed to double spend a file contract termination")
+	}
+	txn.FileContractTerminations = txn.FileContractTerminations[:len(txn.FileContractTerminations)-1]
+	txn.SiafundInputs = append(txn.SiafundInputs, SiafundInput{UnlockConditions: UnlockConditions{}})
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error("failed to double spend a siafund input")
+	}
+	txn.SiafundInputs = txn.SiafundInputs[:len(txn.SiafundInputs)-1]
+
+	// Add a frivilous signature
+	txn.Signatures = append(txn.Signatures, TransactionSignature{})
+	err = txn.validSignatures(10)
+	if err != ErrFrivilousSignature {
+		t.Error(err)
+	}
+	txn.Signatures = txn.Signatures[:len(txn.Signatures)-1]
+
+	// Replace one of the cryptography signatures with an always-accepted
+	// signature. This should get rejected because the always-accepted
+	// signature has already been used.
+	tmpTxn0 := txn.Signatures[0]
+	txn.Signatures[0] = TransactionSignature{PublicKeyIndex: 1}
+	err = txn.validSignatures(10)
+	if err != ErrPublicKeyOveruse {
+		t.Error(err)
+	}
+	txn.Signatures[0] = tmpTxn0
+
+	// Fail the timelock check for signatures.
+	err = txn.validSignatures(4)
+	if err != ErrPrematureSignature {
+		t.Error(err)
+	}
+
+	// Try to spend an entropy signature.
+	txn.Signatures[0] = TransactionSignature{PublicKeyIndex: 2}
+	err = txn.validSignatures(10)
+	if err != ErrEntropyKey {
+		t.Error(err)
+	}
+	txn.Signatures[0] = tmpTxn0
+
+	// Insert a malformed public key into the transaction.
+	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = "malformed"
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error(err)
+	}
+	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = string(pk[:])
+
+	// Insert a malformed signature into the transaction.
+	txn.Signatures[0].Signature = "malformed"
+	err = txn.validSignatures(10)
+	if err == nil {
+		t.Error(err)
+	}
+	txn.Signatures[0] = tmpTxn0
+
+	// Try to spend a transaction when not every required signature is
+	// available.
+	txn.Signatures = txn.Signatures[1:]
+	err = txn.validSignatures(10)
+	if err != ErrMissingSignatures {
+		t.Error(err)
 	}
 }
