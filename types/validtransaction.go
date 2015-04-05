@@ -1,5 +1,10 @@
 package types
 
+// validtransaction.go has functions for checking whether a transaction is
+// valid outside of the context of a consensus set. This means checking the
+// size of the transaction, the content of the signatures, and a large set of
+// other rules that are inherent to how a transaction should be constructed.
+
 import (
 	"errors"
 
@@ -7,46 +12,16 @@ import (
 )
 
 var (
-	ErrMissingSiacoinOutput = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingFileContract  = errors.New("transaction terminates a nonexisting file contract")
-	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
+	ErrDoubleSpend                     = errors.New("transaction uses a parent object twice")
+	ErrFileContractExpirationViolation = errors.New("file contract must expire at least one block after it starts")
+	ErrFileContractStartViolation      = errors.New("file contract must start in the future")
+	ErrFileContractOutputSumViolation  = errors.New("file contract has invalid output sums")
+	ErrNonZeroClaimStart               = errors.New("transaction has a siafund output with a non-zero siafund claim")
+	ErrStorageProofWithOutputs         = errors.New("transaction has both a storage proof and other outputs")
+	ErrTimelockNotSatisfied            = errors.New("timelock has not been met")
+	ErrTransactionTooLarge             = errors.New("transaction is too large to fit in a block")
+	ErrZeroOutput                      = errors.New("transaction cannot have an output or payout that has zero value")
 )
-
-// SiacoinOutputSum returns the sum of all the siacoin outputs in the
-// transaction, which must match the sum of all the siacoin inputs. Siacoin
-// outputs created by storage proofs and siafund outputs are not considered, as
-// they were considered when the contract responsible for funding them was
-// created.
-func (t Transaction) SiacoinOutputSum() (sum Currency) {
-	// Add the miner fees.
-	for _, fee := range t.MinerFees {
-		sum = sum.Add(fee)
-	}
-
-	// Add the contract payouts
-	for _, contract := range t.FileContracts {
-		sum = sum.Add(contract.Payout)
-	}
-
-	// Add the outputs
-	for _, output := range t.SiacoinOutputs {
-		sum = sum.Add(output.Value)
-	}
-
-	return
-}
-
-// validUnlockConditions checks that the conditions of uc have been met. The
-// height is taken as input so that modules who might be at a different height
-// can do the verification without needing to use their own function.
-// Additionally, it means that the function does not need to be a method of the
-// consensus set.
-func validUnlockConditions(uc UnlockConditions, currentHeight BlockHeight) (err error) {
-	if uc.Timelock > currentHeight {
-		return errors.New("unlock condition timelock has not been met")
-	}
-	return
-}
 
 // correctFileContracts checks that the file contracts adhere to the file
 // contract rules.
@@ -55,10 +30,10 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 	for _, fc := range t.FileContracts {
 		// Check that start and expiration are reasonable values.
 		if fc.Start <= currentHeight {
-			return errors.New("contract must start in the future")
+			return ErrFileContractStartViolation
 		}
 		if fc.Expiration <= fc.Start {
-			return errors.New("contract duration must be at least one block")
+			return ErrFileContractExpirationViolation
 		}
 
 		// Check that the valid proof outputs sum to the payout after the
@@ -73,10 +48,10 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		}
 		outputPortion := fc.Payout.Sub(fc.Tax())
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
-			return errors.New("contract valid proof outputs do not sum to the payout minus the siafund fee")
+			return ErrFileContractOutputSumViolation
 		}
 		if missedProofOutputSum.Cmp(fc.Payout) != 0 {
-			return errors.New("contract missed proof outputs do not sum to the payout")
+			return ErrFileContractOutputSumViolation
 		}
 	}
 	return nil
@@ -89,7 +64,34 @@ func (t Transaction) fitsInABlock() error {
 	// Check that the transaction will fit inside of a block, leaving 5kb for
 	// overhead.
 	if uint64(len(encoding.Marshal(t))) > BlockSizeLimit-5e3 {
-		return errors.New("transaction is too large to fit in a block")
+		return ErrTransactionTooLarge
+	}
+	return nil
+}
+
+// followsMinimumValues checks that all outputs adhere to the rules for the
+// minimum allowed value (generally 1).
+func (t Transaction) followsMinimumValues() error {
+	for _, sco := range t.SiacoinOutputs {
+		if sco.Value.IsZero() {
+			return ErrZeroOutput
+		}
+	}
+	for _, fc := range t.FileContracts {
+		if fc.Payout.IsZero() {
+			return ErrZeroOutput
+		}
+	}
+	for _, sfo := range t.SiafundOutputs {
+		// SiafundOutputs are special in that they have a reserved field, the
+		// ClaimStart, which gets sent over the wire but must always be set to
+		// 0. The Value must always be greater than 0.
+		if !sfo.ClaimStart.IsZero() {
+			return ErrNonZeroClaimStart
+		}
+		if sfo.Value.IsZero() {
+			return ErrZeroOutput
+		}
 	}
 	return nil
 }
@@ -103,47 +105,25 @@ func (t Transaction) followsStorageProofRules() error {
 	}
 
 	// If there are storage proofs, there can be no siacoin outputs, siafund
-	// outputs, new file contracts, or file contract terminations.
+	// outputs, new file contracts, or file contract terminations. These
+	// restrictions are in place because a storage proof can be invalidated by
+	// a simple reorg, which will also invalidate the rest of the transaction.
+	// These restrictions minimize blockchain turbulence. These other types
+	// cannot be invalidated by a simple reorg, and must instead by replaced by
+	// a conflicting transaction.
 	if len(t.SiacoinOutputs) != 0 {
-		return errors.New("transaction contains storage proofs and siacoin outputs")
+		return ErrStorageProofWithOutputs
 	}
 	if len(t.FileContracts) != 0 {
-		return errors.New("transaction contains storage proofs and file contracts")
+		return ErrStorageProofWithOutputs
 	}
 	if len(t.FileContractTerminations) != 0 {
-		return errors.New("transaction contains storage proofs and file contract terminations")
+		return ErrStorageProofWithOutputs
 	}
 	if len(t.SiafundOutputs) != 0 {
-		return errors.New("transaction contains storage proofs and siafund outputs")
+		return ErrStorageProofWithOutputs
 	}
 
-	return nil
-}
-
-// followsMinimumValues checks that all outputs adhere to the rules for the
-// minimum allowed value (generally 1).
-func (t Transaction) followsMinimumValues() error {
-	for _, sco := range t.SiacoinOutputs {
-		if sco.Value.IsZero() {
-			return errors.New("empty siacoin output not allowed")
-		}
-	}
-	for _, fc := range t.FileContracts {
-		if fc.Payout.IsZero() {
-			return errors.New("file contract must have non-zero payout")
-		}
-	}
-	for _, sfo := range t.SiafundOutputs {
-		// Check that the ClaimStart is set to 0.
-		if !sfo.ClaimStart.IsZero() {
-			return errors.New("invalid siafund output presented")
-		}
-
-		// Outputs must all be at least 1.
-		if sfo.Value.IsZero() {
-			return errors.New("siafund outputs must have at least 1 siafund")
-		}
-	}
 	return nil
 }
 
@@ -160,7 +140,7 @@ func (t Transaction) noRepeats() error {
 	for _, sci := range t.SiacoinInputs {
 		_, exists := siacoinInputs[sci.ParentID]
 		if exists {
-			return errors.New("output spent twice in the same transaction")
+			return ErrDoubleSpend
 		}
 		siacoinInputs[sci.ParentID] = struct{}{}
 	}
@@ -168,14 +148,14 @@ func (t Transaction) noRepeats() error {
 	for _, sp := range t.StorageProofs {
 		_, exists := doneFileContracts[sp.ParentID]
 		if exists {
-			return errors.New("storage proof submitted earlier this transaction")
+			return ErrDoubleSpend
 		}
 		doneFileContracts[sp.ParentID] = struct{}{}
 	}
 	for _, fct := range t.FileContractTerminations {
 		_, exists := doneFileContracts[fct.ParentID]
 		if exists {
-			return errors.New("multiple terminations for the same contract in transaction")
+			return ErrDoubleSpend
 		}
 		doneFileContracts[fct.ParentID] = struct{}{}
 	}
@@ -183,11 +163,23 @@ func (t Transaction) noRepeats() error {
 	for _, sfi := range t.SiafundInputs {
 		_, exists := siafundInputs[sfi.ParentID]
 		if exists {
-			return errors.New("siafund output spent twice in the same transaction")
+			return ErrDoubleSpend
 		}
 		siafundInputs[sfi.ParentID] = struct{}{}
 	}
 	return nil
+}
+
+// validUnlockConditions checks that the conditions of uc have been met. The
+// height is taken as input so that modules who might be at a different height
+// can do the verification without needing to use their own function.
+// Additionally, it means that the function does not need to be a method of the
+// consensus set.
+func validUnlockConditions(uc UnlockConditions, currentHeight BlockHeight) (err error) {
+	if uc.Timelock > currentHeight {
+		return ErrTimelockNotSatisfied
+	}
+	return
 }
 
 // validUnlockConditions checks that all of the unlock conditions in the

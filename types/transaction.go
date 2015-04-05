@@ -296,6 +296,30 @@ func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashObject(id))
 }
 
+// SiacoinOutputSum returns the sum of all the siacoin outputs in the
+// transaction, which must match the sum of all the siacoin inputs. Siacoin
+// outputs created by storage proofs and siafund outputs are not considered, as
+// they were considered when the contract responsible for funding them was
+// created.
+func (t Transaction) SiacoinOutputSum() (sum Currency) {
+	// Add the siacoin outputs.
+	for _, sco := range t.SiacoinOutputs {
+		sum = sum.Add(sco.Value)
+	}
+
+	// Add the file contract payouts.
+	for _, fc := range t.FileContracts {
+		sum = sum.Add(fc.Payout)
+	}
+
+	// Add the miner fees.
+	for _, fee := range t.MinerFees {
+		sum = sum.Add(fee)
+	}
+
+	return
+}
+
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
 	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)

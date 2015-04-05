@@ -6,7 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
-// TestTransactionIDs probes all of the ID functions of the transaction type.
+// TestTransactionIDs probes all of the ID functions of the Transaction type.
 func TestIDs(t *testing.T) {
 	// Create every type of ID using empty fields.
 	txn := Transaction{
@@ -50,6 +50,29 @@ func TestIDs(t *testing.T) {
 			t.Error("id repeat for index", i)
 		}
 		knownIDs[id] = struct{}{}
+	}
+}
+
+// TestTransactionSiacoinOutputSum probes the SiacoinOutputSum method of the
+// Transaction type.
+func TestTransactionSiacoinOutputSum(t *testing.T) {
+	// Create a transaction with all types of siacoin outputs.
+	txn := Transaction{
+		SiacoinOutputs: []SiacoinOutput{
+			SiacoinOutput{Value: NewCurrency64(1)},
+			SiacoinOutput{Value: NewCurrency64(20)},
+		},
+		FileContracts: []FileContract{
+			FileContract{Payout: NewCurrency64(300)},
+			FileContract{Payout: NewCurrency64(4000)},
+		},
+		MinerFees: []Currency{
+			NewCurrency64(50000),
+			NewCurrency64(600000),
+		},
+	}
+	if txn.SiacoinOutputSum().Cmp(NewCurrency64(654321)) != 0 {
+		t.Error("wrong siacoin output sum was calculated, got:", txn.SiacoinOutputSum())
 	}
 }
 
