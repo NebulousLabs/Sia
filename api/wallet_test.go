@@ -11,8 +11,8 @@ import (
 // The first balance should decrease, and the second balance should increase
 // proportionally.
 func TestSendCoins(t *testing.T) {
-	sender := newServerTester(t)
-	receiver := sender.addPeer()
+	sender := newServerTester("TestSendCoins1", t)
+	receiver := sender.addPeer("TestSendCoins2")
 
 	// get current balances
 	var oldSenderStatus modules.WalletInfo

@@ -17,7 +17,7 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Create a server and add a host to the network.
-	st := newServerTester(t)
+	st := newServerTester("TestUploadAndDownload", t)
 	st.announceHost()
 
 	for st.hostdb.NumHosts() == 0 {
