@@ -30,6 +30,8 @@ func (g *Gateway) addPeer(peer modules.NetAddress) error {
 	}
 	g.peers[peer] = 0
 	g.save()
+
+	g.log.Println("INFO: added new peer", peer)
 	return nil
 }
 
@@ -39,6 +41,7 @@ func (g *Gateway) removePeer(peer modules.NetAddress) error {
 	}
 	delete(g.peers, peer)
 	g.save()
+	g.log.Println("INFO: removed peer", peer)
 	return nil
 }
 
@@ -61,6 +64,7 @@ func (g *Gateway) addStrike(peer modules.NetAddress) {
 		return
 	}
 	g.peers[peer]++
+	g.log.Println("INFO: added a strike to peer", peer)
 	// don't remove bad peers if we aren't well-connected
 	if g.peers[peer] > maxStrikes && len(g.peers) > minPeers {
 		g.removePeer(peer)
@@ -97,6 +101,7 @@ func (g *Gateway) addMe(conn modules.NetConn) error {
 	if err != nil {
 		return err
 	}
+	g.log.Printf("INFO: %v wants to add %v to our peer list\n", conn.Addr(), peer)
 	if !g.Ping(peer) {
 		return errUnreachable
 	}
@@ -126,6 +131,7 @@ func (g *Gateway) sharePeers(conn modules.NetConn) error {
 //
 // TODO: maybe iterate until we have enough new peers?
 func (g *Gateway) requestPeers(addr modules.NetAddress) error {
+	g.log.Println("INFO: requesting peers from", addr)
 	var newPeers []modules.NetAddress
 	err := g.RPC(addr, "SharePeers", func(conn modules.NetConn) error {
 		return conn.ReadObject(&newPeers, maxSharedPeers*maxAddrLength)
@@ -133,6 +139,7 @@ func (g *Gateway) requestPeers(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
+	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(newPeers))
 
 	var wg sync.WaitGroup
 	for _, peer := range newPeers {

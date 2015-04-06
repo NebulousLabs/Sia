@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"log"
 	"net"
 	"os"
 	"time"
@@ -43,6 +44,8 @@ type Gateway struct {
 	// saveDir is the path used to save/load peers.
 	saveDir string
 
+	log *log.Logger
+
 	mu *sync.RWMutex
 }
 
@@ -63,6 +66,8 @@ func (g *Gateway) Close() error {
 // Bootstrap handles mutexes manually to avoid having a lock during network
 // communication.
 func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
+	g.log.Println("INFO: initiated bootstrapping to", bootstrapPeer)
+
 	// contact the bootstrap peer
 	if !g.Ping(bootstrapPeer) {
 		return errUnreachable
@@ -74,6 +79,7 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
 	if err != nil {
+		g.log.Println("WARN: couldn't learn hostname from bootstrap peer; using myexternalip.com")
 		err = g.getExternalIP()
 		if err != nil {
 			return
@@ -93,6 +99,8 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 
 	// spawn synchronizer
 	go g.threadedResynchronize()
+
+	g.log.Printf("INFO: successfully bootstrapped to %v (this does not mean you are synchronized)", bootstrapPeer)
 
 	return
 }
@@ -125,19 +133,25 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 		return
 	}
 
-	g = &Gateway{
-		state:      s,
-		myAddr:     modules.NetAddress(addr),
-		handlerMap: make(map[rpcID]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]int),
-		saveDir:    saveDir,
-		mu:         sync.New(time.Second*1, 0),
-	}
-
 	// Create the directory if it doesn't exist.
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return
+	}
+
+	// Create the logger.
+	logger, err := makeLogger(saveDir)
+	if err != nil {
+		return
+	}
+
+	g = &Gateway{
+		state:      s,
+		handlerMap: make(map[rpcID]modules.RPCFunc),
+		peers:      make(map[modules.NetAddress]int),
+		saveDir:    saveDir,
+		mu:         sync.New(time.Second*1, 0),
+		log:        logger,
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))
@@ -146,10 +160,18 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	g.RegisterRPC("SharePeers", g.sharePeers)
 	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
-	// spawn RPC handler
+	g.log.Println("INFO: gateway created, started logging")
+
+	// Spawn the RPC handler.
 	err = g.startListener(addr)
 	if err != nil {
 		return
+	}
+
+	// Load old peer list. If it doesn't exist, no problem, but if it does, we
+	// want to know about any errors preventing us from loading it.
+	if loadErr := g.load(); !os.IsNotExist(loadErr) {
+		return nil, loadErr
 	}
 
 	return

@@ -9,6 +9,15 @@ import (
 
 type rpcID [8]byte
 
+func (id rpcID) String() string {
+	for i := range id {
+		if id[i] == 0 {
+			id[i] = ' '
+		}
+	}
+	return string(id[:])
+}
+
 // handlerName truncates a string to 8 bytes. If len(name) < 8, the remaining
 // bytes are 0. A handlerName is specified at the beginning of each network
 // call, indicating which function should handle the connection.
@@ -77,6 +86,10 @@ func (g *Gateway) startListener(addr string) (err error) {
 	if err != nil {
 		return
 	}
+	// set myAddr (this is necessary if addr == ":0", in which case the OS
+	// will assign us a random open port)
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
+	g.log.Println("INFO: according to the listener, our address is", g.myAddr)
 
 	go func() {
 		for {
@@ -99,7 +112,7 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 	defer conn.Close()
 	var id rpcID
 	if err := conn.ReadObject(&id, 8); err != nil {
-		// TODO: log error
+		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v\n", conn.Addr(), err)
 		return
 	}
 	// call registered handler for this ID
@@ -107,8 +120,12 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 	fn, ok := g.handlerMap[id]
 	g.mu.RUnlock(counter)
 	if ok {
-		fn(conn)
-		// TODO: log error
+		g.log.Printf("INFO: handling RPC \"%v\" from %v\n", id, conn.Addr())
+		if err := fn(conn); err != nil {
+			g.log.Printf("WARN: incoming RPC \"%v\" failed: %v\n", id, err)
+		}
+	} else {
+		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%s\"", conn.Addr(), id[:])
 	}
 	return
 }
@@ -116,13 +133,17 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
 // list. The calls are run in parallel.
 func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
+	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", handlerName(name), len(g.peers))
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
 	counter := g.mu.RLock()
 	for peer := range g.peers {
 		// contact each peer in a separate thread
 		go func(peer modules.NetAddress) {
-			g.RPC(peer, name, fn)
+			err := g.RPC(peer, name, fn)
+			if err != nil {
+				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v\n", handlerName(name), peer, err)
+			}
 			wg.Done()
 		}(peer)
 	}
