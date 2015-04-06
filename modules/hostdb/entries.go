@@ -88,8 +88,8 @@ func (hdb *HostDB) threadedInsertActiveHost(entry *modules.HostEntry) {
 		return
 	}
 
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 	entry.HostSettings = hs
 
 	hdb.insertCompleteHostEntry(entry)
@@ -148,16 +148,16 @@ func (hdb *HostDB) FlagHost(addr modules.NetAddress) error {
 
 // Insert attempts to insert a host entry into the database.
 func (hdb *HostDB) Insert(entry modules.HostEntry) error {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 	hdb.insert(entry)
 	return nil
 }
 
 // NumHosts returns the number of hosts in the active database.
 func (hdb *HostDB) NumHosts() int {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 
 	if hdb.hostTree == nil {
 		return 0
@@ -168,8 +168,8 @@ func (hdb *HostDB) NumHosts() int {
 // RandomHost pulls a random host from the hostdb weighted according to the
 // internal metrics of the hostdb.
 func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 
 	if len(hdb.activeHosts) == 0 {
 		err = errors.New("no hosts found")
@@ -187,7 +187,7 @@ func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
 
 // Remove is the thread-safe version of remove.
 func (hdb *HostDB) Remove(addr modules.NetAddress) error {
-	hdb.mu.Lock()
-	defer hdb.mu.Unlock()
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 	return hdb.remove(addr)
 }

@@ -101,17 +101,17 @@ func (rwm *RWMutex) safeLock(read bool) int {
 	// Safely register that a lock has been triggered.
 	rwm.openLocksMutex.Lock()
 	li.lockTime = time.Now()
-	counter := rwm.openLocksCounter
-	rwm.openLocks[counter] = li
+	id := rwm.openLocksCounter
+	rwm.openLocks[id] = li
 	rwm.openLocksCounter++
 	rwm.openLocksMutex.Unlock()
 
-	return counter
+	return id
 }
 
 // safeUnlock is the generic function for doing safe unlocking. If the lock had
 // to be removed because a deadlock was detected, an error is printed.
-func (rwm *RWMutex) safeUnlock(read bool, counter int) {
+func (rwm *RWMutex) safeUnlock(read bool, id int) {
 	// Get the call stack.
 	callingFiles := make([]string, rwm.callDepth+1)
 	callingLines := make([]int, rwm.callDepth+1)
@@ -123,9 +123,9 @@ func (rwm *RWMutex) safeUnlock(read bool, counter int) {
 	defer rwm.openLocksMutex.Unlock()
 
 	// Check if a deadlock has been detected and fixed manually.
-	_, exists := rwm.openLocks[counter]
+	_, exists := rwm.openLocks[id]
 	if !exists {
-		fmt.Printf("A lock was held until deadlock, subsequent call to unlock failed. id '%v'. Call stack:\n", counter)
+		fmt.Printf("A lock was held until deadlock, subsequent call to unlock failed. id '%v'. Call stack:\n", id)
 		for i := 0; i <= rwm.callDepth; i++ {
 			fmt.Printf("\tFile: '%v:%v'\n", callingFiles[i], callingLines[i])
 		}
@@ -138,7 +138,7 @@ func (rwm *RWMutex) safeUnlock(read bool, counter int) {
 	} else {
 		rwm.mu.Unlock()
 	}
-	delete(rwm.openLocks, counter)
+	delete(rwm.openLocks, id)
 }
 
 // RLock will read lock the RWMutex. The return value must be used as input
@@ -149,8 +149,8 @@ func (rwm *RWMutex) RLock() int {
 
 // RUnlock will read unlock the RWMutex. The return value of calling RLock must
 // be used as input.
-func (rwm *RWMutex) RUnlock(counter int) {
-	rwm.safeUnlock(true, counter)
+func (rwm *RWMutex) RUnlock(id int) {
+	rwm.safeUnlock(true, id)
 }
 
 // Lock will lock the RWMutex. The return value must be used as input when
@@ -161,6 +161,6 @@ func (rwm *RWMutex) Lock() int {
 
 // Unlock will unlock the RWMutex. The return value of calling Lock must be
 // used as input.
-func (rwm *RWMutex) Unlock(counter int) {
-	rwm.safeUnlock(false, counter)
+func (rwm *RWMutex) Unlock(id int) {
+	rwm.safeUnlock(false, id)
 }

@@ -2,12 +2,11 @@ package hostdb
 
 import (
 	"errors"
-	"sync"
+	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 var (
@@ -15,46 +14,40 @@ var (
 	ErrMissingGenesisBlock = errors.New("state doesn't have a genesis block")
 )
 
-// The HostDB is a database of potential hosts. It assigns a weight to each
-// host based on their hosting parameters, and then can select hosts at random
-// for uploading files.
-type HostDB struct {
-	state       *consensus.State
-	gateway     modules.Gateway
-	recentBlock types.BlockID
+type (
+	// The HostDB is a database of potential hosts. It assigns a weight to each
+	// host based on their hosting parameters, and then can select hosts at random
+	// for uploading files.
+	HostDB struct {
+		state   *consensus.State
+		gateway modules.Gateway
 
-	hostTree    *hostNode
-	activeHosts map[string]*hostNode
-	allHosts    map[modules.NetAddress]*modules.HostEntry
+		hostTree    *hostNode
+		activeHosts map[string]*hostNode
+		allHosts    map[modules.NetAddress]*modules.HostEntry
 
-	mu sync.RWMutex
-}
+		mu *sync.RWMutex
+	}
+)
 
 // New returns an empty HostDatabase.
-func New(s *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
-	if s == nil {
+func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
+	if cs == nil {
 		err = ErrNilState
 		return
 	}
 
-	genesisBlock, exists := s.BlockAtHeight(0)
-	if !exists {
-		if build.DEBUG {
-			panic(ErrMissingGenesisBlock)
-		}
-		err = ErrMissingGenesisBlock
-		return
-	}
-
 	hdb = &HostDB{
-		state:       s,
-		gateway:     g,
-		recentBlock: genesisBlock.ID(),
+		state:   cs,
+		gateway: g,
+
 		activeHosts: make(map[string]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*modules.HostEntry),
+
+		mu: sync.New(1*time.Second, 0),
 	}
 
-	go hdb.threadedConsensusListen()
+	cs.Subscribe(hdb)
 
 	return
 }

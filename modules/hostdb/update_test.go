@@ -36,11 +36,11 @@ func TestFindHostAnnouncements(t *testing.T) {
 		ArbitraryData: []string{modules.PrefixHostAnnouncement},
 	}
 	hdbt.MineAndSubmitCurrentBlock([]types.Transaction{dirtyAnnouncementTxn})
-	hdbt.mu.Lock()
+	id := hdbt.mu.Lock()
 	if len(hdbt.allHosts) != 0 {
 		t.Error("expecting 0 hosts in allHosts, got:", len(hdbt.allHosts))
 	}
-	hdbt.mu.Unlock()
+	hdbt.mu.Unlock(id)
 
 	// Submit a host announcement to the blockchain for a host that won't
 	// respond.
@@ -55,11 +55,11 @@ func TestFindHostAnnouncements(t *testing.T) {
 	// Update the host db and check that the announcement made it to the
 	// inactive set of hosts.
 	for {
-		hdbt.mu.RLock()
+		id := hdbt.mu.RLock()
 		if len(hdbt.allHosts) == 1 {
 			break
 		}
-		hdbt.mu.RUnlock()
+		hdbt.mu.RUnlock(id)
 		time.Sleep(time.Millisecond)
 	}
 }
