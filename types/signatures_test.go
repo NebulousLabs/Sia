@@ -64,13 +64,7 @@ func TestSigHash(t *testing.T) {
 
 // TestSortedUnique probes the sortedUnique function.
 func TestSortedUnique(t *testing.T) {
-	su := []uint64{
-		3,
-		5,
-		6,
-		8,
-		12,
-	}
+	su := []uint64{3, 5, 6, 8, 12}
 	if !sortedUnique(su, 13) {
 		t.Error("sortedUnique rejected a valid array")
 	}
@@ -81,34 +75,17 @@ func TestSortedUnique(t *testing.T) {
 		t.Error("sortedUnique accepted an invalid max")
 	}
 
-	unsorted := []uint64{
-		3,
-		5,
-		3,
-	}
+	unsorted := []uint64{3, 5, 3}
 	if sortedUnique(unsorted, 6) {
 		t.Error("sortedUnique accepted an unsorted array")
 	}
 
-	repeats := []uint64{
-		2,
-		4,
-		4,
-		7,
-	}
+	repeats := []uint64{2, 4, 4, 7}
 	if sortedUnique(repeats, 8) {
 		t.Error("sortedUnique accepted an array with repeats")
 	}
 
-	bothFlaws := []uint64{
-		2,
-		3,
-		4,
-		5,
-		6,
-		6,
-		4,
-	}
+	bothFlaws := []uint64{2, 3, 4, 5, 6, 6, 4}
 	if sortedUnique(bothFlaws, 7) {
 		t.Error("Sorted unique accetped array with multiple flaws")
 	}
