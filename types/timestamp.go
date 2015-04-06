@@ -1,5 +1,8 @@
 package types
 
+// timestamp.go defines the timestamp type and implements sort.Interface
+// interface for slices of timestamps.
+
 import (
 	"time"
 )
@@ -9,14 +12,17 @@ type (
 	TimestampSlice []Timestamp
 )
 
+// Len is part of sort.Interface
 func (ts TimestampSlice) Len() int {
 	return len(ts)
 }
 
+// Less is part of sort.Interface
 func (ts TimestampSlice) Less(i, j int) bool {
 	return ts[i] < ts[j]
 }
 
+// Swap is part of sort.Interface
 func (ts TimestampSlice) Swap(i, j int) {
 	ts[i], ts[j] = ts[j], ts[i]
 }

@@ -5,7 +5,29 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/encoding"
 )
+
+// TestNewCurrency initializes a standard new currency.
+func TestNewCurrency(t *testing.T) {
+	b := big.NewInt(481)
+	c := NewCurrency(b)
+	if b.String() != c.String() {
+		t.Error("NewCurrency does't seem to work properly")
+	}
+}
+
+// TestCurrencyAdd probes the addition function of the currency type.
+func TestCurrencyAdd(t *testing.T) {
+	c7 := NewCurrency64(7)
+	c12 := NewCurrency64(12)
+	c19 := NewCurrency64(19)
+
+	if c7.Add(c12).Cmp(c19) != 0 {
+		t.Error("Add doesn't seem to work right")
+	}
+}
 
 // TestCurrencyToBig tests the Big method for the currency type
 func TestCurrencyToBig(t *testing.T) {
@@ -35,8 +57,52 @@ func TestCurrencyDiv(t *testing.T) {
 	}
 }
 
-// TestCurrencySqrt checks that the sqrt function of the currency type has been
-// correctly implemented.
+// TestCurrencyMul probes the Mul function of the currency type.
+func TestCurrencyMul(t *testing.T) {
+	c5 := NewCurrency64(5)
+	c6 := NewCurrency64(6)
+	c30 := NewCurrency64(30)
+	if c5.Mul(c6).Cmp(c30) != 0 {
+		t.Error("Multiplying 5 by 6 should equal 30")
+	}
+}
+
+// TestCurrencyMulFloat probes the MulFloat function of the currency type.
+func TestCurrencyMulFloat(t *testing.T) {
+	c5 := NewCurrency64(5)
+	c7 := NewCurrency64(7)
+	c10 := NewCurrency64(10)
+	if c5.MulFloat(2).Cmp(c10) != 0 {
+		t.Error("Multiplying 5 by 2 should return 10")
+	}
+	if c5.MulFloat(1.5).Cmp(c7) != 0 {
+		t.Error("Multiplying 5 by 1.5 should return 7")
+	}
+}
+
+// TestCurrencyRoundDown probes the RoundDown function of the currency type.
+func TestCurrencyRoundDown(t *testing.T) {
+	// 10,000 is chosen because that's how many siafunds there usually are.
+	c40000 := NewCurrency64(40000)
+	c45000 := NewCurrency64(45000)
+	if c45000.RoundDown(10000).Cmp(c40000) != 0 {
+		t.Error("rounding down 45000 to the nearest 10000 didn't work")
+	}
+}
+
+// TestCurrencyIsZero probes the IsZero function of the currency type.
+func TestCurrencyIsZero(t *testing.T) {
+	c0 := NewCurrency64(0)
+	c1 := NewCurrency64(1)
+	if !c0.IsZero() {
+		t.Error("IsZero returns wrong value for 0")
+	}
+	if c1.IsZero() {
+		t.Error("IsZero returns wrong value for 1")
+	}
+}
+
+// TestCurrencySqrt probes the Sqrt function of the currency type.
 func TestCurrencySqrt(t *testing.T) {
 	c8 := NewCurrency64(8)
 	c64 := NewCurrency64(64)
@@ -49,6 +115,16 @@ func TestCurrencySqrt(t *testing.T) {
 	}
 	if c8.Cmp(sqrt80) != 0 {
 		t.Error("square root of 80 should be 8")
+	}
+}
+
+// TestCurrencySub probes the Sub function of the currency type.
+func TestCurrencySub(t *testing.T) {
+	c3 := NewCurrency64(3)
+	c13 := NewCurrency64(13)
+	c16 := NewCurrency64(16)
+	if c16.Sub(c3).Cmp(c13) != 0 {
+		t.Error("16 minus 3 should equal 13")
 	}
 }
 
@@ -121,6 +197,21 @@ func TestCurrencyScan(t *testing.T) {
 	_, err = fmt.Sscan("z", &c0)
 	if err == nil {
 		t.Fatal("scan is accepting garbage input")
+	}
+}
+
+// TestCurrencyEncoding checks that a currency can encode and decode without
+// error.
+func TestCurrencyEncoding(t *testing.T) {
+	c := NewCurrency64(351)
+	cMar := encoding.Marshal(c)
+	var cUmar Currency
+	err := encoding.Unmarshal(cMar, &cUmar)
+	if err != nil {
+		t.Error("Error unmarshalling a currency:", err)
+	}
+	if cUmar.Cmp(c) != 0 {
+		t.Error("Marshalling and Unmarshalling a currency did not work correctly")
 	}
 }
 

@@ -47,22 +47,19 @@ type blockNode struct {
 }
 
 // childDepth returns the depth of a blockNode's child nodes. The depth is the
-// "sum" of the current depth and current target, where sum is defined as:
-//
-//     sum(x,y) := 1/(1/x + 1/y)
+// "sum" of the current depth and current difficulty. See target.Add for more
+// detailed information.
 func (bn *blockNode) childDepth() (depth types.Target) {
-	cumulativeDifficulty := new(big.Rat).Add(bn.target.Inverse(), bn.depth.Inverse())
-	return types.RatToTarget(new(big.Rat).Inv(cumulativeDifficulty))
+	return bn.depth.Add(bn.target)
 }
 
 // heavierThan returns true if the blockNode is sufficiently heavier than
-// 'cmp', where "sufficient" is defined as:
-//
-//     (1/bn.depth) - (1/cmp.depth) > (1/cmp.target) * SurpassThreshold
+// 'cmp'. 'cmp' is expected to be the current block node. "Sufficient" means
+// that the weight of 'bn' exceeds the weight of 'cmp' by:
+//		(the target of 'cmp' * 'Surpass Threshold')
 func (bn *blockNode) heavierThan(cmp *blockNode) bool {
-	diff := new(big.Rat).Sub(bn.depth.Inverse(), cmp.depth.Inverse())
-	threshold := new(big.Rat).Mul(cmp.target.Inverse(), SurpassThreshold)
-	return diff.Cmp(threshold) > 0
+	requirement := cmp.depth.Add(cmp.target.Mul(SurpassThreshold))
+	return requirement.Cmp(bn.depth) > 0
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node

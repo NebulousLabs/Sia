@@ -190,3 +190,30 @@ will have higher performace because the code should never fail anyway.
 If the code is continually checking items that should be universally true,
 mistakes are easier to catch during testing, and side effects are less likely
 to go unnoticed.
+
+Testing
+-------
+
+The test suite code needs to have the same level of quality as the rest of the
+codebase.
+
+Some parts of the codebase are still being designed and changed rapidly. These
+portions only need to test the basic major functionality of the code, but
+should not be expected to work well in production. These parts of the codebase
+are not polished because it is expected that they will be changed dramatically
+in the near future.
+
+The remaining parts of the codebase are expected to be polished, and this
+includes a comprehensive test suite. Except for intentionally unreachable code
+(usually in the form of sanity checks), test coverage needs to be 100%. Tests
+should be organized, well commented, and easy to both read and understand. 100%
+should be seen as a minimum bar. It is not sufficient to merely see that code
+has run without producing a runtime error, there needs to be checks that the
+code has produced the expected results. Often, 100% test coverage can be
+reached by testing 1 function which calls numerous other functions, but these
+functions can silently output unexpected/incorrect results. Where possible,
+each function should be tested individually.
+
+Encoding objects is an important part of Sia. Any objects that get declared in
+polished code need to have a test which checks that they can be marshalled and
+unmarshalled without error.

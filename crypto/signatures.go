@@ -36,7 +36,7 @@ func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
 	return
 }
 
-// SignHAsh signs a message using a secret key. An error is returned if the
+// SignHash signs a message using a secret key. An error is returned if the
 // secret key is nil.
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
 	skNorm := [SecretKeySize]byte(sk)

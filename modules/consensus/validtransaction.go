@@ -8,6 +8,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	ErrMissingSiacoinOutput = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingFileContract  = errors.New("transaction terminates a nonexisting file contract")
+	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
+)
+
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
 func (s *State) validSiacoins(t types.Transaction) (err error) {
@@ -16,7 +22,7 @@ func (s *State) validSiacoins(t types.Transaction) (err error) {
 		// Check that the input spends an existing output.
 		sco, exists := s.siacoinOutputs[sci.ParentID]
 		if !exists {
-			return types.ErrMissingSiacoinOutput
+			return ErrMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions match the required unlock hash.
@@ -103,7 +109,7 @@ func (s *State) validFileContractTerminations(t types.Transaction) (err error) {
 		// FileContract.
 		fc, exists := s.fileContracts[fct.ParentID]
 		if !exists {
-			return types.ErrMissingFileContract
+			return ErrMissingFileContract
 		}
 
 		// Check that the height is less than fc.Start - terminations are not
@@ -141,7 +147,7 @@ func (s *State) validSiafunds(t types.Transaction) (err error) {
 	for _, sfi := range t.SiafundInputs {
 		sfo, exists := s.siafundOutputs[sfi.ParentID]
 		if !exists {
-			return types.ErrMissingSiafundOutput
+			return ErrMissingSiafundOutput
 		}
 
 		// Check the unlock conditions match the unlock hash.

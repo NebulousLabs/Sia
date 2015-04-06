@@ -1,5 +1,8 @@
 package types
 
+// block.go defines the Block type for Sia, and provides some helper functions
+// for working with blocks.
+
 import (
 	"bytes"
 
@@ -7,24 +10,24 @@ import (
 )
 
 type (
+	// A Block is a summary of changes to the state that have occurred since the
+	// previous block. Blocks reference the ID of the previous block (their
+	// "parent"), creating the linked-list commonly known as the blockchain. Their
+	// primary function is to bundle together transactions on the network. Blocks
+	// are created by "miners," who collect transactions from other nodes, and
+	// then try to pick a Nonce that results in a block whose BlockID is below a
+	// given Target.
+	Block struct {
+		ParentID     BlockID
+		Nonce        uint64
+		Timestamp    Timestamp
+		MinerPayouts []SiacoinOutput
+		Transactions []Transaction
+	}
+
 	BlockHeight uint64
 	BlockID     crypto.Hash
 )
-
-// A Block is a summary of changes to the state that have occurred since the
-// previous block. Blocks reference the ID of the previous block (their
-// "parent"), creating the linked-list commonly known as the blockchain. Their
-// primary function is to bundle together transactions on the network. Blocks
-// are created by "miners," who collect transactions from other nodes, and
-// then try to pick a Nonce that results in a block whose BlockID is below a
-// given Target.
-type Block struct {
-	ParentID     BlockID
-	Nonce        uint64
-	Timestamp    Timestamp
-	MinerPayouts []SiacoinOutput
-	Transactions []Transaction
-}
 
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase
 // equation is:
@@ -32,15 +35,15 @@ type Block struct {
 //     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * CoinbaseAugment
 func CalculateCoinbase(height BlockHeight) (c Currency) {
 	base := InitialCoinbase - uint64(height)
-	if base < MinimumCoinbase {
+	if uint64(height) > InitialCoinbase || base < MinimumCoinbase {
 		base = MinimumCoinbase
 	}
-
 	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
 }
 
 // ID returns the ID of a Block, which is calculated by hashing the
-// concatenation of the block's parent ID, nonce, and Merkle root.
+// concatenation of the block's parent's ID, nonce, and the result of the
+// b.MerkleRoot().
 func (b Block) ID() BlockID {
 	return BlockID(crypto.HashAll(
 		b.ParentID,
