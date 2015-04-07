@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -54,15 +55,31 @@ var testStructs = []interface{}{
 	test5{"foo"},
 }
 
-var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}}
+func TestMarshaling(t *testing.T) {
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}}
 
-func TestEncoding(t *testing.T) {
 	for i := range testStructs {
 		b := Marshal(testStructs[i])
-		// t.Log(i, b)
 		err := Unmarshal(b, emptyStructs[i])
 		if err != nil {
 			t.Error(err)
 		}
+		//t.Log("\n", testStructs[i], "\n", emptyStructs[i])
+	}
+}
+
+func TestEncoding(t *testing.T) {
+	var emptyStructs = []interface{}{&test0{}, &test1{}, &test2{}, &test3{}, &test4{}, &test5{}}
+
+	b := new(bytes.Buffer)
+	enc := NewEncoder(b)
+	dec := NewDecoder(b)
+	for i := range testStructs {
+		enc.Encode(testStructs[i])
+		err := dec.Decode(emptyStructs[i])
+		if err != nil {
+			t.Error(err)
+		}
+		//t.Log("\n", testStructs[i], "\n", emptyStructs[i])
 	}
 }

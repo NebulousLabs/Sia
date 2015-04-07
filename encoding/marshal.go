@@ -1,91 +1,102 @@
-package encoding
-
-import (
-	"errors"
-	"reflect"
-)
-
-// A Marshaler can be encoded as a byte slice. (Note that Marshaler and
-// Unmarshaler are separate interfaces because Unmarshaler must have a pointer
-// receiver, while Marshaler does not.)
-type SiaMarshaler interface {
-	MarshalSia() []byte
-}
-
-// An Unmarshaler can be decoded from a byte slice. If a decoding error occurs,
-// UnmarshalSia should panic.
-type SiaUnmarshaler interface {
-	UnmarshalSia([]byte)
-}
-
-// Marshal encodes a value as a byte slice. The encoding rules are as follows:
+// Package encoding converts arbitrary objects into byte slices, and vis
+// versa. It also contains helper functions for reading and writing length-
+// prefixed data. The encoding rules are as follows:
 //
-// Most types are encoded as their binary representation.
+// Objects are encoded as binary data, without type information. The receiver
+// uses context to determine the type to decode into.
 //
 // Integers are little-endian, and are always encoded as 8 bytes, i.e. their
 // int64 or uint64 equivalent.
 //
-// Booleans are encoded as one byte, either zero (false) or non-zero (true).
+// Booleans are encoded as one byte, either zero (false) or one (true). No
+// other values may be used.
 //
-// Nil pointers are represented by a zero.
+// Nil pointers are represented by a zero. Valid pointers are represented by a
+// non-zero, followed by the encoding of the dereferenced value.
 //
-// Valid pointers are prefaced by a non-zero, followed by the dereferenced
-// value.
-//
-// Variable-length types, such as strings and slices, are prefaced by 8 bytes
-// containing their length.
+// Variable-length types, such as strings and slices, are represented by an 8-byte
+// length-prefix followed by the encoded value.
 //
 // Slices and structs are simply the concatenation of their encoded elements.
 // Byte slices are not subject to the 8-byte integer rule; they are encoded as
-// their literal representation, one byte per byte.  The ordering of struct
-// fields is determined by their type definition. For example:
+// their literal representation, one byte per byte.
 //
-//   type foo struct { S string I int }
+// The ordering of struct fields is determined by their type definition. For
+// example:
 //
-//   Marshal(foo{"bar", 3}) = append(Marshal("bar"), Marshal(3)...)
+//   type foo struct { S string; I int }
+//
+//   Marshal(foo{"bar", 3}) == append(Marshal("bar"), Marshal(3)...)
 //
 // Finally, if a type implements the SiaMarshaler interface, its MarshalSia
 // method will be used to encode the type. The resulting byte slice will be
-// length-prefixed like any other variable-length types. During decoding, this
-// prefix is used to determine how many bytes should be passed to UnmarshalSia.
-func Marshal(v interface{}) []byte {
-	return marshal(reflect.ValueOf(v))
+// length-prefixed like any other variable-length type. During decoding, the
+// type is decoded as a byte slice, and then passed to UnmarshalSia.
+package encoding
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"reflect"
+)
+
+// A SiaMarshaler can encode itself as a byte slice.
+type SiaMarshaler interface {
+	MarshalSia() []byte
 }
 
-func marshal(val reflect.Value) (b []byte) {
+// A SiaUnmarshaler can decode itself from a byte slice. If a decoding error
+// occurs, UnmarshalSia should panic.
+type SiaUnmarshaler interface {
+	UnmarshalSia([]byte)
+}
+
+// An Encoder writes objects to an output stream.
+type Encoder struct {
+	w io.Writer
+}
+
+// Encode writes the encoding of v to the stream. For encoding details, see
+// the package docstring.
+func (e *Encoder) Encode(v interface{}) {
+	e.encode(reflect.ValueOf(v))
+}
+
+func (e *Encoder) encode(val reflect.Value) {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
-		data := m.MarshalSia()
-		return append(EncUint64(uint64(len(data))), data...)
+		WritePrefix(e.w, m.MarshalSia())
+		return
 	} else if val.CanAddr() {
 		if m, ok := val.Addr().Interface().(SiaMarshaler); ok {
-			data := m.MarshalSia()
-			return append(EncUint64(uint64(len(data))), data...)
+			WritePrefix(e.w, m.MarshalSia())
+			return
 		}
 	}
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		if val.IsNil() {
-			return []byte{0}
+		e.Encode(!val.IsNil()) // write either a 1 or 0
+		if !val.IsNil() {
+			e.encode(val.Elem())
 		}
-		return append([]byte{1}, marshal(val.Elem())...)
 	case reflect.Bool:
 		if val.Bool() {
-			return []byte{1}
+			e.w.Write([]byte{1})
 		} else {
-			return []byte{0}
+			e.w.Write([]byte{0})
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return EncInt64(val.Int())
+		e.w.Write(EncInt64(val.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return EncUint64(val.Uint())
+		e.w.Write(EncUint64(val.Uint()))
 	case reflect.String:
-		s := val.String()
-		return append(EncUint64(uint64(len(s))), s...)
+		WritePrefix(e.w, []byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		b = EncUint64(uint64(val.Len()))
+		e.w.Write(EncUint64(uint64(val.Len())))
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays
@@ -94,16 +105,17 @@ func marshal(val reflect.Value) (b []byte) {
 			// can't just use Slice() because array may be unaddressable
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
-			return append(b, slice.Bytes()...)
+			e.w.Write(slice.Bytes())
+			return
 		}
 		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
-			b = append(b, marshal(val.Index(i))...)
+			e.encode(val.Index(i))
 		}
 		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
-			b = append(b, marshal(val.Field(i))...)
+			e.encode(val.Field(i))
 		}
 		return
 	default:
@@ -113,92 +125,122 @@ func marshal(val reflect.Value) (b []byte) {
 	}
 }
 
-// Unmarshal decodes a byte slice into the provided interface. The interface must be a pointer.
-// The decoding rules are the inverse of those described under Marshal.
-func Unmarshal(b []byte, v interface{}) (err error) {
+// NewEncoder returns a new encoder that writes to w.
+func NewEncoder(w io.Writer) *Encoder {
+	return &Encoder{w}
+}
+
+// Marshal returns the encoding of v. For encoding details, see the package
+// docstring.
+func Marshal(v interface{}) []byte {
+	b := new(bytes.Buffer)
+	NewEncoder(b).Encode(v)
+	return b.Bytes()
+}
+
+// A Decoder reads and decodes values from an input stream.
+type Decoder struct {
+	r io.Reader
+}
+
+// Decode reads the next encoded value from its input stream and stores it in
+// v, which must be a pointer. The decoding rules are the inverse of those
+// specified in the package docstring.
+func (d *Decoder) Decode(v interface{}) (err error) {
 	// v must be a pointer
 	pval := reflect.ValueOf(v)
 	if pval.Kind() != reflect.Ptr || pval.IsNil() {
-		return errors.New("must pass a valid pointer to Unmarshal")
+		return errors.New("must pass a valid pointer to Decode")
 	}
 
-	// unmarshal may panic
-	// note that this allows us to skip any boundary checks while unmarshalling
-	var consumed int
+	// catch decoding panics and convert them to errors
+	// note that this allows us to skip boundary checks during decoding
 	defer func() {
-		if r := recover(); r != nil || consumed != len(b) {
-			err = errors.New("could not unmarshal type " + pval.Elem().Type().String())
+		if r := recover(); r != nil {
+			err = fmt.Errorf("could not decode type %s: %v", pval.Elem().Type().String(), r)
 		}
 	}()
 
-	consumed = unmarshal(b, pval.Elem())
+	d.decode(pval.Elem())
 	return
 }
 
-func unmarshal(b []byte, val reflect.Value) (consumed int) {
+func (d *Decoder) readN(n int) []byte {
+	b := make([]byte, n)
+	_, err := io.ReadFull(d.r, b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func (d *Decoder) readPrefix() []byte {
+	// TODO: what should maxlen be?
+	b, err := ReadPrefix(d.r, 1<<32)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {
 		if u, ok := val.Addr().Interface().(SiaUnmarshaler); ok {
-			var dataLen int
-			dataLen, b = int(DecUint64(b[:8])), b[8:]
-			u.UnmarshalSia(b[:dataLen])
-			return dataLen + 8
+			u.UnmarshalSia(d.readPrefix())
+			return
 		}
 	}
 
 	switch val.Kind() {
 	case reflect.Ptr:
+		b := d.readN(1)
 		// nil pointer, nothing to decode
 		if b[0] == 0 {
-			return 1
+			return
 		}
 		// make sure we aren't decoding into nil
 		if val.IsNil() {
 			val.Set(reflect.New(val.Type().Elem()))
 		}
-		return unmarshal(b[1:], val.Elem()) + 1
+		d.decode(val.Elem())
 	case reflect.Bool:
-		if b[0] == 0 {
-			val.SetBool(false)
-		} else if b[0] == 1 {
-			val.SetBool(true)
-		} else {
+		b := d.readN(1)
+		if b[0] > 1 {
 			panic("boolean value was not 0 or 1")
 		}
-		return 1
+		val.SetBool(b[0] == 1)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val.SetInt(DecInt64(b[:8]))
-		return 8
+		val.SetInt(DecInt64(d.readN(8)))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val.SetUint(DecUint64(b[:8]))
-		return 8
+		val.SetUint(DecUint64(d.readN(8)))
 	case reflect.String:
-		n := DecUint64(b[:8]) + 8
-		val.SetString(string(b[8:n]))
-		return int(n)
+		val.SetString(string(d.readPrefix()))
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
-		var sliceLen int
-		sliceLen, b, consumed = int(DecUint64(b[:8])), b[8:], 8
+		sliceLen := int(DecUint64(d.readN(8)))
 		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays (e.g. hashes)
 		if val.Type().Elem().Kind() == reflect.Uint8 {
-			slice := reflect.ValueOf(b).Slice(0, val.Len())
-			return consumed + reflect.Copy(val, slice)
+			// convert val to a slice and read into it directly
+			b := val.Slice(0, val.Len())
+			_, err := io.ReadFull(d.r, b.Bytes())
+			if err != nil {
+				panic(err)
+			}
+			return
 		}
 		// arrays are unmarshalled by sequentially unmarshalling their elements
 		for i := 0; i < val.Len(); i++ {
-			n := unmarshal(b, val.Index(i))
-			consumed, b = consumed+n, b[n:]
+			d.decode(val.Index(i))
 		}
 		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
-			n := unmarshal(b, val.Field(i))
-			consumed, b = consumed+n, b[n:]
+			d.decode(val.Field(i))
 		}
 		return
 	default:
@@ -206,10 +248,25 @@ func unmarshal(b []byte, val reflect.Value) (consumed int) {
 	}
 }
 
-// MarshalAll marshals all of its inputs and returns their concatenation.
-func MarshalAll(v ...interface{}) (b []byte) {
+// NewDecoder returns a new decoder that reads from r.
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{r}
+}
+
+// Unmarshal decodes the encoded value b and stores it in v, which must be a
+// pointer. The decoding rules are the inverse of those specified in the
+// package docstring.
+func Unmarshal(b []byte, v interface{}) error {
+	r := bytes.NewReader(b)
+	return NewDecoder(r).Decode(v)
+}
+
+// MarshalAll encodes all of its inputs and returns their concatenation.
+func MarshalAll(v ...interface{}) []byte {
+	b := new(bytes.Buffer)
+	enc := NewEncoder(b)
 	for i := range v {
-		b = append(b, Marshal(v[i])...)
+		enc.Encode(v[i])
 	}
-	return
+	return b.Bytes()
 }
