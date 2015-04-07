@@ -9,7 +9,8 @@ import (
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
 // inserting elements, elements are inserted on the side of the tree with the
 // fewest elements. When removing, the node is just made empty but the tree is
-// not reorganized.
+// not reorganized. The size of the tree will never decrease, but it will also
+// not increase unless it has more entries than it has ever had before.
 type hostNode struct {
 	parent *hostNode
 	weight types.Currency // cumulative weight of this node and all children.
@@ -57,7 +58,7 @@ func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *ho
 		hn.right = createNode(hn, entry)
 		nodesAdded = 1
 		newNode = hn.right
-	} else if hn.left.weight.Cmp(hn.right.weight) < 0 {
+	} else if hn.left.count < hn.right.count {
 		nodesAdded, newNode = hn.left.insert(entry)
 	} else {
 		nodesAdded, newNode = hn.right.insert(entry)
