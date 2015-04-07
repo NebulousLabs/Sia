@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -9,15 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
-var (
-	rpcPort = 10000
-)
-
 // newTestingGateway returns a gateway read to use in a testing environment.
-func newTestingGateway(directory string, t *testing.T) *Gateway {
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := New(":"+strconv.Itoa(rpcPort), consensus.CreateGenesisState(), gDir)
-	rpcPort++
+func newTestingGateway(name string, t *testing.T) *Gateway {
+	testdir := tester.TempDir("gateway", name)
+	g, err := New(":0", consensus.CreateGenesisState(), testdir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,11 +81,11 @@ func TestTimeout(t *testing.T) {
 		t.SkipNow()
 	}
 
-	g := newTestingGateway("TestTimeout - Good Peer", t)
+	g := newTestingGateway("TestTimeout1", t)
 	defer g.Close()
 
 	// create unresponsive peer
-	badpeer := newTestingGateway("TestTimeout - Bad Peer", t)
+	badpeer := newTestingGateway("TestTimeout2", t)
 	// overwrite badpeer's Ping RPC with an incorrect one
 	// since g is expecting 4 bytes, it will time out.
 	badpeer.RegisterRPC("Ping", func(conn modules.NetConn) error {

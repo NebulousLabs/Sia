@@ -37,6 +37,7 @@ func (g *Gateway) setHostname(host string) {
 	counter := g.mu.Lock()
 	defer g.mu.Unlock(counter)
 	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
+	g.log.Println("INFO: set hostname to", g.myAddr)
 }
 
 // getExternalIP learns the server's hostname from a centralized service,

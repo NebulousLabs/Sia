@@ -15,7 +15,7 @@ func (st *serverTester) announceHost() {
 // announcement that makes it into the blockchain.
 func TestHostAnnouncement(t *testing.T) {
 	// Create the server tester and check that the initial hostdb is empty.
-	st := newServerTester(t)
+	st := newServerTester("TestHostAnnouncement", t)
 	if st.hostdb.NumHosts() != 0 {
 		t.Fatal("hostdb needs to be empty after calling newServerTester")
 	}

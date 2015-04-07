@@ -1,6 +1,7 @@
 package host
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -9,11 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
-)
-
-var (
-	walletNum int = 0
-	hostNum   int = 0
 )
 
 // A HostTester contains a consensus tester and a host, and provides a set of
@@ -25,10 +21,10 @@ type HostTester struct {
 }
 
 // CreateHostTester initializes a HostTester.
-func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
+func CreateHostTester(name string, t *testing.T) (ht *HostTester) {
 	ct := consensus.NewTestingEnvironment(t)
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", ct.State, gDir)
+	testdir := tester.TempDir("host", name)
+	g, err := gateway.New(":0", ct.State, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,18 +34,15 @@ func CreateHostTester(directory string, t *testing.T) (ht *HostTester) {
 		t.Fatal(err)
 	}
 
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := wallet.New(ct.State, tp, wDir)
+	w, err := wallet.New(ct.State, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	walletNum++
 
-	h, err := New(ct.State, tp, w, modules.HostDir)
+	h, err := New(ct.State, tp, w, filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostNum++
 
 	ht = new(HostTester)
 	ht.ConsensusTester = ct

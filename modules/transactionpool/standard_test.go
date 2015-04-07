@@ -9,7 +9,7 @@ import (
 
 // Try to add a transaction that is too large to the transaction pool.
 func TestLargeTransaction(t *testing.T) {
-	tpt := newTpoolTester("TransactionPool - TestLargeTransaction", t)
+	tpt := newTpoolTester("TestLargeTransaction", t)
 
 	// Create a transaction that's larger than the size limit.
 	largeArbitraryData := make([]byte, TransactionSizeLimit)

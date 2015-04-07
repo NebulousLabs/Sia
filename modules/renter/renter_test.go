@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -12,10 +13,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/wallet"
 )
 
-var (
-	walletNum int = 0
-)
-
 // A RenterTester contains a consensus tester and a renter, and provides a set
 // of helper functions for testing the renter without needing other modules
 // such as the host.
@@ -25,11 +22,11 @@ type RenterTester struct {
 }
 
 // CreateHostTester initializes a HostTester.
-func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
+func CreateRenterTester(name string, t *testing.T) (rt *RenterTester) {
 	ct := consensus.NewTestingEnvironment(t)
+	testdir := tester.TempDir("renter", name)
 
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", ct.State, gDir)
+	g, err := gateway.New(":0", ct.State, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,14 +38,11 @@ func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := wallet.New(ct.State, tp, wDir)
+	w, err := wallet.New(ct.State, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	walletNum++
-	rDir := tester.TempDir(directory, modules.RenterDir)
-	r, err := New(ct.State, g, hdb, w, rDir)
+	r, err := New(ct.State, g, hdb, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +55,7 @@ func CreateRenterTester(directory string, t *testing.T) (rt *RenterTester) {
 
 // TestSaveLoad tests that saving and loading a Renter restores its data.
 func TestSaveLoad(t *testing.T) {
-	rt := CreateRenterTester("Renter - TestSaveLoad", t)
+	rt := CreateRenterTester("TestSaveLoad", t)
 	err := rt.save()
 	if err != nil {
 		rt.Fatal(err)

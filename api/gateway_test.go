@@ -11,13 +11,13 @@ import (
 
 // addPeer creates a new serverTester and bootstraps it to st. It returns the
 // new peer.
-func (st *serverTester) addPeer() *serverTester {
+func (st *serverTester) addPeer(name string) *serverTester {
 	// Mine a block on st, in the event that both st and newPeer are new, they
 	// will be at the same height unless we mine a block on st.
 	st.mineBlock()
 
 	// Create a new peer and bootstrap it to st.
-	newPeer := newServerTester(st.T)
+	newPeer := newServerTester(name, st.T)
 	err := newPeer.gateway.Bootstrap(st.netAddress())
 	if err != nil {
 		st.Fatal("bootstrap failed:", err)
@@ -40,8 +40,8 @@ func (st *serverTester) addPeer() *serverTester {
 // the network.
 func TestPeering(t *testing.T) {
 	// Create to peers and add the first to the second.
-	peer1 := newServerTester(t)
-	peer2 := newServerTester(t)
+	peer1 := newServerTester("TestPeering1", t)
+	peer2 := newServerTester("TestPeering2", t)
 	peer1.callAPI("/gateway/peer/add?address=" + string(peer2.netAddress()))
 
 	// Check that the first has the second as a peer.
@@ -53,7 +53,7 @@ func TestPeering(t *testing.T) {
 
 	// Create a third peer that bootstraps to the first peer and check that it
 	// reports the others as peers.
-	peer3 := peer1.addPeer()
+	peer3 := peer1.addPeer("TestPeering3")
 	peer3.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 2 {
 		t.Fatal("bootstrap peer did not share its peers")
@@ -71,8 +71,8 @@ func TestPeering(t *testing.T) {
 // all peers.
 func TestTransactionRelay(t *testing.T) {
 	// Create a server tester and give it a peer.
-	st := newServerTester(t)
-	st2 := st.addPeer()
+	st := newServerTester("TestTransactionRelay1", t)
+	st2 := st.addPeer("TestTransactionRelay2")
 
 	// Make sure both servers have empty transaction pools.
 	tset := st.tpool.TransactionSet()
@@ -117,14 +117,14 @@ func TestBlockBootstrap(t *testing.T) {
 	}
 
 	// Create a server and give it 2500 blocks.
-	st := newServerTester(t)
+	st := newServerTester("TestBlockBootstrap1", t)
 	for i := 0; i < 2*gateway.MaxCatchUpBlocks+1; i++ {
 		st.mineBlock()
 	}
 
 	// Add a peer and spin until the peer is caught up. addPeer() already does
 	// this check, but it's left here to be explict anyway.
-	st2 := st.addPeer()
+	st2 := st.addPeer("TestBlockBootstrap2")
 	for st.state.Height() != st2.state.Height() {
 		time.Sleep(time.Millisecond)
 	}

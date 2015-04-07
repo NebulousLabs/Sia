@@ -6,7 +6,7 @@ import (
 
 // TestSaveLoad tests that saving and loading a wallet restores its data.
 func TestSaveLoad(t *testing.T) {
-	wt := NewWalletTester("Wallet - TestSaveLoad", t)
+	wt := NewWalletTester("TestSaveLoad", t)
 
 	// save wallet data
 	err := wt.wallet.save()

@@ -7,11 +7,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-func (st *serverTester) testMining() {
+// TestMining starts the miner, mines a few blocks, and checks that the wallet
+// balance increased.
+func TestMining(t *testing.T) {
 	if testing.Short() {
-		st.Skip()
+		t.Skip()
 	}
 
+	st := newServerTester("TestMining", t)
 	// start miner
 	st.callAPI("/miner/start?threads=1")
 	// check that miner has started
@@ -28,11 +31,4 @@ func (st *serverTester) testMining() {
 	if walletstatus.FullBalance.IsZero() {
 		st.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
 	}
-}
-
-// TestMining starts the miner, mines a few blocks, and checks that the wallet
-// balance increased.
-func TestMining(t *testing.T) {
-	st := newServerTester(t)
-	st.testMining()
 }

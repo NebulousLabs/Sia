@@ -1,6 +1,7 @@
 package miner
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -12,16 +13,17 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TODO: factor out newMinerTester
+
 // TestMiner creates a miner, mines a few blocks, and checks that the wallet
 // balance is updating as the blocks get mined.
 func TestMiner(t *testing.T) {
-	directory := "TestMiner"
+	testdir := tester.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
 
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", s, gDir)
+	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,8 +31,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := wallet.New(s, tpool, wDir)
+	w, err := wallet.New(s, tpool, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,12 +69,11 @@ func TestManyBlocks(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	directory := "TestManyBlocks"
+	testdir := tester.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
 	s := consensus.CreateGenesisState()
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", s, gDir)
+	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +81,7 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := wallet.New(s, tpool, wDir)
+	w, err := wallet.New(s, tpool, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}

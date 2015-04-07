@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 )
 
-const (
-	SiaTestingDir = "SiaTesting"
+var (
+	SiaTestingDir = filepath.Join(os.TempDir(), "SiaTesting")
 )
 
-// TempDir takes a set of directory names and joins them to the sia temp
-// folder.
+// TempDir joins the provided directories and prefixes them with the Sia
+// testing directory.
 func TempDir(dirs ...string) string {
-	tmp := append([]string{os.TempDir()}, SiaTestingDir)
-	full := append(tmp, dirs...)
-	return filepath.Join(full...) // filepath.Join(tmp, testing, dirs...) returns 'too many arguments' error.
+	path := filepath.Join(SiaTestingDir, filepath.Join(dirs...))
+	os.RemoveAll(path) // remove old test data
+	return path
 }

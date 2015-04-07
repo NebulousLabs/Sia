@@ -237,26 +237,26 @@ func (tpt *tpoolTester) testRewinding() {
 // TestUpdateTransactionRemoval creates a tpoolTester and uses it to call
 // tetsUpdateTransactionRemoval.
 func TestUpdateTransactionRemoval(t *testing.T) {
-	tpt := newTpoolTester("Transaction Pool - TestUpdateTransactionRemoval", t)
+	tpt := newTpoolTester("TestUpdateTransactionRemoval", t)
 	tpt.testUpdateTransactionRemoval()
 }
 
 // TestBlockConflicts creates a tpoolTester and uses it to call
 // testBlockConflicts.
 func TestBlockConflicts(t *testing.T) {
-	tpt := newTpoolTester("Transaction Pool - TestBlockConflicts", t)
+	tpt := newTpoolTester("TestBlockConflicts", t)
 	tpt.testBlockConflicts()
 }
 
 // TestDependentUpdates creates a tpoolTester and uses it to call
 // testDependentUpdates.
 func TestDependentUpdates(t *testing.T) {
-	tpt := newTpoolTester("Transaction Pool - TestDependentUpdates", t)
+	tpt := newTpoolTester("TestDependentUpdates", t)
 	tpt.testDependentUpdates()
 }
 
 // TestRewinding creates a tpoolTester and uses it to call testRewinding.
 func TestRewinding(t *testing.T) {
-	// tpt := newTpoolTester("Transaction Pool - TestRewinding", t)
+	// tpt := newTpoolTester("TestRewinding", t)
 	// tpt.testRewinding()
 }

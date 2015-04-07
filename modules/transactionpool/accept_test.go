@@ -53,14 +53,14 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 // TestAddSiacoinTransactionToPool creates a tpoolTester and uses it to call
 // addSiacoinTransactionToPool.
 func TestAddSiacoinTransactionToPool(t *testing.T) {
-	tpt := newTpoolTester("TransactionPool - TestAddSiacoinTransactionToPool", t)
+	tpt := newTpoolTester("TestAddSiacoinTransactionToPool", t)
 	tpt.addSiacoinTransactionToPool()
 }
 
 // TestAddDependentSiacoinTransactionToPool creates a tpoolTester and uses it
 // to cal addDependentSiacoinTransactionToPool.
 func TestAddDependentSiacoinTransactionToPool(t *testing.T) {
-	tpt := newTpoolTester("TransactionPool - TestAddDependentSiacoinTransactionToPool", t)
+	tpt := newTpoolTester("TestAddDependentSiacoinTransactionToPool", t)
 	tpt.addDependentSiacoinTransactionToPool()
 }
 
@@ -70,7 +70,7 @@ func TestAddDependentSiacoinTransactionToPool(t *testing.T) {
 // removed, and that will be removed after fees are required in all
 // transactions submitted to the pool.
 func TestDuplicateTransaction(t *testing.T) {
-	tpt := newTpoolTester("TransactionPool - TestDuplicateTransaction", t)
+	tpt := newTpoolTester("TestDuplicateTransaction", t)
 	txn := tpt.addSiacoinTransactionToPool()
 	err := tpt.tpool.AcceptTransaction(txn)
 	if err != ErrDuplicate {

@@ -19,7 +19,8 @@ func (g *Gateway) threadedResynchronize() {
 	for {
 		peer, err := g.randomPeer()
 		if err != nil {
-			// fatal error
+			g.log.Println("ERR: no peers are available for synchronization")
+			// TODO: sleep and try again instead of returning?
 			return
 		}
 		go g.Synchronize(peer)
@@ -38,17 +39,21 @@ func (g *Gateway) threadedResynchronize() {
 //
 // TODO: don't run two Synchronize threads at the same time
 func (g *Gateway) Synchronize(peer modules.NetAddress) error {
+	g.log.Println("INFO: synchronizing to", peer)
 	for {
 		var newBlocks []types.Block
 		newBlocks, moreAvailable, err := g.requestBlocks(peer)
 		if err != nil {
+			g.log.Printf("ERR: synchronization to %v failed: %v\n", peer, err)
 			return err
 		}
+		g.log.Printf("INFO: %v sent us %v blocks\n", peer, len(newBlocks))
 		for _, block := range newBlocks {
 			acceptErr := g.state.AcceptBlock(block)
 			if acceptErr != nil {
 				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 				// block again.
+				g.log.Println("WARN: state rejected a block from", peer)
 			}
 		}
 
@@ -57,6 +62,7 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 			break
 		}
 	}
+	g.log.Printf("INFO: synchronization to %v complete\n", peer)
 	return nil
 }
 
@@ -105,6 +111,7 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	if err != nil {
 		return
 	}
+	g.log.Printf("INFO: %v is at height %v (-%v); sending them %v blocks\n", conn.Addr(), start, g.state.Height()-start, len(blocks))
 	err = conn.WriteObject(blocks)
 	if err != nil {
 		return
@@ -142,6 +149,7 @@ func (g *Gateway) blockHistory() (blockIDs [32]types.BlockID) {
 		block, exists := g.state.BlockAtHeight(height)
 		if !exists {
 			// faulty state; log high-priority error
+			g.log.Println("ERR: state is missing a block at height", height)
 			return
 		}
 		knownBlocks = append(knownBlocks, block.ID())
@@ -161,7 +169,7 @@ func (g *Gateway) blockHistory() (blockIDs [32]types.BlockID) {
 	// always include the genesis block
 	genesis, exists := g.state.BlockAtHeight(0)
 	if !exists {
-		// this should never happen
+		g.log.Println("ERR: state is missing a genesis block")
 		return
 	}
 	knownBlocks = append(knownBlocks, genesis.ID())

@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -22,7 +23,6 @@ import (
 
 var (
 	APIPort int = 9020
-	RPCPort int = 9120
 )
 
 type serverTester struct {
@@ -30,21 +30,15 @@ type serverTester struct {
 	*testing.T
 }
 
-func newServerTester(t *testing.T) *serverTester {
+func newServerTester(name string, t *testing.T) *serverTester {
 	// create testing directory structure
-	testdir, err := ioutil.TempDir("..", "testdir")
-	if err != nil {
-		t.Fatal("Could not create testing dir:", err)
-	}
-
+	testdir := tester.TempDir("api", name)
 	APIAddr := ":" + strconv.Itoa(APIPort)
-	RPCAddr := ":" + strconv.Itoa(RPCPort)
 	APIPort++
-	RPCPort++
 
 	// create modules
 	state := consensus.CreateGenesisState()
-	gateway, err := gateway.New(RPCAddr, state, filepath.Join(testdir, "gateway"))
+	gateway, err := gateway.New(":0", state, filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
 	}
@@ -172,5 +166,5 @@ func (st *serverTester) callAPI(call string) {
 
 // TestCreateServer creates a serverTester and immediately stops it.
 func TestCreateServer(t *testing.T) {
-	newServerTester(t).callAPI("/daemon/stop")
+	newServerTester("TestCreateServer", t).callAPI("/daemon/stop")
 }
