@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -10,10 +11,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-var (
-	walletNum int = 0
 )
 
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
@@ -69,13 +66,14 @@ func (wt *walletTester) updateWait() {
 }
 
 // NewWalletTester takes a testing.T and creates a WalletTester.
-func NewWalletTester(directory string, t *testing.T) (wt *walletTester) {
+func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
+	testdir := tester.TempDir("wallet", name)
+
 	// Create the consensus set.
 	cs := consensus.CreateGenesisState()
 
 	// Create the gateway.
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", cs, gDir)
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,8 +85,7 @@ func NewWalletTester(directory string, t *testing.T) (wt *walletTester) {
 	}
 
 	// Create the wallet.
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := New(cs, tp, wDir)
+	w, err := New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -98,13 +99,14 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 }
 
 // CreatetpoolTester initializes a tpoolTester.
-func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
+func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 	// Create the consensus set.
 	cs := consensus.CreateGenesisState()
 
+	testdir := tester.TempDir("transactionpool", name)
+
 	// Create the gateway.
-	gDir := tester.TempDir(directory, modules.GatewayDir)
-	g, err := gateway.New(":0", cs, gDir)
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,8 +118,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Create the wallet.
-	wDir := tester.TempDir(directory, modules.WalletDir)
-	w, err := wallet.New(cs, tp, wDir)
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func newTpoolTester(directory string, t *testing.T) (tpt *tpoolTester) {
 func TestNewNilInputs(t *testing.T) {
 	// Create a consensus set and gateway.
 	cs := consensus.CreateGenesisState()
-	gDir := tester.TempDir("Transaction Pool - TestNewNilInputs", modules.GatewayDir)
+	gDir := tester.TempDir("transactionpool", "TestNewNilInputs", modules.GatewayDir)
 	g, err := gateway.New(":0", cs, gDir)
 	if err != nil {
 		t.Fatal(err)

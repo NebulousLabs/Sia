@@ -70,11 +70,11 @@ func TestPeerSharing(t *testing.T) {
 
 // TestBadPeer tests that "bad" peers are correctly identified and removed.
 func TestBadPeer(t *testing.T) {
-	g := newTestingGateway("TestBadPeer - Good Peer", t)
+	g := newTestingGateway("TestBadPeer1", t)
 	defer g.Close()
 
 	// create bad peer
-	badpeer := newTestingGateway("TestBadPeer - Bad Peer", t)
+	badpeer := newTestingGateway("TestBadPeer2", t)
 	// overwrite badpeer's Ping RPC with an incorrect one
 	badpeer.RegisterRPC("Ping", writerRPC("lol"))
 
@@ -110,17 +110,17 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	// create bootstrap peer
-	bootstrap := newTestingGateway("TestBootstrap", t)
+	bootstrap := newTestingGateway("TestBootstrap1", t)
 	ct := consensus.NewConsensusTester(t, bootstrap.state)
 	// give it some blocks
 	for i := 0; i < MaxCatchUpBlocks*2+1; i++ {
 		ct.MineAndApplyValidBlock()
 	}
 	// give it a peer
-	bootstrap.AddPeer(newTestingGateway("TestBootstrap - Peer 1", t).Address())
+	bootstrap.AddPeer(newTestingGateway("TestBootstrap2", t).Address())
 
 	// bootstrap a new peer
-	g := newTestingGateway("TestBootstrap - Peer 2", t)
+	g := newTestingGateway("TestBootstrap3", t)
 	err := g.Bootstrap(bootstrap.Address())
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +142,7 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	// add another two peers to bootstrap: a real peer and a "dummy", which won't respond.
-	bootstrap.AddPeer(newTestingGateway("TestBootstrap - Peer 3", t).Address())
+	bootstrap.AddPeer(newTestingGateway("TestBootstrap4", t).Address())
 	bootstrap.AddPeer("dummy")
 
 	// have g request peers from bootstrap. g should add the real peer, but not the dummy.

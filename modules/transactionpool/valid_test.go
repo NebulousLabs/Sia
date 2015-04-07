@@ -66,14 +66,14 @@ func (tpt *tpoolTester) testOverspend() {
 // TestAddConflictingSiacoinTransactionToPool creates a tpoolTester and uses it
 // to call addConflictingSiacoinTransactionToPool.
 func TestAddConflictingSiacoinTransaction(t *testing.T) {
-	tpt := newTpoolTester("Transaction Pool - TestAddConflictingSiacoinTransaction", t)
+	tpt := newTpoolTester("TestAddConflictingSiacoinTransaction", t)
 	tpt.addConflictingSiacoinTransaction()
 }
 
 // TestFalseSiacoinSpend creates a tpoolTester and uses it to call smaller
 // tests that probe the siacoin verification rules.
 func TestFalseSiacoinFeatures(t *testing.T) {
-	tpt := newTpoolTester("Transaction Pool - TestFalseSiacoinFeatures", t)
+	tpt := newTpoolTester("TestFalseSiacoinFeatures", t)
 	tpt.testFalseSiacoinSpend()
 	tpt.testBadSiacoinUnlock()
 	tpt.testOverspend()

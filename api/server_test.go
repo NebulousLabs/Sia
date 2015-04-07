@@ -33,7 +33,7 @@ type serverTester struct {
 
 func newServerTester(name string, t *testing.T) *serverTester {
 	// create testing directory structure
-	testdir := tester.TempDir(name)
+	testdir := tester.TempDir("api", name)
 	APIAddr := ":" + strconv.Itoa(APIPort)
 	RPCAddr := ":" + strconv.Itoa(RPCPort)
 	APIPort++
