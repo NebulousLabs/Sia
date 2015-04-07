@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -9,15 +8,10 @@ import (
 	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
-var (
-	rpcPort = 10000
-)
-
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
 	testdir := tester.TempDir("gateway", name)
-	g, err := New(":"+strconv.Itoa(rpcPort), consensus.CreateGenesisState(), testdir)
-	rpcPort++
+	g, err := New(":0", consensus.CreateGenesisState(), testdir)
 	if err != nil {
 		t.Fatal(err)
 	}

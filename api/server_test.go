@@ -23,7 +23,6 @@ import (
 
 var (
 	APIPort int = 9020
-	RPCPort int = 9120
 )
 
 type serverTester struct {
@@ -35,13 +34,11 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	// create testing directory structure
 	testdir := tester.TempDir("api", name)
 	APIAddr := ":" + strconv.Itoa(APIPort)
-	RPCAddr := ":" + strconv.Itoa(RPCPort)
 	APIPort++
-	RPCPort++
 
 	// create modules
 	state := consensus.CreateGenesisState()
-	gateway, err := gateway.New(RPCAddr, state, filepath.Join(testdir, "gateway"))
+	gateway, err := gateway.New(":0", state, filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
 	}
