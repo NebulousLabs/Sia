@@ -227,7 +227,7 @@ func (ct *ConsensusTester) testBadBlock() {
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -245,7 +245,7 @@ func TestEmptyBlock(t *testing.T) {
 // testLargeBlock.
 func TestLargeBlock(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -256,7 +256,7 @@ func TestLargeBlock(t *testing.T) {
 // testSingleNoFeePayouts.
 func TestSingleNoFeePayout(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -267,7 +267,7 @@ func TestSingleNoFeePayout(t *testing.T) {
 // it to call testMultipleFeesMultiplePayouts.
 func TestMultipleFeesMultiplePayouts(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -278,7 +278,7 @@ func TestMultipleFeesMultiplePayouts(t *testing.T) {
 // testMissedTarget.
 func TestMissedTarget(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -289,7 +289,7 @@ func TestMissedTarget(t *testing.T) {
 // testRepeatBlock.
 func TestRepeatBlock(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
@@ -306,7 +306,7 @@ func TestOrphan(t *testing.T) {
 // testBadBlock.
 func TestBadBlock(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)

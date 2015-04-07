@@ -13,7 +13,7 @@ import (
 // from the renter to the host, and then downloads it.
 func TestUploadAndDownload(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Create a server and add a host to the network.

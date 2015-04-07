@@ -42,7 +42,7 @@ func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []typ
 // scenarios between them to check consistency during forking.
 func TestComplexForking(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Need to grab a single time to make sure that each state ends up with the

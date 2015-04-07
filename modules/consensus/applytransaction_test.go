@@ -123,7 +123,7 @@ func TestApplyFileContract(t *testing.T) {
 // testApplyStorageProof.
 func TestApplyStorageProof(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	ct := NewTestingEnvironment(t)
