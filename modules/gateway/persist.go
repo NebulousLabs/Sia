@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,23 +14,19 @@ func (g *Gateway) save() error {
 	for peer := range g.peers {
 		peers = append(peers, peer)
 	}
-	return ioutil.WriteFile(filepath.Join(g.saveDir, "peers.dat"), encoding.Marshal(peers), 0666)
+	return encoding.WriteFile(filepath.Join(g.saveDir, "peers.dat"), peers)
 }
 
-func (g *Gateway) load() (err error) {
-	contents, err := ioutil.ReadFile(filepath.Join(g.saveDir, "peers.dat"))
-	if err != nil {
-		return
-	}
+func (g *Gateway) load() error {
 	var peers []modules.NetAddress
-	err = encoding.Unmarshal(contents, &peers)
+	err := encoding.ReadFile(filepath.Join(g.saveDir, "peers.dat"), &peers)
 	if err != nil {
-		return
+		return err
 	}
 	for _, peer := range peers {
 		g.peers[peer] = 0 // TODO: support saving/loading strikes
 	}
-	return
+	return nil
 }
 
 // create logger

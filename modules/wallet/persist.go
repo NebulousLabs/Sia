@@ -1,8 +1,6 @@
 package wallet
 
 import (
-	"errors"
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -16,39 +14,34 @@ type savedKey struct {
 }
 
 // save writes the contents of a wallet to a file.
-func (w *Wallet) save() (err error) {
+func (w *Wallet) save() error {
 	// Convert the key map to a slice.
 	keySlice := make([]savedKey, 0, len(w.keys))
 	for _, key := range w.keys {
 		keySlice = append(keySlice, savedKey{key.secretKey, key.unlockConditions})
 	}
-	walletData := encoding.Marshal(keySlice)
 
 	// Write the wallet data to a backup file, in case something goes wrong
-	err = ioutil.WriteFile(filepath.Join(w.saveDir, "wallet.backup"), walletData, 0666)
+	err := encoding.WriteFile(filepath.Join(w.saveDir, "wallet.backup"), keySlice)
 	if err != nil {
-		return
+		return err
 	}
 	// Overwrite the wallet file.
-	err = ioutil.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), walletData, 0666)
+	err = encoding.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), keySlice)
 	if err != nil {
 		// TODO: instruct user to recover wallet from the backup file
-		return
+		return err
 	}
 
-	return
+	return nil
 }
 
 // load reads the contents of a wallet from a file.
-func (w *Wallet) load() (err error) {
-	contents, err := ioutil.ReadFile(filepath.Join(w.saveDir, "wallet.dat"))
-	if err != nil {
-		return
-	}
+func (w *Wallet) load() error {
 	var savedKeys []savedKey
-	err = encoding.Unmarshal(contents, &savedKeys)
+	err := encoding.ReadFile(filepath.Join(w.saveDir, "wallet.dat"), &savedKeys)
 	if err != nil {
-		return errors.New("corrupted wallet file")
+		return err
 	}
 
 	height := w.state.Height()
@@ -69,5 +62,5 @@ func (w *Wallet) load() (err error) {
 
 	// TODO TODO TODO: Need a scan or 're-scan' function.
 
-	return
+	return nil
 }

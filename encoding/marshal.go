@@ -39,6 +39,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 )
 
@@ -156,6 +157,15 @@ func MarshalAll(v ...interface{}) []byte {
 		enc.Encode(v[i]) // no error possible when using a bytes.Buffer
 	}
 	return b.Bytes()
+}
+
+// WriteFile writes v to a file. The file will be created if it does not exist.
+func WriteFile(filename string, v interface{}) error {
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0660)
+	if err != nil {
+		return err
+	}
+	return NewEncoder(file).Encode(v)
 }
 
 // A Decoder reads and decodes values from an input stream.
@@ -279,4 +289,13 @@ func NewDecoder(r io.Reader) *Decoder {
 func Unmarshal(b []byte, v interface{}) error {
 	r := bytes.NewReader(b)
 	return NewDecoder(r).Decode(v)
+}
+
+// ReadFile reads the contents of a file and decodes them into v.
+func ReadFile(filename string, v interface{}) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	return NewDecoder(file).Decode(v)
 }

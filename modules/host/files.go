@@ -1,7 +1,6 @@
 package host
 
 import (
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -25,23 +24,15 @@ func (h *Host) save() (err error) {
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
 	}
-	err = ioutil.WriteFile(filepath.Join(h.saveDir, "settings.dat"), encoding.Marshal(sHost), 0666)
-	if err != nil {
-		return
-	}
 
-	return
+	return encoding.WriteFile(filepath.Join(h.saveDir, "settings.dat"), sHost)
 }
 
-func (h *Host) load() (err error) {
-	contents, err := ioutil.ReadFile(filepath.Join(h.saveDir, "settings.dat"))
-	if err != nil {
-		return
-	}
+func (h *Host) load() error {
 	var sHost savedHost
-	err = encoding.Unmarshal(contents, &sHost)
+	err := encoding.ReadFile(filepath.Join(h.saveDir, "settings.dat"), &sHost)
 	if err != nil {
-		return
+		return err
 	}
 
 	h.spaceRemaining = sHost.SpaceRemaining
@@ -54,5 +45,5 @@ func (h *Host) load() (err error) {
 		h.obligationsByID[obligation.ID] = obligation
 	}
 
-	return
+	return nil
 }
