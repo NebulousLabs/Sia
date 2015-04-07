@@ -60,43 +60,50 @@ type Encoder struct {
 
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
-func (e *Encoder) Encode(v interface{}) {
-	e.encode(reflect.ValueOf(v))
+func (e *Encoder) Encode(v interface{}) error {
+	return e.encode(reflect.ValueOf(v))
 }
 
-func (e *Encoder) encode(val reflect.Value) {
+func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
-		WritePrefix(e.w, m.MarshalSia())
-		return
+		return WritePrefix(e.w, m.MarshalSia())
 	} else if val.CanAddr() {
 		if m, ok := val.Addr().Interface().(SiaMarshaler); ok {
-			WritePrefix(e.w, m.MarshalSia())
-			return
+			return WritePrefix(e.w, m.MarshalSia())
 		}
 	}
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		e.Encode(!val.IsNil()) // write either a 1 or 0
+		// write either a 1 or 0
+		if err := e.Encode(!val.IsNil()); err != nil {
+			return err
+		}
 		if !val.IsNil() {
-			e.encode(val.Elem())
+			return e.encode(val.Elem())
 		}
 	case reflect.Bool:
 		if val.Bool() {
-			e.w.Write([]byte{1})
+			_, err := e.w.Write([]byte{1})
+			return err
 		} else {
-			e.w.Write([]byte{0})
+			_, err := e.w.Write([]byte{0})
+			return err
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		e.w.Write(EncInt64(val.Int()))
+		_, err := e.w.Write(EncInt64(val.Int()))
+		return err
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		e.w.Write(EncUint64(val.Uint()))
+		_, err := e.w.Write(EncUint64(val.Uint()))
+		return err
 	case reflect.String:
-		WritePrefix(e.w, []byte(val.String()))
+		return WritePrefix(e.w, []byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		e.w.Write(EncUint64(uint64(val.Len())))
+		if _, err := e.w.Write(EncUint64(uint64(val.Len()))); err != nil {
+			return err
+		}
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays
@@ -105,24 +112,27 @@ func (e *Encoder) encode(val reflect.Value) {
 			// can't just use Slice() because array may be unaddressable
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
-			e.w.Write(slice.Bytes())
-			return
+			_, err := e.w.Write(slice.Bytes())
+			return err
 		}
 		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
-			e.encode(val.Index(i))
+			if err := e.encode(val.Index(i)); err != nil {
+				return err
+			}
 		}
-		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
-			e.encode(val.Field(i))
+			if err := e.encode(val.Field(i)); err != nil {
+				return err
+			}
 		}
-		return
 	default:
 		// Marshalling should never fail. If it panics, you're doing something wrong,
 		// like trying to encode a map or an unexported struct field.
 		panic("could not marshal type " + val.Type().String())
 	}
+	return nil
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -134,7 +144,17 @@ func NewEncoder(w io.Writer) *Encoder {
 // docstring.
 func Marshal(v interface{}) []byte {
 	b := new(bytes.Buffer)
-	NewEncoder(b).Encode(v)
+	NewEncoder(b).Encode(v) // no error possible when using a bytes.Buffer
+	return b.Bytes()
+}
+
+// MarshalAll encodes all of its inputs and returns their concatenation.
+func MarshalAll(v ...interface{}) []byte {
+	b := new(bytes.Buffer)
+	enc := NewEncoder(b)
+	for i := range v {
+		enc.Encode(v[i]) // no error possible when using a bytes.Buffer
+	}
 	return b.Bytes()
 }
 
@@ -259,14 +279,4 @@ func NewDecoder(r io.Reader) *Decoder {
 func Unmarshal(b []byte, v interface{}) error {
 	r := bytes.NewReader(b)
 	return NewDecoder(r).Decode(v)
-}
-
-// MarshalAll encodes all of its inputs and returns their concatenation.
-func MarshalAll(v ...interface{}) []byte {
-	b := new(bytes.Buffer)
-	enc := NewEncoder(b)
-	for i := range v {
-		enc.Encode(v[i])
-	}
-	return b.Bytes()
 }
