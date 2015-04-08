@@ -3,6 +3,7 @@ package consensus
 import (
 	"time"
 
+	"github.com/NebulousLabs/Sia/blockdb"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -50,6 +51,9 @@ type State struct {
 	revertUpdates [][]*blockNode
 	applyUpdates  [][]*blockNode
 	subscriptions []chan struct{}
+
+	// block database, used for saving/loading the current path
+	db blockdb.DB
 
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
@@ -109,6 +113,12 @@ func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.Unlock
 // CreateGenesisState returns a State containing only the genesis block.
 func CreateGenesisState() (s *State) {
 	return createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
+}
+
+func New(saveDir string) (*State, error) {
+	s := createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
+	err := s.load(saveDir)
+	return s, err
 }
 
 // RLock will readlock the state.

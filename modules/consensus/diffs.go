@@ -125,9 +125,11 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 	// Update the State's metadata
 	if dir == modules.DiffApply {
 		s.currentPath = append(s.currentPath, bn.block.ID())
+		s.db.AddBlock(bn.block)
 		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
 		s.currentPath = s.currentPath[:len(s.currentPath)-1]
+		s.db.RemoveBlock()
 		delete(s.delayedSiacoinOutputs, bn.height)
 	}
 }
@@ -154,6 +156,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 
 	// Update the state to point to the new block.
 	s.currentPath = append(s.currentPath, bn.block.ID())
+	s.db.AddBlock(bn.block)
 	s.delayedSiacoinOutputs[s.height()] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
