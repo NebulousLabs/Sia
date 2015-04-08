@@ -93,7 +93,7 @@ func TestTwofishEncryption(t *testing.T) {
 // mistakes and not to guarantee security of the ciphertext.
 func TestTwofishEntropy(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Encrypt a larger zero plaintext and make sure that the outcome is high
@@ -125,7 +125,7 @@ func TestTwofishEntropy(t *testing.T) {
 // possible padding length.
 func TestTwofishPadding(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Encrypt and decrypt for all of the potential padded values and see that

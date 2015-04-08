@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -13,7 +14,7 @@ import (
 // from the renter to the host, and then downloads it.
 func TestUploadAndDownload(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Create a server and add a host to the network.
@@ -25,7 +26,8 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Upload to the host.
-	st.callAPI("/renter/upload?pieces=1&source=api.go&nickname=first")
+	uploadName := "api.go"
+	st.callAPI("/renter/upload?pieces=1&nickname=first&source=" + uploadName)
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
@@ -41,12 +43,12 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Try to download the file.
-	downloadName := "renterTestDL_test"
+	downloadName := tester.TempDir("api", "TestUploadAndDownload", "downloadTestData")
 	st.callAPI("/renter/download?nickname=first&destination=" + downloadName)
 	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.
-	upFile, err := os.Open("api.go")
+	upFile, err := os.Open(uploadName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,5 +69,4 @@ func TestUploadAndDownload(t *testing.T) {
 	if upRoot != downRoot {
 		t.Error("uploaded and downloaded file have a hash mismatch")
 	}
-	os.Remove(downloadName)
 }

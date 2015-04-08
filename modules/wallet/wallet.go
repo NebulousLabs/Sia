@@ -118,6 +118,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 	}
 	if err != nil {
 		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
+		// TODO: try to recover from wallet.backup?
 		return
 	}
 

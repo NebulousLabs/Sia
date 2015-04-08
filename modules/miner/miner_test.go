@@ -67,7 +67,7 @@ func TestMiner(t *testing.T) {
 // resulted in the state deadlocking.
 func TestManyBlocks(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 	testdir := tester.TempDir("miner", "TestMiner")
 

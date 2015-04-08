@@ -11,7 +11,7 @@ import (
 // balance increased.
 func TestMining(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	st := newServerTester("TestMining", t)

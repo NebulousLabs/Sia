@@ -113,7 +113,7 @@ func TestTransactionRelay(t *testing.T) {
 // when the first state has a few thousand blocks.
 func TestBlockBootstrap(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	// Create a server and give it 2500 blocks.
