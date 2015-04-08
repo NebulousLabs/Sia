@@ -1,5 +1,6 @@
 package hostdb
 
+/*
 import (
 	"crypto/rand"
 	"math/big"
@@ -117,3 +118,4 @@ func TestWeightedList(t *testing.T) {
 	}
 	hdbt.uniformTreeVerification(firstInsertions - removals + secondInsertions)
 }
+*/

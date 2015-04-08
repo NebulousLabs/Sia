@@ -46,7 +46,7 @@ func (hdb *HostDB) ReceiveConsensusUpdate(_, appliedBlocks []types.Block) {
 	// Add hosts announced in blocks that were applied.
 	for _, block := range appliedBlocks {
 		for _, entry := range findHostAnnouncements(block) {
-			hdb.insert(entry)
+			hdb.insertHost(entry)
 		}
 	}
 

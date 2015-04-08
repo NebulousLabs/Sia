@@ -41,27 +41,28 @@ type HostSettings struct {
 type HostEntry struct {
 	HostSettings
 	IPAddress NetAddress
+	Weight    types.Currency
 }
 
+// A HostDB is a database of hosts that the renter can use for figuring out who
+// to upload to, and download from.
 type HostDB interface {
+	// ActiveHosts returns the list of hosts that are actively being selected
+	// from.
+	ActiveHosts() []HostEntry
+
 	// FlagHost alerts the HostDB that a host is not behaving as expected. The
-	// HostDB may decide to remove the host, or just reduce the weight, or it
-	// may decide to ignore the flagging. If the flagging is ignored, an error
-	// will be returned explaining why.
+	// HostDB may decide to remove the host, reduce the weight, or it may
+	// ignore the call.
 	FlagHost(NetAddress) error
 
-	// Insert adds a host to the database.
-	Insert(HostEntry) error
-
-	// NumHosts returns the number of hosts that are being selected from. The
-	// renter uses this to make sure that the pool is big enough before
-	// uploading a file.
-	NumHosts() int
+	// InsertHost adds a host to the database.
+	InsertHost(HostEntry) error
 
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
 	RandomHost() (HostEntry, error)
 
-	// Remove deletes the host with the given address from the database.
-	Remove(NetAddress) error
+	// Remove deletes the host with the input address from the database.
+	RemoveHost(NetAddress) error
 }

@@ -77,7 +77,7 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	// more complex; once there is erasure coding we'll want to hit the minimum
 	// number of pieces plus some buffer before we decide that an upload is
 	// okay.
-	if r.hostDB.NumHosts() < 1 {
+	if len(r.hostDB.ActiveHosts()) < 1 {
 		return errors.New("not enough hosts on the network to upload a file :( - maybe you need to upgrade your software")
 	}
 

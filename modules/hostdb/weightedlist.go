@@ -1,6 +1,9 @@
 package hostdb
 
 import (
+	"crypto/rand"
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -13,13 +16,18 @@ import (
 // not increase unless it has more entries than it has ever had before.
 type hostNode struct {
 	parent *hostNode
-	weight types.Currency // cumulative weight of this node and all children.
-	count  int            // cumulative count of all children.
+	count  int // Cumulative count of this node and  all children.
+
+	// Currently the only weight supported is priceWeight. Eventually, support
+	// will be added for multiple tunable types of weight. The different
+	// weights all represent the cumulative weight of this node and all
+	// children.
+	weight types.Currency
 
 	left  *hostNode
 	right *hostNode
 
-	taken     bool // Used because modules.HostEntry can't be compared to nil.
+	taken     bool // Indicates whether there is an active host at this node or not.
 	hostEntry modules.HostEntry
 }
 
@@ -27,56 +35,11 @@ type hostNode struct {
 func createNode(parent *hostNode, entry modules.HostEntry) *hostNode {
 	return &hostNode{
 		parent: parent,
-		weight: entryWeight(entry),
+		weight: entry.Weight,
 		count:  1,
 
 		taken:     true,
 		hostEntry: entry,
-	}
-}
-
-// insert inserts a host entry into the node. insert is recursive. The value
-// returned is the number of nodes added to the tree, always 1 or 0.
-func (hn *hostNode) insert(entry modules.HostEntry) (nodesAdded int, newNode *hostNode) {
-	hn.weight = hn.weight.Add(entryWeight(entry))
-
-	// If the current node is empty, add the entry but don't increase the
-	// count.
-	if !hn.taken {
-		hn.taken = true
-		hn.hostEntry = entry
-		newNode = hn
-		return
-	}
-
-	// Insert the element into the lightest side.
-	if hn.left == nil {
-		hn.left = createNode(hn, entry)
-		nodesAdded = 1
-		newNode = hn.left
-	} else if hn.right == nil {
-		hn.right = createNode(hn, entry)
-		nodesAdded = 1
-		newNode = hn.right
-	} else if hn.left.count < hn.right.count {
-		nodesAdded, newNode = hn.left.insert(entry)
-	} else {
-		nodesAdded, newNode = hn.right.insert(entry)
-	}
-
-	hn.count += nodesAdded
-	return
-}
-
-// remove takes a node and removes it from the tree by climbing through the
-// list of parents. Remove does not delete nodes.
-func (hn *hostNode) remove() {
-	hn.weight = hn.weight.Sub(entryWeight(hn.hostEntry))
-	hn.taken = false
-	current := hn.parent
-	for current != nil {
-		current.weight = current.weight.Sub(entryWeight(hn.hostEntry))
-		current = current.parent
 	}
 }
 
@@ -114,4 +77,104 @@ func (hn *hostNode) entryAtWeight(weight types.Currency) (entry modules.HostEntr
 	// Return the root entry.
 	entry = hn.hostEntry
 	return
+}
+
+// recursiveInsert is a recurisve function for adding a hostNode to an existing tree
+// of hostNodes. The first call should always be on hostdb.hostTree. Running
+// time of recursiveInsert is log(n) in the maximum number of elements that have
+// ever been in the tree.
+func (hn *hostNode) recursiveInsert(entry modules.HostEntry) (nodesAdded int, newNode *hostNode) {
+	hn.weight = hn.weight.Add(entry.Weight)
+
+	// If the current node is empty, add the entry but don't increase the
+	// count.
+	if !hn.taken {
+		hn.taken = true
+		hn.hostEntry = entry
+		newNode = hn
+		return
+	}
+
+	// Insert the element into the lest populated side.
+	if hn.left == nil {
+		hn.left = createNode(hn, entry)
+		nodesAdded = 1
+		newNode = hn.left
+	} else if hn.right == nil {
+		hn.right = createNode(hn, entry)
+		nodesAdded = 1
+		newNode = hn.right
+	} else if hn.left.count < hn.right.count {
+		nodesAdded, newNode = hn.left.recursiveInsert(entry)
+	} else {
+		nodesAdded, newNode = hn.right.recursiveInsert(entry)
+	}
+
+	hn.count += nodesAdded
+	return
+}
+
+// insertCompleteHostEntry inserts a host entry into the host tree, removing
+// any conflicts. The host settings are assummed to be correct.
+func (hdb *HostDB) insertNode(entry *modules.HostEntry) {
+	// If there's already a host of the same id, remove that host.
+	priorEntry, exists := hdb.activeHosts[entry.IPAddress]
+	if exists {
+		priorEntry.removeNode()
+	}
+
+	// Insert the updated entry into the host tree.
+	if hdb.hostTree == nil {
+		hdb.hostTree = createNode(nil, *entry)
+		hdb.activeHosts[entry.IPAddress] = hdb.hostTree
+	} else {
+		_, hostNode := hdb.hostTree.recursiveInsert(*entry)
+		hdb.activeHosts[entry.IPAddress] = hostNode
+	}
+}
+
+// remove takes a node and removes it from the tree by climbing through the
+// list of parents. remove does not delete nodes.
+func (hn *hostNode) removeNode() {
+	hn.weight = hn.weight.Sub(hn.hostEntry.Weight)
+	hn.taken = false
+	current := hn.parent
+	for current != nil {
+		current.weight = current.weight.Sub(hn.hostEntry.Weight)
+		current = current.parent
+	}
+}
+
+// FlagHost is called when a host is caught misbehaving. The HostDB will
+// usually respond by reducing the weight of the host or by removing the host.
+func (hdb *HostDB) FlagHost(addr modules.NetAddress) error {
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
+
+	if len(hdb.activeHosts) > MinHostThreshold {
+		hdb.removeHost(addr)
+	} else {
+		// TODO: reduce the selection weight of this host.
+	}
+	return nil
+}
+
+// RandomHost pulls a random host from the hostdb weighted according to the
+// internal metrics of the hostdb.
+func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
+
+	if len(hdb.activeHosts) == 0 {
+		err = errors.New("no hosts found")
+		return
+	}
+
+	// Get a random number between 0 and state.TotalWeight and then scroll
+	// through state.HostList until at least that much weight has been passed.
+	randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
+	if err != nil {
+		return
+	}
+	return hdb.hostTree.entryAtWeight(types.NewCurrency(randWeight))
 }
