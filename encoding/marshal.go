@@ -11,8 +11,9 @@
 // Booleans are encoded as one byte, either zero (false) or one (true). No
 // other values may be used.
 //
-// Nil pointers are represented by a zero. Valid pointers are represented by a
-// non-zero, followed by the encoding of the dereferenced value.
+// Nil pointers are equivalent to "false," i.e. a single zero byte. Valid
+// pointers are represented by a "true" byte (0x01) followed by the encoding
+// of the dereferenced value.
 //
 // Variable-length types, such as strings and slices, are represented by an 8-byte
 // length-prefix followed by the encoded value.
@@ -224,9 +225,10 @@ func (d *Decoder) decode(val reflect.Value) {
 
 	switch val.Kind() {
 	case reflect.Ptr:
-		b := d.readN(1)
+		var valid bool
+		d.decode(reflect.ValueOf(&valid).Elem())
 		// nil pointer, nothing to decode
-		if b[0] == 0 {
+		if !valid {
 			return
 		}
 		// make sure we aren't decoding into nil
