@@ -111,7 +111,7 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 
 // newTpoolTester returns a ready-to-use tpool tester, with all modules
 // initialized.
-func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
+func newTpoolTester(name string, t *testing.T) *tpoolTester {
 	testdir := tester.TempDir("transactionpool", name)
 
 	// Create the consensus set.
@@ -142,7 +142,7 @@ func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 	}
 
 	// Assebmle all of the objects in to a tpoolTester
-	tpt = &tpoolTester{
+	tpt := &tpoolTester{
 		cs:      cs,
 		gateway: g,
 		tpool:   tp,
@@ -166,7 +166,7 @@ func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 		tpt.csUpdateWait()
 	}
 
-	return
+	return tpt
 }
 
 // TestNewNilInputs tries to trigger a panic with nil inputs.

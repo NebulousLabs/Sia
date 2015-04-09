@@ -66,7 +66,7 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		mu: sync.New(1*time.Second, 0),
 	}
 
-	cs.ConsensusSubscribe(hdb)
+	cs.ConsensusSetSubscribe(hdb)
 
 	// TODO: start the function that actively checks for hosts being alive or
 	// not.

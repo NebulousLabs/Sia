@@ -37,9 +37,9 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostEntry) {
 	return
 }
 
-// update grabs all of the new blocks from the consensus set and searches them
-// for host announcements.
-func (hdb *HostDB) ReceiveConsensusUpdate(_, appliedBlocks []types.Block) {
+// ReceiveConsensusSetUpdate accepts an update from the consensus set which
+// contains new blocks.
+func (hdb *HostDB) ReceiveConsensusSetUpdate(_, appliedBlocks []types.Block) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 
