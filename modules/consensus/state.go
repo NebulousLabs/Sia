@@ -2,9 +2,11 @@ package consensus
 
 import (
 	"os"
+	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/blockdb"
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -120,6 +122,13 @@ func New(saveDir string) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// during short tests, use an in-memory database
+	if build.Release == "testing" && testing.Short() {
+		s.db = blockdb.NilDB
+		return s, nil
+	}
+
 	err = s.load(saveDir)
 	if err != nil {
 		return nil, err
