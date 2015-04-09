@@ -21,7 +21,7 @@ func (tpt *tpoolTester) testSiacoinTransactionDump() {
 	if err != nil {
 		tpt.t.Error(err)
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 	if len(tpt.tpool.TransactionSet()) != 0 {
 		tpt.t.Error("Transaction set should be empty after mining a block, instead is size", len(tpt.tpool.TransactionSet()))
 	}

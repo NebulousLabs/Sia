@@ -100,7 +100,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 	}
 	h.load()
 
-	typesChan := state.ConsensusNotify()
+	typesChan := state.ConsensusSetNotify()
 	go h.threadedConsensusListen(typesChan)
 
 	return

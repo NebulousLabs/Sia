@@ -306,9 +306,9 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 	}
 }
 
-// ReceiveConsensusUpdate gets called to inform the transaction pool of changes
-// to the consensus set.
-func (tp *TransactionPool) ReceiveConsensusUpdate(revertedBlocks, appliedBlocks []types.Block) {
+// ReceiveConsensusSetUpdate gets called to inform the transaction pool of
+// changes to the consensus set.
+func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks []types.Block) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 

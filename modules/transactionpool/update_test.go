@@ -22,7 +22,7 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 
 	// Check that the transactions have been removed from the unconfirmed set.
 	if len(tpt.tpool.TransactionSet()) != 0 {
@@ -51,12 +51,12 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 	err = tpt.tpool.AcceptTransaction(dependent)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 
 	// Create a transaction that is in conflict with the parent.
 	parentValue := parent.SiacoinOutputSum()
@@ -93,7 +93,7 @@ func (tpt *tpoolTester) testBlockConflicts() {
 			break
 		}
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
@@ -124,12 +124,12 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 	err = tpt.tpool.AcceptTransaction(dependent)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 
 	// Mine a block to put the parent into the confirmed set.
 	tset := tpt.tpool.TransactionSet()
@@ -154,7 +154,7 @@ func (tpt *tpoolTester) testDependentUpdates() {
 			break
 		}
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 
 	// Check that 'parent' and 'dependent' have been removed from the
 	// transaction set, since conflict has made the confirmed set.
@@ -199,7 +199,7 @@ func (tpt *tpoolTester) testRewinding() {
 			break
 		}
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 	if len(tpt.tpool.TransactionSet()) != 0 {
 		tpt.t.Fatal("tset should be empty after FindBlock()")
 	}
@@ -225,7 +225,7 @@ func (tpt *tpoolTester) testRewinding() {
 			break
 		}
 	}
-	tpt.updateWait()
+	tpt.csUpdateWait()
 
 	// Check that the transaction which was once confirmed but no longer is
 	// confirmed is now unconfirmed.
