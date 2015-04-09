@@ -32,7 +32,10 @@ type daemon struct {
 // newDaemon initializes modules using the config parameters and uses them to
 // create an api.Server.
 func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
-	state := consensus.CreateGenesisState()
+	state, err := consensus.New(filepath.Join(cfg.SiaDir, "consensus"))
+	if err != nil {
+		return
+	}
 	gateway, err := gateway.New(cfg.RPCAddr, state, filepath.Join(cfg.SiaDir, "gateway"))
 	if err != nil {
 		return

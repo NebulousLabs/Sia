@@ -1,6 +1,7 @@
 package hostdb
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -53,10 +54,13 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	testdir := tester.TempDir("hostdb", name)
 
 	// Create the consensus set.
-	cs := consensus.CreateGenesisState()
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create the gateway.
-	g, err := gateway.New(":0", cs, testdir)
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,13 +77,13 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	}
 
 	// Create the wallet.
-	w, err := wallet.New(cs, tp, testdir)
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create the host.
-	h, err := host.New(cs, tp, w, testdir)
+	h, err := host.New(cs, tp, w, filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

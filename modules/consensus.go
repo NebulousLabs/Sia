@@ -4,6 +4,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	ConsensusDir = "consensus"
+)
+
 // A DiffDirection indicates the "direction" of a diff, either applied or
 // reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool

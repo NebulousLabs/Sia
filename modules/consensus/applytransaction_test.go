@@ -108,14 +108,14 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 // TestApplySiacoinOutput creates a new testing environment and uses it to call
 // testApplySiacoinOutput.
 func TestApplySiacoinOutput(t *testing.T) {
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestApplySiacoinOutput", t)
 	ct.testApplySiacoinOutput()
 }
 
 // TestApplyFileContract creates a new testing environment and uses it to call
 // testApplyFileContract.
 func TestApplyFileContract(t *testing.T) {
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestApplyFileContract", t)
 	ct.testApplyFileContract()
 }
 
@@ -126,6 +126,6 @@ func TestApplyStorageProof(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestApplyStorageProof", t)
 	ct.testApplyStorageProof()
 }

@@ -44,6 +44,6 @@ func (ct *ConsensusTester) testApplyMissedProof() {
 // TestApplyMissedProof creates a new testing environment and uses it to call
 // testApplyMissedProof.
 func TestApplyMissedProof(t *testing.T) {
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestApplyMissedProof", t)
 	ct.testApplyMissedProof()
 }

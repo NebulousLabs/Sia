@@ -22,14 +22,18 @@ type HostTester struct {
 
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(name string, t *testing.T) (ht *HostTester) {
-	ct := consensus.NewTestingEnvironment(t)
 	testdir := tester.TempDir("host", name)
-	g, err := gateway.New(":0", ct.State, filepath.Join(testdir, modules.GatewayDir))
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct := consensus.NewConsensusTester(t, cs)
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tp, err := transactionpool.New(ct.State, g)
+	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}

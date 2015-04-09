@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/blockdb"
@@ -110,15 +111,20 @@ func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.Unlock
 	return
 }
 
-// CreateGenesisState returns a State containing only the genesis block.
-func CreateGenesisState() (s *State) {
-	return createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
-}
-
+// New returns a new State, containing at least the genesis block. If there is
+// an existing block database present in saveDir, it will be loaded. Otherwise,
+// a new database will be created.
 func New(saveDir string) (*State, error) {
 	s := createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
-	err := s.load(saveDir)
-	return s, err
+	err := os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = s.load(saveDir)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // RLock will readlock the state.

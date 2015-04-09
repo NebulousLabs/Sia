@@ -230,14 +230,14 @@ func TestBlockTimestamps(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestBlockTimestamps", t)
 	ct.testBlockTimestamps()
 }
 
 // TestEmptyBlock creates a new testing environment and uses it to call
 // testEmptyBlock.
 func TestEmptyBlock(t *testing.T) {
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestEmptyBlock", t)
 	ct.testEmptyBlock()
 }
 
@@ -248,7 +248,7 @@ func TestLargeBlock(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestLargeBlock", t)
 	ct.testLargeBlock()
 }
 
@@ -259,7 +259,7 @@ func TestSingleNoFeePayout(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestSingleNoFeePayout", t)
 	ct.testSingleNoFeePayout()
 }
 
@@ -270,7 +270,7 @@ func TestMultipleFeesMultiplePayouts(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestMultipleFeesMultiplePayouts", t)
 	ct.testMultipleFeesMultiplePayouts()
 }
 
@@ -281,7 +281,7 @@ func TestMissedTarget(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestMissedTarget", t)
 	ct.testMissedTarget()
 }
 
@@ -292,13 +292,13 @@ func TestRepeatBlock(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestRepeatBlock", t)
 	ct.testRepeatBlock()
 }
 
 // TestOrphan creates a new testing environment and uses it to call testOrphan.
 func TestOrphan(t *testing.T) {
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestOrphan", t)
 	ct.testOrphan()
 }
 
@@ -309,6 +309,6 @@ func TestBadBlock(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ct := NewTestingEnvironment(t)
+	ct := NewTestingEnvironment("TestBadBlock", t)
 	ct.testBadBlock()
 }

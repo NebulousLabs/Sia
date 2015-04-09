@@ -37,7 +37,10 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	APIPort++
 
 	// create modules
-	state := consensus.CreateGenesisState()
+	state, err := consensus.New(filepath.Join(testdir, "consensus"))
+	if err != nil {
+		t.Fatal("Failed to create consensus set:", err)
+	}
 	gateway, err := gateway.New(":0", state, filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)

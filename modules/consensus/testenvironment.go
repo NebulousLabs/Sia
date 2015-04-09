@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -136,9 +137,12 @@ func NewConsensusTester(t *testing.T, s *State) (ct *ConsensusTester) {
 // NewTestingEnvironment creates a state and an assistant that wraps around the
 // state, then mines enough blocks that the assistant has outputs ready to
 // spend.
-func NewTestingEnvironment(t *testing.T) (ct *ConsensusTester) {
+func NewTestingEnvironment(name string, t *testing.T) (ct *ConsensusTester) {
 	// Get the state and assistant.
-	s := CreateGenesisState()
+	s, err := New(tester.TempDir("consensus", name))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ct = NewConsensusTester(t, s)
 
 	// Mine enough blocks that the first miner payouts come to maturity. The
