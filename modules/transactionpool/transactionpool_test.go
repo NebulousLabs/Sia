@@ -13,20 +13,20 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// A tpoolTester contains a consensus tester and a transaction pool, and
-// provides a set of helper functions for testing the transaction pool without
-// modules that need to use the transaction pool.
-//
-// updateChan is a channel that will block until the transaction pool posts an
-// update. This is useful for synchronizing with updates from the state.
+// A tpoolTester is used during testing to initialize a transaction pool and
+// useful helper modules. The update channels are used to synchronize updates
+// that occur during testing. Any time that an update is submitted to the
+// transaction pool or consensus set, updateWait() should be called or
+// desynchronization could be introduced.
 type tpoolTester struct {
 	cs     *consensus.State
 	tpool  *TransactionPool
 	miner  modules.Miner
 	wallet modules.Wallet
 
-	tpoolUpdateChan chan struct{}
-	minerUpdateChan <-chan struct{}
+	tpoolUpdateChan  <-chan struct{}
+	minerUpdateChan  <-chan struct{}
+	walletUpdateChan <-chan struct{}
 
 	t *testing.T
 }
@@ -64,6 +64,7 @@ func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
 func (tpt *tpoolTester) updateWait() {
 	<-tpt.tpoolUpdateChan
 	<-tpt.minerUpdateChan
+	<-tpt.walletUpdateChan
 }
 
 // spendCoins sends the desired amount of coins to the desired address, calling
@@ -142,8 +143,9 @@ func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 		miner:  m,
 		wallet: w,
 
-		tpoolUpdateChan: tpoolUpdateChan,
-		minerUpdateChan: m.MinerSubscribe(),
+		tpoolUpdateChan:  tp.TransactionPoolNotify(),
+		minerUpdateChan:  m.MinerNotify(),
+		walletUpdateChan: w.WalletNotify(),
 
 		t: t,
 	}

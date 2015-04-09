@@ -26,6 +26,11 @@ type TransactionPool interface {
 	// TransactionSet returns the set of unconfirmed transactions.
 	TransactionSet() []types.Transaction
 
+	// TransactionPoolNotify will push a struct down the channel any time that
+	// the transaction pool updates. An update occurs any time there is a new
+	// transaction or block introduced to the transaction pool.
+	TransactionPoolNotify() <-chan struct{}
+
 	// TransactionPoolSubscribe will subscribe the input object to the changes
 	// in the transaction pool.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)

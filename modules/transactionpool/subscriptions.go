@@ -103,7 +103,7 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []typ
 	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
 	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 
-	// Notify every subscriber.
+	// Pass the update to every subscriber.
 	for _, subscriber := range tp.subscribers {
 		// If the channel is already full, don't block. This will prevent a
 		// deadlocked subscriber from also deadlocking the transaction pool.
@@ -114,7 +114,20 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []typ
 	}
 }
 
-// TransactionPoolSubscribe adds a subscriber to the transaction pool.
+// TransactionPoolNotify adds a subscriber to the list who will be notified any
+// time that there is a change to the transaction pool (new transaction or
+// block), but that subscriber will not be told any details about the change.
+func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
+	c := make(chan struct{}, 1)
+	id := tp.mu.Lock()
+	tp.subscribers = append(tp.subscribers, c)
+	tp.mu.Unlock(id)
+	return c
+}
+
+// TransactionPoolSubscribe adds a subscriber to the transaction pool that will
+// be given a full list of changes via ReceiveTransactionPoolUpdate any time
+// that there is a change.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	c := make(chan struct{}, 1)
 	id := tp.mu.Lock()

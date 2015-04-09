@@ -39,7 +39,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	minerChan := m.MinerSubscribe()
+	minerChan := m.MinerNotify()
 
 	// Check that the wallet balance starts at 0.
 	if !w.Balance(true).IsZero() {
@@ -89,7 +89,7 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	minerChan := m.MinerSubscribe()
+	minerChan := m.MinerNotify()
 
 	for i := 0; i < 200; i++ {
 		_, _, err = m.FindBlock()
