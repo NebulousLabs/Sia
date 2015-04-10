@@ -5,8 +5,8 @@ The modules are a work in progress, not all modules have implemented all
 conventions.
 
 All modules have a ModuleNotify method, which returns a channel that receives a
-struct{} every time that the is an update to the module. The ModuleNotify class
-of methods is primarily used for synchronization, to keep information
+struct{} every time that there is an update to the module. The ModuleNotify
+class of methods is primarily used for synchronization, to keep information
 consistent between modules, especially during testing.
 
 All modules have a ModuleSubscribe method, which takes a ModuleSubscriber
