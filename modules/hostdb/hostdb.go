@@ -74,8 +74,8 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 
 	cs.ConsensusSetSubscribe(hdb)
 
-	// TODO: start the function that actively checks for hosts being alive or
-	// not.
+	// Start the scanner which will periodically check if hosts are online, and
+	// update the settings of the hosts that are online.
 
 	return
 }

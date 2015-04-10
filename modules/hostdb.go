@@ -40,8 +40,9 @@ type HostSettings struct {
 // coins frozen in the host's announcement transaction.
 type HostEntry struct {
 	HostSettings
-	IPAddress NetAddress
-	Weight    types.Currency
+	IPAddress   NetAddress
+	Weight      types.Currency
+	Reliability types.Currency
 }
 
 // A HostDB is a database of hosts that the renter can use for figuring out who
