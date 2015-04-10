@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -11,7 +12,11 @@ import (
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
 	testdir := tester.TempDir("gateway", name)
-	g, err := New(":0", consensus.CreateGenesisState(), testdir)
+	s, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := New(":0", s, testdir)
 	if err != nil {
 		t.Fatal(err)
 	}

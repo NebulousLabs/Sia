@@ -115,7 +115,10 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 	testdir := tester.TempDir("transactionpool", name)
 
 	// Create the consensus set.
-	cs := consensus.CreateGenesisState()
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create the gateway.
 	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
@@ -171,10 +174,14 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 
 // TestNewNilInputs tries to trigger a panic with nil inputs.
 func TestNewNilInputs(t *testing.T) {
+	testdir := tester.TempDir("transactionpool", "TestNewNilInputs")
+
 	// Create a consensus set and gateway.
-	cs := consensus.CreateGenesisState()
-	gDir := tester.TempDir("transactionpool", "TestNewNilInputs", modules.GatewayDir)
-	g, err := gateway.New(":0", cs, gDir)
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}

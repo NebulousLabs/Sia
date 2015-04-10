@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -45,12 +46,20 @@ func TestComplexForking(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// Need to grab a single time to make sure that each state ends up with the
-	// same genesis hash.
-	time := types.CurrentTimestamp()
-	s1 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
-	s2 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
-	s3 := createGenesisState(time, types.ZeroUnlockHash, types.ZeroUnlockHash)
+	// Can't use NewTestingEnvironment; all states need to have the same set of
+	// initial blocks.
+	s1, err := New(tester.TempDir("consensus", "TestComplexForking1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := New(tester.TempDir("consensus", "TestComplexForking2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := New(tester.TempDir("consensus", "TestComplexForking3"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	a1 := NewConsensusTester(t, s1)
 	a2 := NewConsensusTester(t, s2)
 	a3 := NewConsensusTester(t, s3)
@@ -65,12 +74,12 @@ func TestComplexForking(t *testing.T) {
 
 	// Get state1 and state2 on different forks, s3 will follow s1 at this
 	// point.
-	block1 := MineTestingBlock(s1.CurrentBlock().ID(), time, a1.Payouts(s1.Height()+1, nil), nil, s1.CurrentTarget())
-	err := s1.AcceptBlock(block1)
+	block1 := MineTestingBlock(s1.CurrentBlock().ID(), types.GenesisTimestamp, a1.Payouts(s1.Height()+1, nil), nil, s1.CurrentTarget())
+	err = s1.AcceptBlock(block1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	block2 := MineTestingBlock(s2.CurrentBlock().ID(), time+1, a2.Payouts(s2.Height()+1, nil), nil, s2.CurrentTarget())
+	block2 := MineTestingBlock(s2.CurrentBlock().ID(), types.GenesisTimestamp+1, a2.Payouts(s2.Height()+1, nil), nil, s2.CurrentTarget())
 	err = s2.AcceptBlock(block2)
 	if err != nil {
 		t.Fatal(err)

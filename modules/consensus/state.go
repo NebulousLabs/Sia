@@ -1,8 +1,12 @@
 package consensus
 
 import (
+	"os"
+	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/blockdb"
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -51,6 +55,9 @@ type State struct {
 	applyUpdates  [][]*blockNode
 	subscriptions []chan struct{}
 
+	// block database, used for saving/loading the current path
+	db blockdb.DB
+
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
 	// To keep things simple, the entire state was chosen to have a single
@@ -60,11 +67,12 @@ type State struct {
 	mu *sync.RWMutex
 }
 
-// createGenesisState returns a State containing only the genesis block. It
-// takes arguments instead of using global constants to make testing easier.
-func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.UnlockHash, claimUnlockHash types.UnlockHash) (s *State) {
-	// Create a new state and initialize the maps.
-	s = &State{
+// New returns a new State, containing at least the genesis block. If there is
+// an existing block database present in saveDir, it will be loaded. Otherwise,
+// a new database will be created.
+func New(saveDir string) (*State, error) {
+	// Create the State object.
+	s := &State{
 		blockMap:  make(map[types.BlockID]*blockNode),
 		badBlocks: make(map[types.BlockID]struct{}),
 
@@ -80,7 +88,7 @@ func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.Unlock
 
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := types.Block{
-		Timestamp: genesisTime,
+		Timestamp: types.GenesisTimestamp,
 	}
 	s.blockRoot = &blockNode{
 		block:  genesisBlock,
@@ -99,16 +107,28 @@ func createGenesisState(genesisTime types.Timestamp, fundUnlockHash types.Unlock
 	}
 	s.siafundOutputs[types.SiafundOutputID{0}] = types.SiafundOutput{
 		Value:           types.NewCurrency64(types.SiafundCount),
-		UnlockHash:      fundUnlockHash,
-		ClaimUnlockHash: claimUnlockHash,
+		UnlockHash:      types.GenesisSiafundUnlockHash,
+		ClaimUnlockHash: types.GenesisClaimUnlockHash,
 	}
 
-	return
-}
+	// Create the consensus directory.
+	err := os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return nil, err
+	}
 
-// CreateGenesisState returns a State containing only the genesis block.
-func CreateGenesisState() (s *State) {
-	return createGenesisState(types.GenesisTimestamp, types.GenesisSiafundUnlockHash, types.GenesisClaimUnlockHash)
+	// During short tests, use an in-memory database.
+	if build.Release == "testing" && testing.Short() {
+		s.db = blockdb.NilDB
+		return s, nil
+	}
+
+	// Otherwise, try to load an existing database from disk.
+	err = s.load(saveDir)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // RLock will readlock the state.

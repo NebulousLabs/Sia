@@ -70,7 +70,10 @@ func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
 	testdir := tester.TempDir("wallet", name)
 
 	// Create the consensus set.
-	cs := consensus.CreateGenesisState()
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create the gateway.
 	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))

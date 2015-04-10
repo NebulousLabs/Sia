@@ -21,7 +21,10 @@ func TestMiner(t *testing.T) {
 	testdir := tester.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
-	s := consensus.CreateGenesisState()
+	s, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
@@ -72,7 +75,10 @@ func TestManyBlocks(t *testing.T) {
 	testdir := tester.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
-	s := consensus.CreateGenesisState()
+	s, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
 	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)

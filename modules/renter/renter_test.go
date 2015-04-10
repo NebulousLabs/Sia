@@ -23,9 +23,12 @@ type RenterTester struct {
 
 // CreateHostTester initializes a HostTester.
 func CreateRenterTester(name string, t *testing.T) (rt *RenterTester) {
-	ct := consensus.NewTestingEnvironment(t)
 	testdir := tester.TempDir("renter", name)
-
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct := consensus.NewConsensusTester(t, cs)
 	g, err := gateway.New(":0", ct.State, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)

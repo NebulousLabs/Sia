@@ -7,9 +7,11 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A HostTester contains a consensus tester and a host, and provides a set of
@@ -22,14 +24,18 @@ type HostTester struct {
 
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(name string, t *testing.T) (ht *HostTester) {
-	ct := consensus.NewTestingEnvironment(t)
 	testdir := tester.TempDir("host", name)
-	g, err := gateway.New(":0", ct.State, filepath.Join(testdir, modules.GatewayDir))
+	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct := consensus.NewConsensusTester(t, cs)
+	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tp, err := transactionpool.New(ct.State, g)
+	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,6 +48,18 @@ func CreateHostTester(name string, t *testing.T) (ht *HostTester) {
 	h, err := New(ct.State, tp, w, filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// mine a few blocks
+	m, err := miner.New(cs, g, tp, w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, _, err = m.FindBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	ht = new(HostTester)
