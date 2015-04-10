@@ -51,11 +51,6 @@ type HostDB interface {
 	// from.
 	ActiveHosts() []HostEntry
 
-	// FlagHost alerts the HostDB that a host is not behaving as expected. The
-	// HostDB may decide to remove the host, reduce the weight, or it may
-	// ignore the call.
-	FlagHost(NetAddress) error
-
 	// InsertHost adds a host to the database.
 	InsertHost(HostEntry) error
 
