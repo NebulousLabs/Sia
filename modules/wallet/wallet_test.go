@@ -103,8 +103,8 @@ func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
 		miner:  m,
 		wallet: w,
 
-		minerChan:  m.MinerSubscribe(),
-		walletChan: w.WalletSubscribe(),
+		minerChan:  m.MinerNotify(),
+		walletChan: w.WalletNotify(),
 
 		t: t,
 	}

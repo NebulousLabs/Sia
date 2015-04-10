@@ -43,8 +43,8 @@ func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.
 	}
 
 	// Subscribe to the miner and wallet
-	srv.minerUpdates = srv.miner.MinerSubscribe()
-	srv.walletUpdates = srv.wallet.WalletSubscribe()
+	srv.minerUpdates = srv.miner.MinerNotify()
+	srv.walletUpdates = srv.wallet.WalletNotify()
 
 	// Register RPCs for each module
 	g.RegisterRPC("AcceptBlock", srv.acceptBlock)

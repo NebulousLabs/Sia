@@ -90,7 +90,7 @@ type Wallet interface {
 
 	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
-	// WalletSubscribe will push a struct down the channel any time that the
+	// WalletNotify will push a struct down the channel any time that the
 	// wallet updates.
-	WalletSubscribe() <-chan struct{}
+	WalletNotify() <-chan struct{}
 }

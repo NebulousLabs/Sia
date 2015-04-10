@@ -26,9 +26,9 @@ type Miner interface {
 	// miner.
 	MinerInfo() MinerInfo
 
-	// MinerSubscribe is a channel to inform subscribers of when the miner has
+	// MinerNotify is a channel to inform subscribers of when the miner has
 	// updated. This is primarily used for synchronization during testing.
-	MinerSubscribe() <-chan struct{}
+	MinerNotify() <-chan struct{}
 
 	// SetThreads sets the number of threads in the miner.
 	SetThreads(int) error

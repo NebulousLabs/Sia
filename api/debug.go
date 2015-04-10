@@ -102,7 +102,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Host = true
 	}()
 	go func() {
-		srv.hostdb.Remove("")
+		srv.hostdb.RemoveHost("")
 		mds.HostDB = true
 	}()
 	go func() {

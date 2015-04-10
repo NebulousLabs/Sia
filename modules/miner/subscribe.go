@@ -11,8 +11,8 @@ func (m *Miner) notifySubscribers() {
 	}
 }
 
-// MinerSubscribe adds a subscriber to the miner.
-func (m *Miner) MinerSubscribe() <-chan struct{} {
+// MinerNotify adds a subscriber to the miner.
+func (m *Miner) MinerNotify() <-chan struct{} {
 	c := make(chan struct{}, 1)
 	m.mu.Lock()
 	m.subscribers = append(m.subscribers, c)

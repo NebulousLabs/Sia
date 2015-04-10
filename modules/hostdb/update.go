@@ -3,7 +3,6 @@ package hostdb
 import (
 	"strings"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -38,45 +37,18 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostEntry) {
 	return
 }
 
-// update grabs all of the new blocks from the consensus set and searches them
-// for host announcements. The threading is careful to avoid holding a lock
-// while network communication is happening.
-func (hdb *HostDB) update() {
-	// Get the blocks that have been added since the previous update.
-	_, appliedBlocks, err := hdb.state.BlocksSince(hdb.recentBlock)
-	if err != nil {
-		// Sanity check - err should be nil.
-		if build.DEBUG {
-			panic("hostdb got an error when calling hdb.state.BlocksSince")
-		}
-	}
+// ReceiveConsensusSetUpdate accepts an update from the consensus set which
+// contains new blocks.
+func (hdb *HostDB) ReceiveConsensusSetUpdate(_, appliedBlocks []types.Block) {
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 
 	// Add hosts announced in blocks that were applied.
-	for _, blockID := range appliedBlocks {
-		block, exists := hdb.state.Block(blockID)
-		if !exists {
-			if build.DEBUG {
-				panic("state is telling us a block doesn't exist that got returned by BlocksSince")
-			}
-			continue
-		}
+	for _, block := range appliedBlocks {
 		for _, entry := range findHostAnnouncements(block) {
-			hdb.insert(entry)
+			hdb.insertHost(entry)
 		}
-		hdb.recentBlock = blockID
 	}
 
 	return
-}
-
-// threadedConsensusListen listens on a state subscription and updates every
-// time that there's a new block.
-func (hdb *HostDB) threadedConsensusListen() {
-	sub := hdb.state.SubscribeToConsensusChanges()
-	for {
-		hdb.mu.Lock()
-		hdb.update()
-		hdb.mu.Unlock()
-		<-sub
-	}
 }

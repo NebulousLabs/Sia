@@ -11,8 +11,8 @@ func (w *Wallet) notifySubscribers() {
 	}
 }
 
-// WalletSubscribe adds a subscriber to the wallet.
-func (w *Wallet) WalletSubscribe() <-chan struct{} {
+// WalletNotify adds a subscriber to the wallet.
+func (w *Wallet) WalletNotify() <-chan struct{} {
 	c := make(chan struct{}, 1)
 	id := w.mu.Lock()
 	w.subscribers = append(w.subscribers, c)

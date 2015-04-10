@@ -120,7 +120,7 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 	}
 
 	// Subscribe the transaction pool to the consensus set.
-	cs.Subscribe(tp)
+	cs.ConsensusSetSubscribe(tp)
 
 	return
 }

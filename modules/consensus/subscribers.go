@@ -4,15 +4,15 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// A Subscriber is an object that receives updates to the consensus set every
-// time there is a change in consensus.
-type Subscriber interface {
-	// ReceiveConsensusUpdate sends a consensus update to a module through a
+// A ConsensusSetSubscriber is an object that receives updates to the consensus
+// set every time there is a change in consensus.
+type ConsensusSetSubscriber interface {
+	// ReceiveConsensusSetUpdate sends a consensus update to a module through a
 	// function call. Updates will always be sent in the correct order.
 	// Usually, the function receiving the updates will also process the
 	// changes. If the function blocks indefinitely, the state will still
 	// function.
-	ReceiveConsensusUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
+	ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
 }
 
 // threadedSendUpdates sends updates to a specific subscriber as they become
@@ -28,7 +28,7 @@ type Subscriber interface {
 // consensus set while it makes a blocking call to the subscriber. If the
 // subscriber deadlocks or has problems, the thread will stall indefinitely,
 // but the rest of consensus will not be disrupted.
-func (s *State) threadedSendUpdates(update chan struct{}, subscriber Subscriber) {
+func (s *State) threadedSendUpdates(update chan struct{}, subscriber ConsensusSetSubscriber) {
 	i := 0
 	for {
 		id := s.mu.RLock()
@@ -47,7 +47,7 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber Subscriber)
 			s.mu.RUnlock(id)
 
 			// Update the subscriber with the changes.
-			subscriber.ReceiveConsensusUpdate(revertedBlocks, appliedBlocks)
+			subscriber.ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks)
 			i++
 		}
 
@@ -56,8 +56,8 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber Subscriber)
 	}
 }
 
-// updateSubscribers calls ReceiveConsensusUpdate on all of the subscribers to the
-// consensus set.
+// updateSubscribers calls ReceiveConsensusSetUpdate on all of the subscribers
+// to the consensus set.
 func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
 	// Add the changes to the change set.
 	s.revertUpdates = append(s.revertUpdates, revertedNodes)
@@ -73,9 +73,9 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 	}
 }
 
-// SubscribeToConsensusChanges returns a channel that will be sent an empty
-// struct every time the consensus set changes.
-func (s *State) SubscribeToConsensusChanges() <-chan struct{} {
+// ConsensusSetNotify returns a channel that will be sent an empty struct every
+// time the consensus set changes.
+func (s *State) ConsensusSetNotify() <-chan struct{} {
 	id := s.mu.Lock()
 	c := make(chan struct{}, 1)
 	s.subscriptions = append(s.subscriptions, c)
@@ -83,8 +83,9 @@ func (s *State) SubscribeToConsensusChanges() <-chan struct{} {
 	return c
 }
 
-// Subscribe accepts a new subscriber.
-func (s *State) Subscribe(subscriber Subscriber) {
+// ConsensusSetSubscribe accepts a new subscriber who will receive a call to
+// ReceiveConsensusSetUpdate every time there is a change in the consensus set.
+func (s *State) ConsensusSetSubscribe(subscriber ConsensusSetSubscriber) {
 	c := make(chan struct{}, 1)
 	id := s.mu.Lock()
 	s.subscriptions = append(s.subscriptions, c)

@@ -21,7 +21,7 @@ func TestUploadAndDownload(t *testing.T) {
 	st := newServerTester("TestUploadAndDownload", t)
 	st.announceHost()
 
-	for st.hostdb.NumHosts() == 0 {
+	for len(st.hostdb.ActiveHosts()) == 0 {
 		time.Sleep(time.Millisecond)
 	}
 

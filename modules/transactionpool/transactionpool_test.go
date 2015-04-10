@@ -13,20 +13,22 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// A tpoolTester contains a consensus tester and a transaction pool, and
-// provides a set of helper functions for testing the transaction pool without
-// modules that need to use the transaction pool.
-//
-// updateChan is a channel that will block until the transaction pool posts an
-// update. This is useful for synchronizing with updates from the state.
+// A tpoolTester is used during testing to initialize a transaction pool and
+// useful helper modules. The update channels are used to synchronize updates
+// that occur during testing. Any time that an update is submitted to the
+// transaction pool or consensus set, updateWait() should be called or
+// desynchronization could be introduced.
 type tpoolTester struct {
-	cs     *consensus.State
-	tpool  *TransactionPool
-	miner  modules.Miner
-	wallet modules.Wallet
+	cs      *consensus.State
+	gateway modules.Gateway
+	tpool   *TransactionPool
+	miner   modules.Miner
+	wallet  modules.Wallet
 
-	tpoolUpdateChan chan struct{}
-	minerUpdateChan <-chan struct{}
+	csUpdateChan     <-chan struct{}
+	tpoolUpdateChan  <-chan struct{}
+	minerUpdateChan  <-chan struct{}
+	walletUpdateChan <-chan struct{}
 
 	t *testing.T
 }
@@ -60,10 +62,19 @@ func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
 	return txn
 }
 
-// updateWait blocks while an update propagates through the modules.
-func (tpt *tpoolTester) updateWait() {
+// csUpdateWait listens on all channels until a consensus set update has
+// reached all modules.
+func (tpt *tpoolTester) csUpdateWait() {
+	<-tpt.csUpdateChan
+	tpt.tpUpdateWait()
+}
+
+// tpUpdateWait listens on all channels until a transaction pool update has
+// reached all modules.
+func (tpt *tpoolTester) tpUpdateWait() {
 	<-tpt.tpoolUpdateChan
 	<-tpt.minerUpdateChan
+	<-tpt.walletUpdateChan
 }
 
 // spendCoins sends the desired amount of coins to the desired address, calling
@@ -81,7 +92,7 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 	if err != nil {
 		return
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 	_, _, err = tpt.wallet.AddOutput(id, output)
 	if err != nil {
 		return
@@ -94,16 +105,17 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 	if err != nil {
 		return
 	}
-	tpt.updateWait()
+	tpt.tpUpdateWait()
 	return
 }
 
-// CreatetpoolTester initializes a tpoolTester.
-func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
+// newTpoolTester returns a ready-to-use tpool tester, with all modules
+// initialized.
+func newTpoolTester(name string, t *testing.T) *tpoolTester {
+	testdir := tester.TempDir("transactionpool", name)
+
 	// Create the consensus set.
 	cs := consensus.CreateGenesisState()
-
-	testdir := tester.TempDir("transactionpool", name)
 
 	// Create the gateway.
 	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
@@ -129,21 +141,18 @@ func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 		t.Fatal(err)
 	}
 
-	// Subscribe to the updates of the transaction pool.
-	tpoolUpdateChan := make(chan struct{}, 1)
-	id := tp.mu.Lock()
-	tp.subscribers = append(tp.subscribers, tpoolUpdateChan)
-	tp.mu.Unlock(id)
-
 	// Assebmle all of the objects in to a tpoolTester
-	tpt = &tpoolTester{
-		cs:     cs,
-		tpool:  tp,
-		miner:  m,
-		wallet: w,
+	tpt := &tpoolTester{
+		cs:      cs,
+		gateway: g,
+		tpool:   tp,
+		miner:   m,
+		wallet:  w,
 
-		tpoolUpdateChan: tpoolUpdateChan,
-		minerUpdateChan: m.MinerSubscribe(),
+		csUpdateChan:     cs.ConsensusSetNotify(),
+		tpoolUpdateChan:  tp.TransactionPoolNotify(),
+		minerUpdateChan:  m.MinerNotify(),
+		walletUpdateChan: w.WalletNotify(),
 
 		t: t,
 	}
@@ -154,10 +163,10 @@ func newTpoolTester(name string, t *testing.T) (tpt *tpoolTester) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tpt.updateWait()
+		tpt.csUpdateWait()
 	}
 
-	return
+	return tpt
 }
 
 // TestNewNilInputs tries to trigger a panic with nil inputs.
