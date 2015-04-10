@@ -1,5 +1,9 @@
 package hostdb
 
+// weightedlist.go manages a weighted list of nodes that can be queried
+// randomly. The functions for inserting, removing, and fetching nodes from the
+// list are housed in this file.
+
 import (
 	"crypto/rand"
 	"errors"

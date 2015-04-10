@@ -1,5 +1,15 @@
 package hostdb
 
+// update.go is responsible for finding new hosts and adding them to the
+// database. Currently, the blockchain is the only source for finding hosts,
+// and any host announcement in the blockchain is accepted with equal weight.
+// The current implementation is trivially vulnerable to a sybil attack,
+// whereby a host can gain favoritism by announcing itself many times using
+// different addresses. We have chosen to ignore this vulnerability for the
+// early stages of the network, though eventually it will be addressed by
+// requiring hosts to burn coins, and weighting them according to the number of
+// coins burned.
+
 import (
 	"strings"
 

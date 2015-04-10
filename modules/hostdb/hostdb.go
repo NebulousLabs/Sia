@@ -1,4 +1,12 @@
+// package hostdb provides a HostDB object that implements the modules.HostDB
+// interface. The blockchain is scanned for host announcements and hosts that
+// are found get added to the host database. The database continually scans the
+// set of hosts it has found and updates who is online.
 package hostdb
+
+// hostdb.go defines the HostDB type and New for the funtion. The functions for
+// inserting, removing, and querying hosts in the database were put in this
+// file for lack of a better place to put them.
 
 import (
 	"errors"
@@ -20,30 +28,28 @@ var (
 	ErrNilState   = errors.New("consensus set cannot be nil")
 )
 
-type (
-	// The HostDB is a database of potential hosts. It assigns a weight to each
-	// host based on their hosting parameters, and then can select hosts at random
-	// for uploading files.
-	HostDB struct {
-		consensusSet *consensus.State
-		gateway      modules.Gateway
+// The HostDB is a database of potential hosts. It assigns a weight to each
+// host based on their hosting parameters, and then can select hosts at random
+// for uploading files.
+type HostDB struct {
+	consensusSet *consensus.State
+	gateway      modules.Gateway
 
-		// The hostTree is the root node of the tree that organizes hosts by
-		// weight. The tree is necessary for selecting weighted hosts at
-		// random. 'activeHosts' provides a lookup from hostname to the the
-		// corresponding node, as the hostTree is unsorted. A host is active if
-		// it is currently responding to queries about price and other
-		// settings.
-		hostTree    *hostNode
-		activeHosts map[modules.NetAddress]*hostNode
+	// The hostTree is the root node of the tree that organizes hosts by
+	// weight. The tree is necessary for selecting weighted hosts at
+	// random. 'activeHosts' provides a lookup from hostname to the the
+	// corresponding node, as the hostTree is unsorted. A host is active if
+	// it is currently responding to queries about price and other
+	// settings.
+	hostTree    *hostNode
+	activeHosts map[modules.NetAddress]*hostNode
 
-		//  allHosts is a simple list of all known hosts by their network
-		//  address, including hosts that are currently offline.
-		allHosts map[modules.NetAddress]*modules.HostEntry
+	//  allHosts is a simple list of all known hosts by their network
+	//  address, including hosts that are currently offline.
+	allHosts map[modules.NetAddress]*modules.HostEntry
 
-		mu *sync.RWMutex
-	}
-)
+	mu *sync.RWMutex
+}
 
 // New returns an empty HostDatabase.
 func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {

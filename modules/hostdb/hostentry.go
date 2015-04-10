@@ -1,5 +1,10 @@
 package hostdb
 
+// hostentry.go defines helper functions around the modules.HostEntry type,
+// including functions for fetching settings from the host, determining the
+// host weight, and adding a new (unkown) host entry into the host database
+// (which requires steps like fetching the settings from the host.
+
 import (
 	"math/big"
 
@@ -11,8 +16,22 @@ var (
 	// Because most weights would otherwise be fractional, we set the base
 	// weight to 10^80 to give ourselves lots of precision when determing the
 	// weight of an entry.
-	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(80), nil))
+	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(120), nil))
 )
+
+// priceWeight returns the weight of an entry according to the price of the
+// entry. The current equation is:
+//		(1 / price^3)
+func (hdb *HostDB) priceWeight(entry modules.HostEntry) (weight types.Currency) {
+	// Prevent a divide by zero error by making sure the price is at least one.
+	price := entry.Price
+	if price.Cmp(types.NewCurrency64(0)) <= 0 {
+		price = types.NewCurrency64(1)
+	}
+
+	// Divide the base weight by the cube of the price.
+	return baseWeight.Div(price).Div(price).Div(price)
+}
 
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
@@ -48,21 +67,6 @@ func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 	entry.HostSettings = settings
 	entry.Weight = hdb.priceWeight(*entry)
 	hdb.insertNode(entry)
-}
-
-// priceWeight returns the weight of an entry according to the price of the
-// entry. The current equation is:
-//		(1 / price^2)
-func (hdb *HostDB) priceWeight(entry modules.HostEntry) (weight types.Currency) {
-	// Prevent a divide by zero error by making sure the price is at least one.
-	price := entry.Price
-	if price.Cmp(types.NewCurrency64(0)) <= 0 {
-		price = types.NewCurrency64(1)
-	}
-
-	// Take the base weight, multiply it by the clapmed collateral, then divide
-	// it by the square of the price.
-	return baseWeight.Div(price).Div(price)
 }
 
 // insert adds a host entry to the state. The host will be inserted into the
