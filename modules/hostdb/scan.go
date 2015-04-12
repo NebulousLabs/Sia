@@ -14,25 +14,35 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	DefaultReliability  = 10
+	InactiveReliability = 5
+	UnreachablePenalty  = 1
+)
+
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
+//
+// TODO LOG: Log what happens in this function.
 func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
 	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
 		return conn.ReadObject(&settings, 1024)
 	})
+
+	// Now that network communicaiton is done, lock the hostdb.
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 	if err != nil {
-		// Decrement the reliability.
-		entry.Reliability = entry.Reliability.Sub(types.NewCurrency64(1))
+		// Beacuse there was an error, decrement the reliability.
+		entry.Reliability = entry.Reliability.Sub(types.NewCurrency64(UnreachablePenalty))
 
-		// If the reliability has fallen below 5, remove the host from the list
+		// If the reliability has fallen below InactiveReliability, remove the host from the list
 		// of active hosts.
 		node, exists := hdb.activeHosts[entry.IPAddress]
-		if exists && entry.Reliability.Cmp(types.NewCurrency64(5)) < 0 {
+		if exists && entry.Reliability.Cmp(types.NewCurrency64(InactiveReliability)) < 0 {
 			delete(hdb.activeHosts, entry.IPAddress)
 			node.removeNode()
 		}
@@ -45,10 +55,9 @@ func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 		return
 	}
 
-	// Re-insert the host into the database as it is online and has responded
-	// with a set of settings.
+	// Update the host settings, reliability, and weight.
 	entry.HostSettings = settings
-	entry.Reliability = types.NewCurrency64(10)
+	entry.Reliability = types.NewCurrency64(DefaultReliability)
 	entry.Weight = hdb.priceWeight(*entry)
 
 	// If the host is not already in the database, add it to the database.
@@ -62,15 +71,32 @@ func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
 	for {
-		// Sleep for a random amount of time between 4 and 24 hours. The time is randomly generated
+		// Sleep for a random amount of time between 4 and 24 hours. The time
+		// is randomly generated so that hosts who are only on at certain times
+		// of the day or week will still be included.
 		randSleep, err := rand.Int(rand.Reader, big.NewInt(int64(time.Hour*20)))
 		if err != nil {
 			if build.DEBUG {
 				panic(err)
 			} else {
-				randSleep = big.NewInt(int64(time.Hour * 13))
+				// If there's an error generating the random number, just sleep
+				// for 15 hours because it'll hit all times of the day after
+				// enough iterations.
+				randSleep = big.NewInt(int64(time.Hour * 15))
 			}
 		}
 		time.Sleep(time.Duration(randSleep.Int64()) + time.Hour*4)
+
+		// Ask every host in the database for settings.
+		//
+		// TODO: enforce some limit on the number of hosts that will be
+		// queried.
+		id := hdb.mu.Lock()
+		{
+			for _, host := range hdb.allHosts {
+				go hdb.threadedProbeHost(host)
+			}
+		}
+		hdb.mu.Unlock(id)
 	}
 }
