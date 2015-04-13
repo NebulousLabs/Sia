@@ -7,9 +7,10 @@ import (
 
 // A file is a single file that has been uploaded to the network.
 type File struct {
-	nickname    string
-	pieces      []FilePiece
-	startHeight types.BlockHeight
+	nickname     string
+	pieces       []FilePiece
+	startHeight  types.BlockHeight
+	uploadParams modules.UploadParams
 
 	renter *Renter
 }
