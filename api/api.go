@@ -51,6 +51,7 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 
 	// HostDB API Calls
+	handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
 
 	// Miner API Calls
 	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
