@@ -170,7 +170,7 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 
 	// Load old peer list. If it doesn't exist, no problem, but if it does, we
 	// want to know about any errors preventing us from loading it.
-	if loadErr := g.load(); !os.IsNotExist(loadErr) {
+	if loadErr := g.load(); err != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
 
