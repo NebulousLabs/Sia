@@ -52,6 +52,9 @@ type HostDB interface {
 	// from.
 	ActiveHosts() []HostEntry
 
+	// AllHosts returns the full list of hosts known to the hostdb.
+	AllHosts() []HostEntry
+
 	// InsertHost adds a host to the database.
 	InsertHost(HostEntry) error
 

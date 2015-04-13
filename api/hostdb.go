@@ -21,3 +21,11 @@ func (srv *Server) hostdbHostsActiveHandler(w http.ResponseWriter, req *http.Req
 	}
 	writeJSON(w, ah)
 }
+
+// hostdbHostsAllHandler handes the API call asking for the list of all hosts.
+func (srv *Server) hostdbHostsAllHandler(w http.ResponseWriter, req *http.Request) {
+	ah := ActiveHosts{
+		Entries: srv.hostdb.AllHosts(),
+	}
+	writeJSON(w, ah)
+}

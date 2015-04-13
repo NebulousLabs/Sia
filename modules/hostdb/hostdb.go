@@ -80,13 +80,26 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 	return
 }
 
-// NumHosts returns the number of hosts in the active database.
+// ActiveHosts returns the hosts that can be randomly selected out of the
+// hostdb.
 func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostEntry) {
 	id := hdb.mu.RLock()
 	defer hdb.mu.RUnlock(id)
 
 	for _, node := range hdb.activeHosts {
 		activeHosts = append(activeHosts, node.hostEntry)
+	}
+	return
+}
+
+// AllHosts returns all of the hosts known to the hostdb, including the
+// inactive ones.
+func (hdb *HostDB) AllHosts() (allHosts []modules.HostEntry) {
+	id := hdb.mu.RLock()
+	defer hdb.mu.RUnlock(id)
+
+	for _, entry := range hdb.allHosts {
+		allHosts = append(allHosts, *entry)
 	}
 	return
 }
