@@ -3,14 +3,47 @@ package renter
 import (
 	"crypto/rand"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
 	maxUploadAttempts = 8
 )
+
+// checkWalletBalance looks at an upload and determines if there is enough
+// money in the wallet to support such an upload. An error is returned if it is
+// determined that there is not enough money.
+func (r *Renter) checkWalletBalance(up modules.UploadParams) error {
+	// Get the size of the file.
+	fileInfo, err := os.Stat(up.Filename)
+	if err != nil {
+		return err
+	}
+	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
+
+	// TODO: Change average to median so that outliers are ignored.
+	sampleSize := 12
+	var averagePrice types.Currency
+	for i := 0; i < sampleSize; i++ {
+		potentialHost, err := r.hostDB.RandomHost()
+		if err != nil {
+			return err
+		}
+		averagePrice = averagePrice.Add(potentialHost.Price)
+	}
+	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(sampleSize)))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
+	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
+
+	if bufferedCost.Cmp(r.wallet.Balance(false)) > 0 {
+		return errors.New("insufficient balance for upload")
+	}
+	return nil
+}
 
 // threadedUploadPiece will upload the piece of a file to a randomly chosen
 // host. If the wallet has insufficient balance to support uploading,
@@ -65,6 +98,11 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 func (r *Renter) Upload(up modules.UploadParams) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	err := r.checkWalletBalance(up)
+	if err != nil {
+		return err
+	}
 
 	// Check for a nickname conflict.
 	_, exists := r.files[up.Nickname]
