@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	DefaultReliability  = 10
-	InactiveReliability = 5
+	DefaultReliability  = 20
+	InactiveReliability = 10
 	UnreachablePenalty  = 1
 )
 
