@@ -83,10 +83,11 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 
 	// Upload a piece to every host on the network.
 	r.files[up.Nickname] = File{
-		nickname:    up.Nickname,
-		pieces:      make([]FilePiece, up.Pieces),
-		startHeight: r.state.Height() + up.Duration,
-		renter:      r,
+		nickname:     up.Nickname,
+		pieces:       make([]FilePiece, up.Pieces),
+		startHeight:  r.state.Height() + up.Duration,
+		renter:       r,
+		uploadParams: up,
 	}
 	for i := range r.files[up.Nickname].pieces {
 		// threadedUploadPiece will change the memory that the piece points to,
