@@ -47,7 +47,7 @@ xc: dependencies test test-long REBUILD
 # clean removes all directories that get automatically created during
 # development.
 clean:
-	rm -rf /tmp/SiaTesting release whitepaper.aux whitepaper.log whitepaper.pdf
+	rm -rf release whitepaper.aux whitepaper.log whitepaper.pdf
 
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
