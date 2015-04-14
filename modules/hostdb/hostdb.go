@@ -73,9 +73,7 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 	}
 
 	cs.ConsensusSetSubscribe(hdb)
-
-	// Start the scanner which will periodically check if hosts are online, and
-	// update the settings of the hosts that are online.
+	go hdb.threadedScan()
 
 	return
 }
@@ -104,7 +102,7 @@ func (hdb *HostDB) AllHosts() (allHosts []modules.HostEntry) {
 	return
 }
 
-// Insert attempts to insert a host entry into the database.
+// InsertHost inserts a host entry into the database.
 func (hdb *HostDB) InsertHost(entry modules.HostEntry) error {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
@@ -112,7 +110,7 @@ func (hdb *HostDB) InsertHost(entry modules.HostEntry) error {
 	return nil
 }
 
-// Remove is the thread-safe version of remove.
+// RemoveHost removes a host from the database.
 func (hdb *HostDB) RemoveHost(addr modules.NetAddress) error {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
