@@ -37,7 +37,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	if !exists {
 		return
 	}
-	entry.reliability = entry.reliability.Sub(UnreachablePenalty)
+	entry.reliability = entry.reliability.Sub(penalty)
 
 	// If the entry is in the active database and has fallen below
 	// InactiveReliability, remove it from the active database.
