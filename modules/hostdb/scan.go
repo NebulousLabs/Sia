@@ -14,11 +14,36 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	DefaultReliability  = 20
-	InactiveReliability = 10
-	UnreachablePenalty  = 1
+var (
+	DefaultReliability  = types.NewCurrency64(20)
+	InactiveReliability = types.NewCurrency64(10)
+	UnreachablePenalty  = types.NewCurrency64(1)
 )
+
+// decrementReliability reduces the reliability of a node, moving it out of the
+// set of active hosts or deleting it entirely if necessary.
+func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
+	// Look up the entry and decrement the reliability.
+	entry, exists := hdb.allHosts[addr]
+	if !exists {
+		return
+	}
+	entry.Reliability = entry.Reliability.Sub(penalty)
+
+	// If the entry is in the active database and has fallen below
+	// InactiveReliability, remove it from the active database.
+	node, exists := hdb.activeHosts[addr]
+	if exists && entry.Reliability.Cmp(InactiveReliability) < 0 {
+		delete(hdb.activeHosts, entry.IPAddress)
+		node.removeNode()
+	}
+
+	// If the reliability has fallen to 0, remove the host from the
+	// database entirely.
+	if entry.Reliability.IsZero() {
+		delete(hdb.allHosts, addr)
+	}
+}
 
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
@@ -36,28 +61,13 @@ func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 	if err != nil {
-		// Beacuse there was an error, decrement the reliability.
-		entry.Reliability = entry.Reliability.Sub(types.NewCurrency64(UnreachablePenalty))
-
-		// If the reliability has fallen below InactiveReliability, remove the host from the list
-		// of active hosts.
-		node, exists := hdb.activeHosts[entry.IPAddress]
-		if exists && entry.Reliability.Cmp(types.NewCurrency64(InactiveReliability)) < 0 {
-			delete(hdb.activeHosts, entry.IPAddress)
-			node.removeNode()
-		}
-
-		// If the reliability has fallen to 0, remove the host from the
-		// database entirely.
-		if entry.Reliability.IsZero() {
-			delete(hdb.allHosts, entry.IPAddress)
-		}
+		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
 		return
 	}
 
 	// Update the host settings, reliability, and weight.
 	entry.HostSettings = settings
-	entry.Reliability = types.NewCurrency64(DefaultReliability)
+	entry.Reliability = DefaultReliability
 	entry.Weight = hdb.priceWeight(*entry)
 
 	// If the host is not already in the database, add it to the database.
