@@ -15,10 +15,6 @@ import (
 )
 
 const (
-	ActiveReliability   = 25
-	InactiveReliability = 15
-	UnreachablePenalty  = 1
-
 	DefaultScanSleep = 15 * time.Hour
 	MaxScanSleep     = 20 * time.Hour
 	MinScanSleep     = 4 * time.Hour
@@ -26,6 +22,37 @@ const (
 	MaxActiveHosts              = 200
 	InactiveHostCheckupQuantity = 100
 )
+
+var (
+	ActiveReliability   = types.NewCurrency64(20)
+	InactiveReliability = types.NewCurrency64(10)
+	UnreachablePenalty  = types.NewCurrency64(1)
+)
+
+// decrementReliability reduces the reliability of a node, moving it out of the
+// set of active hosts or deleting it entirely if necessary.
+func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
+	// Look up the entry and decrement the reliability.
+	entry, exists := hdb.allHosts[addr]
+	if !exists {
+		return
+	}
+	entry.reliability = entry.reliability.Sub(UnreachablePenalty)
+
+	// If the entry is in the active database and has fallen below
+	// InactiveReliability, remove it from the active database.
+	node, exists := hdb.activeHosts[addr]
+	if exists && entry.reliability.Cmp(InactiveReliability) < 0 {
+		delete(hdb.activeHosts, entry.IPAddress)
+		node.removeNode()
+	}
+
+	// If the reliability has fallen to 0, remove the host from the
+	// database entirely.
+	if entry.reliability.IsZero() {
+		delete(hdb.allHosts, addr)
+	}
+}
 
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
@@ -42,22 +69,7 @@ func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 	if err != nil {
-		// Beacuse there was an error, decrement the reliability.
-		entry.reliability = entry.reliability.Sub(types.NewCurrency64(UnreachablePenalty))
-
-		// If the reliability has fallen below InactiveReliability, remove the host from the list
-		// of active hosts.
-		node, exists := hdb.activeHosts[entry.IPAddress]
-		if exists && entry.reliability.Cmp(types.NewCurrency64(InactiveReliability)) < 0 {
-			delete(hdb.activeHosts, entry.IPAddress)
-			node.removeNode()
-		}
-
-		// If the reliability has fallen to 0, remove the host from the
-		// database entirely.
-		if entry.reliability.IsZero() {
-			delete(hdb.allHosts, entry.IPAddress)
-		}
+		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
 		return
 	}
 
@@ -65,7 +77,7 @@ func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// must be preserved.
 	settings.IPAddress = entry.HostSettings.IPAddress
 	entry.HostSettings = settings
-	entry.reliability = types.NewCurrency64(ActiveReliability)
+	entry.reliability = ActiveReliability
 	entry.weight = hdb.priceWeight(*entry)
 
 	// If the host is not already in the database and 'MaxActiveHosts' has not

@@ -41,7 +41,7 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	// Add the host to allHosts.
 	entry := hostEntry{
 		HostSettings: host,
-		reliability:  types.NewCurrency64(InactiveReliability),
+		reliability:  InactiveReliability,
 	}
 	hdb.allHosts[entry.IPAddress] = entry
 
