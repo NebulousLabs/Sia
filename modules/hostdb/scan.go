@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultReliability  = 25
+	ActiveReliability   = 25
 	InactiveReliability = 15
 	UnreachablePenalty  = 1
 
@@ -30,7 +30,7 @@ const (
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
-func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
+func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
 	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error { // TODO: "HostSettings" should be a const
@@ -43,28 +43,30 @@ func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 	defer hdb.mu.Unlock(id)
 	if err != nil {
 		// Beacuse there was an error, decrement the reliability.
-		entry.Reliability = entry.Reliability.Sub(types.NewCurrency64(UnreachablePenalty))
+		entry.reliability = entry.reliability.Sub(types.NewCurrency64(UnreachablePenalty))
 
 		// If the reliability has fallen below InactiveReliability, remove the host from the list
 		// of active hosts.
 		node, exists := hdb.activeHosts[entry.IPAddress]
-		if exists && entry.Reliability.Cmp(types.NewCurrency64(InactiveReliability)) < 0 {
+		if exists && entry.reliability.Cmp(types.NewCurrency64(InactiveReliability)) < 0 {
 			delete(hdb.activeHosts, entry.IPAddress)
 			node.removeNode()
 		}
 
 		// If the reliability has fallen to 0, remove the host from the
 		// database entirely.
-		if entry.Reliability.IsZero() {
+		if entry.reliability.IsZero() {
 			delete(hdb.allHosts, entry.IPAddress)
 		}
 		return
 	}
 
-	// Update the host settings, reliability, and weight.
+	// Update the host settings, reliability, and weight. The old IPAddress
+	// must be preserved.
+	settings.IPAddress = entry.HostSettings.IPAddress
 	entry.HostSettings = settings
-	entry.Reliability = types.NewCurrency64(DefaultReliability)
-	entry.Weight = hdb.priceWeight(*entry)
+	entry.reliability = types.NewCurrency64(ActiveReliability)
+	entry.weight = hdb.priceWeight(*entry)
 
 	// If the host is not already in the database and 'MaxActiveHosts' has not
 	// been reached, add the host to the database.
@@ -102,15 +104,15 @@ func (hdb *HostDB) threadedScan() {
 		{
 			// Check all of the active hosts.
 			for _, host := range hdb.activeHosts {
-				go hdb.threadedProbeHost(&host.hostEntry)
+				go hdb.threadedProbeHost(host.hostEntry)
 			}
 
 			// Assemble all of the inactive hosts into a single array and
 			// shuffle it.
 			i := 0
-			random := make([]*modules.HostEntry, len(hdb.allHosts))
+			random := make([]*hostEntry, len(hdb.allHosts))
 			for _, entry := range hdb.allHosts {
-				random[i] = entry
+				random[i] = &entry
 				i++
 			}
 

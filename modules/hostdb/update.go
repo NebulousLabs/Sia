@@ -21,7 +21,7 @@ import (
 // findHostAnnouncements returns a list of the host announcements found within
 // a given block. No check is made to see that the ip address found in the
 // announcement is actually a valid ip address.
-func findHostAnnouncements(b types.Block) (announcements []modules.HostEntry) {
+func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings) {
 	for _, t := range b.Transactions {
 		for _, data := range t.ArbitraryData {
 			// the HostAnnouncement must be prefaced by the standard host announcement string
@@ -38,7 +38,7 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostEntry) {
 			}
 
 			// Add the announcement to the slice being returned.
-			announcements = append(announcements, modules.HostEntry{
+			announcements = append(announcements, modules.HostSettings{
 				IPAddress: ha.IPAddress,
 			})
 		}
@@ -55,8 +55,8 @@ func (hdb *HostDB) ReceiveConsensusSetUpdate(_, appliedBlocks []types.Block) {
 
 	// Add hosts announced in blocks that were applied.
 	for _, block := range appliedBlocks {
-		for _, entry := range findHostAnnouncements(block) {
-			hdb.insertHost(entry)
+		for _, host := range findHostAnnouncements(block) {
+			hdb.insertHost(host)
 		}
 	}
 
