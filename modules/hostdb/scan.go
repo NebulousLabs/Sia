@@ -23,7 +23,8 @@ const (
 	MaxScanSleep     = 20 * time.Hour
 	MinScanSleep     = 4 * time.Hour
 
-	MaxActiveHosts = 200
+	MaxActiveHosts              = 200
+	InactiveHostCheckupQuantity = 100
 )
 
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
@@ -97,17 +98,48 @@ func (hdb *HostDB) threadedScan() {
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.
-		//
-		// TODO TODO TODO TODO
-		// TODO TODO TODO TODO
-		// TODO TODO TODO TODO
-		// TODO TODO TODO TODO
-		// TODO TODO TODO TODO
-		// TODO TODO TODO TODO
 		id := hdb.mu.Lock()
 		{
-			for _, host := range hdb.allHosts {
-				go hdb.threadedProbeHost(host)
+			// Check all of the active hosts.
+			for _, host := range hdb.activeHosts {
+				go hdb.threadedProbeHost(&host.hostEntry)
+			}
+
+			// Assemble all of the inactive hosts into a single array and
+			// shuffle it.
+			i := 0
+			random := make([]*modules.HostEntry, len(hdb.allHosts))
+			for _, entry := range hdb.allHosts {
+				random[i] = entry
+				i++
+			}
+
+			// Randomize the slice by swapping each element with an element
+			// that hasn't been visited yet.
+			for i := 0; i < len(hdb.allHosts); i++ {
+				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(hdb.allHosts)-i)))
+				if err != nil {
+					if build.DEBUG {
+						panic(err)
+					}
+				} else {
+					break
+				}
+
+				n := int(N.Int64()) + i
+				tmp := random[i]
+				random[i] = random[n]
+				random[n] = tmp
+			}
+
+			// Select the first InactiveHostCheckupQuantity hosts from the
+			// shuffled list.
+			n := InactiveHostCheckupQuantity
+			if len(random) < InactiveHostCheckupQuantity {
+				n = len(random)
+			}
+			for i := 0; i < n; i++ {
+				go hdb.threadedProbeHost(random[i])
 			}
 		}
 		hdb.mu.Unlock(id)
