@@ -1,5 +1,9 @@
 package hostdb
 
+// weightedlist.go manages a weighted list of nodes that can be queried
+// randomly. The functions for inserting, removing, and fetching nodes from the
+// list are housed in this file.
+
 import (
 	"crypto/rand"
 	"errors"
@@ -7,6 +11,10 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	ErrOverweight = errors.New("requested a too-heavy weight")
 )
 
 // hostNode is the node of an unsorted, balanced, weighted binary tree. When
@@ -50,10 +58,9 @@ func createNode(parent *hostNode, entry modules.HostEntry) *hostNode {
 func (hn *hostNode) entryAtWeight(weight types.Currency) (entry modules.HostEntry, err error) {
 	// Sanity check - entryAtWeight should never be called with a too-large
 	// weight.
-	if build.DEBUG {
-		if weight.Cmp(hn.weight) > 0 {
-			panic("entryAtWeight called with an input exceeding the size of the database.")
-		}
+	if weight.Cmp(hn.weight) > 0 {
+		err = ErrOverweight
+		return
 	}
 
 	// Check if the left or right child should be returned.
@@ -115,7 +122,8 @@ func (hn *hostNode) recursiveInsert(entry modules.HostEntry) (nodesAdded int, ne
 }
 
 // insertCompleteHostEntry inserts a host entry into the host tree, removing
-// any conflicts. The host settings are assummed to be correct.
+// any conflicts. The host settings are assummed to be correct. Though hosts
+// with 0 weight will never be selected, they are accetped into the tree.
 func (hdb *HostDB) insertNode(entry *modules.HostEntry) {
 	// If there's already a host of the same id, remove that host.
 	priorEntry, exists := hdb.activeHosts[entry.IPAddress]
@@ -145,23 +153,9 @@ func (hn *hostNode) removeNode() {
 	}
 }
 
-// FlagHost is called when a host is caught misbehaving. The HostDB will
-// usually respond by reducing the weight of the host or by removing the host.
-func (hdb *HostDB) FlagHost(addr modules.NetAddress) error {
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
-
-	if len(hdb.activeHosts) > MinHostThreshold {
-		hdb.removeHost(addr)
-	} else {
-		// TODO: reduce the selection weight of this host.
-	}
-	return nil
-}
-
 // RandomHost pulls a random host from the hostdb weighted according to the
 // internal metrics of the hostdb.
-func (hdb *HostDB) RandomHost() (h modules.HostEntry, err error) {
+func (hdb *HostDB) RandomHost() (entry modules.HostEntry, err error) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 

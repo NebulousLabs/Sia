@@ -40,8 +40,9 @@ type HostSettings struct {
 // coins frozen in the host's announcement transaction.
 type HostEntry struct {
 	HostSettings
-	IPAddress NetAddress
-	Weight    types.Currency
+	IPAddress   NetAddress
+	Weight      types.Currency
+	Reliability types.Currency
 }
 
 // A HostDB is a database of hosts that the renter can use for figuring out who
@@ -51,10 +52,8 @@ type HostDB interface {
 	// from.
 	ActiveHosts() []HostEntry
 
-	// FlagHost alerts the HostDB that a host is not behaving as expected. The
-	// HostDB may decide to remove the host, reduce the weight, or it may
-	// ignore the call.
-	FlagHost(NetAddress) error
+	// AllHosts returns the full list of hosts known to the hostdb.
+	AllHosts() []HostEntry
 
 	// InsertHost adds a host to the database.
 	InsertHost(HostEntry) error

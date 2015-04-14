@@ -1,5 +1,8 @@
 package hostdb
 
+// hostdb_test.go creates the hostdb tester and implements a few helper
+// functions for managing hostdb tests.
+
 import (
 	"path/filepath"
 	"testing"
@@ -40,7 +43,9 @@ type hdbTester struct {
 }
 
 // csUpdateWait listens on all channels until a consensus set update has
-// reached all modules.
+// reached all modules. csUpdateWait should be called every time that there is
+// an update to the consensus set (typically only when there is a new block),
+// this will keep all of the modules in the hostdb synchronized.
 func (hdbt *hdbTester) csUpdateWait() {
 	<-hdbt.csUpdateChan
 	<-hdbt.tpoolUpdateChan

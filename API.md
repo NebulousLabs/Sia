@@ -101,7 +101,8 @@ Parameters: none
 Response:
 ```
 struct {
-	Peers []string
+	Address NetAddress
+	Peers   []string
 }
 ```
 
@@ -220,7 +221,22 @@ struct {
 HostDB
 ------
 
-Queries: none
+Queries:
+
+* /hostdb/hosts/active
+
+#### /hostdb/hosts/active
+
+Function: Lists all of the active hosts in the hostdb.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Entries []HostEntry
+}
+```
 
 Miner
 -----
