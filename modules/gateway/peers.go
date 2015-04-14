@@ -17,6 +17,8 @@ const (
 func (g *Gateway) addPeer(peer modules.NetAddress) error {
 	if _, exists := g.peers[peer]; exists {
 		return errors.New("peer already added")
+	} else if peer == g.myAddr {
+		return errors.New("can't add our own address")
 	}
 	// If adding this peer brings us above minPeers, try to kick out a bad
 	// peer that we've been forced to keep.
