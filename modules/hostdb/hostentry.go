@@ -56,6 +56,7 @@ func (hdb *HostDB) removeHost(addr modules.NetAddress) error {
 	if exists {
 		delete(hdb.activeHosts, addr)
 		node.removeNode()
+		hdb.notifySubscribers()
 	}
 
 	return nil

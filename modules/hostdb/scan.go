@@ -45,6 +45,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	if exists && entry.reliability.Cmp(InactiveReliability) < 0 {
 		delete(hdb.activeHosts, entry.IPAddress)
 		node.removeNode()
+		hdb.notifySubscribers()
 	}
 
 	// If the reliability has fallen to 0, remove the host from the
@@ -60,8 +61,9 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
-	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error { // TODO: "HostSettings" should be a const
-		return conn.ReadObject(&settings, 1024) // TODO: what is 1024? Should probably be a const.
+	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
+		maxSettingsLen := uint64(1024)
+		return conn.ReadObject(&settings, maxSettingsLen)
 	})
 
 	// Now that network communicaiton is done, lock the hostdb to modify the
@@ -85,6 +87,7 @@ func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	_, exists := hdb.activeHosts[entry.IPAddress]
 	if !exists && len(hdb.activeHosts) < MaxActiveHosts {
 		hdb.insertNode(entry)
+		hdb.notifySubscribers()
 	}
 }
 
@@ -92,23 +95,6 @@ func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 // every few hours to see who is online and available for uploading.
 func (hdb *HostDB) threadedScan() {
 	for {
-		// Sleep for a random amount of time between 4 and 24 hours. The time
-		// is randomly generated so that hosts who are only on at certain times
-		// of the day or week will still be included. Random times also make it
-		// harder for hosts to game the system.
-		randSleep, err := rand.Int(rand.Reader, big.NewInt(int64(MaxScanSleep)))
-		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			} else {
-				// If there's an error generating the random number, just sleep
-				// for 15 hours because it'll hit all times of the day after
-				// enough iterations.
-				randSleep = big.NewInt(int64(DefaultScanSleep))
-			}
-		}
-		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep)
-
 		// Determine who to scan. At most 'MaxActiveHosts' will be scanned,
 		// starting with the active hosts followed by a random selection of the
 		// inactive hosts.
@@ -157,5 +143,22 @@ func (hdb *HostDB) threadedScan() {
 			}
 		}
 		hdb.mu.Unlock(id)
+
+		// Sleep for a random amount of time between 4 and 24 hours. The time
+		// is randomly generated so that hosts who are only on at certain times
+		// of the day or week will still be included. Random times also make it
+		// harder for hosts to game the system.
+		randSleep, err := rand.Int(rand.Reader, big.NewInt(int64(MaxScanSleep)))
+		if err != nil {
+			if build.DEBUG {
+				panic(err)
+			} else {
+				// If there's an error generating the random number, just sleep
+				// for 15 hours because it'll hit all times of the day after
+				// enough iterations.
+				randSleep = big.NewInt(int64(DefaultScanSleep))
+			}
+		}
+		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep)
 	}
 }

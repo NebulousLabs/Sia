@@ -49,14 +49,24 @@ type hdbTester struct {
 // this will keep all of the modules in the hostdb synchronized.
 func (hdbt *hdbTester) csUpdateWait() {
 	<-hdbt.csUpdateChan
-	<-hdbt.hostdbUpdateChan
+	hdbt.hdbUpdateWait()
 	hdbt.tpUpdateWait()
 }
 
+// tpUpdateWait listens on all channels until a transaction pool update has
+// reached all modules. tpUpdateWait should be called any time that an update
+// is pushed to the transaction pool.
 func (hdbt *hdbTester) tpUpdateWait() {
 	<-hdbt.tpoolUpdateChan
 	<-hdbt.minerUpdateChan
 	<-hdbt.walletUpdateChan
+}
+
+// hdbUpdateWait listens on all channels until a hostdb update has reached all
+// modules. hdbUpdateWait should be called every time that there is an update
+// to the hostdb.
+func (hdbt *hdbTester) hdbUpdateWait() {
+	<-hdbt.hostdbUpdateChan
 }
 
 // newHDBTester returns a ready-to-use hdb tester, with all modules
