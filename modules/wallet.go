@@ -93,4 +93,7 @@ type Wallet interface {
 	// WalletNotify will push a struct down the channel any time that the
 	// wallet updates.
 	WalletNotify() <-chan struct{}
+
+	// Close safely closes the wallet file.
+	Close() error
 }

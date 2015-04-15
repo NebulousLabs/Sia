@@ -94,4 +94,7 @@ type Gateway interface {
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
+
+	// Close safely stops the Gateway's listener process.
+	Close() error
 }
