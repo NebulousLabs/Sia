@@ -48,8 +48,6 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
-//
-// TODO LOG: Log what happens in this function.
 func (hdb *HostDB) threadedProbeHost(entry *modules.HostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
