@@ -3,7 +3,6 @@ package gateway
 import (
 	"errors"
 	"math/rand"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -17,6 +16,8 @@ const (
 func (g *Gateway) addPeer(peer modules.NetAddress) error {
 	if _, exists := g.peers[peer]; exists {
 		return errors.New("peer already added")
+	} else if peer == g.myAddr {
+		return errors.New("can't add our own address")
 	}
 	// If adding this peer brings us above minPeers, try to kick out a bad
 	// peer that we've been forced to keep.
@@ -119,43 +120,49 @@ func (g *Gateway) sharePeers(conn modules.NetConn) error {
 		if len(peers) == maxSharedPeers {
 			break
 		}
+		// don't send requester their own address
+		if peer == conn.Addr() {
+			continue
+		}
 		peers = append(peers, peer)
 	}
 	return conn.WriteObject(peers)
 }
 
-// requestPeers calls the SharePeers RPC to learn about new peers. Each
-// returned peer is pinged to ensure connectivity, and then added to the peer
-// list. Each ping is performed in its own goroutine, which manages its own
-// mutexes.
-//
-// TODO: maybe iterate until we have enough new peers?
-func (g *Gateway) requestPeers(addr modules.NetAddress) error {
-	g.log.Println("INFO: requesting peers from", addr)
-	var newPeers []modules.NetAddress
-	err := g.RPC(addr, "SharePeers", func(conn modules.NetConn) error {
-		return conn.ReadObject(&newPeers, maxSharedPeers*maxAddrLength)
-	})
-	if err != nil {
-		return err
-	}
+// requestPeers calls the SharePeers RPC on addr and returns the response.
+func (g *Gateway) requestPeers(addr modules.NetAddress) (newPeers []modules.NetAddress, err error) {
+	g.log.Printf("INFO: requesting peers from %v\n", addr)
+	err = g.RPC(addr, "SharePeers", readerRPC(&newPeers, maxSharedPeers*maxAddrLength))
 	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(newPeers))
+	return
+}
 
-	var wg sync.WaitGroup
-	for _, peer := range newPeers {
-		// don't add ourselves
-		if peer == g.Address() {
+// threadedPeerDiscovery calls requestPeers on each peer in the current peer
+// list and adds all of the returned peers.
+func (g *Gateway) threadedPeerDiscovery() {
+	var newPeers []modules.NetAddress
+	for _, peer := range g.Info().Peers {
+		resp, err := g.requestPeers(peer)
+		if err != nil {
 			continue
 		}
-		// ping each peer in a separate goroutine
-		wg.Add(1)
-		go func(peer modules.NetAddress) {
-			if g.Ping(peer) {
-				g.AddPeer(peer)
-			}
-			wg.Done()
-		}(peer)
+		newPeers = append(newPeers, resp...)
 	}
-	wg.Wait()
-	return nil
+
+	id := g.mu.Lock()
+	var added int
+	for i := range newPeers {
+		if g.addPeer(newPeers[i]) == nil {
+			added++
+		}
+	}
+	g.mu.Unlock(id)
+
+	if added == 0 {
+		g.log.Println("WARN: peer discovery found no new peers")
+		return
+	}
+
+	// announce ourselves to the new peers
+	g.threadedBroadcast("AddMe", writerRPC(g.Address()))
 }

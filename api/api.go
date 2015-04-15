@@ -90,6 +90,7 @@ func (srv *Server) Serve() error {
 	if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
 		err = nil
 	}
+	println("\rCaught stop signal, quitting.")
 	return err
 }
 

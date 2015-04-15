@@ -72,9 +72,9 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	if !g.Ping(bootstrapPeer) {
 		return errUnreachable
 	}
-	counter := g.mu.Lock()
+	id := g.mu.Lock()
 	g.addPeer(bootstrapPeer)
-	g.mu.Unlock(counter)
+	g.mu.Unlock(id)
 
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
@@ -89,13 +89,19 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 		return errors.New("couldn't learn hostname")
 	}
 
-	// request peers from the bootstrap
-	g.requestPeers(bootstrapPeer)
-	// save new peers
-	g.save()
+	// ask the bootstrapPeer to add us back
+	go g.RPC(bootstrapPeer, "AddMe", writerRPC(g.Address()))
 
-	// announce ourselves to the new peers
-	go g.threadedBroadcast("AddMe", writerRPC(g.myAddr))
+	// initial peer discovery
+	// NOTE: per convention, "threadedX" functions are usually called in their
+	// own goroutine. Here, the two calls are intentionally grouped into one
+	// goroutine to ensure that they run in order.
+	go func() {
+		// request peers from bootstrap
+		g.threadedPeerDiscovery()
+		// request peers from all our new peers
+		g.threadedPeerDiscovery()
+	}()
 
 	// spawn synchronizer
 	go g.threadedResynchronize()
@@ -170,7 +176,7 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 
 	// Load old peer list. If it doesn't exist, no problem, but if it does, we
 	// want to know about any errors preventing us from loading it.
-	if loadErr := g.load(); !os.IsNotExist(loadErr) {
+	if loadErr := g.load(); err != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
 

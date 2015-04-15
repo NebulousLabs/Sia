@@ -140,17 +140,4 @@ func TestBootstrap(t *testing.T) {
 	if len(g.Info().Peers) != len(bootstrap.Info().Peers) {
 		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.Info().Peers, bootstrap.Info().Peers)
 	}
-
-	// add another two peers to bootstrap: a real peer and a "dummy", which won't respond.
-	bootstrap.AddPeer(newTestingGateway("TestBootstrap4", t).Address())
-	bootstrap.AddPeer("dummy")
-
-	// have g request peers from bootstrap. g should add the real peer, but not the dummy.
-	err = g.requestPeers(bootstrap.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(g.Info().Peers) != len(bootstrap.Info().Peers)-1 {
-		t.Fatal("gateway added wrong peers:", g.Info().Peers)
-	}
 }

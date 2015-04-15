@@ -22,7 +22,6 @@ func (st *serverTester) addPeer(name string) *serverTester {
 	if err != nil {
 		st.Fatal("bootstrap failed:", err)
 	}
-
 	// Wait for bootstrapping to finish, then check that each has the same
 	// number of peers and blocks.
 	for len(st.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
@@ -39,7 +38,7 @@ func (st *serverTester) addPeer(name string) *serverTester {
 // TestPeering tests that peers are properly announced and relayed throughout
 // the network.
 func TestPeering(t *testing.T) {
-	// Create to peers and add the first to the second.
+	// Create two peers and add the first to the second.
 	peer1 := newServerTester("TestPeering1", t)
 	peer2 := newServerTester("TestPeering2", t)
 	peer1.callAPI("/gateway/peer/add?address=" + string(peer2.netAddress()))
@@ -51,18 +50,22 @@ func TestPeering(t *testing.T) {
 		t.Fatal("/gateway/peer/add did not add peer", peer2.netAddress())
 	}
 
-	// Create a third peer that bootstraps to the first peer and check that it
+	// Create a third peer that bootstraps to the first peer, and check that it
 	// reports the others as peers.
 	peer3 := peer1.addPeer("TestPeering3")
 	peer3.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 2 {
-		t.Fatal("bootstrap peer did not share its peers")
+		t.Fatal("bootstrap peer did not share its peers", info)
 	}
 
-	// peer2 should have received peer3 via peer1. Note that it does not have
-	// peer1 though, because /gateway/add does not contact the added peer.
+	// When peer3 bootstraps to peer1, it should learn about peer2 and
+	// announce to it.
 	peer2.getAPI("/gateway/status", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer3.netAddress() {
+	for len(info.Peers) != 1 {
+		time.Sleep(time.Millisecond)
+		peer2.getAPI("/gateway/status", &info)
+	}
+	if info.Peers[0] != peer3.netAddress() {
 		t.Fatal("bootstrap peer did not relay the bootstrapping peer", info)
 	}
 }
