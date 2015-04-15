@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	ErrNilGateway = errors.New("gateway cannot be nil")
-	ErrNilState   = errors.New("consensus set cannot be nil")
+	ErrNilGateway      = errors.New("gateway cannot be nil")
+	ErrNilConsensusSet = errors.New("consensus set cannot be nil")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
@@ -52,7 +52,7 @@ type HostDB struct {
 // New returns an empty HostDatabase.
 func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 	if cs == nil {
-		err = ErrNilState
+		err = ErrNilConsensusSet
 		return
 	}
 	if g == nil {

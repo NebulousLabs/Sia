@@ -129,3 +129,21 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 
 	return hdbt
 }
+
+// TestNilInputs tries supplying the hostdb with nil inputs can checks for
+// correct rejection.
+func TestNilInputs(t *testing.T) {
+	hdbt := newHDBTester("TestNilInputs", t)
+	_, err := New(nil, nil)
+	if err == nil {
+		t.Error("Should get an error when using nil inputs")
+	}
+	_, err = New(nil, hdbt.gateway)
+	if err != ErrNilConsensusSet {
+		t.Error("expecting ErrNilConsensusSet:", err)
+	}
+	_, err = New(hdbt.cs, nil)
+	if err != ErrNilGateway {
+		t.Error("expecting ErrNilGateway:", err)
+	}
+}
