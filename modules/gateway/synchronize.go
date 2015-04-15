@@ -17,13 +17,20 @@ const (
 // that broadcasts start failing.
 func (g *Gateway) threadedResynchronize() {
 	for {
-		peer, err := g.randomPeer()
-		if err != nil {
-			g.log.Println("ERR: no peers are available for synchronization")
-			// TODO: sleep and try again instead of returning?
-			return
-		}
-		go g.Synchronize(peer)
+		go func() {
+			// max 10 attempts
+			for i := 0; i < 10; i++ {
+				peer, err := g.randomPeer()
+				if err != nil {
+					g.log.Println("ERR: no peers are available for synchronization")
+					return
+				}
+				// keep looping until a successful Synchronize
+				if g.Synchronize(peer) == nil {
+					return
+				}
+			}
+		}()
 		time.Sleep(time.Minute * 2)
 	}
 }
