@@ -93,9 +93,13 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	go g.RPC(bootstrapPeer, "AddMe", writerRPC(g.Address()))
 
 	// initial peer discovery
+	// NOTE: per convention, "threadedX" functions are usually called in their
+	// own goroutine. Here, the two calls are intentionally grouped into one
+	// goroutine to ensure that they run in order.
 	go func() {
-		// run two iterations to build a deeper network
+		// request peers from bootstrap
 		g.threadedPeerDiscovery()
+		// request peers from all our new peers
 		g.threadedPeerDiscovery()
 	}()
 
