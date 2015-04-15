@@ -127,6 +127,12 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 	return
 }
 
+func (w *Wallet) Close() error {
+	id := w.mu.RLock()
+	defer w.mu.RUnlock(id)
+	return w.save()
+}
+
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {

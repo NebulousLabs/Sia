@@ -131,6 +131,11 @@ func New(saveDir string) (*State, error) {
 	return s, nil
 }
 
+// Close safely closes the block database.
+func (s *State) Close() error {
+	return s.db.Close()
+}
+
 // RLock will readlock the state.
 func (s *State) RLock() int {
 	return s.mu.RLock()
