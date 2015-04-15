@@ -46,6 +46,10 @@ type HostDB interface {
 	// AllHosts returns the full list of hosts known to the hostdb.
 	AllHosts() []HostSettings
 
+	// HostDBNotify will push a struct down the returned channel every time the
+	// hostdb receives an update from the consensus set.
+	HostDBNotify() <-chan struct{}
+
 	// InsertHost adds a host to the database.
 	InsertHost(HostSettings) error
 

@@ -46,6 +46,8 @@ type HostDB struct {
 	//  address, including hosts that are currently offline.
 	allHosts map[modules.NetAddress]hostEntry
 
+	subscribers []chan struct{}
+
 	mu *sync.RWMutex
 }
 

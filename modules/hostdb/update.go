@@ -60,5 +60,7 @@ func (hdb *HostDB) ReceiveConsensusSetUpdate(_, appliedBlocks []types.Block) {
 		}
 	}
 
+	hdb.notifySubscribers()
+
 	return
 }
