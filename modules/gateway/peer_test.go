@@ -146,10 +146,7 @@ func TestBootstrap(t *testing.T) {
 	bootstrap.AddPeer("dummy")
 
 	// have g request peers from bootstrap. g should add the real peer, but not the dummy.
-	err = g.requestPeers(bootstrap.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+	g.threadedPeerDiscovery()
 	if len(g.Info().Peers) != len(bootstrap.Info().Peers)-1 {
 		t.Fatal("gateway added wrong peers:", g.Info().Peers)
 	}

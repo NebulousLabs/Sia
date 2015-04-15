@@ -53,7 +53,7 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 			if acceptErr != nil {
 				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 				// block again.
-				g.log.Println("WARN: state rejected a block from", peer)
+				g.log.Printf("WARN: state rejected a block from %v: %v\n", peer, acceptErr)
 			}
 		}
 

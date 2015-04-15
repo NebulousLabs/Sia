@@ -119,14 +119,16 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 	counter := g.mu.RLock()
 	fn, ok := g.handlerMap[id]
 	g.mu.RUnlock(counter)
-	if ok {
-		g.log.Printf("INFO: handling RPC \"%v\" from %v\n", id, conn.Addr())
-		if err := fn(conn); err != nil {
-			g.log.Printf("WARN: incoming RPC \"%v\" failed: %v\n", id, err)
-		}
-	} else {
+	if !ok {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%s\"", conn.Addr(), id[:])
+		return
 	}
+
+	g.log.Printf("INFO: handling RPC \"%v\" from %v\n", id, conn.Addr())
+	if err := fn(conn); err != nil {
+		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v\n", id, err)
+	}
+
 	return
 }
 
