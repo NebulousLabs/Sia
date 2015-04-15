@@ -20,10 +20,9 @@ type hostEntry struct {
 	reliability types.Currency
 }
 
-// priceWeight returns the weight of an entry according to the price of the
-// entry. The current equation is:
-//		(1 / price^3)
-func (hdb *HostDB) priceWeight(entry hostEntry) (weight types.Currency) {
+// hostWeight returns the weight of a host according to the settings of the
+// host database. Currently, only the price is considered.
+func (hdb *HostDB) hostWeight(entry hostEntry) (weight types.Currency) {
 	// Prevent a divide by zero error by making sure the price is at least one.
 	price := entry.Price
 	if price.Cmp(types.NewCurrency64(0)) <= 0 {
