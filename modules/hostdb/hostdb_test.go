@@ -144,6 +144,9 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		hdbt.csUpdateWait()
 	}
 
+	// TODO: Reconsider the way that the RPC's happen.
+	g.RegisterRPC("HostSettings", h.Settings)
+
 	return hdbt
 }
 

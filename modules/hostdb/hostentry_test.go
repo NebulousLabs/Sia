@@ -67,13 +67,8 @@ func TestInsertHost(t *testing.T) {
 	if len(hdbt.hostdb.allHosts) != 2 {
 		t.Error("host was not inserted")
 	}
-
-	// TODO: Bring this stuff back. Can't do it until the API module RPC etc.
-	// stuff is sorted out.
-	/*
 	hdbt.hdbUpdateWait()
 	if len(hdbt.hostdb.activeHosts) != 1 {
 		t.Error("expecting an active host")
 	}
-	*/
 }
