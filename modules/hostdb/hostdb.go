@@ -4,9 +4,7 @@
 // set of hosts it has found and updates who is online.
 package hostdb
 
-// hostdb.go defines the HostDB type and New for the funtion. The functions for
-// inserting, removing, and querying hosts in the database were put in this
-// file for lack of a better place to put them.
+// hostdb.go defines the HostDB type and New for the funtion.
 
 import (
 	"errors"
@@ -24,8 +22,8 @@ const (
 )
 
 var (
-	ErrNilGateway = errors.New("gateway cannot be nil")
-	ErrNilState   = errors.New("consensus set cannot be nil")
+	ErrNilGateway      = errors.New("gateway cannot be nil")
+	ErrNilConsensusSet = errors.New("consensus set cannot be nil")
 )
 
 // The HostDB is a database of potential hosts. It assigns a weight to each
@@ -46,7 +44,9 @@ type HostDB struct {
 
 	//  allHosts is a simple list of all known hosts by their network
 	//  address, including hosts that are currently offline.
-	allHosts map[modules.NetAddress]*modules.HostEntry
+	allHosts map[modules.NetAddress]*hostEntry
+
+	subscribers []chan struct{}
 
 	mu *sync.RWMutex
 }
@@ -54,7 +54,7 @@ type HostDB struct {
 // New returns an empty HostDatabase.
 func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 	if cs == nil {
-		err = ErrNilState
+		err = ErrNilConsensusSet
 		return
 	}
 	if g == nil {
@@ -67,54 +67,13 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		gateway:      g,
 
 		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*modules.HostEntry),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
 
 		mu: sync.New(1*time.Second, 0),
 	}
 
 	cs.ConsensusSetSubscribe(hdb)
-
-	// Start the scanner which will periodically check if hosts are online, and
-	// update the settings of the hosts that are online.
+	go hdb.threadedScan()
 
 	return
-}
-
-// ActiveHosts returns the hosts that can be randomly selected out of the
-// hostdb.
-func (hdb *HostDB) ActiveHosts() (activeHosts []modules.HostEntry) {
-	id := hdb.mu.RLock()
-	defer hdb.mu.RUnlock(id)
-
-	for _, node := range hdb.activeHosts {
-		activeHosts = append(activeHosts, node.hostEntry)
-	}
-	return
-}
-
-// AllHosts returns all of the hosts known to the hostdb, including the
-// inactive ones.
-func (hdb *HostDB) AllHosts() (allHosts []modules.HostEntry) {
-	id := hdb.mu.RLock()
-	defer hdb.mu.RUnlock(id)
-
-	for _, entry := range hdb.allHosts {
-		allHosts = append(allHosts, *entry)
-	}
-	return
-}
-
-// Insert attempts to insert a host entry into the database.
-func (hdb *HostDB) InsertHost(entry modules.HostEntry) error {
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
-	hdb.insertHost(entry)
-	return nil
-}
-
-// Remove is the thread-safe version of remove.
-func (hdb *HostDB) RemoveHost(addr modules.NetAddress) error {
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
-	return hdb.removeHost(addr)
 }

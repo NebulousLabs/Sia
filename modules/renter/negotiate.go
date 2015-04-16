@@ -62,7 +62,7 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 // negotiateContract creates a file contract for a host according to the
 // requests of the host. There is an assumption that only hosts with acceptable
 // terms will be put into the hostdb.
-func (r *Renter) negotiateContract(host modules.HostEntry, up modules.UploadParams) (contract types.FileContract, fcid types.FileContractID, err error) {
+func (r *Renter) negotiateContract(host modules.HostSettings, up modules.UploadParams) (contract types.FileContract, fcid types.FileContractID, err error) {
 	height := r.state.Height()
 
 	file, err := os.Open(up.Filename)

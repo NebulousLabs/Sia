@@ -22,11 +22,7 @@ func fakeAddr(n uint8) modules.NetAddress {
 // every entropy has the same weight.
 func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 	// Check that the weight of the hostTree is what is expected.
-	randomHost, err := hdbt.hostdb.RandomHost()
-	if err != nil {
-		return err
-	}
-	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(randomHost.Weight)
+	expectedWeight := types.NewCurrency64(uint64(numEntries)).Mul(hdbt.hostdb.hostTree.hostEntry.weight)
 	if hdbt.hostdb.hostTree.weight.Cmp(expectedWeight) != 0 {
 		return errors.New("expected weight is incorrect")
 	}
@@ -74,11 +70,11 @@ func TestWeightedList(t *testing.T) {
 	// Create a bunch of host entries of equal weight.
 	firstInsertions := 64
 	for i := 0; i < firstInsertions; i++ {
-		entry := &modules.HostEntry{
-			IPAddress: fakeAddr(uint8(i)),
-			Weight:    types.NewCurrency64(10),
+		entry := hostEntry{
+			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			weight:       types.NewCurrency64(10),
 		}
-		hdbt.hostdb.insertNode(entry)
+		hdbt.hostdb.insertNode(&entry)
 	}
 	err := hdbt.uniformTreeVerification(firstInsertions)
 	if err != nil {
@@ -119,11 +115,11 @@ func TestWeightedList(t *testing.T) {
 	// Do some more insertions.
 	secondInsertions := 64
 	for i := firstInsertions; i < firstInsertions+secondInsertions; i++ {
-		entry := &modules.HostEntry{
-			IPAddress: fakeAddr(uint8(i)),
-			Weight:    types.NewCurrency64(10),
+		entry := hostEntry{
+			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			weight:       types.NewCurrency64(10),
 		}
-		hdbt.hostdb.insertNode(entry)
+		hdbt.hostdb.insertNode(&entry)
 	}
 	hdbt.uniformTreeVerification(firstInsertions - removals + secondInsertions)
 }
@@ -144,11 +140,11 @@ func TestVariedWeights(t *testing.T) {
 	expectedPerWeight := int(100e3)
 	selections := 0
 	for i := 0; i < hostCount; i++ {
-		entry := &modules.HostEntry{
-			IPAddress: fakeAddr(uint8(i)),
-			Weight:    types.NewCurrency64(uint64(i)),
+		entry := hostEntry{
+			HostSettings: modules.HostSettings{IPAddress: fakeAddr(uint8(i))},
+			weight:       types.NewCurrency64(uint64(i)),
 		}
-		hdbt.hostdb.insertNode(entry)
+		hdbt.hostdb.insertNode(&entry)
 		selections += i * expectedPerWeight
 	}
 
@@ -160,7 +156,11 @@ func TestVariedWeights(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		selectionMap[randEntry.Weight.String()] += 1
+		node, exists := hdbt.hostdb.activeHosts[randEntry.IPAddress]
+		if !exists {
+			t.Fatal("can't find randomly selected node in tree")
+		}
+		selectionMap[node.weight.String()] += 1
 	}
 
 	// Check that each host was selected an expected number of times. An error
@@ -183,14 +183,15 @@ func TestVariedWeights(t *testing.T) {
 func TestRepeatInsert(t *testing.T) {
 	hdbt := newHDBTester("TestRepeatInsert", t)
 
-	entry := &modules.HostEntry{
-		IPAddress: fakeAddr(0),
-		Weight:    types.NewCurrency64(1),
+	entry1 := hostEntry{
+		HostSettings: modules.HostSettings{IPAddress: fakeAddr(0)},
+		weight:       types.NewCurrency64(1),
 	}
-	hdbt.hostdb.insertNode(entry)
+	entry2 := entry1
+	hdbt.hostdb.insertNode(&entry1)
 
-	entry.Weight = types.NewCurrency64(100)
-	hdbt.hostdb.insertNode(entry)
+	entry2.weight = types.NewCurrency64(100)
+	hdbt.hostdb.insertNode(&entry2)
 	if len(hdbt.hostdb.activeHosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry in the hostdb")
 	}

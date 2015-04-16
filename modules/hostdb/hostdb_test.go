@@ -35,6 +35,7 @@ type hdbTester struct {
 	hostdb *HostDB
 
 	csUpdateChan     <-chan struct{}
+	hostdbUpdateChan <-chan struct{}
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
@@ -48,9 +49,24 @@ type hdbTester struct {
 // this will keep all of the modules in the hostdb synchronized.
 func (hdbt *hdbTester) csUpdateWait() {
 	<-hdbt.csUpdateChan
+	hdbt.hdbUpdateWait()
+	hdbt.tpUpdateWait()
+}
+
+// tpUpdateWait listens on all channels until a transaction pool update has
+// reached all modules. tpUpdateWait should be called any time that an update
+// is pushed to the transaction pool.
+func (hdbt *hdbTester) tpUpdateWait() {
 	<-hdbt.tpoolUpdateChan
 	<-hdbt.minerUpdateChan
 	<-hdbt.walletUpdateChan
+}
+
+// hdbUpdateWait listens on all channels until a hostdb update has reached all
+// modules. hdbUpdateWait should be called every time that there is an update
+// to the hostdb.
+func (hdbt *hdbTester) hdbUpdateWait() {
+	<-hdbt.hostdbUpdateChan
 }
 
 // newHDBTester returns a ready-to-use hdb tester, with all modules
@@ -111,6 +127,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		hostdb: hdb,
 
 		csUpdateChan:     cs.ConsensusSetNotify(),
+		hostdbUpdateChan: hdb.HostDBNotify(),
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),
@@ -127,5 +144,26 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		hdbt.csUpdateWait()
 	}
 
+	// TODO: Reconsider the way that the RPC's happen.
+	g.RegisterRPC("HostSettings", h.Settings)
+
 	return hdbt
+}
+
+// TestNilInputs tries supplying the hostdb with nil inputs can checks for
+// correct rejection.
+func TestNilInputs(t *testing.T) {
+	hdbt := newHDBTester("TestNilInputs", t)
+	_, err := New(nil, nil)
+	if err == nil {
+		t.Error("Should get an error when using nil inputs")
+	}
+	_, err = New(nil, hdbt.gateway)
+	if err != ErrNilConsensusSet {
+		t.Error("expecting ErrNilConsensusSet:", err)
+	}
+	_, err = New(hdbt.cs, nil)
+	if err != ErrNilGateway {
+		t.Error("expecting ErrNilGateway:", err)
+	}
 }

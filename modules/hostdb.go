@@ -24,6 +24,7 @@ type HostAnnouncement struct {
 // values that the HostDB will request from the host in order to build its
 // database.
 type HostSettings struct {
+	IPAddress    NetAddress
 	TotalStorage int64 // Can go negative.
 	MinFilesize  uint64
 	MaxFilesize  uint64
@@ -35,32 +36,26 @@ type HostSettings struct {
 	UnlockHash   types.UnlockHash
 }
 
-// A HostEntry is an entry in the HostDB. It contains the HostSettings, as
-// well as the IP address where the host can be found, and the value of the
-// coins frozen in the host's announcement transaction.
-type HostEntry struct {
-	HostSettings
-	IPAddress   NetAddress
-	Weight      types.Currency
-	Reliability types.Currency
-}
-
 // A HostDB is a database of hosts that the renter can use for figuring out who
 // to upload to, and download from.
 type HostDB interface {
 	// ActiveHosts returns the list of hosts that are actively being selected
 	// from.
-	ActiveHosts() []HostEntry
+	ActiveHosts() []HostSettings
 
 	// AllHosts returns the full list of hosts known to the hostdb.
-	AllHosts() []HostEntry
+	AllHosts() []HostSettings
+
+	// HostDBNotify will push a struct down the returned channel every time the
+	// hostdb receives an update from the consensus set.
+	HostDBNotify() <-chan struct{}
 
 	// InsertHost adds a host to the database.
-	InsertHost(HostEntry) error
+	InsertHost(HostSettings) error
 
 	// RandomHost pulls a host entry at random from the database, weighted
 	// according to whatever score is assigned the hosts.
-	RandomHost() (HostEntry, error)
+	RandomHost() (HostSettings, error)
 
 	// Remove deletes the host with the input address from the database.
 	RemoveHost(NetAddress) error
