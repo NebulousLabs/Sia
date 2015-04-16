@@ -84,8 +84,9 @@ func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 
 	// If the host is not already in the database and 'MaxActiveHosts' has not
 	// been reached, add the host to the database.
-	_, exists := hdb.activeHosts[entry.IPAddress]
-	if !exists && len(hdb.activeHosts) < MaxActiveHosts {
+	_, exists1 := hdb.activeHosts[entry.IPAddress]
+	_, exists2 := hdb.allHosts[entry.IPAddress]
+	if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
 		hdb.insertNode(entry)
 		hdb.notifySubscribers()
 	}
@@ -107,17 +108,24 @@ func (hdb *HostDB) threadedScan() {
 
 			// Assemble all of the inactive hosts into a single array and
 			// shuffle it.
-			i := 0
-			random := make([]*hostEntry, len(hdb.allHosts))
+			var random []*hostEntry
 			for _, entry := range hdb.allHosts {
-				random[i] = &entry
-				i++
+				entry2, exists := hdb.activeHosts[entry.IPAddress]
+				if !exists {
+					random = append(random, entry)
+				} else {
+					if build.DEBUG {
+						if entry2.hostEntry != entry {
+							panic("allHosts + activeHosts mismatch!")
+						}
+					}
+				}
 			}
 
 			// Randomize the slice by swapping each element with an element
 			// that hasn't been visited yet.
-			for i := 0; i < len(hdb.allHosts); i++ {
-				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(hdb.allHosts)-i)))
+			for i := 0; i < len(random); i++ {
+				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(random)-i)))
 				if err != nil {
 					if build.DEBUG {
 						panic(err)

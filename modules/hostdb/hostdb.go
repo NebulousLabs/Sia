@@ -44,7 +44,7 @@ type HostDB struct {
 
 	//  allHosts is a simple list of all known hosts by their network
 	//  address, including hosts that are currently offline.
-	allHosts map[modules.NetAddress]hostEntry
+	allHosts map[modules.NetAddress]*hostEntry
 
 	subscribers []chan struct{}
 
@@ -67,7 +67,7 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		gateway:      g,
 
 		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]hostEntry),
+		allHosts:    make(map[modules.NetAddress]*hostEntry),
 
 		mu: sync.New(1*time.Second, 0),
 	}

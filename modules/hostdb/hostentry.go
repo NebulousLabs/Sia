@@ -38,13 +38,13 @@ func (hdb *HostDB) hostWeight(entry hostEntry) (weight types.Currency) {
 // put into the list of active hosts.
 func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	// Add the host to allHosts.
-	entry := hostEntry{
+	entry := &hostEntry{
 		HostSettings: host,
 		reliability:  InactiveReliability,
 	}
 	hdb.allHosts[entry.IPAddress] = entry
 
-	go hdb.threadedProbeHost(&entry)
+	go hdb.threadedProbeHost(entry)
 }
 
 // Remove deletes an entry from the hostdb.
