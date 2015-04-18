@@ -13,18 +13,36 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// The header for all siakg files. Do not change.
+	FILEHEADER = "siakg"
+)
+
+// A KeyPair is the object that gets saved to disk for a signature key. All the
+// information necessary to sign a transaction is in the struct, and the struct
+// can be directly written to disk.
 type KeyPair struct {
+	Header           string
+	Version          string
 	Index            int
 	SecretKey        crypto.SecretKey
 	PublicKey        crypto.PublicKey
 	UnlockConditions types.UnlockConditions
 }
 
+// generateKeys will generate a set of keys and save the keyfiles to disk.
 func generateKeys(*cobra.Command, []string) {
 	fmt.Printf("Creating key '%s' with %v total keys and %v required keys.\n", config.Siakg.KeyName, config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
 
-	// Generate 'TotalKeys' keyparis.
+	// Generate 'TotalKeys' keyparis and fill out the metadata.
 	keys := make([]KeyPair, config.Siakg.TotalKeys)
+	for i := range keys {
+		keys[i].Header = FILEHEADER
+		keys[i].Version = VERSION
+		keys[i].Index = i
+	}
+
+	// Add the keys to each keypair.
 	for i := 0; i < config.Siakg.TotalKeys; i++ {
 		var err error
 		keys[i].SecretKey, keys[i].PublicKey, err = crypto.GenerateSignatureKeys()
@@ -32,10 +50,9 @@ func generateKeys(*cobra.Command, []string) {
 			fmt.Println(err)
 			return
 		}
-		keys[i].Index = i
 	}
 
-	// Generate the 'UnlockConditions'.
+	// Generate the unlock conditions and add them to each KeyPair object.
 	uc := types.UnlockConditions{
 		Timelock:      0,
 		NumSignatures: uint64(config.Siakg.RequiredKeys),
@@ -50,6 +67,7 @@ func generateKeys(*cobra.Command, []string) {
 		keys[i].UnlockConditions = uc
 	}
 
+	// Save the KeyPairs to disk.
 	err := os.MkdirAll(config.Siakg.KeyName, 0700)
 	if err != nil {
 		fmt.Println(err)

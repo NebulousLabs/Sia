@@ -7,13 +7,19 @@ import (
 )
 
 const (
+	// Version of the siakg program.
 	VERSION = "1.0"
 )
 
 var (
+	// A global variable containing all of the configuration information,
+	// necessary for interacting with cobra.
 	config Config
 )
 
+// The Config struct holds all of the configuration variables. The format is
+// made to be compatible with gcfg. gcfg is not currently used in the siakg
+// project, however it helps maintain consistency with the design of siad.
 type Config struct {
 	Siakg struct {
 		KeyName      string
@@ -22,6 +28,7 @@ type Config struct {
 	}
 }
 
+// The main function initializes the cobra command scheme and program flags.
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
