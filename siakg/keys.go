@@ -32,6 +32,13 @@ type KeyPair struct {
 
 // generateKeys will generate a set of keys and save the keyfiles to disk.
 func generateKeys(*cobra.Command, []string) {
+	// Check that the total number of keys is at least as large as the required
+	// number of keys.
+	if config.Siakg.TotalKeys < config.Siakg.RequiredKeys {
+		fmt.Printf("Total Keys (%v) must be greater than or equal to Required Keys (%v)\n", config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
+		return
+	}
+
 	fmt.Printf("Creating key '%s' with %v total keys and %v required keys.\n", config.Siakg.KeyName, config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
 
 	// Generate 'TotalKeys' keyparis and fill out the metadata.
