@@ -248,7 +248,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// Add the signatures from the renter signed transaction, and then sign the
 	// transaction, then submit the transaction.
-	for _, sig := range signedTxn.Signatures {
+	for _, sig := range signedTxn.TransactionSignatures {
 		_, _, err = h.wallet.AddSignature(txnID, sig)
 		if err != nil {
 			return

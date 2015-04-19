@@ -66,8 +66,8 @@ func generateKeys(*cobra.Command, []string) {
 
 	// Generate the unlock conditions and add them to each KeyPair object.
 	uc := types.UnlockConditions{
-		Timelock:      0,
-		NumSignatures: uint64(config.Siakg.RequiredKeys),
+		Timelock:           0,
+		RequiredSignatures: uint64(config.Siakg.RequiredKeys),
 	}
 	for i := range keys {
 		uc.PublicKeys = append(uc.PublicKeys, types.SiaPublicKey{
@@ -132,7 +132,7 @@ func generateKeys(*cobra.Command, []string) {
 		}
 		var j int
 		for j < config.Siakg.RequiredKeys {
-			txn.Signatures = append(txn.Signatures, types.TransactionSignature{
+			txn.TransactionSignatures = append(txn.TransactionSignatures, types.TransactionSignature{
 				PublicKeyIndex: uint64(i),
 				CoveredFields:  types.CoveredFields{WholeTransaction: true},
 			})
@@ -142,7 +142,7 @@ func generateKeys(*cobra.Command, []string) {
 				fmt.Println(err)
 				return
 			}
-			txn.Signatures[j].Signature = types.Signature(sig[:])
+			txn.TransactionSignatures[j].Signature = types.Signature(sig[:])
 			i++
 			j++
 		}
@@ -152,7 +152,7 @@ func generateKeys(*cobra.Command, []string) {
 			fmt.Println(err)
 		}
 		// Delete all of the signatures for the next iteration.
-		txn.Signatures = nil
+		txn.TransactionSignatures = nil
 	}
 
 	fmt.Printf("Success, the address for this set of keys is: %x\n", uc.UnlockHash())
@@ -167,6 +167,6 @@ func printKey(*cobra.Command, []string) {
 		return
 	}
 
-	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.NumSignatures, len(kp.UnlockConditions.PublicKeys))
+	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.RequiredSignatures, len(kp.UnlockConditions.PublicKeys))
 	fmt.Printf("The address is: %x\n", kp.UnlockConditions.UnlockHash())
 }

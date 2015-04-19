@@ -56,14 +56,14 @@ func (ct *ConsensusTester) AddSiacoinInputToTransaction(inputT types.Transaction
 		CoveredFields:  types.CoveredFields{},
 		PublicKeyIndex: 0,
 	}
-	tsigIndex := len(t.Signatures)
-	t.Signatures = append(t.Signatures, tsig)
+	tsigIndex := len(t.TransactionSignatures)
+	t.TransactionSignatures = append(t.TransactionSignatures, tsig)
 	sigHash := t.SigHash(tsigIndex)
 	encodedSig, err := crypto.SignHash(sigHash, ct.SecretKey)
 	if err != nil {
 		ct.Fatal(err)
 	}
-	t.Signatures[tsigIndex].Signature = types.Signature(encodedSig[:])
+	t.TransactionSignatures[tsigIndex].Signature = types.Signature(encodedSig[:])
 
 	return
 }

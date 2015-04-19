@@ -57,7 +57,7 @@ type (
 		SiafundOutputs           []SiafundOutput
 		MinerFees                []Currency
 		ArbitraryData            []string
-		Signatures               []TransactionSignature
+		TransactionSignatures    []TransactionSignature
 	}
 
 	// A SiacoinInput consumes a SiacoinOutput and adds the siacoins to the set of

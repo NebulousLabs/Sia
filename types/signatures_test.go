@@ -16,7 +16,7 @@ func TestUnlockHash(t *testing.T) {
 				Key:       "fake key",
 			},
 		},
-		NumSignatures: 3,
+		RequiredSignatures: 3,
 	}
 
 	_ = uc.UnlockHash()
@@ -34,7 +34,7 @@ func TestSigHash(t *testing.T) {
 		SiafundOutputs:           []SiafundOutput{SiafundOutput{}},
 		MinerFees:                []Currency{Currency{}},
 		ArbitraryData:            []string{"one", "two"},
-		Signatures: []TransactionSignature{
+		TransactionSignatures: []TransactionSignature{
 			TransactionSignature{
 				CoveredFields: CoveredFields{
 					WholeTransaction: true,
@@ -51,7 +51,7 @@ func TestSigHash(t *testing.T) {
 					SiafundOutputs:           []uint64{0},
 					MinerFees:                []uint64{0},
 					ArbitraryData:            []uint64{0},
-					Signatures:               []uint64{0},
+					TransactionSignatures:    []uint64{0},
 				},
 			},
 		},
@@ -106,7 +106,7 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 		SiafundOutputs:           []SiafundOutput{SiafundOutput{}},
 		MinerFees:                []Currency{Currency{}},
 		ArbitraryData:            []string{"one", "two"},
-		Signatures: []TransactionSignature{
+		TransactionSignatures: []TransactionSignature{
 			TransactionSignature{
 				CoveredFields: CoveredFields{
 					WholeTransaction: true,
@@ -121,7 +121,7 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 
 	// Second check has CoveredFields object where 'WholeTransaction' is not
 	// set.
-	txn.Signatures = append(txn.Signatures, TransactionSignature{
+	txn.TransactionSignatures = append(txn.TransactionSignatures, TransactionSignature{
 		CoveredFields: CoveredFields{
 			SiacoinOutputs:           []uint64{0},
 			MinerFees:                []uint64{0},
@@ -136,7 +136,7 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 
 	// Add signature coverage to the first signature. This should not violate
 	// any rules.
-	txn.Signatures[0].CoveredFields.Signatures = []uint64{1}
+	txn.TransactionSignatures[0].CoveredFields.TransactionSignatures = []uint64{1}
 	err = txn.validCoveredFields()
 	if err != nil {
 		t.Error(err)
@@ -145,15 +145,15 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 	// Add siacoin output coverage to the first signature. This should violate
 	// rules, as the fields are not allowed to be set when 'WholeTransaction'
 	// is set.
-	txn.Signatures[0].CoveredFields.SiacoinOutputs = []uint64{0}
+	txn.TransactionSignatures[0].CoveredFields.SiacoinOutputs = []uint64{0}
 	err = txn.validCoveredFields()
 	if err != ErrWholeTransactionViolation {
 		t.Error("Expecting ErrWholeTransactionViolation, got", err)
 	}
 
 	// Create a SortedUnique violation instead of a WholeTransactionViolation.
-	txn.Signatures[0].CoveredFields.SiacoinOutputs = nil
-	txn.Signatures[0].CoveredFields.Signatures = []uint64{1, 2}
+	txn.TransactionSignatures[0].CoveredFields.SiacoinOutputs = nil
+	txn.TransactionSignatures[0].CoveredFields.TransactionSignatures = []uint64{1, 2}
 	err = txn.validCoveredFields()
 	if err != ErrSortedUniqueViolation {
 		t.Error("Expecting ErrSortedUniqueViolation, got", err)
@@ -184,7 +184,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 				Algorithm: SignatureEntropy,
 			},
 		},
-		NumSignatures: 2,
+		RequiredSignatures: 2,
 	}
 
 	// Create a transaction with each type of spendable output.
@@ -203,7 +203,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 	txn.SiafundInputs[0].ParentID[0] = 2            // can't overlap with other objects
 
 	// Create the signatures that spend the output.
-	txn.Signatures = []TransactionSignature{
+	txn.TransactionSignatures = []TransactionSignature{
 		// First signatures use cryptography.
 		TransactionSignature{
 			Timelock:      5,
@@ -222,10 +222,10 @@ func TestTransactionValidSignatures(t *testing.T) {
 		TransactionSignature{PublicKeyIndex: 1},
 		TransactionSignature{PublicKeyIndex: 1},
 	}
-	txn.Signatures[1].ParentID[0] = 1
-	txn.Signatures[2].ParentID[0] = 2
-	txn.Signatures[4].ParentID[0] = 1
-	txn.Signatures[5].ParentID[0] = 2
+	txn.TransactionSignatures[1].ParentID[0] = 1
+	txn.TransactionSignatures[2].ParentID[0] = 2
+	txn.TransactionSignatures[4].ParentID[0] = 1
+	txn.TransactionSignatures[5].ParentID[0] = 2
 	sigHash0 := txn.SigHash(0)
 	sigHash1 := txn.SigHash(1)
 	sigHash2 := txn.SigHash(2)
@@ -241,9 +241,9 @@ func TestTransactionValidSignatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.Signatures[0].Signature = Signature(sig0[:])
-	txn.Signatures[1].Signature = Signature(sig1[:])
-	txn.Signatures[2].Signature = Signature(sig2[:])
+	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
+	txn.TransactionSignatures[1].Signature = Signature(sig1[:])
+	txn.TransactionSignatures[2].Signature = Signature(sig2[:])
 
 	// Check that the signing was successful.
 	err = txn.validSignatures(10)
@@ -253,21 +253,21 @@ func TestTransactionValidSignatures(t *testing.T) {
 
 	// Corrupt one of the sigantures.
 	sig0[0]++
-	txn.Signatures[0].Signature = Signature(sig0[:])
+	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error("Corrupted a signature but the txn was still accepted as valid!")
 	}
 	sig0[0]--
-	txn.Signatures[0].Signature = Signature(sig0[:])
+	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
 
 	// Fail the validCoveredFields check.
-	txn.Signatures[0].CoveredFields.SiacoinInputs = []uint64{33}
+	txn.TransactionSignatures[0].CoveredFields.SiacoinInputs = []uint64{33}
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error("failed to flunk the validCoveredFields check")
 	}
-	txn.Signatures[0].CoveredFields.SiacoinInputs = nil
+	txn.TransactionSignatures[0].CoveredFields.SiacoinInputs = nil
 
 	// Double spend a SiacoinInput, FileContractTermination, and SiafundInput.
 	txn.SiacoinInputs = append(txn.SiacoinInputs, SiacoinInput{UnlockConditions: UnlockConditions{}})
@@ -290,23 +290,23 @@ func TestTransactionValidSignatures(t *testing.T) {
 	txn.SiafundInputs = txn.SiafundInputs[:len(txn.SiafundInputs)-1]
 
 	// Add a frivilous signature
-	txn.Signatures = append(txn.Signatures, TransactionSignature{})
+	txn.TransactionSignatures = append(txn.TransactionSignatures, TransactionSignature{})
 	err = txn.validSignatures(10)
 	if err != ErrFrivilousSignature {
 		t.Error(err)
 	}
-	txn.Signatures = txn.Signatures[:len(txn.Signatures)-1]
+	txn.TransactionSignatures = txn.TransactionSignatures[:len(txn.TransactionSignatures)-1]
 
 	// Replace one of the cryptography signatures with an always-accepted
 	// signature. This should get rejected because the always-accepted
 	// signature has already been used.
-	tmpTxn0 := txn.Signatures[0]
-	txn.Signatures[0] = TransactionSignature{PublicKeyIndex: 1}
+	tmpTxn0 := txn.TransactionSignatures[0]
+	txn.TransactionSignatures[0] = TransactionSignature{PublicKeyIndex: 1}
 	err = txn.validSignatures(10)
 	if err != ErrPublicKeyOveruse {
 		t.Error(err)
 	}
-	txn.Signatures[0] = tmpTxn0
+	txn.TransactionSignatures[0] = tmpTxn0
 
 	// Fail the timelock check for signatures.
 	err = txn.validSignatures(4)
@@ -315,12 +315,12 @@ func TestTransactionValidSignatures(t *testing.T) {
 	}
 
 	// Try to spend an entropy signature.
-	txn.Signatures[0] = TransactionSignature{PublicKeyIndex: 2}
+	txn.TransactionSignatures[0] = TransactionSignature{PublicKeyIndex: 2}
 	err = txn.validSignatures(10)
 	if err != ErrEntropyKey {
 		t.Error(err)
 	}
-	txn.Signatures[0] = tmpTxn0
+	txn.TransactionSignatures[0] = tmpTxn0
 
 	// Insert a malformed public key into the transaction.
 	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = "malformed"
@@ -331,16 +331,16 @@ func TestTransactionValidSignatures(t *testing.T) {
 	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = string(pk[:])
 
 	// Insert a malformed signature into the transaction.
-	txn.Signatures[0].Signature = "malformed"
+	txn.TransactionSignatures[0].Signature = "malformed"
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error(err)
 	}
-	txn.Signatures[0] = tmpTxn0
+	txn.TransactionSignatures[0] = tmpTxn0
 
 	// Try to spend a transaction when not every required signature is
 	// available.
-	txn.Signatures = txn.Signatures[1:]
+	txn.TransactionSignatures = txn.TransactionSignatures[1:]
 	err = txn.validSignatures(10)
 	if err != ErrMissingSignatures {
 		t.Error(err)

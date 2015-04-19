@@ -114,7 +114,7 @@ func NewConsensusTester(t *testing.T, s *State) (ct *ConsensusTester) {
 		t.Fatal(err)
 	}
 	uc := types.UnlockConditions{
-		NumSignatures: 1,
+		RequiredSignatures: 1,
 		PublicKeys: []types.SiaPublicKey{
 			types.SiaPublicKey{
 				Algorithm: types.SignatureEd25519,

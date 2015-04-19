@@ -18,9 +18,9 @@ func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []typ
 	txn.MinerFees = append(txn.MinerFees, value)
 
 	// Invalidate the signature.
-	byteSig := []byte(txn.Signatures[0].Signature)
+	byteSig := []byte(txn.TransactionSignatures[0].Signature)
 	byteSig[0]++
-	txn.Signatures[0].Signature = types.Signature(byteSig)
+	txn.TransactionSignatures[0].Signature = types.Signature(byteSig)
 
 	// Mine a block with this transcation.
 	block := ct.MineCurrentBlock([]types.Transaction{txn})
