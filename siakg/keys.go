@@ -28,7 +28,6 @@ type KeyPair struct {
 	Version          string
 	Index            int
 	SecretKey        crypto.SecretKey
-	PublicKey        crypto.PublicKey
 	UnlockConditions types.UnlockConditions
 }
 
@@ -55,9 +54,10 @@ func generateKeys(*cobra.Command, []string) {
 	}
 
 	// Add the keys to each keypair.
+	pubKeys := make([]crypto.PublicKey, config.Siakg.TotalKeys)
 	for i := 0; i < config.Siakg.TotalKeys; i++ {
 		var err error
-		keys[i].SecretKey, keys[i].PublicKey, err = crypto.GenerateSignatureKeys()
+		keys[i].SecretKey, pubKeys[i], err = crypto.GenerateSignatureKeys()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -72,7 +72,7 @@ func generateKeys(*cobra.Command, []string) {
 	for i := range keys {
 		uc.PublicKeys = append(uc.PublicKeys, types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
-			Key:       string(keys[i].PublicKey[:]),
+			Key:       string(pubKeys[i][:]),
 		})
 	}
 	for i := range keys {
