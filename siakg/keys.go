@@ -1,5 +1,7 @@
 package main
 
+// keys.go contains functions for generating and printing keys.
+
 import (
 	"fmt"
 	"os"
@@ -15,7 +17,7 @@ import (
 
 const (
 	// The header for all siakg files. Do not change.
-	FILEHEADER = "siakg"
+	FileHeader = "siakg"
 )
 
 // A KeyPair is the object that gets saved to disk for a signature key. All the
@@ -32,8 +34,11 @@ type KeyPair struct {
 
 // generateKeys will generate a set of keys and save the keyfiles to disk.
 func generateKeys(*cobra.Command, []string) {
-	// Check that the total number of keys is at least as large as the required
-	// number of keys.
+	// Check that the key requirements make sense.
+	if config.Siakg.RequiredKeys == 0 {
+		fmt.Println("An address with 0 required keys is not useful.")
+		return
+	}
 	if config.Siakg.TotalKeys < config.Siakg.RequiredKeys {
 		fmt.Printf("Total Keys (%v) must be greater than or equal to Required Keys (%v)\n", config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
 		return
@@ -44,8 +49,8 @@ func generateKeys(*cobra.Command, []string) {
 	// Generate 'TotalKeys' keyparis and fill out the metadata.
 	keys := make([]KeyPair, config.Siakg.TotalKeys)
 	for i := range keys {
-		keys[i].Header = FILEHEADER
-		keys[i].Version = VERSION
+		keys[i].Header = FileHeader
+		keys[i].Version = Version
 		keys[i].Index = i
 	}
 
@@ -75,13 +80,15 @@ func generateKeys(*cobra.Command, []string) {
 	}
 
 	// Save the KeyPairs to disk.
-	err := os.MkdirAll(config.Siakg.KeyName, 0700)
-	if err != nil {
-		fmt.Println(err)
-		return
+	if config.Siakg.Folder != "" {
+		err := os.MkdirAll(config.Siakg.Folder, 0700)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 	for i, key := range keys {
-		err = encoding.WriteFile(filepath.Join(config.Siakg.KeyName, config.Siakg.KeyName+"_Key"+strconv.Itoa(i)), key)
+		err := encoding.WriteFile(filepath.Join(config.Siakg.Folder, config.Siakg.KeyName)+"_Key"+strconv.Itoa(i)+FileExtension, key)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -89,4 +96,17 @@ func generateKeys(*cobra.Command, []string) {
 	}
 
 	fmt.Printf("Success, the address for this set of keys is: %x\n", uc.UnlockHash())
+}
+
+// printKey opens a keyfile and prints the contents.
+func printKey(*cobra.Command, []string) {
+	var kp KeyPair
+	err := encoding.ReadFile(config.Address.Filename, &kp)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.NumSignatures, len(kp.UnlockConditions.PublicKeys))
+	fmt.Printf("The address is: %x\n", kp.UnlockConditions.UnlockHash())
 }
