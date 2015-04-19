@@ -13,15 +13,18 @@ import (
 )
 
 const (
-	VERSION  = "0.3.0"
-	hostname = "http://localhost:9980"
+	VERSION = "0.3.0"
+)
+
+var (
+	port string
 )
 
 // get wraps a GET request with a status code check, such that if the GET does
 // not return 200, the error will be read and returned. The response body is
 // not closed.
 func get(call string) (resp *http.Response, err error) {
-	resp, err = http.Get(hostname + call)
+	resp, err = http.Get("http://localhost:" + port + call)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
@@ -125,6 +128,9 @@ func main() {
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
 	root.AddCommand(statusCmd, stopCmd)
+
+	// parse flags
+	root.PersistentFlags().StringVarP(&port, "port", "p", "9980", "which port to communicate with (i.e. the port siad is listening on)")
 
 	// run
 	root.Execute()
