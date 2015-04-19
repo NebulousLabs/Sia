@@ -95,6 +95,66 @@ func generateKeys(*cobra.Command, []string) {
 		}
 	}
 
+	// Load the keys from disk back into memory, then verifiy that the keys on
+	// disk are able to sign outputs in transactions.
+	loadedKeys := make([]KeyPair, config.Siakg.TotalKeys)
+	for i := 0; i < len(loadedKeys); i++ {
+		err := encoding.ReadFile(filepath.Join(config.Siakg.Folder, config.Siakg.KeyName)+"_Key"+strconv.Itoa(i)+FileExtension, &loadedKeys[i])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	// Check that the keys can be used to spend transactions. Load them back into memory.
+	for _, loadedKey := range loadedKeys {
+		if loadedKey.UnlockConditions.UnlockHash() != uc.UnlockHash() {
+			fmt.Println("corruption occured while saving the keys to disk")
+		}
+	}
+	// Create a transaction for the keys to sign.
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{
+			types.SiafundInput{
+				UnlockConditions: loadedKeys[0].UnlockConditions,
+			},
+		},
+	}
+	// Loop through and sign the transaction multiple times. All keys will be
+	// used at least once by the time the loop terminates.
+	var i int
+	for i != config.Siakg.TotalKeys {
+		// i tracks which key is next to be used. If i + RequiredKeys results
+		// in going out-of-bounds, reduce i so that the last key will be used
+		// for the final signature.
+		if i+config.Siakg.RequiredKeys > config.Siakg.TotalKeys {
+			i = config.Siakg.TotalKeys - config.Siakg.RequiredKeys
+		}
+		var j int
+		for j < config.Siakg.RequiredKeys {
+			txn.Signatures = append(txn.Signatures, types.TransactionSignature{
+				PublicKeyIndex: uint64(i),
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			})
+			sigHash := txn.SigHash(j)
+			sig, err := crypto.SignHash(sigHash, loadedKeys[i].SecretKey)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			txn.Signatures[j].Signature = types.Signature(sig[:])
+			i++
+			j++
+		}
+		// Check that the signature is valid.
+		err := txn.StandaloneValid(0)
+		if err != nil {
+			fmt.Println(err)
+		}
+		// Delete all of the signatures for the next iteration.
+		txn.Signatures = nil
+	}
+
 	fmt.Printf("Success, the address for this set of keys is: %x\n", uc.UnlockHash())
 }
 
