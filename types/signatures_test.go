@@ -16,7 +16,7 @@ func TestUnlockHash(t *testing.T) {
 				Key:       "fake key",
 			},
 		},
-		RequiredSignatures: 3,
+		SignaturesRequired: 3,
 	}
 
 	_ = uc.UnlockHash()
@@ -184,7 +184,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 				Algorithm: SignatureEntropy,
 			},
 		},
-		RequiredSignatures: 2,
+		SignaturesRequired: 2,
 	}
 
 	// Create a transaction with each type of spendable output.

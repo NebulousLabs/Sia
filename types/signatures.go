@@ -96,17 +96,17 @@ type (
 	// must have a height >= 'Timelock'.
 	//
 	// 'PublicKeys' specifies the set of keys that can be used to satisfy the
-	// UnlockConditions; of these, at least 'RequiredSignatures' unique keys must sign
+	// UnlockConditions; of these, at least 'SignaturesRequired' unique keys must sign
 	// the transaction. The keys that do not need to use the same cryptographic
 	// algorithm.
 	//
-	// If 'RequiredSignatures' == 0, the UnlockConditions are effectively "anyone can
-	// unlock." If 'RequiredSignatures' > len('PublicKeys'), then the UnlockConditions
+	// If 'SignaturesRequired' == 0, the UnlockConditions are effectively "anyone can
+	// unlock." If 'SignaturesRequired' > len('PublicKeys'), then the UnlockConditions
 	// cannot be fulfilled under any circumstances.
 	UnlockConditions struct {
 		Timelock           BlockHeight
 		PublicKeys         []SiaPublicKey
-		RequiredSignatures uint64
+		SignaturesRequired uint64
 	}
 
 	// Each input has a list of public keys and a required number of signatures.
@@ -124,7 +124,7 @@ type (
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the
 // hash of the number of signatures. The keys are put in the middle because
-// Timelock and RequiredSignatures are both low entropy fields; they can be
+// Timelock and SignaturesRequired are both low entropy fields; they can be
 // protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
 	tree := crypto.NewTree()
@@ -132,7 +132,7 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 	for i := range uc.PublicKeys {
 		tree.PushObject(uc.PublicKeys[i])
 	}
-	tree.PushObject(uc.RequiredSignatures)
+	tree.PushObject(uc.SignaturesRequired)
 	return UnlockHash(tree.Root())
 }
 
@@ -282,7 +282,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: input.UnlockConditions.RequiredSignatures,
+			remainingSignatures: input.UnlockConditions.SignaturesRequired,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -296,7 +296,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: termination.TerminationConditions.RequiredSignatures,
+			remainingSignatures: termination.TerminationConditions.SignaturesRequired,
 			possibleKeys:        termination.TerminationConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -310,7 +310,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: input.UnlockConditions.RequiredSignatures,
+			remainingSignatures: input.UnlockConditions.SignaturesRequired,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -319,15 +319,19 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 
 	// Check all of the signatures for validity.
 	for i, sig := range t.TransactionSignatures {
-		// check that sig corresponds to an entry in sigMap
+		// Check that sig corresponds to an entry in sigMap.
 		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
 		if !exists || inSig.remainingSignatures == 0 {
 			return ErrFrivilousSignature
 		}
-		// check that sig's key hasn't already been used
+		// Check that sig's key hasn't already been used.
 		_, exists = inSig.usedKeys[sig.PublicKeyIndex]
 		if exists {
 			return ErrPublicKeyOveruse
+		}
+		// Check that the public key index refers to an existing public key.
+		if sig.PublicKeyIndex >= uint64(len(inSig.possibleKeys)) {
+			return ErrInvalidPubKeyIndex
 		}
 		// Check that the timelock has expired.
 		if sig.Timelock > currentHeight {
