@@ -18,6 +18,7 @@ dependencies:
 	go get -u golang.org/x/tools/cmd/cover
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/boltdb/bolt
+	go get -u github.com/inconshreveable/muxado
 
 # fmt calls go fmt on all packages.
 fmt:

@@ -39,6 +39,7 @@ type NetAddress string
 type GatewayInfo struct {
 	Address NetAddress
 	Peers   []NetAddress
+	Nodes   int
 }
 
 // Host returns the NetAddress' IP.

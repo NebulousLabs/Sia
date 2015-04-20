@@ -11,6 +11,8 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
+
+	"github.com/inconshreveable/muxado"
 )
 
 const (
@@ -25,6 +27,11 @@ var (
 	errUnreachable = errors.New("peer did not respond to ping")
 )
 
+type Peer struct {
+	sess    muxado.Session
+	strikes int
+}
+
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
 	state *consensus.State
@@ -36,10 +43,13 @@ type Gateway struct {
 	// which function should handle the connection.
 	handlerMap map[rpcID]modules.RPCFunc
 
-	// Peers are stored in a map to guarantee uniqueness. They are paired with
-	// the number of "strikes" against them; peers with too many strikes are
-	// removed.
-	peers map[modules.NetAddress]int
+	// peers are the nodes we are currently connected to.
+	peers map[modules.NetAddress]*Peer
+
+	// nodes is a list of all known nodes (i.e. potential peers) on the
+	// network.
+	// TODO: map to a timestamp?
+	nodes map[modules.NetAddress]struct{}
 
 	// saveDir is the path used to save/load peers.
 	saveDir string
@@ -51,8 +61,8 @@ type Gateway struct {
 
 // Address returns the NetAddress of the Gateway.
 func (g *Gateway) Address() modules.NetAddress {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
 	return g.myAddr
 }
 
@@ -69,12 +79,17 @@ func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
 	g.log.Println("INFO: initiated bootstrapping to", bootstrapPeer)
 
 	// contact the bootstrap peer
-	if !g.Ping(bootstrapPeer) {
+	conn, err := dial(bootstrapPeer)
+	if err != nil {
 		return errUnreachable
 	}
+
 	id := g.mu.Lock()
-	g.addPeer(bootstrapPeer)
+	_, err = g.addPeer(conn, bootstrapPeer)
 	g.mu.Unlock(id)
+	if err != nil {
+		return
+	}
 
 	// ask the bootstrap peer for our hostname
 	err = g.learnHostname(bootstrapPeer)
@@ -123,12 +138,13 @@ func (g *Gateway) RelayTransaction(t types.Transaction) {
 
 // Info returns metadata about the Gateway.
 func (g *Gateway) Info() (info modules.GatewayInfo) {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
 	info.Address = g.myAddr
 	for peer := range g.peers {
 		info.Peers = append(info.Peers, peer)
 	}
+	info.Nodes = len(g.nodes)
 	return
 }
 
@@ -154,7 +170,8 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	g = &Gateway{
 		state:      s,
 		handlerMap: make(map[rpcID]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]int),
+		peers:      make(map[modules.NetAddress]*Peer),
+		nodes:      make(map[modules.NetAddress]struct{}),
 		saveDir:    saveDir,
 		mu:         sync.New(time.Second*1, 0),
 		log:        logger,
@@ -168,14 +185,21 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 
 	g.log.Println("INFO: gateway created, started logging")
 
-	// Spawn the RPC handler.
-	err = g.startListener(addr)
+	// Create the listener.
+	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
+	// Set myAddr (this is necessary if addr == ":0", in which case the OS
+	// will assign us a random open port).
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
+	g.log.Println("INFO: according to the listener, our address is", g.myAddr)
 
-	// Load old peer list. If it doesn't exist, no problem, but if it does, we
-	// want to know about any errors preventing us from loading it.
+	// Spawn the RPC handler.
+	go g.listen(g.listener)
+
+	// Load the old peer list. If it doesn't exist, no problem, but if it does,
+	// we want to know about any errors preventing us from loading it.
 	if loadErr := g.load(); err != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}

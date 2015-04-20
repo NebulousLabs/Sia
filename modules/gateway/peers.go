@@ -5,6 +5,8 @@ import (
 	"math/rand"
 
 	"github.com/NebulousLabs/Sia/modules"
+
+	"github.com/inconshreveable/muxado"
 )
 
 const (
@@ -13,27 +15,39 @@ const (
 	minPeers       = 3
 )
 
-func (g *Gateway) addPeer(peer modules.NetAddress) error {
-	if _, exists := g.peers[peer]; exists {
+// addNode adds an address to the set of nodes on the network.
+func (g *Gateway) addNode(addr modules.NetAddress) error {
+	if _, exists := g.nodes[addr]; exists {
 		return errors.New("peer already added")
-	} else if peer == g.myAddr {
-		return errors.New("can't add our own address")
+	}
+	g.nodes[addr] = struct{}{}
+	g.save()
+	return nil
+}
+
+// addPeer records the connected peer in the peer list.
+func (g *Gateway) addPeer(conn modules.NetConn, addr modules.NetAddress) (*Peer, error) {
+	if _, exists := g.peers[addr]; exists {
+		return nil, errors.New("peer already added")
+	} else if addr == g.myAddr {
+		return nil, errors.New("can't connect to our own address")
 	}
 	// If adding this peer brings us above minPeers, try to kick out a bad
 	// peer that we've been forced to keep.
 	if len(g.peers) == minPeers {
-		for peer, strikes := range g.peers {
-			if strikes > maxStrikes {
-				g.removePeer(peer)
+		for addr, peer := range g.peers {
+			if peer.strikes > maxStrikes {
+				g.removePeer(addr)
 				break
 			}
 		}
 	}
-	g.peers[peer] = 0
-	g.save()
+	peer := &Peer{muxado.Server(conn), 0}
+	g.peers[addr] = peer
+	g.addNode(addr)
 
 	g.log.Println("INFO: added new peer", peer)
-	return nil
+	return peer, nil
 }
 
 func (g *Gateway) removePeer(peer modules.NetAddress) error {
@@ -60,60 +74,75 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-func (g *Gateway) addStrike(peer modules.NetAddress) {
-	if _, exists := g.peers[peer]; !exists {
+func (g *Gateway) addStrike(addr modules.NetAddress) {
+	if _, exists := g.peers[addr]; !exists {
+		g.log.Printf("WARN: couldn't add strike to non-peer %v\n", addr)
 		return
 	}
-	g.peers[peer]++
-	g.log.Println("INFO: added a strike to peer", peer)
+	g.peers[addr].strikes++
+	g.log.Println("INFO: added a strike to peer", addr)
 	// don't remove bad peers if we aren't well-connected
-	if g.peers[peer] > maxStrikes && len(g.peers) > minPeers {
-		g.removePeer(peer)
+	if g.peers[addr].strikes > maxStrikes && len(g.peers) > minPeers {
+		g.removePeer(addr)
 	}
 }
 
 // AddPeer adds a peer to the Gateway's peer list.
-func (g *Gateway) AddPeer(peer modules.NetAddress) error {
-	counter := g.mu.Lock()
-	defer g.mu.Unlock(counter)
-	return g.addPeer(peer)
+func (g *Gateway) AddPeer(addr modules.NetAddress) error {
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	conn, err := dial(addr)
+	if err != nil {
+		return err
+	}
+	_, err = g.addPeer(conn, addr)
+	return err
 }
 
 // RemovePeer removes a peer from the Gateway's peer list.
 // TODO: warn if less than minPeers?
 func (g *Gateway) RemovePeer(peer modules.NetAddress) error {
-	counter := g.mu.Lock()
-	defer g.mu.Unlock(counter)
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
 	return g.removePeer(peer)
 }
 
 // RandomPeer returns a random peer from the Gateway's peer list.
 func (g *Gateway) RandomPeer() (modules.NetAddress, error) {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
 	return g.randomPeer()
 }
 
-// addMe is an RPC that requests that the Gateway add a peer to its peer
-// list. The supplied peer is assumed to be the peer making the RPC.
+// addMe is an RPC that requests that the Gateway add a peer to its peer set.
+// addMe is a special RPC in that, if the peer is added, it will block forever,
+// listening and handling new streams from the peer. Why not spawn a listener
+// goroutine? Because the underlying TCP connection will be closed (by
+// threadedHandleConn) when the RPC returns.
 func (g *Gateway) addMe(conn modules.NetConn) error {
-	var peer modules.NetAddress
-	err := conn.ReadObject(&peer, maxAddrLength)
+	var addr modules.NetAddress
+	err := conn.ReadObject(&addr, maxAddrLength)
 	if err != nil {
 		return err
 	}
-	g.log.Printf("INFO: %v wants to add %v to our peer list\n", conn.Addr(), peer)
-	if !g.Ping(peer) {
-		return errUnreachable
+	g.log.Printf("INFO: %v wants to connect (gave address: %v)\n", conn.Addr(), addr)
+	id := g.mu.RLock()
+	peer, err := g.addPeer(conn, addr)
+	g.mu.RUnlock(id)
+	if err != nil {
+		return err
 	}
-	g.AddPeer(peer)
+	// block until connection is closed
+	g.listen(peer.sess.NetListener())
+	// remove peer
+	g.RemovePeer(addr)
 	return nil
 }
 
 // sharePeers is an RPC that returns up to 10 randomly selected peers.
 func (g *Gateway) sharePeers(conn modules.NetConn) error {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
 
 	var peers []modules.NetAddress
 	for peer := range g.peers {
@@ -152,7 +181,7 @@ func (g *Gateway) threadedPeerDiscovery() {
 	id := g.mu.Lock()
 	var added int
 	for i := range newPeers {
-		if g.addPeer(newPeers[i]) == nil {
+		if g.addNode(newPeers[i]) == nil {
 			added++
 		}
 	}

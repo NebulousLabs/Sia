@@ -34,8 +34,8 @@ func (g *Gateway) learnHostname(addr modules.NetAddress) error {
 
 // setHostname sets the hostname of the server.
 func (g *Gateway) setHostname(host string) {
-	counter := g.mu.Lock()
-	defer g.mu.Unlock(counter)
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
 	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
 	g.log.Println("INFO: set hostname to", g.myAddr)
 }
