@@ -16,6 +16,6 @@ keyfile will be created. To create a 2-of-3 address, run `siag -r 2 -t 3`.
 Three keyfiles will be created, and two are required to spend any of the assets
 sent to the address.
 
-Finally, you can print information about a key by running `siag keyinfo -f
+Finally, you can print information about a key by running `siag keyinfo
 myKeyFile.siakey`. This will print the address that the key unlocks, as well as
 the multisig settings of the key.
