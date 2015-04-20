@@ -14,7 +14,7 @@ const (
 	Version       = "1.0"
 	FileExtension = ".siakey"
 
-	DefaultFolder       = "SiafundKeys"
+	DefaultFolder       = ""
 	DefaultKeyname      = "SiafundKeys"
 	DefaultRequiredKeys = 2
 	DefaultTotalKeys    = 3
@@ -37,7 +37,7 @@ type Config struct {
 		TotalKeys    int
 	}
 
-	Address struct {
+	KeyInfo struct {
 		Filename string
 	}
 }
@@ -48,7 +48,7 @@ func main() {
 		Use:   os.Args[0],
 		Short: "Sia Keygen v" + Version,
 		Long:  "Sia Keygen v" + Version,
-		Run:   generateKeys,
+		Run:   siakg,
 	}
 	root.Flags().StringVarP(&config.Siakg.Folder, "folder", "f", DefaultFolder, "The folder where the keys will be created")
 	root.Flags().StringVarP(&config.Siakg.KeyName, "key-name", "n", DefaultKeyname, "The name for this set of keys")
@@ -59,9 +59,9 @@ func main() {
 		Use:   "keyinfo",
 		Short: "Print the address associated with a keyfile.",
 		Long:  "Load a keyfile and print the address that the keyfile is meant to spend on.",
-		Run:   printKey,
+		Run:   keyInfo,
 	}
-	address.Flags().StringVarP(&config.Address.Filename, "filename", "f", "SiafundKeys_Key0"+FileExtension, "Which file is being printed")
+	address.Flags().StringVarP(&config.KeyInfo.Filename, "filename", "f", "SiafundKeys_Key0"+FileExtension, "Which file is being printed")
 	root.AddCommand(address)
 
 	root.Execute()

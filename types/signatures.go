@@ -23,6 +23,7 @@ var (
 
 	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
 	ErrFrivilousSignature        = errors.New("transaction contains a frivilous siganture")
+	ErrInvalidPubKeyIndex        = errors.New("transaction contains a signature that points to a nonexistent public key")
 	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
 	ErrPrematureSignature        = errors.New("timelock on signature has not expired")
 	ErrPublicKeyOveruse          = errors.New("public key was used multiple times while signing transaction")

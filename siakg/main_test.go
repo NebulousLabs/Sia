@@ -10,8 +10,6 @@ import (
 
 // The tests in this file need to be checked manually, even if errors are
 // returned it will not be apparent to the test suite.
-//
-// CONTRIBUTE: Make these tests automatic.
 
 func TestMain(t *testing.T) {
 	// Get a test folder.
@@ -38,47 +36,23 @@ func TestMain(t *testing.T) {
 	}
 	main()
 
-	// Attempt to create an address with 0 required signatures. zeroRequiredDir
-	// should not be created because of an error.
-	zeroRequiredDir := filepath.Join(testDir, "zeroRequired")
+	// Try to create a set of keys that are invalid. An error should be printed.
+	errDir := filepath.Join(testDir, "err")
 	os.Args = []string{
 		"siakg",
 		"-f",
-		zeroRequiredDir,
-		"-r",
+		errDir,
+		"-t",
 		"0",
 	}
 	main()
 
-	// Attempt to create an unspendable address. unspendableDir should not be
-	// created because of an error.
-	unspendableDir := filepath.Join(testDir, "zeroRequired")
-	os.Args = []string{
-		"siakg",
-		"-f",
-		unspendableDir,
-		"-t",
-		"1",
-	}
-	main()
-
-	// Attempt read a nonexistant file. The output should be a nonexistant file
-	// error.
+	// Print the key info for keys that don't exist.
 	os.Args = []string{
 		"siakg",
 		"keyinfo",
 		"-f",
-		"idontexist",
-	}
-	main()
-
-	// Attempt to read a corrupted file. The output should be something
-	// indicating corruption.
-	os.Args = []string{
-		"siakg",
-		"keyinfo",
-		"-f",
-		"main.go",
+		"notExist",
 	}
 	main()
 }

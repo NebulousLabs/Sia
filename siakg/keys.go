@@ -3,6 +3,7 @@ package main
 // keys.go contains functions for generating and printing keys.
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,6 +21,12 @@ const (
 	FileHeader = "siakg"
 )
 
+var (
+	ErrCorruptedKey       = errors.New("A corrupted key has been presented")
+	ErrInsecureAddress    = errors.New("An address needs at least one required key to be secure")
+	ErrUnspendableAddress = errors.New("An address is unspendable if the number of required keys is greater than the total number of keys")
+)
+
 // A KeyPair is the object that gets saved to disk for a signature key. All the
 // information necessary to sign a transaction is in the struct, and the struct
 // can be directly written to disk.
@@ -31,85 +38,85 @@ type KeyPair struct {
 	UnlockConditions types.UnlockConditions
 }
 
-// generateKeys will generate a set of keys and save the keyfiles to disk.
-func generateKeys(*cobra.Command, []string) {
-	// Check that the key requirements make sense.
-	if config.Siakg.RequiredKeys == 0 {
-		fmt.Println("An address with 0 required keys is not useful.")
-		return
+// generateKeys generates a set of keys and saves them to disk.
+func generateKeys(requiredKeys int, totalKeys int, folder string, keyname string) (types.UnlockConditions, error) {
+	// Check that the inputs have sane values.
+	if requiredKeys < 1 {
+		return types.UnlockConditions{}, ErrInsecureAddress
 	}
-	if config.Siakg.TotalKeys < config.Siakg.RequiredKeys {
-		fmt.Printf("Total Keys (%v) must be greater than or equal to Required Keys (%v)\n", config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
-		return
+	if totalKeys < requiredKeys {
+		return types.UnlockConditions{}, ErrUnspendableAddress
 	}
 
-	fmt.Printf("Creating key '%s' with %v total keys and %v required keys.\n", config.Siakg.KeyName, config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
-
-	// Generate 'TotalKeys' keyparis and fill out the metadata.
-	keys := make([]KeyPair, config.Siakg.TotalKeys)
+	// Generate 'TotalKeys', filling out everything except the unlock
+	// conditions.
+	keys := make([]KeyPair, totalKeys)
+	pubKeys := make([]crypto.PublicKey, totalKeys)
 	for i := range keys {
+		var err error
 		keys[i].Header = FileHeader
 		keys[i].Version = Version
 		keys[i].Index = i
-	}
-
-	// Add the keys to each keypair.
-	pubKeys := make([]crypto.PublicKey, config.Siakg.TotalKeys)
-	for i := 0; i < config.Siakg.TotalKeys; i++ {
-		var err error
 		keys[i].SecretKey, pubKeys[i], err = crypto.GenerateSignatureKeys()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return types.UnlockConditions{}, err
 		}
 	}
 
-	// Generate the unlock conditions and add them to each KeyPair object.
-	uc := types.UnlockConditions{
+	// Generate the unlock conditions and add them to each KeyPair object. This
+	// must be done second because the keypairs can't be given unlock
+	// conditions until the PublicKeys have all been added.
+	unlockConditions := types.UnlockConditions{
 		Timelock:           0,
-		RequiredSignatures: uint64(config.Siakg.RequiredKeys),
+		SignaturesRequired: uint64(requiredKeys),
 	}
 	for i := range keys {
-		uc.PublicKeys = append(uc.PublicKeys, types.SiaPublicKey{
+		unlockConditions.PublicKeys = append(unlockConditions.PublicKeys, types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
 			Key:       string(pubKeys[i][:]),
 		})
 	}
 	for i := range keys {
-		keys[i].UnlockConditions = uc
+		keys[i].UnlockConditions = unlockConditions
 	}
 
 	// Save the KeyPairs to disk.
-	if config.Siakg.Folder != "" {
-		err := os.MkdirAll(config.Siakg.Folder, 0700)
+	if folder != "" {
+		err := os.MkdirAll(folder, 0700)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return types.UnlockConditions{}, err
 		}
 	}
 	for i, key := range keys {
-		err := encoding.WriteFile(filepath.Join(config.Siakg.Folder, config.Siakg.KeyName)+"_Key"+strconv.Itoa(i)+FileExtension, key)
+		err := encoding.WriteFile(filepath.Join(folder, keyname+"_Key"+strconv.Itoa(i)+FileExtension), key)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return types.UnlockConditions{}, err
 		}
 	}
 
-	// Load the keys from disk back into memory, then verifiy that the keys on
+	return unlockConditions, nil
+}
+
+// verifyKeys checks a set of keys on disk to see that they can spend funds
+// sent to their address.
+func verifyKeys(uc types.UnlockConditions, folder string, keyname string) error {
+	keysRequired := uc.SignaturesRequired
+	totalKeys := uint64(len(uc.PublicKeys))
+
+	// Load the keys from disk back into memory, then verify that the keys on
 	// disk are able to sign outputs in transactions.
-	loadedKeys := make([]KeyPair, config.Siakg.TotalKeys)
+	loadedKeys := make([]KeyPair, totalKeys)
 	for i := 0; i < len(loadedKeys); i++ {
-		err := encoding.ReadFile(filepath.Join(config.Siakg.Folder, config.Siakg.KeyName)+"_Key"+strconv.Itoa(i)+FileExtension, &loadedKeys[i])
+		err := encoding.ReadFile(filepath.Join(folder, keyname+"_Key"+strconv.Itoa(i)+FileExtension), &loadedKeys[i])
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 	}
 
-	// Check that the keys can be used to spend transactions. Load them back into memory.
+	// Check that the keys can be used to spend transactions.
 	for _, loadedKey := range loadedKeys {
 		if loadedKey.UnlockConditions.UnlockHash() != uc.UnlockHash() {
-			fmt.Println("corruption occured while saving the keys to disk")
+			return ErrCorruptedKey
 		}
 	}
 	// Create a transaction for the keys to sign.
@@ -122,25 +129,24 @@ func generateKeys(*cobra.Command, []string) {
 	}
 	// Loop through and sign the transaction multiple times. All keys will be
 	// used at least once by the time the loop terminates.
-	var i int
-	for i != config.Siakg.TotalKeys {
+	var i uint64
+	for i != totalKeys {
 		// i tracks which key is next to be used. If i + RequiredKeys results
 		// in going out-of-bounds, reduce i so that the last key will be used
 		// for the final signature.
-		if i+config.Siakg.RequiredKeys > config.Siakg.TotalKeys {
-			i = config.Siakg.TotalKeys - config.Siakg.RequiredKeys
+		if i+keysRequired > totalKeys {
+			i = totalKeys - keysRequired
 		}
-		var j int
-		for j < config.Siakg.RequiredKeys {
+		var j uint64
+		for j < keysRequired {
 			txn.TransactionSignatures = append(txn.TransactionSignatures, types.TransactionSignature{
-				PublicKeyIndex: uint64(i),
+				PublicKeyIndex: i,
 				CoveredFields:  types.CoveredFields{WholeTransaction: true},
 			})
-			sigHash := txn.SigHash(j)
+			sigHash := txn.SigHash(int(j))
 			sig, err := crypto.SignHash(sigHash, loadedKeys[i].SecretKey)
 			if err != nil {
-				fmt.Println(err)
-				return
+				return err
 			}
 			txn.TransactionSignatures[j].Signature = types.Signature(sig[:])
 			i++
@@ -149,24 +155,50 @@ func generateKeys(*cobra.Command, []string) {
 		// Check that the signature is valid.
 		err := txn.StandaloneValid(0)
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 		// Delete all of the signatures for the next iteration.
 		txn.TransactionSignatures = nil
 	}
-
-	fmt.Printf("Success, the address for this set of keys is: %x\n", uc.UnlockHash())
+	return nil
 }
 
-// printKey opens a keyfile and prints the contents.
-func printKey(*cobra.Command, []string) {
-	var kp KeyPair
-	err := encoding.ReadFile(config.Address.Filename, &kp)
+// generateKeys will generate a set of keys and save the keyfiles to disk.
+func siakg(*cobra.Command, []string) {
+	unlockConditions, err := generateKeys(config.Siakg.RequiredKeys, config.Siakg.TotalKeys, config.Siakg.Folder, config.Siakg.KeyName)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = verifyKeys(unlockConditions, config.Siakg.Folder, config.Siakg.KeyName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.RequiredSignatures, len(kp.UnlockConditions.PublicKeys))
+	fmt.Printf("Success, the address for this set of keys is: %x\n", unlockConditions.UnlockHash())
+}
+
+// printKeyInfo opens a keyfile and prints the contents, returning an error if
+// there's a problem.
+func printKeyInfo(filename string) error {
+	var kp KeyPair
+	err := encoding.ReadFile(filename, &kp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.SignaturesRequired, len(kp.UnlockConditions.PublicKeys))
 	fmt.Printf("The address is: %x\n", kp.UnlockConditions.UnlockHash())
+	return nil
+}
+
+// keyInfo receives the cobra call 'keyInfo', and is essentially a wrapper for
+// printKeyInfo. This structure makes testing easier.
+func keyInfo(*cobra.Command, []string) {
+	err := printKeyInfo(config.KeyInfo.Filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
