@@ -35,6 +35,12 @@ func TestGenerateKeys(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Try to overwrite the file that was created.
+	_, err = generateKeys(1, 1, testDir, "genuine")
+	if err != ErrOverwrite {
+		t.Error("Expecting ErrOverwrite:", err)
+	}
 }
 
 // TestVerifyKeys proves the verifyKeys function.
