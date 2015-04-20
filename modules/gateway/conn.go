@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -24,18 +23,18 @@ var (
 // A conn is a monitored TCP connection. It satisfies the modules.NetConn
 // interface.
 type conn struct {
-	nc net.Conn
+	modules.NetConn
 }
 
 // Read implements the io.Reader interface. Successful reads will reset the
 // read timeout. If the connection has already timed out, Read will return an
 // error without reading anything.
 func (c *conn) Read(b []byte) (n int, err error) {
-	n, err = c.nc.Read(b)
+	n, err = c.NetConn.Read(b)
 	if ne, ok := err.(net.Error); ok && ne.Timeout() {
 		err = ErrTimeout
 	}
-	c.nc.SetDeadline(time.Now().Add(timeout))
+	c.SetDeadline(time.Now().Add(timeout))
 	return
 }
 
@@ -43,38 +42,17 @@ func (c *conn) Read(b []byte) (n int, err error) {
 // write timeout. If the connection has already timed out, Write will return
 // an error without writing anything.
 func (c *conn) Write(b []byte) (n int, err error) {
-	n, err = c.nc.Write(b)
+	n, err = c.NetConn.Write(b)
 	if ne, ok := err.(net.Error); ok && ne.Timeout() {
 		err = ErrTimeout
 	}
-	c.nc.SetDeadline(time.Now().Add(timeout))
+	c.SetDeadline(time.Now().Add(timeout))
 	return
 }
 
-func (c *conn) Close() error {
-	return c.nc.Close()
-}
-
-// ReadObject implements the encoding.Reader interface.
-func (c *conn) ReadObject(obj interface{}, maxLen uint64) error {
-	return encoding.ReadObject(c, obj, maxLen)
-}
-
-// WriteObject implements the encoding.Writer interface.
-func (c *conn) WriteObject(obj interface{}) error {
-	return encoding.WriteObject(c, obj)
-}
-
-// Addr returns the NetAddress of the remote end of the connection.
-func (c *conn) Addr() modules.NetAddress {
-	return modules.NetAddress(c.nc.RemoteAddr().String())
-}
-
 // newConn creates a new conn from a net.Conn.
-func newConn(nc net.Conn) *conn {
-	return &conn{
-		nc: nc,
-	}
+func newConn(c net.Conn) *conn {
+	return &conn{modules.NewNetConn(c)}
 }
 
 // dial wraps the connection returned by net.Dial in a conn.
