@@ -36,16 +36,14 @@ func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
 	return
 }
 
-// SignHash signs a message using a secret key. An error is returned if the
-// secret key is nil.
+// SignHash signs a message using a secret key.
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
 	skNorm := [SecretKeySize]byte(sk)
 	sig = *ed25519.Sign(&skNorm, data[:])
 	return
 }
 
-// VerifyHash uses a public key and input data to verify a signature. And error
-// is returned if the public key or signature is nil.
+// VerifyHash uses a public key and input data to verify a signature.
 func VerifyHash(data Hash, pk PublicKey, sig Signature) (err error) {
 	pkNorm := [PublicKeySize]byte(pk)
 	sigNorm := [SignatureSize]byte(sig)

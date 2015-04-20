@@ -23,6 +23,7 @@ var (
 
 	ErrEntropyKey                = errors.New("transaction tries to sign an entproy public key")
 	ErrFrivilousSignature        = errors.New("transaction contains a frivilous siganture")
+	ErrInvalidPubKeyIndex        = errors.New("transaction contains a signature that points to a nonexistent public key")
 	ErrMissingSignatures         = errors.New("transaction has inputs with missing signatures")
 	ErrPrematureSignature        = errors.New("timelock on signature has not expired")
 	ErrPublicKeyOveruse          = errors.New("public key was used multiple times while signing transaction")
@@ -57,7 +58,7 @@ type (
 		SiafundOutputs           []uint64
 		MinerFees                []uint64
 		ArbitraryData            []uint64
-		Signatures               []uint64
+		TransactionSignatures    []uint64
 	}
 
 	// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
@@ -96,17 +97,17 @@ type (
 	// must have a height >= 'Timelock'.
 	//
 	// 'PublicKeys' specifies the set of keys that can be used to satisfy the
-	// UnlockConditions; of these, at least 'NumSignatures' unique keys must sign
+	// UnlockConditions; of these, at least 'SignaturesRequired' unique keys must sign
 	// the transaction. The keys that do not need to use the same cryptographic
 	// algorithm.
 	//
-	// If 'NumSignatures' == 0, the UnlockConditions are effectively "anyone can
-	// unlock." If 'NumSignatures' > len('PublicKeys'), then the UnlockConditions
+	// If 'SignaturesRequired' == 0, the UnlockConditions are effectively "anyone can
+	// unlock." If 'SignaturesRequired' > len('PublicKeys'), then the UnlockConditions
 	// cannot be fulfilled under any circumstances.
 	UnlockConditions struct {
-		Timelock      BlockHeight
-		PublicKeys    []SiaPublicKey
-		NumSignatures uint64
+		Timelock           BlockHeight
+		PublicKeys         []SiaPublicKey
+		SignaturesRequired uint64
 	}
 
 	// Each input has a list of public keys and a required number of signatures.
@@ -124,7 +125,7 @@ type (
 // UnlockConditions object. The leaves of this tree are formed by taking the
 // hash of the timelock, the hash of the public keys (one leaf each), and the
 // hash of the number of signatures. The keys are put in the middle because
-// Timelock and NumSignatures are both low entropy fields; they can be
+// Timelock and SignaturesRequired are both low entropy fields; they can be
 // protected by having random public keys next to them.
 func (uc UnlockConditions) UnlockHash() UnlockHash {
 	tree := crypto.NewTree()
@@ -132,14 +133,14 @@ func (uc UnlockConditions) UnlockHash() UnlockHash {
 	for i := range uc.PublicKeys {
 		tree.PushObject(uc.PublicKeys[i])
 	}
-	tree.PushObject(uc.NumSignatures)
+	tree.PushObject(uc.SignaturesRequired)
 	return UnlockHash(tree.Root())
 }
 
 // SigHash returns the hash of the fields in a transaction covered by a given
 // signature. See CoveredFields for more details.
 func (t Transaction) SigHash(i int) crypto.Hash {
-	cf := t.Signatures[i].CoveredFields
+	cf := t.TransactionSignatures[i].CoveredFields
 	var signedData []byte
 	if cf.WholeTransaction {
 		signedData = encoding.MarshalAll(
@@ -152,9 +153,9 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 			t.SiafundOutputs,
 			t.MinerFees,
 			t.ArbitraryData,
-			t.Signatures[i].ParentID,
-			t.Signatures[i].PublicKeyIndex,
-			t.Signatures[i].Timelock,
+			t.TransactionSignatures[i].ParentID,
+			t.TransactionSignatures[i].PublicKeyIndex,
+			t.TransactionSignatures[i].Timelock,
 		)
 	} else {
 		for _, input := range cf.SiacoinInputs {
@@ -186,8 +187,8 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 		}
 	}
 
-	for _, sig := range cf.Signatures {
-		signedData = append(signedData, encoding.Marshal(t.Signatures[sig])...)
+	for _, sig := range cf.TransactionSignatures {
+		signedData = append(signedData, encoding.Marshal(t.TransactionSignatures[sig])...)
 	}
 
 	return crypto.HashBytes(signedData)
@@ -218,7 +219,7 @@ func sortedUnique(elems []uint64, max int) bool {
 // true, all fields except for 'Signatures' must be empty. All fields must be
 // sorted numerically, and there can be no repeats.
 func (t Transaction) validCoveredFields() error {
-	for _, sig := range t.Signatures {
+	for _, sig := range t.TransactionSignatures {
 		// convenience variables
 		cf := sig.CoveredFields
 		fieldMaxs := []struct {
@@ -234,7 +235,7 @@ func (t Transaction) validCoveredFields() error {
 			{cf.SiafundOutputs, len(t.SiafundOutputs)},
 			{cf.MinerFees, len(t.MinerFees)},
 			{cf.ArbitraryData, len(t.ArbitraryData)},
-			{cf.Signatures, len(t.Signatures)},
+			{cf.TransactionSignatures, len(t.TransactionSignatures)},
 		}
 
 		// Check that all fields are empty if 'WholeTransaction' is set, except
@@ -282,7 +283,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: input.UnlockConditions.NumSignatures,
+			remainingSignatures: input.UnlockConditions.SignaturesRequired,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -296,7 +297,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: termination.TerminationConditions.NumSignatures,
+			remainingSignatures: termination.TerminationConditions.SignaturesRequired,
 			possibleKeys:        termination.TerminationConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -310,7 +311,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: input.UnlockConditions.NumSignatures,
+			remainingSignatures: input.UnlockConditions.SignaturesRequired,
 			possibleKeys:        input.UnlockConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
@@ -318,16 +319,20 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	}
 
 	// Check all of the signatures for validity.
-	for i, sig := range t.Signatures {
-		// check that sig corresponds to an entry in sigMap
+	for i, sig := range t.TransactionSignatures {
+		// Check that sig corresponds to an entry in sigMap.
 		inSig, exists := sigMap[crypto.Hash(sig.ParentID)]
 		if !exists || inSig.remainingSignatures == 0 {
 			return ErrFrivilousSignature
 		}
-		// check that sig's key hasn't already been used
+		// Check that sig's key hasn't already been used.
 		_, exists = inSig.usedKeys[sig.PublicKeyIndex]
 		if exists {
 			return ErrPublicKeyOveruse
+		}
+		// Check that the public key index refers to an existing public key.
+		if sig.PublicKeyIndex >= uint64(len(inSig.possibleKeys)) {
+			return ErrInvalidPubKeyIndex
 		}
 		// Check that the timelock has expired.
 		if sig.Timelock > currentHeight {

@@ -418,10 +418,10 @@ func TestTransactionStandaloneValid(t *testing.T) {
 	txn.SiacoinInputs = nil
 
 	// Violate validSignatures
-	txn.Signatures = []TransactionSignature{TransactionSignature{}}
+	txn.TransactionSignatures = []TransactionSignature{TransactionSignature{}}
 	err = txn.StandaloneValid(0)
 	if err == nil {
 		t.Error("failed to trigger validSignatures error")
 	}
-	txn.Signatures = nil
+	txn.TransactionSignatures = nil
 }

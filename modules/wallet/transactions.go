@@ -93,11 +93,11 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
 		}
-		parentTxn.Signatures = append(parentTxn.Signatures, sig)
+		parentTxn.TransactionSignatures = append(parentTxn.TransactionSignatures, sig)
 
 		// Hash the transaction according to the covered fields.
 		coinAddress := input.UnlockConditions.UnlockHash()
-		sigIndex := len(parentTxn.Signatures) - 1
+		sigIndex := len(parentTxn.TransactionSignatures) - 1
 		secKey := w.keys[coinAddress].secretKey
 		sigHash := parentTxn.SigHash(sigIndex)
 
@@ -107,7 +107,7 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 		if err != nil {
 			return
 		}
-		parentTxn.Signatures[sigIndex].Signature = types.Signature(encodedSig[:])
+		parentTxn.TransactionSignatures[sigIndex].Signature = types.Signature(encodedSig[:])
 	}
 
 	// Add the exact output to the wallet's knowledgebase before releasing the
@@ -296,8 +296,8 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 		for i := range txn.ArbitraryData {
 			coveredFields.ArbitraryData = append(coveredFields.ArbitraryData, uint64(i))
 		}
-		for i := range txn.Signatures {
-			coveredFields.Signatures = append(coveredFields.Signatures, uint64(i))
+		for i := range txn.TransactionSignatures {
+			coveredFields.TransactionSignatures = append(coveredFields.TransactionSignatures, uint64(i))
 		}
 	}
 
@@ -309,11 +309,11 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 			CoveredFields:  coveredFields,
 			PublicKeyIndex: 0,
 		}
-		txn.Signatures = append(txn.Signatures, sig)
+		txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
 
 		// Hash the transaction according to the covered fields.
 		coinAddress := input.UnlockConditions.UnlockHash()
-		sigIndex := len(txn.Signatures) - 1
+		sigIndex := len(txn.TransactionSignatures) - 1
 		secKey := w.keys[coinAddress].secretKey
 		sigHash := txn.SigHash(sigIndex)
 
@@ -323,7 +323,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 		if err != nil {
 			return
 		}
-		txn.Signatures[sigIndex].Signature = types.Signature(encodedSig[:])
+		txn.TransactionSignatures[sigIndex].Signature = types.Signature(encodedSig[:])
 	}
 
 	// Delete the open transaction.
@@ -346,8 +346,8 @@ func (w *Wallet) AddSignature(id string, sig types.TransactionSignature) (t type
 		return
 	}
 
-	openTxn.transaction.Signatures = append(openTxn.transaction.Signatures, sig)
+	openTxn.transaction.TransactionSignatures = append(openTxn.transaction.TransactionSignatures, sig)
 	t = *openTxn.transaction
-	sigIndex = uint64(len(t.Signatures) - 1)
+	sigIndex = uint64(len(t.TransactionSignatures) - 1)
 	return
 }

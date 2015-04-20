@@ -15,8 +15,8 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddr
 		return
 	}
 	unlockConditions = types.UnlockConditions{
-		Timelock:      unlockHeight,
-		NumSignatures: 1,
+		Timelock:           unlockHeight,
+		SignaturesRequired: 1,
 		PublicKeys: []types.SiaPublicKey{
 			types.SiaPublicKey{
 				Algorithm: types.SignatureEd25519,
@@ -60,7 +60,7 @@ func (w *Wallet) coinAddress() (coinAddress types.UnlockHash, unlockConditions t
 		return
 	}
 	unlockConditions = types.UnlockConditions{
-		NumSignatures: 1,
+		SignaturesRequired: 1,
 		PublicKeys: []types.SiaPublicKey{
 			types.SiaPublicKey{
 				Algorithm: types.SignatureEd25519,
