@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	// The header for all siakg files. Do not change.
-	FileHeader = "siakg"
+	// The header for all siag files. Do not change.
+	FileHeader = "siag"
 )
 
 var (
@@ -164,20 +164,20 @@ func verifyKeys(uc types.UnlockConditions, folder string, keyname string) error 
 }
 
 // generateKeys will generate a set of keys and save the keyfiles to disk.
-func siakg(*cobra.Command, []string) {
-	unlockConditions, err := generateKeys(config.Siakg.RequiredKeys, config.Siakg.TotalKeys, config.Siakg.Folder, config.Siakg.KeyName)
+func siag(*cobra.Command, []string) {
+	unlockConditions, err := generateKeys(config.Siag.RequiredKeys, config.Siag.TotalKeys, config.Siag.Folder, config.Siag.AddressName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = verifyKeys(unlockConditions, config.Siakg.Folder, config.Siakg.KeyName)
+	err = verifyKeys(unlockConditions, config.Siag.Folder, config.Siag.AddressName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	fmt.Printf("Keys created for address: %x\n", unlockConditions.UnlockHash())
-	fmt.Printf("%v files have been created. KEEP THESE FILES. To spend money from this address, you will need at least %v of the files.\n", config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
+	fmt.Printf("%v file(s) created. KEEP THESE FILES. To spend money from this address, you will need at least %v of the files.\n", config.Siag.TotalKeys, config.Siag.RequiredKeys)
 }
 
 // printKeyInfo opens a keyfile and prints the contents, returning an error if

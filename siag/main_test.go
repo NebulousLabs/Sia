@@ -32,7 +32,7 @@ func TestMain(t *testing.T) {
 		"siakg",
 		"keyinfo",
 		"-f",
-		filepath.Join(defaultsDir, DefaultKeyname+"_Key0"+FileExtension),
+		filepath.Join(defaultsDir, DefaultAddressName+"_Key0"+FileExtension),
 	}
 	main()
 

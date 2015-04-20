@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	// Version of the siakg program.
+	// Version of the siag program.
 	Version       = "1.0"
 	FileExtension = ".siakey"
 
 	DefaultFolder       = ""
-	DefaultKeyname      = "SiafundKeys"
-	DefaultRequiredKeys = 2
-	DefaultTotalKeys    = 3
+	DefaultAddressName  = "SiafundAddress"
+	DefaultRequiredKeys = 1
+	DefaultTotalKeys    = 1
 )
 
 var (
@@ -27,12 +27,12 @@ var (
 )
 
 // The Config struct holds all of the configuration variables. The format is
-// made to be compatible with gcfg. gcfg is not currently used in the siakg
+// made to be compatible with gcfg. gcfg is not currently used in the siag
 // project, however it helps maintain consistency with the design of siad.
 type Config struct {
-	Siakg struct {
+	Siag struct {
 		Folder       string
-		KeyName      string
+		AddressName  string
 		RequiredKeys int
 		TotalKeys    int
 	}
@@ -46,22 +46,22 @@ type Config struct {
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Keygen v" + Version,
-		Long:  "Sia Keygen v" + Version,
-		Run:   siakg,
+		Short: "Sia Address Generator v" + Version,
+		Long:  "Sia Address Generator v" + Version,
+		Run:   siag,
 	}
-	root.Flags().StringVarP(&config.Siakg.Folder, "folder", "f", DefaultFolder, "The folder where the keys will be created")
-	root.Flags().StringVarP(&config.Siakg.KeyName, "key-name", "n", DefaultKeyname, "The name for this set of keys")
-	root.Flags().IntVarP(&config.Siakg.RequiredKeys, "required-keys", "r", DefaultRequiredKeys, "The number of keys required to use the address")
-	root.Flags().IntVarP(&config.Siakg.TotalKeys, "total-keys", "t", DefaultTotalKeys, "The total number of keys that can be used with the address")
+	root.Flags().StringVarP(&config.Siag.Folder, "folder", "f", DefaultFolder, "The folder where the keys will be created")
+	root.Flags().StringVarP(&config.Siag.AddressName, "address-name", "n", DefaultAddressName, "The name for this address")
+	root.Flags().IntVarP(&config.Siag.RequiredKeys, "required-keys", "r", DefaultRequiredKeys, "The number of keys required to use the address")
+	root.Flags().IntVarP(&config.Siag.TotalKeys, "total-keys", "t", DefaultTotalKeys, "The total number of keys that can be used with the address")
 
 	address := &cobra.Command{
 		Use:   "keyinfo",
-		Short: "Print the address associated with a keyfile.",
-		Long:  "Load a keyfile and print the address that the keyfile is meant to spend on.",
+		Short: "Print information about the key.",
+		Long:  "Print the address associated with the key as well as the multisig parameters of the key.",
 		Run:   keyInfo,
 	}
-	address.Flags().StringVarP(&config.KeyInfo.Filename, "filename", "f", "SiafundKeys_Key0"+FileExtension, "Which file is being printed")
+	address.Flags().StringVarP(&config.KeyInfo.Filename, "filename", "f", DefaultAddressName+"_Key0"+FileExtension, "Which key to analyze")
 	root.AddCommand(address)
 
 	root.Execute()
