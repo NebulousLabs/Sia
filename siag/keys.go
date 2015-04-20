@@ -24,6 +24,7 @@ const (
 var (
 	ErrCorruptedKey       = errors.New("A corrupted key has been presented")
 	ErrInsecureAddress    = errors.New("An address needs at least one required key to be secure")
+	ErrOverwrite          = errors.New("Keys already exist with that keyname.")
 	ErrUnspendableAddress = errors.New("An address is unspendable if the number of required keys is greater than the total number of keys")
 )
 
@@ -88,7 +89,15 @@ func generateKeys(requiredKeys int, totalKeys int, folder string, keyname string
 		}
 	}
 	for i, key := range keys {
-		err := encoding.WriteFile(filepath.Join(folder, keyname+"_Key"+strconv.Itoa(i)+FileExtension), key)
+		keyFilename := filepath.Join(folder, keyname+"_Key"+strconv.Itoa(i)+FileExtension)
+		_, err := os.Stat(keyFilename)
+		if !os.IsNotExist(err) {
+			if err != nil {
+				return types.UnlockConditions{}, err
+			}
+			return types.UnlockConditions{}, ErrOverwrite
+		}
+		err = encoding.WriteFile(keyFilename, key)
 		if err != nil {
 			return types.UnlockConditions{}, err
 		}
@@ -198,7 +207,11 @@ func printKeyInfo(filename string) error {
 // printKeyInfo. This structure makes testing easier.
 func keyInfo(c *cobra.Command, args []string) {
 	if len(args) != 1 {
-		fmt.Println("Usage: siag keyinfo [filename]")
+		err := c.Usage()
+		if err != nil {
+			fmt.Println("Unusual error:", err)
+			return
+		}
 		return
 	}
 	err := printKeyInfo(args[0])
