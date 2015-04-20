@@ -39,6 +39,10 @@ func TestGenerateKeys(t *testing.T) {
 
 // TestVerifyKeys proves the verifyKeys function.
 func TestVerifyKeys(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	testDir := tester.TempDir("siakg", "TestVerifyKeys")
 
 	// Create sets of keys that cover all boundaries from 0 of 1 to 5 of 9.

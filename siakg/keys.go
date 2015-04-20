@@ -176,7 +176,8 @@ func siakg(*cobra.Command, []string) {
 		return
 	}
 
-	fmt.Printf("Success, the address for this set of keys is: %x\n", unlockConditions.UnlockHash())
+	fmt.Printf("Keys created for address: %x\n", unlockConditions.UnlockHash())
+	fmt.Printf("%v files have been created. KEEP THESE FILES. To spend money from this address, you will need at least %v of the files.\n", config.Siakg.TotalKeys, config.Siakg.RequiredKeys)
 }
 
 // printKeyInfo opens a keyfile and prints the contents, returning an error if
