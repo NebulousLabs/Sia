@@ -41,7 +41,7 @@
 							<b>What are Sianotes?</b>
 							<br>
 							Sianotes are a temporary asset that are convertible to Siafunds upon the completion and launch of Sia.
-							Sianotes are available on the Nxt AE, and must be purchased at the market price using Nxt.
+							Sianotes are available on the Nxt Asset Exchange, and must be purchased at the market price using Nxt.
 							<br><br>
 							Download an Nxt Client: <a href="http://nxtclient.org">nxtclient.org</a>
 							<br>
@@ -53,31 +53,44 @@
 							<br><br>
 							<b>What are Siafunds?</b>
 							<br>
-							The current iteration of Sia operates using two major cryptocurrencies.
-							The first is Siacoin, and the second is Siafunding.
-							Siacoin is the primary currency of Sia, and most transactions on Sia will be using Siacoin.
-							For example, storage space must be rented from Sia using Siacoin.
-							When storage is rented from Sia, the money goes directly to the hosts.
-							A portion of this income is taken as a network fee and distributed among the owners of Siafunds.
-							The owners of Siafunds will have a regular income of siacoins proportional to the total amount of siacoins being directly spent on storage rental.
+							Sia has two different currencies.
+							The first is Siacoin, which is what must be used for storage contracts.
+							Most transcations will be in Siacoin.
+							The second is Siafunding.
+							Every time that someone spends coins on a storage contract, everyone holding siafunds will get a small fee.
+							Siafunds are therefore a source of income for the owners.
+							There are, and always will be, exactly 10,000 siafunds.
+							Each siafund gets 0.000039% of all coins spent on storage contracts, which means every storage contract has a 3.9% total fee.
+							Simple monetary transactions do not have fees, only storage contracts have fees.
 							<br><br>
-							One Sianote can be directly converted to 0.00039% of host income from renting storage, or 10,000 for 3.9% of all host income from storage.
-							Currently, there are approximately 1250 sianotes in circulation, or just under 0.5%.
+							<b>I have Sianotes. How can I redeem my Siafunds?</b>
+							<br>
+							Siafunds will be distributed to their owners in the genesis block.
+							If you have Sianotes, you can convert each Sianote into a Siafund.
+							To claim your Siafunds, you need a Sia address.
+							Download this tool to generate an address:
+							<br>
+							<ul>
+							<li><a href="https://github.com/NebulousLabs/Sia/releases/download/siag-v1.0/Sia_Address_Generator-v1.0-linux_amd64.tar.gz">Linux</a></li>
+							<li><a href="https://github.com/NebulousLabs/Sia/releases/download/siag-v1.0/Sia_Address_Generator-v1.0-darwin_amd64.zip">OS X</a></li>
+							<li><a href="https://github.com/NebulousLabs/Sia/releases/download/siag-v1.0/Sia_Address_Generator-v1.0-windows_amd64.zip">Windows</a></li>
+							</ul>
+							Once you have an address, send your Sianotes on Nxt to our original address <b>NXT-K5ZJ-NNR2-4J4B-D92UF</b>
+							Include a message that says 'I am redeeming my Sianotes, my Sia address is: [address].'
+							When the Sia network launches, your Siafunds will be at that address and will automatically start collecting fees.
 							<br><br>
 							<b>Why is there a fee on host income?</b>
 							<br>
 							Sia is first and foremost a business, and this fee is our source of income.
 							Unlike other cryptocurrency businesses, Sia does not get profits through premining the primary currency.
 							Instead, we take fees from the network that go directly to the owners of Siafunds.
-							The developers will own the majority of Siafunds.
 							This serves multiple purposes.
-							The first is that initially, we the developers did not have enough funds to work on Sia full time.
-							By selling Siafunds, we were able to raise enough money to reject full time employment and start a company instead.
+							The first is that initially, there was no money to fund developers.
+							By selling Siafunds, we were able to raise enough money to work on Sia full time.
 							The second reason is that it gives us a huge income to have a large development force behind Sia.
-							Bitcoin is huge, but aside from a small number of core developers, everything that happens around Bitcoin is volunteered, or is driven by companies looking to improve their business model with Bitcoin.
 							By giving the Sia team a huge development fund, we will be able to stay cutting edge and be aggressive with our development and marketing.
 							Sia's goal is to replace all centralized cloud storage, and that's going to take a lot of money.
-							By taking a non-crippling fee (such as 5%), we can fund dozens or potentially hundreds of full time developers and have a marketing budget.
+							By taking a non-crippling fee (3.9%), we can fund dozens or potentially hundreds of full time developers and have a marketing budget.
 							We fully intend to use Sia as an enterprise product, the same way that Amazon uses S3 as an enterprise product.
 							<br><br>
 							<b>Legal Disclaimer:</b>
