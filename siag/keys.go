@@ -196,8 +196,12 @@ func printKeyInfo(filename string) error {
 
 // keyInfo receives the cobra call 'keyInfo', and is essentially a wrapper for
 // printKeyInfo. This structure makes testing easier.
-func keyInfo(*cobra.Command, []string) {
-	err := printKeyInfo(config.KeyInfo.Filename)
+func keyInfo(c *cobra.Command, args []string) {
+	if len(args) != 1 {
+		fmt.Println("Usage: siag keyinfo [filename]")
+		return
+	}
+	err := printKeyInfo(args[0])
 	if err != nil {
 		fmt.Println(err)
 		return

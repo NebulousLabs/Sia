@@ -31,7 +31,6 @@ func TestMain(t *testing.T) {
 	os.Args = []string{
 		"siakg",
 		"keyinfo",
-		"-f",
 		filepath.Join(defaultsDir, DefaultAddressName+"_Key0"+FileExtension),
 	}
 	main()
@@ -51,8 +50,14 @@ func TestMain(t *testing.T) {
 	os.Args = []string{
 		"siakg",
 		"keyinfo",
-		"-f",
 		"notExist",
+	}
+	main()
+
+	// Supply too few arguments to keyinfo.
+	os.Args = []string{
+		"siakg",
+		"keyinfo",
 	}
 	main()
 }

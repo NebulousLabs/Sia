@@ -36,10 +36,6 @@ type Config struct {
 		RequiredKeys int
 		TotalKeys    int
 	}
-
-	KeyInfo struct {
-		Filename string
-	}
 }
 
 // The main function initializes the cobra command scheme and program flags.
@@ -56,12 +52,11 @@ func main() {
 	root.Flags().IntVarP(&config.Siag.TotalKeys, "total-keys", "t", DefaultTotalKeys, "The total number of keys that can be used with the address")
 
 	address := &cobra.Command{
-		Use:   "keyinfo",
+		Use:   "keyinfo [filename]",
 		Short: "Print information about the key.",
 		Long:  "Print the address associated with the key as well as the multisig parameters of the key.",
 		Run:   keyInfo,
 	}
-	address.Flags().StringVarP(&config.KeyInfo.Filename, "filename", "f", DefaultAddressName+"_Key0"+FileExtension, "Which key to analyze")
 	root.AddCommand(address)
 
 	root.Execute()
