@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"io"
 	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -21,7 +20,7 @@ var (
 
 // A NetConn is a monitored network connection.
 type NetConn interface {
-	io.ReadWriteCloser
+	net.Conn
 
 	// ReadWriters support reading and writing objects, which are encoded and
 	// decoded via the encoding package.
