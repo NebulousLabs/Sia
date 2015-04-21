@@ -1,5 +1,8 @@
 package crypto
 
+// encrypt.go contains functions for encrypting and decrypting data byte slices
+// and readers.
+
 import (
 	"crypto/cipher"
 	"crypto/rand"
@@ -8,16 +11,13 @@ import (
 	"golang.org/x/crypto/twofish"
 )
 
+var (
+	ErrInsufficientLen = errors.New("supplied ciphertext is not long enough to contain a nonce")
+)
+
 type (
 	TwofishKey [32]byte
 )
-
-// Encryption and decryption of []bytes is supported, but requires keeping some
-// overhead information. Also, nothing is done in-place, which means the
-// functions are more memory intensive, but that's not generally the bottleneck
-// when doing encryption. Developers are less likely to make mistakes when
-// inputs and outputs are different memory, which is why this method has been
-// chosen. Additionally, the overhead of using encryption is more transparent.
 
 // GenerateEncryptionKey produces a key that can be used for encrypting and
 // decrypting files.
@@ -26,67 +26,52 @@ func GenerateTwofishKey() (key TwofishKey, err error) {
 	return
 }
 
-// EncryptBytes encrypts a []byte using the key. The padded ciphertext, iv, and
-// amount of padding used are returned. `plaintext` is not overwritten.
-func (key TwofishKey) EncryptBytes(plaintext []byte) (ciphertext []byte, iv []byte, padding int, err error) {
-	// Determine the length needed for padding. The ciphertext must be padded
-	// to a multiple of twofish.BlockSize.
-	padding = twofish.BlockSize - (len(plaintext) % twofish.BlockSize)
-	if padding == twofish.BlockSize {
-		padding = 0
-	}
-
-	// Create the padded + unencrypted ciphertext.
-	ciphertext = make([]byte, len(plaintext)+padding)
-	copy(ciphertext, plaintext)
-
-	// Create the iv.
-	iv = make([]byte, twofish.BlockSize)
-	_, err = rand.Read(iv)
+// EncryptBytes encrypts a []byte using the key. EncryptBytes uses GCM and
+// prepends the nonce (12 bytes) to the ciphertext.
+func (key TwofishKey) EncryptBytes(plaintext []byte) (ciphertext []byte, err error) {
+	// Create the cipher, encryptor, and nonce.
+	twofishCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	// Encrypt the ciphertext.
-	blockCipher, err := twofish.NewCipher(key[:])
+	aead, err := cipher.NewGCM(twofishCipher)
 	if err != nil {
-		return
+		return nil, err
 	}
-	encrypter := cipher.NewCBCEncrypter(blockCipher, iv)
-	encrypter.CryptBlocks(ciphertext, ciphertext)
+	nonce := make([]byte, aead.NonceSize())
+	_, err = rand.Read(nonce)
+	if err != nil {
+		return nil, err
+	}
 
-	return
+	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
+	// meant for file encryption.
+	ciphertext = append(nonce, aead.Seal(nil, nonce, plaintext, nil)...)
+	return ciphertext, nil
 }
 
-// DecryptBytes decrypts a ciphertext using the key, an iv, and a volume of
-// padding. `ciphertext` is not overwritten. The plaintext is returned.
-func (key TwofishKey) DecryptBytes(ciphertext []byte, iv []byte, padding int) (plaintext []byte, err error) {
-	// Verify the iv is the correct length.
-	if len(iv) != twofish.BlockSize {
-		err = errors.New("iv is not correct size")
-		return
-	}
-	if len(ciphertext)%twofish.BlockSize != 0 {
-		err = errors.New("ciphertext is not correct size")
-		return
-	}
-	if padding > len(ciphertext) || padding < 0 {
-		err = errors.New("invalid padding on ciphertext")
-		return
-	}
-
-	// Allocate the plaintext.
-	plaintext = make([]byte, len(ciphertext))
-
-	// Decrypt the ciphertext.
-	blockCipher, err := twofish.NewCipher(key[:])
+// DecryptBytes decrypts the ciphertext created by EncryptBytes. The nonce is
+// expected to be the first 12 bytes of the ciphertext.
+func (key TwofishKey) DecryptBytes(ciphertext []byte) (plaintext []byte, err error) {
+	// Create the cipher.
+	twofishCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
-		return
+		return nil, err
 	}
-	decrypter := cipher.NewCBCDecrypter(blockCipher, iv)
-	decrypter.CryptBlocks(plaintext, ciphertext)
+	aead, err := cipher.NewGCM(twofishCipher)
+	if err != nil {
+		return nil, err
+	}
 
-	// Remove the padding.
-	plaintext = plaintext[:len(ciphertext)-padding]
-	return
+	// Check for a nonce.
+	if len(ciphertext) < aead.NonceSize() {
+		return nil, ErrInsufficientLen
+	}
+
+	// Decrypt the data.
+	plaintext, err = aead.Open(nil, ciphertext[:aead.NonceSize()], ciphertext[aead.NonceSize():], nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }
