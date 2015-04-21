@@ -16,6 +16,7 @@ var (
 )
 
 type (
+	Ciphertext []byte
 	TwofishKey [32]byte
 )
 
@@ -28,7 +29,7 @@ func GenerateTwofishKey() (key TwofishKey, err error) {
 
 // EncryptBytes encrypts a []byte using the key. EncryptBytes uses GCM and
 // prepends the nonce (12 bytes) to the ciphertext.
-func (key TwofishKey) EncryptBytes(plaintext []byte) (ciphertext []byte, err error) {
+func (key TwofishKey) EncryptBytes(plaintext []byte) (ct Ciphertext, err error) {
 	// Create the cipher, encryptor, and nonce.
 	twofishCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
@@ -46,13 +47,13 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) (ciphertext []byte, err err
 
 	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
 	// meant for file encryption.
-	ciphertext = append(nonce, aead.Seal(nil, nonce, plaintext, nil)...)
-	return ciphertext, nil
+	ct = append(nonce, aead.Seal(nil, nonce, plaintext, nil)...)
+	return ct, nil
 }
 
 // DecryptBytes decrypts the ciphertext created by EncryptBytes. The nonce is
 // expected to be the first 12 bytes of the ciphertext.
-func (key TwofishKey) DecryptBytes(ciphertext []byte) (plaintext []byte, err error) {
+func (key TwofishKey) DecryptBytes(ct Ciphertext) (plaintext []byte, err error) {
 	// Create the cipher.
 	twofishCipher, err := twofish.NewCipher(key[:])
 	if err != nil {
@@ -64,12 +65,12 @@ func (key TwofishKey) DecryptBytes(ciphertext []byte) (plaintext []byte, err err
 	}
 
 	// Check for a nonce.
-	if len(ciphertext) < aead.NonceSize() {
+	if len(ct) < aead.NonceSize() {
 		return nil, ErrInsufficientLen
 	}
 
 	// Decrypt the data.
-	plaintext, err = aead.Open(nil, ciphertext[:aead.NonceSize()], ciphertext[aead.NonceSize():], nil)
+	plaintext, err = aead.Open(nil, ct[:aead.NonceSize()], ct[aead.NonceSize():], nil)
 	if err != nil {
 		return nil, err
 	}
