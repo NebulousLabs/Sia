@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -20,39 +21,49 @@ var (
 	ErrTimeout = errors.New("timeout")
 )
 
-// A conn is a monitored TCP connection. It satisfies the modules.NetConn
-// interface.
+// conn is a barebones type that implements the modules.NetConn interface.
 type conn struct {
-	modules.NetConn
+	net.Conn
 }
 
-// Read implements the io.Reader interface. Successful reads will reset the
-// read timeout. If the connection has already timed out, Read will return an
-// error without reading anything.
+// Read implements the io.Reader interface. Timeout errors result in
+// ErrTimeout.
 func (c *conn) Read(b []byte) (n int, err error) {
-	n, err = c.NetConn.Read(b)
+	n, err = c.Conn.Read(b)
 	if ne, ok := err.(net.Error); ok && ne.Timeout() {
 		err = ErrTimeout
 	}
-	c.SetDeadline(time.Now().Add(timeout))
 	return
 }
 
-// Write implements the io.Writer interface. Successful writes will reset the
-// write timeout. If the connection has already timed out, Write will return
-// an error without writing anything.
+// Write implements the io.Writer interface. Timeout errors result in
+// ErrTimeout.
 func (c *conn) Write(b []byte) (n int, err error) {
-	n, err = c.NetConn.Write(b)
+	n, err = c.Conn.Write(b)
 	if ne, ok := err.(net.Error); ok && ne.Timeout() {
 		err = ErrTimeout
 	}
-	c.SetDeadline(time.Now().Add(timeout))
 	return
 }
 
-// newConn creates a new conn from a net.Conn.
+// ReadObject implements the encoding.Reader interface.
+func (c *conn) ReadObject(obj interface{}, maxLen uint64) error {
+	return encoding.ReadObject(c, obj, maxLen)
+}
+
+// WriteObject implements the encoding.Writer interface.
+func (c *conn) WriteObject(obj interface{}) error {
+	return encoding.WriteObject(c, obj)
+}
+
+// Addr returns the NetAddress of the remote end of the connection.
+func (c *conn) Addr() modules.NetAddress {
+	return modules.NetAddress(c.RemoteAddr().String())
+}
+
+// netConn wraps a net.Conn to implement the methods of modules.NetConn.
 func newConn(c net.Conn) *conn {
-	return &conn{modules.NewNetConn(c)}
+	return &conn{c}
 }
 
 // dial wraps the connection returned by net.Dial in a conn.
@@ -64,7 +75,7 @@ func dial(addr modules.NetAddress) (*conn, error) {
 	return newConn(nc), nil
 }
 
-// accept wraps the connection return by net.Accept in a conn.
+// accept wraps the connection return by listener.Accept in a conn.
 func accept(l net.Listener) (*conn, error) {
 	nc, err := l.Accept()
 	if err != nil {

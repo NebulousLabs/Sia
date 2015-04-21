@@ -98,27 +98,3 @@ type Gateway interface {
 	// Close safely stops the Gateway's listener process.
 	Close() error
 }
-
-type nc struct {
-	net.Conn
-}
-
-// ReadObject implements the encoding.Reader interface.
-func (c *nc) ReadObject(obj interface{}, maxLen uint64) error {
-	return encoding.ReadObject(c, obj, maxLen)
-}
-
-// WriteObject implements the encoding.Writer interface.
-func (c *nc) WriteObject(obj interface{}) error {
-	return encoding.WriteObject(c, obj)
-}
-
-// Addr returns the NetAddress of the remote end of the connection.
-func (c *nc) Addr() NetAddress {
-	return NetAddress(c.RemoteAddr().String())
-}
-
-// NewNetConn wraps a net.Conn, implementing the methods of NetConn over it.
-func NewNetConn(c net.Conn) NetConn {
-	return &nc{c}
-}

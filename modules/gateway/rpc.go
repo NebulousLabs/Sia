@@ -60,7 +60,7 @@ func (g *Gateway) streamRPC(addr modules.NetAddress, name string, fn modules.RPC
 	if err != nil {
 		return err
 	}
-	err = rpc(modules.NewNetConn(conn), name, fn)
+	err = rpc(newConn(conn), name, fn)
 	if err != nil {
 		id := g.mu.Lock()
 		g.addStrike(addr)
@@ -100,13 +100,13 @@ func writerRPC(obj interface{}) modules.RPCFunc {
 // peer.
 func (g *Gateway) listen(l net.Listener) {
 	for {
-		conn, err := l.Accept()
+		conn, err := accept(l)
 		if err != nil {
 			return
 		}
 
 		// it is the handler's responsibility to close the connection
-		go g.threadedHandleConn(modules.NewNetConn(conn))
+		go g.threadedHandleConn(conn)
 	}
 }
 
@@ -120,9 +120,9 @@ func (g *Gateway) threadedHandleConn(conn modules.NetConn) {
 		return
 	}
 	// call registered handler for this ID
-	id := g.mu.RLock()
+	lockid := g.mu.RLock()
 	fn, ok := g.handlerMap[id]
-	g.mu.RUnlock(id)
+	g.mu.RUnlock(lockid)
 	if !ok {
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%s\"", conn.Addr(), id[:])
 		return
