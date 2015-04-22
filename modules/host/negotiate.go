@@ -122,7 +122,7 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
 		return errors.New("bad file contract missed proof outputs")
 
-	case fc.TerminationHash != types.ZeroUnlockHash:
+	case fc.UnlockHash != types.ZeroUnlockHash:
 		return errors.New("bad file contract termination hash")
 	}
 	return nil

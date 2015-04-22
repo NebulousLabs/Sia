@@ -39,6 +39,7 @@ type (
 		ValidProofOutputs  []SiacoinOutput
 		MissedProofOutputs []SiacoinOutput
 		UnlockHash         UnlockHash
+		RevisionNumber     uint64
 	}
 
 	// A FileContractRevision revises an existing file contract. The ParentID
@@ -54,9 +55,9 @@ type (
 	// FileContractRevisions enable trust-free modifications to existing file
 	// contracts.
 	FileContractRevision struct {
-		ParentID         FileContractID
-		UnlockConditions UnlockConditions
-		RevisionNumber   uint64
+		ParentID          FileContractID
+		UnlockConditions  UnlockConditions
+		NewRevisionNumber uint64
 
 		NewFileSize           uint64
 		NewFileMerkleRoot     crypto.Hash

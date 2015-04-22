@@ -74,21 +74,22 @@ func (tp *TransactionPool) removeFileContracts(t types.Transaction) {
 	}
 }
 
-// removeFileContractTerminations removes all of the file contract terminations
-// of a transaction from the unconfirmed consensus set.
-func (tp *TransactionPool) removeFileContractTerminations(t types.Transaction) {
-	for _, fct := range t.FileContractTerminations {
+// removeFileContractRevisions removes all of the file contract revisions of a
+// transaction from the unconfirmed consensus set.
+func (tp *TransactionPool) removeFileContractRevisions(t types.Transaction) {
+	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - the corresponding file contract should be in the
 		// reference set.
+		referenceID := crypto.HashAll(fcr.ParentID, fcr.NewRevisionNumber)
 		if build.DEBUG {
-			_, exists := tp.referenceFileContracts[fct.ParentID]
+			_, exists := tp.referenceFileContractRevisions[referenceID]
 			if !exists {
 				panic("cannot locate file contract to delete storage proof transaction")
 			}
 		}
 
-		tp.fileContracts[fct.ParentID] = tp.referenceFileContracts[fct.ParentID]
-		delete(tp.referenceFileContracts, fct.ParentID)
+		tp.fileContracts[fcr.ParentID] = tp.referenceFileContractRevisions[referenceID]
+		delete(tp.referenceFileContractRevisions, referenceID)
 	}
 }
 
@@ -169,7 +170,7 @@ func (tp *TransactionPool) removeTailTransaction() {
 	tp.removeSiacoinInputs(t)
 	tp.removeSiacoinOutputs(t)
 	tp.removeFileContracts(t)
-	tp.removeFileContractTerminations(t)
+	tp.removeFileContractRevisions(t)
 	tp.removeStorageProofs(t)
 	tp.removeSiafundInputs(t)
 	tp.removeSiafundOutputs(t)

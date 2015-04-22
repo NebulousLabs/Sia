@@ -75,13 +75,13 @@ func (s *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 	return
 }
 
-// applyFileContractTerminations iterates through all of the file contract
-// terminations in a transaction and applies them to the state, updating the
-// diffs in the block node.
-func (s *State) applyFileContractTerminations(bn *blockNode, t types.Transaction) {
-	for _, fct := range t.FileContractTerminations {
+// applyFileContractRevisions iterates through all of the file contract
+// revisions in a transaction and applies them to the state, updating the diffs
+// in the block node.
+func (s *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) {
+	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - termination should affect an existing contract.
-		fc, exists := s.fileContracts[fct.ParentID]
+		fc, exists := s.fileContracts[fcr.ParentID]
 		if !exists {
 			if build.DEBUG {
 				panic("file contract termination terminates a nonexisting contract")
@@ -89,20 +89,31 @@ func (s *State) applyFileContractTerminations(bn *blockNode, t types.Transaction
 			continue
 		}
 
-		// Add the diff for the deletion to the block node.
+		// Add the diff to delete the old file contract.
 		bn.fileContractDiffs = append(bn.fileContractDiffs, modules.FileContractDiff{
 			Direction:    modules.DiffRevert,
-			ID:           fct.ParentID,
+			ID:           fcr.ParentID,
 			FileContract: fc,
 		})
-		delete(s.fileContracts, fct.ParentID)
+		delete(s.fileContracts, fcr.ParentID)
 
-		// Add all of the payouts to the consensus set and block node diffs.
-		for i, payout := range fct.Payouts {
-			id := fct.ParentID.FileContractTerminationPayoutID(i)
-			s.delayedSiacoinOutputs[s.height()][id] = payout
-			bn.delayedSiacoinOutputs[id] = payout
+		// Add the diff to add the revised file contract.
+		nfc := types.FileContract{
+			FileSize:           fcr.NewFileSize,
+			FileMerkleRoot:     fcr.NewFileMerkleRoot,
+			Start:              fcr.NewStart,
+			Expiration:         fcr.NewExpiration,
+			Payout:             fc.Payout,
+			ValidProofOutputs:  fcr.NewValidProofOutputs,
+			MissedProofOutputs: fcr.NewMissedProofOutputs,
+			UnlockHash:         fcr.NewUnlockHash,
+			RevisionNumber:     fcr.NewRevisionNumber,
 		}
+		bn.fileContractDiffs = append(bn.fileContractDiffs, modules.FileContractDiff{
+			Direction:    modules.DiffApply,
+			ID:           fcr.ParentID,
+			FileContract: nfc,
+		})
 	}
 }
 
@@ -229,7 +240,7 @@ func (s *State) applyTransaction(bn *blockNode, t types.Transaction) {
 	s.applySiacoinInputs(bn, t)
 	s.applySiacoinOutputs(bn, t)
 	s.applyFileContracts(bn, t)
-	s.applyFileContractTerminations(bn, t)
+	s.applyFileContractRevisions(bn, t)
 	s.applyStorageProofs(bn, t)
 	s.applySiafundInputs(bn, t)
 	s.applySiafundOutputs(bn, t)

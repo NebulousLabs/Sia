@@ -66,36 +66,42 @@ func (tp *TransactionPool) validUnconfirmedStorageProofs(t types.Transaction) (e
 	return
 }
 
-// validUnconfirmedFileContractTerminations checks that all file contract
-// terminations are valid within the context of the unconfirmed consensus set.
-func (tp *TransactionPool) validUnconfirmedFileContractTerminations(t types.Transaction) (err error) {
-	for _, fct := range t.FileContractTerminations {
+// validUnconfirmedFileContractRevisions checks that all file contract
+// revisions are valid within the context of the unconfirmed consensus set.
+func (tp *TransactionPool) validUnconfirmedFileContractRevisions(t types.Transaction) (err error) {
+	for _, fcr := range t.FileContractRevisions {
 		// Check for the corresponding file contract in the unconfirmed set.
-		fc, exists := tp.fileContracts[fct.ParentID]
+		fc, exists := tp.fileContracts[fcr.ParentID]
 		if !exists {
-			return errors.New("termination given for unrecognized file contract")
+			return errors.New("revision given for unrecognized file contract")
 		}
 
-		// Check that the termination conditions match the termination hash of
-		// the corresponding file contract.
-		if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
-			return errors.New("termination conditions do not meet required termination hash")
-		}
-
-		// Check that the termination was submitted before the storage proof
+		// Check that the revision was submitted before the storage proof
 		// window opened.
-		if fc.Start < tp.consensusSetHeight {
-			return errors.New("termination submitted too late")
+		if tp.consensusSetHeight > fc.Start {
+			return errors.New("revision submitted too late")
 		}
 
-		// Check that the payouts in the termination add up to the payout of
-		// the contract.
-		var payoutSum types.Currency
-		for _, payout := range fct.Payouts {
-			payoutSum = payoutSum.Add(payout.Value)
+		// Check that the revision number is increasing as a result of the
+		// revision.
+		if fc.RevisionNumber >= fcr.NewRevisionNumber {
+			return errors.New("contract revision is outdated")
 		}
-		if payoutSum.Cmp(fc.Payout) != 0 {
-			return errors.New("contract termination has incorrect payouts")
+
+		// Check that the unlock conditions match the unlock hash of the
+		// corresponding file contract.
+		if fcr.UnlockConditions.UnlockHash() != fc.UnlockHash {
+			return errors.New("unlock conditions do not meet required unlock hash")
+		}
+
+		// Check that the payouts in the revision add up to the payout of the
+		// contract.
+		var payout types.Currency
+		for _, output := range fcr.NewMissedProofOutputs {
+			payout = payout.Add(output.Value)
+		}
+		if payout.Cmp(fc.Payout) != 0 {
+			return errors.New("contract revision has incorrect payouts")
 		}
 	}
 	return
@@ -164,7 +170,7 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t types.Transaction) (err
 	// File contracts don't need to be checked as all potential problems are
 	// checked by a combination of StandaloneValid and
 	// ValidUnconfirmedSiacoins.
-	err = tp.validUnconfirmedFileContractTerminations(t)
+	err = tp.validUnconfirmedFileContractRevisions(t)
 	if err != nil {
 		return
 	}

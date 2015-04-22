@@ -109,7 +109,7 @@ func (ct *ConsensusTester) FileContractTransaction(start types.BlockHeight, expi
 				Value: value,
 			},
 		},
-		TerminationHash: ct.UnlockHash,
+		UnlockHash: ct.UnlockHash,
 	})
 	txn.FileContracts[0].ValidProofOutputs = []types.SiacoinOutput{types.SiacoinOutput{Value: value.Sub(txn.FileContracts[0].Tax())}}
 

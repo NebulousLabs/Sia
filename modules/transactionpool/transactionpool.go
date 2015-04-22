@@ -71,9 +71,10 @@ type TransactionPool struct {
 	// The reference set contains any objects that are not in the unconfirmed
 	// set, but may still need to be referenced when creating diffs or
 	// reverting unconfirmed transactions (due to conflicts).
-	referenceSiacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	referenceFileContracts  map[types.FileContractID]types.FileContract
-	referenceSiafundOutputs map[types.SiafundOutputID]types.SiafundOutput
+	referenceSiacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
+	referenceFileContracts         map[types.FileContractID]types.FileContract
+	referenceFileContractRevisions map[crypto.Hash]types.FileContract
+	referenceSiafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 
 	// The entire history of the transaction pool is kept. Each element
 	// represents an atomic change to the transaction pool. When a new

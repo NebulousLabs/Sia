@@ -17,6 +17,7 @@ var (
 	ErrFileContractStartViolation      = errors.New("file contract must start in the future")
 	ErrFileContractOutputSumViolation  = errors.New("file contract has invalid output sums")
 	ErrNonZeroClaimStart               = errors.New("transaction has a siafund output with a non-zero siafund claim")
+	ErrNonZeroRevision                 = errors.New("new file contract has a nonzero revision number")
 	ErrStorageProofWithOutputs         = errors.New("transaction has both a storage proof and other outputs")
 	ErrTimelockNotSatisfied            = errors.New("timelock has not been met")
 	ErrTransactionTooLarge             = errors.New("transaction is too large to fit in a block")
@@ -62,12 +63,6 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 // to the revision rules.
 func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) error {
 	for _, fcr := range t.FileContractRevisions {
-		// The revision number cannot be zero, that revision number is reserved
-		// for original file contracts.
-		if fcr.RevisionNumber == 0 {
-			return ErrZeroRevision
-		}
-
 		// To ensure consistency with the file contract rules, a temporary txn
 		// is created containing only the file contract that would result from
 		// this revision.
@@ -86,6 +81,7 @@ func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) err
 					ValidProofOutputs:  fcr.NewValidProofOutputs,
 					MissedProofOutputs: fcr.NewMissedProofOutputs,
 					UnlockHash:         fcr.NewUnlockHash,
+					RevisionNumber:     fcr.NewRevisionNumber,
 				},
 			},
 		}
