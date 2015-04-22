@@ -21,6 +21,7 @@ var (
 	ErrTimelockNotSatisfied            = errors.New("timelock has not been met")
 	ErrTransactionTooLarge             = errors.New("transaction is too large to fit in a block")
 	ErrZeroOutput                      = errors.New("transaction cannot have an output or payout that has zero value")
+	ErrZeroRevision                    = errors.New("transaction has a file contract revision with RevisionNumber=0")
 )
 
 // correctFileContracts checks that the file contracts adhere to the file
@@ -52,6 +53,45 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		}
 		if missedProofOutputSum.Cmp(fc.Payout) != 0 {
 			return ErrFileContractOutputSumViolation
+		}
+	}
+	return nil
+}
+
+// correctFileContractRevisions checks that any file contract revisions adhere
+// to the revision rules.
+func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) error {
+	for _, fcr := range t.FileContractRevisions {
+		// The revision number cannot be zero, that revision number is reserved
+		// for original file contracts.
+		if fcr.RevisionNumber == 0 {
+			return ErrZeroRevision
+		}
+
+		// To ensure consistency with the file contract rules, a temporary txn
+		// is created containing only the file contract that would result from
+		// this revision.
+		var payout Currency
+		for _, output := range fcr.NewMissedProofOutputs {
+			payout = payout.Add(output.Value)
+		}
+		tmp := Transaction{
+			FileContracts: []FileContract{
+				FileContract{
+					FileSize:           fcr.NewFileSize,
+					FileMerkleRoot:     fcr.NewFileMerkleRoot,
+					Start:              fcr.NewStart,
+					Expiration:         fcr.NewExpiration,
+					Payout:             payout,
+					ValidProofOutputs:  fcr.NewValidProofOutputs,
+					MissedProofOutputs: fcr.NewMissedProofOutputs,
+					UnlockHash:         fcr.NewUnlockHash,
+				},
+			},
+		}
+		err := tmp.correctFileContracts(currentHeight)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -117,7 +157,7 @@ func (t Transaction) followsStorageProofRules() error {
 	if len(t.FileContracts) != 0 {
 		return ErrStorageProofWithOutputs
 	}
-	if len(t.FileContractTerminations) != 0 {
+	if len(t.FileContractRevisions) != 0 {
 		return ErrStorageProofWithOutputs
 	}
 	if len(t.SiafundOutputs) != 0 {
@@ -152,12 +192,12 @@ func (t Transaction) noRepeats() error {
 		}
 		doneFileContracts[sp.ParentID] = struct{}{}
 	}
-	for _, fct := range t.FileContractTerminations {
-		_, exists := doneFileContracts[fct.ParentID]
+	for _, fcr := range t.FileContractRevisions {
+		_, exists := doneFileContracts[fcr.ParentID]
 		if exists {
 			return ErrDoubleSpend
 		}
-		doneFileContracts[fct.ParentID] = struct{}{}
+		doneFileContracts[fcr.ParentID] = struct{}{}
 	}
 	siafundInputs := make(map[SiafundOutputID]struct{})
 	for _, sfi := range t.SiafundInputs {
@@ -191,8 +231,8 @@ func (t Transaction) validUnlockConditions(currentHeight BlockHeight) (err error
 			return
 		}
 	}
-	for _, fct := range t.FileContractTerminations {
-		err = validUnlockConditions(fct.TerminationConditions, currentHeight)
+	for _, fcr := range t.FileContractRevisions {
+		err = validUnlockConditions(fcr.UnlockConditions, currentHeight)
 		if err != nil {
 			return
 		}
@@ -228,6 +268,10 @@ func (t Transaction) StandaloneValid(currentHeight BlockHeight) (err error) {
 		return
 	}
 	err = t.correctFileContracts(currentHeight)
+	if err != nil {
+		return
+	}
+	err = t.correctFileContractRevisions(currentHeight)
 	if err != nil {
 		return
 	}

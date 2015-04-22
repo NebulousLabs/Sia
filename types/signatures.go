@@ -48,17 +48,17 @@ type (
 	// fields must be empty (except for the Signatures field, since a signature
 	// cannot sign itself).
 	CoveredFields struct {
-		WholeTransaction         bool
-		SiacoinInputs            []uint64
-		SiacoinOutputs           []uint64
-		FileContracts            []uint64
-		FileContractTerminations []uint64
-		StorageProofs            []uint64
-		SiafundInputs            []uint64
-		SiafundOutputs           []uint64
-		MinerFees                []uint64
-		ArbitraryData            []uint64
-		TransactionSignatures    []uint64
+		WholeTransaction      bool
+		SiacoinInputs         []uint64
+		SiacoinOutputs        []uint64
+		FileContracts         []uint64
+		FileContractRevisions []uint64
+		StorageProofs         []uint64
+		SiafundInputs         []uint64
+		SiafundOutputs        []uint64
+		MinerFees             []uint64
+		ArbitraryData         []uint64
+		TransactionSignatures []uint64
 	}
 
 	// A SiaPublicKey is a public key prefixed by a Specifier. The Specifier
@@ -147,7 +147,7 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 			t.SiacoinInputs,
 			t.SiacoinOutputs,
 			t.FileContracts,
-			t.FileContractTerminations,
+			t.FileContractRevisions,
 			t.StorageProofs,
 			t.SiafundInputs,
 			t.SiafundOutputs,
@@ -167,8 +167,8 @@ func (t Transaction) SigHash(i int) crypto.Hash {
 		for _, contract := range cf.FileContracts {
 			signedData = append(signedData, encoding.Marshal(t.FileContracts[contract])...)
 		}
-		for _, termination := range cf.FileContractTerminations {
-			signedData = append(signedData, encoding.Marshal(t.FileContractTerminations[termination])...)
+		for _, revision := range cf.FileContractRevisions {
+			signedData = append(signedData, encoding.Marshal(t.FileContractRevisions[revision])...)
 		}
 		for _, storageProof := range cf.StorageProofs {
 			signedData = append(signedData, encoding.Marshal(t.StorageProofs[storageProof])...)
@@ -229,7 +229,7 @@ func (t Transaction) validCoveredFields() error {
 			{cf.SiacoinInputs, len(t.SiacoinInputs)},
 			{cf.SiacoinOutputs, len(t.SiacoinOutputs)},
 			{cf.FileContracts, len(t.FileContracts)},
-			{cf.FileContractTerminations, len(t.FileContractTerminations)},
+			{cf.FileContractRevisions, len(t.FileContractRevisions)},
 			{cf.StorageProofs, len(t.StorageProofs)},
 			{cf.SiafundInputs, len(t.SiafundInputs)},
 			{cf.SiafundOutputs, len(t.SiafundOutputs)},
@@ -289,16 +289,16 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 			index:               i,
 		}
 	}
-	for i, termination := range t.FileContractTerminations {
-		id := crypto.Hash(termination.ParentID)
+	for i, revision := range t.FileContractRevisions {
+		id := crypto.Hash(revision.ParentID)
 		_, exists := sigMap[id]
 		if exists {
 			return ErrDoubleSpend
 		}
 
 		sigMap[id] = &inputSignatures{
-			remainingSignatures: termination.TerminationConditions.SignaturesRequired,
-			possibleKeys:        termination.TerminationConditions.PublicKeys,
+			remainingSignatures: revision.UnlockConditions.SignaturesRequired,
+			possibleKeys:        revision.UnlockConditions.PublicKeys,
 			usedKeys:            make(map[uint64]struct{}),
 			index:               i,
 		}

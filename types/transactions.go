@@ -48,16 +48,16 @@ type (
 	// but transactions cannot spend outputs that they create or otherwise be
 	// self-dependent.
 	Transaction struct {
-		SiacoinInputs            []SiacoinInput
-		SiacoinOutputs           []SiacoinOutput
-		FileContracts            []FileContract
-		FileContractTerminations []FileContractTermination
-		StorageProofs            []StorageProof
-		SiafundInputs            []SiafundInput
-		SiafundOutputs           []SiafundOutput
-		MinerFees                []Currency
-		ArbitraryData            []string
-		TransactionSignatures    []TransactionSignature
+		SiacoinInputs         []SiacoinInput
+		SiacoinOutputs        []SiacoinOutput
+		FileContracts         []FileContract
+		FileContractRevisions []FileContractRevision
+		StorageProofs         []StorageProof
+		SiafundInputs         []SiafundInput
+		SiafundOutputs        []SiafundOutput
+		MinerFees             []Currency
+		ArbitraryData         []string
+		TransactionSignatures []TransactionSignature
 	}
 
 	// A SiacoinInput consumes a SiacoinOutput and adds the siacoins to the set of
@@ -127,7 +127,7 @@ func (t Transaction) ID() crypto.Hash {
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
-		t.FileContractTerminations,
+		t.FileContractRevisions,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
@@ -148,7 +148,7 @@ func (t Transaction) SiacoinOutputID(i int) SiacoinOutputID {
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
-		t.FileContractTerminations,
+		t.FileContractRevisions,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
@@ -168,7 +168,7 @@ func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
-		t.FileContractTerminations,
+		t.FileContractRevisions,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,
@@ -188,7 +188,7 @@ func (t Transaction) FileContractID(i int) FileContractID {
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
-		t.FileContractTerminations,
+		t.FileContractRevisions,
 		t.StorageProofs,
 		t.SiafundInputs,
 		t.SiafundOutputs,

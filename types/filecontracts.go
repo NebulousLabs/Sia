@@ -38,22 +38,33 @@ type (
 		Payout             Currency
 		ValidProofOutputs  []SiacoinOutput
 		MissedProofOutputs []SiacoinOutput
-		TerminationHash    UnlockHash
+		UnlockHash         UnlockHash
 	}
 
-	// A FileContractTermination terminates a file contract. The ParentID
-	// specifies the contract being terminated, and the TerminationConditions are
-	// the conditions under which termination will be treated as valid. The hash
-	// of the TerminationConditions must match the TerminationHash in the
-	// contract. 'Payouts' is a set of SiacoinOutputs describing how the payout of
-	// the contract is redistributed. It follows that the sum of these outputs
-	// must equal the original payout. The outputs can have any Value and
-	// UnlockHash, and do not need to match the ValidProofUnlockHash or
-	// MissedProofUnlockHash of the original FileContract.
-	FileContractTermination struct {
-		ParentID              FileContractID
-		TerminationConditions UnlockConditions
-		Payouts               []SiacoinOutput
+	// A FileContractRevision revises an existing file contract. The ParentID
+	// points to the file contract that is being revised. The UnlockConditions
+	// are the conditions under which the revision is valid, and must match the
+	// UnlockHash of the parent file contract. The Payout of the file contract
+	// cannot be changed, but all other fields are allowed to be changed. The
+	// sum of the outputs must match the original payout (taking into account
+	// the fee for valid proof payouts.) A revision number is included. When
+	// getting accepted, the revision number of the revision must be higher
+	// than any previously seen revision number for that file contract.
+	//
+	// FileContractRevisions enable trust-free modifications to existing file
+	// contracts.
+	FileContractRevision struct {
+		ParentID         FileContractID
+		UnlockConditions UnlockConditions
+		RevisionNumber   uint64
+
+		NewFileSize           uint64
+		NewFileMerkleRoot     crypto.Hash
+		NewStart              BlockHeight
+		NewExpiration         BlockHeight
+		NewValidProofOutputs  []SiacoinOutput
+		NewMissedProofOutputs []SiacoinOutput
+		NewUnlockHash         UnlockHash
 	}
 
 	// A StorageProof fulfills a FileContract. The proof contains a specific
