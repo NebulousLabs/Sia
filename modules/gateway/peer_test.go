@@ -1,74 +1,77 @@
 package gateway
 
 import (
-	"strconv"
+	//"strconv"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 )
 
-// TestPeerSharing tests that peers are correctly shared.
-func TestPeerSharing(t *testing.T) {
-	g := newTestingGateway("TestPeerSharing", t)
-	defer g.Close()
-
-	// add a peer
-	peer := modules.NetAddress("foo:9001")
-	g.AddPeer(peer)
-	// gateway only has one peer, so randomPeer should return peer
-	if p, err := g.randomPeer(); err != nil || p != peer {
-		t.Fatal("gateway has bad peer list:", g.Info().Peers)
+// TestNodeSharing tests that nodes are correctly shared.
+func TestNodeSharing(t *testing.T) {
+	g1 := newTestingGateway("TestPeerSharing1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestPeerSharing2", t)
+	defer g2.Close()
+	peer, err := g1.Connect(g2.Address())
+	if err != nil {
+		t.Fatal("couldn't connect:", err)
 	}
 
-	// ask gateway for peers
-	var peers []modules.NetAddress
-	err := g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
+	// ask gateway for nodes
+	var nodes []modules.NetAddress
+	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// response should be exactly []Address{peer}
-	if len(peers) != 1 || peers[0] != peer {
-		t.Fatal("gateway gave bad peer list:", peers)
+	// response should be exactly []NetAddress{g1.Address(), g2.Address()}
+	if len(nodes) != 2 || (nodes[0] != g1.Address() && nodes[1] != g1.Address()) {
+		t.Fatalf("gateway gave bad node list %v (expected %v)", nodes, []modules.NetAddress{g1.Address(), g2.Address()})
 	}
 
-	// add a couple more peers
-	g.AddPeer("bar:9002")
-	g.AddPeer("baz:9003")
-	g.AddPeer("quux:9004")
-	err = g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
+	// add a couple more nodes
+	g2.addNode("foo:9001")
+	g2.addNode("bar:9002")
+	g2.addNode("baz:9003")
+	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// peers should now contain 4 distinct addresses
-	for i := 0; i < len(peers); i++ {
-		for j := i + 1; j < len(peers); j++ {
-			if peers[i] == peers[j] {
-				t.Fatal("gateway gave duplicate addresses:", peers)
+	// nodes should now contain 4 distinct addresses
+	for i := 0; i < len(nodes); i++ {
+		for j := i + 1; j < len(nodes); j++ {
+			if nodes[i] == nodes[j] {
+				t.Fatal("gateway gave duplicate addresses:", nodes)
 			}
 		}
 	}
 
-	// remove all the peers
-	g.RemovePeer("foo:9001")
-	g.RemovePeer("bar:9002")
-	g.RemovePeer("baz:9003")
-	g.RemovePeer("quux:9004")
-	if len(g.peers) != 0 {
-		t.Fatal("gateway has peers remaining after removal:", g.Info().Peers)
+	// remove all the nodes
+	g2.removeNode("foo:9001")
+	g2.removeNode("bar:9002")
+	g2.removeNode("baz:9003")
+	g2.removeNode(g1.Address())
+	g2.removeNode(g2.Address())
+	if len(g2.nodes) != 0 {
+		t.Fatalf("gateway has %d node(s) remaining after removal", g2.Info().Nodes)
 	}
 
-	// no peers should be returned
-	err = g.RPC(g.myAddr, "SharePeers", readerRPC(&peers, 1024))
+	// no nodes should be returned
+	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(peers) != 0 {
-		t.Fatal("gateway gave non-existent addresses:", peers)
+	if len(nodes) != 0 {
+		t.Fatal("gateway gave non-existent addresses:", nodes)
 	}
 }
 
+/*
+
 // TestBadPeer tests that "bad" peers are correctly identified and removed.
+// TODO: bring back strike system
 func TestBadPeer(t *testing.T) {
 	g := newTestingGateway("TestBadPeer1", t)
 	defer g.Close()
@@ -78,7 +81,7 @@ func TestBadPeer(t *testing.T) {
 	// overwrite badpeer's Ping RPC with an incorrect one
 	badpeer.RegisterRPC("Ping", writerRPC("lol"))
 
-	g.AddPeer(badpeer.Address())
+	g.addNode(badpeer.Address())
 
 	// try to ping the peer 'maxStrikes'+1 times
 	for i := 0; i < maxStrikes+1; i++ {
@@ -92,7 +95,7 @@ func TestBadPeer(t *testing.T) {
 
 	// add minPeers more peers
 	for i := 0; i < minPeers; i++ {
-		g.AddPeer(modules.NetAddress("foo" + strconv.Itoa(i)))
+		g.addNode(modules.NetAddress("foo" + strconv.Itoa(i)))
 	}
 
 	// once we exceed minPeers, badpeer should be kicked out
@@ -102,6 +105,8 @@ func TestBadPeer(t *testing.T) {
 		t.Fatal("gateway removed wrong peer:", g.Info().Peers)
 	}
 }
+
+*/
 
 // TestBootstrap tests the bootstrapping process, including synchronization.
 func TestBootstrap(t *testing.T) {
@@ -117,7 +122,7 @@ func TestBootstrap(t *testing.T) {
 		ct.MineAndApplyValidBlock()
 	}
 	// give it a peer
-	bootstrap.AddPeer(newTestingGateway("TestBootstrap2", t).Address())
+	bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
 
 	// bootstrap a new peer
 	g := newTestingGateway("TestBootstrap3", t)
@@ -126,18 +131,13 @@ func TestBootstrap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// heights should match
-	if g.state.Height() != bootstrap.state.Height() {
-		// g may have tried to synchronize to the other peer, so try manually
-		// synchronizing to the bootstrap
-		g.Synchronize(bootstrap.Address())
-		if g.state.Height() != bootstrap.state.Height() {
-			t.Fatalf("gateway height %v does not match bootstrap height %v", g.state.Height(), bootstrap.state.Height())
-		}
+	// wait for synchronize to complete
+	for g.state.Height() != bootstrap.state.Height() {
+		time.Sleep(10 * time.Millisecond)
 	}
-	// peer lists should be the same size, though they won't match; bootstrap
-	// will have g and g will have bootstrap.
-	if len(g.Info().Peers) != len(bootstrap.Info().Peers) {
-		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.Info().Peers, bootstrap.Info().Peers)
+
+	// node lists should be the same
+	if g.Info().Nodes != bootstrap.Info().Nodes {
+		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
 	}
 }

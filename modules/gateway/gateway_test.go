@@ -1,9 +1,11 @@
 package gateway
 
 import (
+	"net"
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/tester"
@@ -23,39 +25,37 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	return g
 }
 
-// TestTableTennis pings myAddr and checks the response.
-func TestTableTennis(t *testing.T) {
-	g := newTestingGateway("TestTableTennis", t)
-	defer g.Close()
-	if !g.Ping(g.myAddr) {
-		t.Fatal("gateway did not respond to ping")
-	}
-}
-
 func TestRPC(t *testing.T) {
-	g := newTestingGateway("TestRPC", t)
-	defer g.Close()
+	g1 := newTestingGateway("TestRPC1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestRPC2", t)
+	defer g1.Close()
 
-	g.RegisterRPC("Foo", func(conn modules.NetConn) error {
+	g1.RegisterRPC("Foo", func(conn net.Conn) error {
 		var i uint64
-		err := conn.ReadObject(&i, 8)
+		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
 			t.Error(err)
 			return err
 		} else if i == 0xdeadbeef {
-			return conn.WriteObject("foo")
+			return encoding.WriteObject(conn, "foo")
 		} else {
-			return conn.WriteObject("bar")
+			return encoding.WriteObject(conn, "bar")
 		}
 	})
 
+	peer, err := g2.Connect(g1.Address())
+	if err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
 	var foo string
-	err := g.RPC(g.myAddr, "Foo", func(conn modules.NetConn) error {
-		err := conn.WriteObject(0xdeadbeef)
+	err = peer.rpc("Foo", func(conn net.Conn) error {
+		err := encoding.WriteObject(conn, 0xdeadbeef)
 		if err != nil {
 			return err
 		}
-		return conn.ReadObject(&foo, 11)
+		return encoding.ReadObject(conn, &foo, 11)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -65,12 +65,12 @@ func TestRPC(t *testing.T) {
 	}
 
 	// wrong number should produce an error
-	err = g.RPC(g.myAddr, "Foo", func(conn modules.NetConn) error {
-		err := conn.WriteObject(0xbadbeef)
+	err = peer.rpc("Foo", func(conn net.Conn) error {
+		err := encoding.WriteObject(conn, 0xbadbeef)
 		if err != nil {
 			return err
 		}
-		return conn.ReadObject(&foo, 11)
+		return encoding.ReadObject(conn, &foo, 11)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -80,27 +80,33 @@ func TestRPC(t *testing.T) {
 	}
 }
 
+/*
+
 // TestTimeout tests that connections time out properly.
+// TODO: bring back connection monitoring
 func TestTimeout(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	g := newTestingGateway("TestTimeout1", t)
+	g := newTestingGateway("TestTimeout", t)
 	defer g.Close()
 
 	// create unresponsive peer
-	badpeer := newTestingGateway("TestTimeout2", t)
-	// overwrite badpeer's Ping RPC with an incorrect one
-	// since g is expecting 4 bytes, it will time out.
-	badpeer.RegisterRPC("Ping", func(conn modules.NetConn) error {
-		// write a length prefix, but no actual data
-		conn.Write([]byte{1, 0, 0, 0, 0, 0, 0, 0})
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal("listen failed:", err)
+	}
+	go func() {
+		l.Accept()
 		select {}
-	})
+	}()
 
-	err := g.RPC(badpeer.Address(), "Ping", readerRPC([1]byte{}, 1))
-	if err != ErrTimeout {
-		t.Fatalf("Got wrong error: expected %v, got %v", ErrTimeout, err)
+	_, err = g.Connect(modules.NetAddress(l.Addr().String()))
+	ne, ok := err.(net.Error)
+	if err == nil || !ok || !ne.Timeout() {
+		t.Fatalf("Got wrong error: expected timeout, got %v", err)
 	}
 }
+
+*/
