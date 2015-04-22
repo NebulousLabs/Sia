@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"time"
 
@@ -20,8 +21,8 @@ type Peer struct {
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
-func (g *Gateway) addPeer(conn net.Conn, addr modules.NetAddress) *Peer {
-	peer := &Peer{muxado.Server(conn), 0}
+func (g *Gateway) addPeer(sess muxado.Session, addr modules.NetAddress) *Peer {
+	peer := &Peer{sess, 0}
 	id := g.mu.Lock()
 	g.peers[addr] = peer
 	g.addNode(addr)
@@ -54,7 +55,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) (*Peer, error) {
 	}
 	// TODO: exchange version messages
 
-	peer := g.addPeer(conn, addr)
+	peer := g.addPeer(muxado.Client(conn), addr)
 
 	g.log.Println("INFO: connected to new peer", addr)
 	return peer, nil
@@ -76,7 +77,39 @@ func (g *Gateway) listen() {
 				return
 			}
 			g.log.Printf("INFO: %v wants to connect (gave address: %v)\n", conn.RemoteAddr(), addr)
-			g.addPeer(conn, addr)
+			g.addPeer(muxado.Server(conn), addr)
 		}(conn)
 	}
+}
+
+// Disconnect terminates a connection to a peer and removes it from the
+// Gateway's peer list. The peer's address remains in the node list.
+func (g *Gateway) Disconnect(addr modules.NetAddress) error {
+	id := g.mu.RLock()
+	peer, exists := g.peers[addr]
+	g.mu.RUnlock(id)
+	if !exists {
+		return errors.New("not connected to that node")
+	}
+	peer.sess.Close()
+	id = g.mu.Lock()
+	delete(g.peers, addr)
+	g.mu.Unlock(id)
+
+	g.log.Println("INFO: disconnected from peer", addr)
+	return nil
+}
+
+func (g *Gateway) randomPeer() (*Peer, error) {
+	if len(g.peers) > 0 {
+		r := rand.Intn(len(g.peers))
+		for _, peer := range g.peers {
+			if r == 0 {
+				return peer, nil
+			}
+			r--
+		}
+	}
+
+	return nil, errNoPeers
 }

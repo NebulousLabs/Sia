@@ -81,7 +81,7 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	}
 
 	// initial peer discovery
-	go g.requestPeers(bootstrap)
+	go g.requestNodes(bootstrap)
 
 	// spawn synchronizer
 	go g.threadedResynchronize()
@@ -142,8 +142,7 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 		log:        logger,
 	}
 
-	g.RegisterRPC("Ping", writerRPC(pong))
-	g.RegisterRPC("SharePeers", g.sharePeers)
+	g.RegisterRPC("ShareNodes", g.shareNodes)
 	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
 	g.log.Println("INFO: gateway created, started logging")

@@ -53,8 +53,8 @@ type Gateway interface {
 	// Connect establishes a persistent connection to a peer.
 	Connect(NetAddress) error
 
-	// RemovePeer removes a peer from the Gateway's peer list.
-	RemovePeer(NetAddress) error
+	// Disconnect terminates a connection to a peer.
+	Disconnect(NetAddress) error
 
 	// RandomPeer returns a random peer from the Gateway's peer list.
 	RandomPeer() (NetAddress, error)
