@@ -47,7 +47,7 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) (ct Ciphertext, err error) 
 
 	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
 	// meant for file encryption.
-	ct = append(nonce, aead.Seal(nil, nonce, plaintext, nil)...)
+	ct = aead.Seal(nonce, nonce, plaintext, nil)
 	return ct, nil
 }
 
