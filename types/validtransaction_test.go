@@ -204,12 +204,12 @@ func TestTransactionFollowsStorageProofRules(t *testing.T) {
 	txn.FileContracts = nil
 
 	// Try a transaction with a storage proof and a FileContractTermination.
-	txn.FileContractTerminations = append(txn.FileContractTerminations, FileContractTermination{})
+	txn.FileContractRevisions = append(txn.FileContractRevisions, FileContractRevision{})
 	err = txn.followsStorageProofRules()
 	if err != ErrStorageProofWithOutputs {
 		t.Error(err)
 	}
-	txn.FileContractTerminations = nil
+	txn.FileContractRevisions = nil
 
 	// Try a transaction with a storage proof and a FileContractTermination.
 	txn.SiafundOutputs = append(txn.SiafundOutputs, SiafundOutput{})
@@ -225,12 +225,12 @@ func TestTransactionFollowsStorageProofRules(t *testing.T) {
 func TestTransactionNoRepeats(t *testing.T) {
 	// Try a transaction all the repeatable types but no conflicts.
 	txn := Transaction{
-		SiacoinInputs:            []SiacoinInput{SiacoinInput{}},
-		StorageProofs:            []StorageProof{StorageProof{}},
-		FileContractTerminations: []FileContractTermination{FileContractTermination{}},
-		SiafundInputs:            []SiafundInput{SiafundInput{}},
+		SiacoinInputs:         []SiacoinInput{SiacoinInput{}},
+		StorageProofs:         []StorageProof{StorageProof{}},
+		FileContractRevisions: []FileContractRevision{FileContractRevision{}},
+		SiafundInputs:         []SiafundInput{SiafundInput{}},
 	}
-	txn.FileContractTerminations[0].ParentID[0] = 1 // Otherwise it will conflict with the storage proof.
+	txn.FileContractRevisions[0].ParentID[0] = 1 // Otherwise it will conflict with the storage proof.
 	err := txn.noRepeats()
 	if err != nil {
 		t.Error(err)
@@ -262,13 +262,13 @@ func TestTransactionNoRepeats(t *testing.T) {
 	txn.StorageProofs[0].ParentID[0] = 0
 
 	// Have the file contract termination conflict with itself.
-	txn.FileContractTerminations = append(txn.FileContractTerminations, FileContractTermination{})
-	txn.FileContractTerminations[1].ParentID[0] = 1
+	txn.FileContractRevisions = append(txn.FileContractRevisions, FileContractRevision{})
+	txn.FileContractRevisions[1].ParentID[0] = 1
 	err = txn.noRepeats()
 	if err != ErrDoubleSpend {
 		t.Error(err)
 	}
-	txn.FileContractTerminations = txn.FileContractTerminations[:1]
+	txn.FileContractRevisions = txn.FileContractRevisions[:1]
 
 	// Try a transaction double spending a siafund output.
 	txn.SiafundInputs = append(txn.SiafundInputs, SiafundInput{})
@@ -307,9 +307,9 @@ func TestTransactionValidUnlockConditions(t *testing.T) {
 				UnlockConditions: UnlockConditions{Timelock: 3},
 			},
 		},
-		FileContractTerminations: []FileContractTermination{
-			FileContractTermination{
-				TerminationConditions: UnlockConditions{Timelock: 3},
+		FileContractRevisions: []FileContractRevision{
+			FileContractRevision{
+				UnlockConditions: UnlockConditions{Timelock: 3},
 			},
 		},
 		SiafundInputs: []SiafundInput{
@@ -332,12 +332,12 @@ func TestTransactionValidUnlockConditions(t *testing.T) {
 	txn.SiacoinInputs[0].UnlockConditions.Timelock = 3
 
 	// Try with illegal conditions in the siafund inputs.
-	txn.FileContractTerminations[0].TerminationConditions.Timelock = 5
+	txn.FileContractRevisions[0].UnlockConditions.Timelock = 5
 	err = txn.validUnlockConditions(4)
 	if err == nil {
 		t.Error(err)
 	}
-	txn.FileContractTerminations[0].TerminationConditions.Timelock = 3
+	txn.FileContractRevisions[0].UnlockConditions.Timelock = 3
 
 	// Try with illegal conditions in the siafund inputs.
 	txn.SiafundInputs[0].UnlockConditions.Timelock = 5
