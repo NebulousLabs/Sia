@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -13,45 +14,35 @@ var pong = [4]byte{'p', 'o', 'n', 'g'}
 // ping request -- in other words, whether it is a potential peer.
 func (g *Gateway) Ping(addr modules.NetAddress) bool {
 	var resp [4]byte
-	err := g.RPC(addr, "Ping", readerRPC(&resp, 4))
-	return err == nil && resp == pong
-}
-
-// sendHostname replies to the sender with the sender's external IP.
-func sendHostname(conn modules.NetConn) error {
-	return conn.WriteObject(conn.Addr().Host())
-}
-
-func (g *Gateway) learnHostname(addr modules.NetAddress) error {
-	var hostname string
-	err := g.RPC(addr, "SendHostname", readerRPC(&hostname, 50))
+	conn, err := net.DialTimeout("tcp", string(addr), dialTimeout)
 	if err != nil {
-		return err
+		return false
 	}
-	g.setHostname(hostname)
-	return nil
-}
+	if err := encoding.WriteObject(conn, handlerName("Ping")); err != nil {
+		return false
+	}
+	if err := encoding.ReadObject(conn, &resp, 4); err != nil {
+		return false
+	}
 
-// setHostname sets the hostname of the server.
-func (g *Gateway) setHostname(host string) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
-	g.myAddr = modules.NetAddress(net.JoinHostPort(host, g.myAddr.Port()))
-	g.log.Println("INFO: set hostname to", g.myAddr)
+	return err == nil && resp == pong
 }
 
 // getExternalIP learns the server's hostname from a centralized service,
 // myexternalip.com.
-func (g *Gateway) getExternalIP() (err error) {
+func (g *Gateway) getExternalIP() error {
 	resp, err := http.Get("http://myexternalip.com/raw")
 	if err != nil {
-		return
+		return err
 	}
 	defer resp.Body.Close()
 	buf := make([]byte, 64)
 	n, _ := resp.Body.Read(buf)
 	hostname := string(buf[:n-1]) // trim newline
-	// TODO: try to ping ourselves
-	g.setHostname(hostname)
-	return
+
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	g.myAddr = modules.NetAddress(net.JoinHostPort(hostname, g.myAddr.Port()))
+	g.log.Println("INFO: set hostname to", g.myAddr)
+	return nil
 }

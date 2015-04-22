@@ -11,8 +11,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-
-	"github.com/inconshreveable/muxado"
 )
 
 const (
@@ -26,11 +24,6 @@ var (
 	errNoPeers     = errors.New("no peers")
 	errUnreachable = errors.New("peer did not respond to ping")
 )
-
-type Peer struct {
-	sess    muxado.Session
-	strikes int
-}
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
@@ -72,58 +65,30 @@ func (g *Gateway) Close() error {
 }
 
 // Bootstrap joins the Sia network and establishes an initial peer list.
-//
-// Bootstrap handles mutexes manually to avoid having a lock during network
-// communication.
-func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
-	g.log.Println("INFO: initiated bootstrapping to", bootstrapPeer)
+func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
+	g.log.Println("INFO: initiated bootstrapping to", addr)
+
+	// learn our hostname
+	err := g.getExternalIP()
+	if err != nil {
+		return err
+	}
 
 	// contact the bootstrap peer
-	conn, err := dial(bootstrapPeer)
+	bootstrap, err := g.Connect(addr)
 	if err != nil {
-		return errUnreachable
+		return err
 	}
-
-	id := g.mu.Lock()
-	_, err = g.addPeer(conn, bootstrapPeer)
-	g.mu.Unlock(id)
-	if err != nil {
-		return
-	}
-
-	// ask the bootstrap peer for our hostname
-	err = g.learnHostname(bootstrapPeer)
-	if err != nil {
-		g.log.Println("WARN: couldn't learn hostname from bootstrap peer; using myexternalip.com")
-		err = g.getExternalIP()
-		if err != nil {
-			return
-		}
-	}
-	if !g.Ping(g.myAddr) {
-		return errors.New("couldn't learn hostname")
-	}
-
-	// ask the bootstrapPeer to add us back
-	go g.RPC(bootstrapPeer, "AddMe", writerRPC(g.Address()))
 
 	// initial peer discovery
-	// NOTE: per convention, "threadedX" functions are usually called in their
-	// own goroutine. Here, the two calls are intentionally grouped into one
-	// goroutine to ensure that they run in order.
-	go func() {
-		// request peers from bootstrap
-		g.threadedPeerDiscovery()
-		// request peers from all our new peers
-		g.threadedPeerDiscovery()
-	}()
+	go g.requestPeers(bootstrap)
 
 	// spawn synchronizer
 	go g.threadedResynchronize()
 
-	g.log.Printf("INFO: successfully bootstrapped to %v (this does not mean you are synchronized)", bootstrapPeer)
+	g.log.Printf("INFO: successfully bootstrapped to %v (this does not mean you are synchronized)", addr)
 
-	return
+	return nil
 }
 
 // RelayBlock relays a block to the network.
@@ -178,8 +143,6 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	g.RegisterRPC("Ping", writerRPC(pong))
-	g.RegisterRPC("SendHostname", sendHostname)
-	g.RegisterRPC("AddMe", g.addMe)
 	g.RegisterRPC("SharePeers", g.sharePeers)
 	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
@@ -195,8 +158,8 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	g.myAddr = modules.NetAddress(g.listener.Addr().String())
 	g.log.Println("INFO: according to the listener, our address is", g.myAddr)
 
-	// Spawn the RPC handler.
-	go g.listen(g.listener)
+	// Spawn the primary listener.
+	go g.listen()
 
 	// Load the old peer list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.

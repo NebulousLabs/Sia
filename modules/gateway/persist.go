@@ -24,7 +24,7 @@ func (g *Gateway) load() error {
 		return err
 	}
 	for _, peer := range peers {
-		g.AddPeer(peer) // TODO: support saving/loading strikes
+		g.addNode(peer) // TODO: support saving/loading strikes
 	}
 	return nil
 }

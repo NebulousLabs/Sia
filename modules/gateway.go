@@ -3,7 +3,6 @@ package modules
 import (
 	"net"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -18,29 +17,11 @@ var (
 	}
 )
 
-// A NetConn is a monitored network connection.
-type NetConn interface {
-	net.Conn
-
-	// ReadWriters support reading and writing objects, which are encoded and
-	// decoded via the encoding package.
-	encoding.ReadWriter
-
-	// Addr returns the NetAddress of the remote end of the connection.
-	Addr() NetAddress
-}
-
 // RPCFunc is the type signature of functions that handle incoming RPCs.
-type RPCFunc func(NetConn) error
+type RPCFunc func(net.Conn) error
 
 // A NetAddress contains the information needed to contact a peer.
 type NetAddress string
-
-type GatewayInfo struct {
-	Address NetAddress
-	Peers   []NetAddress
-	Nodes   int
-}
 
 // Host returns the NetAddress' IP.
 func (na NetAddress) Host() string {
@@ -54,6 +35,12 @@ func (na NetAddress) Port() string {
 	return port
 }
 
+type GatewayInfo struct {
+	Address NetAddress
+	Peers   []NetAddress
+	Nodes   int
+}
+
 // A Gateway facilitates the interactions between the local node and remote
 // nodes (peers). It relays incoming blocks and transactions to local modules,
 // and broadcasts outgoing blocks and transactions to peers. In a broad sense,
@@ -63,9 +50,8 @@ type Gateway interface {
 	// Bootstrap joins the Sia network and establishes an initial peer list.
 	Bootstrap(NetAddress) error
 
-	// AddPeer adds a peer to the Gateway's peer list. The peer
-	// may be rejected. AddPeer is also an RPC.
-	AddPeer(NetAddress) error
+	// Connect establishes a persistent connection to a peer.
+	Connect(NetAddress) error
 
 	// RemovePeer removes a peer from the Gateway's peer list.
 	RemovePeer(NetAddress) error

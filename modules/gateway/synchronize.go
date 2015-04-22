@@ -1,10 +1,11 @@
 package gateway
 
 import (
+	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -45,8 +46,8 @@ func (g *Gateway) threadedResynchronize() {
 // such transmissions may be required to fully synchronize.
 //
 // TODO: don't run two Synchronize threads at the same time
-func (g *Gateway) Synchronize(peer modules.NetAddress) error {
-	g.log.Println("INFO: synchronizing to", peer)
+func (g *Gateway) Synchronize(peer *Peer) error {
+	g.log.Println("INFO: synchronizing to", peer.sess.RemoteAddr())
 	for {
 		var newBlocks []types.Block
 		newBlocks, moreAvailable, err := g.requestBlocks(peer)
@@ -54,13 +55,13 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 			g.log.Printf("ERR: synchronization to %v failed: %v\n", peer, err)
 			return err
 		}
-		g.log.Printf("INFO: %v sent us %v blocks\n", peer, len(newBlocks))
+		g.log.Printf("INFO: %v sent us %v blocks\n", peer.sess.RemoteAddr(), len(newBlocks))
 		for _, block := range newBlocks {
 			acceptErr := g.state.AcceptBlock(block)
 			if acceptErr != nil {
 				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 				// block again.
-				g.log.Printf("WARN: state rejected a block from %v: %v\n", peer, acceptErr)
+				g.log.Printf("WARN: state rejected a block from %v: %v\n", peer.sess.RemoteAddr(), acceptErr)
 			}
 		}
 
@@ -69,7 +70,7 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 			break
 		}
 	}
-	g.log.Printf("INFO: synchronization to %v complete\n", peer)
+	g.log.Printf("INFO: synchronization to %v complete\n", peer.sess.RemoteAddr())
 	return nil
 }
 
@@ -77,10 +78,10 @@ func (g *Gateway) Synchronize(peer modules.NetAddress) error {
 // IDs. The most recent known ID is used as the starting point, and up to
 // 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
 // sends a boolean indicating whether more blocks are available.
-func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
+func (g *Gateway) sendBlocks(conn net.Conn) (err error) {
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
-	err = conn.ReadObject(&knownBlocks, 32*crypto.HashSize)
+	err = encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
 	if err != nil {
 		return
 	}
@@ -101,12 +102,12 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	// is probably on a different blockchain altogether.
 	if !found || start > g.state.Height() {
 		// Send 0 blocks.
-		err = conn.WriteObject([]types.Block{})
+		err = encoding.WriteObject(conn, []types.Block{})
 		if err != nil {
 			return
 		}
 		// Indicate that no more blocks are available.
-		return conn.WriteObject(false)
+		return encoding.WriteObject(conn, false)
 	}
 
 	// Determine range of blocks to send.
@@ -118,29 +119,29 @@ func (g *Gateway) sendBlocks(conn modules.NetConn) (err error) {
 	if err != nil {
 		return
 	}
-	g.log.Printf("INFO: %v is at height %v (-%v); sending them %v blocks\n", conn.Addr(), start, g.state.Height()-start, len(blocks))
-	err = conn.WriteObject(blocks)
+	g.log.Printf("INFO: %v is at height %v (-%v); sending them %v blocks\n", conn.RemoteAddr(), start, g.state.Height()-start, len(blocks))
+	err = encoding.WriteObject(conn, blocks)
 	if err != nil {
 		return
 	}
 
 	// Indicate whether more blocks are available.
 	more := g.state.Height() > stop
-	return conn.WriteObject(more)
+	return encoding.WriteObject(conn, more)
 }
 
-func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []types.Block, moreAvailable bool, err error) {
+func (g *Gateway) requestBlocks(peer *Peer) (newBlocks []types.Block, moreAvailable bool, err error) {
 	history := g.blockHistory()
-	err = g.RPC(peer, "SendBlocks", func(conn modules.NetConn) error {
-		err := conn.WriteObject(history)
+	err = peer.rpc("SendBlocks", func(conn net.Conn) error {
+		err := encoding.WriteObject(conn, history)
 		if err != nil {
 			return err
 		}
-		err = conn.ReadObject(&newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit)
+		err = encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit)
 		if err != nil {
 			return err
 		}
-		return conn.ReadObject(&moreAvailable, 1)
+		return encoding.ReadObject(conn, &moreAvailable, 1)
 	})
 	return
 }
