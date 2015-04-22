@@ -60,7 +60,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	}
 
 	// Mine blocks until the file contract is active.
-	for ct.Height() < fcTxn.FileContracts[0].Start {
+	for ct.Height() < fcTxn.FileContracts[0].WindowStart {
 		block := ct.MineCurrentBlock(nil)
 		err := ct.AcceptBlock(block)
 		if err != nil {

@@ -101,9 +101,9 @@ func (ct *ConsensusTester) FileContractTransaction(start types.BlockHeight, expi
 	txn.FileContracts = append(txn.FileContracts, types.FileContract{
 		FileSize:       4e3,
 		FileMerkleRoot: mRoot,
-		Start:          start,
+		WindowStart:    start,
 		Payout:         value,
-		Expiration:     expiration,
+		WindowEnd:      expiration,
 		MissedProofOutputs: []types.SiacoinOutput{
 			types.SiacoinOutput{
 				Value: value,

@@ -78,7 +78,7 @@ func (tp *TransactionPool) validUnconfirmedFileContractRevisions(t types.Transac
 
 		// Check that the revision was submitted before the storage proof
 		// window opened.
-		if tp.consensusSetHeight > fc.Start {
+		if tp.consensusSetHeight > fc.WindowStart {
 			return errors.New("revision submitted too late")
 		}
 

@@ -101,8 +101,8 @@ func (s *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) {
 		nfc := types.FileContract{
 			FileSize:           fcr.NewFileSize,
 			FileMerkleRoot:     fcr.NewFileMerkleRoot,
-			Start:              fcr.NewStart,
-			Expiration:         fcr.NewExpiration,
+			WindowStart:        fcr.NewWindowStart,
+			WindowEnd:          fcr.NewWindowEnd,
 			Payout:             fc.Payout,
 			ValidProofOutputs:  fcr.NewValidProofOutputs,
 			MissedProofOutputs: fcr.NewMissedProofOutputs,

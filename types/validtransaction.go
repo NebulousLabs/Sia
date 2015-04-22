@@ -12,17 +12,17 @@ import (
 )
 
 var (
-	ErrDoubleSpend                     = errors.New("transaction uses a parent object twice")
-	ErrFileContractExpirationViolation = errors.New("file contract must expire at least one block after it starts")
-	ErrFileContractStartViolation      = errors.New("file contract must start in the future")
-	ErrFileContractOutputSumViolation  = errors.New("file contract has invalid output sums")
-	ErrNonZeroClaimStart               = errors.New("transaction has a siafund output with a non-zero siafund claim")
-	ErrNonZeroRevision                 = errors.New("new file contract has a nonzero revision number")
-	ErrStorageProofWithOutputs         = errors.New("transaction has both a storage proof and other outputs")
-	ErrTimelockNotSatisfied            = errors.New("timelock has not been met")
-	ErrTransactionTooLarge             = errors.New("transaction is too large to fit in a block")
-	ErrZeroOutput                      = errors.New("transaction cannot have an output or payout that has zero value")
-	ErrZeroRevision                    = errors.New("transaction has a file contract revision with RevisionNumber=0")
+	ErrDoubleSpend                      = errors.New("transaction uses a parent object twice")
+	ErrFileContractExpirationViolation  = errors.New("file contract must expire at least one block after it starts")
+	ErrFileContractWindowStartViolation = errors.New("file contract must start in the future")
+	ErrFileContractOutputSumViolation   = errors.New("file contract has invalid output sums")
+	ErrNonZeroClaimStart                = errors.New("transaction has a siafund output with a non-zero siafund claim")
+	ErrNonZeroRevision                  = errors.New("new file contract has a nonzero revision number")
+	ErrStorageProofWithOutputs          = errors.New("transaction has both a storage proof and other outputs")
+	ErrTimelockNotSatisfied             = errors.New("timelock has not been met")
+	ErrTransactionTooLarge              = errors.New("transaction is too large to fit in a block")
+	ErrZeroOutput                       = errors.New("transaction cannot have an output or payout that has zero value")
+	ErrZeroRevision                     = errors.New("transaction has a file contract revision with RevisionNumber=0")
 )
 
 // correctFileContracts checks that the file contracts adhere to the file
@@ -31,10 +31,10 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 	// Check that FileContract rules are being followed.
 	for _, fc := range t.FileContracts {
 		// Check that start and expiration are reasonable values.
-		if fc.Start <= currentHeight {
-			return ErrFileContractStartViolation
+		if fc.WindowStart <= currentHeight {
+			return ErrFileContractWindowStartViolation
 		}
-		if fc.Expiration <= fc.Start {
+		if fc.WindowEnd <= fc.WindowStart {
 			return ErrFileContractExpirationViolation
 		}
 
@@ -75,8 +75,8 @@ func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) err
 				FileContract{
 					FileSize:           fcr.NewFileSize,
 					FileMerkleRoot:     fcr.NewFileMerkleRoot,
-					Start:              fcr.NewStart,
-					Expiration:         fcr.NewExpiration,
+					WindowStart:        fcr.NewWindowStart,
+					WindowEnd:          fcr.NewWindowEnd,
 					Payout:             payout,
 					ValidProofOutputs:  fcr.NewValidProofOutputs,
 					MissedProofOutputs: fcr.NewMissedProofOutputs,

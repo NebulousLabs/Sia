@@ -11,9 +11,9 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	txn := Transaction{
 		FileContracts: []FileContract{
 			FileContract{
-				Start:      35,
-				Expiration: 40,
-				Payout:     NewCurrency64(1e6),
+				WindowStart: 35,
+				WindowEnd:   40,
+				Payout:      NewCurrency64(1e6),
 				ValidProofOutputs: []SiacoinOutput{
 					SiacoinOutput{
 						Value: NewCurrency64(70e3),
@@ -40,26 +40,26 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 
 	// Try when the start height was missed.
 	err = txn.correctFileContracts(35)
-	if err != ErrFileContractStartViolation {
+	if err != ErrFileContractWindowStartViolation {
 		t.Error(err)
 	}
 	err = txn.correctFileContracts(135)
-	if err != ErrFileContractStartViolation {
+	if err != ErrFileContractWindowStartViolation {
 		t.Error(err)
 	}
 
 	// Try when the expiration equal to and less than the start.
-	txn.FileContracts[0].Expiration = 35
+	txn.FileContracts[0].WindowEnd = 35
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractExpirationViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].Expiration = 35
+	txn.FileContracts[0].WindowEnd = 35
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractExpirationViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].Expiration = 40
+	txn.FileContracts[0].WindowEnd = 40
 
 	// Attempt under and over output sums.
 	txn.FileContracts[0].ValidProofOutputs[0].Value = NewCurrency64(69e3)
@@ -89,9 +89,9 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	// Try the payouts when the value of the contract is too low to incur a
 	// fee.
 	txn.FileContracts = append(txn.FileContracts, FileContract{
-		Start:      35,
-		Expiration: 40,
-		Payout:     NewCurrency64(1e3),
+		WindowStart: 35,
+		WindowEnd:   40,
+		Payout:      NewCurrency64(1e3),
 		ValidProofOutputs: []SiacoinOutput{
 			SiacoinOutput{
 				Value: NewCurrency64(1e3),
@@ -397,9 +397,9 @@ func TestTransactionStandaloneValid(t *testing.T) {
 	// Violate correctFileContracts
 	txn.FileContracts = []FileContract{
 		FileContract{
-			Payout:     NewCurrency64(1),
-			Start:      5,
-			Expiration: 5,
+			Payout:      NewCurrency64(1),
+			WindowStart: 5,
+			WindowEnd:   5,
 		},
 	}
 	err = txn.StandaloneValid(0)

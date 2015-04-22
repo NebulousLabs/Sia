@@ -40,7 +40,7 @@ func (h *Host) load() error {
 	h.HostSettings = sHost.HostSettings
 	// recreate maps
 	for _, obligation := range sHost.Obligations {
-		height := obligation.FileContract.Start + StorageProofReorgDepth
+		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
 	}

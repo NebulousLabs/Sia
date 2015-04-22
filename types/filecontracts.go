@@ -33,8 +33,8 @@ type (
 	FileContract struct {
 		FileSize           uint64
 		FileMerkleRoot     crypto.Hash
-		Start              BlockHeight
-		Expiration         BlockHeight
+		WindowStart        BlockHeight
+		WindowEnd          BlockHeight
 		Payout             Currency
 		ValidProofOutputs  []SiacoinOutput
 		MissedProofOutputs []SiacoinOutput
@@ -61,8 +61,8 @@ type (
 
 		NewFileSize           uint64
 		NewFileMerkleRoot     crypto.Hash
-		NewStart              BlockHeight
-		NewExpiration         BlockHeight
+		NewWindowStart        BlockHeight
+		NewWindowEnd          BlockHeight
 		NewValidProofOutputs  []SiacoinOutput
 		NewMissedProofOutputs []SiacoinOutput
 		NewUnlockHash         UnlockHash

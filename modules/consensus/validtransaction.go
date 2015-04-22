@@ -49,7 +49,7 @@ func (s *State) storageProofSegment(fcid types.FileContractID) (index uint64, er
 	}
 
 	// Get the ID of the trigger block.
-	triggerHeight := fc.Start - 1
+	triggerHeight := fc.WindowStart - 1
 	if triggerHeight > s.height() {
 		err = errors.New("no block found at contract trigger block height")
 		return
@@ -111,10 +111,10 @@ func (s *State) validFileContractRevisions(t types.Transaction) (err error) {
 			return ErrMissingFileContract
 		}
 
-		// Check that the height is less than fc.Start - revisions are not
-		// allowed to be submitted once the storage proof window has opened.
-		// This reduces complexity for unconfirmed transactions.
-		if s.height() > fc.Start {
+		// Check that the height is less than fc.WindowStart - revisions are
+		// not allowed to be submitted once the storage proof window has
+		// opened.  This reduces complexity for unconfirmed transactions.
+		if s.height() > fc.WindowStart {
 			return errors.New("contract revision submitted too late")
 		}
 
