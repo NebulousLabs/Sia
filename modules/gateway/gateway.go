@@ -2,11 +2,14 @@ package gateway
 
 import (
 	"errors"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
@@ -67,12 +70,6 @@ func (g *Gateway) Close() error {
 // Bootstrap joins the Sia network and establishes an initial peer list.
 func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	g.log.Println("INFO: initiated bootstrapping to", addr)
-
-	// learn our hostname
-	err := g.getExternalIP()
-	if err != nil {
-		return err
-	}
 
 	// contact the bootstrap peer
 	bootstrap, err := g.Connect(addr)
@@ -155,7 +152,18 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	// Set myAddr (this is necessary if addr == ":0", in which case the OS
 	// will assign us a random open port).
 	g.myAddr = modules.NetAddress(g.listener.Addr().String())
-	g.log.Println("INFO: according to the listener, our address is", g.myAddr)
+
+	// Discover external IP
+	hostname, err := g.getExternalIP()
+	if err != nil {
+		return nil, err
+	}
+	g.myAddr = modules.NetAddress(net.JoinHostPort(hostname, g.myAddr.Port()))
+
+	g.log.Println("INFO: our address is", g.myAddr)
+
+	// Add ourselves as a node.
+	g.addNode(g.myAddr)
 
 	// Spawn the primary listener.
 	go g.listen()
@@ -167,4 +175,26 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	return
+}
+
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func (g *Gateway) getExternalIP() (string, error) {
+	// during testing, return the loopback address
+	if build.Release == "testing" {
+		return "::1", nil
+	}
+
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 64)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	hostname := string(buf[:n-1]) // trim newline
+	return hostname, nil
 }
