@@ -322,6 +322,14 @@ func TestTransactionValidSignatures(t *testing.T) {
 	}
 	txn.TransactionSignatures[0] = tmpTxn0
 
+	// Try to point to a nonexistant public key.
+	txn.TransactionSignatures[0] = TransactionSignature{PublicKeyIndex: 5}
+	err = txn.validSignatures(10)
+	if err != ErrInvalidPubKeyIndex {
+		t.Error(err)
+	}
+	txn.TransactionSignatures[0] = tmpTxn0
+
 	// Insert a malformed public key into the transaction.
 	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = "malformed"
 	err = txn.validSignatures(10)

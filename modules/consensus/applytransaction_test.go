@@ -86,7 +86,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	block = ct.MineCurrentBlock([]types.Transaction{proofTxn})
 	err = ct.AcceptBlock(block)
 	if err != nil {
-		ct.Fatal(err)
+		ct.Fatal(err) // TODO: Occasionally fails, not sure why.
 	}
 
 	// Check that the file contract was deleted from the consensus set, and

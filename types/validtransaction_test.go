@@ -51,12 +51,12 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	// Try when the expiration equal to and less than the start.
 	txn.FileContracts[0].WindowEnd = 35
 	err = txn.correctFileContracts(30)
-	if err != ErrFileContractExpirationViolation {
+	if err != ErrFileContractWindowEndViolation {
 		t.Error(err)
 	}
 	txn.FileContracts[0].WindowEnd = 35
 	err = txn.correctFileContracts(30)
-	if err != ErrFileContractExpirationViolation {
+	if err != ErrFileContractWindowEndViolation {
 		t.Error(err)
 	}
 	txn.FileContracts[0].WindowEnd = 40
@@ -106,6 +106,47 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	err = txn.correctFileContracts(30)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// TestCorrectFileContractRevisions probes the correctFileContractRevisions
+// method of the Transaction type.
+func TestCorrectFileContractRevisions(t *testing.T) {
+	// Try a revision that starts in the past.
+	txn := Transaction{
+		FileContractRevisions: []FileContractRevision{FileContractRevision{}},
+	}
+	err := txn.correctFileContractRevisions(0)
+	if err != ErrFileContractWindowStartViolation {
+		t.Error(err)
+	}
+
+	// Try a revision that has a window which ends before it starts.
+	txn = Transaction{
+		FileContractRevisions: []FileContractRevision{
+			FileContractRevision{
+				NewWindowStart: 1,
+			},
+		},
+	}
+	err = txn.correctFileContractRevisions(0)
+	if err != ErrFileContractWindowEndViolation {
+		t.Error(err)
+	}
+
+	// Try a revision with misaligned payouts.
+	txn.FileContractRevisions = []FileContractRevision{
+		FileContractRevision{
+			NewWindowStart: 1,
+			NewWindowEnd:   2,
+			NewMissedProofOutputs: []SiacoinOutput{
+				SiacoinOutput{Value: NewCurrency64(10)},
+			},
+		},
+	}
+	err = txn.correctFileContractRevisions(0)
+	if err != ErrFileContractOutputSumViolation {
+		t.Error("Expecting ErrFileContractOutputSumViolation:", err)
 	}
 }
 
@@ -203,7 +244,7 @@ func TestTransactionFollowsStorageProofRules(t *testing.T) {
 	}
 	txn.FileContracts = nil
 
-	// Try a transaction with a storage proof and a FileContractTermination.
+	// Try a transaction with a storage proof and a FileContractRevision.
 	txn.FileContractRevisions = append(txn.FileContractRevisions, FileContractRevision{})
 	err = txn.followsStorageProofRules()
 	if err != ErrStorageProofWithOutputs {
@@ -211,7 +252,7 @@ func TestTransactionFollowsStorageProofRules(t *testing.T) {
 	}
 	txn.FileContractRevisions = nil
 
-	// Try a transaction with a storage proof and a FileContractTermination.
+	// Try a transaction with a storage proof and a FileContractRevision.
 	txn.SiafundOutputs = append(txn.SiafundOutputs, SiafundOutput{})
 	err = txn.followsStorageProofRules()
 	if err != ErrStorageProofWithOutputs {
@@ -407,6 +448,14 @@ func TestTransactionStandaloneValid(t *testing.T) {
 		t.Error("failed to trigger correctFileContracts error")
 	}
 	txn.FileContracts = nil
+
+	// Violate correctFileContractRevisions
+	txn.FileContractRevisions = []FileContractRevision{FileContractRevision{}}
+	err = txn.StandaloneValid(0)
+	if err == nil {
+		t.Error("failed to trigger correctFileContractRevisions error")
+	}
+	txn.FileContractRevisions = nil
 
 	// Violate validUnlockConditions
 	txn.SiacoinInputs = []SiacoinInput{SiacoinInput{}}
