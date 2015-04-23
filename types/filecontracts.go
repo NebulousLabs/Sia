@@ -13,14 +13,14 @@ type (
 	// network, proving that they still possess the file they have agreed to
 	// store.
 	//
-	// The party must submit the storage proof in a block that is between 'Start'
-	// and 'Expiration'. Upon submitting the proof, the outputs for
-	// 'ValidProofOutputs' are created. If the party does not submit a storage
-	// proof by 'Expiration', then the outputs for 'MissedProofOutputs' are
-	// created instead. The sum of 'MissedProofOutputs' must equal 'Payout', and
-	// the sum of 'ValidProofOutputs' must equal 'Payout' plus the siafund fee.
-	// This fee is sent to the siafund pool, which is a set of siacoins only
-	// spendable by siafund owners.
+	// The party must submit the storage proof in a block that is between
+	// 'WindowStart' and 'WindowEnd'. Upon submitting the proof, the outputs
+	// for 'ValidProofOutputs' are created. If the party does not submit a
+	// storage proof by 'WindowEnd', then the outputs for 'MissedProofOutputs'
+	// are created instead. The sum of 'MissedProofOutputs' must equal
+	// 'Payout', and the sum of 'ValidProofOutputs' must equal 'Payout' plus
+	// the siafund fee.  This fee is sent to the siafund pool, which is a set
+	// of siacoins only spendable by siafund owners.
 	//
 	// Under normal circumstances, the payout will be funded by both the host and
 	// the renter, which gives the host incentive not to lose the file. The
@@ -70,10 +70,10 @@ type (
 
 	// A StorageProof fulfills a FileContract. The proof contains a specific
 	// segment of the file, along with a set of hashes from the file's Merkle
-	// tree. In combination, these can be used to prove that the segment came from
-	// the file. To prevent abuse, the segment must be chosen randomly, so the ID
-	// of block 'Start' - 1 is used as a seed value; see StorageProofSegment for
-	// the exact implementation.
+	// tree. In combination, these can be used to prove that the segment came
+	// from the file. To prevent abuse, the segment must be chosen randomly, so
+	// the ID of block 'WindowStart' - 1 is used as a seed value; see
+	// StorageProofSegment for the exact implementation.
 	//
 	// A transaction with a StorageProof cannot have any SiacoinOutputs,
 	// SiafundOutputs, or FileContracts. This is because a mundane reorg can
