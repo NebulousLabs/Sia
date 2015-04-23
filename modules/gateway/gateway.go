@@ -202,3 +202,6 @@ func (g *Gateway) getExternalIP() (string, error) {
 	hostname := string(buf[:n-1]) // trim newline
 	return hostname, nil
 }
+
+// enforce that Gateway satisfies the modules.Gateway interface
+var _ modules.Gateway = (*Gateway)(nil)

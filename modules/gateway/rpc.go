@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"net"
 	"sync"
 
@@ -44,6 +45,16 @@ func (p *Peer) rpc(name string, fn modules.RPCFunc) error {
 		p.strikes++
 	}
 	return err
+}
+
+// RPC calls an RPC on the given address. RPC cannot be called on an address
+// that the Gateway is not connected to.
+func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	peer, ok := g.peers[addr]
+	if !ok {
+		return errors.New("can't call RPC on unconnected peer " + string(addr))
+	}
+	return peer.rpc(name, fn)
 }
 
 // readerRPC returns a closure that can be passed to RPC to read a

@@ -2,8 +2,6 @@ package modules
 
 import (
 	"net"
-
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -56,27 +54,13 @@ type Gateway interface {
 	// Disconnect terminates a connection to a peer.
 	Disconnect(NetAddress) error
 
-	// RandomPeer returns a random peer from the Gateway's peer list.
-	RandomPeer() (NetAddress, error)
-
-	// RPC establishes a connection to the supplied address and writes the RPC
-	// header, indicating which function will handle the connection. The
-	// supplied function takes over from there.
-	RPC(NetAddress, string, RPCFunc) error
-
 	// RegisterRPC registers a function to handle incoming connections that
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
 
-	// Synchronize synchronizes the local consensus set with the set of the
-	// given peer.
-	Synchronize(NetAddress) error
-
-	// RelayBlock broadcasts a block to the Gateway's peers.
-	RelayBlock(types.Block)
-
-	// RelayTransaction broadcasts a transaction to the Gateway's peers.
-	RelayTransaction(types.Transaction)
+	// RPC calls an RPC on the given address. RPC cannot be called on an
+	// address that the Gateway is not connected to.
+	RPC(NetAddress, string, RPCFunc) error
 
 	// Info reports metadata about the Gateway.
 	Info() GatewayInfo
