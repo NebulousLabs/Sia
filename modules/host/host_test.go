@@ -14,56 +14,103 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// A HostTester contains a consensus tester and a host, and provides a set of
-// helper functions for testing the host without needing other modules such as
-// the renter.
-type HostTester struct {
-	*consensus.ConsensusTester
-	*Host
+type hostTester struct {
+	cs      *consensus.State
+	gateway modules.Gateway
+	miner   modules.Miner
+	tpool   modules.TransactionPool
+	wallet  modules.Wallet
+
+	host *Host
+
+	csUpdateChan     <-chan struct{}
+	tpoolUpdateChan  <-chan struct{}
+	minerUpdateChan  <-chan struct{}
+	walletUpdateChan <-chan struct{}
+
+	t *testing.T
+}
+
+// csUpdateWait blocks until a consensus update has propagated to all modules.
+func (ht *hostTester) csUpdateWait() {
+	<-ht.csUpdateChan
+	ht.tpUpdateWait()
+}
+
+// tpUpdateWait blocks until a transaction pool update has propagated to all
+// modules.
+func (ht *hostTester) tpUpdateWait() {
+	<-ht.tpoolUpdateChan
+	<-ht.minerUpdateChan
+	<-ht.walletUpdateChan
 }
 
 // CreateHostTester initializes a HostTester.
-func CreateHostTester(name string, t *testing.T) (ht *HostTester) {
+func CreateHostTester(name string, t *testing.T) *hostTester {
 	testdir := tester.TempDir("host", name)
+
+	// Create the consensus set.
 	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ct := consensus.NewConsensusTester(t, cs)
+
+	// Create the gateway.
 	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Create the transaction pool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	w, err := wallet.New(ct.State, tp, filepath.Join(testdir, modules.WalletDir))
+	// Create the wallet.
+	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	h, err := New(ct.State, tp, w, filepath.Join(testdir, modules.HostDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// mine a few blocks
+	// Create the miner.
 	m, err := miner.New(cs, g, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Create the host.
+	h, err := New(cs, tp, w, filepath.Join(testdir, modules.HostDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assemble all objects into a hostTester
+	ht := &hostTester{
+		cs:      cs,
+		gateway: g,
+		miner:   m,
+		tpool:   tp,
+		wallet:  w,
+
+		host: h,
+
+		csUpdateChan:     cs.ConsensusSetNotify(),
+		tpoolUpdateChan:  tp.TransactionPoolNotify(),
+		minerUpdateChan:  m.MinerNotify(),
+		walletUpdateChan: w.WalletNotify(),
+
+		t: t,
+	}
+
+	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		_, _, err = m.FindBlock()
 		if err != nil {
 			t.Fatal(err)
 		}
+		ht.csUpdateWait()
 	}
 
-	ht = new(HostTester)
-	ht.ConsensusTester = ct
-	ht.Host = h
-	return
+	return ht
 }

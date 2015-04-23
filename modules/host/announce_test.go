@@ -15,7 +15,7 @@ func TestAnnouncement(t *testing.T) {
 
 	// Place the announcement.
 	originalAddress := modules.NetAddress(":1111")
-	err := ht.Announce(originalAddress)
+	err := ht.host.Announce(originalAddress)
 	if err != nil {
 		t.Fatal(err)
 	}

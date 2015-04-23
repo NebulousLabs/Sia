@@ -86,6 +86,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		t.Fatal(err)
 	}
 
+	// Create the hostdb.
 	hdb, err := New(cs, g)
 	if err != nil {
 		t.Fatal(err)
