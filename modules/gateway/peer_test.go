@@ -15,7 +15,7 @@ func TestNodeSharing(t *testing.T) {
 	defer g1.Close()
 	g2 := newTestingGateway("TestPeerSharing2", t)
 	defer g2.Close()
-	peer, err := g1.Connect(g2.Address())
+	peer, err := g1.connect(g2.Address())
 	if err != nil {
 		t.Fatal("couldn't connect:", err)
 	}
@@ -122,11 +122,14 @@ func TestBootstrap(t *testing.T) {
 		ct.MineAndApplyValidBlock()
 	}
 	// give it a peer
-	bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
+	err := bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
+	if err != nil {
+		t.Fatal("couldn't connect:", err)
+	}
 
 	// bootstrap a new peer
 	g := newTestingGateway("TestBootstrap3", t)
-	err := g.Bootstrap(bootstrap.Address())
+	err = g.Bootstrap(bootstrap.Address())
 	if err != nil {
 		t.Fatal(err)
 	}

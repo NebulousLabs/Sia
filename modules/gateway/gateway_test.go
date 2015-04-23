@@ -44,7 +44,7 @@ func TestRPC(t *testing.T) {
 		}
 	})
 
-	peer, err := g2.Connect(g1.Address())
+	peer, err := g2.connect(g1.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)
 	}

@@ -72,7 +72,7 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	g.log.Println("INFO: initiated bootstrapping to", addr)
 
 	// contact the bootstrap peer
-	bootstrap, err := g.Connect(addr)
+	bootstrap, err := g.connect(addr)
 	if err != nil {
 		return err
 	}
