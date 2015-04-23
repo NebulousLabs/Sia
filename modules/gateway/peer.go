@@ -19,18 +19,18 @@ type Peer struct {
 	strikes int
 }
 
-func (g *Gateway) randomPeer() (*Peer, error) {
+func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
 		r := rand.Intn(len(g.peers))
-		for _, peer := range g.peers {
+		for addr := range g.peers {
 			if r == 0 {
-				return peer, nil
+				return addr, nil
 			}
 			r--
 		}
 	}
 
-	return nil, errNoPeers
+	return "", errNoPeers
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread

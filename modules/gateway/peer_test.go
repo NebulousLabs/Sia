@@ -15,14 +15,14 @@ func TestNodeSharing(t *testing.T) {
 	defer g1.Close()
 	g2 := newTestingGateway("TestPeerSharing2", t)
 	defer g2.Close()
-	peer, err := g1.connect(g2.Address())
+	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("couldn't connect:", err)
 	}
 
 	// ask gateway for nodes
 	var nodes []modules.NetAddress
-	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
+	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestNodeSharing(t *testing.T) {
 	g2.addNode("foo:9001")
 	g2.addNode("bar:9002")
 	g2.addNode("baz:9003")
-	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
+	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestNodeSharing(t *testing.T) {
 	}
 
 	// no nodes should be returned
-	err = peer.rpc("ShareNodes", readerRPC(&nodes, 1024))
+	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
 	if err != nil {
 		t.Fatal(err)
 	}

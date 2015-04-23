@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -46,8 +47,8 @@ func (g *Gateway) threadedResynchronize() {
 // such transmissions may be required to fully synchronize.
 //
 // TODO: don't run two Synchronize threads at the same time
-func (g *Gateway) Synchronize(peer *Peer) error {
-	g.log.Println("INFO: synchronizing to", peer.sess.RemoteAddr())
+func (g *Gateway) Synchronize(peer modules.NetAddress) error {
+	g.log.Println("INFO: synchronizing to", peer)
 	for {
 		var newBlocks []types.Block
 		newBlocks, moreAvailable, err := g.requestBlocks(peer)
@@ -55,13 +56,13 @@ func (g *Gateway) Synchronize(peer *Peer) error {
 			g.log.Printf("ERR: synchronization to %v failed: %v\n", peer, err)
 			return err
 		}
-		g.log.Printf("INFO: %v sent us %v blocks\n", peer.sess.RemoteAddr(), len(newBlocks))
+		g.log.Printf("INFO: %v sent us %v blocks\n", peer, len(newBlocks))
 		for _, block := range newBlocks {
 			acceptErr := g.state.AcceptBlock(block)
 			if acceptErr != nil {
 				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
 				// block again.
-				g.log.Printf("WARN: state rejected a block from %v: %v\n", peer.sess.RemoteAddr(), acceptErr)
+				g.log.Printf("WARN: state rejected a block from %v: %v\n", peer, acceptErr)
 			}
 		}
 
@@ -70,7 +71,7 @@ func (g *Gateway) Synchronize(peer *Peer) error {
 			break
 		}
 	}
-	g.log.Printf("INFO: synchronization to %v complete\n", peer.sess.RemoteAddr())
+	g.log.Printf("INFO: synchronization to %v complete\n", peer)
 	return nil
 }
 
@@ -130,9 +131,9 @@ func (g *Gateway) sendBlocks(conn net.Conn) (err error) {
 	return encoding.WriteObject(conn, more)
 }
 
-func (g *Gateway) requestBlocks(peer *Peer) (newBlocks []types.Block, moreAvailable bool, err error) {
+func (g *Gateway) requestBlocks(peer modules.NetAddress) (newBlocks []types.Block, moreAvailable bool, err error) {
 	history := g.blockHistory()
-	err = peer.rpc("SendBlocks", func(conn net.Conn) error {
+	err = g.RPC(peer, "SendBlocks", func(conn net.Conn) error {
 		err := encoding.WriteObject(conn, history)
 		if err != nil {
 			return err

@@ -28,12 +28,21 @@ func handlerName(name string) (id rpcID) {
 	return
 }
 
-func (p *Peer) rpc(name string, fn modules.RPCFunc) error {
-	conn, err := p.sess.Open()
+// RPC calls an RPC on the given address. RPC cannot be called on an address
+// that the Gateway is not connected to.
+func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
+	g.log.Printf("INFO: calling RPC \"%v\" on %v\n", name, addr)
+	peer, ok := g.peers[addr]
+	if !ok {
+		return errors.New("can't call RPC on unconnected peer " + string(addr))
+	}
+
+	conn, err := peer.sess.Open()
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
+
 	// write header
 	if err := encoding.WriteObject(conn, handlerName(name)); err != nil {
 		return err
@@ -42,19 +51,9 @@ func (p *Peer) rpc(name string, fn modules.RPCFunc) error {
 	err = fn(conn)
 	if err != nil {
 		// TODO: use sync/atomic
-		p.strikes++
+		peer.strikes++
 	}
 	return err
-}
-
-// RPC calls an RPC on the given address. RPC cannot be called on an address
-// that the Gateway is not connected to.
-func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	peer, ok := g.peers[addr]
-	if !ok {
-		return errors.New("can't call RPC on unconnected peer " + string(addr))
-	}
-	return peer.rpc(name, fn)
 }
 
 // readerRPC returns a closure that can be passed to RPC to read a
@@ -123,19 +122,19 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 // threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
 // list. The calls are run in parallel.
 func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
-	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", handlerName(name), len(g.peers))
+	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", name, len(g.peers))
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
 	id := g.mu.RLock()
-	for _, peer := range g.peers {
+	for addr := range g.peers {
 		// contact each peer in a separate thread
-		go func(peer *Peer) {
-			err := peer.rpc(name, fn)
+		go func(addr modules.NetAddress) {
+			err := g.RPC(addr, name, fn)
 			if err != nil {
-				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v\n", handlerName(name), peer, err)
+				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v\n", name, addr, err)
 			}
 			wg.Done()
-		}(peer)
+		}(addr)
 	}
 	g.mu.RUnlock(id)
 	wg.Wait()

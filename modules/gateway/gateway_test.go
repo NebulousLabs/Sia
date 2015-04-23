@@ -44,13 +44,13 @@ func TestRPC(t *testing.T) {
 		}
 	})
 
-	peer, err := g2.connect(g1.Address())
+	err := g2.Connect(g1.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)
 	}
 
 	var foo string
-	err = peer.rpc("Foo", func(conn net.Conn) error {
+	err = g2.RPC(g1.Address(), "Foo", func(conn net.Conn) error {
 		err := encoding.WriteObject(conn, 0xdeadbeef)
 		if err != nil {
 			return err
@@ -65,7 +65,7 @@ func TestRPC(t *testing.T) {
 	}
 
 	// wrong number should produce an error
-	err = peer.rpc("Foo", func(conn net.Conn) error {
+	err = g2.RPC(g1.Address(), "Foo", func(conn net.Conn) error {
 		err := encoding.WriteObject(conn, 0xbadbeef)
 		if err != nil {
 			return err

@@ -72,13 +72,13 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	g.log.Println("INFO: initiated bootstrapping to", addr)
 
 	// contact the bootstrap peer
-	bootstrap, err := g.connect(addr)
+	err := g.Connect(addr)
 	if err != nil {
 		return err
 	}
 
 	// initial peer discovery
-	go g.requestNodes(bootstrap)
+	go g.requestNodes(addr)
 
 	// spawn synchronizer
 	go g.threadedResynchronize()

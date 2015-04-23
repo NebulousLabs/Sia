@@ -49,15 +49,15 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-// requestNodes calls the ShareNodes RPC on p.
-func (g *Gateway) requestNodes(p *Peer) error {
-	g.log.Printf("INFO: requesting peers from %v\n", p.sess.RemoteAddr())
+// requestNodes calls the ShareNodes RPC on addr.
+func (g *Gateway) requestNodes(addr modules.NetAddress) error {
+	g.log.Printf("INFO: requesting peers from %v\n", addr)
 	var newPeers []modules.NetAddress
-	err := p.rpc("ShareNodes", readerRPC(&newPeers, maxSharedNodes*maxAddrLength))
+	err := g.RPC(addr, "ShareNodes", readerRPC(&newPeers, maxSharedNodes*maxAddrLength))
 	if err != nil {
 		return err
 	}
-	g.log.Printf("INFO: %v sent us %v peers\n", p.sess.RemoteAddr(), len(newPeers))
+	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(newPeers))
 	id := g.mu.Lock()
 	for i := range newPeers {
 		g.addNode(newPeers[i])
