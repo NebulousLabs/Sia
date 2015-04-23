@@ -49,7 +49,7 @@ func (s *State) storageProofSegment(fcid types.FileContractID) (index uint64, er
 	}
 
 	// Get the ID of the trigger block.
-	triggerHeight := fc.Start - 1
+	triggerHeight := fc.WindowStart - 1
 	if triggerHeight > s.height() {
 		err = errors.New("no block found at contract trigger block height")
 		return
@@ -101,37 +101,45 @@ func (s *State) validStorageProofs(t types.Transaction) error {
 	return nil
 }
 
-// validFileContractTerminations checks that each file contract termination is
-// valid in the context of the current consensus set.
-func (s *State) validFileContractTerminations(t types.Transaction) (err error) {
-	for _, fct := range t.FileContractTerminations {
-		// Check that the FileContractTermination terminates an existing
-		// FileContract.
-		fc, exists := s.fileContracts[fct.ParentID]
+// validFileContractRevision checks that each file contract revision is valid
+// in the context of the current consensus set.
+func (s *State) validFileContractRevisions(t types.Transaction) (err error) {
+	for _, fcr := range t.FileContractRevisions {
+		// Check that the revision revises an existing contract.
+		fc, exists := s.fileContracts[fcr.ParentID]
 		if !exists {
 			return ErrMissingFileContract
 		}
 
-		// Check that the height is less than fc.Start - terminations are not
-		// allowed to be submitted once the storage proof window has opened.
-		// This reduces complexity for unconfirmed transactions.
-		if fc.Start < s.height() {
-			return errors.New("contract termination submitted too late")
+		// Check that the height is less than fc.WindowStart - revisions are
+		// not allowed to be submitted once the storage proof window has
+		// opened.  This reduces complexity for unconfirmed transactions.
+		if s.height() > fc.WindowStart {
+			return errors.New("contract revision submitted too late")
+		}
+
+		// Check that the revision number of the revision is greater than the
+		// revision number of the existing file contract.
+		if fc.RevisionNumber >= fcr.NewRevisionNumber {
+			return errors.New("contract revision has an outdated revision number")
 		}
 
 		// Check that the unlock conditions match the unlock hash.
-		if fct.TerminationConditions.UnlockHash() != fc.TerminationHash {
-			return errors.New("termination conditions don't match required termination hash")
+		if fcr.UnlockConditions.UnlockHash() != fc.UnlockHash {
+			return errors.New("unlock conditions don't match unlock hash")
 		}
 
-		// Check that the payouts in the termination add up to the payout of the
-		// contract.
-		var payoutSum types.Currency
-		for _, payout := range fct.Payouts {
-			payoutSum = payoutSum.Add(payout.Value)
+		// Check that the payout of the revision matches the payout of the
+		// original.
+		//
+		// txn.StandaloneValid checks for the validity of the
+		// ValidProofOutputs.
+		var payout types.Currency
+		for _, output := range fcr.NewMissedProofOutputs {
+			payout = payout.Add(output.Value)
 		}
-		if payoutSum.Cmp(fc.Payout) != 0 {
-			return errors.New("contract termination has incorrect payouts")
+		if payout.Cmp(fc.Payout) != 0 {
+			return errors.New("contract revision has incorrect payouts")
 		}
 	}
 
@@ -182,7 +190,7 @@ func (s *State) validTransaction(t types.Transaction) (err error) {
 	if err != nil {
 		return
 	}
-	err = s.validFileContractTerminations(t)
+	err = s.validFileContractRevisions(t)
 	if err != nil {
 		return
 	}

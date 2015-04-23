@@ -78,27 +78,42 @@ func (tp *TransactionPool) applyFileContracts(t types.Transaction) {
 	}
 }
 
-// applyFileContractTerminations incorporates all of the file contract
-// terminations of a transaction into the unconfirmed set.
-func (tp *TransactionPool) applyFileContractTerminations(t types.Transaction) {
-	// For each file contract termination, delete the corresponding file
-	// contract from the unconfirmed set and add it to the reference set.
-	for _, fct := range t.FileContractTerminations {
+// applyFileContractRevisions incorporates all of the file contract revisions
+// of a transaction into the unconfirmed set.
+func (tp *TransactionPool) applyFileContractRevisions(t types.Transaction) {
+	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - file contract should be in the unconfirmed set and
 		// absent from the reference set.
-		fc, exists := tp.fileContracts[fct.ParentID]
+		revisionID := crypto.HashAll(fcr.ParentID, fcr.NewRevisionNumber)
+		fc, exists := tp.fileContracts[fcr.ParentID]
 		if build.DEBUG {
 			if !exists {
 				panic("could not find file contract")
 			}
-			_, exists = tp.referenceFileContracts[fct.ParentID]
+			_, exists = tp.referenceFileContractRevisions[revisionID]
 			if exists {
 				panic("reference contract already exists")
 			}
 		}
 
-		delete(tp.fileContracts, fct.ParentID)
-		tp.referenceFileContracts[fct.ParentID] = fc
+		// Delete the old file contract from the unconfirmed set and add it to
+		// the reference set.
+		delete(tp.fileContracts, fcr.ParentID)
+		tp.referenceFileContractRevisions[revisionID] = fc
+
+		// Add the new file contract to the reference set.
+		nfc := types.FileContract{
+			FileSize:           fcr.NewFileSize,
+			FileMerkleRoot:     fcr.NewFileMerkleRoot,
+			WindowStart:        fcr.NewWindowStart,
+			WindowEnd:          fcr.NewWindowEnd,
+			Payout:             fc.Payout,
+			ValidProofOutputs:  fcr.NewValidProofOutputs,
+			MissedProofOutputs: fcr.NewMissedProofOutputs,
+			UnlockHash:         fcr.NewUnlockHash,
+			RevisionNumber:     fcr.NewRevisionNumber,
+		}
+		tp.fileContracts[fcr.ParentID] = nfc
 	}
 }
 
@@ -176,7 +191,7 @@ func (tp *TransactionPool) addTransactionToPool(t types.Transaction) {
 	tp.applySiacoinInputs(t)
 	tp.applySiacoinOutputs(t)
 	tp.applyFileContracts(t)
-	tp.applyFileContractTerminations(t)
+	tp.applyFileContractRevisions(t)
 	tp.applyStorageProofs(t)
 	tp.applySiafundInputs(t)
 	tp.applySiafundOutputs(t)

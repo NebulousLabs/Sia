@@ -35,8 +35,8 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 	contract := types.FileContract{
 		FileMerkleRoot:     merkleRoot,
 		FileSize:           terms.FileSize,
-		Start:              terms.DurationStart + terms.Duration,
-		Expiration:         terms.DurationStart + terms.Duration + terms.WindowSize,
+		WindowStart:        terms.DurationStart + terms.Duration,
+		WindowEnd:          terms.DurationStart + terms.Duration + terms.WindowSize,
 		Payout:             payout,
 		ValidProofOutputs:  terms.ValidProofOutputs,
 		MissedProofOutputs: terms.MissedProofOutputs,

@@ -60,7 +60,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	}
 
 	// Mine blocks until the file contract is active.
-	for ct.Height() < fcTxn.FileContracts[0].Start {
+	for ct.Height() < fcTxn.FileContracts[0].WindowStart {
 		block := ct.MineCurrentBlock(nil)
 		err := ct.AcceptBlock(block)
 		if err != nil {
@@ -86,7 +86,7 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	block = ct.MineCurrentBlock([]types.Transaction{proofTxn})
 	err = ct.AcceptBlock(block)
 	if err != nil {
-		ct.Fatal(err)
+		ct.Fatal(err) // TODO: Occasionally fails, not sure why.
 	}
 
 	// Check that the file contract was deleted from the consensus set, and

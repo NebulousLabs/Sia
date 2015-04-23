@@ -2,6 +2,9 @@ package types
 
 // constants.go contains the Sia constants. Depending on which build tags are
 // used, the constants will be initialized to different values.
+//
+// CONTRIBUTE: We don't have way to check that the non-test constants are all
+// sane, plus we have no coverage for them.
 
 import (
 	"math/big"
@@ -92,7 +95,11 @@ func init() {
 		RootTarget = Target{64} // Takes an expected 4 hashes; very fast for testing but still probes 'bad hash' code.
 		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-		MaxAdjustmentUp = big.NewRat(10001, 10000) // Small to prevent the difficulty from increasing during testing.
+		// A really restrictive difficulty clamp prevents the difficulty from
+		// climbing during testing, as the resolution on the difficulty
+		// adjustment is only 1 second and testing mining should be happening
+		// substantially faster than that.
+		MaxAdjustmentUp = big.NewRat(10001, 10000)
 		MaxAdjustmentDown = big.NewRat(9999, 10000)
 
 		CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
@@ -114,11 +121,7 @@ func init() {
 
 		RenterZeroConfDelay = 60 * time.Second
 
-		// Some types of siacoin outputs cannot be collected for 50 blocks, or
-		// about 8 hours. This makes it difficult to spend money that may not exist
-		// in the future. Reorganizations 50 deep would be required, which takes a
-		// lot of resources.
-		MaturityDelay = 50
+		MaturityDelay = 50 // 8 hours.
 
 		RootTarget = Target{0, 0, 0, 64}
 		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}

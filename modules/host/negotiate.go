@@ -101,10 +101,10 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 	case fc.FileMerkleRoot != merkleRoot:
 		return errors.New("bad file contract Merkle root")
 
-	case fc.Start != terms.DurationStart+terms.Duration:
+	case fc.WindowStart != terms.DurationStart+terms.Duration:
 		return errors.New("bad file contract start height")
 
-	case fc.Expiration != terms.DurationStart+terms.Duration+terms.WindowSize:
+	case fc.WindowEnd != terms.DurationStart+terms.Duration+terms.WindowSize:
 		return errors.New("bad file contract expiration")
 
 	case fc.Payout.Cmp(expectedPayout) != 0:
@@ -122,7 +122,7 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
 		return errors.New("bad file contract missed proof outputs")
 
-	case fc.TerminationHash != types.ZeroUnlockHash:
+	case fc.UnlockHash != types.ZeroUnlockHash:
 		return errors.New("bad file contract termination hash")
 	}
 	return nil
@@ -266,7 +266,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	// Add this contract to the host's list of obligations.
 	fcid := signedTxn.FileContractID(0)
 	fc := signedTxn.FileContracts[0]
-	proofHeight := fc.Expiration + StorageProofReorgDepth
+	proofHeight := fc.WindowEnd + StorageProofReorgDepth
 	co := contractObligation{
 		ID:           fcid,
 		FileContract: fc,

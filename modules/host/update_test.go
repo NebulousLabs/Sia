@@ -39,8 +39,8 @@ func (ht *HostTester) testObligation() {
 	fc := types.FileContract{
 		FileSize:       filesize,
 		FileMerkleRoot: merkleRoot,
-		Start:          ht.State.Height() + 2,
-		Expiration:     ht.State.Height() + 3,
+		WindowStart:    ht.State.Height() + 2,
+		WindowEnd:      ht.State.Height() + 3,
 		Payout:         value,
 		ValidProofOutputs: []types.SiacoinOutput{
 			types.SiacoinOutput{Value: value, UnlockHash: ht.Host.UnlockHash},

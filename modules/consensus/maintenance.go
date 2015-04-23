@@ -104,7 +104,7 @@ func (s *State) applyContractMaintenance(bn *blockNode) {
 	currentHeight := s.height()
 	var expiredFileContracts []types.FileContractID
 	for id, fc := range s.fileContracts {
-		if fc.Expiration == currentHeight {
+		if fc.WindowEnd == currentHeight {
 			expiredFileContracts = append(expiredFileContracts, id)
 		}
 	}

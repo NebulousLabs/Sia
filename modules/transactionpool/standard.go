@@ -67,8 +67,8 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 			return
 		}
 	}
-	for _, fct := range t.FileContractTerminations {
-		err = tp.checkUnlockConditions(fct.TerminationConditions)
+	for _, fcr := range t.FileContractRevisions {
+		err = tp.checkUnlockConditions(fcr.UnlockConditions)
 		if err != nil {
 			return
 		}
