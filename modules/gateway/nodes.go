@@ -58,9 +58,11 @@ func (g *Gateway) requestNodes(p *Peer) error {
 		return err
 	}
 	g.log.Printf("INFO: %v sent us %v peers\n", p.sess.RemoteAddr(), len(newPeers))
+	id := g.mu.Lock()
 	for i := range newPeers {
 		g.addNode(newPeers[i])
 	}
+	g.mu.Unlock(id)
 	return nil
 }
 

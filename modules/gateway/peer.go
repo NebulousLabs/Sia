@@ -126,7 +126,9 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 func (g *Gateway) makeOutboundConnections() {
 	for {
 		for i := 0; i < 100 && len(g.Info().Peers) < 8; i++ {
+			id := g.mu.RLock()
 			addr, err := g.randomNode()
+			g.mu.RUnlock(id)
 			if err != nil {
 				break
 			}
