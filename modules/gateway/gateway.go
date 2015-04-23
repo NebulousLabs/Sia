@@ -174,6 +174,10 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 		return nil, loadErr
 	}
 
+	// Spawn the connector loop. This will continually attempt to add nodes as
+	// peers to ensure we stay well-connected.
+	go g.makeOutboundConnections()
+
 	return
 }
 

@@ -118,3 +118,20 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	g.log.Println("INFO: disconnected from peer", addr)
 	return nil
 }
+
+// makeOutboundConnections tries to keep the Gateway well-connected. As long
+// as the Gateway is not well-connected, it tries to add random nodes as
+// peers. It sleeps when the Gateway becomes well-connected, or it has tried
+// more than 100 nodes.
+func (g *Gateway) makeOutboundConnections() {
+	for {
+		for i := 0; i < 100 && len(g.Info().Peers) < 8; i++ {
+			addr, err := g.randomNode()
+			if err != nil {
+				break
+			}
+			g.Connect(addr)
+		}
+		time.Sleep(5 * time.Second)
+	}
+}
