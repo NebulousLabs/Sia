@@ -24,6 +24,7 @@ type hostTester struct {
 	host *Host
 
 	csUpdateChan     <-chan struct{}
+	hostUpdateChan   <-chan struct{}
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
@@ -34,6 +35,7 @@ type hostTester struct {
 // csUpdateWait blocks until a consensus update has propagated to all modules.
 func (ht *hostTester) csUpdateWait() {
 	<-ht.csUpdateChan
+	<-ht.hostUpdateChan
 	ht.tpUpdateWait()
 }
 
@@ -47,7 +49,7 @@ func (ht *hostTester) tpUpdateWait() {
 
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(name string, t *testing.T) *hostTester {
-	testdir := tester.TempDir("host", name)
+	testdir := tester.TempDir(modules.HostDir, name)
 
 	// Create the consensus set.
 	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
@@ -96,6 +98,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 		host: h,
 
 		csUpdateChan:     cs.ConsensusSetNotify(),
+		hostUpdateChan:   h.HostNotify(),
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),

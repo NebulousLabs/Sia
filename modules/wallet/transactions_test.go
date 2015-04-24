@@ -20,7 +20,7 @@ func (wt *walletTester) testFundTransaction() {
 	if err != nil {
 		wt.t.Fatal(err)
 	}
-	wt.updateWait()
+	wt.tpUpdateWait()
 	_, _, err = wt.wallet.AddMinerFee(id, fund)
 	if err != nil {
 		wt.t.Fatal(err)
@@ -33,7 +33,7 @@ func (wt *walletTester) testFundTransaction() {
 	if err != nil {
 		wt.t.Fatal(err)
 	}
-	wt.updateWait()
+	wt.tpUpdateWait()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1.

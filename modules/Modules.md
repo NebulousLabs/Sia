@@ -29,3 +29,7 @@ to both the transaction pool and the consensus set. All consensus set updates
 should be received through the transaction pool. This helps with
 synchronization and ensures that no child module ever has information that the
 parent module has not yet received (desynchronization).
+
+#### Module Update Flow
+
+consensus -> (host, hostdb, renter, (transaction pool -> miner, wallet))
