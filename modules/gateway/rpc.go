@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -50,8 +51,8 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	// call fn
 	err = fn(conn)
 	if err != nil {
-		// TODO: use sync/atomic
-		peer.strikes++
+		// give peer a strike
+		atomic.AddUint32(&peer.strikes, 1)
 	}
 	return err
 }
