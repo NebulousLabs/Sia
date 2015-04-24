@@ -96,7 +96,8 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 	fn, ok := g.handlerMap[id]
 	g.mu.RUnlock(lockid)
 	if !ok {
-		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%s\"", conn.RemoteAddr(), id[:])
+		// TODO: write this error to conn?
+		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
 
@@ -116,8 +117,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
 	fn := func(conn net.Conn) error {
-		_, err := conn.Write(enc)
-		return err
+		return encoding.WritePrefix(conn, enc)
 	}
 
 	var wg sync.WaitGroup

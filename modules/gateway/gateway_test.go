@@ -123,3 +123,18 @@ func TestExternalIP(t *testing.T) {
 		t.Fatal("getExternalIP returned bad IP:", ip)
 	}
 }
+
+func TestLoad(t *testing.T) {
+	g := newTestingGateway("TestLoad", t)
+	g.addNode("foo")
+	g.save()
+	g.Close()
+
+	g2, err := New(":0", g.saveDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := g2.nodes["foo"]; !ok {
+		t.Fatal("gateway did not load old peer list:", g2.nodes)
+	}
+}

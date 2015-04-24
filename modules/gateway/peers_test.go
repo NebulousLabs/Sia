@@ -1,18 +1,20 @@
 package gateway
 
 import (
-	//"strconv"
 	"net"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	//	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/inconshreveable/muxado"
 )
 
 func TestAddPeer(t *testing.T) {
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
-	g.addPeer("foo", nil)
+	g.addPeer(&peer{addr: "foo", sess: muxado.Client(nil)})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
@@ -32,51 +34,114 @@ func TestListen(t *testing.T) {
 	if err := encoding.WriteObject(conn, "foo"); err != nil {
 		t.Fatal("couldn't write address")
 	}
-	// g should have added foo
-	/*
-		if g.peers["foo"] == nil {
-			t.Fatal("g did not add connecting node")
-		}
-	*/
-	defer conn.Close()
+	// g should add foo
+	for g.peers["foo"] == nil {
+	}
+	conn.Close()
+	// g should remove foo
+	for g.peers["foo"] != nil {
+	}
+
+	// "uncompliant" connect
+	conn, err = net.Dial("tcp", string(g.Address()))
+	if err != nil {
+		t.Fatal("dial failed:", err)
+	}
+	if _, err := conn.Write([]byte("missing length prefix")); err != nil {
+		t.Fatal("couldn't write malformed header")
+	}
+	// g should have closed the connection
+	if n, err := conn.Write([]byte("closed")); err != nil && n > 0 {
+		t.Error("write succeeded after closed connection")
+	}
 }
 
-/*
-
-// TestBadPeer tests that "bad" peers are correctly identified and removed.
-// TODO: bring back strike system
-func TestBadPeer(t *testing.T) {
-	g := newTestingGateway("TestBadPeer1", t)
+func TestConnect(t *testing.T) {
+	g := newTestingGateway("TestConnect", t)
 	defer g.Close()
 
-	// create bad peer
-	badpeer := newTestingGateway("TestBadPeer2", t)
-	// overwrite badpeer's Ping RPC with an incorrect one
-	badpeer.RegisterRPC("Ping", writerRPC("lol"))
+	// dummy listener to accept connection
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal("couldn't start listener:", err)
+	}
+	go func() {
+		conn, err := l.Accept()
+		if err != nil {
+			t.Fatal("accept failed:", err)
+		}
+		conn.Close()
+	}()
 
-	g.addNode(badpeer.Address())
-
-	// try to ping the peer 'maxStrikes'+1 times
-	for i := 0; i < maxStrikes+1; i++ {
-		g.Ping(badpeer.Address())
+	if err := g.Connect(modules.NetAddress(l.Addr().String())); err != nil {
+		t.Fatal("connect failed:", err)
 	}
 
-	// since we are poorly-connected, badpeer should still be in our peer list
 	if len(g.peers) != 1 {
-		t.Fatal("gateway removed peer when poorly-connected:", g.Info().Peers)
-	}
-
-	// add minPeers more peers
-	for i := 0; i < minPeers; i++ {
-		g.addNode(modules.NetAddress("foo" + strconv.Itoa(i)))
-	}
-
-	// once we exceed minPeers, badpeer should be kicked out
-	if len(g.peers) != minPeers {
-		t.Fatal("gateway did not remove bad peer after becoming well-connected:", g.Info().Peers)
-	} else if _, ok := g.peers[badpeer.Address()]; ok {
-		t.Fatal("gateway removed wrong peer:", g.Info().Peers)
+		t.Fatal("gateway did not add peer after connecting:", g.peers)
 	}
 }
 
-*/
+func TestDisconnect(t *testing.T) {
+	g := newTestingGateway("TestDisconnect", t)
+	defer g.Close()
+
+	if err := g.Disconnect("bar"); err == nil {
+		t.Fatal("disconnect removed unconnected peer")
+	}
+
+	// dummy listener to accept connection
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal("couldn't start listener:", err)
+	}
+	go func() {
+		conn, err := l.Accept()
+		if err != nil {
+			t.Fatal("accept failed:", err)
+		}
+		conn.Close()
+	}()
+
+	conn, err := net.Dial("tcp", string(g.Address()))
+	if err != nil {
+		t.Fatal("dial failed:", err)
+	}
+	g.addPeer(&peer{addr: "foo", sess: muxado.Client(conn)})
+	if err := g.Disconnect("foo"); err != nil {
+		t.Fatal("disconnect failed:", err)
+	}
+}
+
+func TestMakeOutboundConnections(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	g1 := newTestingGateway("TestMakeOutboundConnections1", t)
+	defer g1.Close()
+
+	// first add 8 dummy peers
+	for i := 0; i < 8; i++ {
+		peerAddr := modules.NetAddress("foo" + strconv.Itoa(i))
+		g1.addPeer(&peer{addr: peerAddr, sess: muxado.Client(nil)})
+	}
+
+	// makeOutboundConnections should now sleep for 5 seconds
+	time.Sleep(1 * time.Second)
+	// remove a peer while makeOutboundConnections is asleep, and add a new
+	// connectable address to the node list
+	g1.Disconnect("foo1")
+	g2 := newTestingGateway("TestMakeOutboundConnections2", t)
+	defer g2.Close()
+	g1.addNode(g2.Address())
+
+	// when makeOutboundConnections wakes up, it should connect to g2.
+	time.Sleep(5 * time.Second)
+	if len(g1.peers) != 8 {
+		t.Fatal("gateway did not reach 8 peers:", g1.peers)
+	}
+	if g1.peers[g2.Address()] == nil {
+		t.Fatal("gateway did not connect to g2")
+	}
+}
