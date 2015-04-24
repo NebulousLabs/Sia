@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"errors"
-	"math/rand"
 	"net"
 	"time"
 
@@ -17,20 +16,6 @@ const dialTimeout = 10 * time.Second
 type peer struct {
 	sess    muxado.Session
 	strikes int
-}
-
-func (g *Gateway) randomPeer() (modules.NetAddress, error) {
-	if len(g.peers) > 0 {
-		r := rand.Intn(len(g.peers))
-		for addr := range g.peers {
-			if r == 0 {
-				return addr, nil
-			}
-			r--
-		}
-	}
-
-	return "", errNoPeers
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread

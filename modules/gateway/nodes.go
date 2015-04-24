@@ -50,20 +50,11 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 }
 
 // requestNodes calls the ShareNodes RPC on addr.
-func (g *Gateway) requestNodes(addr modules.NetAddress) error {
-	g.log.Printf("INFO: requesting peers from %v\n", addr)
-	var newPeers []modules.NetAddress
-	err := g.RPC(addr, "ShareNodes", readerRPC(&newPeers, maxSharedNodes*maxAddrLength))
-	if err != nil {
-		return err
-	}
-	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(newPeers))
-	id := g.mu.Lock()
-	for i := range newPeers {
-		g.addNode(newPeers[i])
-	}
-	g.mu.Unlock(id)
-	return nil
+func (g *Gateway) requestNodes(addr modules.NetAddress) (newPeers []modules.NetAddress, err error) {
+	err = g.RPC(addr, "ShareNodes", func(conn net.Conn) error {
+		return encoding.ReadObject(conn, &newPeers, maxSharedNodes*maxAddrLength)
+	})
+	return
 }
 
 // shareNodes is an RPC that returns up to 10 randomly selected nodes.

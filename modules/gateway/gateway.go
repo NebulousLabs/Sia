@@ -77,7 +77,13 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	}
 
 	// initial peer discovery
-	g.requestNodes(addr)
+	nodes, err := g.requestNodes(addr)
+	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(nodes))
+	id := g.mu.Lock()
+	for _, node := range nodes {
+		g.addNode(node)
+	}
+	g.mu.Unlock(id)
 
 	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
 

@@ -19,8 +19,7 @@ func TestNodeSharing(t *testing.T) {
 	}
 
 	// ask gateway for nodes
-	var nodes []modules.NetAddress
-	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
+	nodes, err := g1.requestNodes(g2.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +32,7 @@ func TestNodeSharing(t *testing.T) {
 	g2.addNode("foo:9001")
 	g2.addNode("bar:9002")
 	g2.addNode("baz:9003")
-	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
+	nodes, err = g1.requestNodes(g2.Address())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +56,7 @@ func TestNodeSharing(t *testing.T) {
 	}
 
 	// no nodes should be returned
-	err = g1.RPC(g2.Address(), "ShareNodes", readerRPC(&nodes, 1024))
+	nodes, err = g1.requestNodes(g2.Address())
 	if err != nil {
 		t.Fatal(err)
 	}

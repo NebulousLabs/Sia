@@ -3,7 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
-	"sync"
+	//"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -56,22 +56,6 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	return err
 }
 
-// readerRPC returns a closure that can be passed to RPC to read a
-// single value.
-func readerRPC(obj interface{}, maxLen uint64) modules.RPCFunc {
-	return func(conn net.Conn) error {
-		return encoding.ReadObject(conn, obj, maxLen)
-	}
-}
-
-// writerRPC returns a closure that can be passed to RPC to write a
-// single value.
-func writerRPC(obj interface{}) modules.RPCFunc {
-	return func(conn net.Conn) error {
-		return encoding.WriteObject(conn, obj)
-	}
-}
-
 // RegisterRPC registers a function as an RPC handler for a given identifier.
 // To call an RPC, use gateway.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
@@ -119,9 +103,11 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 	}
 }
 
-// threadedBroadcast calls an RPC on all of the peers in the Gateway's peer
-// list. The calls are run in parallel.
-func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
+/*
+
+// broadcast calls an RPC on all of the peers in the Gateway's peer list. The
+// calls are run in parallel.
+func (g *Gateway) broadcast(name string, fn modules.RPCFunc) {
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", name, len(g.peers))
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
@@ -139,3 +125,5 @@ func (g *Gateway) threadedBroadcast(name string, fn modules.RPCFunc) {
 	g.mu.RUnlock(id)
 	wg.Wait()
 }
+
+*/
