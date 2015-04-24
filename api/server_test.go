@@ -123,7 +123,6 @@ func (st *serverTester) mineMoney() {
 	// Mine enough blocks to overcome the maturity delay and receive coins.
 	for i := types.BlockHeight(0); i < 1+types.MaturityDelay; i++ {
 		st.mineBlock()
-		st.updateWait()
 	}
 
 	// Compare new balance to old balance.

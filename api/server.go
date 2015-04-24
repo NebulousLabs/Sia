@@ -23,9 +23,6 @@ type Server struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	minerUpdates  <-chan struct{}
-	walletUpdates <-chan struct{}
-
 	apiServer *graceful.Server
 }
 
@@ -42,10 +39,6 @@ func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.
 		wallet:  w,
 	}
 
-	// Subscribe to the miner and wallet
-	srv.minerUpdates = srv.miner.MinerNotify()
-	srv.walletUpdates = srv.wallet.WalletNotify()
-
 	// Register RPCs for each module
 	g.RegisterRPC("AcceptBlock", srv.acceptBlock)
 	g.RegisterRPC("AcceptTransaction", srv.acceptTransaction)
@@ -57,11 +50,6 @@ func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.
 	srv.initAPI(APIAddr)
 
 	return srv
-}
-
-func (srv *Server) updateWait() {
-	<-srv.minerUpdates
-	<-srv.walletUpdates
 }
 
 // TODO: move this to the state module?
