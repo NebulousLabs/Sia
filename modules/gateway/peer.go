@@ -14,7 +14,7 @@ import (
 
 const dialTimeout = 10 * time.Second
 
-type Peer struct {
+type peer struct {
 	sess    muxado.Session
 	strikes int
 }
@@ -35,14 +35,12 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
-func (g *Gateway) addPeer(sess muxado.Session, addr modules.NetAddress) *Peer {
-	peer := &Peer{sess, 0}
+func (g *Gateway) addPeer(addr modules.NetAddress, p *peer) {
 	id := g.mu.Lock()
-	g.peers[addr] = peer
+	defer g.mu.Unlock(id)
+	g.peers[addr] = p
 	g.addNode(addr)
-	g.mu.Unlock(id)
-	go g.listenPeer(peer)
-	return peer
+	go g.listenPeer(p)
 }
 
 // listen handles incoming connection requests. If the connection is accepted,
@@ -58,59 +56,55 @@ func (g *Gateway) listen() {
 		go func(conn net.Conn) {
 			var addr modules.NetAddress
 			if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
+				conn.Close()
 				return
 			}
 			g.log.Printf("INFO: %v wants to connect (gave address: %v)\n", conn.RemoteAddr(), addr)
-			g.addPeer(muxado.Server(conn), addr)
+			g.addPeer(addr, &peer{muxado.Server(conn), 0})
 		}(conn)
 	}
 }
 
-func (g *Gateway) connect(addr modules.NetAddress) (*Peer, error) {
+// Connect establishes a persistent connection to a peer, and adds it to the
+// Gateway's peer list.
+func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if addr == g.myAddr {
-		return nil, errors.New("can't connect to our own address")
+		return errors.New("can't connect to our own address")
 	}
 
 	id := g.mu.RLock()
 	_, exists := g.peers[addr]
 	g.mu.RUnlock(id)
 	if exists {
-		return nil, errors.New("peer already added")
+		return errors.New("peer already added")
 	}
 
 	conn, err := net.DialTimeout("tcp", string(addr), dialTimeout)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// send our address
 	if err := encoding.WriteObject(conn, g.myAddr); err != nil {
-		return nil, err
+		return err
 	}
 	// TODO: exchange version messages
 
-	peer := g.addPeer(muxado.Client(conn), addr)
+	g.addPeer(addr, &peer{muxado.Client(conn), 0})
 
 	g.log.Println("INFO: connected to new peer", addr)
-	return peer, nil
-}
-
-// Connect establishes a persistent connection to a peer, and adds it to the
-// Gateway's peer list.
-func (g *Gateway) Connect(addr modules.NetAddress) error {
-	_, err := g.connect(addr)
-	return err
+	return nil
 }
 
 // Disconnect terminates a connection to a peer and removes it from the
 // Gateway's peer list. The peer's address remains in the node list.
 func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 	id := g.mu.RLock()
-	peer, exists := g.peers[addr]
+	p, exists := g.peers[addr]
 	g.mu.RUnlock(id)
 	if !exists {
 		return errors.New("not connected to that node")
 	}
-	peer.sess.Close()
+	p.sess.Close()
 	id = g.mu.Lock()
 	delete(g.peers, addr)
 	g.mu.Unlock(id)

@@ -39,7 +39,7 @@ type Gateway struct {
 	handlerMap map[rpcID]modules.RPCFunc
 
 	// peers are the nodes we are currently connected to.
-	peers map[modules.NetAddress]*Peer
+	peers map[modules.NetAddress]*peer
 
 	// nodes is a list of all known nodes (i.e. potential peers) on the
 	// network.
@@ -89,8 +89,8 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
 	info.Address = g.myAddr
-	for peer := range g.peers {
-		info.Peers = append(info.Peers, peer)
+	for addr := range g.peers {
+		info.Peers = append(info.Peers, addr)
 	}
 	info.Nodes = len(g.nodes)
 	return
@@ -112,7 +112,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 
 	g = &Gateway{
 		handlerMap: make(map[rpcID]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]*Peer),
+		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
 		saveDir:    saveDir,
 		mu:         sync.New(time.Second*1, 0),

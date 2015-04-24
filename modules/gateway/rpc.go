@@ -83,7 +83,7 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 
 // listenPeer listens for new streams on a peer connection and serves them via
 // threadedHandleConn.
-func (g *Gateway) listenPeer(p *Peer) {
+func (g *Gateway) listenPeer(p *peer) {
 	for {
 		conn, err := p.sess.Accept()
 		if err != nil {

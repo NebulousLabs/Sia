@@ -23,7 +23,7 @@ func TestRPC(t *testing.T) {
 	g2 := newTestingGateway("TestRPC2", t)
 	defer g1.Close()
 
-	g1.RegisterRPC("Foo", func(conn net.Conn) error {
+	g2.RegisterRPC("Foo", func(conn net.Conn) error {
 		var i uint64
 		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
@@ -36,13 +36,13 @@ func TestRPC(t *testing.T) {
 		}
 	})
 
-	err := g2.Connect(g1.Address())
+	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)
 	}
 
 	var foo string
-	err = g2.RPC(g1.Address(), "Foo", func(conn net.Conn) error {
+	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
 		err := encoding.WriteObject(conn, 0xdeadbeef)
 		if err != nil {
 			return err
@@ -57,7 +57,7 @@ func TestRPC(t *testing.T) {
 	}
 
 	// wrong number should produce an error
-	err = g2.RPC(g1.Address(), "Foo", func(conn net.Conn) error {
+	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
 		err := encoding.WriteObject(conn, 0xbadbeef)
 		if err != nil {
 			return err
@@ -69,6 +69,11 @@ func TestRPC(t *testing.T) {
 	}
 	if foo != "bar" {
 		t.Fatal("Foo gave wrong response:", foo)
+	}
+
+	err = g1.Disconnect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
 	}
 }
 

@@ -64,6 +64,11 @@ func TestNodeSharing(t *testing.T) {
 	if len(nodes) != 0 {
 		t.Fatal("gateway gave non-existent addresses:", nodes)
 	}
+
+	err = g1.Disconnect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
 }
 
 /*
@@ -131,5 +136,10 @@ func TestBootstrap(t *testing.T) {
 	// node lists should be the same
 	if g.Info().Nodes != bootstrap.Info().Nodes {
 		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
+	}
+
+	err = g.Disconnect(bootstrap.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
 	}
 }
