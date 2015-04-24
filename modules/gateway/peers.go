@@ -15,16 +15,17 @@ const dialTimeout = 10 * time.Second
 
 type peer struct {
 	strikes uint32
+	addr    modules.NetAddress
 	sess    muxado.Session
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
-func (g *Gateway) addPeer(addr modules.NetAddress, p *peer) {
+func (g *Gateway) addPeer(p *peer) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	g.peers[addr] = p
-	g.addNode(addr)
+	g.peers[p.addr] = p
+	g.addNode(p.addr)
 	go g.listenPeer(p)
 }
 
@@ -45,7 +46,7 @@ func (g *Gateway) listen() {
 				return
 			}
 			g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
-			g.addPeer(addr, &peer{sess: muxado.Server(conn)})
+			g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
 		}(conn)
 	}
 }
@@ -74,7 +75,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// TODO: exchange version messages
 
-	g.addPeer(addr, &peer{sess: muxado.Client(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 
 	g.log.Println("INFO: connected to new peer", addr)
 	return nil
