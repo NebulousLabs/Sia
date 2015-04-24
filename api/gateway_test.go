@@ -17,20 +17,20 @@ func (st *serverTester) addPeer(name string) *serverTester {
 	st.mineBlock()
 
 	// Create a new peer and bootstrap it to st.
-	newPeer := newServerTester(name, st.T)
-	err := newPeer.gateway.Bootstrap(st.netAddress())
+	newPeer := newServerTester(name, st.t)
+	err := newPeer.server.gateway.Bootstrap(st.netAddress())
 	if err != nil {
-		st.Fatal("bootstrap failed:", err)
+		st.t.Fatal("bootstrap failed:", err)
 	}
 	// Wait for bootstrapping to finish, then check that each has the same
 	// number of peers and blocks.
-	for len(st.gateway.Info().Peers) != len(newPeer.gateway.Info().Peers) {
+	for len(st.server.gateway.Info().Peers) != len(newPeer.server.gateway.Info().Peers) {
 		time.Sleep(time.Millisecond)
 	}
 	// force synchronization to st, in case newPeer tried to synchronize to
 	// one of st's peers.
-	for st.state.Height() != newPeer.state.Height() {
-		newPeer.gateway.Synchronize(st.netAddress())
+	for st.server.cs.Height() != newPeer.server.cs.Height() {
+		newPeer.server.gateway.Synchronize(st.netAddress())
 	}
 	return newPeer
 }
@@ -80,34 +80,34 @@ func TestTransactionRelay(t *testing.T) {
 	st2 := st.addPeer("TestTransactionRelay2")
 
 	// Make sure both servers have empty transaction pools.
-	tset := st.tpool.TransactionSet()
-	tset2 := st2.tpool.TransactionSet()
+	tset := st.server.tpool.TransactionSet()
+	tset2 := st2.server.tpool.TransactionSet()
 	if len(tset) != 0 || len(tset2) != 0 {
 		t.Fatal("transaction set is not empty after creating new server tester")
 	}
 
 	// Get the original balances of each server for later comparison.
-	origBal := st.wallet.Balance(false)
-	origBal2 := st2.wallet.Balance(false)
+	origBal := st.server.wallet.Balance(false)
+	origBal2 := st2.server.wallet.Balance(false)
 
 	// Create a transaction in the first server and check that it propagates to
 	// the second. The check is done via spinning because network propagation
 	// will take an unknown amount of time.
 	st.callAPI("/wallet/send?amount=15&destination=" + st2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
-		tset = st.tpool.TransactionSet()
-		tset2 = st2.tpool.TransactionSet()
+		tset = st.server.tpool.TransactionSet()
+		tset2 = st2.server.tpool.TransactionSet()
 		time.Sleep(time.Millisecond)
 	}
 
 	// Check that the balances of each have updated appropriately, in
 	// accordance with 0-conf.
-	if origBal.Sub(types.NewCurrency64(15)).Cmp(st.wallet.Balance(false)) != 0 {
+	if origBal.Sub(types.NewCurrency64(15)).Cmp(st.server.wallet.Balance(false)) != 0 {
 		t.Error(origBal.Big())
-		t.Error(st.wallet.Balance(false).Big())
+		t.Error(st.server.wallet.Balance(false).Big())
 		t.Error("balances are incorrect for 0-conf transaction")
 	}
-	for origBal2.Add(types.NewCurrency64(15)).Cmp(st2.wallet.Balance(false)) != 0 {
+	for origBal2.Add(types.NewCurrency64(15)).Cmp(st2.server.wallet.Balance(false)) != 0 {
 		// t.Error(origBal2.Big())
 		// t.Error(st2.wallet.Balance(false).Big())
 		// t.Error("balances are incorrect for 0-conf transaction")
@@ -130,7 +130,7 @@ func TestBlockBootstrap(t *testing.T) {
 	// Add a peer and spin until the peer is caught up. addPeer() already does
 	// this check, but it's left here to be explict anyway.
 	st2 := st.addPeer("TestBlockBootstrap2")
-	for st.state.Height() != st2.state.Height() {
+	for st.server.cs.Height() != st2.server.cs.Height() {
 		time.Sleep(time.Millisecond)
 	}
 }

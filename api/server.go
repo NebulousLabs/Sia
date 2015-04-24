@@ -14,7 +14,7 @@ import (
 // A Server is essentially a collection of modules and an API server to talk
 // to them all.
 type Server struct {
-	state   *consensus.State
+	cs      *consensus.State
 	gateway modules.Gateway
 	host    modules.Host
 	hostdb  modules.HostDB
@@ -29,7 +29,7 @@ type Server struct {
 // NewServer creates a new API server from the provided modules.
 func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *Server {
 	srv := &Server{
-		state:   s,
+		cs:      s,
 		gateway: g,
 		host:    h,
 		hostdb:  hdb,
@@ -60,7 +60,7 @@ func (srv *Server) acceptBlock(conn modules.NetConn) error {
 		return err
 	}
 
-	err = srv.state.AcceptBlock(b)
+	err = srv.cs.AcceptBlock(b)
 	if err == consensus.ErrOrphan {
 		go srv.gateway.Synchronize(conn.Addr())
 		return err
@@ -69,16 +69,16 @@ func (srv *Server) acceptBlock(conn modules.NetConn) error {
 	}
 
 	// Check if b is in the current path.
-	height, exists := srv.state.HeightOfBlock(b.ID())
+	height, exists := srv.cs.HeightOfBlock(b.ID())
 	if !exists {
 		if build.DEBUG {
 			panic("could not get the height of a block that did not return an error when being accepted into the state")
 		}
-		return errors.New("state malfunction")
+		return errors.New("consensus set malfunction")
 	}
-	currentPathBlock, exists := srv.state.BlockAtHeight(height)
+	currentPathBlock, exists := srv.cs.BlockAtHeight(height)
 	if !exists || b.ID() != currentPathBlock.ID() {
-		return errors.New("block added, but it does not extend the state height")
+		return errors.New("block added, but it does not extend the consensus set height")
 	}
 
 	srv.gateway.RelayBlock(b)

@@ -16,7 +16,7 @@ func (st *serverTester) announceHost() {
 func TestHostAnnouncement(t *testing.T) {
 	// Create the server tester and check that the initial hostdb is empty.
 	st := newServerTester("TestHostAnnouncement", t)
-	if len(st.hostdb.ActiveHosts()) != 0 {
+	if len(st.server.hostdb.ActiveHosts()) != 0 {
 		t.Fatal("hostdb needs to be empty after calling newServerTester")
 	}
 
@@ -26,7 +26,7 @@ func TestHostAnnouncement(t *testing.T) {
 	// out when the call will finish, we spin until the update has finished. If
 	// the update never finishes, the test environment should timeout.
 	st.announceHost()
-	for len(st.hostdb.ActiveHosts()) != 1 {
+	for len(st.server.hostdb.ActiveHosts()) != 1 {
 		time.Sleep(time.Millisecond)
 	}
 }

@@ -90,7 +90,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 	// changes. After the blocking function unlocks, set the value to true.
 	var mds ModuleDeadlockStatus
 	go func() {
-		srv.state.AcceptBlock(types.Block{})
+		srv.cs.AcceptBlock(types.Block{})
 		mds.State = true
 	}()
 	go func() {
