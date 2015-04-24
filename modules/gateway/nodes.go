@@ -21,7 +21,7 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 		return errors.New("node already added")
 	}
 	g.nodes[addr] = struct{}{}
-	g.save()
+	g.log.Println("INFO: added node", addr)
 	return nil
 }
 
@@ -30,7 +30,6 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 		return errors.New("no record of that node")
 	}
 	delete(g.nodes, addr)
-	g.save()
 	g.log.Println("INFO: removed node", addr)
 	return nil
 }

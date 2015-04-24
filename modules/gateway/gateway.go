@@ -93,6 +93,7 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	for _, node := range nodes {
 		g.addNode(node)
 	}
+	g.save()
 	g.mu.Unlock(id)
 
 	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
