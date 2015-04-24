@@ -3,10 +3,8 @@ package gateway
 import (
 	//"strconv"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 )
 
 // TestNodeSharing tests that nodes are correctly shared.
@@ -116,11 +114,7 @@ func TestBootstrap(t *testing.T) {
 
 	// create bootstrap peer
 	bootstrap := newTestingGateway("TestBootstrap1", t)
-	ct := consensus.NewConsensusTester(t, bootstrap.state)
-	// give it some blocks
-	for i := 0; i < MaxCatchUpBlocks*2+1; i++ {
-		ct.MineAndApplyValidBlock()
-	}
+
 	// give it a peer
 	err := bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
 	if err != nil {
@@ -132,11 +126,6 @@ func TestBootstrap(t *testing.T) {
 	err = g.Bootstrap(bootstrap.Address())
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	// wait for synchronize to complete
-	for g.state.Height() != bootstrap.state.Height() {
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// node lists should be the same

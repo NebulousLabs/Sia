@@ -1,4 +1,6 @@
-package gateway
+package consensus
+
+/*
 
 import (
 	"net"
@@ -186,3 +188,5 @@ func (g *Gateway) blockHistory() (blockIDs [32]types.BlockID) {
 	copy(blockIDs[:], knownBlocks)
 	return
 }
+
+*/

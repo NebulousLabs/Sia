@@ -13,7 +13,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -78,24 +77,11 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	}
 
 	// initial peer discovery
-	go g.requestNodes(addr)
+	g.requestNodes(addr)
 
-	// spawn synchronizer
-	go g.threadedResynchronize()
-
-	g.log.Printf("INFO: successfully bootstrapped to %v (this does not mean you are synchronized)", addr)
+	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
 
 	return nil
-}
-
-// RelayBlock relays a block to the network.
-func (g *Gateway) RelayBlock(b types.Block) {
-	go g.threadedBroadcast("AcceptBlock", writerRPC(b))
-}
-
-// RelayTransaction relays a transaction to the network.
-func (g *Gateway) RelayTransaction(t types.Transaction) {
-	go g.threadedBroadcast("AcceptTransaction", writerRPC(t))
 }
 
 // Info returns metadata about the Gateway.
@@ -111,12 +97,7 @@ func (g *Gateway) Info() (info modules.GatewayInfo) {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error) {
-	if s == nil {
-		err = errors.New("gateway cannot use nil state")
-		return
-	}
-
+func New(addr string, saveDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
@@ -130,7 +111,6 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	g = &Gateway{
-		state:      s,
 		handlerMap: make(map[rpcID]modules.RPCFunc),
 		peers:      make(map[modules.NetAddress]*Peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
@@ -140,7 +120,6 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("SendBlocks", g.sendBlocks)
 
 	g.log.Println("INFO: gateway created, started logging")
 
