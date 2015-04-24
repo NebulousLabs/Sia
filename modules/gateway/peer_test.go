@@ -52,7 +52,7 @@ func TestNodeSharing(t *testing.T) {
 	g2.removeNode(g1.Address())
 	g2.removeNode(g2.Address())
 	if len(g2.nodes) != 0 {
-		t.Fatalf("gateway has %d node(s) remaining after removal", g2.Info().Nodes)
+		t.Fatal("gateway has nodes remaining after removal:", g2.nodes)
 	}
 
 	// no nodes should be returned
@@ -133,7 +133,7 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	// node lists should be the same
-	if g.Info().Nodes != bootstrap.Info().Nodes {
+	if len(g.nodes) != len(bootstrap.nodes) {
 		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
 	}
 

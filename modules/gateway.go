@@ -33,12 +33,6 @@ func (na NetAddress) Port() string {
 	return port
 }
 
-type GatewayInfo struct {
-	Address NetAddress
-	Peers   []NetAddress
-	Nodes   int
-}
-
 // A Gateway facilitates the interactions between the local node and remote
 // nodes (peers). It relays incoming blocks and transactions to local modules,
 // and broadcasts outgoing blocks and transactions to peers. In a broad sense,
@@ -54,6 +48,9 @@ type Gateway interface {
 	// Disconnect terminates a connection to a peer.
 	Disconnect(NetAddress) error
 
+	// Peers returns the addresses that the Gateway is currently connected to.
+	Peers() []NetAddress
+
 	// RegisterRPC registers a function to handle incoming connections that
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
@@ -61,9 +58,6 @@ type Gateway interface {
 	// RPC calls an RPC on the given address. RPC cannot be called on an
 	// address that the Gateway is not connected to.
 	RPC(NetAddress, string, RPCFunc) error
-
-	// Info reports metadata about the Gateway.
-	Info() GatewayInfo
 
 	// Close safely stops the Gateway's listener process.
 	Close() error

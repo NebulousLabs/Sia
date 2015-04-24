@@ -61,6 +61,16 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
+func (g *Gateway) Peers() []modules.NetAddress {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	var peers []modules.NetAddress
+	for addr := range g.peers {
+		peers = append(peers, addr)
+	}
+	return peers
+}
+
 // Close stops the Gateway's listener process.
 func (g *Gateway) Close() error {
 	return g.listener.Close()
@@ -88,18 +98,6 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
 
 	return nil
-}
-
-// Info returns metadata about the Gateway.
-func (g *Gateway) Info() (info modules.GatewayInfo) {
-	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
-	info.Address = g.myAddr
-	for addr := range g.peers {
-		info.Peers = append(info.Peers, addr)
-	}
-	info.Nodes = len(g.nodes)
-	return
 }
 
 // New returns an initialized Gateway.

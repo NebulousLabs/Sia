@@ -53,7 +53,7 @@ func (g *Gateway) listen() {
 // Connect establishes a persistent connection to a peer, and adds it to the
 // Gateway's peer list.
 func (g *Gateway) Connect(addr modules.NetAddress) error {
-	if addr == g.myAddr {
+	if addr == g.Address() {
 		return errors.New("can't connect to our own address")
 	}
 
@@ -69,7 +69,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return err
 	}
 	// send our address
-	if err := encoding.WriteObject(conn, g.myAddr); err != nil {
+	if err := encoding.WriteObject(conn, g.Address()); err != nil {
 		return err
 	}
 	// TODO: exchange version messages
@@ -104,11 +104,12 @@ func (g *Gateway) Disconnect(addr modules.NetAddress) error {
 // more than 100 nodes.
 func (g *Gateway) makeOutboundConnections() {
 	for {
-		for i := 0; i < 100 && len(g.Info().Peers) < 8; i++ {
+		for i := 0; i < 100; i++ {
 			id := g.mu.RLock()
+			numPeers := len(g.peers)
 			addr, err := g.randomNode()
 			g.mu.RUnlock(id)
-			if err != nil {
+			if err != nil || numPeers >= 8 {
 				break
 			}
 			g.Connect(addr)
