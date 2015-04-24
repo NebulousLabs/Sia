@@ -101,12 +101,12 @@ func TestNew(t *testing.T) {
 	// create corrupted peers.dat
 	dir := tester.TempDir("gateway", "TestNew2")
 	os.MkdirAll(dir, 0700)
-	err := ioutil.WriteFile(filepath.Join(dir, "peers.dat"), []byte{1, 2, 3}, 0660)
+	err := ioutil.WriteFile(filepath.Join(dir, "nodes.dat"), []byte{1, 2, 3}, 0660)
 	if err != nil {
 		t.Fatal("couldn't create corrupted file:", err)
 	}
 	if _, err := New(":0", dir); err == nil {
-		t.Fatal("expect load error, got nil")
+		t.Fatal("expected load error, got nil")
 	}
 }
 
