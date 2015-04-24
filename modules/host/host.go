@@ -29,7 +29,7 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	state       *consensus.State
+	cs          *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock types.BlockID
@@ -47,8 +47,8 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
-	if state == nil {
+func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
+	if cs == nil {
 		err = errors.New("host cannot use a nil state")
 		return
 	}
@@ -66,7 +66,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		return
 	}
 	h = &Host{
-		state:  state,
+		cs:     cs,
 		tpool:  tpool,
 		wallet: wallet,
 
@@ -87,7 +87,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
 	}
-	block, exists := state.BlockAtHeight(0)
+	block, exists := cs.BlockAtHeight(0)
 	if !exists {
 		err = errors.New("state doesn't have a genesis block")
 		return
@@ -100,8 +100,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 	}
 	h.load()
 
-	typesChan := state.ConsensusSetNotify()
-	go h.threadedConsensusListen(typesChan)
+	h.cs.ConsensusSetSubscribe(h)
 
 	return
 }

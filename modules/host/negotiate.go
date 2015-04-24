@@ -49,7 +49,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.Duration < h.MinDuration || terms.Duration > h.MaxDuration:
 		return errors.New("duration is out of bounds")
 
-	case terms.DurationStart >= h.state.Height():
+	case terms.DurationStart >= h.cs.Height():
 		return errors.New("duration cannot start in the future")
 
 	case terms.WindowSize < h.WindowSize:
