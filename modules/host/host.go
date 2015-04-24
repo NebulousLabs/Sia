@@ -44,6 +44,8 @@ type Host struct {
 
 	modules.HostSettings
 
+	subscriptions []chan struct{}
+
 	mu *sync.RWMutex
 }
 

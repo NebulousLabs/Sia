@@ -56,8 +56,8 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber ConsensusSe
 	}
 }
 
-// updateSubscribers calls ReceiveConsensusSetUpdate on all of the subscribers
-// to the consensus set.
+// updateSubscribers will inform all subscribers of the new update to the
+// consensus set.
 func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
 	// Add the changes to the change set.
 	s.revertUpdates = append(s.revertUpdates, revertedNodes)

@@ -91,4 +91,6 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 		}
 		delete(h.obligationsByHeight, height)
 	}
+
+	h.updateSubscribers()
 }
