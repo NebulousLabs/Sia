@@ -33,6 +33,10 @@ type Host interface {
 	// Announce announces the host on the blockchain.
 	Announce(NetAddress) error
 
+	// HostNotify will push a struct down the channel every time that an update
+	// is received.
+	HostNotify() <-chan struct{}
+
 	// NegotiateContract is an RPC that enables a client to communicate with
 	// the host to propose a contract.
 	//

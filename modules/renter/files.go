@@ -63,7 +63,7 @@ func (f *File) Repairing() bool {
 func (f *File) TimeRemaining() types.BlockHeight {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
-	return f.startHeight - f.renter.state.Height()
+	return f.startHeight - f.renter.blockHeight
 }
 
 // FileList returns all of the files that the renter has.

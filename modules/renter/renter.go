@@ -8,27 +8,31 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	state   *consensus.State
-	gateway modules.Gateway
-	hostDB  modules.HostDB
-	wallet  modules.Wallet
+	cs          *consensus.State
+	gateway     modules.Gateway
+	hostDB      modules.HostDB
+	wallet      modules.Wallet
+	blockHeight types.BlockHeight
 
 	files         map[string]File
 	downloadQueue []*Download
 	saveDir       string
 
+	subscriptions []chan struct{}
+
 	mu *sync.RWMutex
 }
 
 // New returns an empty renter.
-func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (r *Renter, err error) {
-	if state == nil {
-		err = errors.New("renter.New: cannot have nil state")
+func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (r *Renter, err error) {
+	if cs == nil {
+		err = errors.New("renter.New: cannot have nil consensus set")
 		return
 	}
 	if gateway == nil {
@@ -45,7 +49,7 @@ func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wa
 	}
 
 	r = &Renter{
-		state:   state,
+		cs:      cs,
 		gateway: gateway,
 		hostDB:  hdb,
 		wallet:  wallet,
@@ -69,6 +73,8 @@ func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wa
 	// balance had loaded, which would require loading the entire blockchain.
 	// This also won't be a problem once we're also saving the addresses.
 	go r.scanAllFiles()
+
+	r.cs.ConsensusSetSubscribe(r)
 
 	return
 }

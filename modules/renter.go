@@ -79,6 +79,10 @@ type Renter interface {
 	// Rename changes the nickname of a file.
 	Rename(currentName, newName string) error
 
+	// RenterNotify will push a struct down the channel every time it receives
+	// an update.
+	RenterNotify() <-chan struct{}
+
 	// Upload uploads a file using the input parameters.
 	Upload(UploadParams) error
 }
