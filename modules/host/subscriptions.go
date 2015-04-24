@@ -1,5 +1,9 @@
 package host
 
+import (
+	"github.com/NebulousLabs/Sia/modules"
+)
+
 // updateSubscribers will inform all subscribers of the new update to the host.
 func (h *Host) updateSubscribers() {
 	for _, subscriber := range h.subscriptions {
@@ -14,7 +18,7 @@ func (h *Host) updateSubscribers() {
 // is an update received from another module.
 func (h *Host) HostNotify() <-chan struct{} {
 	lockID := h.mu.Lock()
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
 	h.subscriptions = append(h.subscriptions, c)
 	h.mu.Unlock(lockID)
 	return c

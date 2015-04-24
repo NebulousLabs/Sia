@@ -1,5 +1,9 @@
 package hostdb
 
+import (
+	"github.com/NebulousLabs/Sia/modules"
+)
+
 // notifySubscribers tells each subscriber that the hostdb has received an
 // update.
 func (hdb *HostDB) notifySubscribers() {
@@ -13,7 +17,7 @@ func (hdb *HostDB) notifySubscribers() {
 
 // HostDBNotify adds a subscriber to the hostdb.
 func (hdb *HostDB) HostDBNotify() <-chan struct{} {
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
 	id := hdb.mu.Lock()
 	hdb.subscribers = append(hdb.subscribers, c)
 	hdb.mu.Unlock(id)
