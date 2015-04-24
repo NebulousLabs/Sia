@@ -3,7 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
-	//"sync"
+	"sync"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -103,17 +103,23 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 	}
 }
 
-/*
-
-// broadcast calls an RPC on all of the peers in the Gateway's peer list. The
-// calls are run in parallel.
-func (g *Gateway) broadcast(name string, fn modules.RPCFunc) {
+// Broadcast calls an RPC on all of the peers in the Gateway's peer list. The
+// calls are run in parallel. Broadcasts are restricted to "one-way" RPCs,
+// which simply write an object and disconnect. This is why Broadcast takes an
+// interface{} instead of an RPCFunc.
+func (g *Gateway) Broadcast(name string, obj interface{}) {
 	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", name, len(g.peers))
+
+	// only encode obj once, instead of using WriteObject
+	enc := encoding.Marshal(obj)
+	fn := func(conn net.Conn) error {
+		_, err := conn.Write(enc)
+		return err
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(len(g.peers))
-	id := g.mu.RLock()
-	for addr := range g.peers {
-		// contact each peer in a separate thread
+	for _, addr := range g.Peers() {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
@@ -122,8 +128,5 @@ func (g *Gateway) broadcast(name string, fn modules.RPCFunc) {
 			wg.Done()
 		}(addr)
 	}
-	g.mu.RUnlock(id)
 	wg.Wait()
 }
-
-*/

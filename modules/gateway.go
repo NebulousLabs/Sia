@@ -59,6 +59,10 @@ type Gateway interface {
 	// address that the Gateway is not connected to.
 	RPC(NetAddress, string, RPCFunc) error
 
+	// Broadcast transmits obj, prefaced by the RPC name, to all of the
+	// Gateway's connected peers in parallel.
+	Broadcast(name string, obj interface{})
+
 	// Close safely stops the Gateway's listener process.
 	Close() error
 }
