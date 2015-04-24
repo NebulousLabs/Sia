@@ -32,7 +32,7 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	g.log.Printf("INFO: calling RPC \"%v\" on %v\n", name, addr)
+	g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
 	peer, ok := g.peers[addr]
 	if !ok {
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
@@ -86,7 +86,7 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 	defer conn.Close()
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
-		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v\n", conn.RemoteAddr(), err)
+		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.RemoteAddr(), err)
 		return
 	}
 	// call registered handler for this ID
@@ -98,9 +98,9 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 		return
 	}
 
-	g.log.Printf("INFO: handling RPC \"%v\" from %v\n", id, conn.RemoteAddr())
+	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
 	if err := fn(conn); err != nil {
-		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v\n", id, err)
+		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
 }
 
@@ -109,7 +109,7 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 // which simply write an object and disconnect. This is why Broadcast takes an
 // interface{} instead of an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}) {
-	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers\n", name, len(g.peers))
+	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(g.peers))
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
@@ -124,7 +124,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
-				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v\n", name, addr, err)
+				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
 			}
 			wg.Done()
 		}(addr)

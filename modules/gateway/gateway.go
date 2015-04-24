@@ -88,7 +88,7 @@ func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
 
 	// initial peer discovery
 	nodes, err := g.requestNodes(addr)
-	g.log.Printf("INFO: %v sent us %v peers\n", addr, len(nodes))
+	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
 	id := g.mu.Lock()
 	for _, node := range nodes {
 		g.addNode(node)
@@ -137,10 +137,15 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 	// will assign us a random open port).
 	g.myAddr = modules.NetAddress(g.listener.Addr().String())
 
-	// Discover external IP
-	hostname, err := g.getExternalIP()
-	if err != nil {
-		return nil, err
+	// Discover our external IP. (During testing, return the loopback address.)
+	var hostname string
+	if build.Release == "testing" {
+		hostname = "::1"
+	} else {
+		hostname, err = getExternalIP()
+		if err != nil {
+			return nil, err
+		}
 	}
 	g.myAddr = modules.NetAddress(net.JoinHostPort(hostname, g.myAddr.Port()))
 
@@ -154,7 +159,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 
 	// Load the old peer list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
-	if loadErr := g.load(); err != nil && !os.IsNotExist(loadErr) {
+	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
 
@@ -167,12 +172,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 
 // getExternalIP learns the server's hostname from a centralized service,
 // myexternalip.com.
-func (g *Gateway) getExternalIP() (string, error) {
-	// during testing, return the loopback address
-	if build.Release == "testing" {
-		return "::1", nil
-	}
-
+func getExternalIP() (string, error) {
 	resp, err := http.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "", err

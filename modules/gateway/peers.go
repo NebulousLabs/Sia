@@ -44,7 +44,7 @@ func (g *Gateway) listen() {
 				conn.Close()
 				return
 			}
-			g.log.Printf("INFO: %v wants to connect (gave address: %v)\n", conn.RemoteAddr(), addr)
+			g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
 			g.addPeer(addr, &peer{sess: muxado.Server(conn)})
 		}(conn)
 	}

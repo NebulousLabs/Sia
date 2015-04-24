@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
@@ -17,93 +20,106 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	return g
 }
 
-func TestRPC(t *testing.T) {
+func TestAddress(t *testing.T) {
+	g := newTestingGateway("TestAddress", t)
+	defer g.Close()
+	if g.Address() != g.myAddr {
+		t.Fatal("Address does not return g.myAddr")
+	}
+	port := modules.NetAddress(g.listener.Addr().String()).Port()
+	expAddr := modules.NetAddress(net.JoinHostPort("::1", port))
+	if g.Address() != expAddr {
+		t.Fatalf("Wrong address: expected %v, got %v", expAddr, g.Address())
+	}
+}
+
+func TestPeers(t *testing.T) {
 	g1 := newTestingGateway("TestRPC1", t)
 	defer g1.Close()
 	g2 := newTestingGateway("TestRPC2", t)
 	defer g1.Close()
-
-	g2.RegisterRPC("Foo", func(conn net.Conn) error {
-		var i uint64
-		err := encoding.ReadObject(conn, &i, 8)
-		if err != nil {
-			t.Error(err)
-			return err
-		} else if i == 0xdeadbeef {
-			return encoding.WriteObject(conn, "foo")
-		} else {
-			return encoding.WriteObject(conn, "bar")
-		}
-	})
-
 	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("failed to connect:", err)
 	}
-
-	var foo string
-	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
-		err := encoding.WriteObject(conn, 0xdeadbeef)
-		if err != nil {
-			return err
-		}
-		return encoding.ReadObject(conn, &foo, 11)
-	})
-	if err != nil {
-		t.Fatal(err)
+	peers := g1.Peers()
+	if len(peers) != 1 || peers[0] != g2.Address() {
+		t.Fatal("g1 has bad peer list:", peers)
 	}
-	if foo != "foo" {
-		t.Fatal("Foo gave wrong response:", foo)
-	}
-
-	// wrong number should produce an error
-	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
-		err := encoding.WriteObject(conn, 0xbadbeef)
-		if err != nil {
-			return err
-		}
-		return encoding.ReadObject(conn, &foo, 11)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if foo != "bar" {
-		t.Fatal("Foo gave wrong response:", foo)
-	}
-
 	err = g1.Disconnect(g2.Address())
+	if err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	peers = g1.Peers()
+	if len(peers) != 0 {
+		t.Fatal("g1 has peers after disconnect:", peers)
+	}
+}
+
+func TestBootstrap(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// create bootstrap peer
+	bootstrap := newTestingGateway("TestBootstrap1", t)
+
+	// give it a peer
+	err := bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
+	if err != nil {
+		t.Fatal("couldn't connect:", err)
+	}
+
+	// bootstrap a new peer
+	g := newTestingGateway("TestBootstrap3", t)
+	err = g.Bootstrap(bootstrap.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// node lists should be the same
+	if len(g.nodes) != len(bootstrap.nodes) {
+		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
+	}
+
+	err = g.Disconnect(bootstrap.Address())
 	if err != nil {
 		t.Fatal("failed to disconnect:", err)
 	}
 }
 
-/*
+func TestNew(t *testing.T) {
+	if _, err := New("", ""); err == nil {
+		t.Fatal("expecting saveDir error, got nil")
+	}
+	if _, err := New(":0", ""); err == nil {
+		t.Fatal("expecting saveDir error, got nil")
+	}
+	if g, err := New("foo", tester.TempDir("gateway", "TestNew1")); err == nil {
+		t.Fatal("expecting listener error, got nil", g.myAddr)
+	}
+	// create corrupted peers.dat
+	dir := tester.TempDir("gateway", "TestNew2")
+	os.MkdirAll(dir, 0700)
+	err := ioutil.WriteFile(filepath.Join(dir, "peers.dat"), []byte{1, 2, 3}, 0660)
+	if err != nil {
+		t.Fatal("couldn't create corrupted file:", err)
+	}
+	if _, err := New(":0", dir); err == nil {
+		t.Fatal("expect load error, got nil")
+	}
+}
 
-// TestTimeout tests that connections time out properly.
-// TODO: bring back connection monitoring
-func TestTimeout(t *testing.T) {
+func TestExternalIP(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	g := newTestingGateway("TestTimeout", t)
-	defer g.Close()
-
-	// create unresponsive peer
-	l, err := net.Listen("tcp", ":0")
+	ip, err := getExternalIP()
 	if err != nil {
-		t.Fatal("listen failed:", err)
+		t.Fatal("couldn't determine external IP:", err)
 	}
-	go func() {
-		l.Accept()
-		select {}
-	}()
-
-	_, err = g.Connect(modules.NetAddress(l.Addr().String()))
-	ne, ok := err.(net.Error)
-	if err == nil || !ok || !ne.Timeout() {
-		t.Fatalf("Got wrong error: expected timeout, got %v", err)
+	if net.ParseIP(ip) == nil {
+		t.Fatal("getExternalIP returned bad IP:", ip)
 	}
 }
-
-*/
