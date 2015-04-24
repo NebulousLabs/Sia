@@ -10,7 +10,7 @@ import (
 // ReceiveTransactionPoolUpdate listens to the transaction pool for changes in
 // the transaction pool. These changes will be applied to the blocks being
 // mined.
-func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, unconfirmedSiacoinOutputDiffs []modules.SiacoinOutputDiff) {
+func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, _ []modules.SiacoinOutputDiff) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	defer m.notifySubscribers()

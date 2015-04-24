@@ -52,7 +52,7 @@ func (tp *TransactionPool) validUnconfirmedSiacoins(t types.Transaction) (err er
 func (tp *TransactionPool) validUnconfirmedStorageProofs(t types.Transaction) (err error) {
 	// Check that the corresponding file contract is in the unconfirmed set.
 	for _, sp := range t.StorageProofs {
-		_, exists := tp.consensusSet.FileContract(sp.ParentID)
+		_, exists := tp.fileContracts[sp.ParentID]
 		if !exists {
 			return errors.New("storage proof submitted for file contract not in confirmed set.")
 		}

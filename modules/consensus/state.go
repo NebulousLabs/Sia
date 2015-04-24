@@ -135,13 +135,3 @@ func New(saveDir string) (*State, error) {
 func (s *State) Close() error {
 	return s.db.Close()
 }
-
-// RLock will readlock the state.
-func (s *State) RLock() int {
-	return s.mu.RLock()
-}
-
-// RUnlock will readunlock the state.
-func (s *State) RUnlock(id int) {
-	s.mu.RUnlock(id)
-}
