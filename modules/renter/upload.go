@@ -52,9 +52,9 @@ func (r *Renter) checkWalletBalance(up modules.UploadParams) error {
 // updated.
 func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) {
 	// Set 'Repairing' for the piece to true.
-	r.mu.Lock()
+	lockID := r.mu.Lock()
 	piece.Repairing = true
-	r.mu.Unlock()
+	r.mu.Unlock(lockID)
 
 	// Try 'maxUploadAttempts' hosts before giving up.
 	for attempts := 0; attempts < maxUploadAttempts; attempts++ {
@@ -79,7 +79,7 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 			continue
 		}
 
-		r.mu.Lock()
+		lockID := r.mu.Lock()
 		*piece = FilePiece{
 			Active:     true,
 			Repairing:  false,
@@ -88,7 +88,7 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 			HostIP:     host.IPAddress,
 		}
 		r.save()
-		r.mu.Unlock()
+		r.mu.Unlock(lockID)
 		return
 	}
 }
@@ -96,8 +96,8 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 // Upload takes an upload parameters, which contain a file to upload, and then
 // creates a redundant copy of the file on the Sia network.
 func (r *Renter) Upload(up modules.UploadParams) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
 
 	err := r.checkWalletBalance(up)
 	if err != nil {

@@ -3,8 +3,8 @@ package renter
 // scanAllFiles checks all files for pieces that are not yet active and then
 // uploads them to the network.
 func (r *Renter) scanAllFiles() {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 
 	for _, file := range r.files {
 		for i := range file.pieces {

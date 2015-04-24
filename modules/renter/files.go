@@ -28,8 +28,8 @@ type FilePiece struct {
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *File) Available() bool {
-	f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock()
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
 
 	for _, piece := range f.pieces {
 		if piece.Active {
@@ -41,15 +41,15 @@ func (f *File) Available() bool {
 
 // Nickname returns the nickname of the file.
 func (f *File) Nickname() string {
-	f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock()
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
 	return f.nickname
 }
 
 // Repairing returns whether or not the file is actively being repaired.
 func (f *File) Repairing() bool {
-	f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock()
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
 
 	for _, piece := range f.pieces {
 		if piece.Repairing {
@@ -61,15 +61,15 @@ func (f *File) Repairing() bool {
 
 // TimeRemaining returns the amount of time until the file's contracts expire.
 func (f *File) TimeRemaining() types.BlockHeight {
-	f.renter.mu.RLock()
-	defer f.renter.mu.RUnlock()
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
 	return f.startHeight - f.renter.state.Height()
 }
 
 // FileList returns all of the files that the renter has.
 func (r *Renter) FileList() (files []modules.FileInfo) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 
 	for _, file := range r.files {
 		// Because 'file' is the same memory for all iterations, we need to
