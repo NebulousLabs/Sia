@@ -3,10 +3,11 @@ package host
 import (
 	"errors"
 	"os"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -43,7 +44,7 @@ type Host struct {
 
 	modules.HostSettings
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // New returns an initialized Host.
@@ -86,6 +87,8 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
+
+		mu: sync.New(1*time.Second, 0),
 	}
 	block, exists := cs.BlockAtHeight(0)
 	if !exists {
@@ -108,23 +111,23 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
 func (h *Host) SetSettings(settings modules.HostSettings) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	h.HostSettings = settings
 	h.save()
 }
 
 // Settings is an RPC used to request the settings of a host.
 func (h *Host) Settings(conn modules.NetConn) error {
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	hs := h.HostSettings
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	return conn.WriteObject(hs)
 }
 
 func (h *Host) Info() modules.HostInfo {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 
 	info := modules.HostInfo{
 		HostSettings: h.HostSettings,

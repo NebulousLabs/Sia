@@ -57,8 +57,8 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 // RecieveConsensusSetUpdate will be called by the consensus set every time
 // there is a new block or a fork of some kind.
 func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
