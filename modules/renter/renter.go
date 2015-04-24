@@ -3,10 +3,10 @@ package renter
 import (
 	"errors"
 	"os"
-	"sync"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/sync"
 )
 
 // A Renter is responsible for tracking all of the files that a user has
@@ -21,7 +21,7 @@ type Renter struct {
 	downloadQueue []*Download
 	saveDir       string
 
-	mu sync.RWMutex
+	mu *sync.RWMutex
 }
 
 // New returns an empty renter.
@@ -73,8 +73,8 @@ func New(state *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wa
 // must exist, and there must not be any file that already has the replacement
 // nickname.
 func (r *Renter) Rename(currentName, newName string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
 
 	// Check that the currentName exists and the newName doesn't.
 	entry, exists := r.files[currentName]
@@ -98,8 +98,8 @@ func (r *Renter) Rename(currentName, newName string) error {
 // Info returns generic information about the renter and the files that are
 // being rented.
 func (r *Renter) Info() (ri modules.RentInfo) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 
 	for filename := range r.files {
 		ri.Files = append(ri.Files, filename)
