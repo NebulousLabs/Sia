@@ -46,13 +46,13 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	APIPort++
 
 	// create modules
-	cs, err := consensus.New(filepath.Join(testdir, "consensus"))
-	if err != nil {
-		t.Fatal("Failed to create consensus set:", err)
-	}
-	gateway, err := gateway.New(":0", cs, filepath.Join(testdir, "gateway"))
+	gateway, err := gateway.New(":0", filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
+	}
+	cs, err := consensus.New(gateway, filepath.Join(testdir, "consensus"))
+	if err != nil {
+		t.Fatal("Failed to create consensus set:", err)
 	}
 	tpool, err := transactionpool.New(cs, gateway)
 	if err != nil {
@@ -62,7 +62,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	miner, err := miner.New(cs, gateway, tpool, wallet)
+	miner, err := miner.New(cs, tpool, wallet)
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
@@ -122,7 +122,7 @@ func (st *serverTester) tpUpdateWait() {
 
 // netAddress returns the NetAddress of the caller.
 func (st *serverTester) netAddress() modules.NetAddress {
-	return st.server.gateway.Info().Address
+	return st.server.gateway.Address()
 }
 
 // coinAddress returns a coin address that the caller is able to spend from.

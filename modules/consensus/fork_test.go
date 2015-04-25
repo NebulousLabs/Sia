@@ -48,15 +48,15 @@ func TestComplexForking(t *testing.T) {
 
 	// Can't use NewTestingEnvironment; all states need to have the same set of
 	// initial blocks.
-	s1, err := New(tester.TempDir("consensus", "TestComplexForking1"))
+	s1, err := New(nil, tester.TempDir("consensus", "TestComplexForking1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := New(tester.TempDir("consensus", "TestComplexForking2"))
+	s2, err := New(nil, tester.TempDir("consensus", "TestComplexForking2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s3, err := New(tester.TempDir("consensus", "TestComplexForking3"))
+	s3, err := New(nil, tester.TempDir("consensus", "TestComplexForking3"))
 	if err != nil {
 		t.Fatal(err)
 	}
