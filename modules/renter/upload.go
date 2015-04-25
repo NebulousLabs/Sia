@@ -123,7 +123,6 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	r.files[up.Nickname] = File{
 		nickname:     up.Nickname,
 		pieces:       make([]FilePiece, up.Pieces),
-		startHeight:  r.blockHeight + up.Duration,
 		renter:       r,
 		uploadParams: up,
 	}

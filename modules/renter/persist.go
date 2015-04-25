@@ -4,15 +4,13 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // savedFiles contains the list of all the files that have been saved by the
 // renter.
 type savedFiles struct {
-	FilePieces  []FilePiece
-	Nickname    string
-	StartHeight types.BlockHeight
+	FilePieces []FilePiece
+	Nickname   string
 }
 
 // save puts all of the files known to the renter on disk.
@@ -20,7 +18,7 @@ func (r *Renter) save() error {
 	// create slice of savedFiles
 	savedPieces := make([]savedFiles, 0, len(r.files))
 	for nickname, file := range r.files {
-		savedPieces = append(savedPieces, savedFiles{file.pieces, nickname, file.startHeight})
+		savedPieces = append(savedPieces, savedFiles{file.pieces, nickname})
 	}
 	return encoding.WriteFile(filepath.Join(r.saveDir, "files.dat"), savedPieces)
 }
@@ -34,10 +32,9 @@ func (r *Renter) load() error {
 	}
 	for _, piece := range pieces {
 		r.files[piece.Nickname] = File{
-			nickname:    piece.Nickname,
-			pieces:      piece.FilePieces,
-			startHeight: piece.StartHeight,
-			renter:      r,
+			nickname: piece.Nickname,
+			pieces:   piece.FilePieces,
+			renter:   r,
 		}
 	}
 	return nil
