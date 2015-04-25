@@ -94,7 +94,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.State = true
 	}()
 	go func() {
-		srv.gateway.RemovePeer("")
+		srv.gateway.Address()
 		mds.Gateway = true
 	}()
 	go func() {

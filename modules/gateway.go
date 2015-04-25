@@ -48,6 +48,9 @@ type Gateway interface {
 	// Disconnect terminates a connection to a peer.
 	Disconnect(NetAddress) error
 
+	// Address returns the Gateway's address.
+	Address() NetAddress
+
 	// Peers returns the addresses that the Gateway is currently connected to.
 	Peers() []NetAddress
 

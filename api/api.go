@@ -41,7 +41,7 @@ func (srv *Server) initAPI(addr string) {
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-	handleHTTPRequest(mux, "/gateway/synchronize", srv.gatewaySynchronizeHandler)
+	//handleHTTPRequest(mux, "/gateway/synchronize", srv.gatewaySynchronizeHandler)
 	handleHTTPRequest(mux, "/gateway/peer/add", srv.gatewayPeerAddHandler)
 	handleHTTPRequest(mux, "/gateway/peer/remove", srv.gatewayPeerRemoveHandler)
 

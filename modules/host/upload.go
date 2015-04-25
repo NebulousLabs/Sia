@@ -3,11 +3,12 @@ package host
 import (
 	"errors"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -17,10 +18,10 @@ import (
 // intensive operations. All necessary interaction with the host involves
 // looking up the filepath of the file being requested. This is done all at
 // once.
-func (h *Host) RetrieveFile(conn modules.NetConn) (err error) {
+func (h *Host) RetrieveFile(conn net.Conn) (err error) {
 	// Get the filename.
 	var contractID types.FileContractID
-	err = conn.ReadObject(&contractID, crypto.HashSize)
+	err = encoding.ReadObject(conn, &contractID, crypto.HashSize)
 	if err != nil {
 		return
 	}

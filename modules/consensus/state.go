@@ -1,12 +1,14 @@
 package consensus
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/blockdb"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )

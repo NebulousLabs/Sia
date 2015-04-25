@@ -3,10 +3,12 @@ package renter
 import (
 	"errors"
 	"io"
+	"net"
 	"os"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -128,13 +130,13 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	time.Sleep(types.RenterZeroConfDelay)
 
 	// Perform the negotiations with the host through a network call.
-	err = r.gateway.RPC(host.IPAddress, "NegotiateContract", func(conn modules.NetConn) (err error) {
+	err = r.gateway.RPC(host.IPAddress, "NegotiateContract", func(conn net.Conn) (err error) {
 		// Send the contract terms and read the response.
-		if err = conn.WriteObject(terms); err != nil {
+		if err = encoding.WriteObject(conn, terms); err != nil {
 			return
 		}
 		var response string
-		if err = conn.ReadObject(&response, 128); err != nil {
+		if err = encoding.ReadObject(conn, &response, 128); err != nil {
 			return
 		}
 		if response != modules.AcceptTermsResponse {
@@ -148,7 +150,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		}
 
 		// Send the unsigned transaction to the host.
-		err = conn.WriteObject(unsignedTxn)
+		err = encoding.WriteObject(conn, unsignedTxn)
 		if err != nil {
 			return
 		}
@@ -157,7 +159,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		// Add the collateral inputs from the host to the original wallet
 		// transaction.
 		var collateralTxn types.Transaction
-		err = conn.ReadObject(&collateralTxn, 16e3)
+		err = encoding.ReadObject(conn, &collateralTxn, 16e3)
 		if err != nil {
 			return
 		}
@@ -173,7 +175,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		}
 
 		// Send the signed transaction back to the host.
-		err = conn.WriteObject(signedTxn)
+		err = encoding.WriteObject(conn, signedTxn)
 		if err != nil {
 			return
 		}

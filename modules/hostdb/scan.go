@@ -7,9 +7,11 @@ package hostdb
 import (
 	"crypto/rand"
 	"math/big"
+	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -61,9 +63,9 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
-	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
+	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn net.Conn) error {
 		maxSettingsLen := uint64(1024)
-		return conn.ReadObject(&settings, maxSettingsLen)
+		return encoding.ReadObject(conn, &settings, maxSettingsLen)
 	})
 
 	// Now that network communicaiton is done, lock the hostdb to modify the

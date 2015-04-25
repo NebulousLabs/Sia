@@ -4,11 +4,13 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -69,9 +71,9 @@ func (d *Download) Write(b []byte) (int, error) {
 
 // downloadPiece attempts to retrieve a file piece from a host.
 func (d *Download) downloadPiece(piece filePiece) error {
-	return d.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) error {
+	return d.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn net.Conn) error {
 		// Send the ID of the contract for the file piece we're requesting.
-		if err := conn.WriteObject(piece.ContractID); err != nil {
+		if err := encoding.WriteObject(conn, piece.ContractID); err != nil {
 			return err
 		}
 

@@ -120,12 +120,14 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 }
 
 // Settings is an RPC used to request the settings of a host.
+/*
 func (h *Host) Settings(conn modules.NetConn) error {
 	lockID := h.mu.RLock()
 	hs := h.HostSettings
 	h.mu.RUnlock(lockID)
 	return conn.WriteObject(hs)
 }
+*/
 
 func (h *Host) Info() modules.HostInfo {
 	lockID := h.mu.RLock()

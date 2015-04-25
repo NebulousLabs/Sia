@@ -42,17 +42,17 @@ type Host interface {
 	//
 	// TODO: enhance this documentataion. For now, see the host package for a
 	// reference implementation.
-	NegotiateContract(NetConn) error
+	//NegotiateContract(NetConn) error
 
 	// RetrieveFile is an RPC that enables a client to download a file from
 	// the host.
-	RetrieveFile(NetConn) error
+	//RetrieveFile(NetConn) error
 
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)
 
 	// Settings is an RPC that returns the host's settings.
-	Settings(NetConn) error
+	//Settings(NetConn) error
 
 	// Info returns info about the host, including its hosting parameters, the
 	// amount of storage remaining, and the number of active contracts.

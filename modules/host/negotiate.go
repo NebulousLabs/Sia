@@ -3,11 +3,13 @@ package host
 import (
 	"errors"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -153,10 +155,10 @@ func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms)
 // NegotiateContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
-func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
+func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 	// Read the contract terms.
 	var terms modules.ContractTerms
-	err = conn.ReadObject(&terms, maxContractLen)
+	err = encoding.ReadObject(conn, &terms, maxContractLen)
 	if err != nil {
 		return
 	}
@@ -167,7 +169,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	err = h.considerTerms(terms)
 	h.mu.RUnlock(lockID)
 	if err != nil {
-		err = conn.WriteObject(err.Error())
+		err = encoding.WriteObject(conn, err.Error())
 		return
 	}
 
@@ -190,7 +192,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	}()
 
 	// signal that we are ready to download file
-	err = conn.WriteObject(modules.AcceptTermsResponse)
+	err = encoding.WriteObject(conn, modules.AcceptTermsResponse)
 	if err != nil {
 		return
 	}
@@ -210,7 +212,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	// Data has been sent, read in the unsigned transaction with the file
 	// contract.
 	var unsignedTxn types.Transaction
-	err = conn.ReadObject(&unsignedTxn, maxContractLen)
+	err = encoding.ReadObject(conn, &unsignedTxn, maxContractLen)
 	if err != nil {
 		return
 	}
@@ -229,7 +231,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	if err != nil {
 		return
 	}
-	err = conn.WriteObject(collateralTxn)
+	err = encoding.WriteObject(conn, collateralTxn)
 	if err != nil {
 		return
 	}
@@ -237,7 +239,7 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 	// Read in the renter-signed transaction and check that it matches the
 	// previously accepted transaction.
 	var signedTxn types.Transaction
-	err = conn.ReadObject(&signedTxn, maxContractLen)
+	err = encoding.ReadObject(conn, &signedTxn, maxContractLen)
 	if err != nil {
 		return
 	}

@@ -73,12 +73,16 @@ func gatewaysynchronizecmd() {
 }
 
 func gatewaystatuscmd() {
-	var info modules.GatewayInfo
+	var info struct {
+		Address modules.NetAddress
+		Peers   []modules.NetAddress
+	}
 	err := getAPI("/gateway/status", &info)
 	if err != nil {
 		fmt.Println("Could not get gateway status:", err)
 		return
 	}
+	fmt.Println("Address:", info.Address)
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")
 		return

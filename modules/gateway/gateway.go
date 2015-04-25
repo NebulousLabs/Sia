@@ -11,7 +11,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 )
 
@@ -29,8 +28,6 @@ var (
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
-	state *consensus.State
-
 	listener net.Listener
 	myAddr   modules.NetAddress
 

@@ -2,9 +2,11 @@ package transactionpool
 
 import (
 	"errors"
+	"net"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -201,8 +203,9 @@ func (tp *TransactionPool) addTransactionToPool(t types.Transaction) {
 	tp.transactionList = append(tp.transactionList, t)
 }
 
-// AcceptTransaction adds a transaction to the unconfirmed set of transactions.
-// An error is returned if the transaction cannot be accepted.
+// AcceptTransaction adds a transaction to the unconfirmed set of
+// transactions. If the transaction is accepted, it will be relayed to
+// connected peers.
 func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
@@ -225,6 +228,18 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	// the transaction.
 	tp.addTransactionToPool(t)
 	tp.updateSubscribers(nil, nil, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
-	tp.gateway.RelayTransaction(t) // error is not checked
+	go tp.gateway.Broadcast("RelayTransaction", t)
 	return
+}
+
+// RelayTransaction is an RPC which accepts a transaction from a peer. If the
+// accept is successful, the transaction will be relayed to the Gateway's
+// other peers.
+func (tp *TransactionPool) RelayTransaction(conn net.Conn) error {
+	var t types.Transaction
+	err := encoding.ReadObject(conn, &t, types.BlockSizeLimit)
+	if err != nil {
+		return err
+	}
+	return tp.AcceptTransaction(t)
 }

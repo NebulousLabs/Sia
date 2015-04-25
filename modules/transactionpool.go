@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"net"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,9 +17,12 @@ type TransactionPoolSubscriber interface {
 
 type TransactionPool interface {
 	// AcceptTransaction takes a transaction, analyzes it, and either rejects
-	// it or adds it to the transaction pool, returning an error if the
-	// transaction is rejected.
+	// it or adds it to the transaction pool. Accepted transactions will be
+	// relayed to connected peers.
 	AcceptTransaction(types.Transaction) error
+
+	// RelayTransaction is an RPC that accepts a block from a peer.
+	RelayTransaction(net.Conn) error
 
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
