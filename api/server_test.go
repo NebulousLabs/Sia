@@ -26,8 +26,17 @@ var (
 )
 
 type serverTester struct {
-	*Server
-	*testing.T
+	server *Server
+
+	csUpdateChan     <-chan struct{}
+	hostUpdateChan   <-chan struct{}
+	hostdbUpdateChan <-chan struct{}
+	minerUpdateChan  <-chan struct{}
+	renterUpdateChan <-chan struct{}
+	tpoolUpdateChan  <-chan struct{}
+	walletUpdateChan <-chan struct{}
+
+	t *testing.T
 }
 
 func newServerTester(name string, t *testing.T) *serverTester {
@@ -37,41 +46,53 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	APIPort++
 
 	// create modules
-	state, err := consensus.New(filepath.Join(testdir, "consensus"))
+	cs, err := consensus.New(filepath.Join(testdir, "consensus"))
 	if err != nil {
 		t.Fatal("Failed to create consensus set:", err)
 	}
-	gateway, err := gateway.New(":0", state, filepath.Join(testdir, "gateway"))
+	gateway, err := gateway.New(":0", cs, filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
 	}
-	tpool, err := transactionpool.New(state, gateway)
+	tpool, err := transactionpool.New(cs, gateway)
 	if err != nil {
 		t.Fatal("Failed to create tpool:", err)
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(testdir, "wallet"))
+	wallet, err := wallet.New(cs, tpool, filepath.Join(testdir, "wallet"))
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	miner, err := miner.New(state, gateway, tpool, wallet)
+	miner, err := miner.New(cs, gateway, tpool, wallet)
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
-	host, err := host.New(state, tpool, wallet, filepath.Join(testdir, "host"))
+	host, err := host.New(cs, tpool, wallet, filepath.Join(testdir, "host"))
 	if err != nil {
 		t.Fatal("Failed to create host:", err)
 	}
-	hostdb, err := hostdb.New(state, gateway)
+	hostdb, err := hostdb.New(cs, gateway)
 	if err != nil {
 		t.Fatal("Failed to create hostdb:", err)
 	}
-	renter, err := renter.New(state, gateway, hostdb, wallet, filepath.Join(testdir, "renter"))
+	renter, err := renter.New(cs, gateway, hostdb, wallet, filepath.Join(testdir, "renter"))
 	if err != nil {
 		t.Fatal("Failed to create renter:", err)
 	}
 
-	srv := NewServer(APIAddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)
-	st := &serverTester{srv, t}
+	srv := NewServer(APIAddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet)
+	st := &serverTester{
+		server: srv,
+
+		csUpdateChan:     cs.ConsensusSetNotify(),
+		hostUpdateChan:   host.HostNotify(),
+		hostdbUpdateChan: hostdb.HostDBNotify(),
+		minerUpdateChan:  miner.MinerNotify(),
+		renterUpdateChan: renter.RenterNotify(),
+		tpoolUpdateChan:  tpool.TransactionPoolNotify(),
+		walletUpdateChan: wallet.WalletNotify(),
+
+		t: t,
+	}
 
 	go func() {
 		listenErr := srv.Serve()
@@ -86,9 +107,22 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	return st
 }
 
+func (st *serverTester) csUpdateWait() {
+	<-st.csUpdateChan
+	<-st.hostUpdateChan
+	<-st.renterUpdateChan
+	st.tpUpdateWait()
+}
+
+func (st *serverTester) tpUpdateWait() {
+	<-st.tpoolUpdateChan
+	<-st.minerUpdateChan
+	<-st.walletUpdateChan
+}
+
 // netAddress returns the NetAddress of the caller.
 func (st *serverTester) netAddress() modules.NetAddress {
-	return st.gateway.Info().Address
+	return st.server.gateway.Info().Address
 }
 
 // coinAddress returns a coin address that the caller is able to spend from.
@@ -103,9 +137,9 @@ func (st *serverTester) coinAddress() string {
 // mineBlock mines a block and puts it into the consensus set.
 func (st *serverTester) mineBlock() {
 	for {
-		_, solved, err := st.miner.FindBlock()
+		_, solved, err := st.server.miner.FindBlock()
 		if err != nil {
-			st.Fatal("Mining failed:", err)
+			st.t.Fatal("Mining failed:", err)
 		} else if solved {
 			// SolveBlock automatically puts the block into the consensus set.
 			break
@@ -123,14 +157,14 @@ func (st *serverTester) mineMoney() {
 	// Mine enough blocks to overcome the maturity delay and receive coins.
 	for i := types.BlockHeight(0); i < 1+types.MaturityDelay; i++ {
 		st.mineBlock()
-		st.updateWait()
+		st.csUpdateWait()
 	}
 
 	// Compare new balance to old balance.
 	var info2 modules.WalletInfo
 	st.getAPI("/wallet/status", &info2)
 	if info2.Balance.Cmp(info.Balance) <= 0 {
-		st.Fatal("Mining did not increase balance")
+		st.t.Fatal("Mining did not increase balance")
 	}
 }
 
@@ -138,15 +172,15 @@ func (st *serverTester) mineMoney() {
 // not return 200, the error will be read and returned. The response body is
 // not closed.
 func (st *serverTester) get(call string) (resp *http.Response) {
-	resp, err := http.Get("http://localhost" + st.apiServer.Addr + call)
+	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
 	if err != nil {
-		st.Fatalf("GET %s failed: %v", call, err)
+		st.t.Fatalf("GET %s failed: %v", call, err)
 	}
 	// check error code
 	if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
-		st.Fatalf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
+		st.t.Fatalf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
 	}
 	return
 }
@@ -157,7 +191,7 @@ func (st *serverTester) getAPI(call string, obj interface{}) {
 	defer resp.Body.Close()
 	err := json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
-		st.Fatalf("Could not decode API response: %s", call)
+		st.t.Fatalf("Could not decode API response: %s", call)
 	}
 	return
 }

@@ -10,8 +10,8 @@ import (
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce(addr modules.NetAddress) (err error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 
 	// create the transaction that will hold the announcement
 	var t types.Transaction

@@ -63,8 +63,10 @@ test-long: clean fmt REBUILD
 # Testing for each package individually. Packages are added to this set as needed.
 test-types: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./types
-test-consensus:
+test-consensus: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
+test-host: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=5s ./modules/host
 test-tpool: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/transactionpool
 test-wallet: clean fmt REBUILD

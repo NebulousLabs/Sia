@@ -21,7 +21,7 @@ func TestUploadAndDownload(t *testing.T) {
 	st := newServerTester("TestUploadAndDownload", t)
 	st.announceHost()
 
-	for len(st.hostdb.ActiveHosts()) == 0 {
+	for len(st.server.hostdb.ActiveHosts()) == 0 {
 		time.Sleep(time.Millisecond)
 	}
 
@@ -37,7 +37,7 @@ func TestUploadAndDownload(t *testing.T) {
 	// indicate if a download has completed or not.
 	time.Sleep(types.RenterZeroConfDelay + time.Second*10)
 
-	files := st.renter.FileList()
+	files := st.server.renter.FileList()
 	if len(files) != 1 || !files[0].Available() {
 		t.Fatal("file is not uploaded")
 	}

@@ -1,5 +1,9 @@
 package miner
 
+import (
+	"github.com/NebulousLabs/Sia/modules"
+)
+
 // notifySubscribers tells each subscriber that the miner has received an
 // update.
 func (m *Miner) notifySubscribers() {
@@ -13,7 +17,7 @@ func (m *Miner) notifySubscribers() {
 
 // MinerNotify adds a subscriber to the miner.
 func (m *Miner) MinerNotify() <-chan struct{} {
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
 	m.mu.Lock()
 	m.subscribers = append(m.subscribers, c)
 	m.mu.Unlock()

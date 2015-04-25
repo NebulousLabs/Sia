@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -56,8 +57,8 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber ConsensusSe
 	}
 }
 
-// updateSubscribers calls ReceiveConsensusSetUpdate on all of the subscribers
-// to the consensus set.
+// updateSubscribers will inform all subscribers of the new update to the
+// consensus set.
 func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
 	// Add the changes to the change set.
 	s.revertUpdates = append(s.revertUpdates, revertedNodes)
@@ -77,7 +78,7 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 // time the consensus set changes.
 func (s *State) ConsensusSetNotify() <-chan struct{} {
 	id := s.mu.Lock()
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
 	s.subscriptions = append(s.subscriptions, c)
 	s.mu.Unlock(id)
 	return c

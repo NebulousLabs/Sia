@@ -161,40 +161,6 @@ func (s *State) BlockOutputDiffs(id types.BlockID) (scods []modules.SiacoinOutpu
 	return
 }
 
-// BlocksSince returns a set of output diffs representing how the state
-// has changed since block 'id'. OutputDiffsSince will flip the `new` value for
-// diffs that got reversed.
-func (s *State) BlocksSince(id types.BlockID) (removedBlocks, addedBlocks []types.BlockID, err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-
-	node, exists := s.blockMap[id]
-	if !exists {
-		err = errors.New("block is unknown")
-		return
-	}
-
-	// Get all the IDs from the blockchain to the current path.
-	path := s.backtrackToCurrentPath(node)
-	for i := len(path) - 1; i > 0; i-- {
-		removedBlocks = append(removedBlocks, path[i].block.ID())
-	}
-
-	// Get all the IDs going forward from the common parent.
-	addedBlocks = s.currentPath[path[0].height+1:]
-	return
-}
-
-// FileContract returns the file contract associated with the 'id'. If the
-// contract does not exist, exists will be false.
-func (s *State) FileContract(id types.FileContractID) (fc types.FileContract, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-
-	fc, exists = s.fileContracts[id]
-	return
-}
-
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
@@ -258,29 +224,6 @@ func (s *State) HeightOfBlock(bid types.BlockID) (height types.BlockHeight, exis
 	}
 	height = bn.height
 	return
-}
-
-// SiacoinOutput returns the siacoin output associated with the given ID.
-func (s *State) SiacoinOutput(id types.SiacoinOutputID) (output types.SiacoinOutput, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.output(id)
-}
-
-// SiafundOutput returns the siafund output associated with the given ID.
-func (s *State) SiafundOutput(id types.SiafundOutputID) (output types.SiafundOutput, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	output, exists = s.siafundOutputs[id]
-	return
-}
-
-// SortedUtxoSet returns all of the unspent transaction outputs sorted
-// according to the numerical value of their id.
-func (s *State) SortedUtxoSet() []types.SiacoinOutput {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.sortedUscoSet()
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

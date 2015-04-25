@@ -20,7 +20,7 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	}
 	defer file.Close()
 
-	segmentIndex, err := h.state.StorageProofSegment(obligation.ID)
+	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
 	if err != nil {
 		return
 	}
@@ -54,29 +54,16 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	return
 }
 
-// update grabs all of the blocks that have appeared since the last update and
-// submits any necessary storage proofs.
-func (h *Host) update() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// Get the blocks since the recent update.
-	_, appliedBlockIDs, err := h.state.BlocksSince(h.latestBlock)
-	if err != nil {
-		// The host has somehow desynchronized.
-		if build.DEBUG {
-			panic(err)
-		}
-	}
-	if len(appliedBlockIDs) == 0 {
-		return
-	}
-	h.latestBlock = appliedBlockIDs[len(appliedBlockIDs)-1]
+// RecieveConsensusSetUpdate will be called by the consensus set every time
+// there is a new block or a fork of some kind.
+func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block) {
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
-	for _, blockID := range appliedBlockIDs {
-		height, exists := h.state.HeightOfBlock(blockID)
+	for _, block := range appliedBlocks {
+		height, exists := h.cs.HeightOfBlock(block.ID())
 		if build.DEBUG {
 			if !exists {
 				panic("a block returned by BlocksSince doesn't appear to exist")
@@ -85,7 +72,7 @@ func (h *Host) update() {
 
 		for _, obligation := range h.obligationsByHeight[height] {
 			// Submit a storage proof for the obligation.
-			err := h.createStorageProof(obligation, h.state.Height())
+			err := h.createStorageProof(obligation, h.cs.Height())
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -104,14 +91,6 @@ func (h *Host) update() {
 		}
 		delete(h.obligationsByHeight, height)
 	}
-}
 
-// threadedConsensusListen listens to a channel that's subscribed to the state
-// and updates every time the consensus set changes. When the consensus set
-// changes, the host checks if there are any storage proofs that need to be
-// submitted and submits them.
-func (h *Host) threadedConsensusListen(consensusChan <-chan struct{}) {
-	for _ = range consensusChan {
-		h.update()
-	}
+	h.updateSubscribers()
 }

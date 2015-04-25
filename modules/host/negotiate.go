@@ -49,7 +49,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case terms.Duration < h.MinDuration || terms.Duration > h.MaxDuration:
 		return errors.New("duration is out of bounds")
 
-	case terms.DurationStart >= h.state.Height():
+	case terms.DurationStart >= h.cs.Height():
 		return errors.New("duration cannot start in the future")
 
 	case terms.WindowSize < h.WindowSize:
@@ -163,18 +163,18 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// Consider the contract terms. If they are unnacceptable, return an error
 	// describing why.
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	err = h.considerTerms(terms)
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	if err != nil {
 		err = conn.WriteObject(err.Error())
 		return
 	}
 
 	// terms are acceptable; allocate space for file
-	h.mu.Lock()
+	lockID = h.mu.Lock()
 	file, path, err := h.allocate(terms.FileSize)
-	h.mu.Unlock()
+	h.mu.Unlock(lockID)
 	if err != nil {
 		return
 	}
@@ -182,8 +182,8 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 
 	// rollback everything if something goes wrong
 	defer func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
+		lockID := h.mu.Lock()
+		defer h.mu.Unlock(lockID)
 		if err != nil {
 			h.deallocate(terms.FileSize, path)
 		}
@@ -272,11 +272,11 @@ func (h *Host) NegotiateContract(conn modules.NetConn) (err error) {
 		FileContract: fc,
 		Path:         path,
 	}
-	h.mu.Lock()
+	lockID = h.mu.Lock()
 	h.obligationsByHeight[proofHeight] = append(h.obligationsByHeight[proofHeight], co)
 	h.obligationsByID[fcid] = co
 	h.save()
-	h.mu.Unlock()
+	h.mu.Unlock(lockID)
 
 	// TODO: we don't currently watch the blockchain to make sure that the
 	// transaction actually gets into the blockchain.

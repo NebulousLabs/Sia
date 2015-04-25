@@ -3,10 +3,11 @@ package host
 import (
 	"errors"
 	"os"
-	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -29,7 +30,7 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	state       *consensus.State
+	cs          *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	latestBlock types.BlockID
@@ -43,12 +44,14 @@ type Host struct {
 
 	modules.HostSettings
 
-	mu sync.RWMutex
+	subscriptions []chan struct{}
+
+	mu *sync.RWMutex
 }
 
 // New returns an initialized Host.
-func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
-	if state == nil {
+func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
+	if cs == nil {
 		err = errors.New("host cannot use a nil state")
 		return
 	}
@@ -66,7 +69,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 		return
 	}
 	h = &Host{
-		state:  state,
+		cs:     cs,
 		tpool:  tpool,
 		wallet: wallet,
 
@@ -86,8 +89,10 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
+
+		mu: sync.New(1*time.Second, 0),
 	}
-	block, exists := state.BlockAtHeight(0)
+	block, exists := cs.BlockAtHeight(0)
 	if !exists {
 		err = errors.New("state doesn't have a genesis block")
 		return
@@ -100,8 +105,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 	}
 	h.load()
 
-	typesChan := state.ConsensusSetNotify()
-	go h.threadedConsensusListen(typesChan)
+	h.cs.ConsensusSetSubscribe(h)
 
 	return
 }
@@ -109,23 +113,23 @@ func New(state *consensus.State, tpool modules.TransactionPool, wallet modules.W
 // SetConfig updates the host's internal HostSettings object. To modify
 // a specific field, use a combination of Info and SetConfig
 func (h *Host) SetSettings(settings modules.HostSettings) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
 	h.HostSettings = settings
 	h.save()
 }
 
 // Settings is an RPC used to request the settings of a host.
 func (h *Host) Settings(conn modules.NetConn) error {
-	h.mu.RLock()
+	lockID := h.mu.RLock()
 	hs := h.HostSettings
-	h.mu.RUnlock()
+	h.mu.RUnlock(lockID)
 	return conn.WriteObject(hs)
 }
 
 func (h *Host) Info() modules.HostInfo {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
 
 	info := modules.HostInfo{
 		HostSettings: h.HostSettings,

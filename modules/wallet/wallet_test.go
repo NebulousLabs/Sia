@@ -21,8 +21,10 @@ type walletTester struct {
 	miner  modules.Miner
 	wallet *Wallet
 
-	minerChan  <-chan struct{}
-	walletChan <-chan struct{}
+	csUpdateChan     <-chan struct{}
+	tpoolUpdateChan  <-chan struct{}
+	minerUpdateChan  <-chan struct{}
+	walletUpdateChan <-chan struct{}
 
 	t *testing.T
 }
@@ -42,7 +44,7 @@ func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 	if err != nil {
 		return
 	}
-	wt.updateWait()
+	wt.tpUpdateWait()
 	_, _, err = wt.wallet.AddOutput(id, output)
 	if err != nil {
 		return
@@ -55,14 +57,19 @@ func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 	if err != nil {
 		return
 	}
-	wt.updateWait()
+	wt.tpUpdateWait()
 	return
 }
 
-// updateWait blocks while an update propagates through the modules.
-func (wt *walletTester) updateWait() {
-	<-wt.minerChan
-	<-wt.walletChan
+func (wt *walletTester) csUpdateWait() {
+	<-wt.csUpdateChan
+	wt.tpUpdateWait()
+}
+
+func (wt *walletTester) tpUpdateWait() {
+	<-wt.tpoolUpdateChan
+	<-wt.minerUpdateChan
+	<-wt.walletUpdateChan
 }
 
 // NewWalletTester takes a testing.T and creates a WalletTester.
@@ -106,8 +113,10 @@ func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
 		miner:  m,
 		wallet: w,
 
-		minerChan:  m.MinerNotify(),
-		walletChan: w.WalletNotify(),
+		csUpdateChan:     cs.ConsensusSetNotify(),
+		tpoolUpdateChan:  tp.TransactionPoolNotify(),
+		minerUpdateChan:  m.MinerNotify(),
+		walletUpdateChan: w.WalletNotify(),
 
 		t: t,
 	}
@@ -118,7 +127,7 @@ func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		wt.updateWait()
+		wt.csUpdateWait()
 	}
 
 	return

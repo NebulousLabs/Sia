@@ -118,7 +118,7 @@ func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []typ
 // time that there is a change to the transaction pool (new transaction or
 // block), but that subscriber will not be told any details about the change.
 func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
 	id := tp.mu.Lock()
 	tp.subscribers = append(tp.subscribers, c)
 	tp.mu.Unlock(id)

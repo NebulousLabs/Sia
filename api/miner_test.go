@@ -21,7 +21,7 @@ func TestMining(t *testing.T) {
 	var minerstatus modules.MinerInfo
 	st.getAPI("/miner/status", &minerstatus)
 	if minerstatus.State != "On" {
-		st.Fatal("Miner did not start")
+		st.t.Fatal("Miner did not start")
 	}
 	time.Sleep(1000 * time.Millisecond)
 	st.callAPI("/miner/stop")
@@ -29,6 +29,6 @@ func TestMining(t *testing.T) {
 	var walletstatus modules.WalletInfo
 	st.getAPI("/wallet/status", &walletstatus)
 	if walletstatus.FullBalance.IsZero() {
-		st.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
+		st.t.Fatalf("Mining did not increase wallet balance: %v", walletstatus.FullBalance.Big())
 	}
 }

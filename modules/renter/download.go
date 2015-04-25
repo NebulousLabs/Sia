@@ -162,8 +162,8 @@ func newDownload(file File, destination string) (*Download, error) {
 // Download downloads a file, identified by its nickname, to the destination
 // specified.
 func (r *Renter) Download(nickname, destination string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
 
 	// Lookup the File associated with the nickname.
 	file, exists := r.files[nickname]
@@ -185,8 +185,8 @@ func (r *Renter) Download(nickname, destination string) error {
 
 // DownloadQueue returns the list of downloads in the queue.
 func (r *Renter) DownloadQueue() []modules.DownloadInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
