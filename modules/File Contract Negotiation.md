@@ -61,10 +61,3 @@ double spend has been submitted, the submitter needs only wait until the double
 spend has been fully confirmed by the blockchain. The double spend can only be
 foiled by the appearance of the file contract, which was the original goal
 anyway.
-
-Weaknesses 
-----------
-
-This protocol can fail if transactions are being actively censored by miners,
-or are not being submitted with high enough fees to get priority on the
-blockchain.
