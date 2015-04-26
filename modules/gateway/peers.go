@@ -22,8 +22,6 @@ type peer struct {
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
-	id := g.mu.Lock()
-	defer g.mu.Unlock(id)
 	g.peers[p.addr] = p
 	g.addNode(p.addr)
 	go g.listenPeer(p)
@@ -46,7 +44,9 @@ func (g *Gateway) listen() {
 				return
 			}
 			g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
+			id := g.mu.Lock()
 			g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
+			g.mu.Unlock(id)
 		}(conn)
 	}
 }
@@ -75,7 +75,9 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// TODO: exchange version messages
 
+	id = g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
+	g.mu.Unlock(id)
 
 	g.log.Println("INFO: connected to new peer", addr)
 	return nil

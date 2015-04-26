@@ -10,6 +10,8 @@ import (
 func TestAddNode(t *testing.T) {
 	g := newTestingGateway("TestAddNode", t)
 	defer g.Close()
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
 	if err := g.addNode("foo"); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
@@ -21,6 +23,8 @@ func TestAddNode(t *testing.T) {
 func TestRemoveNode(t *testing.T) {
 	g := newTestingGateway("TestRemoveNode", t)
 	defer g.Close()
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
 	if err := g.addNode("foo"); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
@@ -35,15 +39,17 @@ func TestRemoveNode(t *testing.T) {
 func TestRandomNode(t *testing.T) {
 	g := newTestingGateway("TestRemoveNode", t)
 	defer g.Close()
+	id := g.mu.RLock()
 
 	if addr, err := g.randomNode(); err != nil {
 		t.Fatal("randomNode failed:", err)
 	} else if addr != g.Address() {
 		t.Fatal("randomNode returned wrong address:", addr)
 	}
+	g.mu.RUnlock(id)
 
-	g.removeNode(g.Address())
-
+	id = g.mu.Lock()
+	g.removeNode(g.myAddr)
 	if _, err := g.randomNode(); err != errNoPeers {
 		t.Fatalf("randomNode returned wrong error: expected %v, got %v", errNoPeers, err)
 	}
@@ -56,8 +62,12 @@ func TestRandomNode(t *testing.T) {
 	for addr := range nodes {
 		g.addNode(addr)
 	}
+	g.mu.Unlock(id)
+
 	for i := 0; i < len(nodes)*10; i++ {
+		id = g.mu.RLock()
 		addr, err := g.randomNode()
+		g.mu.RUnlock(id)
 		if err != nil {
 			t.Fatal("randomNode failed:", err)
 		}

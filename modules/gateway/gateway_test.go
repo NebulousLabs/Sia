@@ -126,8 +126,10 @@ func TestExternalIP(t *testing.T) {
 
 func TestLoad(t *testing.T) {
 	g := newTestingGateway("TestLoad", t)
+	id := g.mu.Lock()
 	g.addNode("foo")
 	g.save()
+	g.mu.Unlock(id)
 	g.Close()
 
 	g2, err := New(":0", g.saveDir)

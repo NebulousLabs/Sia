@@ -189,17 +189,22 @@ func TestBroadcast(t *testing.T) {
 		t.Fatal("failed to connect:", err)
 	}
 
-	var g2Payload string
+	var g2Payload, g3Payload string
+	doneChan := make(chan struct{})
 	g2.RegisterRPC("Recv", func(conn net.Conn) error {
-		return encoding.ReadObject(conn, &g2Payload, 100)
+		encoding.ReadObject(conn, &g2Payload, 100)
+		doneChan <- struct{}{}
+		return nil
 	})
-	var g3Payload string
 	g3.RegisterRPC("Recv", func(conn net.Conn) error {
-		return encoding.ReadObject(conn, &g3Payload, 100)
+		encoding.ReadObject(conn, &g3Payload, 100)
+		doneChan <- struct{}{}
+		return nil
 	})
 
 	g1.Broadcast("Recv", "foo")
-	time.Sleep(10 * time.Millisecond)
+	<-doneChan
+	<-doneChan
 	if g2Payload != "foo" || g3Payload != "foo" {
 		t.Fatal("broadcast failed:", g2Payload, g3Payload)
 	}

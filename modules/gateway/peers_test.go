@@ -14,6 +14,8 @@ import (
 func TestAddPeer(t *testing.T) {
 	g := newTestingGateway("TestAddPeer", t)
 	defer g.Close()
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
 	g.addPeer(&peer{addr: "foo", sess: muxado.Client(nil)})
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
@@ -35,11 +37,20 @@ func TestListen(t *testing.T) {
 		t.Fatal("couldn't write address")
 	}
 	// g should add foo
-	for g.peers["foo"] == nil {
+	var ok bool
+	for !ok {
+		id := g.mu.RLock()
+		_, ok = g.peers["foo"]
+		g.mu.RUnlock(id)
 	}
+
 	conn.Close()
+
 	// g should remove foo
-	for g.peers["foo"] != nil {
+	for ok {
+		id := g.mu.RLock()
+		_, ok = g.peers["foo"]
+		g.mu.RUnlock(id)
 	}
 
 	// "uncompliant" connect
@@ -77,7 +88,7 @@ func TestConnect(t *testing.T) {
 		t.Fatal("connect failed:", err)
 	}
 
-	if len(g.peers) != 1 {
+	if len(g.Peers()) != 1 {
 		t.Fatal("gateway did not add peer after connecting:", g.peers)
 	}
 }
@@ -107,7 +118,9 @@ func TestDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
+	id := g.mu.Lock()
 	g.addPeer(&peer{addr: "foo", sess: muxado.Client(conn)})
+	g.mu.Unlock(id)
 	if err := g.Disconnect("foo"); err != nil {
 		t.Fatal("disconnect failed:", err)
 	}
@@ -122,10 +135,12 @@ func TestMakeOutboundConnections(t *testing.T) {
 	defer g1.Close()
 
 	// first add 8 dummy peers
+	id := g1.mu.Lock()
 	for i := 0; i < 8; i++ {
 		peerAddr := modules.NetAddress("foo" + strconv.Itoa(i))
 		g1.addPeer(&peer{addr: peerAddr, sess: muxado.Client(nil)})
 	}
+	g1.mu.Unlock(id)
 
 	// makeOutboundConnections should now sleep for 5 seconds
 	time.Sleep(1 * time.Second)
@@ -134,10 +149,15 @@ func TestMakeOutboundConnections(t *testing.T) {
 	g1.Disconnect("foo1")
 	g2 := newTestingGateway("TestMakeOutboundConnections2", t)
 	defer g2.Close()
+	id = g1.mu.Lock()
 	g1.addNode(g2.Address())
+	g1.mu.Unlock(id)
 
 	// when makeOutboundConnections wakes up, it should connect to g2.
 	time.Sleep(5 * time.Second)
+
+	id = g1.mu.RLock()
+	defer g1.mu.RUnlock(id)
 	if len(g1.peers) != 8 {
 		t.Fatal("gateway did not reach 8 peers:", g1.peers)
 	}
