@@ -4,7 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -21,56 +22,52 @@ func (st *serverTester) addPeer(name string) *serverTester {
 	if err != nil {
 		st.t.Fatal("bootstrap failed:", err)
 	}
-	// Wait for bootstrapping to finish, then check that each has the same
-	// number of peers and blocks.
-	for len(st.server.gateway.Peers()) != len(newPeer.server.gateway.Peers()) {
-		time.Sleep(time.Millisecond)
-	}
-	/*
-		// force synchronization to st, in case newPeer tried to synchronize to
-		// one of st's peers.
-		for st.server.cs.Height() != newPeer.server.cs.Height() {
-			newPeer.server.gateway.Synchronize(st.netAddress())
-		}
-	*/
+
 	return newPeer
 }
 
-// TestPeering tests that peers are properly announced and relayed throughout
-// the network.
-func TestPeering(t *testing.T) {
-	// Create two peers and add the first to the second.
-	peer1 := newServerTester("TestPeering1", t)
-	peer2 := newServerTester("TestPeering2", t)
-	peer1.callAPI("/gateway/peer/add?address=" + string(peer2.netAddress()))
+func TestGatewayStatus(t *testing.T) {
+	st := newServerTester("TestGatewayStatus", t)
+	var info GatewayInfo
+	st.getAPI("/gateway/status", &info)
+	if len(info.Peers) != 0 {
+		t.Fatal("/gateway/status gave bad peer list:", info.Peers)
+	}
+}
 
-	// Check that the first has the second as a peer.
-	var info struct {
-		Address modules.NetAddress
-		Peers   []modules.NetAddress
+func TestGatewayPeerAdd(t *testing.T) {
+	st := newServerTester("TestGatewayPeerAdd", t)
+	peer, err := gateway.New(":0", tester.TempDir("api", "TestGatewayPeerAdd", "gateway"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	peer1.getAPI("/gateway/status", &info)
-	if len(info.Peers) != 1 || info.Peers[0] != peer2.netAddress() {
-		t.Fatal("/gateway/peer/add did not add peer", peer2.netAddress())
+	st.callAPI("/gateway/peer/add?address=" + string(peer.Address()))
+
+	var info GatewayInfo
+	st.getAPI("/gateway/status", &info)
+	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
+		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
+	}
+}
+
+func TestGatewayPeerRemove(t *testing.T) {
+	st := newServerTester("TestGatewayPeerRemove", t)
+	peer, err := gateway.New(":0", tester.TempDir("api", "TestGatewayPeerRemove", "gateway"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.callAPI("/gateway/peer/add?address=" + string(peer.Address()))
+
+	var info GatewayInfo
+	st.getAPI("/gateway/status", &info)
+	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
+		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
 	}
 
-	// Create a third peer that bootstraps to the first peer, and check that it
-	// reports the others as peers.
-	peer3 := peer1.addPeer("TestPeering3")
-	peer3.getAPI("/gateway/status", &info)
-	if len(info.Peers) != 2 {
-		t.Fatal("bootstrap peer did not share its peers", info)
-	}
-
-	// When peer3 bootstraps to peer1, it should learn about peer2 and
-	// announce to it.
-	peer2.getAPI("/gateway/status", &info)
-	for len(info.Peers) != 1 {
-		time.Sleep(time.Millisecond)
-		peer2.getAPI("/gateway/status", &info)
-	}
-	if info.Peers[0] != peer3.netAddress() {
-		t.Fatal("bootstrap peer did not relay the bootstrapping peer", info)
+	st.callAPI("/gateway/peer/remove?address=" + string(peer.Address()))
+	st.getAPI("/gateway/status", &info)
+	if len(info.Peers) != 0 {
+		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
 	}
 }
 

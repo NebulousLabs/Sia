@@ -6,12 +6,14 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+type GatewayInfo struct {
+	Address modules.NetAddress
+	Peers   []modules.NetAddress
+}
+
 // gatewayStatusHandler handles the API call asking for the gatway status.
 func (srv *Server) gatewayStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, struct {
-		Address modules.NetAddress
-		Peers   []modules.NetAddress
-	}{srv.gateway.Address(), srv.gateway.Peers()})
+	writeJSON(w, GatewayInfo{srv.gateway.Address(), srv.gateway.Peers()})
 }
 
 /*
