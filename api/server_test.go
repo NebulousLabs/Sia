@@ -79,6 +79,10 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		t.Fatal("Failed to create renter:", err)
 	}
 
+	// register gateway RPCs
+	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
+	gateway.RegisterRPC("RelayTransaction", tpool.RelayTransaction)
+
 	srv := NewServer(APIAddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet)
 	st := &serverTester{
 		server: srv,
