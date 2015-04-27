@@ -16,6 +16,7 @@ type file struct {
 
 	// Erasure coding variables:
 	//		piecesRequired <= optimalRecoveryPieces <= totalPieces
+	ErasureScheme         string
 	PiecesRequired        int
 	OptimalRecoveryPieces int
 	TotalPieces           int
@@ -52,8 +53,12 @@ func (f *file) Available() bool {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
 
+	var active int
 	for _, piece := range f.Pieces {
 		if piece.Active {
+			active++
+		}
+		if active >= f.PiecesRequired {
 			return true
 		}
 	}
