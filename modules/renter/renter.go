@@ -27,7 +27,7 @@ type Renter struct {
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
 
-	files         map[string]file
+	files         map[string]*file
 	downloadQueue []*Download
 	saveDir       string
 
@@ -57,7 +57,7 @@ func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, walle
 		hostDB:  hdb,
 		wallet:  wallet,
 
-		files:   make(map[string]file),
+		files:   make(map[string]*file),
 		saveDir: saveDir,
 
 		mu: sync.New(1*time.Second, 0),

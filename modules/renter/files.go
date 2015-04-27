@@ -8,6 +8,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	ErrUnknownNickname  = errors.New("no file known by that nickname")
+	ErrNicknameOverload = errors.New("a file with the proposed nickname already exists")
+)
+
 // A file is a single file that has been uploaded to the network.
 type file struct {
 	Name          string
@@ -104,12 +109,10 @@ func (r *Renter) FileList() (files []modules.FileInfo) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	for i := range r.files {
+	for _, f := range r.files {
 		// Because 'file' is the same memory for all iterations, we need to
 		// make a copy.
-		nf := new(file)
-		*nf = r.files[i]
-		files = append(files, nf)
+		files = append(files, f)
 	}
 	return
 }
@@ -122,19 +125,19 @@ func (r *Renter) Rename(currentName, newName string) error {
 	defer r.mu.Unlock(lockID)
 
 	// Check that the currentName exists and the newName doesn't.
-	entry, exists := r.files[currentName]
+	file, exists := r.files[currentName]
 	if !exists {
-		return errors.New("no file found by that name")
+		return ErrUnknownNickname
 	}
 	_, exists = r.files[newName]
 	if exists {
-		return errors.New("file of new name already exists")
+		return ErrNicknameOverload
 	}
 
 	// Do the renaming.
 	delete(r.files, currentName)
-	entry.Name = newName
-	r.files[newName] = entry
+	file.Name = newName
+	r.files[newName] = file
 
 	r.save()
 	return nil

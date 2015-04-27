@@ -120,7 +120,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Upload a piece to every host on the network.
-	r.files[up.Nickname] = file{
+	r.files[up.Nickname] = &file{
 		Name:         up.Nickname,
 		Pieces:       make([]filePiece, up.Pieces),
 		UploadParams: up,

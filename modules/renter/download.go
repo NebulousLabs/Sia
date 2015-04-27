@@ -127,7 +127,7 @@ func (d *Download) start() {
 }
 
 // newDownload initializes a new Download object.
-func newDownload(file file, destination string) (*Download, error) {
+func newDownload(file *file, destination string) (*Download, error) {
 	// Create the download destination file.
 	handle, err := os.Create(destination)
 	if err != nil {

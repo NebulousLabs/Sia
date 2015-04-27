@@ -34,7 +34,7 @@ func (r *Renter) save() error {
 		Files:   make([]file, 0, len(r.files)),
 	}
 	for _, file := range r.files {
-		rp.Files = append(rp.Files, file)
+		rp.Files = append(rp.Files, *file)
 	}
 
 	persistBytes, err := json.Marshal(rp)
@@ -67,7 +67,7 @@ func (r *Renter) load() error {
 		return ErrUnrecognizedVersion
 	}
 	for _, file := range rp.Files {
-		r.files[file.Name] = file
+		r.files[file.Name] = &file
 	}
 	return nil
 }

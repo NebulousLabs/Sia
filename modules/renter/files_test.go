@@ -115,3 +115,90 @@ func TestFileTimeRemaining(t *testing.T) {
 		t.Error("file should claim to be expiring in 100 blocks")
 	}
 }
+
+// TestRenterFileList probes the FileList method of the renter type.
+func TestRenterFileList(t *testing.T) {
+	rt := newRenterTester("TestRenterFileList", t)
+
+	// Get the file list of an empty renter.
+	if len(rt.renter.FileList()) != 0 {
+		t.Error("FileList has non-zero length for empty renter?")
+	}
+
+	// Put a file in the renter.
+	rt.renter.files["1"] = &file{
+		Name:   "one",
+		renter: rt.renter,
+	}
+	if len(rt.renter.FileList()) != 1 {
+		t.Error("FileList is not returning the only file in the renter")
+	}
+	if rt.renter.FileList()[0].Nickname() != "one" {
+		t.Error("FileList is not returning the correct filename for the only file")
+	}
+
+	// Put multiple files in the renter.
+	rt.renter.files["2"] = &file{
+		Name:   "two",
+		renter: rt.renter,
+	}
+	if len(rt.renter.FileList()) != 2 {
+		t.Error("FileList is not returning both files in the renter")
+	}
+	files := rt.renter.FileList()
+	if !((files[0].Nickname() == "one" || files[0].Nickname() == "two") &&
+		(files[1].Nickname() == "one" || files[1].Nickname() == "two") &&
+		(files[0].Nickname() != files[1].Nickname())) {
+		t.Error("FileList is returning wrong names for the files:", files[0].Nickname(), files[1].Nickname())
+	}
+}
+
+// TestRenterRename probes the rename method of the renter.
+func TestRenterRename(t *testing.T) {
+	rt := newRenterTester("TestRenterRename", t)
+
+	// Rename a file that doesn't exist.
+	err := rt.renter.Rename("1", "1a")
+	if err != ErrUnknownNickname {
+		t.Error("Expecting ErrUnknownNickname:", err)
+	}
+
+	// Rename a file that does exist.
+	rt.renter.files["1"] = &file{
+		Name:   "1",
+		renter: rt.renter,
+	}
+	files := rt.renter.FileList()
+	err = rt.renter.Rename("1", "1a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rt.renter.FileList()) != 1 {
+		t.Fatal("FileList has unexpected number of files:", len(rt.renter.FileList()))
+	}
+	if files[0].Nickname() != "1a" {
+		t.Error("Rename failed, new file nickname is not what is expected.")
+	}
+
+	// Rename a file to an existing name.
+	rt.renter.files["1"] = &file{
+		Name:   "1",
+		renter: rt.renter,
+	}
+	err = rt.renter.Rename("1", "1a")
+	if err != ErrNicknameOverload {
+		t.Error("Expecting ErrNicknameOverload:", err)
+	}
+	if files[0].Nickname() != "1a" {
+		t.Error("Side effect occured during rename:", files[0].Nickname())
+	}
+
+	// Rename a file to the same name.
+	err = rt.renter.Rename("1", "1")
+	if err != ErrNicknameOverload {
+		t.Error("Expecting ErrNicknameOverload:", err)
+	}
+	if files[0].Nickname() != "1a" {
+		t.Error("Side effect occured during rename:", files[0].Nickname())
+	}
+}
