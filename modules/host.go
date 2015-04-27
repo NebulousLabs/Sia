@@ -31,7 +31,7 @@ type HostInfo struct {
 
 type Host interface {
 	// Announce announces the host on the blockchain.
-	Announce(NetAddress) error
+	Announce() error
 
 	// HostNotify will push a struct down the channel every time that an update
 	// is received.

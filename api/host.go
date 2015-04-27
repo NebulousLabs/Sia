@@ -8,7 +8,7 @@ import (
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.host.Announce(srv.gateway.Address())
+	err := srv.host.Announce()
 	if err != nil {
 		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
 		return
@@ -51,7 +51,7 @@ func (srv *Server) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	srv.host.SetSettings(config)
-	err := srv.host.Announce(srv.gateway.Address())
+	err := srv.host.Announce()
 	if err != nil {
 		writeError(w, "Could not announce host: "+err.Error(), http.StatusBadRequest)
 		return
