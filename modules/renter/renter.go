@@ -20,7 +20,7 @@ type Renter struct {
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
 
-	files         map[string]File
+	files         map[string]file
 	downloadQueue []*Download
 	saveDir       string
 
@@ -54,7 +54,7 @@ func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, walle
 		hostDB:  hdb,
 		wallet:  wallet,
 
-		files:   make(map[string]File),
+		files:   make(map[string]file),
 		saveDir: saveDir,
 
 		mu: sync.New(1*time.Second, 0),
@@ -98,7 +98,7 @@ func (r *Renter) Rename(currentName, newName string) error {
 
 	// Do the renaming.
 	delete(r.files, currentName)
-	entry.nickname = newName
+	entry.Name = newName
 	r.files[newName] = entry
 
 	r.save()

@@ -1,41 +1,73 @@
 package renter
 
 import (
+	"encoding/json"
+	"errors"
+	"io/ioutil"
 	"path/filepath"
-
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
-// savedFiles contains the list of all the files that have been saved by the
-// renter.
-type savedFiles struct {
-	FilePieces []FilePiece
-	Nickname   string
+const (
+	PersistFilename = "renter.dat"
+	PersistHeader   = "Renter Persistence"
+	PersistVersion  = "0.2"
+)
+
+var (
+	ErrUnrecognizedHeader  = errors.New("renter persistence file has unrecognized header")
+	ErrUnrecognizedVersion = errors.New("renter persistence file has unrecognized version")
+)
+
+// RenterPersistence is the struct that gets written to and read from disk as
+// the renter is saved and loaded.
+type RenterPersistence struct {
+	Header  string
+	Version string
+	Files   []file
 }
 
-// save puts all of the files known to the renter on disk.
+// save stores the current renter data to disk.
 func (r *Renter) save() error {
-	// create slice of savedFiles
-	savedPieces := make([]savedFiles, 0, len(r.files))
-	for nickname, file := range r.files {
-		savedPieces = append(savedPieces, savedFiles{file.pieces, nickname})
+	rp := RenterPersistence{
+		Header:  PersistHeader,
+		Version: PersistVersion,
+		Files:   make([]file, 0, len(r.files)),
 	}
-	return encoding.WriteFile(filepath.Join(r.saveDir, "files.dat"), savedPieces)
-}
+	for _, file := range r.files {
+		rp.Files = append(rp.Files, file)
+	}
 
-// load loads all of the files from disk.
-func (r *Renter) load() error {
-	var pieces []savedFiles
-	err := encoding.ReadFile(filepath.Join(r.saveDir, "files.dat"), &pieces)
+	persistBytes, err := json.Marshal(rp)
 	if err != nil {
 		return err
 	}
-	for _, piece := range pieces {
-		r.files[piece.Nickname] = File{
-			nickname: piece.Nickname,
-			pieces:   piece.FilePieces,
-			renter:   r,
-		}
+	err = ioutil.WriteFile(filepath.Join(r.saveDir, PersistFilename), persistBytes, 0660)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// load fetches the saved renter data from disk.
+func (r *Renter) load() error {
+	persistBytes, err := ioutil.ReadFile(filepath.Join(r.saveDir, "files.dat"))
+	if err != nil {
+		return err
+	}
+	var rp RenterPersistence
+	err = json.Unmarshal(persistBytes, &rp)
+	if err != nil {
+		return err
+	}
+
+	if rp.Header != PersistHeader {
+		return ErrUnrecognizedHeader
+	}
+	if rp.Version != PersistVersion {
+		return ErrUnrecognizedVersion
+	}
+	for _, file := range rp.Files {
+		r.files[file.Name] = file
 	}
 	return nil
 }
