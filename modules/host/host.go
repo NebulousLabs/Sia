@@ -2,6 +2,7 @@ package host
 
 import (
 	"errors"
+	"net"
 	"os"
 	"time"
 
@@ -39,6 +40,8 @@ type Host struct {
 	spaceRemaining int64
 	fileCounter    int
 
+	listener net.Listener
+
 	obligationsByID     map[types.FileContractID]contractObligation
 	obligationsByHeight map[types.BlockHeight][]contractObligation
 
@@ -50,7 +53,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
+func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (h *Host, err error) {
 	if cs == nil {
 		err = errors.New("host cannot use a nil state")
 		return
@@ -64,7 +67,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		return
 	}
 
-	addr, _, err := wallet.CoinAddress()
+	coinAddr, _, err := wallet.CoinAddress()
 	if err != nil {
 		return
 	}
@@ -81,7 +84,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 			WindowSize:   288,                      // 48 hours.
 			Price:        types.NewCurrency64(1e9), // 10^9
 			Collateral:   types.NewCurrency64(0),
-			UnlockHash:   addr,
+			UnlockHash:   coinAddr,
 		},
 
 		saveDir:        saveDir,
@@ -98,6 +101,12 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		return
 	}
 	h.latestBlock = block.ID()
+
+	h.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+	go h.listen()
 
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
@@ -119,15 +128,12 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.save()
 }
 
-// Settings is an RPC used to request the settings of a host.
-/*
-func (h *Host) Settings(conn modules.NetConn) error {
+// Settings returns the settings of a host.
+func (h *Host) Settings() modules.HostSettings {
 	lockID := h.mu.RLock()
-	hs := h.HostSettings
-	h.mu.RUnlock(lockID)
-	return conn.WriteObject(hs)
+	defer h.mu.RUnlock(lockID)
+	return h.HostSettings
 }
-*/
 
 func (h *Host) Info() modules.HostInfo {
 	lockID := h.mu.RLock()

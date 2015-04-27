@@ -37,22 +37,11 @@ type Host interface {
 	// is received.
 	HostNotify() <-chan struct{}
 
-	// NegotiateContract is an RPC that enables a client to communicate with
-	// the host to propose a contract.
-	//
-	// TODO: enhance this documentataion. For now, see the host package for a
-	// reference implementation.
-	//NegotiateContract(NetConn) error
-
-	// RetrieveFile is an RPC that enables a client to download a file from
-	// the host.
-	//RetrieveFile(NetConn) error
-
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)
 
-	// Settings is an RPC that returns the host's settings.
-	//Settings(NetConn) error
+	// Settings returns the host's settings.
+	Settings() HostSettings
 
 	// Info returns info about the host, including its hosting parameters, the
 	// amount of storage remaining, and the number of active contracts.

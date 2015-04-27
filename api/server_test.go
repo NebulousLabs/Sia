@@ -66,7 +66,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
-	host, err := host.New(cs, tpool, wallet, filepath.Join(testdir, "host"))
+	host, err := host.New(cs, tpool, wallet, ":0", filepath.Join(testdir, "host"))
 	if err != nil {
 		t.Fatal("Failed to create host:", err)
 	}

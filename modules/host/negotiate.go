@@ -152,10 +152,10 @@ func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms)
 	return
 }
 
-// NegotiateContract is an RPC that negotiates a file contract. If the
+// rpcContract is an RPC that negotiates a file contract. If the
 // negotiation is successful, the file is downloaded and the host begins
 // submitting proofs of storage.
-func (h *Host) NegotiateContract(conn net.Conn) (err error) {
+func (h *Host) rpcContract(conn net.Conn) (err error) {
 	// Read the contract terms.
 	var terms modules.ContractTerms
 	err = encoding.ReadObject(conn, &terms, maxContractLen)
@@ -163,7 +163,7 @@ func (h *Host) NegotiateContract(conn net.Conn) (err error) {
 		return
 	}
 
-	// Consider the contract terms. If they are unnacceptable, return an error
+	// Consider the contract terms. If they are unacceptable, return an error
 	// describing why.
 	lockID := h.mu.RLock()
 	err = h.considerTerms(terms)

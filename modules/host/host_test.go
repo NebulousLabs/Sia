@@ -82,7 +82,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	}
 
 	// Create the host.
-	h, err := New(cs, tp, w, filepath.Join(testdir, modules.HostDir))
+	h, err := New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

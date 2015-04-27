@@ -23,6 +23,8 @@ const (
 
 	MaxActiveHosts              = 200
 	InactiveHostCheckupQuantity = 100
+
+	maxSettingsLen = 1024
 )
 
 var (
@@ -62,20 +64,27 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 // from the set of active hosts.
 func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// Request the most recent set of settings from the host.
-	var settings modules.HostSettings
-	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn net.Conn) error {
-		maxSettingsLen := uint64(1024)
-		return encoding.ReadObject(conn, &settings, maxSettingsLen)
-	})
-
-	// Now that network communicaiton is done, lock the hostdb to modify the
-	// host entry.
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
+	conn, err := net.DialTimeout("tcp", string(entry.IPAddress), 10e9)
 	if err != nil {
 		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
 		return
 	}
+	err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
+	if err != nil {
+		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
+		return
+	}
+	var settings modules.HostSettings
+	err = encoding.ReadObject(conn, &settings, maxSettingsLen)
+	if err != nil {
+		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
+		return
+	}
+
+	// Now that network communication is done, lock the hostdb to modify the
+	// host entry.
+	id := hdb.mu.Lock()
+	defer hdb.mu.Unlock(id)
 
 	// Update the host settings, reliability, and weight. The old IPAddress
 	// must be preserved.
