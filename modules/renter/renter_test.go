@@ -2,6 +2,7 @@ package renter
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -135,28 +136,28 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 // TestNilInputs tries supplying the renter with nil inputs and checks for
 // correct rejection.
 func TestNilInputs(t *testing.T) {
-	rt := newRenterTester("TestNilInputs", t)
-	_, err := New(nil, nil, nil, nil, modules.RenterDir)
-	if err == nil {
-		t.Error("no error returned for nil inputs")
-	}
-	_, err = New(rt.cs, rt.gateway, rt.hostdb, rt.wallet, modules.RenterDir)
+	rt := newRenterTester("TestNilInputs-0", t)
+	_, err := New(rt.cs, rt.gateway, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "1", -1))
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = New(nil, rt.gateway, rt.hostdb, rt.wallet, modules.RenterDir)
+	_, err = New(nil, nil, nil, nil, strings.Replace(rt.renter.saveDir, "0", "2", -1))
+	if err == nil {
+		t.Error("no error returned for nil inputs")
+	}
+	_, err = New(nil, rt.gateway, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "3", -1))
 	if err != ErrNilCS {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, nil, rt.hostdb, rt.wallet, modules.RenterDir)
+	_, err = New(rt.cs, nil, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "4", -1))
 	if err != ErrNilGateway {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.gateway, nil, rt.wallet, modules.RenterDir)
+	_, err = New(rt.cs, rt.gateway, nil, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "5", -1))
 	if err != ErrNilHostDB {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.gateway, rt.hostdb, nil, modules.RenterDir)
+	_, err = New(rt.cs, rt.gateway, rt.hostdb, nil, strings.Replace(rt.renter.saveDir, "0", "6", -1))
 	if err != ErrNilWallet {
 		t.Error(err)
 	}
