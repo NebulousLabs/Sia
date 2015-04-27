@@ -1,6 +1,8 @@
 package renter
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -97,12 +99,38 @@ func (r *Renter) FileList() (files []modules.FileInfo) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	for _, f := range r.files {
+	for i := range r.files {
 		// Because 'file' is the same memory for all iterations, we need to
 		// make a copy.
 		nf := new(file)
-		*nf = f
+		*nf = r.files[i]
 		files = append(files, nf)
 	}
 	return
+}
+
+// Rename takes an existing file and changes the nickname. The original file
+// must exist, and there must not be any file that already has the replacement
+// nickname.
+func (r *Renter) Rename(currentName, newName string) error {
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
+
+	// Check that the currentName exists and the newName doesn't.
+	entry, exists := r.files[currentName]
+	if !exists {
+		return errors.New("no file found by that name")
+	}
+	_, exists = r.files[newName]
+	if exists {
+		return errors.New("file of new name already exists")
+	}
+
+	// Do the renaming.
+	delete(r.files, currentName)
+	entry.Name = newName
+	r.files[newName] = entry
+
+	r.save()
+	return nil
 }
