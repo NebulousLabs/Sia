@@ -63,7 +63,7 @@ func TestInsertHost(t *testing.T) {
 		t.Error("not expecting an active host")
 	}
 
-	hdbt.hostdb.InsertHost(modules.HostSettings{IPAddress: hdbt.gateway.Address()})
+	hdbt.hostdb.InsertHost(modules.HostSettings{IPAddress: hdbt.host.Address()})
 	if len(hdbt.hostdb.allHosts) != 2 {
 		t.Error("host was not inserted")
 	}

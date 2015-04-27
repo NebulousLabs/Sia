@@ -30,6 +30,9 @@ type HostInfo struct {
 }
 
 type Host interface {
+	// Address returns the host's network address
+	Address() NetAddress
+
 	// Announce announces the host on the blockchain.
 	Announce() error
 
