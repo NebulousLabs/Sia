@@ -16,21 +16,6 @@ func (srv *Server) gatewayStatusHandler(w http.ResponseWriter, req *http.Request
 	writeJSON(w, GatewayInfo{srv.gateway.Address(), srv.gateway.Peers()})
 }
 
-/*
-// gatewaySynchronizeHandler handles the API call asking for the gateway to
-// synchronize with other peers.
-func (srv *Server) gatewaySynchronizeHandler(w http.ResponseWriter, req *http.Request) {
-	peer, err := srv.gateway.RandomPeer()
-	if err != nil {
-		writeError(w, "No peers available for syncing", http.StatusInternalServerError)
-		return
-	}
-	go srv.gateway.Synchronize(peer)
-
-	writeSuccess(w)
-}
-*/
-
 // gatewayPeerAddHandler handles the API call to add a peer to the gateway.
 func (srv *Server) gatewayPeerAddHandler(w http.ResponseWriter, req *http.Request) {
 	addr := modules.NetAddress(req.FormValue("address"))

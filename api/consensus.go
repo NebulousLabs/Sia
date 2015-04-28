@@ -20,3 +20,16 @@ func (srv *Server) consensusStatusHandler(w http.ResponseWriter, req *http.Reque
 		target,
 	})
 }
+
+// consensusSynchronizeHandler handles the API call asking for the consensus to
+// synchronize with other peers.
+func (srv *Server) consensusSynchronizeHandler(w http.ResponseWriter, req *http.Request) {
+	peers := srv.gateway.Peers()
+	if len(peers) == 0 {
+		writeError(w, "No peers available for syncing", http.StatusInternalServerError)
+		return
+	}
+	go srv.cs.Synchronize(peers[0])
+
+	writeSuccess(w)
+}
