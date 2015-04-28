@@ -139,6 +139,10 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// spawn resynchronize loop
+	go s.threadedResynchronize()
+
 	return s, nil
 }
 
