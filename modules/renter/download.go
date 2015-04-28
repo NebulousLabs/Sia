@@ -28,7 +28,7 @@ type Download struct {
 	destination string
 	nickname    string
 
-	pieces  []FilePiece
+	pieces  []filePiece
 	file    *os.File
 	gateway modules.Gateway
 }
@@ -68,7 +68,7 @@ func (d *Download) Write(b []byte) (int, error) {
 }
 
 // downloadPiece attempts to retrieve a file piece from a host.
-func (d *Download) downloadPiece(piece FilePiece) error {
+func (d *Download) downloadPiece(piece filePiece) error {
 	return d.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn modules.NetConn) error {
 		// Send the ID of the contract for the file piece we're requesting.
 		if err := conn.WriteObject(piece.ContractID); err != nil {
@@ -127,7 +127,7 @@ func (d *Download) start() {
 }
 
 // newDownload initializes a new Download object.
-func newDownload(file File, destination string) (*Download, error) {
+func newDownload(file *file, destination string) (*Download, error) {
 	// Create the download destination file.
 	handle, err := os.Create(destination)
 	if err != nil {
@@ -135,8 +135,8 @@ func newDownload(file File, destination string) (*Download, error) {
 	}
 
 	// Filter out the inactive pieces.
-	var activePieces []FilePiece
-	for _, piece := range file.pieces {
+	var activePieces []filePiece
+	for _, piece := range file.Pieces {
 		if piece.Active {
 			activePieces = append(activePieces, piece)
 		}
@@ -148,10 +148,10 @@ func newDownload(file File, destination string) (*Download, error) {
 	return &Download{
 		complete: false,
 		// for now, all the pieces are equivalent
-		filesize:    file.pieces[0].Contract.FileSize,
+		filesize:    file.Pieces[0].Contract.FileSize,
 		received:    0,
 		destination: destination,
-		nickname:    file.nickname,
+		nickname:    file.Name,
 
 		pieces:  activePieces,
 		file:    handle,

@@ -4,6 +4,9 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+// subscriptions.go is the standard module subscription file. Only Notify is
+// implemented for the renter.
+
 // updateSubscribers will inform all subscribers of the new update to the host.
 func (r *Renter) updateSubscribers() {
 	for _, subscriber := range r.subscriptions {

@@ -8,8 +8,9 @@ var (
 	RenterDir = "renter"
 )
 
-// UploadParams contains the information used by the Renter to upload a file.
-type UploadParams struct {
+// FileUploadParams contains the information used by the Renter to upload a
+// file.
+type FileUploadParams struct {
 	Filename string
 	Duration types.BlockHeight
 	Nickname string
@@ -84,5 +85,5 @@ type Renter interface {
 	RenterNotify() <-chan struct{}
 
 	// Upload uploads a file using the input parameters.
-	Upload(UploadParams) error
+	Upload(FileUploadParams) error
 }

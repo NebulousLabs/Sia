@@ -7,9 +7,9 @@ func (r *Renter) scanAllFiles() {
 	defer r.mu.RUnlock(lockID)
 
 	for _, file := range r.files {
-		for i := range file.pieces {
-			if !file.pieces[i].Active && !file.pieces[i].Repairing {
-				go r.threadedUploadPiece(file.uploadParams, &file.pieces[i])
+		for i := range file.Pieces {
+			if !file.Pieces[i].Active && !file.Pieces[i].Repairing {
+				go r.threadedUploadPiece(file.UploadParams, &file.Pieces[i])
 			}
 		}
 	}

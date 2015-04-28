@@ -17,7 +17,7 @@ const (
 // checkWalletBalance looks at an upload and determines if there is enough
 // money in the wallet to support such an upload. An error is returned if it is
 // determined that there is not enough money.
-func (r *Renter) checkWalletBalance(up modules.UploadParams) error {
+func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	// Get the size of the file.
 	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
@@ -50,7 +50,7 @@ func (r *Renter) checkWalletBalance(up modules.UploadParams) error {
 // uploadPiece will give up. The file uploading can be continued using a repair
 // tool. Upon completion, the memory containg the piece's information is
 // updated.
-func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) {
+func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePiece) {
 	// Set 'Repairing' for the piece to true.
 	lockID := r.mu.Lock()
 	piece.Repairing = true
@@ -80,7 +80,7 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 		}
 
 		lockID := r.mu.Lock()
-		*piece = FilePiece{
+		*piece = filePiece{
 			Active:     true,
 			Repairing:  false,
 			Contract:   contract,
@@ -95,7 +95,7 @@ func (r *Renter) threadedUploadPiece(up modules.UploadParams, piece *FilePiece) 
 
 // Upload takes an upload parameters, which contain a file to upload, and then
 // creates a redundant copy of the file on the Sia network.
-func (r *Renter) Upload(up modules.UploadParams) error {
+func (r *Renter) Upload(up modules.FileUploadParams) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
@@ -120,18 +120,17 @@ func (r *Renter) Upload(up modules.UploadParams) error {
 	}
 
 	// Upload a piece to every host on the network.
-	r.files[up.Nickname] = File{
-		nickname:     up.Nickname,
-		pieces:       make([]FilePiece, up.Pieces),
-		startHeight:  r.blockHeight + up.Duration,
+	r.files[up.Nickname] = &file{
+		Name:         up.Nickname,
+		Pieces:       make([]filePiece, up.Pieces),
+		UploadParams: up,
 		renter:       r,
-		uploadParams: up,
 	}
-	for i := range r.files[up.Nickname].pieces {
+	for i := range r.files[up.Nickname].Pieces {
 		// threadedUploadPiece will change the memory that the piece points to,
 		// which is useful because it means the file itself can be renamed but
 		// will still point to the same underlying pieces.
-		go r.threadedUploadPiece(up, &r.files[up.Nickname].pieces[i])
+		go r.threadedUploadPiece(up, &r.files[up.Nickname].Pieces[i])
 	}
 	r.save()
 

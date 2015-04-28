@@ -11,6 +11,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	ErrNilCS      = errors.New("cannot create renter with nil consensus set")
+	ErrNilGateway = errors.New("cannot create renter with nil gateway")
+	ErrNilHostDB  = errors.New("cannot create renter with nil hostdb")
+	ErrNilWallet  = errors.New("cannot create renter wil nil wlalet")
+)
+
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
@@ -20,7 +27,7 @@ type Renter struct {
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
 
-	files         map[string]File
+	files         map[string]*file
 	downloadQueue []*Download
 	saveDir       string
 
@@ -30,39 +37,35 @@ type Renter struct {
 }
 
 // New returns an empty renter.
-func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (r *Renter, err error) {
+func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
 	if cs == nil {
-		err = errors.New("renter.New: cannot have nil consensus set")
-		return
+		return nil, ErrNilCS
 	}
 	if gateway == nil {
-		err = errors.New("renter.New: cannot have nil gateway")
-		return
+		return nil, ErrNilGateway
 	}
 	if hdb == nil {
-		err = errors.New("renter.New: cannot have nil hostDB")
-		return
+		return nil, ErrNilHostDB
 	}
 	if wallet == nil {
-		err = errors.New("renter.New: cannot have nil wallet")
-		return
+		return nil, ErrNilWallet
 	}
 
-	r = &Renter{
+	r := &Renter{
 		cs:      cs,
 		gateway: gateway,
 		hostDB:  hdb,
 		wallet:  wallet,
 
-		files:   make(map[string]File),
+		files:   make(map[string]*file),
 		saveDir: saveDir,
 
 		mu: sync.New(1*time.Second, 0),
 	}
 
-	err = os.MkdirAll(saveDir, 0700)
+	err := os.MkdirAll(saveDir, 0700)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	r.load()
@@ -76,33 +79,7 @@ func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, walle
 
 	r.cs.ConsensusSetSubscribe(r)
 
-	return
-}
-
-// Rename takes an existing file and changes the nickname. The original file
-// must exist, and there must not be any file that already has the replacement
-// nickname.
-func (r *Renter) Rename(currentName, newName string) error {
-	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-
-	// Check that the currentName exists and the newName doesn't.
-	entry, exists := r.files[currentName]
-	if !exists {
-		return errors.New("no file found by that name")
-	}
-	_, exists = r.files[newName]
-	if exists {
-		return errors.New("file of new name already exists")
-	}
-
-	// Do the renaming.
-	delete(r.files, currentName)
-	entry.nickname = newName
-	r.files[newName] = entry
-
-	r.save()
-	return nil
+	return r, nil
 }
 
 // Info returns generic information about the renter and the files that are

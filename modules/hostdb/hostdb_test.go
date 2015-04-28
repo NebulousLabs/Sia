@@ -147,7 +147,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	return hdbt
 }
 
-// TestNilInputs tries supplying the hostdb with nil inputs can checks for
+// TestNilInputs tries supplying the hostdb with nil inputs and checks for
 // correct rejection.
 func TestNilInputs(t *testing.T) {
 	hdbt := newHDBTester("TestNilInputs", t)
