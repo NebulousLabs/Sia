@@ -3,7 +3,6 @@ package gateway
 import (
 	"errors"
 	"math/rand"
-	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -50,14 +49,14 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 
 // requestNodes calls the ShareNodes RPC on addr.
 func (g *Gateway) requestNodes(addr modules.NetAddress) (newPeers []modules.NetAddress, err error) {
-	err = g.RPC(addr, "ShareNodes", func(conn net.Conn) error {
+	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
 		return encoding.ReadObject(conn, &newPeers, maxSharedNodes*maxAddrLength)
 	})
 	return
 }
 
 // shareNodes is an RPC that returns up to 10 randomly selected nodes.
-func (g *Gateway) shareNodes(conn net.Conn) error {
+func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 	id := g.mu.RLock()
 	var nodes []modules.NetAddress
 	for node := range g.nodes {

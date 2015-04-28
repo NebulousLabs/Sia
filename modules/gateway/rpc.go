@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"errors"
-	"net"
 	"sync"
 	"sync/atomic"
 
@@ -38,7 +37,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
 	}
 
-	conn, err := peer.sess.Open()
+	conn, err := peer.open()
 	if err != nil {
 		return err
 	}
@@ -70,7 +69,7 @@ func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 // threadedHandleConn.
 func (g *Gateway) listenPeer(p *peer) {
 	for {
-		conn, err := p.sess.Accept()
+		conn, err := p.accept()
 		if err != nil {
 			break
 		}
@@ -84,11 +83,11 @@ func (g *Gateway) listenPeer(p *peer) {
 
 // threadedHandleConn reads header data from a connection, then routes it to the
 // appropriate handler for further processing.
-func (g *Gateway) threadedHandleConn(conn net.Conn) {
+func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
-		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.RemoteAddr(), err)
+		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.CallbackAddr(), err)
 		return
 	}
 	// call registered handler for this ID
@@ -97,11 +96,11 @@ func (g *Gateway) threadedHandleConn(conn net.Conn) {
 	g.mu.RUnlock(lockid)
 	if !ok {
 		// TODO: write this error to conn?
-		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
+		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.CallbackAddr(), id)
 		return
 	}
 
-	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
+	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.CallbackAddr())
 	if err := fn(conn); err != nil {
 		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}
@@ -116,7 +115,7 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
-	fn := func(conn net.Conn) error {
+	fn := func(conn modules.PeerConn) error {
 		return encoding.WritePrefix(conn, enc)
 	}
 

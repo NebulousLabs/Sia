@@ -19,6 +19,22 @@ type peer struct {
 	sess    muxado.Session
 }
 
+func (p *peer) open() (modules.PeerConn, error) {
+	conn, err := p.sess.Open()
+	if err != nil {
+		return nil, err
+	}
+	return &peerConn{conn, p.addr}, nil
+}
+
+func (p *peer) accept() (modules.PeerConn, error) {
+	conn, err := p.sess.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &peerConn{conn, p.addr}, nil
+}
+
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
