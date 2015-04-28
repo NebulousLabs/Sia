@@ -11,8 +11,7 @@ import (
 
 const (
 	// Version of the siag program.
-	Version       = "1.0"
-	FileExtension = ".siakey"
+	Version = "1.0"
 
 	DefaultFolder       = ""
 	DefaultAddressName  = "SiafundAddress"

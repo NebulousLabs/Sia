@@ -51,6 +51,39 @@ func TestVerifyKeys(t *testing.T) {
 
 	testDir := tester.TempDir("siakg", "TestVerifyKeys")
 
+	// Check that a corrupted header or version will trigger an error.
+	keyname := "headerCheck"
+	uc, err := generateKeys(1, 1, testDir, keyname)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kp, badKP KeyPair
+	keyfile := filepath.Join(testDir, keyname+"_Key0"+FileExtension)
+	err = encoding.ReadFile(keyfile, &kp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badKP = kp
+	badKP.Header = "bad"
+	err = encoding.WriteFile(keyfile, badKP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = verifyKeys(uc, testDir, keyname)
+	if err != ErrUnknownHeader {
+		t.Error("Expected ErrUnknownHeader:", err)
+	}
+	badKP = kp
+	badKP.Version = "bad"
+	err = encoding.WriteFile(keyfile, badKP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = verifyKeys(uc, testDir, keyname)
+	if err != ErrUnknownVersion {
+		t.Error("Expected ErrUnknownVersion:", err)
+	}
+
 	// Create sets of keys that cover all boundaries from 0 of 1 to 5 of 9.
 	// This is to check for errors in the keycheck calculations.
 	for i := 1; i < 5; i++ {
@@ -58,7 +91,7 @@ func TestVerifyKeys(t *testing.T) {
 			keyname := "genuine" + strconv.Itoa(i) + strconv.Itoa(j)
 			uc, err := generateKeys(i, j, testDir, keyname)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 
 			// Check that the validate under standard conditions.
@@ -147,5 +180,47 @@ func TestVerifyKeys(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestPrintKeyInfo probes the printKeyInfo function.
+func TestPrintKeyInfo(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	testDir := tester.TempDir("siakg", "TestPrintKeyInfo")
+
+	// Check that a corrupted header or version will trigger an error.
+	keyname := "headerCheck"
+	_, err := generateKeys(1, 1, testDir, keyname)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kp, badKP KeyPair
+	keyfile := filepath.Join(testDir, keyname+"_Key0"+FileExtension)
+	err = encoding.ReadFile(keyfile, &kp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badKP = kp
+	badKP.Header = "bad"
+	err = encoding.WriteFile(keyfile, badKP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = printKeyInfo(keyfile)
+	if err != ErrUnknownHeader {
+		t.Error("Expected ErrUnknownHeader:", err)
+	}
+	badKP = kp
+	badKP.Version = "bad"
+	err = encoding.WriteFile(keyfile, badKP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = printKeyInfo(keyfile)
+	if err != ErrUnknownVersion {
+		t.Error("Expected ErrUnknownVersion:", err)
 	}
 }
