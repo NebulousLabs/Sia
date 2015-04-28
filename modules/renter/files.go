@@ -15,9 +15,8 @@ var (
 
 // A file is a single file that has been uploaded to the network.
 type file struct {
-	Name          string
-	EncryptionKey crypto.TwofishKey
-	Checksum      crypto.Hash // checksum of the decoded file.
+	Name     string
+	Checksum crypto.Hash // checksum of the decoded file.
 
 	// Erasure coding variables:
 	//		piecesRequired <= optimalRecoveryPieces <= totalPieces
@@ -49,8 +48,9 @@ type filePiece struct {
 	StartIndex uint64
 	EndIndex   uint64
 
-	PieceIndex int // Indicates the erasure coding index of this piece.
-	Checksum   crypto.Hash
+	PieceIndex    int // Indicates the erasure coding index of this piece.
+	EncryptionKey crypto.TwofishKey
+	Checksum      crypto.Hash
 }
 
 // Available indicates whether the file is ready to be downloaded.

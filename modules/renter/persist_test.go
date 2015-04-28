@@ -13,15 +13,9 @@ import (
 func TestRenterSaveAndLoad(t *testing.T) {
 	rt := newRenterTester("TestRenterSaveAndLoad", t)
 
-	encryptionKey, err := crypto.GenerateTwofishKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	rt.renter.files["1"] = &file{
-		Name:          "1",
-		EncryptionKey: encryptionKey,
-		Checksum:      crypto.HashObject("fake id"),
+		Name:     "1",
+		Checksum: crypto.HashObject("fake id"),
 
 		Pieces: []filePiece{
 			filePiece{
@@ -67,9 +61,6 @@ func TestRenterSaveAndLoad(t *testing.T) {
 
 	if r.files["1"].Name != "1" {
 		t.Error("Name didn't load correctly")
-	}
-	if r.files["1"].EncryptionKey != encryptionKey {
-		t.Error("EncryptionKey didn't load correctly")
 	}
 	if r.files["1"].Checksum != crypto.HashObject("fake id") {
 		t.Error("Checksum didn't load correctly")
