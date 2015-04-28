@@ -74,7 +74,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create hostdb:", err)
 	}
-	renter, err := renter.New(cs, gateway, hostdb, wallet, filepath.Join(testdir, "renter"))
+	renter, err := renter.New(cs, hostdb, wallet, filepath.Join(testdir, "renter"))
 	if err != nil {
 		t.Fatal("Failed to create renter:", err)
 	}

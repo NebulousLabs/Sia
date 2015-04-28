@@ -130,64 +130,71 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	time.Sleep(types.RenterZeroConfDelay)
 
 	// Perform the negotiations with the host through a network call.
-	err = r.gateway.RPC(host.IPAddress, "NegotiateContract", func(conn net.Conn) (err error) {
-		// Send the contract terms and read the response.
-		if err = encoding.WriteObject(conn, terms); err != nil {
-			return
-		}
-		var response string
-		if err = encoding.ReadObject(conn, &response, 128); err != nil {
-			return
-		}
-		if response != modules.AcceptTermsResponse {
-			return errors.New(response)
-		}
-
-		// write file data
-		_, err = io.CopyN(conn, file, int64(filesize))
-		if err != nil {
-			return
-		}
-
-		// Send the unsigned transaction to the host.
-		err = encoding.WriteObject(conn, unsignedTxn)
-		if err != nil {
-			return
-		}
-
-		// The host will respond with a transaction with the collateral added.
-		// Add the collateral inputs from the host to the original wallet
-		// transaction.
-		var collateralTxn types.Transaction
-		err = encoding.ReadObject(conn, &collateralTxn, 16e3)
-		if err != nil {
-			return
-		}
-		for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
-			_, _, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
-			if err != nil {
-				return
-			}
-		}
-		signedTxn, err := r.wallet.SignTransaction(txnRef, true)
-		if err != nil {
-			return
-		}
-
-		// Send the signed transaction back to the host.
-		err = encoding.WriteObject(conn, signedTxn)
-		if err != nil {
-			return
-		}
-
-		fcid = signedTxn.FileContractID(0)
-		contract = signedTxn.FileContracts[0]
-
-		// TODO: We don't actually watch the blockchain to make sure that the
-		// file contract made it.
-
+	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 10e9)
+	if err != nil {
 		return
-	})
+	}
+	defer conn.Close()
+	err = encoding.WriteObject(conn, [8]byte{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'})
+	if err != nil {
+		return
+	}
+
+	// Send the contract terms and read the response.
+	if err = encoding.WriteObject(conn, terms); err != nil {
+		return
+	}
+	var response string
+	if err = encoding.ReadObject(conn, &response, 128); err != nil {
+		return
+	}
+	if response != modules.AcceptTermsResponse {
+		err = errors.New(response)
+		return
+	}
+
+	// write file data
+	_, err = io.CopyN(conn, file, int64(filesize))
+	if err != nil {
+		return
+	}
+
+	// Send the unsigned transaction to the host.
+	err = encoding.WriteObject(conn, unsignedTxn)
+	if err != nil {
+		return
+	}
+
+	// The host will respond with a transaction with the collateral added.
+	// Add the collateral inputs from the host to the original wallet
+	// transaction.
+	var collateralTxn types.Transaction
+	err = encoding.ReadObject(conn, &collateralTxn, 16e3)
+	if err != nil {
+		return
+	}
+	for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
+		_, _, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
+		if err != nil {
+			return
+		}
+	}
+	signedTxn, err := r.wallet.SignTransaction(txnRef, true)
+	if err != nil {
+		return
+	}
+
+	// Send the signed transaction back to the host.
+	err = encoding.WriteObject(conn, signedTxn)
+	if err != nil {
+		return
+	}
+
+	fcid = signedTxn.FileContractID(0)
+	contract = signedTxn.FileContracts[0]
+
+	// TODO: We don't actually watch the blockchain to make sure that the
+	// file contract made it.
 
 	return
 }

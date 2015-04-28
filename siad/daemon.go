@@ -61,7 +61,7 @@ func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	renter, err := renter.New(state, gateway, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
+	renter, err := renter.New(state, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
 	if err != nil {
 		return
 	}

@@ -30,9 +30,8 @@ type Download struct {
 	destination string
 	nickname    string
 
-	pieces  []filePiece
-	file    *os.File
-	gateway modules.Gateway
+	pieces []filePiece
+	file   *os.File
 }
 
 // Complete returns whether the file is ready to be used.
@@ -71,30 +70,38 @@ func (d *Download) Write(b []byte) (int, error) {
 
 // downloadPiece attempts to retrieve a file piece from a host.
 func (d *Download) downloadPiece(piece filePiece) error {
-	return d.gateway.RPC(piece.HostIP, "RetrieveFile", func(conn net.Conn) error {
-		// Send the ID of the contract for the file piece we're requesting.
-		if err := encoding.WriteObject(conn, piece.ContractID); err != nil {
-			return err
-		}
+	conn, err := net.DialTimeout("tcp", string(piece.HostIP), 10e9)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	err = encoding.WriteObject(conn, [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'})
+	if err != nil {
+		return err
+	}
 
-		// Simultaneously download the file and calculate its Merkle root.
-		tee := io.TeeReader(
-			// Use a LimitedReader to ensure we don't read indefinitely.
-			io.LimitReader(conn, int64(piece.Contract.FileSize)),
-			// Each byte we read from tee will also be written to file.
-			d,
-		)
-		merkleRoot, err := crypto.ReaderMerkleRoot(tee)
-		if err != nil {
-			return err
-		}
+	// Send the ID of the contract for the file piece we're requesting.
+	if err := encoding.WriteObject(conn, piece.ContractID); err != nil {
+		return err
+	}
 
-		if merkleRoot != piece.Contract.FileMerkleRoot {
-			return errors.New("host provided a file that's invalid")
-		}
+	// Simultaneously download the file and calculate its Merkle root.
+	tee := io.TeeReader(
+		// Use a LimitedReader to ensure we don't read indefinitely.
+		io.LimitReader(conn, int64(piece.Contract.FileSize)),
+		// Each byte we read from tee will also be written to file.
+		d,
+	)
+	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
+	if err != nil {
+		return err
+	}
 
-		return nil
-	})
+	if merkleRoot != piece.Contract.FileMerkleRoot {
+		return errors.New("host provided a file that's invalid")
+	}
+
+	return nil
 }
 
 // start initiates the download of a File.
@@ -155,9 +162,8 @@ func newDownload(file *file, destination string) (*Download, error) {
 		destination: destination,
 		nickname:    file.Name,
 
-		pieces:  activePieces,
-		file:    handle,
-		gateway: file.renter.gateway,
+		pieces: activePieces,
+		file:   handle,
 	}, nil
 }
 
