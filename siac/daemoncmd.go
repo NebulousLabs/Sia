@@ -30,13 +30,6 @@ var (
 		Run:   wrap(updateapplycmd),
 	}
 
-	statusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "Print the current state of the daemon",
-		Long:  "Query the daemon for values such as the current difficulty, target, height, peers, transactions, etc.",
-		Run:   wrap(statuscmd),
-	}
-
 	stopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the Sia daemon",

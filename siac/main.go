@@ -122,12 +122,14 @@ func main() {
 	renterCmd.AddCommand(renterUploadCmd, renterDownloadCmd, renterDownloadQueueCmd, renterStatusCmd)
 
 	root.AddCommand(gatewayCmd)
-	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewaySynchronizeCmd, gatewayStatusCmd)
+	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
 
 	root.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
-	root.AddCommand(statusCmd, stopCmd)
+	// consensus cmds have no leading qualifier
+	root.AddCommand(consensusSynchronizeCmd, consensusStatusCmd)
+	root.AddCommand(stopCmd)
 
 	// parse flags
 	root.PersistentFlags().StringVarP(&port, "port", "p", "9980", "which port to communicate with (i.e. the port siad is listening on)")

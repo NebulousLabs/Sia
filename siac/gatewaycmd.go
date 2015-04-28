@@ -30,13 +30,6 @@ var (
 		Run:   wrap(gatewayremovecmd),
 	}
 
-	gatewaySynchronizeCmd = &cobra.Command{
-		Use:   "sync",
-		Short: "Synchronize with the network",
-		Long:  "Attempt to synchronize with a randomly selected peer.",
-		Run:   wrap(gatewaysynchronizecmd),
-	}
-
 	gatewayStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "View a list of peers",
@@ -61,15 +54,6 @@ func gatewayremovecmd(addr string) {
 		return
 	}
 	fmt.Println("Removed", addr, "from peer list.")
-}
-
-func gatewaysynchronizecmd() {
-	err := callAPI("/gateway/synchronize")
-	if err != nil {
-		fmt.Println("Could not synchronize:", err)
-		return
-	}
-	fmt.Println("Sync initiated.")
 }
 
 func gatewaystatuscmd() {
