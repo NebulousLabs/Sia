@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -46,17 +47,24 @@ func TestComplexForking(t *testing.T) {
 		t.SkipNow()
 	}
 
+	// Create gateway. For this test, we can use the same gateway in all
+	// States without causing problems.
+	g, err := gateway.New(":0", tester.TempDir("consensus", "TestComplexForking", "gateway"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Can't use NewTestingEnvironment; all states need to have the same set of
 	// initial blocks.
-	s1, err := New(nil, tester.TempDir("consensus", "TestComplexForking1"))
+	s1, err := New(g, tester.TempDir("consensus", "TestComplexForking1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := New(nil, tester.TempDir("consensus", "TestComplexForking2"))
+	s2, err := New(g, tester.TempDir("consensus", "TestComplexForking2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	s3, err := New(nil, tester.TempDir("consensus", "TestComplexForking3"))
+	s3, err := New(g, tester.TempDir("consensus", "TestComplexForking3"))
 	if err != nil {
 		t.Fatal(err)
 	}
