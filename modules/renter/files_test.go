@@ -116,6 +116,53 @@ func TestFileTimeRemaining(t *testing.T) {
 	}
 }
 
+// TestRenterDeleteFile probes the DeleteFile method of the renter type.
+func TestRenterDeleteFile(t *testing.T) {
+	rt := newRenterTester("TestRenterDeleteFile", t)
+
+	// Delete a file from an empty renter.
+	err := rt.renter.DeleteFile("dne")
+	if err != ErrUnknownNickname {
+		t.Error("Expected ErrUnknownNickname:", err)
+	}
+
+	// Put a file in the renter.
+	rt.renter.files["1"] = &file{
+		Name:   "one",
+		renter: rt.renter,
+	}
+	// Delete a different file.
+	err = rt.renter.DeleteFile("one")
+	if err != ErrUnknownNickname {
+		t.Error("Expected ErrUnknownNickname:", err)
+	}
+	// Delete the file.
+	err = rt.renter.DeleteFile("1")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(rt.renter.FileList()) != 0 {
+		t.Error("file was deleted, but is still reported in FileList?")
+	}
+
+	// Put a file in the renter, then rename it.
+	rt.renter.files["1"] = &file{
+		Name:   "one",
+		renter: rt.renter,
+	}
+	rt.renter.RenameFile("1", "one")
+	// Call delete on the previous name.
+	err = rt.renter.DeleteFile("1")
+	if err != ErrUnknownNickname {
+		t.Error("Expected ErrUnknownNickname:", err)
+	}
+	// Call delete on the new name.
+	err = rt.renter.DeleteFile("one")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 // TestRenterFileList probes the FileList method of the renter type.
 func TestRenterFileList(t *testing.T) {
 	rt := newRenterTester("TestRenterFileList", t)
@@ -153,12 +200,12 @@ func TestRenterFileList(t *testing.T) {
 	}
 }
 
-// TestRenterRename probes the rename method of the renter.
-func TestRenterRename(t *testing.T) {
-	rt := newRenterTester("TestRenterRename", t)
+// TestRenterRenameFile probes the rename method of the renter.
+func TestRenterRenameFile(t *testing.T) {
+	rt := newRenterTester("TestRenterRenameFile", t)
 
 	// Rename a file that doesn't exist.
-	err := rt.renter.Rename("1", "1a")
+	err := rt.renter.RenameFile("1", "1a")
 	if err != ErrUnknownNickname {
 		t.Error("Expecting ErrUnknownNickname:", err)
 	}
@@ -169,7 +216,7 @@ func TestRenterRename(t *testing.T) {
 		renter: rt.renter,
 	}
 	files := rt.renter.FileList()
-	err = rt.renter.Rename("1", "1a")
+	err = rt.renter.RenameFile("1", "1a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +224,7 @@ func TestRenterRename(t *testing.T) {
 		t.Fatal("FileList has unexpected number of files:", len(rt.renter.FileList()))
 	}
 	if files[0].Nickname() != "1a" {
-		t.Error("Rename failed, new file nickname is not what is expected.")
+		t.Error("RenameFile failed, new file nickname is not what is expected.")
 	}
 
 	// Rename a file to an existing name.
@@ -185,7 +232,7 @@ func TestRenterRename(t *testing.T) {
 		Name:   "1",
 		renter: rt.renter,
 	}
-	err = rt.renter.Rename("1", "1a")
+	err = rt.renter.RenameFile("1", "1a")
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload:", err)
 	}
@@ -194,7 +241,7 @@ func TestRenterRename(t *testing.T) {
 	}
 
 	// Rename a file to the same name.
-	err = rt.renter.Rename("1", "1")
+	err = rt.renter.RenameFile("1", "1")
 	if err != ErrNicknameOverload {
 		t.Error("Expecting ErrNicknameOverload:", err)
 	}

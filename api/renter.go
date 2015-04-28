@@ -29,6 +29,18 @@ type FileInfo struct {
 	TimeRemaining types.BlockHeight
 }
 
+// renterDeleteFileHandler handles the API call to delete a file entry from the
+// renter.
+func (srv *Server) renterDeleteFileHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.DeleteFile(req.FormValue("nickname"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeSuccess(w)
+}
+
 // renterDownloadHandler handles the API call to download a file.
 func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
@@ -77,6 +89,18 @@ func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request) 
 // renterStatusHandler handles the API call querying the renter's status.
 func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, srv.renter.Info())
+}
+
+// renterRenameFileHandler handles the API call to rename a file entry in the
+// renter.
+func (srv *Server) renterRenameFileHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeSuccess(w)
 }
 
 // renterUploadHandler handles the API call to upload a file.

@@ -65,6 +65,9 @@ type RentInfo struct {
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
 // user.
 type Renter interface {
+	// DeleteFile deletes a file entry from the renter.
+	DeleteFile(nickname string) error
+
 	// Download downloads a file to the given filepath.
 	Download(nickname, filepath string) error
 
@@ -78,7 +81,7 @@ type Renter interface {
 	Info() RentInfo
 
 	// Rename changes the nickname of a file.
-	Rename(currentName, newName string) error
+	RenameFile(currentName, newName string) error
 
 	// RenterNotify will push a struct down the channel every time it receives
 	// an update.

@@ -297,10 +297,25 @@ Renter
 
 Queries:
 
+* /renter/delete
 * /renter/download
 * /renter/downloadqueue
 * /renter/files
+* /renter/rename
 * /renter/upload
+
+#### /renter/delete
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+nickname string
+```
+`nickname` is the nickname of the file that has been uploaded to the network.
+
+Response: standard
 
 #### /renter/download
 
@@ -373,6 +388,20 @@ Each uploaded file is represented by the above struct.
 typically best not to shut down siad until files are no longer being repaired.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
+
+#### /renter/rename
+
+Function: Rename a file. Does not rename any downloads or source files, only
+renames the entry in the renter.
+
+Parameters:
+```
+nickname string
+newname  string
+```
+`nickname` is the current name of the file entry.
+
+`newname` is the new name for the file entry.
 
 #### /renter/upload
 
