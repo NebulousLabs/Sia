@@ -151,7 +151,7 @@ func (s *State) AcceptBlock(b types.Block) error {
 	return nil
 }
 
-// RelayBlock is an RPC which accepts a block from a peer.
+// RelayBlock is an RPC that accepts a block from a peer.
 func (s *State) RelayBlock(conn net.Conn) error {
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)

@@ -232,7 +232,7 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	return
 }
 
-// RelayTransaction is an RPC which accepts a transaction from a peer. If the
+// RelayTransaction is an RPC that accepts a transaction from a peer. If the
 // accept is successful, the transaction will be relayed to the Gateway's
 // other peers.
 func (tp *TransactionPool) RelayTransaction(conn net.Conn) error {
