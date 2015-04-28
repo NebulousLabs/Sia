@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -38,15 +38,9 @@ var (
 	}
 )
 
-// TODO: this should be defined outside of siac
-type updateResp struct {
-	Available bool
-	Version   string
-}
-
 func updatecmd() {
-	update := new(updateResp)
-	err := getAPI("/daemon/update/check", update)
+	var update api.UpdateInfo
+	err := getAPI("/daemon/update/check", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -64,8 +58,8 @@ func updatecmd() {
 }
 
 func updatecheckcmd() {
-	update := new(updateResp)
-	err := getAPI("/daemon/update/check", update)
+	var update api.UpdateInfo
+	err := getAPI("/daemon/update/check", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -84,19 +78,6 @@ func updateapplycmd(version string) {
 		return
 	}
 	fmt.Printf("Updated to version %s! Restart siad now.\n", version)
-}
-
-func statuscmd() {
-	status := new(consensus.StateInfo)
-	err := getAPI("/consensus/status", status)
-	if err != nil {
-		fmt.Println("Could not get daemon status:", err)
-		return
-	}
-	fmt.Printf(`Block:  %v
-Height: %v
-Target: %v
-`, status.CurrentBlock, status.Height, status.Target)
 }
 
 func stopcmd() {

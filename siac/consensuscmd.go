@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -34,22 +34,14 @@ func consensussynchronizecmd() {
 }
 
 func consensusstatuscmd() {
-	var info struct {
-		Address modules.NetAddress
-		Peers   []modules.NetAddress
-	}
+	var info api.ConsensusInfo
 	err := getAPI("/consensus/status", &info)
 	if err != nil {
-		fmt.Println("Could not get consensus status:", err)
+		fmt.Println("Could not get daemon status:", err)
 		return
 	}
-	fmt.Println("Address:", info.Address)
-	if len(info.Peers) == 0 {
-		fmt.Println("No peers to show.")
-		return
-	}
-	fmt.Println(len(info.Peers), "active peers:")
-	for _, peer := range info.Peers {
-		fmt.Println("\t", peer)
-	}
+	fmt.Printf(`Block:  %v
+Height: %v
+Target: %v
+`, info.CurrentBlock, info.Height, info.Target)
 }

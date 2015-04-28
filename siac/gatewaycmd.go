@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -57,10 +57,7 @@ func gatewayremovecmd(addr string) {
 }
 
 func gatewaystatuscmd() {
-	var info struct {
-		Address modules.NetAddress
-		Peers   []modules.NetAddress
-	}
+	var info api.GatewayInfo
 	err := getAPI("/gateway/status", &info)
 	if err != nil {
 		fmt.Println("Could not get gateway status:", err)

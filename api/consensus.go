@@ -6,18 +6,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+type ConsensusInfo struct {
+	Height       types.BlockHeight
+	CurrentBlock types.BlockID
+	Target       types.Target
+}
+
 // consensusStatusHandler handles the API call asking for the consensus status.
 func (srv *Server) consensusStatusHandler(w http.ResponseWriter, req *http.Request) {
-	currentBlock := srv.cs.CurrentBlock().ID()
-	target := srv.cs.CurrentTarget()
-	writeJSON(w, struct {
-		Height       types.BlockHeight
-		CurrentBlock types.BlockID
-		Target       types.Target
-	}{
+	writeJSON(w, ConsensusInfo{
 		srv.cs.Height(),
-		currentBlock,
-		target,
+		srv.cs.CurrentBlock().ID(),
+		srv.cs.CurrentTarget(),
 	})
 }
 
