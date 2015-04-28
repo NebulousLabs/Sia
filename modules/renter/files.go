@@ -45,7 +45,7 @@ type filePiece struct {
 	Contract   types.FileContract   // The contract being enforced.
 	ContractID types.FileContractID // The ID of the contract.
 
-	HostIP     modules.NetAddress // Where to find the file.
+	HostIP     modules.NetAddress // Where to find the file piece.
 	StartIndex uint64
 	EndIndex   uint64
 

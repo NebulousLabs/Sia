@@ -50,7 +50,7 @@ func (r *Renter) save() error {
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	persistBytes, err := ioutil.ReadFile(filepath.Join(r.saveDir, "files.dat"))
+	persistBytes, err := ioutil.ReadFile(filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
@@ -66,8 +66,9 @@ func (r *Renter) load() error {
 	if rp.Version != PersistVersion {
 		return ErrUnrecognizedVersion
 	}
-	for _, file := range rp.Files {
-		r.files[file.Name] = &file
+	for i := range rp.Files {
+		rp.Files[i].renter = r
+		r.files[rp.Files[i].Name] = &rp.Files[i]
 	}
 	return nil
 }
