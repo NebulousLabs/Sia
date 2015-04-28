@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -55,7 +54,7 @@ func (s *State) Synchronize(peer modules.NetAddress) error {
 
 		// perform RPC
 		var newBlocks []types.Block
-		err := s.gateway.RPC(peer, "SendBlocks", func(conn net.Conn) error {
+		err := s.gateway.RPC(peer, "SendBlocks", func(conn modules.PeerConn) error {
 			err := encoding.WriteObject(conn, history)
 			if err != nil {
 				return err
@@ -87,7 +86,7 @@ func (s *State) Synchronize(peer modules.NetAddress) error {
 // IDs. The most recent known ID is used as the starting point, and up to
 // 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
 // sends a boolean indicating whether more blocks are available.
-func (s *State) SendBlocks(conn net.Conn) error {
+func (s *State) SendBlocks(conn modules.PeerConn) error {
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)

@@ -2,10 +2,10 @@ package consensus
 
 import (
 	"errors"
-	"net"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -152,7 +152,7 @@ func (s *State) AcceptBlock(b types.Block) error {
 }
 
 // RelayBlock is an RPC that accepts a block from a peer.
-func (s *State) RelayBlock(conn net.Conn) error {
+func (s *State) RelayBlock(conn modules.PeerConn) error {
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
 	if err != nil {
@@ -161,8 +161,7 @@ func (s *State) RelayBlock(conn net.Conn) error {
 
 	err = s.AcceptBlock(b)
 	if err == ErrOrphan {
-		// TODO: RPCs need access to the peer's real address
-		//go s.Synchronize(conn.Addr())
+		go s.Synchronize(conn.CallbackAddr())
 	}
 	if err != nil {
 		return err

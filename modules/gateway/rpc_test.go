@@ -1,11 +1,11 @@
 package gateway
 
 import (
-	"net"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 func TestRPCID(t *testing.T) {
@@ -50,7 +50,7 @@ func TestRPC(t *testing.T) {
 		t.Fatal("failed to connect:", err)
 	}
 
-	g2.RegisterRPC("Foo", func(conn net.Conn) error {
+	g2.RegisterRPC("Foo", func(conn modules.PeerConn) error {
 		var i uint64
 		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
@@ -64,7 +64,7 @@ func TestRPC(t *testing.T) {
 	})
 
 	var foo string
-	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
+	err = g1.RPC(g2.Address(), "Foo", func(conn modules.PeerConn) error {
 		err := encoding.WriteObject(conn, 0xdeadbeef)
 		if err != nil {
 			return err
@@ -79,7 +79,7 @@ func TestRPC(t *testing.T) {
 	}
 
 	// wrong number should produce an error
-	err = g1.RPC(g2.Address(), "Foo", func(conn net.Conn) error {
+	err = g1.RPC(g2.Address(), "Foo", func(conn modules.PeerConn) error {
 		err := encoding.WriteObject(conn, 0xbadbeef)
 		if err != nil {
 			return err
@@ -94,7 +94,7 @@ func TestRPC(t *testing.T) {
 	}
 
 	// force a strike
-	err = g1.RPC(g2.Address(), "Foo", func(net.Conn) error {
+	err = g1.RPC(g2.Address(), "Foo", func(modules.PeerConn) error {
 		return errNoPeers // any non-nil error will do
 	})
 	if err == nil {
@@ -123,7 +123,7 @@ func TestThreadedHandleConn(t *testing.T) {
 		t.Fatal("failed to connect:", err)
 	}
 
-	g2.RegisterRPC("Foo", func(conn net.Conn) error {
+	g2.RegisterRPC("Foo", func(conn modules.PeerConn) error {
 		var i uint64
 		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
@@ -137,8 +137,8 @@ func TestThreadedHandleConn(t *testing.T) {
 	})
 
 	// custom rpc fn (doesn't automatically write rpcID)
-	rpcFn := func(fn func(net.Conn) error) error {
-		conn, err := g1.peers[g2.Address()].sess.Open()
+	rpcFn := func(fn func(modules.PeerConn) error) error {
+		conn, err := g1.peers[g2.Address()].open()
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func TestThreadedHandleConn(t *testing.T) {
 	}
 
 	// bad rpcID
-	err = rpcFn(func(conn net.Conn) error {
+	err = rpcFn(func(conn modules.PeerConn) error {
 		return encoding.WriteObject(conn, [3]byte{1, 2, 3})
 	})
 	if err != nil {
@@ -156,7 +156,7 @@ func TestThreadedHandleConn(t *testing.T) {
 	}
 
 	// unknown rpcID
-	err = rpcFn(func(conn net.Conn) error {
+	err = rpcFn(func(conn modules.PeerConn) error {
 		return encoding.WriteObject(conn, handlerName("bar"))
 	})
 	if err != nil {
@@ -164,7 +164,7 @@ func TestThreadedHandleConn(t *testing.T) {
 	}
 
 	// valid rpcID
-	err = rpcFn(func(conn net.Conn) error {
+	err = rpcFn(func(conn modules.PeerConn) error {
 		return encoding.WriteObject(conn, handlerName("Foo"))
 	})
 	if err != nil {
@@ -191,12 +191,12 @@ func TestBroadcast(t *testing.T) {
 
 	var g2Payload, g3Payload string
 	doneChan := make(chan struct{})
-	g2.RegisterRPC("Recv", func(conn net.Conn) error {
+	g2.RegisterRPC("Recv", func(conn modules.PeerConn) error {
 		encoding.ReadObject(conn, &g2Payload, 100)
 		doneChan <- struct{}{}
 		return nil
 	})
-	g3.RegisterRPC("Recv", func(conn net.Conn) error {
+	g3.RegisterRPC("Recv", func(conn modules.PeerConn) error {
 		encoding.ReadObject(conn, &g3Payload, 100)
 		doneChan <- struct{}{}
 		return nil

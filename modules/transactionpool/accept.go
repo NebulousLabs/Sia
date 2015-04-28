@@ -2,11 +2,11 @@ package transactionpool
 
 import (
 	"errors"
-	"net"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -235,7 +235,7 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 // RelayTransaction is an RPC that accepts a transaction from a peer. If the
 // accept is successful, the transaction will be relayed to the Gateway's
 // other peers.
-func (tp *TransactionPool) RelayTransaction(conn net.Conn) error {
+func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
 	var t types.Transaction
 	err := encoding.ReadObject(conn, &t, types.BlockSizeLimit)
 	if err != nil {
