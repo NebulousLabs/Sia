@@ -118,7 +118,7 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 		referenceFileContracts:  make(map[types.FileContractID]types.FileContract),
 		referenceSiafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		mu: sync.New(1*time.Second, 0),
+		mu: sync.New(3*time.Second, 0),
 	}
 
 	// Register RPCs
