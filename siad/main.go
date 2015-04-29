@@ -42,7 +42,7 @@ func avail(filename string) bool {
 // framework.
 func init() {
 	// Initialize the started channel, only used for testing.
-	started = make(chan struct{})
+	started = make(chan struct{}, 1)
 
 }
 
