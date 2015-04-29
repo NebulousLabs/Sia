@@ -66,11 +66,6 @@ func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
 		return
 	}
 
-	// Register RPCs for each module
-	gateway.RegisterRPC("SendBlocks", state.SendBlocks)
-	gateway.RegisterRPC("RelayBlock", state.RelayBlock)
-	gateway.RegisterRPC("RelayTransaction", tpool.RelayTransaction)
-
 	// bootstrap to the network
 	// TODO: probably a better way of doing this.
 	if !config.Siacore.NoBootstrap {

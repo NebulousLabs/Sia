@@ -131,14 +131,17 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	// During short tests, use an in-memory database.
 	if build.Release == "testing" && testing.Short() {
 		s.db = blockdb.NilDB
-		return s, nil
+	} else {
+		// Otherwise, try to load an existing database from disk.
+		err = s.load(saveDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Otherwise, try to load an existing database from disk.
-	err = s.load(saveDir)
-	if err != nil {
-		return nil, err
-	}
+	// Register RPCs
+	gateway.RegisterRPC("SendBlocks", s.SendBlocks)
+	gateway.RegisterRPC("RelayBlock", s.RelayBlock)
 
 	// spawn resynchronize loop
 	go s.threadedResynchronize()

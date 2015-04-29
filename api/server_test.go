@@ -80,9 +80,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	}
 
 	// register gateway RPCs
-	gateway.RegisterRPC("SendBlocks", cs.SendBlocks)
-	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
-	gateway.RegisterRPC("RelayTransaction", tpool.RelayTransaction)
+	//gateway.RegisterRPC("SendBlocks", cs.SendBlocks)
 
 	srv := NewServer(APIAddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet)
 	st := &serverTester{

@@ -101,6 +101,7 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 	}
 	if g == nil {
 		err = errors.New("transaction pool cannot use a nil gateway")
+		return
 	}
 
 	// Initialize a transaction pool.
@@ -119,6 +120,9 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 
 		mu: sync.New(1*time.Second, 0),
 	}
+
+	// Register RPCs
+	g.RegisterRPC("RelayTransaction", tp.RelayTransaction)
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)

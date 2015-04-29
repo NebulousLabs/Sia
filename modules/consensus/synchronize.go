@@ -45,7 +45,6 @@ func (s *State) threadedResynchronize() {
 func (s *State) Synchronize(peer modules.NetAddress) error {
 	// loop until there are no more blocks available
 	moreAvailable := true
-
 	for moreAvailable {
 		// get blockIDs to send
 		id := s.mu.RLock()
