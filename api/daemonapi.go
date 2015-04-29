@@ -17,7 +17,7 @@ type UpdateInfo struct {
 	Version   string
 }
 
-const VERSION = "0.3.0"
+const VERSION = "0.3.1"
 
 // TODO: Updates need to be signed!
 // TODO: Updating on Windows may not work correctly.

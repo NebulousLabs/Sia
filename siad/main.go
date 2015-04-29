@@ -38,14 +38,9 @@ func avail(filename string) bool {
 	return err == nil
 }
 
-// init
+// init creates the channel that's used to communicate with the testing
+// framework.
 func init() {
-	// Set the default config values.
-	config.Siad.NoBootstrap = false
-	config.Siad.APIaddr = "localhost:9980"
-	config.Siad.RPCaddr = ":9981"
-	config.Siad.HostAddr = ":9982"
-
 	// Initialize the started channel, only used for testing.
 	started = make(chan struct{})
 
@@ -73,11 +68,11 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", config.Siad.NoBootstrap, "disable bootstrapping on this run")
-	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", config.Siad.APIaddr, "which host:port the API server listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", config.Siad.RPCaddr, "which port the gateway listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", config.Siad.HostAddr, "which port the host listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", config.Siad.SiaDir, "location of the sia directory")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
+	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.
