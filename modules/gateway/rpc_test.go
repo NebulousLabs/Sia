@@ -43,7 +43,7 @@ func TestRPC(t *testing.T) {
 	}
 
 	g2 := newTestingGateway("TestRPC2", t)
-	defer g1.Close()
+	defer g2.Close()
 
 	err := g1.Connect(g2.Address())
 	if err != nil {
