@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
@@ -13,65 +15,62 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+
+	"github.com/spf13/cobra"
 )
 
-// DaemonConfig is a struct containing the daemon configuration variables. It
-// is only used when calling 'newDaemon', but is it's own struct because there
-// are many values.
-type DaemonConfig struct {
-	APIAddr  string
-	RPCAddr  string
-	HostAddr string
+// startDaemonCmd uses the config parameters to start siad.
+func startDaemonCmd(*cobra.Command, []string) {
+	// Establish multithreading.
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	SiaDir string
-}
-
-type daemon struct {
-	srv *api.Server
-}
-
-// newDaemon initializes modules using the config parameters and uses them to
-// create an api.Server.
-func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
-	gateway, err := gateway.New(cfg.RPCAddr, filepath.Join(cfg.SiaDir, "gateway"))
+	// Create all of the modules.
+	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
-	state, err := consensus.New(gateway, filepath.Join(cfg.SiaDir, "consensus"))
+	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
 	tpool, err := transactionpool.New(state, gateway)
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(cfg.SiaDir, "wallet"))
+	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, "wallet"))
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
 	miner, err := miner.New(state, tpool, wallet)
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
-	host, err := host.New(state, tpool, wallet, cfg.HostAddr, filepath.Join(cfg.SiaDir, "host"))
+	host, err := host.New(state, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
 	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
 	}
-	renter, err := renter.New(state, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
+	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, "renter"))
 	if err != nil {
-		return
+		fmt.Println("Could not start daemon:", err)
+	}
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)
+	if err != nil {
+		fmt.Println("Could not start daemon:", err)
 	}
 
-	// bootstrap to the network
-	// TODO: probably a better way of doing this.
-	if !config.Siacore.NoBootstrap {
+	// Bootstrap to the network.
+	if !config.Siad.NoBootstrap {
 		go gateway.Bootstrap(modules.BootstrapPeers[0])
 	}
 
-	d = &daemon{api.NewServer(cfg.APIAddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)}
+	// Start serving api requests.
+	err = srv.Serve()
+	if err != nil {
+		fmt.Println("Could not start daemon:", err)
+	}
 	return
 }

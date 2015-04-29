@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"code.google.com/p/gcfg"
 	"github.com/mitchellh/go-homedir"
@@ -15,111 +13,78 @@ import (
 )
 
 var (
+	// A global config variable is needed to work with cobra's flag system.
 	config Config
-	siaDir string
 )
 
+// The Config struct contains all configurable variables for siad. It is
+// compatible with gcfg.
 type Config struct {
-	Siacore struct {
-		RPCaddr     string
-		HostAddr    string
-		NoBootstrap bool
-	}
-
 	Siad struct {
-		APIaddr           string
-		ConfigFilename    string
-		DownloadDirectory string
+		NoBootstrap bool
+
+		APIaddr  string
+		RPCaddr  string
+		HostAddr string
+
+		ConfigFilename string
+		SiaDir         string
 	}
 }
 
-// Helper function for determining existence of a file. Technically, err != nil
-// does not necessarily mean that the file does not exist, but it does mean
-// that it cannot be read, and for our purposes these are equivalent.
-func exists(filename string) bool {
-	ex, err := homedir.Expand(filename)
-	if err != nil {
-		return false
-	}
-	_, err = os.Stat(ex)
+// avail checks if a file is available from the disk.
+func avail(filename string) bool {
+	_, err := os.Stat(filename)
 	return err == nil
 }
 
+// init looks for a config file.
 func init() {
-	// locate siaDir by checking for config file
+	homeConfig, err := homedir.Expand(filepath.Join("~", ".config", "sia", "config"))
+	if err != nil {
+		panic(err)
+	}
+
 	switch {
-	case exists("config"):
-		siaDir = ""
-	case exists("~/.config/sia/config"):
-		siaDir = "~/.config/sia/"
+	case avail("config"):
+		config.Siad.ConfigFilename = "config"
+	case avail(homeConfig):
+		config.Siad.ConfigFilename = homeConfig
 	default:
-		siaDir = ""
-		fmt.Println("Warning: config file not found. Default values will be used.")
 	}
 }
 
-func startEnvironment(*cobra.Command, []string) {
-	// Set GOMAXPROCS equal to the number of cpu cores.
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	daemonConfig := DaemonConfig{
-		APIAddr: config.Siad.APIaddr,
-		RPCAddr: config.Siacore.RPCaddr,
-
-		SiaDir: siaDir,
-	}
-	d, err := newDaemon(daemonConfig)
-	if err != nil {
-		fmt.Println("Failed to create daemon:", err)
-		return
-	}
-
-	// serve API requests
-	err = d.srv.Serve()
-	if err != nil {
-		fmt.Println("API server quit unexpectedly:", err)
-	}
-}
-
-func version(*cobra.Command, []string) {
+// versionCmd is a cobra command that prints the version of siad.
+func versionCmd(*cobra.Command, []string) {
 	fmt.Println("Sia Daemon v" + api.VERSION)
 }
 
+// main establishes a set of commands and flags using the cobra package.
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
 		Short: "Sia Daemon v" + api.VERSION,
 		Long:  "Sia Daemon v" + api.VERSION,
-		Run:   startEnvironment,
+		Run:   startDaemonCmd,
 	}
 
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
 		Long:  "Print version information about the Sia Daemon",
-		Run:   version,
+		Run:   versionCmd,
 	})
 
 	// Set default values, which have the lowest priority.
-	defaultConfigFile := filepath.Join(siaDir, "config")
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
-	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port the gateway listens on")
-	root.PersistentFlags().StringVarP(&config.Siacore.HostAddr, "host-addr", "h", ":9990", "which port the host listens on")
-	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
-	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "location of the siad config file")
-
-	// Create a Logger for this package
-	logFile, err := os.OpenFile(filepath.Join(siaDir, "info.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		fmt.Printf("error opening log file: %v", err)
-		os.Exit(1)
-	}
-	defer logFile.Close()
-	log.SetOutput(logFile)
-	log.SetFlags(log.Ldate | log.Ltime)
+	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9988", "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9990", "which port the host listens on")
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
+	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", config.Siad.ConfigFilename, "location of the siad config file")
+	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "s", "", "location of the sia directory")
 
 	// Load the config file, which will overwrite the default values.
-	if exists(config.Siad.ConfigFilename) {
+	if avail(config.Siad.ConfigFilename) {
 		configFilename, err := homedir.Expand(config.Siad.ConfigFilename)
 		if err != nil {
 			fmt.Println("Failed to load config file:", err)

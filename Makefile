@@ -81,7 +81,7 @@ test-wallet: clean fmt REBUILD
 # have been hit during testing and how many times each line has been hit.
 coverpackages = api compatibility crypto encoding modules/consensus           \
 	modules/gateway modules/host modules/hostdb modules/miner modules/renter  \
-	modules/transactionpool modules/wallet siag types
+	modules/transactionpool modules/wallet siad siag types
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \

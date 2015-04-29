@@ -23,7 +23,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) *Server {
+func NewServer(APIaddr string, s *consensus.State, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet) (*Server, error) {
 	srv := &Server{
 		cs:      s,
 		gateway: g,
@@ -36,7 +36,7 @@ func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.
 	}
 
 	// Register API handlers
-	srv.initAPI(APIAddr)
+	srv.initAPI(APIaddr)
 
-	return srv
+	return srv, nil
 }

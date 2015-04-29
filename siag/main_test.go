@@ -11,6 +11,7 @@ import (
 // The tests in this file need to be checked manually, even if errors are
 // returned it will not be apparent to the test suite.
 
+// TestMain tries running the main executable using a few different commands.
 func TestMain(t *testing.T) {
 	// Get a test folder.
 	testDir := tester.TempDir("siag", "TestMain")
