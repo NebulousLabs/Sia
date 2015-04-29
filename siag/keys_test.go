@@ -12,7 +12,7 @@ import (
 
 // TestGenerateKeys probes the generateKeys function.
 func TestGenerateKeys(t *testing.T) {
-	testDir := tester.TempDir("siakg", "TestGenerateKeys")
+	testDir := tester.TempDir("siag", "TestGenerateKeys")
 
 	// Try to create an anyone-can-spend set of keys.
 	_, err := generateKeys(0, 0, testDir, "anyoneCanSpend")
@@ -49,7 +49,7 @@ func TestVerifyKeys(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testDir := tester.TempDir("siakg", "TestVerifyKeys")
+	testDir := tester.TempDir("siag", "TestVerifyKeys")
 
 	// Create sets of keys that cover all boundaries from 0 of 1 to 5 of 9.
 	// This is to check for errors in the keycheck calculations.

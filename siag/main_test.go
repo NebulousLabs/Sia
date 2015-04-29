@@ -13,13 +13,13 @@ import (
 
 func TestMain(t *testing.T) {
 	// Get a test folder.
-	testDir := tester.TempDir("siakg", "TestMain")
+	testDir := tester.TempDir("siag", "TestMain")
 
 	// Create a default set of keys. The result should be 'DefaultTotalKeys'
 	// files being created.
 	defaultsDir := filepath.Join(testDir, "defaults")
 	os.Args = []string{
-		"siakg",
+		"siag",
 		"-f",
 		defaultsDir,
 	}
@@ -29,7 +29,7 @@ func TestMain(t *testing.T) {
 	// that is 'DefaultRequiredKeys' of 'DefaultTotalKeys', and the same
 	// address printed by the above call should be printed now.
 	os.Args = []string{
-		"siakg",
+		"siag",
 		"keyinfo",
 		filepath.Join(defaultsDir, DefaultAddressName+"_Key0"+FileExtension),
 	}
@@ -38,7 +38,7 @@ func TestMain(t *testing.T) {
 	// Try to create a set of keys that are invalid. An error should be printed.
 	errDir := filepath.Join(testDir, "err")
 	os.Args = []string{
-		"siakg",
+		"siag",
 		"-f",
 		errDir,
 		"-t",
@@ -48,7 +48,7 @@ func TestMain(t *testing.T) {
 
 	// Print the key info for keys that don't exist.
 	os.Args = []string{
-		"siakg",
+		"siag",
 		"keyinfo",
 		"notExist",
 	}
@@ -56,7 +56,7 @@ func TestMain(t *testing.T) {
 
 	// Supply too few arguments to keyinfo.
 	os.Args = []string{
-		"siakg",
+		"siag",
 		"keyinfo",
 	}
 	main()
