@@ -3,10 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"code.google.com/p/gcfg"
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -15,6 +12,10 @@ import (
 var (
 	// A global config variable is needed to work with cobra's flag system.
 	config Config
+
+	// started is a channel that's used during testing to inform the test suite
+	// that initialization of the daemon has completed.
+	started chan struct{}
 )
 
 // The Config struct contains all configurable variables for siad. It is
@@ -27,8 +28,7 @@ type Config struct {
 		RPCaddr  string
 		HostAddr string
 
-		ConfigFilename string
-		SiaDir         string
+		SiaDir string
 	}
 }
 
@@ -38,20 +38,17 @@ func avail(filename string) bool {
 	return err == nil
 }
 
-// init looks for a config file.
+// init
 func init() {
-	homeConfig, err := homedir.Expand(filepath.Join("~", ".config", "sia", "config"))
-	if err != nil {
-		panic(err)
-	}
+	// Set the default config values.
+	config.Siad.NoBootstrap = false
+	config.Siad.APIaddr = "localhost:9980"
+	config.Siad.RPCaddr = ":9981"
+	config.Siad.HostAddr = ":9982"
 
-	switch {
-	case avail("config"):
-		config.Siad.ConfigFilename = "config"
-	case avail(homeConfig):
-		config.Siad.ConfigFilename = homeConfig
-	default:
-	}
+	// Initialize the started channel, only used for testing.
+	started = make(chan struct{})
+
 }
 
 // versionCmd is a cobra command that prints the version of siad.
@@ -76,25 +73,11 @@ func main() {
 	})
 
 	// Set default values, which have the lowest priority.
-	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9988", "which port the gateway listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9990", "which port the host listens on")
-	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
-	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", config.Siad.ConfigFilename, "location of the siad config file")
-	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "s", "", "location of the sia directory")
-
-	// Load the config file, which will overwrite the default values.
-	if avail(config.Siad.ConfigFilename) {
-		configFilename, err := homedir.Expand(config.Siad.ConfigFilename)
-		if err != nil {
-			fmt.Println("Failed to load config file:", err)
-			return
-		}
-		if err := gcfg.ReadFileInto(&config, configFilename); err != nil {
-			fmt.Println("Failed to load config file:", err)
-			return
-		}
-	}
+	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", config.Siad.NoBootstrap, "disable bootstrapping on this run")
+	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", config.Siad.APIaddr, "which host:port the API server listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", config.Siad.RPCaddr, "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", config.Siad.HostAddr, "which port the host listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", config.Siad.SiaDir, "location of the sia directory")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

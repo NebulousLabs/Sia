@@ -70,6 +70,8 @@ test-host: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/host
 test-renter: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/renter
+test-siad: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=15s ./siad
 test-siag: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./siag
 test-tpool: clean fmt REBUILD
