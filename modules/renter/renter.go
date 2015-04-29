@@ -69,7 +69,7 @@ func New(cs *consensus.State, hdb modules.HostDB, wallet modules.Wallet, saveDir
 	// need to make sure that scanAllFiles() didn't get called until the entire
 	// balance had loaded, which would require loading the entire blockchain.
 	// This also won't be a problem once we're also saving the addresses.
-	go r.scanAllFiles()
+	r.scanAllFiles()
 
 	r.cs.ConsensusSetSubscribe(r)
 
