@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -63,28 +64,19 @@ func renterdownloadcmd(nickname, destination string) {
 	fmt.Printf("Started downloading '%s' to %s.\n", nickname, destination)
 }
 
-// TODO: this should be defined elsewhere
-type queue []struct {
-	Complete    bool
-	Filesize    uint64
-	Received    uint64
-	Destination string
-	Nickname    string
-}
-
 func renterdownloadqueuecmd() {
-	var q queue
-	err := getAPI("/renter/downloadqueue", &q)
+	var queue []api.DownloadInfo
+	err := getAPI("/renter/downloadqueue", &queue)
 	if err != nil {
 		fmt.Println("Could not get download queue:", err)
 		return
 	}
-	if len(q) == 0 {
+	if len(queue) == 0 {
 		fmt.Println("No downloads to show.")
 		return
 	}
 	fmt.Println("Download Queue:")
-	for _, file := range q {
+	for _, file := range queue {
 		fmt.Printf("%5.1f%% %s -> %s\n", 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }

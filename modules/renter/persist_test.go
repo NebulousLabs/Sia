@@ -50,7 +50,7 @@ func TestRenterSaveAndLoad(t *testing.T) {
 	rt.renter.mu.Unlock(lockID)
 
 	// Create a new renter that calls load.
-	r, err := New(rt.cs, rt.gateway, rt.hostdb, rt.wallet, rt.renter.saveDir)
+	r, err := New(rt.cs, rt.hostdb, rt.wallet, rt.renter.saveDir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -114,14 +114,14 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 func newTpoolTester(name string, t *testing.T) *tpoolTester {
 	testdir := tester.TempDir("transactionpool", name)
 
-	// Create the consensus set.
-	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	// Create the gateway.
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create the gateway.
-	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
+	// Create the consensus set.
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 	}
 
 	// Create the miner.
-	m, err := miner.New(cs, g, tp, w)
+	m, err := miner.New(cs, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,12 +176,12 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 func TestNewNilInputs(t *testing.T) {
 	testdir := tester.TempDir("transactionpool", "TestNewNilInputs")
 
-	// Create a consensus set and gateway.
-	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	// Create a gateway and consensus set.
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}

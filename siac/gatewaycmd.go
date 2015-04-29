@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/api"
 )
 
 var (
@@ -28,13 +28,6 @@ var (
 		Short: "Remove a peer",
 		Long:  "Remove a peer from the peer list.",
 		Run:   wrap(gatewayremovecmd),
-	}
-
-	gatewaySynchronizeCmd = &cobra.Command{
-		Use:   "sync",
-		Short: "Synchronize with the network",
-		Long:  "Attempt to synchronize with a randomly selected peer.",
-		Run:   wrap(gatewaysynchronizecmd),
 	}
 
 	gatewayStatusCmd = &cobra.Command{
@@ -63,22 +56,14 @@ func gatewayremovecmd(addr string) {
 	fmt.Println("Removed", addr, "from peer list.")
 }
 
-func gatewaysynchronizecmd() {
-	err := callAPI("/gateway/synchronize")
-	if err != nil {
-		fmt.Println("Could not synchronize:", err)
-		return
-	}
-	fmt.Println("Sync initiated.")
-}
-
 func gatewaystatuscmd() {
-	var info modules.GatewayInfo
+	var info api.GatewayInfo
 	err := getAPI("/gateway/status", &info)
 	if err != nil {
 		fmt.Println("Could not get gateway status:", err)
 		return
 	}
+	fmt.Println("Address:", info.Address)
 	if len(info.Peers) == 0 {
 		fmt.Println("No peers to show.")
 		return

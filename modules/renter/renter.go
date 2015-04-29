@@ -12,17 +12,15 @@ import (
 )
 
 var (
-	ErrNilCS      = errors.New("cannot create renter with nil consensus set")
-	ErrNilGateway = errors.New("cannot create renter with nil gateway")
-	ErrNilHostDB  = errors.New("cannot create renter with nil hostdb")
-	ErrNilWallet  = errors.New("cannot create renter wil nil wlalet")
+	ErrNilCS     = errors.New("cannot create renter with nil consensus set")
+	ErrNilHostDB = errors.New("cannot create renter with nil hostdb")
+	ErrNilWallet = errors.New("cannot create renter wil nil wlalet")
 )
 
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
 	cs          *consensus.State
-	gateway     modules.Gateway
 	hostDB      modules.HostDB
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
@@ -37,12 +35,9 @@ type Renter struct {
 }
 
 // New returns an empty renter.
-func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
+func New(cs *consensus.State, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
-	}
-	if gateway == nil {
-		return nil, ErrNilGateway
 	}
 	if hdb == nil {
 		return nil, ErrNilHostDB
@@ -52,10 +47,9 @@ func New(cs *consensus.State, gateway modules.Gateway, hdb modules.HostDB, walle
 	}
 
 	r := &Renter{
-		cs:      cs,
-		gateway: gateway,
-		hostDB:  hdb,
-		wallet:  wallet,
+		cs:     cs,
+		hostDB: hdb,
+		wallet: wallet,
 
 		files:   make(map[string]*file),
 		saveDir: saveDir,

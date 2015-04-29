@@ -12,6 +12,11 @@ import (
 	"github.com/inconshreveable/go-update"
 )
 
+type UpdateInfo struct {
+	Available bool
+	Version   string
+}
+
 const VERSION = "0.3.0"
 
 // TODO: Updates need to be signed!
@@ -120,10 +125,7 @@ func (srv *Server) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	writeJSON(w, struct {
-		Available bool
-		Version   string
-	}{available, version})
+	writeJSON(w, UpdateInfo{available, version})
 }
 
 // daemonUpdateApplyHandler handles the API call to apply daemon updates.

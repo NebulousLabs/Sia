@@ -7,9 +7,11 @@ package hostdb
 import (
 	"crypto/rand"
 	"math/big"
+	"net"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -21,6 +23,8 @@ const (
 
 	MaxActiveHosts              = 200
 	InactiveHostCheckupQuantity = 100
+
+	maxSettingsLen = 1024
 )
 
 var (
@@ -61,15 +65,24 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
 	// Request the most recent set of settings from the host.
 	var settings modules.HostSettings
-	err := hdb.gateway.RPC(entry.IPAddress, "HostSettings", func(conn modules.NetConn) error {
-		maxSettingsLen := uint64(1024)
-		return conn.ReadObject(&settings, maxSettingsLen)
-	})
+	err := func() error {
+		conn, err := net.DialTimeout("tcp", string(entry.IPAddress), 10e9)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
+		if err != nil {
+			return err
+		}
+		return encoding.ReadObject(conn, &settings, maxSettingsLen)
+	}()
 
-	// Now that network communicaiton is done, lock the hostdb to modify the
+	// Now that network communication is done, lock the hostdb to modify the
 	// host entry.
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
+
 	if err != nil {
 		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
 		return

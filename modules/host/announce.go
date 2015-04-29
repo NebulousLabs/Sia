@@ -9,7 +9,7 @@ import (
 // Announce creates a host announcement transaction, adding information to the
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
-func (h *Host) Announce(addr modules.NetAddress) (err error) {
+func (h *Host) Announce() (err error) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
@@ -23,7 +23,7 @@ func (h *Host) Announce(addr modules.NetAddress) (err error) {
 	// create and encode the announcement and add it to the arbitrary data of
 	// the transaction.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: addr,
+		IPAddress: h.myAddr,
 	})
 	_, _, err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
 	if err != nil {

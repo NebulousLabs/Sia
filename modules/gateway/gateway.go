@@ -2,15 +2,16 @@ package gateway
 
 import (
 	"errors"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -27,8 +28,6 @@ var (
 
 // Gateway implements the modules.Gateway interface.
 type Gateway struct {
-	state *consensus.State
-
 	listener net.Listener
 	myAddr   modules.NetAddress
 
@@ -36,10 +35,13 @@ type Gateway struct {
 	// which function should handle the connection.
 	handlerMap map[rpcID]modules.RPCFunc
 
-	// Peers are stored in a map to guarantee uniqueness. They are paired with
-	// the number of "strikes" against them; peers with too many strikes are
-	// removed.
-	peers map[modules.NetAddress]int
+	// peers are the nodes we are currently connected to.
+	peers map[modules.NetAddress]*peer
+
+	// nodes is a list of all known nodes (i.e. potential peers) on the
+	// network.
+	// TODO: map to a timestamp?
+	nodes map[modules.NetAddress]struct{}
 
 	// saveDir is the path used to save/load peers.
 	saveDir string
@@ -51,9 +53,19 @@ type Gateway struct {
 
 // Address returns the NetAddress of the Gateway.
 func (g *Gateway) Address() modules.NetAddress {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
 	return g.myAddr
+}
+
+func (g *Gateway) Peers() []modules.NetAddress {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	var peers []modules.NetAddress
+	for addr := range g.peers {
+		peers = append(peers, addr)
+	}
+	return peers
 }
 
 // Close stops the Gateway's listener process.
@@ -62,83 +74,32 @@ func (g *Gateway) Close() error {
 }
 
 // Bootstrap joins the Sia network and establishes an initial peer list.
-//
-// Bootstrap handles mutexes manually to avoid having a lock during network
-// communication.
-func (g *Gateway) Bootstrap(bootstrapPeer modules.NetAddress) (err error) {
-	g.log.Println("INFO: initiated bootstrapping to", bootstrapPeer)
+func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
+	g.log.Println("INFO: initiated bootstrapping to", addr)
 
 	// contact the bootstrap peer
-	if !g.Ping(bootstrapPeer) {
-		return errUnreachable
-	}
-	id := g.mu.Lock()
-	g.addPeer(bootstrapPeer)
-	g.mu.Unlock(id)
-
-	// ask the bootstrap peer for our hostname
-	err = g.learnHostname(bootstrapPeer)
+	err := g.Connect(addr)
 	if err != nil {
-		g.log.Println("WARN: couldn't learn hostname from bootstrap peer; using myexternalip.com")
-		err = g.getExternalIP()
-		if err != nil {
-			return
-		}
+		return err
 	}
-	if !g.Ping(g.myAddr) {
-		return errors.New("couldn't learn hostname")
-	}
-
-	// ask the bootstrapPeer to add us back
-	go g.RPC(bootstrapPeer, "AddMe", writerRPC(g.Address()))
 
 	// initial peer discovery
-	// NOTE: per convention, "threadedX" functions are usually called in their
-	// own goroutine. Here, the two calls are intentionally grouped into one
-	// goroutine to ensure that they run in order.
-	go func() {
-		// request peers from bootstrap
-		g.threadedPeerDiscovery()
-		// request peers from all our new peers
-		g.threadedPeerDiscovery()
-	}()
-
-	// spawn synchronizer
-	go g.threadedResynchronize()
-
-	g.log.Printf("INFO: successfully bootstrapped to %v (this does not mean you are synchronized)", bootstrapPeer)
-
-	return
-}
-
-// RelayBlock relays a block to the network.
-func (g *Gateway) RelayBlock(b types.Block) {
-	go g.threadedBroadcast("AcceptBlock", writerRPC(b))
-}
-
-// RelayTransaction relays a transaction to the network.
-func (g *Gateway) RelayTransaction(t types.Transaction) {
-	go g.threadedBroadcast("AcceptTransaction", writerRPC(t))
-}
-
-// Info returns metadata about the Gateway.
-func (g *Gateway) Info() (info modules.GatewayInfo) {
-	counter := g.mu.RLock()
-	defer g.mu.RUnlock(counter)
-	info.Address = g.myAddr
-	for peer := range g.peers {
-		info.Peers = append(info.Peers, peer)
+	nodes, err := g.requestNodes(addr)
+	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
+	id := g.mu.Lock()
+	for _, node := range nodes {
+		g.addNode(node)
 	}
-	return
+	g.save()
+	g.mu.Unlock(id)
+
+	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
+
+	return nil
 }
 
 // New returns an initialized Gateway.
-func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error) {
-	if s == nil {
-		err = errors.New("gateway cannot use nil state")
-		return
-	}
-
+func New(addr string, saveDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
@@ -152,33 +113,76 @@ func New(addr string, s *consensus.State, saveDir string) (g *Gateway, err error
 	}
 
 	g = &Gateway{
-		state:      s,
 		handlerMap: make(map[rpcID]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]int),
+		peers:      make(map[modules.NetAddress]*peer),
+		nodes:      make(map[modules.NetAddress]struct{}),
 		saveDir:    saveDir,
 		mu:         sync.New(time.Second*1, 0),
 		log:        logger,
 	}
 
-	g.RegisterRPC("Ping", writerRPC(pong))
-	g.RegisterRPC("SendHostname", sendHostname)
-	g.RegisterRPC("AddMe", g.addMe)
-	g.RegisterRPC("SharePeers", g.sharePeers)
-	g.RegisterRPC("SendBlocks", g.sendBlocks)
+	g.RegisterRPC("ShareNodes", g.shareNodes)
 
 	g.log.Println("INFO: gateway created, started logging")
 
-	// Spawn the RPC handler.
-	err = g.startListener(addr)
+	// Create the listener.
+	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
+	// Set myAddr (this is necessary if addr == ":0", in which case the OS
+	// will assign us a random open port).
+	g.myAddr = modules.NetAddress(g.listener.Addr().String())
 
-	// Load old peer list. If it doesn't exist, no problem, but if it does, we
-	// want to know about any errors preventing us from loading it.
-	if loadErr := g.load(); err != nil && !os.IsNotExist(loadErr) {
+	// Discover our external IP. (During testing, return the loopback address.)
+	var hostname string
+	if build.Release == "testing" {
+		hostname = "::1"
+	} else {
+		hostname, err = getExternalIP()
+		if err != nil {
+			return nil, err
+		}
+	}
+	g.myAddr = modules.NetAddress(net.JoinHostPort(hostname, g.myAddr.Port()))
+
+	g.log.Println("INFO: our address is", g.myAddr)
+
+	// Add ourselves as a node.
+	g.addNode(g.myAddr)
+
+	// Spawn the primary listener.
+	go g.listen()
+
+	// Load the old peer list. If it doesn't exist, no problem, but if it does,
+	// we want to know about any errors preventing us from loading it.
+	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
 
+	// Spawn the connector loop. This will continually attempt to add nodes as
+	// peers to ensure we stay well-connected.
+	go g.makeOutboundConnections()
+
 	return
 }
+
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func getExternalIP() (string, error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 64)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	hostname := string(buf[:n-1]) // trim newline
+	return hostname, nil
+}
+
+// enforce that Gateway satisfies the modules.Gateway interface
+var _ modules.Gateway = (*Gateway)(nil)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -118,9 +119,10 @@ func (s *State) addBlockToTree(b types.Block) (err error) {
 	return
 }
 
-// AcceptBlock will add blocks to the state, forking the blockchain if they are
-// on a fork that is heavier than the current fork.
-func (s *State) AcceptBlock(b types.Block) (err error) {
+// AcceptBlock will add a block to the state, forking the blockchain if it is
+// on a fork that is heavier than the current fork. If the block is accepted,
+// it will be relayed to connected peers.
+func (s *State) AcceptBlock(b types.Block) error {
 	counter := s.mu.Lock()
 	defer s.mu.Unlock(counter)
 
@@ -134,15 +136,48 @@ func (s *State) AcceptBlock(b types.Block) (err error) {
 		return ErrBlockKnown
 	}
 
-	err = s.validHeader(b)
+	err := s.validHeader(b)
 	if err != nil {
-		return
+		return err
 	}
 
 	err = s.addBlockToTree(b)
 	if err != nil {
-		return
+		return err
 	}
 
-	return
+	go s.gateway.Broadcast("RelayBlock", b)
+
+	return nil
+}
+
+// RelayBlock is an RPC that accepts a block from a peer.
+func (s *State) RelayBlock(conn modules.PeerConn) error {
+	var b types.Block
+	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
+	if err != nil {
+		return err
+	}
+
+	err = s.AcceptBlock(b)
+	if err == ErrOrphan {
+		go s.Synchronize(conn.CallbackAddr())
+	}
+	if err != nil {
+		return err
+	}
+
+	// Check if b is in the current path.
+	height, exists := s.HeightOfBlock(b.ID())
+	if !exists {
+		if build.DEBUG {
+			panic("could not get the height of a block that did not return an error when being accepted into the state")
+		}
+		return errors.New("consensus set malfunction")
+	}
+	currentPathBlock, exists := s.BlockAtHeight(height)
+	if !exists || b.ID() != currentPathBlock.ID() {
+		return errors.New("block added, but it does not extend the consensus set height")
+	}
+	return nil
 }

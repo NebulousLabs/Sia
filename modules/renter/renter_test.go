@@ -2,7 +2,6 @@ package renter
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -18,12 +17,11 @@ import (
 
 // renterTester contains all of the modules that are used while testing the renter.
 type renterTester struct {
-	cs      *consensus.State
-	gateway modules.Gateway
-	hostdb  modules.HostDB
-	miner   modules.Miner
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	cs     *consensus.State
+	hostdb modules.HostDB
+	miner  modules.Miner
+	tpool  modules.TransactionPool
+	wallet modules.Wallet
 
 	renter *Renter
 
@@ -59,14 +57,14 @@ func (rt *renterTester) tpUpdateWait() {
 func newRenterTester(name string, t *testing.T) *renterTester {
 	testdir := tester.TempDir("renter", name)
 
-	// Create the consensus set.
-	cs, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	// Create the gateway.
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create the gateway.
-	g, err := gateway.New(":0", cs, filepath.Join(testdir, modules.GatewayDir))
+	// Create the consensus set.
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,25 +88,24 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 	}
 
 	// Create the renter.
-	r, err := New(cs, g, hdb, w, filepath.Join(testdir, modules.RenterDir))
+	r, err := New(cs, hdb, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create the miner.
-	m, err := miner.New(cs, g, tp, w)
+	m, err := miner.New(cs, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Assemble all pieces into a renter tester.
 	rt := &renterTester{
-		cs:      cs,
-		gateway: g,
-		hostdb:  hdb,
-		miner:   m,
-		tpool:   tp,
-		wallet:  w,
+		cs:     cs,
+		hostdb: hdb,
+		miner:  m,
+		tpool:  tp,
+		wallet: w,
 
 		renter: r,
 
@@ -136,28 +133,24 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 // TestNilInputs tries supplying the renter with nil inputs and checks for
 // correct rejection.
 func TestNilInputs(t *testing.T) {
-	rt := newRenterTester("TestNilInputs-0", t)
-	_, err := New(rt.cs, rt.gateway, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "1", -1))
+	rt := newRenterTester("TestNilInputs", t)
+	_, err := New(rt.cs, rt.hostdb, rt.wallet, rt.renter.saveDir+"1")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = New(nil, nil, nil, nil, strings.Replace(rt.renter.saveDir, "0", "2", -1))
+	_, err = New(nil, nil, nil, rt.renter.saveDir+"2")
 	if err == nil {
 		t.Error("no error returned for nil inputs")
 	}
-	_, err = New(nil, rt.gateway, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "3", -1))
+	_, err = New(nil, rt.hostdb, rt.wallet, rt.renter.saveDir+"3")
 	if err != ErrNilCS {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, nil, rt.hostdb, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "4", -1))
-	if err != ErrNilGateway {
-		t.Error(err)
-	}
-	_, err = New(rt.cs, rt.gateway, nil, rt.wallet, strings.Replace(rt.renter.saveDir, "0", "5", -1))
+	_, err = New(rt.cs, nil, rt.wallet, rt.renter.saveDir+"5")
 	if err != ErrNilHostDB {
 		t.Error(err)
 	}
-	_, err = New(rt.cs, rt.gateway, rt.hostdb, nil, strings.Replace(rt.renter.saveDir, "0", "6", -1))
+	_, err = New(rt.cs, rt.hostdb, nil, rt.renter.saveDir+"6")
 	if err != ErrNilWallet {
 		t.Error(err)
 	}

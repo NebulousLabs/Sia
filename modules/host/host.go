@@ -2,9 +2,13 @@ package host
 
 import (
 	"errors"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
@@ -35,9 +39,12 @@ type Host struct {
 	wallet      modules.Wallet
 	latestBlock types.BlockID
 
+	myAddr         modules.NetAddress
 	saveDir        string
 	spaceRemaining int64
 	fileCounter    int
+
+	listener net.Listener
 
 	obligationsByID     map[types.FileContractID]contractObligation
 	obligationsByHeight map[types.BlockHeight][]contractObligation
@@ -50,7 +57,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, saveDir string) (h *Host, err error) {
+func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (h *Host, err error) {
 	if cs == nil {
 		err = errors.New("host cannot use a nil state")
 		return
@@ -64,7 +71,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		return
 	}
 
-	addr, _, err := wallet.CoinAddress()
+	coinAddr, _, err := wallet.CoinAddress()
 	if err != nil {
 		return
 	}
@@ -81,7 +88,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 			WindowSize:   288,                      // 48 hours.
 			Price:        types.NewCurrency64(1e9), // 10^9
 			Collateral:   types.NewCurrency64(0),
-			UnlockHash:   addr,
+			UnlockHash:   coinAddr,
 		},
 
 		saveDir:        saveDir,
@@ -99,11 +106,32 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 	}
 	h.latestBlock = block.ID()
 
+	h.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+	h.myAddr = modules.NetAddress(h.listener.Addr().String())
+
+	// discover external IP (during testing, use the loopback address)
+	var hostname string
+	if build.Release == "testing" {
+		hostname = "::1"
+	} else {
+		hostname, err = getExternalIP()
+		if err != nil {
+			return nil, err
+		}
+	}
+	h.myAddr = modules.NetAddress(net.JoinHostPort(hostname, h.myAddr.Port()))
+
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return
 	}
 	h.load()
+
+	// spawn listener
+	go h.listen()
 
 	h.cs.ConsensusSetSubscribe(h)
 
@@ -119,12 +147,16 @@ func (h *Host) SetSettings(settings modules.HostSettings) {
 	h.save()
 }
 
-// Settings is an RPC used to request the settings of a host.
-func (h *Host) Settings(conn modules.NetConn) error {
+// Settings returns the settings of a host.
+func (h *Host) Settings() modules.HostSettings {
 	lockID := h.mu.RLock()
-	hs := h.HostSettings
-	h.mu.RUnlock(lockID)
-	return conn.WriteObject(hs)
+	defer h.mu.RUnlock(lockID)
+	return h.HostSettings
+}
+
+func (h *Host) Address() modules.NetAddress {
+	// no lock needed; h.myAddr is only set once (in New).
+	return h.myAddr
 }
 
 func (h *Host) Info() modules.HostInfo {
@@ -138,4 +170,21 @@ func (h *Host) Info() modules.HostInfo {
 		NumContracts:     len(h.obligationsByID),
 	}
 	return info
+}
+
+// getExternalIP learns the server's hostname from a centralized service,
+// myexternalip.com.
+func getExternalIP() (string, error) {
+	resp, err := http.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 64)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	hostname := string(buf[:n-1]) // trim newline
+	return hostname, nil
 }

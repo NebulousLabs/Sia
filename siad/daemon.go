@@ -19,8 +19,9 @@ import (
 // is only used when calling 'newDaemon', but is it's own struct because there
 // are many values.
 type DaemonConfig struct {
-	APIAddr string
-	RPCAddr string
+	APIAddr  string
+	RPCAddr  string
+	HostAddr string
 
 	SiaDir string
 }
@@ -32,11 +33,11 @@ type daemon struct {
 // newDaemon initializes modules using the config parameters and uses them to
 // create an api.Server.
 func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
-	state, err := consensus.New(filepath.Join(cfg.SiaDir, "consensus"))
+	gateway, err := gateway.New(cfg.RPCAddr, filepath.Join(cfg.SiaDir, "gateway"))
 	if err != nil {
 		return
 	}
-	gateway, err := gateway.New(cfg.RPCAddr, state, filepath.Join(cfg.SiaDir, "gateway"))
+	state, err := consensus.New(gateway, filepath.Join(cfg.SiaDir, "consensus"))
 	if err != nil {
 		return
 	}
@@ -48,11 +49,11 @@ func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	miner, err := miner.New(state, gateway, tpool, wallet)
+	miner, err := miner.New(state, tpool, wallet)
 	if err != nil {
 		return
 	}
-	host, err := host.New(state, tpool, wallet, filepath.Join(cfg.SiaDir, "host"))
+	host, err := host.New(state, tpool, wallet, cfg.HostAddr, filepath.Join(cfg.SiaDir, "host"))
 	if err != nil {
 		return
 	}
@@ -60,7 +61,7 @@ func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
 	if err != nil {
 		return
 	}
-	renter, err := renter.New(state, gateway, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
+	renter, err := renter.New(state, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
 	if err != nil {
 		return
 	}

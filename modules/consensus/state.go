@@ -1,12 +1,14 @@
 package consensus
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/NebulousLabs/Sia/blockdb"
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -58,6 +60,9 @@ type State struct {
 	// block database, used for saving/loading the current path
 	db blockdb.DB
 
+	// gateway, for receiving/relaying blocks to/from peers
+	gateway modules.Gateway
+
 	// Per convention, all exported functions in the consensus package can be
 	// called concurrently. The state mutex helps to orchestrate thread safety.
 	// To keep things simple, the entire state was chosen to have a single
@@ -70,7 +75,11 @@ type State struct {
 // New returns a new State, containing at least the genesis block. If there is
 // an existing block database present in saveDir, it will be loaded. Otherwise,
 // a new database will be created.
-func New(saveDir string) (*State, error) {
+func New(gateway modules.Gateway, saveDir string) (*State, error) {
+	if gateway == nil {
+		return nil, errors.New("cannot have nil gateway")
+	}
+
 	// Create the State object.
 	s := &State{
 		blockMap:  make(map[types.BlockID]*blockNode),
@@ -82,6 +91,8 @@ func New(saveDir string) (*State, error) {
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
+
+		gateway: gateway,
 
 		mu: sync.New(1*time.Second, 1),
 	}
@@ -120,14 +131,21 @@ func New(saveDir string) (*State, error) {
 	// During short tests, use an in-memory database.
 	if build.Release == "testing" && testing.Short() {
 		s.db = blockdb.NilDB
-		return s, nil
+	} else {
+		// Otherwise, try to load an existing database from disk.
+		err = s.load(saveDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Otherwise, try to load an existing database from disk.
-	err = s.load(saveDir)
-	if err != nil {
-		return nil, err
-	}
+	// Register RPCs
+	gateway.RegisterRPC("SendBlocks", s.SendBlocks)
+	gateway.RegisterRPC("RelayBlock", s.RelayBlock)
+
+	// spawn resynchronize loop
+	go s.threadedResynchronize()
+
 	return s, nil
 }
 

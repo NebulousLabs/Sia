@@ -14,8 +14,7 @@ func TestAnnouncement(t *testing.T) {
 	ht := CreateHostTester("TestAnnouncement", t)
 
 	// Place the announcement.
-	originalAddress := modules.NetAddress(":1111")
-	err := ht.host.Announce(originalAddress)
+	err := ht.host.Announce()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,8 +29,5 @@ func TestAnnouncement(t *testing.T) {
 	err = encoding.Unmarshal([]byte(encodedAnnouncement), &ha)
 	if err != nil {
 		t.Error(err)
-	}
-	if ha.IPAddress != originalAddress {
-		t.Error("announcement didn't decode properly after being put in the transation pool")
 	}
 }

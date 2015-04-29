@@ -1,11 +1,7 @@
 package modules
 
 import (
-	"io"
 	"net"
-
-	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -19,28 +15,22 @@ var (
 	}
 )
 
-// A NetConn is a monitored network connection.
-type NetConn interface {
-	io.ReadWriteCloser
+// A PeerConn is the connection type used when communicating with peers during
+// an RPC. In addition to the standard net.Conn methods, it includeds a
+// CallbackAddr method which can be used to perform a "response" RPC.
+type PeerConn interface {
+	net.Conn
 
-	// ReadWriters support reading and writing objects, which are encoded and
-	// decoded via the encoding package.
-	encoding.ReadWriter
-
-	// Addr returns the NetAddress of the remote end of the connection.
-	Addr() NetAddress
+	// CallbackAddr returns the "real" address of the peer, i.e. the address
+	// used to connect to the peer.
+	CallbackAddr() NetAddress
 }
 
 // RPCFunc is the type signature of functions that handle incoming RPCs.
-type RPCFunc func(NetConn) error
+type RPCFunc func(PeerConn) error
 
 // A NetAddress contains the information needed to contact a peer.
 type NetAddress string
-
-type GatewayInfo struct {
-	Address NetAddress
-	Peers   []NetAddress
-}
 
 // Host returns the NetAddress' IP.
 func (na NetAddress) Host() string {
@@ -63,37 +53,29 @@ type Gateway interface {
 	// Bootstrap joins the Sia network and establishes an initial peer list.
 	Bootstrap(NetAddress) error
 
-	// AddPeer adds a peer to the Gateway's peer list. The peer
-	// may be rejected. AddPeer is also an RPC.
-	AddPeer(NetAddress) error
+	// Connect establishes a persistent connection to a peer.
+	Connect(NetAddress) error
 
-	// RemovePeer removes a peer from the Gateway's peer list.
-	RemovePeer(NetAddress) error
+	// Disconnect terminates a connection to a peer.
+	Disconnect(NetAddress) error
 
-	// RandomPeer returns a random peer from the Gateway's peer list.
-	RandomPeer() (NetAddress, error)
+	// Address returns the Gateway's address.
+	Address() NetAddress
 
-	// RPC establishes a connection to the supplied address and writes the RPC
-	// header, indicating which function will handle the connection. The
-	// supplied function takes over from there.
-	RPC(NetAddress, string, RPCFunc) error
+	// Peers returns the addresses that the Gateway is currently connected to.
+	Peers() []NetAddress
 
 	// RegisterRPC registers a function to handle incoming connections that
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
 
-	// Synchronize synchronizes the local consensus set with the set of the
-	// given peer.
-	Synchronize(NetAddress) error
+	// RPC calls an RPC on the given address. RPC cannot be called on an
+	// address that the Gateway is not connected to.
+	RPC(NetAddress, string, RPCFunc) error
 
-	// RelayBlock broadcasts a block to the Gateway's peers.
-	RelayBlock(types.Block)
-
-	// RelayTransaction broadcasts a transaction to the Gateway's peers.
-	RelayTransaction(types.Transaction)
-
-	// Info reports metadata about the Gateway.
-	Info() GatewayInfo
+	// Broadcast transmits obj, prefaced by the RPC name, to all of the
+	// Gateway's connected peers in parallel.
+	Broadcast(name string, obj interface{})
 
 	// Close safely stops the Gateway's listener process.
 	Close() error

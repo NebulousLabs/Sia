@@ -18,13 +18,17 @@ import (
 
 const (
 	// The header for all siag files. Do not change.
-	FileHeader = "siag"
+	FileHeader    = "siag"
+	FileExtension = ".siakey"
+	FileVersion   = "1.0"
 )
 
 var (
 	ErrCorruptedKey       = errors.New("A corrupted key has been presented")
 	ErrInsecureAddress    = errors.New("An address needs at least one required key to be secure")
 	ErrOverwrite          = errors.New("Keys already exist with that keyname.")
+	ErrUnknownHeader      = errors.New("File contains the wrong header.")
+	ErrUnknownVersion     = errors.New("File has an unknown version number. You may need to download the latest release.")
 	ErrUnspendableAddress = errors.New("An address is unspendable if the number of required keys is greater than the total number of keys")
 )
 
@@ -56,7 +60,7 @@ func generateKeys(requiredKeys int, totalKeys int, folder string, keyname string
 	for i := range keys {
 		var err error
 		keys[i].Header = FileHeader
-		keys[i].Version = Version
+		keys[i].Version = FileVersion
 		keys[i].Index = i
 		keys[i].SecretKey, pubKeys[i], err = crypto.GenerateSignatureKeys()
 		if err != nil {
@@ -119,6 +123,12 @@ func verifyKeys(uc types.UnlockConditions, folder string, keyname string) error 
 		err := encoding.ReadFile(filepath.Join(folder, keyname+"_Key"+strconv.Itoa(i)+FileExtension), &loadedKeys[i])
 		if err != nil {
 			return err
+		}
+		if loadedKeys[i].Header != FileHeader {
+			return ErrUnknownHeader
+		}
+		if loadedKeys[i].Version != FileVersion {
+			return ErrUnknownVersion
 		}
 	}
 
@@ -196,6 +206,12 @@ func printKeyInfo(filename string) error {
 	err := encoding.ReadFile(filename, &kp)
 	if err != nil {
 		return err
+	}
+	if kp.Header != FileHeader {
+		return ErrUnknownHeader
+	}
+	if kp.Version != FileVersion {
+		return ErrUnknownVersion
 	}
 
 	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.SignaturesRequired, len(kp.UnlockConditions.PublicKeys))

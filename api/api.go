@@ -29,6 +29,7 @@ func (srv *Server) initAPI(addr string) {
 
 	// Consensus API Calls
 	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
+	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler)
 
 	// Server API Calls
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
@@ -41,7 +42,6 @@ func (srv *Server) initAPI(addr string) {
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-	handleHTTPRequest(mux, "/gateway/synchronize", srv.gatewaySynchronizeHandler)
 	handleHTTPRequest(mux, "/gateway/peer/add", srv.gatewayPeerAddHandler)
 	handleHTTPRequest(mux, "/gateway/peer/remove", srv.gatewayPeerRemoveHandler)
 
