@@ -144,7 +144,7 @@ func (st *serverTester) mineBlock() {
 		if err != nil {
 			st.t.Fatal("Mining failed:", err)
 		} else if solved {
-			// SolveBlock automatically puts the block into the consensus set.
+			// FindBlock automatically puts the block into the consensus set.
 			break
 		}
 	}

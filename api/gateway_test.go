@@ -120,26 +120,3 @@ func TestTransactionRelay(t *testing.T) {
 		// t.Error("balances are incorrect for 0-conf transaction")
 	}
 }
-
-/*
-// TestBlockBootstrap checks that gateway.Synchronize will be effective even
-// when the first state has a few thousand blocks.
-func TestBlockBootstrap(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	// Create a server and give it 2500 blocks.
-	st := newServerTester("TestBlockBootstrap1", t)
-	for i := 0; i < 2*gateway.MaxCatchUpBlocks+1; i++ {
-		st.mineBlock()
-	}
-
-	// Add a peer and spin until the peer is caught up. addPeer() already does
-	// this check, but it's left here to be explict anyway.
-	st2 := st.addPeer("TestBlockBootstrap2")
-	for st.server.cs.Height() != st2.server.cs.Height() {
-		time.Sleep(time.Millisecond)
-	}
-}
-*/
