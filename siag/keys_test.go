@@ -12,7 +12,7 @@ import (
 
 // TestGenerateKeys probes the generateKeys function.
 func TestGenerateKeys(t *testing.T) {
-	testDir := tester.TempDir("siakg", "TestGenerateKeys")
+	testDir := tester.TempDir("siag", "TestGenerateKeys")
 
 	// Try to create an anyone-can-spend set of keys.
 	_, err := generateKeys(0, 0, testDir, "anyoneCanSpend")
@@ -49,7 +49,7 @@ func TestVerifyKeys(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testDir := tester.TempDir("siakg", "TestVerifyKeys")
+	testDir := tester.TempDir("siag", "TestVerifyKeys")
 
 	// Check that a corrupted header or version will trigger an error.
 	keyname := "headerCheck"

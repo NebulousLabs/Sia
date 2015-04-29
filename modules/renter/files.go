@@ -15,9 +15,8 @@ var (
 
 // A file is a single file that has been uploaded to the network.
 type file struct {
-	Name          string
-	EncryptionKey crypto.TwofishKey
-	Checksum      crypto.Hash // checksum of the decoded file.
+	Name     string
+	Checksum crypto.Hash // checksum of the decoded file.
 
 	// Erasure coding variables:
 	//		piecesRequired <= optimalRecoveryPieces <= totalPieces
@@ -49,8 +48,9 @@ type filePiece struct {
 	StartIndex uint64
 	EndIndex   uint64
 
-	PieceIndex int // Indicates the erasure coding index of this piece.
-	Checksum   crypto.Hash
+	PieceIndex    int // Indicates the erasure coding index of this piece.
+	EncryptionKey crypto.TwofishKey
+	Checksum      crypto.Hash
 }
 
 // Available indicates whether the file is ready to be downloaded.
@@ -104,6 +104,19 @@ func (f *file) TimeRemaining() types.BlockHeight {
 	return f.Pieces[0].Contract.WindowStart - f.renter.blockHeight
 }
 
+// DeleteFile removes a file entry from the renter.
+func (r *Renter) DeleteFile(nickname string) error {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
+
+	_, exists := r.files[nickname]
+	if !exists {
+		return ErrUnknownNickname
+	}
+	delete(r.files, nickname)
+	return nil
+}
+
 // FileList returns all of the files that the renter has.
 func (r *Renter) FileList() (files []modules.FileInfo) {
 	lockID := r.mu.RLock()
@@ -117,10 +130,10 @@ func (r *Renter) FileList() (files []modules.FileInfo) {
 	return
 }
 
-// Rename takes an existing file and changes the nickname. The original file
-// must exist, and there must not be any file that already has the replacement
-// nickname.
-func (r *Renter) Rename(currentName, newName string) error {
+// RenameFile takes an existing file and changes the nickname. The original
+// file must exist, and there must not be any file that already has the
+// replacement nickname.
+func (r *Renter) RenameFile(currentName, newName string) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 

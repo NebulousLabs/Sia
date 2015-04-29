@@ -110,7 +110,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.Miner = true
 	}()
 	go func() {
-		srv.renter.Rename("", "")
+		srv.renter.RenameFile("", "")
 		mds.Renter = true
 	}()
 	go func() {

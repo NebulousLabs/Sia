@@ -63,6 +63,10 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/download", srv.renterDownloadHandler)
 	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
 	handleHTTPRequest(mux, "/renter/files", srv.renterFilesHandler)
+	handleHTTPRequest(mux, "/renter/file/delete", srv.renterFileDeleteHandler)
+	handleHTTPRequest(mux, "/renter/file/rename", srv.renterFileRenameHandler)
+	handleHTTPRequest(mux, "/renter/file/share/load", srv.renterFileShareLoadHandler)
+	handleHTTPRequest(mux, "/renter/file/share/save", srv.renterFileShareSaveHandler)
 	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
 	handleHTTPRequest(mux, "/renter/upload", srv.renterUploadHandler)
 
