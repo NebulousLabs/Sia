@@ -46,7 +46,7 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 
 	// Put a host announcement into the blockchain.
 	announcement := encoding.Marshal(modules.HostAnnouncement{
-		IPAddress: hdbt.gateway.Info().Address,
+		IPAddress: hdbt.gateway.Address(),
 	})
 	id, err := hdbt.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {

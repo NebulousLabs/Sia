@@ -105,8 +105,6 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 					println(err.Error())
 				}
 			}
-			m.gateway.RelayBlock(b)
-
 			solved = true
 
 			// Grab a new address for the miner.

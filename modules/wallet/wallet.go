@@ -100,7 +100,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 
 		transactions: make(map[string]*openTransaction),
 
-		mu: sync.New(1*time.Second, 0),
+		mu: sync.New(3*time.Second, 0),
 	}
 
 	// Create the wallet folder.

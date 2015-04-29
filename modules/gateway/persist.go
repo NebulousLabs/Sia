@@ -10,21 +10,21 @@ import (
 )
 
 func (g *Gateway) save() error {
-	var peers []modules.NetAddress
-	for peer := range g.peers {
-		peers = append(peers, peer)
+	var nodes []modules.NetAddress
+	for node := range g.nodes {
+		nodes = append(nodes, node)
 	}
-	return encoding.WriteFile(filepath.Join(g.saveDir, "peers.dat"), peers)
+	return encoding.WriteFile(filepath.Join(g.saveDir, "nodes.dat"), nodes)
 }
 
 func (g *Gateway) load() error {
-	var peers []modules.NetAddress
-	err := encoding.ReadFile(filepath.Join(g.saveDir, "peers.dat"), &peers)
+	var nodes []modules.NetAddress
+	err := encoding.ReadFile(filepath.Join(g.saveDir, "nodes.dat"), &nodes)
 	if err != nil {
 		return err
 	}
-	for _, peer := range peers {
-		g.peers[peer] = 0 // TODO: support saving/loading strikes
+	for _, node := range nodes {
+		g.addNode(node)
 	}
 	return nil
 }

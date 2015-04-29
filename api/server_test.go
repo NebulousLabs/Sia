@@ -46,13 +46,13 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	APIPort++
 
 	// create modules
-	cs, err := consensus.New(filepath.Join(testdir, "consensus"))
-	if err != nil {
-		t.Fatal("Failed to create consensus set:", err)
-	}
-	gateway, err := gateway.New(":0", cs, filepath.Join(testdir, "gateway"))
+	gateway, err := gateway.New(":0", filepath.Join(testdir, "gateway"))
 	if err != nil {
 		t.Fatal("Failed to create gateway:", err)
+	}
+	cs, err := consensus.New(gateway, filepath.Join(testdir, "consensus"))
+	if err != nil {
+		t.Fatal("Failed to create consensus set:", err)
 	}
 	tpool, err := transactionpool.New(cs, gateway)
 	if err != nil {
@@ -62,11 +62,11 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	miner, err := miner.New(cs, gateway, tpool, wallet)
+	miner, err := miner.New(cs, tpool, wallet)
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
-	host, err := host.New(cs, tpool, wallet, filepath.Join(testdir, "host"))
+	host, err := host.New(cs, tpool, wallet, ":0", filepath.Join(testdir, "host"))
 	if err != nil {
 		t.Fatal("Failed to create host:", err)
 	}
@@ -74,10 +74,13 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create hostdb:", err)
 	}
-	renter, err := renter.New(cs, gateway, hostdb, wallet, filepath.Join(testdir, "renter"))
+	renter, err := renter.New(cs, hostdb, wallet, filepath.Join(testdir, "renter"))
 	if err != nil {
 		t.Fatal("Failed to create renter:", err)
 	}
+
+	// register gateway RPCs
+	//gateway.RegisterRPC("SendBlocks", cs.SendBlocks)
 
 	srv := NewServer(APIAddr, cs, gateway, host, hostdb, miner, renter, tpool, wallet)
 	st := &serverTester{
@@ -122,7 +125,7 @@ func (st *serverTester) tpUpdateWait() {
 
 // netAddress returns the NetAddress of the caller.
 func (st *serverTester) netAddress() modules.NetAddress {
-	return st.server.gateway.Info().Address
+	return st.server.gateway.Address()
 }
 
 // coinAddress returns a coin address that the caller is able to spend from.
@@ -141,7 +144,7 @@ func (st *serverTester) mineBlock() {
 		if err != nil {
 			st.t.Fatal("Mining failed:", err)
 		} else if solved {
-			// SolveBlock automatically puts the block into the consensus set.
+			// FindBlock automatically puts the block into the consensus set.
 			break
 		}
 	}

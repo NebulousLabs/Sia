@@ -22,6 +22,7 @@ var (
 type Config struct {
 	Siacore struct {
 		RPCaddr     string
+		HostAddr    string
 		NoBootstrap bool
 	}
 
@@ -101,8 +102,9 @@ func main() {
 
 	// Set default values, which have the lowest priority.
 	defaultConfigFile := filepath.Join(siaDir, "config")
-	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port is used to communicate with the user")
-	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port is used when talking to other nodes on the network")
+	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
+	root.PersistentFlags().StringVarP(&config.Siacore.RPCaddr, "rpc-addr", "r", ":9988", "which port the gateway listens on")
+	root.PersistentFlags().StringVarP(&config.Siacore.HostAddr, "host-addr", "h", ":9990", "which port the host listens on")
 	root.PersistentFlags().BoolVarP(&config.Siacore.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
 	root.PersistentFlags().StringVarP(&config.Siad.ConfigFilename, "config-file", "c", defaultConfigFile, "location of the siad config file")
 

@@ -65,6 +65,7 @@ Consensus
 Queries:
 
 * /consensus/status
+* /consensus/synchronize
 
 #### /consensus/status
 
@@ -82,13 +83,21 @@ struct {
 }
 ```
 
+#### /consensus/synchronize
+
+Function: Will force synchronization of the local node and the rest of the
+network. May take a while. Should only be necessary for debugging.
+
+Parameters: none
+
+Reponse: standard
+
 Gateway
 -------
 
 Queries:
 
 * /gateway/status
-* /gateway/synchronize
 * /gateway/peer/add
 * /gateway/peer/remove
 
@@ -105,15 +114,6 @@ struct {
 	Peers   []string
 }
 ```
-
-#### /gateway/synchronize
-
-Function: Will force synchronization of the local node and the rest of the
-network. May take a while. Should only be necessary for debugging.
-
-Parameters: none
-
-Reponse: standard
 
 #### /gateway/peer/add
 

@@ -20,13 +20,12 @@ import (
 func TestMiner(t *testing.T) {
 	testdir := tester.TempDir("miner", "TestMiner")
 
-	// Create the miner and all of it's dependencies.
-	s, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	// Create the miner and all of its dependencies.
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
+	s, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +37,7 @@ func TestMiner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(s, g, tpool, w)
+	m, err := New(s, tpool, w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,11 +74,11 @@ func TestManyBlocks(t *testing.T) {
 	testdir := tester.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
-	s, err := consensus.New(filepath.Join(testdir, modules.ConsensusDir))
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := gateway.New(":0", s, filepath.Join(testdir, modules.GatewayDir))
+	s, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +90,7 @@ func TestManyBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(s, g, tpool, w)
+	m, err := New(s, tpool, w)
 	if err != nil {
 		t.Fatal(err)
 	}

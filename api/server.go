@@ -1,14 +1,10 @@
 package api
 
 import (
-	"errors"
-
 	"github.com/stretchr/graceful"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Server is essentially a collection of modules and an API server to talk
@@ -39,58 +35,8 @@ func NewServer(APIAddr string, s *consensus.State, g modules.Gateway, h modules.
 		wallet:  w,
 	}
 
-	// Register RPCs for each module
-	g.RegisterRPC("AcceptBlock", srv.acceptBlock)
-	g.RegisterRPC("AcceptTransaction", srv.acceptTransaction)
-	g.RegisterRPC("HostSettings", h.Settings)
-	g.RegisterRPC("NegotiateContract", h.NegotiateContract)
-	g.RegisterRPC("RetrieveFile", h.RetrieveFile)
-
 	// Register API handlers
 	srv.initAPI(APIAddr)
 
 	return srv
-}
-
-// TODO: move this to the state module?
-func (srv *Server) acceptBlock(conn modules.NetConn) error {
-	var b types.Block
-	err := conn.ReadObject(&b, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-
-	err = srv.cs.AcceptBlock(b)
-	if err == consensus.ErrOrphan {
-		go srv.gateway.Synchronize(conn.Addr())
-		return err
-	} else if err != nil {
-		return err
-	}
-
-	// Check if b is in the current path.
-	height, exists := srv.cs.HeightOfBlock(b.ID())
-	if !exists {
-		if build.DEBUG {
-			panic("could not get the height of a block that did not return an error when being accepted into the state")
-		}
-		return errors.New("consensus set malfunction")
-	}
-	currentPathBlock, exists := srv.cs.BlockAtHeight(height)
-	if !exists || b.ID() != currentPathBlock.ID() {
-		return errors.New("block added, but it does not extend the consensus set height")
-	}
-
-	srv.gateway.RelayBlock(b)
-	return nil
-}
-
-// TODO: move this to the tpool module?
-func (srv *Server) acceptTransaction(conn modules.NetConn) error {
-	var t types.Transaction
-	err := conn.ReadObject(&t, types.BlockSizeLimit)
-	if err != nil {
-		return err
-	}
-	return srv.tpool.AcceptTransaction(t)
 }
