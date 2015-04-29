@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 )
 
 const (
@@ -101,7 +100,7 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	}
 	// Suffix enforcement is not really necessary, but I want explicit
 	// enforcement of the suffix until people are used to seeing '.sia' files.
-	if !strings.HasSuffix(sharedest, ShareExtension) {
+	if filepath.Ext(sharedest) != ShareExtension {
 		return ErrNonShareSuffix
 	}
 
