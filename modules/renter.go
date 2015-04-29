@@ -80,12 +80,20 @@ type Renter interface {
 	// Info returns the list of all files by nickname. (deprecated)
 	Info() RentInfo
 
+	// LoadSharedFile loads a '.sia' file into the renter, so that the user can
+	// download files which have been shared with them.
+	LoadSharedFile(filename string) error
+
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error
 
 	// RenterNotify will push a struct down the channel every time it receives
 	// an update.
 	RenterNotify() <-chan struct{}
+
+	// ShareFiles creates a '.sia' file that can be shared with others, so that
+	// they may download files which they have not uploaded.
+	ShareFiles(nicknames []string, sharedest string) error
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error

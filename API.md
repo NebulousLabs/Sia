@@ -297,25 +297,14 @@ Renter
 
 Queries:
 
-* /renter/delete
 * /renter/download
 * /renter/downloadqueue
 * /renter/files
-* /renter/rename
+* /renter/file/delete
+* /renter/file/rename
+* /renter/file/share/save
+* /renter/file/share/load
 * /renter/upload
-
-#### /renter/delete
-
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
-
-Parameters:
-```
-nickname string
-```
-`nickname` is the nickname of the file that has been uploaded to the network.
-
-Response: standard
 
 #### /renter/download
 
@@ -389,7 +378,20 @@ typically best not to shut down siad until files are no longer being repaired.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
 
-#### /renter/rename
+#### /renter/file/delete
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+nickname string
+```
+`nickname` is the nickname of the file that has been uploaded to the network.
+
+Response: standard
+
+#### /renter/file/rename
 
 Function: Rename a file. Does not rename any downloads or source files, only
 renames the entry in the renter.
@@ -402,6 +404,34 @@ newname  string
 `nickname` is the current name of the file entry.
 
 `newname` is the new name for the file entry.
+
+#### /renter/file/share/save
+
+Function: Create a '.sia' that can be shared with other people.
+
+Parameters:
+```
+nickname string
+filepath string
+```
+`nickname` is the nickname of the file that will be shared.
+
+`filepath` is the filepath of the '.sia' that will be created to share the
+file. `filepath` must have the suffix '.sia'.
+
+Response: standard.
+
+#### /renter/file/share/load
+
+Function: Load a '.sia' into the renter.
+
+Parameters:
+```
+filename string
+```
+`filename` is the filepath of the '.sia' that is being loaded.
+
+Response: standard.
 
 #### /renter/upload
 
