@@ -32,12 +32,6 @@ type Config struct {
 	}
 }
 
-// avail checks if a file is available from the disk.
-func avail(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
-}
-
 // init creates the channel that's used to communicate with the testing
 // framework.
 func init() {

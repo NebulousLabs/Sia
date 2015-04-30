@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules/tester"
@@ -28,9 +27,12 @@ func TestMain(t *testing.T) {
 		"-H",
 		"localhost:45152",
 		"-d",
-		filepath.Join(testDir, "Naive Run"),
+		testDir,
 	}
 	go main()
+
+	// Wait until the daemon has started and then send a kill signal to the
+	// daemon.
 	<-started
 	resp, err := http.Get("http://localhost:45150/daemon/stop")
 	if err != nil {

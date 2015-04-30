@@ -20,55 +20,46 @@ import (
 )
 
 // startDaemonCmd uses the config parameters to start siad.
-func startDaemonCmd(*cobra.Command, []string) {
+func startDaemon() error {
 	// Establish multithreading.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	tpool, err := transactionpool.New(state, gateway)
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, "wallet"))
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	miner, err := miner.New(state, tpool, wallet)
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	host, err := host.New(state, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, "renter"))
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
 
 	// Bootstrap to the network.
@@ -77,14 +68,25 @@ func startDaemonCmd(*cobra.Command, []string) {
 	}
 
 	// Send a struct down the started channel, so the testing package knows
-	// that daemon startup has completed.
-	started <- struct{}{}
+	// that daemon startup has completed. A gofunc is used with the hope that
+	// srv.Serve() will start running before the value is sent down the
+	// channel.
+	go func() {
+		started <- struct{}{}
+	}()
 
 	// Start serving api requests.
 	err = srv.Serve()
 	if err != nil {
-		fmt.Println("Could not start daemon:", err)
-		return
+		return err
 	}
-	return
+	return nil
+}
+
+// startDaemonCmd is a passthrough function for startDaemon.
+func startDaemonCmd(*cobra.Command, []string) {
+	err := startDaemon()
+	if err != nil {
+		fmt.Println(err)
+	}
 }
