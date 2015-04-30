@@ -111,7 +111,8 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 // which simply write an object and disconnect. This is why Broadcast takes an
 // interface{} instead of an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}) {
-	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(g.peers))
+	peers := g.Peers()
+	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
@@ -120,8 +121,8 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(g.peers))
-	for _, addr := range g.Peers() {
+	wg.Add(len(peers))
+	for _, addr := range peers {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
