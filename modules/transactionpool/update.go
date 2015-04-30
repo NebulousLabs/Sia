@@ -175,23 +175,24 @@ func (tp *TransactionPool) removeTailTransaction() {
 	tp.removeSiafundInputs(t)
 	tp.removeSiafundOutputs(t)
 
+	// Sanity check - transaction hash should be in the list of transactions.
+	if build.DEBUG {
+		_, exists := tp.transactions[crypto.HashObject(t)]
+		if !exists {
+			panic("transaction not available in transaction list")
+		}
+	}
+
 	// Remove the transaction from the transaction lists.
 	delete(tp.transactions, crypto.HashObject(t))
 	tp.transactionList = tp.transactionList[:len(tp.transactionList)-1]
-
-	// Sanity check - the lengths of the transactions by hash vs. the ordered
-	// set of transactions should always be the same.
-	if len(tp.transactions) != len(tp.transactionList) {
-		panic("length mismatch for transactions and transactionList")
-	}
-
 	return
 }
 
 // purge removes all transactions from the transaction pool.
 func (tp *TransactionPool) purge() {
 	// Remove the tail transaction repeatedly until no transactions remain.
-	for len(tp.transactions) != 0 {
+	for len(tp.transactionList) != 0 {
 		tp.removeTailTransaction()
 	}
 
@@ -206,9 +207,6 @@ func (tp *TransactionPool) purge() {
 		}
 		if len(tp.referenceSiafundOutputs) != 0 {
 			panic("referenceSiafundOuptuts is not empty")
-		}
-		if len(tp.transactions) != 0 {
-			panic("transactions is not empty")
 		}
 		if len(tp.transactionList) != 0 {
 			panic("transactionList is not empty")
@@ -313,16 +311,31 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 
-	// Save all of the reverted transactions. When the existing unconfirmed
-	// transactions are added back to the pool, these previously confirmed
-	// transactions will also be added to the pool. Because the transactions
-	// get added in order, they need to be saved in order. After grabbing the
-	// set of reverted transactions, also grab the set of unconfirmed
-	// transactions.
+	// Save all of the reverted transactions. Transactions need to appear in
+	// 'unconfirmedTxns' in the same order that they would appear in the
+	// blockchain. 'revertedBlocks' is backwards (first element has highest
+	// height), so each time a new block processed, the transactions need to be
+	// prepended to the list of unconfirmed transactions.
 	var unconfirmedTxns []types.Transaction
 	for _, block := range revertedBlocks {
-		unconfirmedTxns = append(unconfirmedTxns, block.Transactions...)
+		unconfirmedTxns = append(block.Transactions, unconfirmedTxns...)
 	}
+
+	// Delete the hashes of each transaction from the 'already seen' list.
+	for _, txn := range unconfirmedTxns {
+		// Sanity check - transaction should be in the list of already seen
+		// transactions.
+		if build.DEBUG {
+			_, exists := tp.transactions[crypto.HashObject(txn)]
+			if !exists {
+				panic("transaction should be in the list of already seen transactions")
+			}
+		}
+		delete(tp.transactions, crypto.HashObject(txn))
+	}
+
+	// Add all of the current unconfirmed transactions to the unconfirmed
+	// transaction list.
 	unconfirmedTxns = append(unconfirmedTxns, tp.transactionList...)
 
 	// Purge the pool of unconfirmed transactions so that there is no
@@ -331,10 +344,9 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	// blockchain.
 	tp.purge()
 
-	// Apply all of the reverted diffs to the unconfirmed set. The diffs need
-	// to be applied in the inverse order of how they were applied.
-	for i := len(revertedBlocks) - 1; i >= 0; i-- {
-		block := revertedBlocks[i]
+	// Apply all of the reverted diffs to the unconfirmed set. revertedBlocks
+	// is already in reverse order; the first block has the highest height.
+	for _, block := range revertedBlocks {
 		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
 		if err != nil {
 			if build.DEBUG {
@@ -359,6 +371,11 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 			}
 		}
 		tp.applyDiffs(scods, fcds, sfods, modules.DiffApply)
+
+		// Mark all of the applied transactions as 'already seen'.
+		for _, txn := range block.Transactions {
+			tp.transactions[crypto.HashObject(txn)] = struct{}{}
+		}
 
 		tp.consensusSetHeight++
 	}
