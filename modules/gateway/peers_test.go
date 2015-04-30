@@ -68,28 +68,28 @@ func TestListen(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	g := newTestingGateway("TestConnect", t)
-	defer g.Close()
+	// create bootstrap peer
+	bootstrap := newTestingGateway("TestConnect1", t)
+	defer bootstrap.Close()
 
-	// dummy listener to accept connection
-	l, err := net.Listen("tcp", ":0")
+	// give it a peer
+	peer := newTestingGateway("TestConnect2", t)
+	defer peer.Close()
+	err := bootstrap.Connect(peer.Address())
 	if err != nil {
-		t.Fatal("couldn't start listener:", err)
-	}
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			t.Fatal("accept failed:", err)
-		}
-		conn.Close()
-	}()
-
-	if err := g.Connect(modules.NetAddress(l.Addr().String())); err != nil {
-		t.Fatal("connect failed:", err)
+		t.Fatal("couldn't connect:", err)
 	}
 
-	if len(g.Peers()) != 1 {
-		t.Fatal("gateway did not add peer after connecting:", g.peers)
+	// bootstrap
+	g := newTestingGateway("TestConnect3", t)
+	err = g.Connect(bootstrap.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// node lists should be the same
+	if len(g.nodes) != len(bootstrap.nodes) {
+		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
 	}
 }
 

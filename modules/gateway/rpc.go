@@ -50,6 +50,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	// call fn
 	err = fn(conn)
 	if err != nil {
+		// TODO: log error here?
 		// give peer a strike
 		atomic.AddUint32(&peer.strikes, 1)
 	}
