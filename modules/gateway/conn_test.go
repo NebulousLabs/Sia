@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -18,19 +17,21 @@ func TestCallbackAddr(t *testing.T) {
 		t.Fatal("failed to connect:", err)
 	}
 
+	rpcChan := make(chan struct{})
 	var g1addr, g2addr modules.NetAddress
 	g2.RegisterRPC("Foo", func(conn modules.PeerConn) error {
 		g1addr = conn.CallbackAddr()
+		rpcChan <- struct{}{}
 		return nil
 	})
 	err = g1.RPC(g2.Address(), "Foo", func(conn modules.PeerConn) error {
 		g2addr = conn.CallbackAddr()
-		time.Sleep(10 * time.Millisecond)
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	<-rpcChan
 	if g1addr != g1.Address() {
 		t.Errorf("CallbackAddr returned %v, expected %v", g1addr, g1.Address())
 	} else if g2addr != g2.Address() {
