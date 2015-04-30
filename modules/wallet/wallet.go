@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -100,7 +99,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 
 		transactions: make(map[string]*openTransaction),
 
-		mu: sync.New(3*time.Second, 0),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Create the wallet folder.

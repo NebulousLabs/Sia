@@ -2,7 +2,6 @@ package transactionpool
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -118,7 +117,7 @@ func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error
 		referenceFileContracts:  make(map[types.FileContractID]types.FileContract),
 		referenceSiafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		mu: sync.New(3*time.Second, 0),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Register RPCs

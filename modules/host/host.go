@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -97,7 +96,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
 
-		mu: sync.New(1*time.Second, 0),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 	block, exists := cs.BlockAtHeight(0)
 	if !exists {
