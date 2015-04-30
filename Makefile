@@ -66,10 +66,14 @@ test-types: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./types
 test-consensus: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
+test-gateway: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=35s ./modules/gateway
 test-host: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/host
 test-renter: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/renter
+test-siad: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=15s ./siad
 test-siag: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./siag
 test-tpool: clean fmt REBUILD
@@ -81,7 +85,7 @@ test-wallet: clean fmt REBUILD
 # have been hit during testing and how many times each line has been hit.
 coverpackages = api compatibility crypto encoding modules/consensus           \
 	modules/gateway modules/host modules/hostdb modules/miner modules/renter  \
-	modules/transactionpool modules/wallet siag types
+	modules/transactionpool modules/wallet siad siag types
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(coverpackages); do \

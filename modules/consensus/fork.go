@@ -42,7 +42,8 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 }
 
 // revertToNode will revert blocks from the State's current path until 'bn' is
-// the current block.
+// the current block. The list returned is in reversed order; the first block
+// in the list was the first reverted, and has the highest height.
 func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
+	"runtime"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
@@ -13,65 +15,78 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+
+	"github.com/spf13/cobra"
 )
 
-// DaemonConfig is a struct containing the daemon configuration variables. It
-// is only used when calling 'newDaemon', but is it's own struct because there
-// are many values.
-type DaemonConfig struct {
-	APIAddr  string
-	RPCAddr  string
-	HostAddr string
+// startDaemonCmd uses the config parameters to start siad.
+func startDaemon() error {
+	// Establish multithreading.
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	SiaDir string
-}
-
-type daemon struct {
-	srv *api.Server
-}
-
-// newDaemon initializes modules using the config parameters and uses them to
-// create an api.Server.
-func newDaemon(cfg DaemonConfig) (d *daemon, err error) {
-	gateway, err := gateway.New(cfg.RPCAddr, filepath.Join(cfg.SiaDir, "gateway"))
+	// Create all of the modules.
+	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
 	if err != nil {
-		return
+		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(cfg.SiaDir, "consensus"))
+	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
 	if err != nil {
-		return
+		return err
 	}
 	tpool, err := transactionpool.New(state, gateway)
 	if err != nil {
-		return
+		return err
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(cfg.SiaDir, "wallet"))
+	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, "wallet"))
 	if err != nil {
-		return
+		return err
 	}
 	miner, err := miner.New(state, tpool, wallet)
 	if err != nil {
-		return
+		return err
 	}
-	host, err := host.New(state, tpool, wallet, cfg.HostAddr, filepath.Join(cfg.SiaDir, "host"))
+	host, err := host.New(state, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
 	if err != nil {
-		return
+		return err
 	}
 	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
-		return
+		return err
 	}
-	renter, err := renter.New(state, hostdb, wallet, filepath.Join(cfg.SiaDir, "renter"))
+	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, "renter"))
 	if err != nil {
-		return
+		return err
+	}
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)
+	if err != nil {
+		return err
 	}
 
-	// bootstrap to the network
-	// TODO: probably a better way of doing this.
-	if !config.Siacore.NoBootstrap {
+	// Bootstrap to the network.
+	if !config.Siad.NoBootstrap {
 		go gateway.Bootstrap(modules.BootstrapPeers[0])
 	}
 
-	d = &daemon{api.NewServer(cfg.APIAddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)}
-	return
+	// Send a struct down the started channel, so the testing package knows
+	// that daemon startup has completed. A gofunc is used with the hope that
+	// srv.Serve() will start running before the value is sent down the
+	// channel.
+	go func() {
+		started <- struct{}{}
+	}()
+
+	// Start serving api requests.
+	err = srv.Serve()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// startDaemonCmd is a passthrough function for startDaemon.
+func startDaemonCmd(*cobra.Command, []string) {
+	err := startDaemon()
+	if err != nil {
+		fmt.Println(err)
+	}
 }

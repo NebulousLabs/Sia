@@ -166,6 +166,7 @@ func WriteFile(filename string, v interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	return NewEncoder(file).Encode(v)
 }
 
@@ -299,5 +300,6 @@ func ReadFile(filename string, v interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	return NewDecoder(file).Decode(v)
 }
