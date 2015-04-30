@@ -66,6 +66,8 @@ test-types: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./types
 test-consensus: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
+test-gateway: clean fmt REBUILD
+	go test -v -race -tags='testing debug' -timeout=35s ./modules/gateway
 test-host: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=5s ./modules/host
 test-renter: clean fmt REBUILD
