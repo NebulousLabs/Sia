@@ -96,11 +96,11 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// TODO: exchange version messages
 
+	g.log.Println("INFO: connected to new peer", addr)
+
 	id = g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 	g.mu.Unlock(id)
-
-	g.log.Println("INFO: connected to new peer", addr)
 
 	// request nodes
 	nodes, err := g.requestNodes(addr)
