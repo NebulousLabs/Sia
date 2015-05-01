@@ -67,7 +67,7 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 		// Negotiate the contract with the host. If the negotiation is
 		// unsuccessful, we need to try again with a new host. Otherwise, the
 		// file will be uploaded and we'll be done.
-		contract, contractID, err := r.negotiateContract(host, up)
+		contract, contractID, key, err := r.negotiateContract(host, up)
 		if err != nil {
 			// The previous attempt didn't work. We will try again after
 			// sleeping for a randomized amount of time to increase our chances
@@ -85,7 +85,10 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 			Repairing:  false,
 			Contract:   contract,
 			ContractID: contractID,
-			HostIP:     host.IPAddress,
+
+			HostIP: host.IPAddress,
+
+			EncryptionKey: key,
 		}
 		r.save()
 		r.mu.Unlock(lockID)
