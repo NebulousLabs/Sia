@@ -84,6 +84,10 @@ type Renter interface {
 	// download files which have been shared with them.
 	LoadSharedFile(filename string) error
 
+	// LoadSharedFilesAscii loads a '.sia' file into the renter, except instead
+	// of taking a filename it takes a base64 encoded string of the file.
+	LoadSharedFilesAscii(asciiSia string) error
+
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error
 
@@ -94,6 +98,10 @@ type Renter interface {
 	// ShareFiles creates a '.sia' file that can be shared with others, so that
 	// they may download files which they have not uploaded.
 	ShareFiles(nicknames []string, sharedest string) error
+
+	// ShareFilesAscii creates a '.sia' file that can be shared with others,
+	// except it returns the bytes of the file in base64.
+	ShareFilesAscii(nicknames []string) (asciiSia string, err error)
 
 	// Upload uploads a file using the input parameters.
 	Upload(FileUploadParams) error

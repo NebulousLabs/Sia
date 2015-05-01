@@ -110,6 +110,18 @@ func (srv *Server) renterFileShareLoadHandler(w http.ResponseWriter, req *http.R
 	writeSuccess(w)
 }
 
+// renterFileShareLoadAsciiHandler handles the API call to load a '.sia' file
+// in ascii form.
+func (srv *Server) renterFileShareLoadAsciiHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.LoadSharedFilesAscii(req.FormValue("asciisia"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeSuccess(w)
+}
+
 // renterFileShareSaveHandler handles the API call to create a '.sia' file that
 // shares a file.
 func (srv *Server) renterFileShareSaveHandler(w http.ResponseWriter, req *http.Request) {
@@ -120,6 +132,18 @@ func (srv *Server) renterFileShareSaveHandler(w http.ResponseWriter, req *http.R
 	}
 
 	writeSuccess(w)
+}
+
+// renterFileShareSaveAsciiHandler handles the API call to return a '.sia' file
+// in ascii form.
+func (srv *Server) renterFileShareSaveAsciiHandler(w http.ResponseWriter, req *http.Request) {
+	ascii, err := srv.renter.ShareFilesAscii([]string{req.FormValue("nickname")})
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, ascii)
 }
 
 // renterStatusHandler handles the API call querying the renter's status.

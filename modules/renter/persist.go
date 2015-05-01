@@ -1,6 +1,7 @@
 package renter
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -88,20 +89,11 @@ func (r *Renter) load() error {
 	return nil
 }
 
-// ShareFiles saves a '.sia' file that can be shared with others, enabling them
-// to download the file you are sharing. It creates a Sia equivalent of a
-// '.torrent'.
-func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
-	lockID := r.mu.RLock()
-	defer r.mu.RUnlock(lockID)
-
+// shareFiles encodes a set of file nicknames into a byte slice that can be
+// shared with other daemons, giving them access to those files.
+func (r *Renter) shareFiles(nicknames []string) (shareBytes []byte, err error) {
 	if len(nicknames) == 0 {
-		return ErrNoNicknames
-	}
-	// Suffix enforcement is not really necessary, but I want explicit
-	// enforcement of the suffix until people are used to seeing '.sia' files.
-	if filepath.Ext(sharedest) != ShareExtension {
-		return ErrNonShareSuffix
+		return nil, ErrNoNicknames
 	}
 
 	rsf := RenterSharedFile{
@@ -112,15 +104,37 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	for _, nickname := range nicknames {
 		file, exists := r.files[nickname]
 		if !exists {
-			return ErrUnknownNickname
+			return nil, ErrUnknownNickname
 		}
 		rsf.Files = append(rsf.Files, *file)
 	}
 
-	shareBytes, err := json.Marshal(rsf)
+	shareBytes, err = json.Marshal(rsf)
+	if err != nil {
+		return nil, err
+	}
+
+	return shareBytes, nil
+}
+
+// ShareFiles saves a '.sia' file that can be shared with others, enabling them
+// to download the file you are sharing. It creates a Sia equivalent of a
+// '.torrent'.
+func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
+
+	// Suffix enforcement is not really necessary, but I want explicit
+	// enforcement of the suffix until people are used to seeing '.sia' files.
+	if filepath.Ext(sharedest) != ShareExtension {
+		return ErrNonShareSuffix
+	}
+
+	shareBytes, err := r.shareFiles(nicknames)
 	if err != nil {
 		return err
 	}
+
 	err = ioutil.WriteFile(sharedest, shareBytes, 0660)
 	if err != nil {
 		return err
@@ -128,17 +142,24 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 	return nil
 }
 
-// LoadSharedFile loads a shared file into the renter.
-func (r *Renter) LoadSharedFile(filename string) error {
-	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
+// ShareFilesAscii returns an ascii string that can be shared with other
+// daemons, granting them access to the files.
+func (r *Renter) ShareFilesAscii(nicknames []string) (asciiSia string, err error) {
+	lockID := r.mu.RLock()
+	defer r.mu.RUnlock(lockID)
 
-	shareBytes, err := ioutil.ReadFile(filename)
+	shareBytes, err := r.shareFiles(nicknames)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	return base64.URLEncoding.EncodeToString(shareBytes), nil
+}
+
+// loadSharedFile takes an encoded set of files and adds them to the renter.
+func (r *Renter) loadSharedFile(shareBytes []byte) error {
 	var rsf RenterSharedFile
-	err = json.Unmarshal(shareBytes, &rsf)
+	err := json.Unmarshal(shareBytes, &rsf)
 	if err != nil {
 		return err
 	}
@@ -154,5 +175,28 @@ func (r *Renter) LoadSharedFile(filename string) error {
 		r.files[rsf.Files[i].Name] = &rsf.Files[i]
 	}
 	r.save()
+
 	return nil
+}
+
+// LoadSharedFile loads a shared file into the renter.
+func (r *Renter) LoadSharedFile(filename string) error {
+	lockID := r.mu.Lock()
+	defer r.mu.Unlock(lockID)
+
+	shareBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	return r.loadSharedFile(shareBytes)
+}
+
+// loadSharedFile takes an encoded set of files and adds them to the renter,
+// taking them form an ascii string.
+func (r *Renter) LoadSharedFilesAscii(asciiSia string) error {
+	shareBytes, err := base64.URLEncoding.DecodeString(asciiSia)
+	if err != nil {
+		return err
+	}
+	return r.loadSharedFile(shareBytes)
 }

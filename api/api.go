@@ -66,7 +66,9 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/file/delete", srv.renterFileDeleteHandler)
 	handleHTTPRequest(mux, "/renter/file/rename", srv.renterFileRenameHandler)
 	handleHTTPRequest(mux, "/renter/file/share/load", srv.renterFileShareLoadHandler)
+	handleHTTPRequest(mux, "/renter/file/share/loadascii", srv.renterFileShareLoadAsciiHandler)
 	handleHTTPRequest(mux, "/renter/file/share/save", srv.renterFileShareSaveHandler)
+	handleHTTPRequest(mux, "/renter/file/share/saveascii", srv.renterFileShareSaveAsciiHandler)
 	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
 	handleHTTPRequest(mux, "/renter/upload", srv.renterUploadHandler)
 
