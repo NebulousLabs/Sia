@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -117,7 +116,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 		peers:      make(map[modules.NetAddress]*peer),
 		nodes:      make(map[modules.NetAddress]struct{}),
 		saveDir:    saveDir,
-		mu:         sync.New(time.Second*1, 0),
+		mu:         sync.New(modules.SafeMutexDelay, 0),
 		log:        logger,
 	}
 

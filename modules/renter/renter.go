@@ -3,7 +3,6 @@ package renter
 import (
 	"errors"
 	"os"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -54,7 +53,7 @@ func New(cs *consensus.State, hdb modules.HostDB, wallet modules.Wallet, saveDir
 		files:   make(map[string]*file),
 		saveDir: saveDir,
 
-		mu: sync.New(1*time.Second, 0),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	err := os.MkdirAll(saveDir, 0700)

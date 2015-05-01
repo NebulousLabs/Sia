@@ -8,7 +8,6 @@ package hostdb
 
 import (
 	"errors"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -69,7 +68,7 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		activeHosts: make(map[modules.NetAddress]*hostNode),
 		allHosts:    make(map[modules.NetAddress]*hostEntry),
 
-		mu: sync.New(1*time.Second, 0),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	cs.ConsensusSetSubscribe(hdb)

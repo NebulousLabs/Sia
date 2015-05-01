@@ -280,6 +280,12 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	h.save()
 	h.mu.Unlock(lockID)
 
+	// Send an ack to the renter that all is well.
+	err = encoding.WriteObject(conn, true)
+	if err != nil {
+		return
+	}
+
 	// TODO: we don't currently watch the blockchain to make sure that the
 	// transaction actually gets into the blockchain.
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/blockdb"
 	"github.com/NebulousLabs/Sia/build"
@@ -94,7 +93,7 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 
 		gateway: gateway,
 
-		mu: sync.New(1*time.Second, 1),
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Create the genesis block and add it as the BlockRoot.
