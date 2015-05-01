@@ -193,6 +193,17 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	fcid = signedTxn.FileContractID(0)
 	contract = signedTxn.FileContracts[0]
 
+	// Read an ack from the host that all is well.
+	var ack bool
+	err = encoding.ReadObject(conn, &ack, 1)
+	if err != nil {
+		return
+	}
+	if !ack {
+		err = errors.New("host negotiation failed")
+		return
+	}
+
 	// TODO: We don't actually watch the blockchain to make sure that the
 	// file contract made it.
 
