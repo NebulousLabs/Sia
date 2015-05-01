@@ -143,7 +143,7 @@ func (srv *Server) renterFileShareSaveAsciiHandler(w http.ResponseWriter, req *h
 		return
 	}
 
-	writeJSON(w, ascii)
+	writeJSON(w, struct{ Ascii string }{ascii})
 }
 
 // renterStatusHandler handles the API call querying the renter's status.

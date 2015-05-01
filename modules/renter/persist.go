@@ -1,9 +1,13 @@
 package renter
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -53,11 +57,13 @@ func (r *Renter) save() error {
 		rp.Files = append(rp.Files, *file)
 	}
 
-	persistBytes, err := json.Marshal(rp)
+	jsonBytes, err := json.Marshal(rp)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filepath.Join(r.saveDir, PersistFilename), persistBytes, 0660)
+
+	// Write everything to disk.
+	err = ioutil.WriteFile(filepath.Join(r.saveDir, PersistFilename), jsonBytes, 0660)
 	if err != nil {
 		return err
 	}
@@ -70,6 +76,7 @@ func (r *Renter) load() error {
 	if err != nil {
 		return err
 	}
+
 	var rp RenterPersistence
 	err = json.Unmarshal(persistBytes, &rp)
 	if err != nil {
@@ -91,7 +98,7 @@ func (r *Renter) load() error {
 
 // shareFiles encodes a set of file nicknames into a byte slice that can be
 // shared with other daemons, giving them access to those files.
-func (r *Renter) shareFiles(nicknames []string) (shareBytes []byte, err error) {
+func (r *Renter) shareFiles(nicknames []string) (zipBytes []byte, err error) {
 	if len(nicknames) == 0 {
 		return nil, ErrNoNicknames
 	}
@@ -109,12 +116,24 @@ func (r *Renter) shareFiles(nicknames []string) (shareBytes []byte, err error) {
 		rsf.Files = append(rsf.Files, *file)
 	}
 
-	shareBytes, err = json.Marshal(rsf)
+	shareBytes, err := json.Marshal(rsf)
 	if err != nil {
 		return nil, err
 	}
 
-	return shareBytes, nil
+	// Gzip the result.
+	var zipBuffer bytes.Buffer
+	zip, err := gzip.NewWriterLevel(&zipBuffer, flate.BestCompression)
+	if err != nil {
+		return nil, err
+	}
+	_, err = zip.Write(shareBytes)
+	if err != nil {
+		return nil, err
+	}
+	zip.Close()
+
+	return zipBuffer.Bytes(), nil
 }
 
 // ShareFiles saves a '.sia' file that can be shared with others, enabling them
@@ -157,9 +176,19 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (asciiSia string, err error
 }
 
 // loadSharedFile takes an encoded set of files and adds them to the renter.
-func (r *Renter) loadSharedFile(shareBytes []byte) error {
+func (r *Renter) loadSharedFile(zipBytes []byte) error {
+	// Un-gzip the contents.
+	var unzipBuffer bytes.Buffer
+	zipBuffer := bytes.NewBuffer(zipBytes)
+	zip, err := gzip.NewReader(zipBuffer)
+	if err != nil {
+		return err
+	}
+	io.Copy(&unzipBuffer, zip)
+	shareBytes := unzipBuffer.Bytes()
+
 	var rsf RenterSharedFile
-	err := json.Unmarshal(shareBytes, &rsf)
+	err = json.Unmarshal(shareBytes, &rsf)
 	if err != nil {
 		return err
 	}
