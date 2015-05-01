@@ -68,8 +68,10 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	id := g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
-	g.log.Println("INFO: accepted connection from new peer %v", addr)
+	g.log.Printf("INFO: accepted connection from new peer %v", addr)
 
+	// broadcast our new peer's address
+	g.Broadcast("RelayNode", addr)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -103,7 +105,10 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.mu.Unlock(id)
 
 	// request nodes
-	nodes, err := g.requestNodes(addr)
+	var nodes []modules.NetAddress
+	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+	})
 	if err != nil {
 		// log this error, but don't return it
 		g.log.Printf("WARN: request for node list of %v failed: %v", addr, err)

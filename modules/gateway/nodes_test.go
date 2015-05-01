@@ -3,7 +3,9 @@ package gateway
 import (
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -80,55 +82,45 @@ func TestRandomNode(t *testing.T) {
 	}
 }
 
-func TestRequestNodes(t *testing.T) {
-	g1 := newTestingGateway("TestRequestNodes1", t)
+func TestShareNodes(t *testing.T) {
+	g1 := newTestingGateway("TestShareNodes1", t)
 	defer g1.Close()
-	g2 := newTestingGateway("TestRequestNodes2", t)
+	g2 := newTestingGateway("TestShareNodes2", t)
 	defer g2.Close()
+
+	// add a node to g2
+	g2.addNode("foo")
+
+	// connect
 	err := g1.Connect(g2.Address())
 	if err != nil {
 		t.Fatal("couldn't connect:", err)
 	}
 
-	// ask gateway for nodes
-	nodes, err := g1.requestNodes(g2.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	// response should be exactly []NetAddress{g1.Address(), g2.Address()}
-	if len(nodes) != 2 || (nodes[0] != g1.Address() && nodes[1] != g1.Address()) {
-		t.Fatalf("gateway gave bad node list %v (expected %v)", nodes, []modules.NetAddress{g1.Address(), g2.Address()})
+	// g1 should have received foo
+	if g1.addNode("foo") == nil {
+		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
 
-	// add a couple more nodes
-	g2.addNode("foo:9001")
-	g2.addNode("bar:9002")
-	g2.addNode("baz:9003")
-	nodes, err = g1.requestNodes(g2.Address())
-	if err != nil {
-		t.Fatal(err)
+	// remove all nodes from both peers
+	g1.removeNode("foo")
+	g1.removeNode(g1.Address())
+	g1.removeNode(g2.Address())
+	if len(g1.nodes) != 0 {
+		t.Fatal("gateway has nodes remaining after removal:", g1.nodes)
 	}
-	// nodes should now contain 4 distinct addresses
-	for i := 0; i < len(nodes); i++ {
-		for j := i + 1; j < len(nodes); j++ {
-			if nodes[i] == nodes[j] {
-				t.Fatal("gateway gave duplicate addresses:", nodes)
-			}
-		}
-	}
-
-	// remove all the nodes
-	g2.removeNode("foo:9001")
-	g2.removeNode("bar:9002")
-	g2.removeNode("baz:9003")
+	g2.removeNode("foo")
 	g2.removeNode(g1.Address())
 	g2.removeNode(g2.Address())
 	if len(g2.nodes) != 0 {
 		t.Fatal("gateway has nodes remaining after removal:", g2.nodes)
 	}
 
-	// no nodes should be returned
-	nodes, err = g1.requestNodes(g2.Address())
+	// SharePeers should now return no peers
+	var nodes []modules.NetAddress
+	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,19 +128,46 @@ func TestRequestNodes(t *testing.T) {
 		t.Fatal("gateway gave non-existent addresses:", nodes)
 	}
 
-	if testing.Short() {
-		t.SkipNow()
-	}
-
 	// sharing should be capped at maxSharedNodes
 	for i := 0; i < maxSharedNodes+10; i++ {
 		g2.addNode(modules.NetAddress("foo" + strconv.Itoa(i)))
 	}
-	nodes, err = g1.requestNodes(g2.Address())
+	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(nodes) != maxSharedNodes {
-		t.Fatal("gateway gave wrong number of nodes: expected %v, got %v", maxSharedNodes, len(nodes))
+		t.Fatalf("gateway gave wrong number of nodes: expected %v, got %v", maxSharedNodes, len(nodes))
+	}
+}
+
+func TestRelayNodes(t *testing.T) {
+	g1 := newTestingGateway("TestRelayNodes1", t)
+	defer g1.Close()
+	g2 := newTestingGateway("TestRelayNodes2", t)
+	defer g2.Close()
+	g3 := newTestingGateway("TestRelayNodes3", t)
+	defer g2.Close()
+
+	// connect g2 to g1
+	err := g2.Connect(g1.Address())
+	if err != nil {
+		t.Fatal("couldn't connect:", err)
+	}
+
+	// connect g3 to g1
+	err = g3.Connect(g1.Address())
+	if err != nil {
+		t.Fatal("couldn't connect:", err)
+	}
+
+	// g2 should have received g3's address from g1
+	time.Sleep(10 * time.Millisecond)
+	id := g2.mu.Lock()
+	defer g2.mu.Unlock(id)
+	if _, ok := g2.nodes[g3.Address()]; !ok {
+		t.Fatal("node was not relayed:", g2.nodes)
 	}
 }

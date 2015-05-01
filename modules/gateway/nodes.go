@@ -47,14 +47,6 @@ func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	return "", errNoPeers
 }
 
-// requestNodes calls the ShareNodes RPC on addr.
-func (g *Gateway) requestNodes(addr modules.NetAddress) (newPeers []modules.NetAddress, err error) {
-	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &newPeers, maxSharedNodes*maxAddrLength)
-	})
-	return
-}
-
 // shareNodes is an RPC that returns up to 10 randomly selected nodes.
 func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 	id := g.mu.RLock()
@@ -67,4 +59,24 @@ func (g *Gateway) shareNodes(conn modules.PeerConn) error {
 	}
 	g.mu.RUnlock(id)
 	return encoding.WriteObject(conn, nodes)
+}
+
+// relayNode adds a node to the Gateway's node list and relays it to each of
+// the Gateway's peers. If the node is already in the node list, it is not
+// relayed.
+func (g *Gateway) relayNode(conn modules.PeerConn) error {
+	// read address
+	var addr modules.NetAddress
+	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
+		return err
+	}
+	// add node
+	id := g.mu.Lock()
+	err := g.addNode(addr)
+	g.mu.Unlock(id)
+	// relay
+	if err == nil {
+		go g.Broadcast("RelayNode", addr)
+	}
+	return nil
 }

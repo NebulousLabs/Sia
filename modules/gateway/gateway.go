@@ -97,6 +97,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 	}
 
 	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("RelayNode", g.relayNode)
 
 	g.log.Println("INFO: gateway created, started logging")
 
