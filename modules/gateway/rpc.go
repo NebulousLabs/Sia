@@ -32,7 +32,9 @@ func handlerName(name string) (id rpcID) {
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
 	g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
+	id := g.mu.RLock()
 	peer, ok := g.peers[addr]
+	g.mu.RUnlock(id)
 	if !ok {
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
 	}
