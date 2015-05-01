@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -130,6 +131,9 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
 				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
+				// try one more time before giving up
+				time.Sleep(10 * time.Second)
+				g.RPC(addr, name, fn)
 			}
 			wg.Done()
 		}(addr)
