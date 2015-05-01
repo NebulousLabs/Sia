@@ -238,38 +238,4 @@ func TestFileSharing(t *testing.T) {
 	if err == nil {
 		t.Error("Expecting corruption error")
 	}
-
-	// Alter the header and version information.
-	var rsf RenterSharedFile
-	err = json.Unmarshal(shareBytes, &rsf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rsf.Header = "bad"
-	badBytes, err := json.Marshal(rsf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(filepath.Join(shareDir, "1share.sia"), badBytes, 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
-	if err != ErrUnrecognizedHeader {
-		t.Error("Expecting ErrUnrecognizedHeader:", err)
-	}
-	rsf.Header = ShareHeader
-	rsf.Version = "bad"
-	badBytes, err = json.Marshal(rsf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(filepath.Join(shareDir, "1share.sia"), badBytes, 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
-	if err != ErrUnrecognizedVersion {
-		t.Error("Expecting ErrUnrecognizedVersion", err)
-	}
 }

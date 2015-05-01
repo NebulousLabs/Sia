@@ -99,7 +99,7 @@ func TestTwofishEntropy(t *testing.T) {
 	// Gzip the ciphertext
 	var b bytes.Buffer
 	zip := gzip.NewWriter(&b)
-	_, err := zip.Write(ciphertext)
+	_, err = zip.Write(ciphertext)
 	if err != nil {
 		t.Fatal(err)
 	}

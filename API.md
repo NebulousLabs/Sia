@@ -16,49 +16,6 @@ There may be functional API calls which are not documented. These are not
 guaranteed to be supported beyond the current release, and should not be used
 in production.
 
-Daemon
-------
-
-Queries:
-
-* /daemon/stop
-* /daemon/update/apply
-* /daemon/update/check
-
-#### /daemon/stop
-
-Function: Cleanly shuts down the daemon. May take a while.
-
-Parameters: none
-
-Response: standard
-
-#### /daemon/update/apply:
-
-Function: Applies the update specified by `version`.
-
-Parameters:
-```
-version string
-```
-
-Response: standard
-
-#### /daemon/update/check:
-
-Function: Checks for an update, returning a bool indicating whether
-there is an update and a version indicating the version of the update.
-
-Parameters: none
-
-Response:
-```
-struct {
-	Available bool
-	Version   string
-}
-```
-
 Consensus
 ---------
 
@@ -92,14 +49,57 @@ Parameters: none
 
 Reponse: standard
 
+Daemon
+------
+
+Queries:
+
+* /daemon/stop
+* /daemon/updates/apply
+* /daemon/updates/check
+
+#### /daemon/stop
+
+Function: Cleanly shuts down the daemon. May take a while.
+
+Parameters: none
+
+Response: standard
+
+#### /daemon/updates/apply:
+
+Function: Applies the update specified by `version`.
+
+Parameters:
+```
+version string
+```
+
+Response: standard
+
+#### /daemon/updates/check:
+
+Function: Checks for an update, returning a bool indicating whether
+there is an update and a version indicating the version of the update.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Available bool
+	Version   string
+}
+```
+
 Gateway
 -------
 
 Queries:
 
 * /gateway/status
-* /gateway/peer/add
-* /gateway/peer/remove
+* /gateway/peers/add
+* /gateway/peers/remove
 
 #### /gateway/status
 
@@ -115,7 +115,7 @@ struct {
 }
 ```
 
-#### /gateway/peer/add
+#### /gateway/peers/add
 
 Function: Will add a peer to the gateway.
 
@@ -128,7 +128,7 @@ address string
 
 Response: standard
 
-#### /gateway/peer/remove
+#### /gateway/peers/remove
 
 Function: Will remove a peer from the gateway.
 
@@ -147,7 +147,7 @@ Host
 Queries:
 
 * /host/announce
-* /host/config
+* /host/configure
 * /host/status
 
 #### /host/announce
@@ -159,7 +159,7 @@ Parameters: none
 
 Response: standard
 
-#### /host/config
+#### /host/configure
 
 Function: Sets the configuration of the host.
 
@@ -297,29 +297,16 @@ Renter
 
 Queries:
 
-* /renter/download
 * /renter/downloadqueue
-* /renter/files
-* /renter/file/delete
-* /renter/file/rename
-* /renter/file/share/save
-* /renter/file/share/load
-* /renter/upload
-
-#### /renter/download
-
-Function: Starts a file download.
-
-Parameters:
-```
-nickname    string
-destination string
-```
-`nickname` is the nickname of the file that has been uploaded to the network.
-
-`destination` is the path that the file will be downloaded to.
-
-Response: standard
+* /renter/files/delete
+* /renter/files/download
+* /renter/files/list
+* /renter/files/load
+* /renter/files/loadascii
+* /renter/files/rename
+* /renter/files/share
+* /renter/files/shareascii
+* /renter/files/upload
 
 #### /renter/downloadqueue
 
@@ -352,7 +339,35 @@ downloaded.
 
 `Nickname` is the nickname given to the file when it was uploaded.
 
-#### /renter/files
+#### /renter/files/delete
+
+Function: Deletes a renter file entry. Does not delete any downloads or
+original files, only the entry in the renter.
+
+Parameters:
+```
+nickname string
+```
+`nickname` is the nickname of the file that has been uploaded to the network.
+
+Response: standard
+
+#### /renter/files/download
+
+Function: Starts a file download.
+
+Parameters:
+```
+nickname    string
+destination string
+```
+`nickname` is the nickname of the file that has been uploaded to the network.
+
+`destination` is the path that the file will be downloaded to.
+
+Response: standard
+
+#### /renter/files/list
 
 Function: Lists the status of all files.
 
@@ -378,20 +393,32 @@ typically best not to shut down siad until files are no longer being repaired.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
 
-#### /renter/file/delete
+#### /renter/files/load
 
-Function: Deletes a renter file entry. Does not delete any downloads or
-original files, only the entry in the renter.
+Function: Load a '.sia' into the renter.
 
 Parameters:
 ```
-nickname string
+filename string
 ```
-`nickname` is the nickname of the file that has been uploaded to the network.
+`filename` is the filepath of the '.sia' that is being loaded.
 
-Response: standard
+Response: standard.
 
-#### /renter/file/rename
+#### /renter/files/loadascii
+
+Function: Load a '.sia' into the renter.
+
+Parameters:
+```
+file string
+```
+`file` is the ascii representation of the '.sia' file being loaded into the
+renter.
+
+Response: standard.
+
+#### /renter/files/rename
 
 Function: Rename a file. Does not rename any downloads or source files, only
 renames the entry in the renter.
@@ -405,7 +432,7 @@ newname  string
 
 `newname` is the new name for the file entry.
 
-#### /renter/file/share/save
+#### /renter/files/share
 
 Function: Create a '.sia' that can be shared with other people.
 
@@ -421,19 +448,23 @@ file. `filepath` must have the suffix '.sia'.
 
 Response: standard.
 
-#### /renter/file/share/load
+#### /renter/files/shareascii
 
-Function: Load a '.sia' into the renter.
+Function: Create a '.sia' that can be shared with other people.
 
 Parameters:
 ```
-filename string
+nickname string
 ```
-`filename` is the filepath of the '.sia' that is being loaded.
+`nickname` is the nickname of the file that will be shared.
 
-Response: standard.
+Response:
+```
+File string
+```
+`file` is the ascii representation of the '.sia' that would have been created.
 
-#### /renter/upload
+#### /renter/files/upload
 
 Function: Upload a file.
 

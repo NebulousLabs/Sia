@@ -31,10 +31,12 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
 	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler)
 
-	// Server API Calls
+	// Daemon API Calls
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
-	handleHTTPRequest(mux, "/daemon/update/apply", srv.daemonUpdateApplyHandler)
-	handleHTTPRequest(mux, "/daemon/update/check", srv.daemonUpdateCheckHandler)
+	handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
+	handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
+	handleHTTPRequest(mux, "/daemon/update/apply", srv.daemonUpdatesApplyHandler) // DEPRECATED
+	handleHTTPRequest(mux, "/daemon/update/check", srv.daemonUpdatesCheckHandler) // DEPRECATED
 
 	// Debugging API Calls
 	handleHTTPRequest(mux, "/debug/constants", srv.debugConstantsHandler)
@@ -42,17 +44,23 @@ func (srv *Server) initAPI(addr string) {
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-	handleHTTPRequest(mux, "/gateway/peer/add", srv.gatewayPeerAddHandler)
-	handleHTTPRequest(mux, "/gateway/peer/remove", srv.gatewayPeerRemoveHandler)
+	handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
+	handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+	handleHTTPRequest(mux, "/gateway/peer/add", srv.gatewayPeersAddHandler)         // DEPRECATED
+	handleHTTPRequest(mux, "/gateway/peer/remove", srv.gatewayPeersRemoveHandler)   // DEPRECATED
+	handleHTTPRequest(mux, "/gateway/synchronize", srv.consensusSynchronizeHandler) // DEPRECATED
 
 	// Host API Calls
 	handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
-	handleHTTPRequest(mux, "/host/config", srv.hostConfigHandler)
+	handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
 	handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
+	handleHTTPRequest(mux, "/host/config", srv.hostConfigureHandler) // DEPRECATED
 
 	// HostDB API Calls
 	handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
 	handleHTTPRequest(mux, "/hostdb/hosts/all", srv.hostdbHostsAllHandler)
+	handleHTTPRequest(mux, "/hostdb/host/active", srv.hostdbHostsActiveHandler) // DEPRECATED
+	handleHTTPRequest(mux, "/hostdb/host/all", srv.hostdbHostsAllHandler)       // DEPRECATED
 
 	// Miner API Calls
 	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
@@ -60,17 +68,20 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/download", srv.renterDownloadHandler)
 	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
-	handleHTTPRequest(mux, "/renter/files", srv.renterFilesHandler)
-	handleHTTPRequest(mux, "/renter/file/delete", srv.renterFileDeleteHandler)
-	handleHTTPRequest(mux, "/renter/file/rename", srv.renterFileRenameHandler)
-	handleHTTPRequest(mux, "/renter/file/share/load", srv.renterFileShareLoadHandler)
-	handleHTTPRequest(mux, "/renter/file/share/loadascii", srv.renterFileShareLoadAsciiHandler)
-	handleHTTPRequest(mux, "/renter/file/share/save", srv.renterFileShareSaveHandler)
-	handleHTTPRequest(mux, "/renter/file/share/saveascii", srv.renterFileShareSaveAsciiHandler)
-	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
-	handleHTTPRequest(mux, "/renter/upload", srv.renterUploadHandler)
+	handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
+	handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
+	handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
+	handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
+	handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
+	handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
+	handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
+	handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
+	handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
+	handleHTTPRequest(mux, "/renter/files", srv.renterFilesListHandler)        // DEPRECATED
+	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)          // DEPRECATED
+	handleHTTPRequest(mux, "/renter/download", srv.renterFilesDownloadHandler) // DEPRECATED
+	handleHTTPRequest(mux, "/renter/upload", srv.renterFilesUploadHandler)     // DEPRECATED
 
 	// TransactionPool API Calls
 	handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)

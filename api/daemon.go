@@ -117,8 +117,8 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	srv.apiServer.Stop(time.Second)
 }
 
-// daemonUpdateCheckHandler handles the API call to check for daemon updates.
-func (srv *Server) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Request) {
+// daemonUpdatesCheckHandler handles the API call to check for daemon updates.
+func (srv *Server) daemonUpdatesCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
@@ -128,8 +128,8 @@ func (srv *Server) daemonUpdateCheckHandler(w http.ResponseWriter, req *http.Req
 	writeJSON(w, UpdateInfo{available, version})
 }
 
-// daemonUpdateApplyHandler handles the API call to apply daemon updates.
-func (srv *Server) daemonUpdateApplyHandler(w http.ResponseWriter, req *http.Request) {
+// daemonUpdatesApplyHandler handles the API call to apply daemon updates.
+func (srv *Server) daemonUpdatesApplyHandler(w http.ResponseWriter, req *http.Request) {
 	err := applyUpdate(req.FormValue("version"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
