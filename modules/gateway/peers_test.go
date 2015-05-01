@@ -68,28 +68,44 @@ func TestListen(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	g := newTestingGateway("TestConnect", t)
+	// create bootstrap peer
+	bootstrap := newTestingGateway("TestConnect1", t)
+	defer bootstrap.Close()
+
+	// give it a node
+	bootstrap.addNode("foo")
+
+	// create peer who will connect to bootstrap
+	g := newTestingGateway("TestConnect2", t)
 	defer g.Close()
 
-	// dummy listener to accept connection
-	l, err := net.Listen("tcp", ":0")
+	// first simulate a "bad" connect, where bootstrap won't share its nodes
+	bootstrap.RegisterRPC("ShareNodes", func(modules.PeerConn) error {
+		return nil
+	})
+	// connect
+	err := g.Connect(bootstrap.Address())
 	if err != nil {
-		t.Fatal("couldn't start listener:", err)
+		t.Fatal(err)
 	}
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			t.Fatal("accept failed:", err)
-		}
-		conn.Close()
-	}()
-
-	if err := g.Connect(modules.NetAddress(l.Addr().String())); err != nil {
-		t.Fatal("connect failed:", err)
+	// g should not have foo
+	if g.removeNode("foo") == nil {
+		t.Fatal("bootstrapper should not have received foo:", g.nodes)
 	}
 
-	if len(g.Peers()) != 1 {
-		t.Fatal("gateway did not add peer after connecting:", g.peers)
+	// split 'em up
+	g.Disconnect(bootstrap.Address())
+	bootstrap.Disconnect(g.Address())
+
+	// now restore the correct ShareNodes RPC and try again
+	bootstrap.RegisterRPC("ShareNodes", bootstrap.shareNodes)
+	err = g.Connect(bootstrap.Address())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// g should have foo
+	if g.removeNode("foo") != nil {
+		t.Fatal("bootstrapper should have received foo:", g.nodes)
 	}
 }
 

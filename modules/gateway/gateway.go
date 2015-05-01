@@ -72,31 +72,6 @@ func (g *Gateway) Close() error {
 	return g.listener.Close()
 }
 
-// Bootstrap joins the Sia network and establishes an initial peer list.
-func (g *Gateway) Bootstrap(addr modules.NetAddress) error {
-	g.log.Println("INFO: initiated bootstrapping to", addr)
-
-	// contact the bootstrap peer
-	err := g.Connect(addr)
-	if err != nil {
-		return err
-	}
-
-	// initial peer discovery
-	nodes, err := g.requestNodes(addr)
-	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
-	id := g.mu.Lock()
-	for _, node := range nodes {
-		g.addNode(node)
-	}
-	g.save()
-	g.mu.Unlock(id)
-
-	g.log.Printf("INFO: successfully bootstrapped to %v", addr)
-
-	return nil
-}
-
 // New returns an initialized Gateway.
 func New(addr string, saveDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
@@ -121,6 +96,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 	}
 
 	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("RelayNode", g.relayNode)
 
 	g.log.Println("INFO: gateway created, started logging")
 

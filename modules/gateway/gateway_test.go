@@ -56,38 +56,6 @@ func TestPeers(t *testing.T) {
 	}
 }
 
-func TestBootstrap(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	// create bootstrap peer
-	bootstrap := newTestingGateway("TestBootstrap1", t)
-
-	// give it a peer
-	err := bootstrap.Connect(newTestingGateway("TestBootstrap2", t).Address())
-	if err != nil {
-		t.Fatal("couldn't connect:", err)
-	}
-
-	// bootstrap a new peer
-	g := newTestingGateway("TestBootstrap3", t)
-	err = g.Bootstrap(bootstrap.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// node lists should be the same
-	if len(g.nodes) != len(bootstrap.nodes) {
-		t.Fatalf("gateway peer list %v does not match bootstrap peer list %v", g.nodes, bootstrap.nodes)
-	}
-
-	err = g.Disconnect(bootstrap.Address())
-	if err != nil {
-		t.Fatal("failed to disconnect:", err)
-	}
-}
-
 func TestNew(t *testing.T) {
 	if _, err := New("", ""); err == nil {
 		t.Fatal("expecting saveDir error, got nil")

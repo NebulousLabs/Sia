@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -143,7 +142,6 @@ func TestThreadedHandleConn(t *testing.T) {
 			return err
 		}
 		defer conn.Close()
-		time.Sleep(10 * time.Millisecond)
 		return fn(conn)
 	}
 

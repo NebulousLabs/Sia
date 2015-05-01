@@ -18,7 +18,7 @@ func (st *serverTester) addPeer(name string) *serverTester {
 
 	// Create a new peer and bootstrap it to st.
 	newPeer := newServerTester(name, st.t)
-	err := newPeer.server.gateway.Bootstrap(st.netAddress())
+	err := newPeer.server.gateway.Connect(st.netAddress())
 	if err != nil {
 		st.t.Fatal("bootstrap failed:", err)
 	}

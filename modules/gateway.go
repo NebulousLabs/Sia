@@ -50,9 +50,6 @@ func (na NetAddress) Port() string {
 // it is responsible for ensuring that the local consensus set is consistent
 // with the "network" consensus set.
 type Gateway interface {
-	// Bootstrap joins the Sia network and establishes an initial peer list.
-	Bootstrap(NetAddress) error
-
 	// Connect establishes a persistent connection to a peer.
 	Connect(NetAddress) error
 

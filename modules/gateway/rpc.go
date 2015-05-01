@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -32,7 +33,9 @@ func handlerName(name string) (id rpcID) {
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
 	g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
+	id := g.mu.RLock()
 	peer, ok := g.peers[addr]
+	g.mu.RUnlock(id)
 	if !ok {
 		return errors.New("can't call RPC on unconnected peer " + string(addr))
 	}
@@ -50,6 +53,7 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	// call fn
 	err = fn(conn)
 	if err != nil {
+		// TODO: log error here?
 		// give peer a strike
 		atomic.AddUint32(&peer.strikes, 1)
 	}
@@ -71,13 +75,13 @@ func (g *Gateway) listenPeer(p *peer) {
 	for {
 		conn, err := p.accept()
 		if err != nil {
+			g.log.Println("WARN: lost connection to peer", p.addr)
 			break
 		}
 
 		// it is the handler's responsibility to close the connection
 		go g.threadedHandleConn(conn)
 	}
-	g.log.Println("WARN: lost connection to peer", p.addr)
 	g.Disconnect(p.addr)
 }
 
@@ -111,7 +115,8 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 // which simply write an object and disconnect. This is why Broadcast takes an
 // interface{} instead of an RPCFunc.
 func (g *Gateway) Broadcast(name string, obj interface{}) {
-	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(g.peers))
+	peers := g.Peers()
+	g.log.Printf("INFO: broadcasting RPC \"%v\" to %v peers", name, len(peers))
 
 	// only encode obj once, instead of using WriteObject
 	enc := encoding.Marshal(obj)
@@ -120,12 +125,15 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(len(g.peers))
-	for _, addr := range g.Peers() {
+	wg.Add(len(peers))
+	for _, addr := range peers {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
 				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
+				// try one more time before giving up
+				time.Sleep(10 * time.Second)
+				g.RPC(addr, name, fn)
 			}
 			wg.Done()
 		}(addr)

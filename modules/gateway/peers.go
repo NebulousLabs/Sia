@@ -51,20 +51,27 @@ func (g *Gateway) listen() {
 		if err != nil {
 			return
 		}
-		// for now just accept all requests
-		// TODO: reject when we have too many active connections
-		go func(conn net.Conn) {
-			var addr modules.NetAddress
-			if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
-				conn.Close()
-				return
-			}
-			g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
-			id := g.mu.Lock()
-			g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
-			g.mu.Unlock(id)
-		}(conn)
+
+		go g.acceptConn(conn)
 	}
+}
+
+// acceptConn adds a connecting node as a peer.
+// TODO: reject when we have too many active connections
+func (g *Gateway) acceptConn(conn net.Conn) {
+	var addr modules.NetAddress
+	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
+		conn.Close()
+		return
+	}
+	g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
+	id := g.mu.Lock()
+	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
+	g.mu.Unlock(id)
+	g.log.Printf("INFO: accepted connection from new peer %v", addr)
+
+	// broadcast our new peer's address
+	g.Broadcast("RelayNode", addr)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -91,11 +98,30 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	}
 	// TODO: exchange version messages
 
+	g.log.Println("INFO: connected to new peer", addr)
+
 	id = g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 	g.mu.Unlock(id)
 
-	g.log.Println("INFO: connected to new peer", addr)
+	// request nodes
+	var nodes []modules.NetAddress
+	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
+		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
+	})
+	if err != nil {
+		// log this error, but don't return it
+		g.log.Printf("WARN: request for node list of %v failed: %v", addr, err)
+		return nil
+	}
+	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
+	id = g.mu.Lock()
+	for _, node := range nodes {
+		g.addNode(node)
+	}
+	g.save()
+	g.mu.Unlock(id)
+
 	return nil
 }
 
