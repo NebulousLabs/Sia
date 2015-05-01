@@ -123,8 +123,6 @@ func (r *Renter) FileList() (files []modules.FileInfo) {
 	defer r.mu.RUnlock(lockID)
 
 	for _, f := range r.files {
-		// Because 'file' is the same memory for all iterations, we need to
-		// make a copy.
 		files = append(files, f)
 	}
 	return
