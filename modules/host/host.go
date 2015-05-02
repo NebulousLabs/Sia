@@ -36,7 +36,7 @@ type Host struct {
 	cs          *consensus.State
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
-	latestBlock types.BlockID
+	blockHeight types.BlockHeight
 
 	myAddr         modules.NetAddress
 	saveDir        string
@@ -98,12 +98,6 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
-	block, exists := cs.BlockAtHeight(0)
-	if !exists {
-		err = errors.New("state doesn't have a genesis block")
-		return
-	}
-	h.latestBlock = block.ID()
 
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {

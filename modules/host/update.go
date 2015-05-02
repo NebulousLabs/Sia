@@ -60,17 +60,16 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
+	for _ = range revertedBlocks {
+		h.blockHeight--
+	}
+
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
-	for _, block := range appliedBlocks {
-		height, exists := h.cs.HeightOfBlock(block.ID())
-		if build.DEBUG {
-			if !exists {
-				panic("a block returned by BlocksSince doesn't appear to exist")
-			}
-		}
+	for _ = range appliedBlocks {
+		h.blockHeight++
 
-		for _, obligation := range h.obligationsByHeight[height] {
+		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
 			// Submit a storage proof for the obligation.
 			err := h.createStorageProof(obligation, h.cs.Height())
 			if err != nil {
@@ -89,7 +88,7 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 
 			delete(h.obligationsByID, obligation.ID)
 		}
-		delete(h.obligationsByHeight, height)
+		delete(h.obligationsByHeight, h.blockHeight)
 	}
 
 	h.updateSubscribers()
