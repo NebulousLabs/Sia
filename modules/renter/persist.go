@@ -184,6 +184,16 @@ func (r *Renter) loadSharedFile(reader io.Reader) error {
 		return ErrUnrecognizedVersion
 	}
 	for i := range rsf.Files {
+		for {
+			_, exists := r.files[rsf.Files[i].Name]
+			if !exists {
+				break
+			}
+			if len(rsf.Files[i].Name) > 50 {
+				break
+			}
+			rsf.Files[i].Name += "_"
+		}
 		rsf.Files[i].renter = r
 		r.files[rsf.Files[i].Name] = &rsf.Files[i]
 	}
