@@ -120,6 +120,7 @@ func (d *Download) start() {
 					plaintext, _ := piece.EncryptionKey.DecryptBytes(cryptBytes)
 					d.file.Seek(0, 0)
 					d.file.Write(plaintext)
+					d.file.Truncate(int64(len(plaintext)))
 					d.complete = true
 					d.file.Close()
 					return
