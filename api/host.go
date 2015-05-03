@@ -16,8 +16,8 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request)
 	writeSuccess(w)
 }
 
-// hostConfigHandler handles the API call to set the host configuration.
-func (srv *Server) hostConfigHandler(w http.ResponseWriter, req *http.Request) {
+// hostConfigureHandler handles the API call to set the host configuration.
+func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
 	config := srv.host.Info().HostSettings
 

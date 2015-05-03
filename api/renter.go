@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	duration   = 2000 // Duration that hosts will hold onto the file.
-	redundancy = 15   // Redundancy of files uploaded to the network.
+	duration   = 1000 // Duration that hosts will hold onto the file.
+	redundancy = 12   // Redundancy of files uploaded to the network.
 )
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
@@ -29,8 +29,8 @@ type FileInfo struct {
 	TimeRemaining types.BlockHeight
 }
 
-// renterDownloadHandler handles the API call to download a file.
-func (srv *Server) renterDownloadHandler(w http.ResponseWriter, req *http.Request) {
+// renterFilesDownloadHandler handles the API call to download a file.
+func (srv *Server) renterFilesDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "Download failed: "+err.Error(), http.StatusInternalServerError)
@@ -58,8 +58,8 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 	writeJSON(w, downloadSet)
 }
 
-// renterFilesHandler handles the API call to list all of the files.
-func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request) {
+// renterFilesListHandler handles the API call to list all of the files.
+func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Request) {
 	files := srv.renter.FileList()
 	fileSet := make([]FileInfo, 0, len(files))
 	for _, file := range files {
@@ -74,9 +74,9 @@ func (srv *Server) renterFilesHandler(w http.ResponseWriter, req *http.Request) 
 	writeJSON(w, fileSet)
 }
 
-// renterFileDeleteHander handles the API call to delete a file entry from the
+// renterFilesDeleteHander handles the API call to delete a file entry from the
 // renter.
-func (srv *Server) renterFileDeleteHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) renterFilesDeleteHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.DeleteFile(req.FormValue("nickname"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -86,9 +86,9 @@ func (srv *Server) renterFileDeleteHandler(w http.ResponseWriter, req *http.Requ
 	writeSuccess(w)
 }
 
-// renterFileRenameHandler handles the API call to rename a file entry in the
+// renterFilesRenameHandler handles the API call to rename a file entry in the
 // renter.
-func (srv *Server) renterFileRenameHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) renterFilesRenameHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.RenameFile(req.FormValue("nickname"), req.FormValue("newname"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -98,9 +98,9 @@ func (srv *Server) renterFileRenameHandler(w http.ResponseWriter, req *http.Requ
 	writeSuccess(w)
 }
 
-// renterFileShareLoadHandler handles the API call to load a '.sia' that
+// renterFilesLoadHandler handles the API call to load a '.sia' that
 // contains filesharing information.
-func (srv *Server) renterFileShareLoadHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) renterFilesLoadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.LoadSharedFile(req.FormValue("filename"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -110,9 +110,21 @@ func (srv *Server) renterFileShareLoadHandler(w http.ResponseWriter, req *http.R
 	writeSuccess(w)
 }
 
-// renterFileShareSaveHandler handles the API call to create a '.sia' file that
+// renterFilesLoadAsciiHandler handles the API call to load a '.sia' file
+// in ascii form.
+func (srv *Server) renterFilesLoadAsciiHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.renter.LoadSharedFilesAscii(req.FormValue("file"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeSuccess(w)
+}
+
+// renterFilesShareHandler handles the API call to create a '.sia' file that
 // shares a file.
-func (srv *Server) renterFileShareSaveHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) renterFilesShareHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.ShareFiles([]string{req.FormValue("nickname")}, req.FormValue("filepath"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -122,13 +134,25 @@ func (srv *Server) renterFileShareSaveHandler(w http.ResponseWriter, req *http.R
 	writeSuccess(w)
 }
 
+// renterFilesShareAsciiHandler handles the API call to return a '.sia' file
+// in ascii form.
+func (srv *Server) renterFilesShareAsciiHandler(w http.ResponseWriter, req *http.Request) {
+	ascii, err := srv.renter.ShareFilesAscii([]string{req.FormValue("nickname")})
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, struct{ File string }{ascii})
+}
+
 // renterStatusHandler handles the API call querying the renter's status.
 func (srv *Server) renterStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, srv.renter.Info())
 }
 
-// renterUploadHandler handles the API call to upload a file.
-func (srv *Server) renterUploadHandler(w http.ResponseWriter, req *http.Request) {
+// renterFilesUploadHandler handles the API call to upload a file.
+func (srv *Server) renterFilesUploadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.Upload(modules.FileUploadParams{
 		Filename: req.FormValue("source"),
 		Duration: duration,
