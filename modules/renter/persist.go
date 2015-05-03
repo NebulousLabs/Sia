@@ -2,13 +2,13 @@ package renter
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
@@ -96,11 +96,12 @@ func (r *Renter) load() error {
 	return nil
 }
 
-// shareFiles encodes a set of file nicknames into a byte slice that can be
-// shared with other daemons, giving them access to those files.
-func (r *Renter) shareFiles(nicknames []string) (zipBytes []byte, err error) {
+// shareFiles writes the metadata of each file specified by nicknames to w.
+// This output can be shared with other daemons, giving them access to those
+// files.
+func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 	if len(nicknames) == 0 {
-		return nil, ErrNoNicknames
+		return ErrNoNicknames
 	}
 
 	rsf := RenterSharedFile{
@@ -111,29 +112,20 @@ func (r *Renter) shareFiles(nicknames []string) (zipBytes []byte, err error) {
 	for _, nickname := range nicknames {
 		file, exists := r.files[nickname]
 		if !exists {
-			return nil, ErrUnknownNickname
+			return ErrUnknownNickname
 		}
 		rsf.Files = append(rsf.Files, *file)
 	}
 
-	shareBytes, err := json.Marshal(rsf)
+	// pipe data through json -> gzip -> w
+	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	err := json.NewEncoder(zip).Encode(rsf)
 	if err != nil {
-		return nil, err
-	}
-
-	// Gzip the result.
-	var zipBuffer bytes.Buffer
-	zip, err := gzip.NewWriterLevel(&zipBuffer, flate.BestCompression)
-	if err != nil {
-		return nil, err
-	}
-	_, err = zip.Write(shareBytes)
-	if err != nil {
-		return nil, err
+		return err
 	}
 	zip.Close()
 
-	return zipBuffer.Bytes(), nil
+	return nil
 }
 
 // ShareFiles saves a '.sia' file that can be shared with others, enabling them
@@ -149,54 +141,47 @@ func (r *Renter) ShareFiles(nicknames []string, sharedest string) error {
 		return ErrNonShareSuffix
 	}
 
-	shareBytes, err := r.shareFiles(nicknames)
+	file, err := os.Create(sharedest)
 	if err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(sharedest, shareBytes, 0660)
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.shareFiles(nicknames, file)
 }
 
 // ShareFilesAscii returns an ascii string that can be shared with other
 // daemons, granting them access to the files.
-func (r *Renter) ShareFilesAscii(nicknames []string) (asciiSia string, err error) {
+func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
-	shareBytes, err := r.shareFiles(nicknames)
+	// pipe to a base64 encoder
+	buf := new(bytes.Buffer)
+	err := r.shareFiles(nicknames, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
 
-	return base64.URLEncoding.EncodeToString(shareBytes), nil
+	return buf.String(), nil
 }
 
-// loadSharedFile takes an encoded set of files and adds them to the renter.
-func (r *Renter) loadSharedFile(zipBytes []byte) error {
-	// Un-gzip the contents.
-	var unzipBuffer bytes.Buffer
-	zipBuffer := bytes.NewBuffer(zipBytes)
-	zip, err := gzip.NewReader(zipBuffer)
+// loadSharedFile reads and decodes file metadata from reader and adds it to
+// the renter.
+func (r *Renter) loadSharedFile(reader io.Reader) error {
+	zip, err := gzip.NewReader(reader)
 	if err != nil {
 		return err
 	}
-	io.Copy(&unzipBuffer, zip)
-	shareBytes := unzipBuffer.Bytes()
 
 	var rsf RenterSharedFile
-	err = json.Unmarshal(shareBytes, &rsf)
+	err = json.NewDecoder(zip).Decode(&rsf)
 	if err != nil {
 		return err
 	}
 
 	if rsf.Header != ShareHeader {
 		return ErrUnrecognizedHeader
-	}
-	if rsf.Version != ShareVersion {
+	} else if rsf.Version != ShareVersion {
 		return ErrUnrecognizedVersion
 	}
 	for i := range rsf.Files {
@@ -213,19 +198,16 @@ func (r *Renter) LoadSharedFile(filename string) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
-	shareBytes, err := ioutil.ReadFile(filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
-	return r.loadSharedFile(shareBytes)
+	return r.loadSharedFile(file)
 }
 
 // loadSharedFile takes an encoded set of files and adds them to the renter,
 // taking them form an ascii string.
 func (r *Renter) LoadSharedFilesAscii(asciiSia string) error {
-	shareBytes, err := base64.URLEncoding.DecodeString(asciiSia)
-	if err != nil {
-		return err
-	}
-	return r.loadSharedFile(shareBytes)
+	dec := base64.NewDecoder(base64.URLEncoding, bytes.NewBufferString(asciiSia))
+	return r.loadSharedFile(dec)
 }
