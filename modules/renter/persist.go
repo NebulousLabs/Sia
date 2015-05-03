@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -57,28 +56,28 @@ func (r *Renter) save() error {
 		rp.Files = append(rp.Files, *file)
 	}
 
-	jsonBytes, err := json.Marshal(rp)
+	file, err := os.Create(filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
 
-	// Write everything to disk.
-	err = ioutil.WriteFile(filepath.Join(r.saveDir, PersistFilename), jsonBytes, 0660)
+	err = json.NewEncoder(file).Encode(rp)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	persistBytes, err := ioutil.ReadFile(filepath.Join(r.saveDir, PersistFilename))
+	file, err := os.Open(filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
 
 	var rp RenterPersistence
-	err = json.Unmarshal(persistBytes, &rp)
+	err = json.NewDecoder(file).Decode(&rp)
 	if err != nil {
 		return err
 	}
