@@ -12,13 +12,15 @@ import (
 // addPeer creates a new serverTester and bootstraps it to st. It returns the
 // new peer.
 func (st *serverTester) addPeer(name string) *serverTester {
-	// Mine a block on st, in the event that both st and newPeer are new, they
-	// will be at the same height unless we mine a block on st.
-	st.mineBlock()
+	_, _, err := st.miner.FindBlock()
+	if err != nil {
+		st.t.Fatal(err)
+	}
+	st.csUpdateWait()
 
 	// Create a new peer and bootstrap it to st.
 	newPeer := newServerTester(name, st.t)
-	err := newPeer.server.gateway.Connect(st.netAddress())
+	err = newPeer.server.gateway.Connect(st.netAddress())
 	if err != nil {
 		st.t.Fatal("bootstrap failed:", err)
 	}

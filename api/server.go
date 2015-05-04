@@ -38,7 +38,5 @@ func NewServer(APIaddr string, s *consensus.State, g modules.Gateway, h modules.
 	// Register API handlers
 	srv.initAPI(APIaddr)
 
-	go srv.Serve()
-
 	return srv, nil
 }

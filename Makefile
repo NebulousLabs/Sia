@@ -63,7 +63,7 @@ test-long: clean fmt REBUILD
 
 # Testing for each package individually. Packages are added to this set as needed.
 test-api: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=25s ./api
+	go test -v -race -tags='testing debug' -timeout=65s ./api
 test-consensus: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
 test-gateway: clean fmt REBUILD

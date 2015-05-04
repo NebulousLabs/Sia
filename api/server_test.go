@@ -175,19 +175,6 @@ func (st *serverTester) coinAddress() string {
 	return addr.Address
 }
 
-// mineBlock mines a block and puts it into the consensus set.
-func (st *serverTester) mineBlock() {
-	for {
-		_, solved, err := st.server.miner.FindBlock()
-		if err != nil {
-			st.t.Fatal("Mining failed:", err)
-		} else if solved {
-			// FindBlock automatically puts the block into the consensus set.
-			break
-		}
-	}
-}
-
 // get wraps a GET request with a status code check, such that if the GET does
 // not return 200, the error will be read and returned. The response body is
 // not closed.
