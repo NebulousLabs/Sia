@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 const (
@@ -184,15 +185,15 @@ func (r *Renter) loadSharedFile(reader io.Reader) error {
 		return ErrUnrecognizedVersion
 	}
 	for i := range rsf.Files {
+		dupCount := 0
+		origName := rsf.Files[i].Name
 		for {
 			_, exists := r.files[rsf.Files[i].Name]
 			if !exists {
 				break
 			}
-			if len(rsf.Files[i].Name) > 50 {
-				break
-			}
-			rsf.Files[i].Name += "_"
+			dupCount++
+			rsf.Files[i].Name = origName + "_" + strconv.Itoa(dupCount)
 		}
 		rsf.Files[i].renter = r
 		r.files[rsf.Files[i].Name] = &rsf.Files[i]

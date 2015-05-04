@@ -60,9 +60,7 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
-	for _ = range revertedBlocks {
-		h.blockHeight--
-	}
+	h.blockHeight -= types.BlockHeight(len(revertedBlocks))
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
