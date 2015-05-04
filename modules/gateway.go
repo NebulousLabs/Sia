@@ -11,7 +11,8 @@ const (
 // TODO: Move this and it's functionality into the gateway package.
 var (
 	BootstrapPeers = []NetAddress{
-		"23.239.14.98:9988",
+		"23.239.14.98:9981",
+		"87.98.216.46:9981",
 	}
 )
 

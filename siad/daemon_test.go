@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules/tester"
 )
@@ -25,6 +26,7 @@ func TestStartDaemon(t *testing.T) {
 	// Wait until the server has started, and then send a kill command to the
 	// daemon.
 	<-started
+	time.Sleep(250 * time.Millisecond)
 	resp, err := http.Get("http://localhost:45170/daemon/stop")
 	if err != nil {
 		t.Fatal(err)

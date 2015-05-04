@@ -8,17 +8,17 @@ dependencies:
 	go install -race std
 	go get -u code.google.com/p/gcfg
 	go get -u github.com/agl/ed25519
+	go get -u github.com/boltdb/bolt
 	go get -u github.com/dchest/blake2b
 	go get -u github.com/inconshreveable/go-update
+	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir
+	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
 	go get -u golang.org/x/crypto/twofish
 	go get -u golang.org/x/tools/cmd/cover
-	go get -u github.com/NebulousLabs/merkletree
-	go get -u github.com/boltdb/bolt
-	go get -u github.com/inconshreveable/muxado
 
 # fmt calls go fmt on all packages.
 fmt:
@@ -42,7 +42,7 @@ release: dependencies test-long REBUILD
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.0          \
-		-br=release -pr=beta -include=example-config,LICENSE*,README*,API*      \
+		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
 		-tasks-=deb,deb-dev,deb-source,go-test
 
 # clean removes all directories that get automatically created during

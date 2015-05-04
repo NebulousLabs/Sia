@@ -28,6 +28,9 @@ func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc)
 func (srv *Server) initAPI(addr string) {
 	mux := http.NewServeMux()
 
+	// 404 Calls
+	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
+
 	// Consensus API Calls
 	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
 	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler)
@@ -97,6 +100,12 @@ func (srv *Server) initAPI(addr string) {
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
 	}
+}
+
+// unrecognizedCallHandler handles calls to unknown pages (404).
+func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprintf(w, "404 - Refer to API.md")
 }
 
 // Serve listens for and handles API calls. It a blocking function.

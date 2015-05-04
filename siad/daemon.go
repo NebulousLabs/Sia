@@ -64,7 +64,9 @@ func startDaemon() error {
 
 	// Bootstrap to the network.
 	if !config.Siad.NoBootstrap {
-		go gateway.Connect(modules.BootstrapPeers[0])
+		for i := range modules.BootstrapPeers {
+			go gateway.Connect(modules.BootstrapPeers[i])
+		}
 	}
 
 	// Send a struct down the started channel, so the testing package knows
