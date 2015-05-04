@@ -268,7 +268,7 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	// Add this contract to the host's list of obligations.
 	fcid := signedTxn.FileContractID(0)
 	fc := signedTxn.FileContracts[0]
-	proofHeight := fc.WindowEnd + StorageProofReorgDepth
+	proofHeight := fc.WindowStart + StorageProofReorgDepth
 	co := contractObligation{
 		ID:           fcid,
 		FileContract: fc,

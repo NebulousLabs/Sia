@@ -1,8 +1,10 @@
 package renter
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -64,20 +66,30 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 // negotiateContract creates a file contract for a host according to the
 // requests of the host. There is an assumption that only hosts with acceptable
 // terms will be put into the hostdb.
-func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUploadParams) (contract types.FileContract, fcid types.FileContractID, err error) {
+func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUploadParams) (contract types.FileContract, fcid types.FileContractID, key crypto.TwofishKey, err error) {
 	height := r.blockHeight
 
-	file, err := os.Open(up.Filename)
+	key, err = crypto.GenerateTwofishKey()
 	if err != nil {
 		return
 	}
-	defer file.Close()
 
-	info, err := file.Stat()
+	filePlain, err := os.Open(up.Filename)
 	if err != nil {
 		return
 	}
-	filesize := uint64(info.Size())
+	defer filePlain.Close()
+	plainBytes, err := ioutil.ReadAll(filePlain)
+	if err != nil {
+		return
+	}
+	cryptBytes, err := key.EncryptBytes(plainBytes)
+	if err != nil {
+		return
+	}
+	file := bytes.NewReader(cryptBytes)
+
+	filesize := uint64(file.Len())
 
 	// Get the price and payout.
 	sizeCurrency := types.NewCurrency64(filesize)

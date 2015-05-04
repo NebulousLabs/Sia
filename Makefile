@@ -48,7 +48,7 @@ xc: dependencies test test-long REBUILD
 # clean removes all directories that get automatically created during
 # development.
 clean:
-	rm -rf release whitepaper.aux whitepaper.log whitepaper.pdf
+	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
 # test runs the short tests for Sia, and aims to always take less than 2
 # seconds.
@@ -97,7 +97,7 @@ cover: clean REBUILD
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
 # called twice because references will not update correctly the first time.
 whitepaper:
-	@pdflatex whitepaper.tex > /dev/null
-	pdflatex whitepaper.tex
+	@pdflatex -output-directory=doc whitepaper.tex > /dev/null
+	pdflatex -output-directory=doc whitepaper.tex
 
 .PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc REBUILD

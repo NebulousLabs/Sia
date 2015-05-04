@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"sync/atomic"
@@ -112,9 +113,18 @@ func (d *Download) start() {
 		for _, piece := range d.pieces {
 			downloadErr := d.downloadPiece(piece)
 			if downloadErr == nil {
-				d.complete = true
-				d.file.Close()
-				return
+				// Decrypt the file.
+				d.file.Seek(0, 0)
+				cryptBytes, err := ioutil.ReadAll(d.file)
+				if err == nil {
+					plaintext, _ := piece.EncryptionKey.DecryptBytes(cryptBytes)
+					d.file.Seek(0, 0)
+					d.file.Write(plaintext)
+					d.file.Truncate(int64(len(plaintext)))
+					d.complete = true
+					d.file.Close()
+					return
+				}
 			}
 			// Reset seek, since the file may have been partially written. The
 			// next attempt will overwrite these bytes.
@@ -131,8 +141,6 @@ func (d *Download) start() {
 	// File could not be downloaded; delete the copy on disk.
 	d.file.Close()
 	os.Remove(d.destination)
-
-	// TODO: log?
 }
 
 // newDownload initializes a new Download object.
