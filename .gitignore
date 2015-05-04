@@ -1,6 +1,6 @@
 cover
 release
-whitepaper.aux
-whitepaper.log
-whitepaper.pdf
+doc/whitepaper.aux
+doc/whitepaper.log
+doc/whitepaper.pdf
 *.swp
