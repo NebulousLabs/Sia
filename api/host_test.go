@@ -6,9 +6,14 @@ import (
 )
 
 // announceHost puts a host announcement for the host into the blockchain.
-func (st *serverTester) announceHost() {
+func (st *serverTester) announceHost() error {
 	st.callAPI("/host/announce")
-	st.mineBlock()
+	_, _, err := st.miner.FindBlock()
+	if err != nil {
+		return err
+	}
+	st.csUpdateWait()
+	return nil
 }
 
 // TestHostAnnouncement checks that calling '/host/announce' results in an
@@ -25,7 +30,10 @@ func TestHostAnnouncement(t *testing.T) {
 	// happens in a separate goroutine. Since there's not a good way to figure
 	// out when the call will finish, we spin until the update has finished. If
 	// the update never finishes, the test environment should timeout.
-	st.announceHost()
+	err := st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for len(st.server.hostdb.ActiveHosts()) != 1 {
 		time.Sleep(time.Millisecond)
 	}

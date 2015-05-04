@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -107,7 +108,7 @@ func (srv *Server) Serve() error {
 	if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
 		err = nil
 	}
-	println("\rCaught stop signal, quitting.")
+	fmt.Println("\rCaught stop signal, quitting.")
 	return err
 }
 
