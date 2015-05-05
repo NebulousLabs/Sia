@@ -72,11 +72,11 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	}
 	// add node
 	id := g.mu.Lock()
-	err := g.addNode(addr)
-	g.mu.Unlock(id)
-	// relay
-	if err == nil {
-		go g.Broadcast("RelayNode", addr)
+	defer g.mu.Unlock(id)
+	if err := g.addNode(addr); err != nil {
+		return err
 	}
+	// relay
+	go g.Broadcast("RelayNode", addr)
 	return nil
 }

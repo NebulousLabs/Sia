@@ -43,10 +43,6 @@ func TestListen(t *testing.T) {
 	} else if ack != "accept" {
 		t.Fatal("gateway should have given ack")
 	}
-	// send address
-	if err := encoding.WriteObject(conn, "foo"); err != nil {
-		t.Fatal("couldn't write address")
-	}
 
 	// g should add foo
 	var ok bool

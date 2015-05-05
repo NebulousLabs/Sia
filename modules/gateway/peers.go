@@ -95,22 +95,11 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// read address
-	var addr modules.NetAddress
-	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
-		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but we could not read their address: %v", conn.RemoteAddr(), err)
-		return
-	}
-
 	// add the peer
 	id = g.mu.Lock()
 	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
-	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
-
-	// broadcast our new peer's address
-	g.Broadcast("RelayNode", addr)
+	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", conn.RemoteAddr(), remoteVersion)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -142,16 +131,21 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	} else if ack != "accept" {
 		return errors.New("peer rejected connection")
 	}
-	// write our address
-	if err := encoding.WriteObject(conn, g.Address()); err != nil {
-		return err
-	}
 
 	g.log.Println("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 	g.mu.Unlock(id)
+
+	// Tell the peer to add our callback address as a node
+	err = g.RPC(addr, "RelayNode", func(conn modules.PeerConn) error {
+		return encoding.WriteObject(conn, g.Address())
+	})
+	if err != nil {
+		// log this error, but don't return it
+		g.log.Printf("WARN: could not relay our address to %v: %v", addr, err)
+	}
 
 	// request nodes
 	var nodes []modules.NetAddress
