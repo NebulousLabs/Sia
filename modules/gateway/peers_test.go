@@ -28,14 +28,28 @@ func TestAddPeer(t *testing.T) {
 func TestListen(t *testing.T) {
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
+
 	// "compliant" connect
 	conn, err := net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
+	// send version
+	if err := encoding.WriteObject(conn, version); err != nil {
+		t.Fatal("couldn't write version")
+	}
+	// read ack
+	var ack string
+	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+		t.Fatal(err)
+	} else if ack != "accept" {
+		t.Fatal("gateway should have given ack")
+	}
+	// send address
 	if err := encoding.WriteObject(conn, "foo"); err != nil {
 		t.Fatal("couldn't write address")
 	}
+
 	// g should add foo
 	var ok bool
 	for !ok {
@@ -129,7 +143,7 @@ func TestDisconnect(t *testing.T) {
 		}
 		conn.Close()
 	}()
-
+	// skip standard connection protocol
 	conn, err := net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)

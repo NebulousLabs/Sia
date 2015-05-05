@@ -11,7 +11,15 @@ import (
 	"github.com/inconshreveable/muxado"
 )
 
-const dialTimeout = 10 * time.Second
+const (
+	version = "0.1"
+
+	dialTimeout = 10 * time.Second
+	// the gateway will not make outbound connections above this threshold
+	wellConnectedThreshold = 8
+	// the gateway will not accept inbound connections above this threshold
+	fullyConnectedThreshold = 128
+)
 
 type peer struct {
 	strikes uint32
@@ -59,16 +67,48 @@ func (g *Gateway) listen() {
 // acceptConn adds a connecting node as a peer.
 // TODO: reject when we have too many active connections
 func (g *Gateway) acceptConn(conn net.Conn) {
+	g.log.Printf("INFO: %v wants to connect", conn.RemoteAddr())
+
+	// read version
+	var remoteVersion string
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
+		conn.Close()
+		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", conn.RemoteAddr(), err)
+		return
+	}
+
+	// decide whether to accept
+	id := g.mu.RLock()
+	numPeers := len(g.peers)
+	g.mu.RUnlock(id)
+	if numPeers >= fullyConnectedThreshold {
+		encoding.WriteObject(conn, "reject")
+		conn.Close()
+		g.log.Printf("INFO: rejected connection from %v (already have %v peers)", conn.RemoteAddr(), len(g.peers))
+		return
+	}
+	// TODO: reject old versions
+
+	// send ack
+	if err := encoding.WriteObject(conn, "accept"); err != nil {
+		conn.Close()
+		g.log.Printf("INFO: could not write ack to %v: %v", conn.RemoteAddr(), err)
+		return
+	}
+
+	// read address
 	var addr modules.NetAddress
 	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
 		conn.Close()
+		g.log.Printf("INFO: %v wanted to connect, but we could not read their address: %v", conn.RemoteAddr(), err)
 		return
 	}
-	g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
-	id := g.mu.Lock()
+
+	// add the peer
+	id = g.mu.Lock()
 	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
-	g.log.Printf("INFO: accepted connection from new peer %v", addr)
+	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 
 	// broadcast our new peer's address
 	g.Broadcast("RelayNode", addr)
@@ -92,11 +132,21 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-	// send our address
+	// send our version
+	if err := encoding.WriteObject(conn, version); err != nil {
+		return err
+	}
+	// read ack
+	var ack string
+	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+		return err
+	} else if ack != "accept" {
+		return errors.New("peer rejected connection")
+	}
+	// write our address
 	if err := encoding.WriteObject(conn, g.Address()); err != nil {
 		return err
 	}
-	// TODO: exchange version messages
 
 	g.log.Println("INFO: connected to new peer", addr)
 
@@ -154,7 +204,7 @@ func (g *Gateway) makeOutboundConnections() {
 			numPeers := len(g.peers)
 			addr, err := g.randomNode()
 			g.mu.RUnlock(id)
-			if err != nil || numPeers >= 8 {
+			if err != nil || numPeers >= wellConnectedThreshold {
 				break
 			}
 			g.Connect(addr)
