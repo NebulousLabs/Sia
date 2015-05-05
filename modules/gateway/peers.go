@@ -32,7 +32,7 @@ func (p *peer) open() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn, p.addr}, nil
+	return &peerConn{conn}, nil
 }
 
 func (p *peer) accept() (modules.PeerConn, error) {
@@ -40,14 +40,13 @@ func (p *peer) accept() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn, p.addr}, nil
+	return &peerConn{conn}, nil
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
 	g.peers[p.addr] = p
-	g.addNode(p.addr)
 	go g.listenPeer(p)
 }
 
@@ -106,7 +105,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 
 	// add the peer
 	id = g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
+	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 

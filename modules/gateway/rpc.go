@@ -91,7 +91,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	defer conn.Close()
 	var id rpcID
 	if err := encoding.ReadObject(conn, &id, 8); err != nil {
-		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.CallbackAddr(), err)
+		g.log.Printf("WARN: could not read RPC identifier from incoming conn %v: %v", conn.RemoteAddr(), err)
 		return
 	}
 	// call registered handler for this ID
@@ -100,11 +100,11 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	g.mu.RUnlock(lockid)
 	if !ok {
 		// TODO: write this error to conn?
-		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.CallbackAddr(), id)
+		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
 
-	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.CallbackAddr())
+	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
 	if err := fn(conn); err != nil {
 		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}

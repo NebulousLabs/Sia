@@ -103,18 +103,8 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// remove all nodes from both peers
-	g1.removeNode("foo")
-	g1.removeNode(g1.Address())
-	g1.removeNode(g2.Address())
-	if len(g1.nodes) != 0 {
-		t.Fatal("gateway has nodes remaining after removal:", g1.nodes)
-	}
-	g2.removeNode("foo")
-	g2.removeNode(g1.Address())
-	g2.removeNode(g2.Address())
-	if len(g2.nodes) != 0 {
-		t.Fatal("gateway has nodes remaining after removal:", g2.nodes)
-	}
+	g1.nodes = map[modules.NetAddress]struct{}{}
+	g2.nodes = map[modules.NetAddress]struct{}{}
 
 	// SharePeers should now return no peers
 	var nodes []modules.NetAddress

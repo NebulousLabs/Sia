@@ -17,14 +17,10 @@ var (
 )
 
 // A PeerConn is the connection type used when communicating with peers during
-// an RPC. In addition to the standard net.Conn methods, it includeds a
-// CallbackAddr method which can be used to perform a "response" RPC.
+// an RPC. For now it is identical to a net.Conn.
 type PeerConn interface {
 	net.Conn
-
-	// CallbackAddr returns the "real" address of the peer, i.e. the address
-	// used to connect to the peer.
-	CallbackAddr() NetAddress
+	// AddStrike() ?
 }
 
 // RPCFunc is the type signature of functions that handle incoming RPCs.

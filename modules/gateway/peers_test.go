@@ -20,9 +20,6 @@ func TestAddPeer(t *testing.T) {
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
-	if len(g.nodes) != 2 {
-		t.Fatal("gateway did not add node")
-	}
 }
 
 func TestListen(t *testing.T) {
@@ -34,6 +31,7 @@ func TestListen(t *testing.T) {
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
+	addr := modules.NetAddress(conn.LocalAddr().String())
 	// send version
 	if err := encoding.WriteObject(conn, version); err != nil {
 		t.Fatal("couldn't write version")
@@ -54,7 +52,7 @@ func TestListen(t *testing.T) {
 	var ok bool
 	for !ok {
 		id := g.mu.RLock()
-		_, ok = g.peers["foo"]
+		_, ok = g.peers[addr]
 		g.mu.RUnlock(id)
 	}
 
@@ -63,7 +61,7 @@ func TestListen(t *testing.T) {
 	// g should remove foo
 	for ok {
 		id := g.mu.RLock()
-		_, ok = g.peers["foo"]
+		_, ok = g.peers[addr]
 		g.mu.RUnlock(id)
 	}
 
