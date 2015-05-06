@@ -114,6 +114,16 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownNickname
 		}
+		active = false
+		for _, piece := range file.Pieces {
+			if piece.Active {
+				active = true
+				break
+			}
+		}
+		if !active {
+			return errors.New("Cannot upload an inactive file piece")
+		}
 		rsf.Files = append(rsf.Files, *file)
 	}
 
@@ -195,6 +205,8 @@ func (r *Renter) loadSharedFile(reader io.Reader) error {
 			dupCount++
 			rsf.Files[i].Name = origName + "_" + strconv.Itoa(dupCount)
 		}
+		print("Got file ")
+		println(rsf.Files[i].Name)
 		rsf.Files[i].renter = r
 		r.files[rsf.Files[i].Name] = &rsf.Files[i]
 	}
