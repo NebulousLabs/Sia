@@ -136,7 +136,7 @@ func init() {
 
 		CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
 
-		GenesisTimestamp = Timestamp(1426537000) // Approx. 4:16pm EST Mar. 16th, 2015
+		GenesisTimestamp = Timestamp(1431000000) // 12:00pm UTC May 7th 2015
 		GenesisSiafundUnlockHash = ZeroUnlockHash
 		GenesisClaimUnlockHash = ZeroUnlockHash
 	}
