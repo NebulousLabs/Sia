@@ -161,7 +161,8 @@ Response: standard
 
 #### /host/configure
 
-Function: Sets the configuration of the host.
+Function: Configures hosting parameters. All parameters are optional;
+unspecified parameters will be left unchanged.
 
 Parameters:
 ```
