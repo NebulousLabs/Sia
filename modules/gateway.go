@@ -23,7 +23,10 @@ type PeerConn interface {
 	// AddStrike() ?
 }
 
-// RPCFunc is the type signature of functions that handle incoming RPCs.
+// RPCFunc is the type signature of functions that handle RPCs. It is used for
+// both the caller and the callee. RPCFuncs may perform locking. RPCFuncs may
+// close the connection early, and it is recommended that they do so to avoid
+// keeping the connection open after all necessary I/O has been performed.
 type RPCFunc func(PeerConn) error
 
 // A NetAddress contains the information needed to contact a peer.
