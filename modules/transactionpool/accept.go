@@ -228,8 +228,6 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	// the transaction.
 	tp.addTransactionToPool(t)
 	tp.updateSubscribers(nil, nil, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
-	print("Got transaction, now have: ")
-	println(len(tp.transactionList))
 	go tp.gateway.Broadcast("RelayTransaction", t)
 	return
 }

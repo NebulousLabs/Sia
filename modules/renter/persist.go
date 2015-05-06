@@ -121,7 +121,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 			}
 		}
 		if active < 3 {
-			return errors.New("Cannot upload an inactive file piece")
+			return errors.New("Cannot share an inactive file")
 		}
 		rsf.Files = append(rsf.Files, *file)
 	}

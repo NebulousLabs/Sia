@@ -1,9 +1,11 @@
 package miner
 
 import (
+	"bytes"
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -87,6 +89,15 @@ func (m *Miner) threadedMine() {
 	}
 }
 
+func fastCheckTarget(target types.Target, b types.Block, bRoot crypto.Hash) bool {
+	id := crypto.HashAll(
+		b.ParentID,
+		b.Nonce,
+		bRoot,
+	)
+	return bytes.Compare(target[:], id[:]) >= 0
+}
+
 // solveBlock takes a block, target, and number of iterations as input and
 // tries to find a block that meets the target. This function can take a long
 // time to complete, and should not be called with a lock.
@@ -94,14 +105,15 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 	// solveBlock could operate on a pointer, but it's not strictly necessary
 	// and it makes calling weirder/more opaque.
 	b = blockForWork
+	bRoot := b.MerkleRoot()
 
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
-		if b.CheckTarget(target) {
+		if fastCheckTarget(target, b, bRoot) {
 			err = m.state.AcceptBlock(b)
 			if err != nil {
-				println("Mined a block, but there was an error.")
+				print("mined a block, but with an error: ")
 				println(err.Error())
 				m.tpool.PurgeTransactionPool()
 			}
