@@ -30,6 +30,8 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 		m.transactions = append(m.transactions, unconfirmedTransactions[0])
 		unconfirmedTransactions = unconfirmedTransactions[1:]
 	}
+	print("miner has updated mining set, len: ")
+	println(len(m.transactions))
 
 	// If no blocks have been applied, the block variables do not need to be
 	// updated.
