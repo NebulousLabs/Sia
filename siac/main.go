@@ -112,6 +112,9 @@ func main() {
 	root.AddCommand(hostCmd)
 	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
 
+	root.AddCommand(hostdbCmd)
+	hostCmd.AddCommand(hostdbCmd)
+
 	root.AddCommand(minerCmd)
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
@@ -119,7 +122,9 @@ func main() {
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)
 
 	root.AddCommand(renterCmd)
-	renterCmd.AddCommand(renterUploadCmd, renterDownloadCmd, renterDownloadQueueCmd, renterStatusCmd)
+	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,
+		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd, renterFilesRenameCmd,
+		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd)
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)

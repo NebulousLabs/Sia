@@ -121,7 +121,7 @@ func (hn *hostNode) recursiveInsert(entry *hostEntry) (nodesAdded int, newNode *
 	return
 }
 
-// insertCompleteHostEntry inserts a host entry into the host tree, removing
+// insertNode inserts a host entry into the host tree, removing
 // any conflicts. The host settings are assummed to be correct. Though hosts
 // with 0 weight will never be selected, they are accetped into the tree.
 func (hdb *HostDB) insertNode(entry *hostEntry) {

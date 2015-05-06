@@ -40,7 +40,7 @@ var (
 
 func updatecmd() {
 	var update api.UpdateInfo
-	err := getAPI("/daemon/update/check", &update)
+	err := getAPI("/daemon/updates/check", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -59,7 +59,7 @@ func updatecmd() {
 
 func updatecheckcmd() {
 	var update api.UpdateInfo
-	err := getAPI("/daemon/update/check", &update)
+	err := getAPI("/daemon/updates/check", &update)
 	if err != nil {
 		fmt.Println("Could not check for update:", err)
 		return
@@ -72,7 +72,7 @@ func updatecheckcmd() {
 }
 
 func updateapplycmd(version string) {
-	err := callAPI("/daemon/update/apply?version=" + version)
+	err := callAPI("/daemon/updates/apply?version=" + version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
