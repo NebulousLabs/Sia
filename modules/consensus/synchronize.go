@@ -43,28 +43,27 @@ func (s *State) threadedResynchronize() {
 //
 // TODO: don't run two Synchronize threads at the same time
 func (s *State) Synchronize(peer modules.NetAddress) error {
-	// loop until there are no more blocks available
+	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
+}
+
+// receiveBlocks is the calling end of the SendBlocks RPC.
+func (s *State) receiveBlocks(conn modules.PeerConn) error {
+	// get blockIDs to send
+	id := s.mu.RLock()
+	history := s.blockHistory()
+	s.mu.RUnlock(id)
+	if err := encoding.WriteObject(conn, history); err != nil {
+		return err
+	}
+
+	// loop until no more blocks are available
 	moreAvailable := true
 	for moreAvailable {
-		// get blockIDs to send
-		id := s.mu.RLock()
-		history := s.blockHistory()
-		s.mu.RUnlock(id)
-
-		// perform RPC
 		var newBlocks []types.Block
-		err := s.gateway.RPC(peer, "SendBlocks", func(conn modules.PeerConn) error {
-			err := encoding.WriteObject(conn, history)
-			if err != nil {
-				return err
-			}
-			err = encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit)
-			if err != nil {
-				return err
-			}
-			return encoding.ReadObject(conn, &moreAvailable, 1)
-		})
-		if err != nil {
+		if err := encoding.ReadObject(conn, &newBlocks, MaxCatchUpBlocks*types.BlockSizeLimit); err != nil {
+			return err
+		}
+		if err := encoding.ReadObject(conn, &moreAvailable, 1); err != nil {
 			return err
 		}
 
@@ -78,6 +77,7 @@ func (s *State) Synchronize(peer modules.NetAddress) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -122,30 +122,36 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 		return encoding.WriteObject(conn, false)
 	}
 
-	// Fetch blocks to send.
-	id = s.mu.RLock()
-	height := s.height()
-	var blocks []types.Block
-	for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-		node, exists := s.blockMap[s.currentPath[i]]
-		if !exists {
-			if build.DEBUG {
-				panic("blockMap is missing a block whose ID is in the currentPath")
+	moreAvailable := true
+	for moreAvailable {
+		// Fetch blocks to send.
+		id = s.mu.RLock()
+		height := s.height()
+		var blocks []types.Block
+		for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
+			node, exists := s.blockMap[s.currentPath[i]]
+			if !exists {
+				if build.DEBUG {
+					panic("blockMap is missing a block whose ID is in the currentPath")
+				}
+				break
 			}
-			break
+			blocks = append(blocks, node.block)
 		}
-		blocks = append(blocks, node.block)
-	}
-	// Indicate whether more blocks are available.
-	more := start+MaxCatchUpBlocks < height
-	s.mu.RUnlock(id)
+		s.mu.RUnlock(id)
+		moreAvailable = start+MaxCatchUpBlocks < height
+		start += MaxCatchUpBlocks
 
-	err = encoding.WriteObject(conn, blocks)
-	if err != nil {
-		return err
+		// Write blocks + moreAvailable.
+		if err = encoding.WriteObject(conn, blocks); err != nil {
+			return err
+		}
+		if err = encoding.WriteObject(conn, moreAvailable); err != nil {
+			return err
+		}
 	}
 
-	return encoding.WriteObject(conn, more)
+	return nil
 }
 
 // blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
