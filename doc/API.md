@@ -419,7 +419,7 @@ Parameters:
 ```
 file string
 ```
-`file` is the ascii representation of the '.sia' file being loaded into the
+`file` is the ASCII representation of the '.sia' file being loaded into the
 renter.
 
 Response:
@@ -442,6 +442,8 @@ newname  string
 `nickname` is the current name of the file entry.
 
 `newname` is the new name for the file entry.
+
+Response: standard.
 
 #### /renter/files/share
 
@@ -473,7 +475,7 @@ Response:
 ```
 File string
 ```
-`file` is the ascii representation of the '.sia' that would have been created.
+`file` is the ASCII representation of the '.sia' that would have been created.
 
 #### /renter/files/upload
 

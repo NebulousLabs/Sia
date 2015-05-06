@@ -122,7 +122,9 @@ func main() {
 	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)
 
 	root.AddCommand(renterCmd)
-	renterCmd.AddCommand(renterUploadCmd, renterDownloadCmd, renterDownloadQueueCmd, renterStatusCmd)
+	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,
+		renterFilesListCmd, renterFilesLoadCmd, renterFilesLoadASCIICmd, renterFilesRenameCmd,
+		renterFilesShareCmd, renterFilesShareASCIICmd, renterFilesUploadCmd)
 
 	root.AddCommand(gatewayCmd)
 	gatewayCmd.AddCommand(gatewayAddCmd, gatewayRemoveCmd, gatewayStatusCmd)
