@@ -106,6 +106,7 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 				m.tpool.PurgeTransactionPool()
 			}
 			solved = true
+			println("Found a block. If the block is not orphaned, you will receive the reward after 50 more blocks have been mined. Blocks are only orphaned when two miners find a block at the same time, as only 1 block can be accepted.")
 
 			// Grab a new address for the miner.
 			m.mu.Lock()
