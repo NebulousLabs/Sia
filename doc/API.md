@@ -403,7 +403,12 @@ filename string
 ```
 `filename` is the filepath of the '.sia' that is being loaded.
 
-Response: standard.
+Response:
+```
+struct {
+	FilesAdded []string
+}
+```
 
 #### /renter/files/loadascii
 
@@ -416,7 +421,12 @@ file string
 `file` is the ascii representation of the '.sia' file being loaded into the
 renter.
 
-Response: standard.
+Response:
+```
+struct {
+	FilesAdded []string
+}
+```
 
 #### /renter/files/rename
 

@@ -26,6 +26,13 @@ type TransactionPool interface {
 	// standard, otherwise it returns an error explaining what is not standard.
 	IsStandardTransaction(types.Transaction) error
 
+	// PurgeTransactionPool is a termporary function available to the miner. In
+	// the event that a miner mines an unacceptable block, the transaction pool
+	// will be purged to clear out the transaction pool and get rid of the
+	// illegal transaction. This should never happen, however there are bugs
+	// that make this condition necessary.
+	PurgeTransactionPool()
+
 	// TransactionSet returns the set of unconfirmed transactions.
 	TransactionSet() []types.Transaction
 
