@@ -81,11 +81,12 @@ func (s *State) Synchronize(peer modules.NetAddress) error {
 	return nil
 }
 
-// SendBlocks returns a sequential set of blocks based on the 32 input block
-// IDs. The most recent known ID is used as the starting point, and up to
-// 'MaxCatchUpBlocks' from that BlockHeight onwards are returned. It also
-// sends a boolean indicating whether more blocks are available.
-func (s *State) SendBlocks(conn modules.PeerConn) error {
+// sendBlocks is the receiving end of the SendBlocks RPC. It returns a
+// sequential set of blocks based on the 32 input block IDs. The most recent
+// known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
+// that BlockHeight onwards are returned. It also sends a boolean indicating
+// whether more blocks are available.
+func (s *State) sendBlocks(conn modules.PeerConn) error {
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
