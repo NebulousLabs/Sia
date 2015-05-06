@@ -95,13 +95,17 @@ func (f *file) TimeRemaining() types.BlockHeight {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
 
-	if len(f.Pieces) == 0 {
-		return 0
+	largest := types.BlockHeight(0)
+	for _, piece := range f.Pieces {
+		if piece.Contract.WindowStart < f.renter.blockHeight {
+			continue
+		}
+		current := piece.Contract.WindowStart - f.renter.blockHeight
+		if current > largest {
+			largest = current
+		}
 	}
-	if f.Pieces[0].Contract.WindowStart < f.renter.blockHeight {
-		return 0
-	}
-	return f.Pieces[0].Contract.WindowStart - f.renter.blockHeight
+	return largest
 }
 
 // DeleteFile removes a file entry from the renter.

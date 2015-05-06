@@ -114,14 +114,13 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownNickname
 		}
-		active = false
+		active := 0
 		for _, piece := range file.Pieces {
 			if piece.Active {
-				active = true
-				break
+				active++
 			}
 		}
-		if !active {
+		if active < 3 {
 			return errors.New("Cannot upload an inactive file piece")
 		}
 		rsf.Files = append(rsf.Files, *file)
