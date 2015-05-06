@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -138,32 +139,19 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 	g.mu.Unlock(id)
 
-	// Tell the peer to add our callback address as a node
-	err = g.RPC(addr, "RelayNode", func(conn modules.PeerConn) error {
-		return encoding.WriteObject(conn, g.Address())
-	})
-	if err != nil {
-		// log this error, but don't return it
-		g.log.Printf("WARN: could not relay our address to %v: %v", addr, err)
+	// call initRPCs
+	id = g.mu.RLock()
+	var wg sync.WaitGroup
+	wg.Add(len(g.initRPCs))
+	for name, fn := range g.initRPCs {
+		go func(name string, fn modules.RPCFunc) {
+			// errors here are non-fatal
+			g.RPC(addr, name, fn)
+			wg.Done()
+		}(name, fn)
 	}
-
-	// request nodes
-	var nodes []modules.NetAddress
-	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
-	})
-	if err != nil {
-		// log this error, but don't return it
-		g.log.Printf("WARN: request for node list of %v failed: %v", addr, err)
-		return nil
-	}
-	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
-	id = g.mu.Lock()
-	for _, node := range nodes {
-		g.addNode(node)
-	}
-	g.save()
-	g.mu.Unlock(id)
+	g.mu.RUnlock(id)
+	wg.Wait()
 
 	return nil
 }

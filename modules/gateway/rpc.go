@@ -53,20 +53,28 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	// call fn
 	err = fn(conn)
 	if err != nil {
-		// TODO: log error here?
+		g.log.Printf("WARN: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
 		// give peer a strike
 		atomic.AddUint32(&peer.strikes, 1)
 	}
 	return err
 }
 
-// RegisterRPC registers a function as an RPC handler for a given identifier.
-// To call an RPC, use gateway.RPC, supplying the same identifier given to
+// RegisterRPC registers an RPCFunc as a handler for a given identifier. To
+// call an RPC, use gateway.RPC, supplying the same identifier given to
 // RegisterRPC. Identifiers should always use PascalCase.
 func (g *Gateway) RegisterRPC(name string, fn modules.RPCFunc) {
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	g.handlerMap[handlerName(name)] = fn
+	g.handlers[handlerName(name)] = fn
+}
+
+// RegisterConnectCall registers a name and RPCFunc to be called on a peer
+// upon connecting.
+func (g *Gateway) RegisterConnectCall(name string, fn modules.RPCFunc) {
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	g.initRPCs[name] = fn
 }
 
 // listenPeer listens for new streams on a peer connection and serves them via
@@ -96,7 +104,7 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	}
 	// call registered handler for this ID
 	lockid := g.mu.RLock()
-	fn, ok := g.handlerMap[id]
+	fn, ok := g.handlers[id]
 	g.mu.RUnlock(lockid)
 	if !ok {
 		// TODO: write this error to conn?
@@ -130,7 +138,6 @@ func (g *Gateway) Broadcast(name string, obj interface{}) {
 		go func(addr modules.NetAddress) {
 			err := g.RPC(addr, name, fn)
 			if err != nil {
-				g.log.Printf("WARN: broadcast: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
 				// try one more time before giving up
 				time.Sleep(10 * time.Second)
 				g.RPC(addr, name, fn)

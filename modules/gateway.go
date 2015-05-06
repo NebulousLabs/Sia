@@ -66,6 +66,10 @@ type Gateway interface {
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
 
+	// RegisterConnectCall registers an RPC name and function to be called
+	// upon connecting to a peer.
+	RegisterConnectCall(string, RPCFunc)
+
 	// RPC calls an RPC on the given address. RPC cannot be called on an
 	// address that the Gateway is not connected to.
 	RPC(NetAddress, string, RPCFunc) error

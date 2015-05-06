@@ -30,9 +30,10 @@ type Gateway struct {
 	listener net.Listener
 	myAddr   modules.NetAddress
 
-	// Each incoming connection begins with a string of 8 bytes, indicating
-	// which function should handle the connection.
-	handlerMap map[rpcID]modules.RPCFunc
+	// handlers are the RPCs that the Gateway can handle.
+	handlers map[rpcID]modules.RPCFunc
+	// initRPCs are the RPCs that the Gateway calls upon connecting to a peer.
+	initRPCs map[string]modules.RPCFunc
 
 	// peers are the nodes we are currently connected to.
 	peers map[modules.NetAddress]*peer
@@ -87,16 +88,20 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 	}
 
 	g = &Gateway{
-		handlerMap: make(map[rpcID]modules.RPCFunc),
-		peers:      make(map[modules.NetAddress]*peer),
-		nodes:      make(map[modules.NetAddress]struct{}),
-		saveDir:    saveDir,
-		mu:         sync.New(modules.SafeMutexDelay, 0),
-		log:        logger,
+		handlers: make(map[rpcID]modules.RPCFunc),
+		initRPCs: make(map[string]modules.RPCFunc),
+		peers:    make(map[modules.NetAddress]*peer),
+		nodes:    make(map[modules.NetAddress]struct{}),
+		saveDir:  saveDir,
+		mu:       sync.New(modules.SafeMutexDelay, 0),
+		log:      logger,
 	}
 
+	// Register RPCs
 	g.RegisterRPC("ShareNodes", g.shareNodes)
 	g.RegisterRPC("RelayNode", g.relayNode)
+	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+	g.RegisterConnectCall("RelayNode", g.sendAddress)
 
 	g.log.Println("INFO: gateway created, started logging")
 
