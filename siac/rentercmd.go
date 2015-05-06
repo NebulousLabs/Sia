@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -87,6 +88,17 @@ var (
 	}
 )
 
+// abs returns the absolute representation of a path.
+// TODO: bad things can happen if you run siac from a non-existent directory.
+// Implement some checks to catch this problem.
+func abs(path string) string {
+	abspath, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	return abspath
+}
+
 func renterdownloadqueuecmd() {
 	var queue []api.DownloadInfo
 	err := getAPI("/renter/downloadqueue", &queue)
@@ -114,12 +126,12 @@ func renterfilesdeletecmd(nickname string) {
 }
 
 func renterfilesdownloadcmd(nickname, destination string) {
-	err := callAPI(fmt.Sprintf("/renter/files/download?nickname=%s&destination=%s", nickname, destination))
+	err := callAPI(fmt.Sprintf("/renter/files/download?nickname=%s&destination=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
 	}
-	fmt.Printf("Started downloading '%s' to %s.\n", nickname, destination)
+	fmt.Printf("Started downloading '%s' to %s.\n", nickname, abs(destination))
 }
 
 func renterfileslistcmd() {
@@ -174,13 +186,13 @@ func renterfilesrenamecmd(nickname, newname string) {
 	fmt.Printf("Renamed %s to %s\n", nickname, newname)
 }
 
-func renterfilessharecmd(nickname, filepath string) {
-	err := callAPI(fmt.Sprintf("/renter/files/share?nickname=%s&filepath=%s", nickname, filepath))
+func renterfilessharecmd(nickname, destination string) {
+	err := callAPI(fmt.Sprintf("/renter/files/share?nickname=%s&filepath=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
 	}
-	fmt.Printf("Exported %s to %s\n", nickname, filepath)
+	fmt.Printf("Exported %s to %s\n", nickname, abs(destination))
 }
 
 func renterfilesshareasciicmd(nickname string) {
