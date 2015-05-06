@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -11,7 +12,15 @@ import (
 	"github.com/inconshreveable/muxado"
 )
 
-const dialTimeout = 10 * time.Second
+const (
+	version = "0.1"
+
+	dialTimeout = 10 * time.Second
+	// the gateway will not make outbound connections above this threshold
+	wellConnectedThreshold = 8
+	// the gateway will not accept inbound connections above this threshold
+	fullyConnectedThreshold = 128
+)
 
 type peer struct {
 	strikes uint32
@@ -24,7 +33,7 @@ func (p *peer) open() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn, p.addr}, nil
+	return &peerConn{conn}, nil
 }
 
 func (p *peer) accept() (modules.PeerConn, error) {
@@ -32,14 +41,13 @@ func (p *peer) accept() (modules.PeerConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &peerConn{conn, p.addr}, nil
+	return &peerConn{conn}, nil
 }
 
 // addPeer adds a peer to the Gateway's peer list and spawns a listener thread
 // to handle its requests.
 func (g *Gateway) addPeer(p *peer) {
 	g.peers[p.addr] = p
-	g.addNode(p.addr)
 	go g.listenPeer(p)
 }
 
@@ -59,19 +67,40 @@ func (g *Gateway) listen() {
 // acceptConn adds a connecting node as a peer.
 // TODO: reject when we have too many active connections
 func (g *Gateway) acceptConn(conn net.Conn) {
-	var addr modules.NetAddress
-	if err := encoding.ReadObject(conn, &addr, maxAddrLength); err != nil {
+	g.log.Printf("INFO: %v wants to connect", conn.RemoteAddr())
+
+	// read version
+	var remoteVersion string
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		conn.Close()
+		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", conn.RemoteAddr(), err)
 		return
 	}
-	g.log.Printf("INFO: %v wants to connect (gave address: %v)", conn.RemoteAddr(), addr)
-	id := g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
-	g.mu.Unlock(id)
-	g.log.Printf("INFO: accepted connection from new peer %v", addr)
 
-	// broadcast our new peer's address
-	g.Broadcast("RelayNode", addr)
+	// decide whether to accept
+	id := g.mu.RLock()
+	numPeers := len(g.peers)
+	g.mu.RUnlock(id)
+	if numPeers >= fullyConnectedThreshold {
+		encoding.WriteObject(conn, "reject")
+		conn.Close()
+		g.log.Printf("INFO: rejected connection from %v (already have %v peers)", conn.RemoteAddr(), len(g.peers))
+		return
+	}
+	// TODO: reject old versions
+
+	// send ack
+	if err := encoding.WriteObject(conn, "accept"); err != nil {
+		conn.Close()
+		g.log.Printf("INFO: could not write ack to %v: %v", conn.RemoteAddr(), err)
+		return
+	}
+
+	// add the peer
+	id = g.mu.Lock()
+	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
+	g.mu.Unlock(id)
+	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", conn.RemoteAddr(), remoteVersion)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -92,11 +121,17 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-	// send our address
-	if err := encoding.WriteObject(conn, g.Address()); err != nil {
+	// send our version
+	if err := encoding.WriteObject(conn, version); err != nil {
 		return err
 	}
-	// TODO: exchange version messages
+	// read ack
+	var ack string
+	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+		return err
+	} else if ack != "accept" {
+		return errors.New("peer rejected connection")
+	}
 
 	g.log.Println("INFO: connected to new peer", addr)
 
@@ -104,23 +139,19 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
 	g.mu.Unlock(id)
 
-	// request nodes
-	var nodes []modules.NetAddress
-	err = g.RPC(addr, "ShareNodes", func(conn modules.PeerConn) error {
-		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
-	})
-	if err != nil {
-		// log this error, but don't return it
-		g.log.Printf("WARN: request for node list of %v failed: %v", addr, err)
-		return nil
+	// call initRPCs
+	id = g.mu.RLock()
+	var wg sync.WaitGroup
+	wg.Add(len(g.initRPCs))
+	for name, fn := range g.initRPCs {
+		go func(name string, fn modules.RPCFunc) {
+			// errors here are non-fatal
+			g.RPC(addr, name, fn)
+			wg.Done()
+		}(name, fn)
 	}
-	g.log.Printf("INFO: %v sent us %v peers", addr, len(nodes))
-	id = g.mu.Lock()
-	for _, node := range nodes {
-		g.addNode(node)
-	}
-	g.save()
-	g.mu.Unlock(id)
+	g.mu.RUnlock(id)
+	wg.Wait()
 
 	return nil
 }
@@ -154,7 +185,7 @@ func (g *Gateway) makeOutboundConnections() {
 			numPeers := len(g.peers)
 			addr, err := g.randomNode()
 			g.mu.RUnlock(id)
-			if err != nil || numPeers >= 8 {
+			if err != nil || numPeers >= wellConnectedThreshold {
 				break
 			}
 			g.Connect(addr)

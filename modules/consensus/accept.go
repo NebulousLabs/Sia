@@ -161,7 +161,7 @@ func (s *State) RelayBlock(conn modules.PeerConn) error {
 
 	err = s.AcceptBlock(b)
 	if err == ErrOrphan {
-		go s.Synchronize(conn.CallbackAddr())
+		go s.Synchronize(modules.NetAddress(conn.RemoteAddr().String()))
 	}
 	if err != nil {
 		return err

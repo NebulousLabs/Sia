@@ -139,8 +139,9 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	}
 
 	// Register RPCs
-	gateway.RegisterRPC("SendBlocks", s.SendBlocks)
+	gateway.RegisterRPC("SendBlocks", s.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", s.RelayBlock)
+	gateway.RegisterConnectCall("SendBlocks", s.receiveBlocks)
 
 	// spawn resynchronize loop
 	go s.threadedResynchronize()

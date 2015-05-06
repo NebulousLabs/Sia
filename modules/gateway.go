@@ -17,17 +17,16 @@ var (
 )
 
 // A PeerConn is the connection type used when communicating with peers during
-// an RPC. In addition to the standard net.Conn methods, it includeds a
-// CallbackAddr method which can be used to perform a "response" RPC.
+// an RPC. For now it is identical to a net.Conn.
 type PeerConn interface {
 	net.Conn
-
-	// CallbackAddr returns the "real" address of the peer, i.e. the address
-	// used to connect to the peer.
-	CallbackAddr() NetAddress
+	// AddStrike() ?
 }
 
-// RPCFunc is the type signature of functions that handle incoming RPCs.
+// RPCFunc is the type signature of functions that handle RPCs. It is used for
+// both the caller and the callee. RPCFuncs may perform locking. RPCFuncs may
+// close the connection early, and it is recommended that they do so to avoid
+// keeping the connection open after all necessary I/O has been performed.
 type RPCFunc func(PeerConn) error
 
 // A NetAddress contains the information needed to contact a peer.
@@ -66,6 +65,10 @@ type Gateway interface {
 	// RegisterRPC registers a function to handle incoming connections that
 	// supply the given RPC ID.
 	RegisterRPC(string, RPCFunc)
+
+	// RegisterConnectCall registers an RPC name and function to be called
+	// upon connecting to a peer.
+	RegisterConnectCall(string, RPCFunc)
 
 	// RPC calls an RPC on the given address. RPC cannot be called on an
 	// address that the Gateway is not connected to.

@@ -20,27 +20,35 @@ func TestAddPeer(t *testing.T) {
 	if len(g.peers) != 1 {
 		t.Fatal("gateway did not add peer")
 	}
-	if len(g.nodes) != 2 {
-		t.Fatal("gateway did not add node")
-	}
 }
 
 func TestListen(t *testing.T) {
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
+
 	// "compliant" connect
 	conn, err := net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
-	if err := encoding.WriteObject(conn, "foo"); err != nil {
-		t.Fatal("couldn't write address")
+	addr := modules.NetAddress(conn.LocalAddr().String())
+	// send version
+	if err := encoding.WriteObject(conn, version); err != nil {
+		t.Fatal("couldn't write version")
 	}
+	// read ack
+	var ack string
+	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+		t.Fatal(err)
+	} else if ack != "accept" {
+		t.Fatal("gateway should have given ack")
+	}
+
 	// g should add foo
 	var ok bool
 	for !ok {
 		id := g.mu.RLock()
-		_, ok = g.peers["foo"]
+		_, ok = g.peers[addr]
 		g.mu.RUnlock(id)
 	}
 
@@ -49,7 +57,7 @@ func TestListen(t *testing.T) {
 	// g should remove foo
 	for ok {
 		id := g.mu.RLock()
-		_, ok = g.peers["foo"]
+		_, ok = g.peers[addr]
 		g.mu.RUnlock(id)
 	}
 
@@ -104,7 +112,9 @@ func TestConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	// g should have foo
-	if g.removeNode("foo") != nil {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	if _, ok := g.nodes["foo"]; !ok {
 		t.Fatal("bootstrapper should have received foo:", g.nodes)
 	}
 }
@@ -129,7 +139,7 @@ func TestDisconnect(t *testing.T) {
 		}
 		conn.Close()
 	}()
-
+	// skip standard connection protocol
 	conn, err := net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
