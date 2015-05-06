@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -15,11 +14,10 @@ const (
 	apiTimeout = 5 * time.Second
 )
 
-// handleHTTPRequest is a wrapper function that logs and then handles all
-// incoming calls to the API.
+// handleHTTPRequest is a wrapper function that handles all incoming calls to
+// the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
-		log.Printf("%s %s", req.Method, req.URL)
 		handler(w, req)
 	})
 }
@@ -121,9 +119,8 @@ func (srv *Server) Serve() error {
 	return err
 }
 
-// writeError logs an writes an error to the API caller.
+// writeError an error to the API caller.
 func writeError(w http.ResponseWriter, msg string, err int) {
-	log.Printf("%d HTTP ERROR: %s", err, msg)
 	http.Error(w, msg, err)
 }
 
