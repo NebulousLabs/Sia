@@ -112,7 +112,9 @@ func TestConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	// g should have foo
-	if g.removeNode("foo") != nil {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	if _, ok := g.nodes["foo"]; !ok {
 		t.Fatal("bootstrapper should have received foo:", g.nodes)
 	}
 }
