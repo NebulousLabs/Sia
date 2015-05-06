@@ -113,13 +113,12 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 		if fastCheckTarget(target, b, bRoot) {
 			err = m.state.AcceptBlock(b)
 			if err != nil {
-				print("mined a block, but with an error: ")
-				println(err.Error())
+				println("Mined a bad block " + err.Error())
 				m.tpool.PurgeTransactionPool()
 			}
 			solved = true
 			if build.Release != "testing" {
-				println("Found a block! If the block is not orphaned, you will receive the reward after 50 more blocks have been mined. Blocks are only orphaned when two miners find a block at the same time, as only 1 block can be accepted.")
+				println("Found a block! Reward will be received in 50 blocks.")
 			}
 
 			// Grab a new address for the miner.
