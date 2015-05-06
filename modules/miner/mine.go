@@ -100,10 +100,10 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
 		if b.CheckTarget(target) {
 			err = m.state.AcceptBlock(b)
-			if build.DEBUG {
-				if err != nil {
-					println(err.Error())
-				}
+			if err != nil {
+				println("Mined a block, but there was an error.")
+				println(err.Error())
+				m.tpool.PurgeTransactionPool()
 			}
 			solved = true
 

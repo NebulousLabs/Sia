@@ -393,3 +393,9 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	// Inform the subscribers that an update has executed.
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 }
+
+func (tp *TransactionPool) PurgeTransactionPool() {
+	lockID := tp.mu.Lock()
+	defer tp.mu.Unlock(lockID)
+	tp.purge()
+}
