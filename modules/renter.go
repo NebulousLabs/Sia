@@ -82,11 +82,11 @@ type Renter interface {
 
 	// LoadSharedFile loads a '.sia' file into the renter, so that the user can
 	// download files which have been shared with them.
-	LoadSharedFile(filename string) error
+	LoadSharedFile(filename string) ([]string, error)
 
 	// LoadSharedFilesAscii loads a '.sia' file into the renter, except instead
 	// of taking a filename it takes a base64 encoded string of the file.
-	LoadSharedFilesAscii(asciiSia string) error
+	LoadSharedFilesAscii(asciiSia string) ([]string, error)
 
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error

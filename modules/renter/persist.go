@@ -176,23 +176,24 @@ func (r *Renter) ShareFilesAscii(nicknames []string) (string, error) {
 
 // loadSharedFile reads and decodes file metadata from reader and adds it to
 // the renter.
-func (r *Renter) loadSharedFile(reader io.Reader) error {
+func (r *Renter) loadSharedFile(reader io.Reader) ([]string, error) {
 	zip, err := gzip.NewReader(reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var rsf RenterSharedFile
 	err = json.NewDecoder(zip).Decode(&rsf)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if rsf.Header != ShareHeader {
-		return ErrUnrecognizedHeader
+		return nil, ErrUnrecognizedHeader
 	} else if rsf.Version != ShareVersion {
-		return ErrUnrecognizedVersion
+		return nil, ErrUnrecognizedVersion
 	}
+	var fileList []string
 	for i := range rsf.Files {
 		dupCount := 0
 		origName := rsf.Files[i].Name
@@ -204,31 +205,30 @@ func (r *Renter) loadSharedFile(reader io.Reader) error {
 			dupCount++
 			rsf.Files[i].Name = origName + "_" + strconv.Itoa(dupCount)
 		}
-		print("Got file ")
-		println(rsf.Files[i].Name)
 		rsf.Files[i].renter = r
 		r.files[rsf.Files[i].Name] = &rsf.Files[i]
+		fileList = append(fileList, rsf.Files[i].Name)
 	}
 	r.save()
 
-	return nil
+	return fileList, nil
 }
 
 // LoadSharedFile loads a shared file into the renter.
-func (r *Renter) LoadSharedFile(filename string) error {
+func (r *Renter) LoadSharedFile(filename string) ([]string, error) {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
 	file, err := os.Open(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return r.loadSharedFile(file)
 }
 
 // loadSharedFile takes an encoded set of files and adds them to the renter,
 // taking them form an ascii string.
-func (r *Renter) LoadSharedFilesAscii(asciiSia string) error {
+func (r *Renter) LoadSharedFilesAscii(asciiSia string) ([]string, error) {
 	dec := base64.NewDecoder(base64.URLEncoding, bytes.NewBufferString(asciiSia))
 	return r.loadSharedFile(dec)
 }

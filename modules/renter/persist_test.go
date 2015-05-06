@@ -202,7 +202,7 @@ func TestFileSharing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = rt2.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
+	_, err = rt2.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestFileSharing(t *testing.T) {
 	}
 
 	// Load a non-existant file.
-	err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "0share.sia"))
+	_, err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "0share.sia"))
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -235,7 +235,7 @@ func TestFileSharing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
+	_, err = rt1.renter.LoadSharedFile(filepath.Join(shareDir, "1share.sia"))
 	if err == nil {
 		t.Error("Expecting corruption error")
 	}

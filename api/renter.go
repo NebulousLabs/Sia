@@ -29,6 +29,11 @@ type FileInfo struct {
 	TimeRemaining types.BlockHeight
 }
 
+// LoadedFiles lists files that were loaded into the renter.
+type RenterFilesLoadResponse struct {
+	FilesAdded []string
+}
+
 // renterFilesDownloadHandler handles the API call to download a file.
 func (srv *Server) renterFilesDownloadHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.renter.Download(req.FormValue("nickname"), req.FormValue("destination"))
@@ -101,25 +106,25 @@ func (srv *Server) renterFilesRenameHandler(w http.ResponseWriter, req *http.Req
 // renterFilesLoadHandler handles the API call to load a '.sia' that
 // contains filesharing information.
 func (srv *Server) renterFilesLoadHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.renter.LoadSharedFile(req.FormValue("filename"))
+	files, err := srv.renter.LoadSharedFile(req.FormValue("filename"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	writeSuccess(w)
+	writeJSON(w, RenterFilesLoadResponse{FilesAdded: files})
 }
 
 // renterFilesLoadAsciiHandler handles the API call to load a '.sia' file
 // in ascii form.
 func (srv *Server) renterFilesLoadAsciiHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.renter.LoadSharedFilesAscii(req.FormValue("file"))
+	files, err := srv.renter.LoadSharedFilesAscii(req.FormValue("file"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	writeSuccess(w)
+	writeJSON(w, RenterFilesLoadResponse{FilesAdded: files})
 }
 
 // renterFilesShareHandler handles the API call to create a '.sia' file that
