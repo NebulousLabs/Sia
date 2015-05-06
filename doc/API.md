@@ -235,7 +235,7 @@ Parameters: none
 Response:
 ```
 struct {
-	Entries []HostEntry
+	Hosts []HostSettings
 }
 ```
 
