@@ -2,9 +2,7 @@ package host
 
 import (
 	"errors"
-	"io"
 	"net"
-	"net/http"
 	"os"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -106,16 +104,12 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 	h.myAddr = modules.NetAddress(h.listener.Addr().String())
 
 	// discover external IP (during testing, use the loopback address)
-	var hostname string
 	if build.Release == "testing" {
-		hostname = "::1"
+		h.myAddr = modules.NetAddress(net.JoinHostPort("::1", h.myAddr.Port()))
 	} else {
-		hostname, err = getExternalIP()
-		if err != nil {
-			return nil, err
-		}
+		// potentially slow
+		go h.getExternalIP()
 	}
-	h.myAddr = modules.NetAddress(net.JoinHostPort(hostname, h.myAddr.Port()))
 
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
@@ -163,21 +157,4 @@ func (h *Host) Info() modules.HostInfo {
 		NumContracts:     len(h.obligationsByID),
 	}
 	return info
-}
-
-// getExternalIP learns the server's hostname from a centralized service,
-// myexternalip.com.
-func getExternalIP() (string, error) {
-	resp, err := http.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	buf := make([]byte, 64)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	hostname := string(buf[:n-1]) // trim newline
-	return hostname, nil
 }
