@@ -77,7 +77,7 @@ func TestRandomNode(t *testing.T) {
 	}
 	for node, count := range nodes {
 		if count == 0 { // 1-in-200000 chance of occuring naturally
-			t.Errorf("node %v was never selected", node, count)
+			t.Errorf("node %v was never selected", node)
 		}
 	}
 }

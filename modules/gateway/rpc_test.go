@@ -15,7 +15,7 @@ func TestRPCID(t *testing.T) {
 	}
 	for id, s := range cases {
 		if id.String() != s {
-			t.Error("rpcID.String mismatch: expected %v, got %v", s, id.String())
+			t.Errorf("rpcID.String mismatch: expected %v, got %v", s, id.String())
 		}
 	}
 }
@@ -28,7 +28,7 @@ func TestHandlerName(t *testing.T) {
 	}
 	for s, id := range cases {
 		if hid := handlerName(s); hid != id {
-			t.Error("handlerName mismatch: expected %v, got %v", id, hid)
+			t.Errorf("handlerName mismatch: expected %v, got %v", id, hid)
 		}
 	}
 }
