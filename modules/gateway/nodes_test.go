@@ -154,9 +154,9 @@ func TestRelayNodes(t *testing.T) {
 	}
 
 	// g2 should have received g3's address from g1
-	time.Sleep(10 * time.Millisecond)
-	id := g2.mu.Lock()
-	defer g2.mu.Unlock(id)
+	time.Sleep(100 * time.Millisecond)
+	id := g2.mu.RLock()
+	defer g2.mu.RUnlock(id)
 	if _, ok := g2.nodes[g3.Address()]; !ok {
 		t.Fatal("node was not relayed:", g2.nodes)
 	}
