@@ -43,7 +43,7 @@ release-fast: REBUILD
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
-	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.0          \
+	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.1          \
 		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
 		-tasks-=deb,deb-dev,deb-source,go-test
 
