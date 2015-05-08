@@ -44,8 +44,8 @@ release-fast: REBUILD
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.1          \
-		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
-		-tasks-=deb,deb-dev,deb-source,go-test
+		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md          \
+		-main-dirs-exclude=siag	-tasks-=deb,deb-dev,deb-source,go-test
 
 # clean removes all directories that get automatically created during
 # development.
