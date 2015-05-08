@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -46,6 +47,10 @@ func (h *Host) Announce() error {
 	// create and encode the announcement and add it to the arbitrary data of
 	// the transaction.
 	lockID := h.mu.RLock()
+	if h.myAddr == "" {
+		h.mu.RUnlock(lockID)
+		return errors.New("can't announce without knowing external IP")
+	}
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: h.myAddr,
 	})
