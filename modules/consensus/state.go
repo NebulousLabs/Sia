@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/blockdb"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -57,7 +57,7 @@ type State struct {
 	subscriptions []chan struct{}
 
 	// block database, used for saving/loading the current path
-	db blockdb.DB
+	db persist.DB
 
 	// gateway, for receiving/relaying blocks to/from peers
 	gateway modules.Gateway
@@ -129,7 +129,7 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 
 	// During short tests, use an in-memory database.
 	if build.Release == "testing" && testing.Short() {
-		s.db = blockdb.NilDB
+		s.db = persist.NilDB
 	} else {
 		// Otherwise, try to load an existing database from disk.
 		err = s.load(saveDir)

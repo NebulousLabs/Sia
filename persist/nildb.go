@@ -1,4 +1,4 @@
-package blockdb
+package persist
 
 import (
 	"github.com/NebulousLabs/Sia/types"
