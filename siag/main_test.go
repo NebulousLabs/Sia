@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules/tester"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // The tests in this file need to be checked manually, even if errors are
@@ -14,7 +14,7 @@ import (
 // TestMain tries running the main executable using a few different commands.
 func TestMain(t *testing.T) {
 	// Get a test folder.
-	testDir := tester.TempDir("siag", "TestMain")
+	testDir := build.TempDir("siag", "TestMain")
 
 	// Create a default set of keys. The result should be 'DefaultTotalKeys'
 	// files being created.

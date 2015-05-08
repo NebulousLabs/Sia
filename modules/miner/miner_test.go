@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -18,7 +18,7 @@ import (
 // TestMiner creates a miner, mines a few blocks, and checks that the wallet
 // balance is updating as the blocks get mined.
 func TestMiner(t *testing.T) {
-	testdir := tester.TempDir("miner", "TestMiner")
+	testdir := build.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of its dependencies.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
@@ -71,7 +71,7 @@ func TestManyBlocks(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testdir := tester.TempDir("miner", "TestMiner")
+	testdir := build.TempDir("miner", "TestMiner")
 
 	// Create the miner and all of it's dependencies.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))

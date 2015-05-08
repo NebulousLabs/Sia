@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
 // TestRenterSaveAndLoad probes the save and load methods of the renter type.
@@ -165,7 +165,7 @@ func TestFileSharing(t *testing.T) {
 	// Create a directory to put all the files shared between the renters in
 	// this test.
 	t.Skip("broken")
-	shareDir := tester.TempDir("renter", "TestFileSharing")
+	shareDir := build.TempDir("renter", "TestFileSharing")
 	err := os.MkdirAll(shareDir, 0700)
 	if err != nil {
 		t.Fatal(err)

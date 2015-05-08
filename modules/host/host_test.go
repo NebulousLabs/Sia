@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -49,7 +49,7 @@ func (ht *hostTester) tpUpdateWait() {
 
 // CreateHostTester initializes a HostTester.
 func CreateHostTester(name string, t *testing.T) *hostTester {
-	testdir := tester.TempDir(modules.HostDir, name)
+	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the gateway.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))

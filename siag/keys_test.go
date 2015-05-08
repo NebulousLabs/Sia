@@ -6,13 +6,13 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
 // TestGenerateKeys probes the generateKeys function.
 func TestGenerateKeys(t *testing.T) {
-	testDir := tester.TempDir("siag", "TestGenerateKeys")
+	testDir := build.TempDir("siag", "TestGenerateKeys")
 
 	// Try to create an anyone-can-spend set of keys.
 	_, err := generateKeys(0, 0, testDir, "anyoneCanSpend")
@@ -49,7 +49,7 @@ func TestVerifyKeys(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testDir := tester.TempDir("siag", "TestVerifyKeys")
+	testDir := build.TempDir("siag", "TestVerifyKeys")
 
 	// Check that a corrupted header or version will trigger an error.
 	keyname := "headerCheck"
@@ -189,7 +189,7 @@ func TestPrintKeyInfo(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testDir := tester.TempDir("siakg", "TestPrintKeyInfo")
+	testDir := build.TempDir("siakg", "TestPrintKeyInfo")
 
 	// Check that a corrupted header or version will trigger an error.
 	keyname := "headerCheck"
