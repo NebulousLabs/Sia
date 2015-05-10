@@ -20,8 +20,9 @@ const (
 func (s *State) threadedResynchronize() {
 	for {
 		go func() {
-			// The set of connected peers is small and randomly ordered, so
-			// just naively iterate through them until a Synchronize succeeds.
+			// TODO: gateway.Peers() does not return randomly ordered peers -
+			// while maps cannot be expected to happen in any particular order,
+			// the ordering is certainly not random.
 			for _, peer := range s.gateway.Peers() {
 				if s.Synchronize(peer) == nil {
 					break
@@ -94,7 +95,7 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 		return err
 	}
 
-	// Find the most recent block from knownBlocks that is in our current path.
+	// Find the most recent block from knownBlocks in the current path.
 	id := s.mu.RLock()
 	found := false
 	var start types.BlockHeight
@@ -108,10 +109,8 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 	}
 	s.mu.RUnlock(id)
 
-	// If we didn't find any matching blocks, or if we're already
-	// synchronized, don't send any blocks. The genesis block should be
-	// included in knownBlocks, so if no matching blocks are found, the caller
-	// is probably on a different blockchain altogether.
+	// If no matching blocks are found, or if the caller has all known blocks,
+	// don't send any blocks.
 	if !found || start > s.Height() {
 		// Send 0 blocks.
 		err = encoding.WriteObject(conn, []types.Block{})
@@ -122,27 +121,31 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 		return encoding.WriteObject(conn, false)
 	}
 
+	// Send the caller all of the blocks that they are missing.
 	moreAvailable := true
 	for moreAvailable {
-		// Fetch blocks to send.
-		id = s.mu.RLock()
-		height := s.height()
+		// Get the set of blocks to send.
 		var blocks []types.Block
-		for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-			node, exists := s.blockMap[s.currentPath[i]]
-			if !exists {
-				if build.DEBUG {
+		id = s.mu.RLock()
+		{
+			height := s.height()
+			// TODO: unit test for off-by-one errors here
+			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
+				node, exists := s.blockMap[s.currentPath[i]]
+				if build.DEBUG && !exists {
 					panic("blockMap is missing a block whose ID is in the currentPath")
 				}
-				break
+				blocks = append(blocks, node.block)
 			}
-			blocks = append(blocks, node.block)
+
+			// TODO: Check for off-by-one here too.
+			moreAvailable = start+MaxCatchUpBlocks < height
+			start += MaxCatchUpBlocks
 		}
 		s.mu.RUnlock(id)
-		moreAvailable = start+MaxCatchUpBlocks < height
-		start += MaxCatchUpBlocks
 
-		// Write blocks + moreAvailable.
+		// Send a set of blocks to the caller + a flag indicating whether more
+		// are available.
 		if err = encoding.WriteObject(conn, blocks); err != nil {
 			return err
 		}

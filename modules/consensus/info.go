@@ -144,9 +144,12 @@ func (s *State) CurrentBlock() types.Block {
 	return s.currentBlockNode().block
 }
 
+// ChildTarget does not need a lock, as the values being read are not changed
+// once they have been created.
 func (s *State) ChildTarget(bid types.BlockID) (target types.Target, exists bool) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
+
 	bn, exists := s.blockMap[bid]
 	if !exists {
 		return

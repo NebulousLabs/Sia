@@ -58,16 +58,6 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
-func (g *Gateway) Peers() []modules.NetAddress {
-	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
-	var peers []modules.NetAddress
-	for addr := range g.peers {
-		peers = append(peers, addr)
-	}
-	return peers
-}
-
 // Close stops the Gateway's listener process.
 func (g *Gateway) Close() error {
 	return g.listener.Close()

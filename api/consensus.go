@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -14,10 +15,20 @@ type ConsensusInfo struct {
 
 // consensusStatusHandler handles the API call asking for the consensus status.
 func (srv *Server) consensusStatusHandler(w http.ResponseWriter, req *http.Request) {
+	lockID := srv.mu.RLock()
+	defer srv.mu.RUnlock(lockID)
+
+	currentTarget, exists := srv.cs.ChildTarget(srv.currentBlock.ID())
+	if build.DEBUG {
+		if !exists {
+			panic("server has nonexistent current block")
+		}
+	}
+
 	writeJSON(w, ConsensusInfo{
-		srv.cs.Height(),
-		srv.cs.CurrentBlock().ID(),
-		srv.cs.CurrentTarget(),
+		srv.blockchainHeight,
+		srv.currentBlock.ID(),
+		currentTarget,
 	})
 }
 
@@ -29,7 +40,20 @@ func (srv *Server) consensusSynchronizeHandler(w http.ResponseWriter, req *http.
 		writeError(w, "No peers available for syncing", http.StatusInternalServerError)
 		return
 	}
+
+	// TODO: Do not select first peer every time.
 	go srv.cs.Synchronize(peers[0])
 
 	writeSuccess(w)
+}
+
+// ReceiveConsensusSetUpdate gets called by the consensus set every time there
+// is a change to the blockchain.
+func (srv *Server) ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks []types.Block) {
+	lockID := srv.mu.Lock()
+	defer srv.mu.Unlock(lockID)
+
+	srv.blockchainHeight -= types.BlockHeight(len(revertedBlocks))
+	srv.blockchainHeight += types.BlockHeight(len(appliedBlocks))
+	srv.currentBlock = appliedBlocks[len(appliedBlocks)-1]
 }

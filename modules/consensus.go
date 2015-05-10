@@ -8,6 +8,17 @@ const (
 	ConsensusDir = "consensus"
 )
 
+// A ConsensusSetSubscriber is an object that receives updates to the consensus
+// set every time there is a change in consensus.
+type ConsensusSetSubscriber interface {
+	// ReceiveConsensusSetUpdate sends a consensus update to a module through a
+	// function call. Updates will always be sent in the correct order.
+	// Usually, the function receiving the updates will also process the
+	// changes. If the function blocks indefinitely, the state will still
+	// function.
+	ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
+}
+
 // A DiffDirection indicates the "direction" of a diff, either applied or
 // reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool
@@ -48,4 +59,16 @@ type SiafundOutputDiff struct {
 type SiafundPoolDiff struct {
 	Previous types.Currency
 	Adjusted types.Currency
+}
+
+type ConsensusSet interface {
+	AcceptBlock(types.Block) error
+
+	ChildTarget(types.BlockID) (types.Target, bool)
+
+	Close() error
+
+	ConsensusSetSubscribe(ConsensusSetSubscriber)
+
+	Synchronize(NetAddress) error
 }
