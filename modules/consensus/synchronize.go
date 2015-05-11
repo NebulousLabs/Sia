@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"crypto/rand"
+	"math/big"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -11,40 +13,37 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks = 50
+	MaxCatchUpBlocks       = 50
+	MaxSynchronizeAttempts = 8
+	ResynchronizeTimeout   = time.Minute * 2
 )
 
-// threadedResynchronize continuously calls Synchronize on a random peer every
-// few minutes. This helps prevent unintentional desychronization in the event
-// that broadcasts start failing.
+// threadedResynchronize will call synchronize on up to 8 random peers.
 func (s *State) threadedResynchronize() {
 	for {
 		go func() {
-			// TODO: gateway.Peers() does not return randomly ordered peers -
-			// while maps cannot be expected to happen in any particular order,
-			// the ordering is certainly not random.
-			for _, peer := range s.gateway.Peers() {
-				if s.Synchronize(peer) == nil {
+			peers := s.gateway.Peers()
+			for i := 0; i < MaxSynchronizeAttempts && len(peers) > 0; i++ {
+				// Select a peer at random from the list of peers.
+				big, err := rand.Int(rand.Reader, big.NewInt(int64(len(peers))))
+				if err != nil && build.DEBUG {
+					panic("rand err!")
+				}
+
+				err = s.Synchronize(peers[big.Int64()])
+				if err == nil {
 					break
 				}
+
+				// After syncrhonizing with the peer, remove them from the list
+				// of selectable peers by replacing them with the first peer in
+				// the list, and then removing the first peer from the list.
+				peers[big.Int64()] = peers[0]
+				peers = peers[1:]
 			}
 		}()
-		time.Sleep(time.Minute * 2)
+		time.Sleep(ResynchronizeTimeout)
 	}
-}
-
-// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
-// the network consensus set. The process is as follows: synchronize asks a
-// peer for new blocks. The requester sends 32 block IDs, starting with the 12
-// most recent and then progressing exponentially backwards to the genesis
-// block. The receiver uses these blocks to find the most recent block seen by
-// both peers. From this starting height, it transmits blocks sequentially.
-// The requester then integrates these blocks into its consensus set. Multiple
-// such transmissions may be required to fully synchronize.
-//
-// TODO: don't run two Synchronize threads at the same time
-func (s *State) Synchronize(peer modules.NetAddress) error {
-	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
@@ -73,13 +72,40 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 			// TODO: don't Broadcast these blocks
 			acceptErr := s.AcceptBlock(block)
 			if acceptErr != nil {
-				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
-				// block again.
+				return
 			}
 		}
 	}
 
 	return nil
+}
+
+// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
+// BlockIDs and then doubling in step size until the genesis block is reached.
+// The genesis block is always included. This array of BlockIDs is used to
+// establish a shared commonality between peers during synchronization.
+func (s *State) blockHistory() (blockIDs [32]types.BlockID) {
+	knownBlocks := make([]types.BlockID, 0, 32)
+	step := types.BlockHeight(1)
+	for height := s.height(); ; height -= step {
+		knownBlocks = append(knownBlocks, s.currentPath[height])
+
+		// after 12, start doubling
+		if len(knownBlocks) >= 12 {
+			step *= 2
+		}
+
+		// this check has to come before height -= step;
+		// otherwise we might underflow
+		if height <= step {
+			break
+		}
+	}
+	// always include the genesis block
+	knownBlocks = append(knownBlocks, s.currentPath[0])
+
+	copy(blockIDs[:], knownBlocks)
+	return
 }
 
 // sendBlocks is the receiving end of the SendBlocks RPC. It returns a
@@ -157,30 +183,14 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 	return nil
 }
 
-// blockHistory returns up to 32 BlockIDs, starting with the 12 most recent
-// BlockIDs and then doubling in step size until the genesis block is reached.
-// The genesis block is always included. This array of BlockIDs is used to
-// establish a shared commonality between peers during synchronization.
-func (s *State) blockHistory() (blockIDs [32]types.BlockID) {
-	knownBlocks := make([]types.BlockID, 0, 32)
-	step := types.BlockHeight(1)
-	for height := s.height(); ; height -= step {
-		knownBlocks = append(knownBlocks, s.currentPath[height])
-
-		// after 12, start doubling
-		if len(knownBlocks) >= 12 {
-			step *= 2
-		}
-
-		// this check has to come before height -= step;
-		// otherwise we might underflow
-		if height <= step {
-			break
-		}
-	}
-	// always include the genesis block
-	knownBlocks = append(knownBlocks, s.currentPath[0])
-
-	copy(blockIDs[:], knownBlocks)
-	return
+// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
+// the network consensus set. The process is as follows: synchronize asks a
+// peer for new blocks. The requester sends 32 block IDs, starting with the 12
+// most recent and then progressing exponentially backwards to the genesis
+// block. The receiver uses these blocks to find the most recent block seen by
+// both peers. From this starting height, it transmits blocks sequentially.
+// The requester then integrates these blocks into its consensus set. Multiple
+// such transmissions may be required to fully synchronize.
+func (s *State) Synchronize(peer modules.NetAddress) error {
+	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }

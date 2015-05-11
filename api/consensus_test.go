@@ -27,9 +27,9 @@ func TestBlockBootstrap(t *testing.T) {
 	// this check, but it's left here to be explict anyway.
 	st2 := st.addPeer("TestBlockBootstrap2")
 	lockID := st.server.mu.RLock()
-	lockID := st2.server.mu.RLock()
+	lockID = st2.server.mu.RLock()
 	defer st.server.mu.RUnlock(lockID)
-	defer st.server.mu.RUnlock(lockID)
+	defer st2.server.mu.RUnlock(lockID)
 	if st.server.blockchainHeight != st2.server.blockchainHeight {
 		t.Fatal("heights do not match after synchronize")
 	}
