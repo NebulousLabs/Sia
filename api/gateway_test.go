@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -45,7 +45,7 @@ func TestGatewayStatus(t *testing.T) {
 
 func TestGatewayPeerAdd(t *testing.T) {
 	st := newServerTester("TestGatewayPeerAdd", t)
-	peer, err := gateway.New(":0", tester.TempDir("api", "TestGatewayPeerAdd", "gateway"))
+	peer, err := gateway.New(":0", build.TempDir("api", "TestGatewayPeerAdd", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestGatewayPeerAdd(t *testing.T) {
 
 func TestGatewayPeerRemove(t *testing.T) {
 	st := newServerTester("TestGatewayPeerRemove", t)
-	peer, err := gateway.New(":0", tester.TempDir("api", "TestGatewayPeerRemove", "gateway"))
+	peer, err := gateway.New(":0", build.TempDir("api", "TestGatewayPeerRemove", "gateway"))
 	if err != nil {
 		t.Fatal(err)
 	}

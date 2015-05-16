@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules/tester"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // TestMain tries running the main executable using a few different commands.
@@ -15,7 +15,7 @@ func TestMain(t *testing.T) {
 		t.SkipNow()
 	}
 
-	testDir := tester.TempDir("siad", "TestMain")
+	testDir := build.TempDir("siad", "TestMain")
 
 	// Try running and closing an instance of siad.
 	os.Args = []string{

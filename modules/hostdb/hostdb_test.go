@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -67,7 +67,7 @@ func (hdbt *hdbTester) tpUpdateWait() {
 // newHDBTester returns a ready-to-use hdb tester, with all modules
 // initialized.
 func newHDBTester(name string, t *testing.T) *hdbTester {
-	testdir := tester.TempDir("hostdb", name)
+	testdir := build.TempDir("hostdb", name)
 
 	// Create the gateway.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))

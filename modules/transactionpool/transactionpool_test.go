@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -112,7 +112,7 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 // newTpoolTester returns a ready-to-use tpool tester, with all modules
 // initialized.
 func newTpoolTester(name string, t *testing.T) *tpoolTester {
-	testdir := tester.TempDir("transactionpool", name)
+	testdir := build.TempDir("transactionpool", name)
 
 	// Create the gateway.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
@@ -174,7 +174,7 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 
 // TestNewNilInputs tries to trigger a panic with nil inputs.
 func TestNewNilInputs(t *testing.T) {
-	testdir := tester.TempDir("transactionpool", "TestNewNilInputs")
+	testdir := build.TempDir("transactionpool", "TestNewNilInputs")
 
 	// Create a gateway and consensus set.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))

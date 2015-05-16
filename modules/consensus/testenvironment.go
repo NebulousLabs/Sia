@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -141,7 +141,7 @@ func NewConsensusTester(t *testing.T, s *State) (ct *ConsensusTester) {
 // spend.
 func NewTestingEnvironment(name string, t *testing.T) (ct *ConsensusTester) {
 	// Get the state and assistant.
-	testdir := tester.TempDir("consensus", name)
+	testdir := build.TempDir("consensus", name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	s, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {

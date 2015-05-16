@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/tester"
 )
 
 // newTestingGateway returns a gateway read to use in a testing environment.
 func newTestingGateway(name string, t *testing.T) *Gateway {
-	g, err := New(":0", tester.TempDir("gateway", name))
+	g, err := New(":0", build.TempDir("gateway", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,11 +63,11 @@ func TestNew(t *testing.T) {
 	if _, err := New(":0", ""); err == nil {
 		t.Fatal("expecting saveDir error, got nil")
 	}
-	if g, err := New("foo", tester.TempDir("gateway", "TestNew1")); err == nil {
+	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
 		t.Fatal("expecting listener error, got nil", g.myAddr)
 	}
 	// create corrupted peers.dat
-	dir := tester.TempDir("gateway", "TestNew2")
+	dir := build.TempDir("gateway", "TestNew2")
 	os.MkdirAll(dir, 0700)
 	err := ioutil.WriteFile(filepath.Join(dir, "nodes.dat"), []byte{1, 2, 3}, 0660)
 	if err != nil {

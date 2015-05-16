@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -43,7 +43,7 @@ func TestUploadAndDownload(t *testing.T) {
 	}
 
 	// Try to download the file.
-	downloadName := tester.TempDir("api", "TestUploadAndDownload", "downloadTestData")
+	downloadName := build.TempDir("api", "TestUploadAndDownload", "downloadTestData")
 	st.callAPI("/renter/download?nickname=first&destination=" + downloadName)
 	time.Sleep(time.Second * 2)
 

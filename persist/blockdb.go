@@ -1,6 +1,6 @@
-// Package blockdb provides read/write access to an on-disk block database.
+// Package blockdb provides read/write access to an on-disk block database
 // blockdb uses Bolt as its underlying database, but this is subject to change.
-package blockdb
+package persist
 
 import (
 	"errors"
@@ -72,10 +72,10 @@ func (db *boltDB) Height() (types.BlockHeight, error) {
 	return height, err
 }
 
-// Open returns a database ready for use. If the database file does not exist,
-// it will be created. Only one view of a given database file should be open at
-// any one time.
-func Open(filename string) (DB, error) {
+// OpenDB returns a database ready for use. If the database file does not
+// exist, it will be created. Only one view of a given database file should be
+// open at any one time.
+func OpenDB(filename string) (DB, error) {
 	db, err := bolt.Open(filename, 0600, nil)
 	if err != nil {
 		return nil, err

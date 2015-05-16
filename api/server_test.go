@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -15,7 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter"
-	"github.com/NebulousLabs/Sia/modules/tester"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -75,7 +75,7 @@ func (st *serverTester) tpUpdateWait() {
 // including money in the wallet and all modules initalized.
 func newServerTester(name string, t *testing.T) *serverTester {
 	// Create the testing directory and assign the api port.
-	testdir := tester.TempDir("api", name)
+	testdir := build.TempDir("api", name)
 	APIAddr := ":" + strconv.Itoa(APIPort)
 	APIPort++
 

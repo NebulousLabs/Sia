@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/Sia/modules/tester"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // TestStartDaemon probes the startDaemon function.
 func TestStartDaemon(t *testing.T) {
-	testDir := tester.TempDir("siad", "TestStartDaemon")
+	testDir := build.TempDir("siad", "TestStartDaemon")
 	config.Siad.NoBootstrap = false
 	config.Siad.APIaddr = "localhost:45170"
 	config.Siad.RPCaddr = ":45171"

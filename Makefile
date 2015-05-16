@@ -35,16 +35,14 @@ install: fmt REBUILD
 	go install -tags='dev debug' ./...
 
 # release builds and installs release binaries.
-release: dependencies test-long REBUILD
-	go install -a ./...
-release-fast: REBUILD
+release: REBUILD
 	go install -a ./...
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
 	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.1          \
-		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md          \
+		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
 		-main-dirs-exclude=siag	-tasks-=deb,deb-dev,deb-source,go-test
 
 # clean removes all directories that get automatically created during
@@ -52,47 +50,23 @@ xc: dependencies test test-long REBUILD
 clean:
 	rm -rf release doc/whitepaper.aux doc/whitepaper.log doc/whitepaper.pdf
 
-# test runs the short tests for Sia, and aims to always take less than 2
-# seconds.
+# 3 commands and a variable are available for testing Sia packages. 'pkgs'
+# indicates which packages should be tested, and defaults to all the packages
+# with test files. Using './...' as default breaks compatibility with the cover
+# command. 'test' runs short tests that should last no more than a few seconds,
+# 'test-long' runs more thorough tests which should not last more than a few
+# minutes.
+pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus            \
+	./modules/gateway ./modules/host ./modules/hostdb ./modules/miner           \
+	./modules/renter ./modules/transactionpool ./modules/wallet ./siad ./siag   \
+	./types
 test: clean fmt REBUILD
-	go test -short -tags='debug testing' -timeout=1s ./...
-
-# test-long does a forced rebuild of all packages, and then runs all tests
-# with the race libraries enabled. test-long aims to be
-# thorough.
+	go test -short -tags='debug testing' -timeout=1s $(pkgs)
 test-long: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=180s ./...
-
-# Testing for each package individually. Packages are added to this set as needed.
-test-api: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=65s ./api
-test-consensus: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=35s ./modules/consensus
-test-gateway: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=35s ./modules/gateway
-test-host: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=5s ./modules/host
-test-renter: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=5s ./modules/renter
-test-siad: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=15s ./siad
-test-siag: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=35s ./siag
-test-tpool: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=5s ./modules/transactionpool
-test-wallet: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=5s ./modules/wallet
-test-types: clean fmt REBUILD
-	go test -v -race -tags='testing debug' -timeout=5s ./types
-
-# cover runs the long tests and creats html files that show you which lines
-# have been hit during testing and how many times each line has been hit.
-coverpackages = api compatibility crypto encoding modules/consensus           \
-	modules/gateway modules/host modules/hostdb modules/miner modules/renter  \
-	modules/transactionpool modules/wallet siad siag types
+	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
-	@for package in $(coverpackages); do \
+	@for package in $(pkgs); do \
 		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
 		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
 		rm cover/$$package.out ; \
@@ -104,4 +78,4 @@ whitepaper:
 	@pdflatex -output-directory=doc whitepaper.tex > /dev/null
 	pdflatex -output-directory=doc whitepaper.tex
 
-.PHONY: all fmt install clean test test-long cover whitepaper dependencies release xc REBUILD
+.PHONY: all dependencies fmt REBUILD install release xc clean test test-long cover whitepaper
