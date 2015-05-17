@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	ErrNoData    = errors.New("no data")
-	ErrBadPrefix = errors.New("could not read full length prefix")
+	errNoData    = errors.New("no data")
+	errBadPrefix = errors.New("could not read full length prefix")
 )
 
 // ReadPrefix reads an 8-byte length prefixes, followed by the number of bytes
@@ -17,9 +17,9 @@ var (
 func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 	prefix := make([]byte, 8)
 	if n, err := io.ReadFull(r, prefix); n == 0 {
-		return nil, ErrNoData
+		return nil, errNoData
 	} else if err != nil {
-		return nil, ErrBadPrefix
+		return nil, errBadPrefix
 	}
 	dataLen := DecUint64(prefix)
 	if dataLen > maxLen {

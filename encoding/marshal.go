@@ -61,7 +61,7 @@ type Encoder struct {
 }
 
 var (
-	ErrBadPointer = errors.New("cannot decode into invalid pointer")
+	errBadPointer = errors.New("cannot decode into invalid pointer")
 )
 
 // Encode writes the encoding of v to the stream. For encoding details, see
@@ -79,6 +79,8 @@ func (e *Encoder) write(p []byte) error {
 	return err
 }
 
+// Encode writes the encoding of val to the stream. For encoding details, see
+// the package docstring.
 func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
@@ -187,7 +189,7 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 	// v must be a pointer
 	pval := reflect.ValueOf(v)
 	if pval.Kind() != reflect.Ptr || pval.IsNil() {
-		return ErrBadPointer
+		return errBadPointer
 	}
 
 	// catch decoding panics and convert them to errors
@@ -202,6 +204,7 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 	return
 }
 
+// readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
 	b := make([]byte, n)
 	_, err := io.ReadFull(d.r, b)
@@ -211,6 +214,7 @@ func (d *Decoder) readN(n int) []byte {
 	return b
 }
 
+// readPrefix reads a length-prefixed byte slice and panics if the read fails.
 func (d *Decoder) readPrefix() []byte {
 	// TODO: what should maxlen be?
 	b, err := ReadPrefix(d.r, 1<<32)
@@ -220,6 +224,9 @@ func (d *Decoder) readPrefix() []byte {
 	return b
 }
 
+// decode reads the next encoded value from its input stream and stores it in
+// val. The decoding rules are the inverse of those specified in the package
+// docstring.
 func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {

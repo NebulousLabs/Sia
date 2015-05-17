@@ -38,22 +38,22 @@ func TestReadPrefix(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	_, err = ReadPrefix(b, 3)
-	if err != ErrNoData {
-		t.Error("expected ErrNoData, got", err)
+	if err != errNoData {
+		t.Error("expected errNoData, got", err)
 	}
 
 	// less than 8 bytes
 	b.Write([]byte{1, 2, 3})
 	_, err = ReadPrefix(b, 3)
-	if err != ErrBadPrefix {
-		t.Error("expected ErrBadPrefix, got", err)
+	if err != errBadPrefix {
+		t.Error("expected errBadPrefix, got", err)
 	}
 
 	// exceed maxLen
 	b.Write(EncUint64(4))
 	_, err = ReadPrefix(b, 3)
 	if err == nil {
-		t.Error("expected ErrBadPrefix, got nil")
+		t.Error("expected errBadPrefix, got nil")
 	} else if err.Error() != "length 4 exceeds maxLen of 3" {
 		t.Error("expected maxLen error, got", err)
 	}
@@ -83,8 +83,8 @@ func TestReadObject(t *testing.T) {
 	// empty
 	b.Write([]byte{})
 	err = ReadObject(b, &obj, 0)
-	if err != ErrNoData {
-		t.Error("expected ErrNoData, got", err)
+	if err != errNoData {
+		t.Error("expected errNoData, got", err)
 	}
 
 	// bad object
@@ -93,8 +93,8 @@ func TestReadObject(t *testing.T) {
 	err = ReadObject(b, &obj, 3)
 	if err == nil {
 		t.Error("expected err, got nil")
-	} else if err.Error() != "could not decode type string: "+ErrBadPrefix.Error() {
-		t.Error("expected ErrBadPrefix, got", err)
+	} else if err.Error() != "could not decode type string: "+errBadPrefix.Error() {
+		t.Error("expected errBadPrefix, got", err)
 	}
 }
 
@@ -107,7 +107,7 @@ func TestWritePrefix(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if bytes.Compare(b.Bytes(), expected) != 0 {
-		t.Error("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
+		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
 	// badWriter (returns nil error, but doesn't write anything)
@@ -127,7 +127,7 @@ func TestWriteObject(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if bytes.Compare(b.Bytes(), expected) != 0 {
-		t.Error("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
+		t.Errorf("WritePrefix wrote wrong data: expected %v, got %v", b.Bytes(), expected)
 	}
 
 	// badWriter

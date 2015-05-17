@@ -127,8 +127,8 @@ func TestDecode(t *testing.T) {
 
 	// non-pointer
 	err = Unmarshal([]byte{1, 2, 3}, "foo")
-	if err != ErrBadPointer {
-		t.Error("expected ErrBadPointer, got", err)
+	if err != errBadPointer {
+		t.Error("expected errBadPointer, got", err)
 	}
 
 	// unknown type
@@ -186,7 +186,7 @@ func TestMarshalAll(t *testing.T) {
 
 	expected := MarshalAll(testStructs...)
 	if bytes.Compare(b, expected) != 0 {
-		t.Error("expected %v, got %v", expected, b)
+		t.Errorf("expected %v, got %v", expected, b)
 	}
 }
 
