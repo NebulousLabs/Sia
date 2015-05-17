@@ -192,12 +192,12 @@ func TestMarshalAll(t *testing.T) {
 
 func TestReadWriteFile(t *testing.T) {
 	// standard
-	path := build.TempDir("TestReadWriteFile")
+	os.MkdirAll(build.TempDir("encoding"), 0777)
+	path := build.TempDir("encoding", "TestReadWriteFile")
 	err := WriteFile(path, testStructs[3])
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(path)
 
 	var obj test4
 	err = ReadFile(path, &obj)
