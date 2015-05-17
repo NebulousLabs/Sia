@@ -20,9 +20,9 @@
 				</div>
 				<div class='col-md-9'>
 					<div class='header-links'>
-						<span class='item'><a href="/">Home</a></span>
-						<span class='item'><a href="/about.html">About</a></span>
-						<span class='item'><a href="/sia.pdf">Whitepaper</a></span>
+						<span class='item'><a href="index.html">Home</a></span>
+						<span class='item'><a href="about.html">About</a></span>
+						<span class='item'><a href="sia.pdf">Whitepaper</a></span>
 						<span class='item'><a href="http://github.com/NebulousLabs/Sia">GitHub</a></span>
 					</div>
 				</div>
@@ -40,7 +40,13 @@
 						<div>
 							<b>What are Sianotes?</b>
 							<br>
-							Sianotes are a temporary asset that are convertible to Siafunds upon the completion and launch of Sia.
+							Sianotes are a temporary asset that are convertible to Siafunds.
+							The deadline for conversion is June 1st, 2015.
+							One sianote converts to one siafund.
+							<a href="siafunds.html">More&nbsp;about&nbsp;Siafunds&nbsp;→</a>
+							<br><br>
+							<b>Where can I get Sianotes?</b>
+							<br>
 							Sianotes are available on the Nxt Asset Exchange, and must be purchased at the market price using Nxt.
 							<br><br>
 							Download an Nxt Client: <a href="http://nxtclient.org">nxtclient.org</a>
@@ -51,19 +57,7 @@
 							<br>
 							Nxt AE Tutorial: <a href="http://wiki.nxtcrypto.org/wiki/Asset_Exchange">wiki.nxtcrypto.org/wiki/Asset_Exchange</a>
 							<br><br>
-							<b>What are Siafunds?</b>
-							<br>
-							Sia has two different currencies.
-							The first is Siacoin, which is what must be used for storage contracts.
-							Most transcations will be in Siacoin.
-							The second is Siafunding.
-							Every time that someone spends coins on a storage contract, everyone holding siafunds will get a small fee.
-							Siafunds are therefore a source of income for the owners.
-							There are, and always will be, exactly 10,000 siafunds.
-							Each siafund gets 0.000039% of all coins spent on storage contracts, which means every storage contract has a 3.9% total fee.
-							Simple monetary transactions do not have fees, only storage contracts have fees.
-							<br><br>
-							<b>I have Sianotes. How can I redeem my Siafunds?</b>
+							<b>How can I redeem my Sianotes?</b>
 							<br>
 							Siafunds will be distributed to their owners in the genesis block.
 							If you have Sianotes, you can convert each Sianote into a Siafund.
@@ -77,32 +71,69 @@
 							</ul>
 							Once you have an address, send your Sianotes on Nxt to our original address <b>NXT-K5ZJ-NNR2-4J4B-D92UF</b>
 							Include a message that says 'I am redeeming my Sianotes, my Sia address is: [address].'
-							When the Sia network launches, your Siafunds will be at that address and will automatically start collecting fees.
+							When the Sia network launches, you will have Siafunds at the address provided.
+							The deadline for redemption is June 1st, 2015.
+							The network launches on June 7th, 2015.
 							<br><br>
-							<b>Why is there a fee on host income?</b>
-							<br>
-							Sia is first and foremost a business, and this fee is our source of income.
-							Unlike other cryptocurrency businesses, Sia does not get profits through premining the primary currency.
-							Instead, we take fees from the network that go directly to the owners of Siafunds.
-							This serves multiple purposes.
-							The first is that initially, there was no money to fund developers.
-							By selling Siafunds, we were able to raise enough money to work on Sia full time.
-							The second reason is that it gives us a huge income to have a large development force behind Sia.
-							By giving the Sia team a huge development fund, we will be able to stay cutting edge and be aggressive with our development and marketing.
-							Sia's goal is to replace all centralized cloud storage, and that's going to take a lot of money.
-							By taking a non-crippling fee (3.9%), we can fund dozens or potentially hundreds of full time developers and have a marketing budget.
-							We fully intend to use Sia as an enterprise product, the same way that Amazon uses S3 as an enterprise product.
+							<b>What does the current Siafund database look like?</b>
 							<br><br>
-							<b>Legal Disclaimer:</b>
+							<p style="font-family: 'Courier New'">
+							7d0c44f7664e2d34e53efde0661a6f628ec9264785ae8e3cd7c973e8d190c3c9: 8780<br>
+							0439e5bc7f14ccf5d3a7e882d040923e45625166dd077b64466bc771791ac6fc: 2<br>
+							2c6aef338a66f213ccc5f8b2db7a98fb13143420af20049c4921a3a5deb8d9da: 8<br>
+							33979254c7073b596face3c83e37a5fdeeba1c912f89c80f46c7bb7df368b3f0: 1<br>
+							38db03321c03a65f8da3ca233cc7db0a97b0e461b085bd21d3ca53c51fd0fec1: 50<br>
+							44be8c5760e89620a1b1cc41e4df57d9865a1938332d486b810c1dca0607320d: 75<br>
+							450ec9c85a49f52d9a5ea113c7f1cb380d3f05dc79f5f734c2b5fc4c82067224: 10<br>
+							4880fdcfa930011aedcda966c4e02aba5f973be2cb88fbdfa526586e2fd579e0: 10<br>
+							57ef537d980e1316cb882ec0cb57e0be4dec7d128edf92461017fc1364455b6f: 121<br>
+							723a932c404548b841b2d55e9d2c586a5c1f91c1d7c8d7e9637424c5a0464f99: 3<br>
+							7b6ae565dcfc32cb26b78598faa7d29bfc66961dbb03b2350b918f21a673fa28: 1<br>
+							7c65cfaf3277cf1a3e0ff78d96ae49f7ee1c4dffde68a6f47056e350d72d458f: 5<br>
+							8689c6ac60362d0a64805be1e2868f6c1f46bbe436d446e5953940a6997beeb4: 25<br>
+							9b4f591c4547efc6f602c6fe5c3bc0cde59824ba6e7ae9dd4c8f03ee59e7c017: 58<br>
+							ce3a7294833157c55612d81a3e4f98af210484a06ce735c8304c7d5e9c552082: 23<br>
+							c867877ec502cb3ff106f5c3dc661b4ae8f9c956cf22331ab497886c70388448: 80<br>
+							a35e33dc0e9053703e0a00ada1ead3b0ba5409bdfa6f21e77257644b48d90b1a: 75<br>
+							ad788068ba56978cbf17e7c14df5f368c4379bf36f0f548b94bbad2f68458d27: 90<br>
+							f132e5d3422073f17557b4ef4cf60e8169b5996969cbe5ed1782c1aa64c92647: 1<br>
+							Unclaimed: 582<br>
+							Total: 10,000
+							</p>
 							<br>
-							Sianotes have no cash value and are not redeemable for cash.
-							Siafunds have no cash value as are not redeemable for cash.
-							Sianotes do not represent corporate equity.
-							Siafunds are not corporate equity.
-							Sianotes may not be redeemed until the 1.0 launch of Sia.
-							Sianotes may not be redeemed on any alpha networks, beta network, or test networks.
-							Sia is a product of Nebulous Incorporated.
-							The network fee structure is subject to change, however 1 Sianote converts to 0.00039% of host income from renting storage.
+							<b>FAQ:</b>
+							<br><br>
+							<b>Q:</b> What does a sia address look like?
+							<br>
+							<b>A:</b> A sia address is 64 hexadecimal characters.
+							An example: <i>fbe93b8cdb8ce2496cf1dec11bd9d2ee82b4626a5c8088ecd5c9fe91ac1c3bdd</i>
+							<br><br>
+							<b>Q:</b> Do I need to keep the address?
+							<br>
+							<b>A:</b> You need to keep the key files, typically of the form 'SiafundAddress_KeyN.siakey'.
+							The address can be generated from this keyfile.
+							<br><br>
+							<b>Q:</b> Does the message I send on nxt need to follow an exact format?
+							<br>
+							<b>A:</b> No, we are manually checking all of the messages that we receive.
+							It is okay if you deviate from the format slightly.
+							<br><br>
+							<b>Q:</b> Does my message need to be encrypted?
+							<br>
+							<b>A:</b> Encryption helps your privacy, and it is preferred that you encrypt the message.
+							Encryption is not mandatory however.
+							All that matters is that we can read the message.
+							<br><br>
+							<b>Q:</b> Who owns 8780 siafunds?
+							<br>
+							<b>A:</b> Nebulous, the parent company of Sia development.
+							<br><br>
+							<b>Q:</b> What will happen to the unclaimed siafunds?
+							<br>
+							<b>A:</b> Any siafunds not claimed by June 1st become property of Nebulous, and will join the other 8780.
+							This is a hard deadline for legal reasons.
+							We will most likely honor any late redemptions of sianotes, however we have no legal obligation to do so.
+							<br><br>
 						</div>
 					</div>
 				</div>
@@ -115,9 +146,9 @@
 				<div class='footer'>
 					<div class='copyright'>&copy; Nebulous Inc.</div>
 					<div class='footer-links'>
-						<span class='link'><a href="/">Home</a></span>
-						<span class='link'><a href="/about.html">About</a></span>
-						<span class='link'><a href="/sia.pdf">Whitepaper</a></span>
+						<span class='link'><a href="index.html">Home</a></span>
+						<span class='link'><a href="about.html">About</a></span>
+						<span class='link'><a href="sia.pdf">Whitepaper</a></span>
 						<span class='link'><a href="http://github.com/NebulousLabs/Sia">GitHub</a></span>
 					</div>
 				</div>
