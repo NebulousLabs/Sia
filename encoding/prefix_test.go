@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+// badReader/Writer used to test error handling
+
+type badReader struct{}
+
+func (br *badReader) Read([]byte) (int, error) { return 0, io.EOF }
+
+type badWriter struct{}
+
+func (bw *badWriter) Write([]byte) (int, error) { return 0, nil }
+
 func TestReadPrefix(t *testing.T) {
 	b := new(bytes.Buffer)
 
@@ -88,10 +98,6 @@ func TestReadObject(t *testing.T) {
 	}
 }
 
-type badWriter struct{}
-
-func (bw *badWriter) Write([]byte) (int, error) { return 0, nil }
-
 func TestWritePrefix(t *testing.T) {
 	b := new(bytes.Buffer)
 
@@ -132,8 +138,7 @@ func TestWriteObject(t *testing.T) {
 	}
 }
 
-// feed writers into readers
-func TestReadWrite(t *testing.T) {
+func TestReadWritePrefix(t *testing.T) {
 	b := new(bytes.Buffer)
 
 	// WritePrefix -> ReadPrefix
