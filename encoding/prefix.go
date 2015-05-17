@@ -11,23 +11,6 @@ var (
 	ErrBadPrefix = errors.New("could not read full length prefix")
 )
 
-type (
-	// A Reader can decode an object from its input. maxLen specifies the
-	// maximum length of the object being decoded.
-	Reader interface {
-		ReadObject(obj interface{}, maxLen uint64) error
-	}
-	// A Writer can encode objects to its output.
-	Writer interface {
-		WriteObject(obj interface{}) error
-	}
-	// A ReadWriter can both read and write objects.
-	ReadWriter interface {
-		Reader
-		Writer
-	}
-)
-
 // ReadPrefix reads an 8-byte length prefixes, followed by the number of bytes
 // specified in the prefix. The operation is aborted if the prefix exceeds a
 // specified maximum length.
