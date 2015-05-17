@@ -7,7 +7,6 @@ package types
 
 import (
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/encoding"
 )
 
 type (
@@ -123,7 +122,7 @@ var (
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() crypto.Hash {
-	tBytes := encoding.MarshalAll(
+	return crypto.HashAll(
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
@@ -134,8 +133,6 @@ func (t Transaction) ID() crypto.Hash {
 		t.MinerFees,
 		t.ArbitraryData,
 	)
-
-	return crypto.HashBytes(tBytes)
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
