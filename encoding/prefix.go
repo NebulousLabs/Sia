@@ -7,24 +7,8 @@ import (
 )
 
 var (
-	ErrNoData = errors.New("no data")
-)
-
-type (
-	// A Reader can decode an object from its input. maxLen specifies the
-	// maximum length of the object being decoded.
-	Reader interface {
-		ReadObject(obj interface{}, maxLen uint64) error
-	}
-	// A Writer can encode objects to its output.
-	Writer interface {
-		WriteObject(obj interface{}) error
-	}
-	// A ReadWriter can both read and write objects.
-	ReadWriter interface {
-		Reader
-		Writer
-	}
+	errNoData    = errors.New("no data")
+	errBadPrefix = errors.New("could not read full length prefix")
 )
 
 // ReadPrefix reads an 8-byte length prefixes, followed by the number of bytes
@@ -33,9 +17,9 @@ type (
 func ReadPrefix(r io.Reader, maxLen uint64) ([]byte, error) {
 	prefix := make([]byte, 8)
 	if n, err := io.ReadFull(r, prefix); n == 0 {
-		return nil, ErrNoData
+		return nil, errNoData
 	} else if err != nil {
-		return nil, errors.New("could not read full length prefix")
+		return nil, errBadPrefix
 	}
 	dataLen := DecUint64(prefix)
 	if dataLen > maxLen {

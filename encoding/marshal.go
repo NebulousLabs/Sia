@@ -60,20 +60,31 @@ type Encoder struct {
 	w io.Writer
 }
 
+var (
+	errBadPointer = errors.New("cannot decode into invalid pointer")
+)
+
 // Encode writes the encoding of v to the stream. For encoding details, see
 // the package docstring.
 func (e *Encoder) Encode(v interface{}) error {
 	return e.encode(reflect.ValueOf(v))
 }
 
+// write catches instances where short writes do not return an error.
+func (e *Encoder) write(p []byte) error {
+	n, err := e.w.Write(p)
+	if n != len(p) {
+		return io.ErrShortWrite
+	}
+	return err
+}
+
+// Encode writes the encoding of val to the stream. For encoding details, see
+// the package docstring.
 func (e *Encoder) encode(val reflect.Value) error {
 	// check for MarshalSia interface first
 	if m, ok := val.Interface().(SiaMarshaler); ok {
 		return WritePrefix(e.w, m.MarshalSia())
-	} else if val.CanAddr() {
-		if m, ok := val.Addr().Interface().(SiaMarshaler); ok {
-			return WritePrefix(e.w, m.MarshalSia())
-		}
 	}
 
 	switch val.Kind() {
@@ -87,23 +98,19 @@ func (e *Encoder) encode(val reflect.Value) error {
 		}
 	case reflect.Bool:
 		if val.Bool() {
-			_, err := e.w.Write([]byte{1})
-			return err
+			return e.write([]byte{1})
 		} else {
-			_, err := e.w.Write([]byte{0})
-			return err
+			return e.write([]byte{0})
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		_, err := e.w.Write(EncInt64(val.Int()))
-		return err
+		return e.write(EncInt64(val.Int()))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		_, err := e.w.Write(EncUint64(val.Uint()))
-		return err
+		return e.write(EncUint64(val.Uint()))
 	case reflect.String:
 		return WritePrefix(e.w, []byte(val.String()))
 	case reflect.Slice:
 		// slices are variable length, so prepend the length and then fallthrough to array logic
-		if _, err := e.w.Write(EncUint64(uint64(val.Len()))); err != nil {
+		if err := e.write(EncUint64(uint64(val.Len()))); err != nil {
 			return err
 		}
 		fallthrough
@@ -114,8 +121,7 @@ func (e *Encoder) encode(val reflect.Value) error {
 			// can't just use Slice() because array may be unaddressable
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
-			_, err := e.w.Write(slice.Bytes())
-			return err
+			return e.write(slice.Bytes())
 		}
 		// normal slices/arrays are encoded by sequentially encoding their elements
 		for i := 0; i < val.Len(); i++ {
@@ -144,6 +150,7 @@ func NewEncoder(w io.Writer) *Encoder {
 
 // Marshal returns the encoding of v. For encoding details, see the package
 // docstring.
+// TODO: merge with MarshalAll?
 func Marshal(v interface{}) []byte {
 	b := new(bytes.Buffer)
 	NewEncoder(b).Encode(v) // no error possible when using a bytes.Buffer
@@ -182,7 +189,7 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 	// v must be a pointer
 	pval := reflect.ValueOf(v)
 	if pval.Kind() != reflect.Ptr || pval.IsNil() {
-		return errors.New("must pass a valid pointer to Decode")
+		return errBadPointer
 	}
 
 	// catch decoding panics and convert them to errors
@@ -197,6 +204,7 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 	return
 }
 
+// readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
 	b := make([]byte, n)
 	_, err := io.ReadFull(d.r, b)
@@ -206,6 +214,7 @@ func (d *Decoder) readN(n int) []byte {
 	return b
 }
 
+// readPrefix reads a length-prefixed byte slice and panics if the read fails.
 func (d *Decoder) readPrefix() []byte {
 	// TODO: what should maxlen be?
 	b, err := ReadPrefix(d.r, 1<<32)
@@ -215,6 +224,9 @@ func (d *Decoder) readPrefix() []byte {
 	return b
 }
 
+// decode reads the next encoded value from its input stream and stores it in
+// val. The decoding rules are the inverse of those specified in the package
+// docstring.
 func (d *Decoder) decode(val reflect.Value) {
 	// check for UnmarshalSia interface first
 	if val.CanAddr() {
