@@ -1,11 +1,11 @@
 package gateway
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
@@ -14,12 +14,20 @@ func (g *Gateway) save() error {
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	return encoding.WriteFile(filepath.Join(g.saveDir, "nodes.dat"), nodes)
+	file, err := os.Create(filepath.Join(g.saveDir, "nodes.json"))
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(file).Encode(nodes)
 }
 
 func (g *Gateway) load() error {
+	file, err := os.Open(filepath.Join(g.saveDir, "nodes.json"))
+	if err != nil {
+		return err
+	}
 	var nodes []modules.NetAddress
-	err := encoding.ReadFile(filepath.Join(g.saveDir, "nodes.dat"), &nodes)
+	err = json.NewDecoder(file).Decode(&nodes)
 	if err != nil {
 		return err
 	}
