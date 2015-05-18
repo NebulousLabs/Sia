@@ -39,6 +39,7 @@ body {
 
 .content-title{
 	font-size:48px;
+	margin-bottom:30px;
 	padding-left:100px;
 	padding-right:100px;
 	padding-top:40px;
@@ -48,10 +49,11 @@ body {
 
 .content-subtext{
 	font-size:31px;
-	margin-bottom:30px;
 	padding-left:100px;
 	padding-right:100px;
 	text-align:center;
+	position: relative;
+	top: -30px;
 }
 
 .content{
