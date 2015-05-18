@@ -14,11 +14,16 @@ func (g *Gateway) save() error {
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
+	data, err := json.MarshalIndent(nodes, "", "\t")
+	if err != nil {
+		return err
+	}
 	file, err := os.Create(filepath.Join(g.saveDir, "nodes.json"))
 	if err != nil {
 		return err
 	}
-	return json.NewEncoder(file).Encode(nodes)
+	_, err = file.Write(data)
+	return err
 }
 
 func (g *Gateway) load() error {
