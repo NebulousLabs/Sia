@@ -39,11 +39,18 @@ body {
 
 .content-title{
 	font-size:48px;
-	margin-bottom:40px;
 	padding-left:100px;
 	padding-right:100px;
 	padding-top:40px;
 	border-top:1px solid #E0E0E0;
+	text-align:center;
+}
+
+.content-subtext{
+	font-size:31px;
+	margin-bottom:30px;
+	padding-left:100px;
+	padding-right:100px;
 	text-align:center;
 }
 
@@ -70,9 +77,6 @@ body {
 
 .extra-stuff .download-links{
 	padding:30px;
-}
-
-.extra-stuff .link{
 }
 
 .footer{
