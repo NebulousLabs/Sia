@@ -7,19 +7,6 @@ body {
 	color: #616161;
 }
 
-/*
-@g50:#FAFAFA;
-@g100:#F5F5F5;
-@g200:#EEEEEE;
-@g300:#E0E0E0;
-@g400:#BDBDBD;
-@g500:#9E9E9E;
-@g600:#757575;
-@g700:#616161;
-@g800:#424242;
-@g900:#212121;
-*/
-
 .page{
 	background-color:#fff;
 	box-shadow:0px 0px 8px rgba(0,0,0,.5);

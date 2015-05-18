@@ -1,0 +1,12 @@
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  src: local('Roboto Light'), local('Roboto-Light'), url(../assets/roboto/roboto-light.woff2) format('woff2'), url(../assets/roboto/roboto-light.woff) format('woff');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Roboto'), local('Roboto-Regular'), url(../assets/roboto/roboto-regular.woff2) format('woff2'), url(../assets/roboto/roboto-regular.woff) format('woff');
+}
