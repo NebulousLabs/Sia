@@ -44,7 +44,7 @@ func TestListen(t *testing.T) {
 		t.Fatal("gateway should have given ack")
 	}
 
-	// g should add foo
+	// g should add the peer
 	var ok bool
 	for !ok {
 		id := g.mu.RLock()
@@ -54,7 +54,7 @@ func TestListen(t *testing.T) {
 
 	conn.Close()
 
-	// g should remove foo
+	// g should remove the peer
 	for ok {
 		id := g.mu.RLock()
 		_, ok = g.peers[addr]
@@ -81,7 +81,7 @@ func TestConnect(t *testing.T) {
 	defer bootstrap.Close()
 
 	// give it a node
-	bootstrap.addNode("foo")
+	bootstrap.addNode(dummyNode)
 
 	// create peer who will connect to bootstrap
 	g := newTestingGateway("TestConnect2", t)
@@ -96,9 +96,9 @@ func TestConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// g should not have foo
-	if g.removeNode("foo") == nil {
-		t.Fatal("bootstrapper should not have received foo:", g.nodes)
+	// g should not have the node
+	if g.removeNode(dummyNode) == nil {
+		t.Fatal("bootstrapper should not have received dummyNode:", g.nodes)
 	}
 
 	// split 'em up
@@ -111,11 +111,11 @@ func TestConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// g should have foo
+	// g should have the node
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
-	if _, ok := g.nodes["foo"]; !ok {
-		t.Fatal("bootstrapper should have received foo:", g.nodes)
+	if _, ok := g.nodes[dummyNode]; !ok {
+		t.Fatal("bootstrapper should have received dummyNode:", g.nodes)
 	}
 }
 
@@ -176,7 +176,7 @@ func TestMakeOutboundConnections(t *testing.T) {
 	g2 := newTestingGateway("TestMakeOutboundConnections2", t)
 	defer g2.Close()
 	id = g1.mu.Lock()
-	g1.addNode(g2.Address())
+	g1.nodes[g2.Address()] = struct{}{} // manual insertion to bypass addNode
 	g1.mu.Unlock(id)
 
 	// when makeOutboundConnections wakes up, it should connect to g2.

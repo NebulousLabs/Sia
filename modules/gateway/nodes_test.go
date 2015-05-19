@@ -9,16 +9,24 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
+const dummyNode = "111.111.111.111:1111"
+
 func TestAddNode(t *testing.T) {
 	g := newTestingGateway("TestAddNode", t)
 	defer g.Close()
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if err := g.addNode("foo"); err != nil {
+	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
+	if err := g.addNode(dummyNode); err == nil {
+		t.Error("addNode added duplicate node")
+	}
 	if err := g.addNode("foo"); err == nil {
-		t.Fatal("addNode added duplicate node")
+		t.Error("addNode added unroutable address")
+	}
+	if err := g.addNode("[::1]:9981"); err == nil {
+		t.Error("addNode added loopback address")
 	}
 }
 
@@ -27,10 +35,10 @@ func TestRemoveNode(t *testing.T) {
 	defer g.Close()
 	id := g.mu.Lock()
 	defer g.mu.Unlock(id)
-	if err := g.addNode("foo"); err != nil {
+	if err := g.addNode(dummyNode); err != nil {
 		t.Fatal("addNode failed:", err)
 	}
-	if err := g.removeNode("foo"); err != nil {
+	if err := g.removeNode(dummyNode); err != nil {
 		t.Fatal("removeNode failed:", err)
 	}
 	if err := g.removeNode("bar"); err == nil {
@@ -39,7 +47,7 @@ func TestRemoveNode(t *testing.T) {
 }
 
 func TestRandomNode(t *testing.T) {
-	g := newTestingGateway("TestRemoveNode", t)
+	g := newTestingGateway("TestRandomNode", t)
 	defer g.Close()
 	id := g.mu.RLock()
 
@@ -49,17 +57,16 @@ func TestRandomNode(t *testing.T) {
 		t.Fatal("randomNode returned wrong address:", addr)
 	}
 	g.mu.RUnlock(id)
-
+	g.removeNode(g.Address())
 	id = g.mu.Lock()
-	g.removeNode(g.myAddr)
 	if _, err := g.randomNode(); err != errNoPeers {
 		t.Fatalf("randomNode returned wrong error: expected %v, got %v", errNoPeers, err)
 	}
 
 	nodes := map[modules.NetAddress]int{
-		"foo": 0,
-		"bar": 0,
-		"baz": 0,
+		"111.111.111.111:1111": 0,
+		"111.111.111.111:2222": 0,
+		"111.111.111.111:3333": 0,
 	}
 	for addr := range nodes {
 		g.addNode(addr)
@@ -89,7 +96,7 @@ func TestShareNodes(t *testing.T) {
 	defer g2.Close()
 
 	// add a node to g2
-	g2.addNode("foo")
+	g2.addNode(dummyNode)
 
 	// connect
 	err := g1.Connect(g2.Address())
@@ -97,8 +104,8 @@ func TestShareNodes(t *testing.T) {
 		t.Fatal("couldn't connect:", err)
 	}
 
-	// g1 should have received foo
-	if g1.addNode("foo") == nil {
+	// g1 should have received the node
+	if g1.addNode(dummyNode) == nil {
 		t.Fatal("gateway did not receive nodes during Connect:", g1.nodes)
 	}
 
@@ -120,7 +127,7 @@ func TestShareNodes(t *testing.T) {
 
 	// sharing should be capped at maxSharedNodes
 	for i := 0; i < maxSharedNodes+10; i++ {
-		g2.addNode(modules.NetAddress("foo" + strconv.Itoa(i)))
+		g2.addNode(modules.NetAddress("111.111.111.111:" + strconv.Itoa(i)))
 	}
 	err = g1.RPC(g2.Address(), "ShareNodes", func(conn modules.PeerConn) error {
 		return encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength)
@@ -140,6 +147,10 @@ func TestRelayNodes(t *testing.T) {
 	defer g2.Close()
 	g3 := newTestingGateway("TestRelayNodes3", t)
 	defer g2.Close()
+
+	// overwrite g3's address with a non-loopback address;
+	// otherwise it will be rejected
+	g3.myAddr = dummyNode
 
 	// connect g2 to g1
 	err := g2.Connect(g1.Address())

@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"math/rand"
+	"net"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -18,6 +19,10 @@ const (
 func (g *Gateway) addNode(addr modules.NetAddress) error {
 	if _, exists := g.nodes[addr]; exists {
 		return errors.New("node already added")
+	} else if net.ParseIP(addr.Host()) == nil {
+		return errors.New("address is not routable: " + string(addr))
+	} else if net.ParseIP(addr.Host()).IsLoopback() {
+		return errors.New("cannot add loopback address")
 	}
 	g.nodes[addr] = struct{}{}
 	g.log.Println("INFO: added node", addr)
@@ -68,7 +73,7 @@ func (g *Gateway) requestNodes(conn modules.PeerConn) error {
 	if err := encoding.ReadObject(conn, &nodes, maxSharedNodes*maxAddrLength); err != nil {
 		return err
 	}
-	g.log.Printf("INFO: %v sent us %v peers", conn.RemoteAddr(), len(nodes))
+	g.log.Printf("INFO: %v sent us %v nodes", conn.RemoteAddr(), len(nodes))
 	id := g.mu.Lock()
 	for _, node := range nodes {
 		g.addNode(node)

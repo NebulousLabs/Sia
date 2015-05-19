@@ -17,6 +17,9 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Manually add myAddr as a node. This is necessary because g.addNode
+	// rejects loopback addresses.
+	g.nodes[g.myAddr] = struct{}{}
 	return g
 }
 
@@ -66,10 +69,10 @@ func TestNew(t *testing.T) {
 	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
 		t.Fatal("expecting listener error, got nil", g.myAddr)
 	}
-	// create corrupted peers.dat
+	// create corrupted nodes.json
 	dir := build.TempDir("gateway", "TestNew2")
 	os.MkdirAll(dir, 0700)
-	err := ioutil.WriteFile(filepath.Join(dir, "nodes.dat"), []byte{1, 2, 3}, 0660)
+	err := ioutil.WriteFile(filepath.Join(dir, "nodes.json"), []byte{1, 2, 3}, 0660)
 	if err != nil {
 		t.Fatal("couldn't create corrupted file:", err)
 	}
