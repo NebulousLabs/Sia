@@ -23,7 +23,7 @@ Cryptographic Algorithms
 ------------------------
 
 Sia uses cryptographic hashing and cryptographic signing, each of which has
-many potentially secure algorithms that can be used. We acknoledge our
+many potentially secure algorithms that can be used. We acknowledge our
 inexperience, and that we have chosen these algorithms not because of our own
 confidence in their properties, but because other people seem confident in
 their properties.
@@ -45,17 +45,11 @@ threshold signatures.
   apathetic Bitcoin miners mining on our blockchain, which may make soft forks
   harder to coordinate.
 
-  Alternative modes of blake2 have been considered, particularly blake2bp,
-  blake2sp, and and tree mode variants. At this time, we are uncertain about
-  all of the tradeoffs involved, and additionally uncertain about which
-  tradeoffs are worth making, therefore the typical default of blake2b has been
-  chosen.
-
 #### Signatures: variable type signatures
 
   Each public key will have an specifier (a 16 byte array) and a byte slice
   containing an encoding of the public key. The specifier will tell the
-  signature verification which signing algorithm to use when verifiying a
+  signature verification which signing algorithm to use when verifying a
   signature. Each signature will be a byte slice, the encoding can be
   determined by looking at the specifier of the corresponding public key.
 
@@ -131,7 +125,7 @@ size, though it must fit inside of the block.
 Block Timestamps
 ----------------
 
-Each block has a minimum allowed timestamp. The minumum timestamp is found by
+Each block has a minimum allowed timestamp. The minimum timestamp is found by
 taking the median timestamp of the previous 11 blocks. If there are not 11
 previous blocks, the genesis timestamp is used repeatedly.
 
@@ -366,7 +360,7 @@ value indicates the number of siafunds that are put into the output, and the
 unlock hash is the Merkle root of the unlock conditions object which allows the
 output to be spent.
 
-Siafund outputs also contain a claim unlock hash field, which indiactes the
+Siafund outputs also contain a claim unlock hash field, which indicates the
 unlock hash of the siacoin output that is created when the siafund output is
 spent. The value of the output that gets created will depend on the growth of
 the siacoin pool between the creation and the spending of the output. This
@@ -396,14 +390,14 @@ the transaction get included in the signature. There is a 'whole transaction'
 flag, which indicates that every part of the transaction except for the
 signatures gets included, which eliminates any malleability outside of the
 signatures. The signatures can also be individually included, to enforce that
-your signature is only valid if certain other sigantures are present.
+your signature is only valid if certain other signatures are present.
 
 If the 'whole transaction' is not set, all fields need to be added manually,
 and additional parties can add new fields, meaning the transaction will be
-malleable. This does however allow other parites to add additional inputs,
+malleable. This does however allow other parties to add additional inputs,
 fees, etc. after you have signed the transaction without invalidating your
 signature. If the whole transaction flag is set, all other elements in the
-covered fields object must be empty except for the siagnatures field.
+covered fields object must be empty except for the signatures field.
 
 The covered fields object contains a slice of indexes for each element of the
 transaction (siacoin inputs, miner fees, etc.). The slice must be sorted, and
@@ -411,7 +405,7 @@ there can be no repeated elements.
 
 Entirely nonmalleable transactions can be achieved by setting the 'whole
 transaction' flag and then providing the last signature, including every other
-signature in your signature. Because no frivilous signatures are allowed, the
+signature in your signature. Because no frivolous signatures are allowed, the
 transaction cannot be changed without your signature being invalidated.
 
 Consensus Set
@@ -419,7 +413,7 @@ Consensus Set
 
 The blockchain is used to achieve consensus around 3 objects. The first is
 unspent financial outputs. The second is unfulfilled storage contracts. The
-third is siafund ownership and claims. All transaction componenets have some
+third is siafund ownership and claims. All transaction components have some
 effect on this set of information.
 
 Genesis Set

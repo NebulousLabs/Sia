@@ -31,7 +31,7 @@ A discussion on this problem can be found [here](http://groups.google.com/forum/
 Developer Conventions
 =====================
 
-This file is meant to help a developer navagate the codebase and develop clean,
+This file is meant to help a developer navigate the codebase and develop clean,
 maintainable code. Knowing all of these conventions will also make it easier to
 read and code review the Sia project.
 
@@ -58,7 +58,7 @@ disruption to user experience or causes a security vulnerability.
 Documentation should give a sense of what each function does, but should also
 give a sense of the overall architecture of the code. Where useful, examples
 should be provided, and common pitfalls should be explained. Anything that
-breaks other coventions in any way needs to have a comment, even if it is
+breaks other conventions in any way needs to have a comment, even if it is
 obvious why the convention had to be broken.
 
 The goal of the codebase is to be accessible to newbies. Anything more advanced
@@ -69,7 +69,7 @@ over other potential choices.
 Naming
 ------
 
-Names are used to give readers and reviers a sense of what is happening in the
+Names are used to give readers and reviewers a sense of what is happening in the
 code. When naming variables, you should assume that the person reading your
 code is unfamiliar with the codebase. Short names (like 's' instead of 'state')
 should only be used when the context is immediately obvious. For example
@@ -185,7 +185,7 @@ if consensus.DEBUG {
 
 In the example, a panic is called for incorrect use of the function, but only
 in debug mode. This failure will be invisible in production code, but the code
-will have higher performace because the code should never fail anyway.
+will have higher performance because the code should never fail anyway.
 
 If the code is continually checking items that should be universally true,
 mistakes are easier to catch during testing, and side effects are less likely
