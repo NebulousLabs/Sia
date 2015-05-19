@@ -46,10 +46,10 @@
 							Sia specifically uses erasure coding, primarily Reed-Solomon coding, to add redundancy to the network.
 							Reed-Solomon coding is an M-of-N erasure code with optimal efficiency.
 							Out of N total copies of the data, only M are required to recover the data, and the overhead is N/M.
-							For example, on the Sia network we can have 60 total pieces of data, of which only 20 are required to recover the original, and the overhead is only 3.
+							For example, on the Sia network we can have 180 total pieces of data, of which only 60 are required to recover the original, and the overhead is only 3.
 							Using that scheme, even if half of the network goes offline simultaneously, the original data can still be recovered.
-							Once the original datat is recovered, the full redundancy of 60 pieces can be restored.
-							When the network is live, we will use statisical analysis to determine how much redundancy is required.
+							Once the original data is recovered, the full redundancy of 180 pieces can be restored.
+							When the network is live, we will use statistical analysis to determine how much redundancy is required to achieve satisfactory reliability.
 							We believe it very likely that the standard consumer will not need more than double redundancy.
 							<br><br>
 							All data on Sia is encrypted before being uploaded.
@@ -58,7 +58,7 @@
 							Twofish is used as the default encryption algorithm.
 							<br><br>
 							Hosts are kept honest by using contracts on a blockchain.
-							When a file is uploaded to a host, a contract is created that says "at time X, the host must have Y data."
+							When a file is uploaded to a host, a contract is created that says "at time X, the host must have data Y."
 							The host uses a Merkle tree based proof-of-storage to verify that the data is still available at time X.
 							Randomness from the blockchain is used to prevent the host from precalculating the proof.
 							If the host fails to construct the proof, the host does not get paid, and can even be made to face penalties.
@@ -74,9 +74,9 @@
 							It's difficult to know exactly where the Sia storage price will end up.
 							Nobody could have predicted that the price of Bitcoin hashing would drop so low - many orders of magnitude below what many people would have initially thought was possible.
 							Today, the standard consumer (non-bulk) price of hard drives is around $35/TB.
-							After redunancy, servers, and electricity, we expect the total cost of storage to be $100/TB, with the components lasting 18 months on average.
+							After redundancy, servers, and electricity, we expect the total cost of storage to be $100/TB, with the components lasting 18 months on average.
 							This results in a monthly cost of $6/TB.
-							The service provided by Sia is likely to be an improvement to the service provided by Amazon S3, which costs at best $27/TB/mo.
+							The service provided by Sia is likely to be an improvement upon the service provided by Amazon S3, which costs at best $27/TB/mo.
 							Under these calculations, Sia will be the absolutely dominant service in the cloud storage market.
 							These competitive advantages are only possible through the leverage of a vast distributed network.
 						</div>
