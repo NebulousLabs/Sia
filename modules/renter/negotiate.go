@@ -1,10 +1,8 @@
 package renter
 
 import (
-	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -74,22 +72,18 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		return
 	}
 
-	filePlain, err := os.Open(up.Filename)
+	file, err := os.Open(up.Filename)
 	if err != nil {
 		return
 	}
-	defer filePlain.Close()
-	plainBytes, err := ioutil.ReadAll(filePlain)
-	if err != nil {
-		return
-	}
-	cryptBytes, err := key.EncryptBytes(plainBytes)
-	if err != nil {
-		return
-	}
-	file := bytes.NewReader(cryptBytes)
+	defer file.Close()
 
-	filesize := uint64(file.Len())
+	info, err := file.Stat()
+	if err != nil {
+		return
+	}
+
+	filesize := uint64(info.Size())
 
 	// Get the price and payout.
 	sizeCurrency := types.NewCurrency64(filesize)
@@ -107,32 +101,14 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		WindowSize:    defaultWindowSize,
 		Price:         host.Price,
 		Collateral:    host.Collateral,
-	}
-	terms.ValidProofOutputs = []types.SiacoinOutput{
-		types.SiacoinOutput{
-			Value:      validOutputValue,
-			UnlockHash: host.UnlockHash,
-		},
-	}
-	terms.MissedProofOutputs = []types.SiacoinOutput{
-		types.SiacoinOutput{
-			Value:      payout,
-			UnlockHash: types.ZeroUnlockHash,
-		},
-	}
 
-	// Create the transaction holding the contract. This is done first so the
-	// transaction is created sooner, which will impact the user's wallet
-	// balance faster vs. waiting for the whole thing to upload before
-	// affecting the user's balance.
-	merkleRoot, err := crypto.ReaderMerkleRoot(file)
-	if err != nil {
-		return
-	}
-	file.Seek(0, 0) // reset read position
-	unsignedTxn, txnRef, err := r.createContractTransaction(terms, merkleRoot)
-	if err != nil {
-		return
+		ValidProofOutputs: []types.SiacoinOutput{
+			{Value: validOutputValue, UnlockHash: host.UnlockHash},
+		},
+
+		MissedProofOutputs: []types.SiacoinOutput{
+			{Value: payout, UnlockHash: types.ZeroUnlockHash},
+		},
 	}
 
 	// TODO: This is a hackish sleep, we need to be certain that all dependent
@@ -165,8 +141,23 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		return
 	}
 
-	// write file data
-	_, err = io.CopyN(conn, file, int64(filesize))
+	// Encrypt and transmit the file data while calculating its Merkle root.
+	tee := io.TeeReader(
+		// wrap file reader in encryption layer
+		key.NewReader(file),
+		// each byte we read from tee will also be written to conn
+		conn,
+	)
+	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
+	if err != nil {
+		return
+	}
+
+	// Create the transaction holding the contract. This is done first so the
+	// transaction is created sooner, which will impact the user's wallet
+	// balance faster vs. waiting for the whole thing to upload before
+	// affecting the user's balance.
+	unsignedTxn, txnRef, err := r.createContractTransaction(terms, merkleRoot)
 	if err != nil {
 		return
 	}

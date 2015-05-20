@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"sync/atomic"
@@ -86,10 +85,10 @@ func (d *Download) downloadPiece(piece filePiece) error {
 		return err
 	}
 
-	// Simultaneously download the file and calculate its Merkle root.
+	// Simultaneously download, decrypt, and calculate the Merkle root of the file.
 	tee := io.TeeReader(
 		// Use a LimitedReader to ensure we don't read indefinitely.
-		io.LimitReader(conn, int64(piece.Contract.FileSize)),
+		piece.EncryptionKey.NewReader(io.LimitReader(conn, int64(piece.Contract.FileSize))),
 		// Each byte we read from tee will also be written to file.
 		d,
 	)
@@ -113,18 +112,9 @@ func (d *Download) start() {
 		for _, piece := range d.pieces {
 			downloadErr := d.downloadPiece(piece)
 			if downloadErr == nil {
-				// Decrypt the file.
-				d.file.Seek(0, 0)
-				cryptBytes, err := ioutil.ReadAll(d.file)
-				if err == nil {
-					plaintext, _ := piece.EncryptionKey.DecryptBytes(cryptBytes)
-					d.file.Seek(0, 0)
-					d.file.Write(plaintext)
-					d.file.Truncate(int64(len(plaintext)))
-					d.complete = true
-					d.file.Close()
-					return
-				}
+				d.complete = true
+				d.file.Close()
+				return
 			}
 			// Reset seek, since the file may have been partially written. The
 			// next attempt will overwrite these bytes.
