@@ -24,8 +24,8 @@ the transaction to the host. At this point, the only risk that the renter has
 taken is the resources expended to upload the data to the host.
 
 6. The host inspects the data and the transaction. The transaction must contain
-a file contract, and the merkle root specified in the contract must match the
-merkle root of the data that the renter uploaded. All of the parts of the file
+a file contract, and the Merkle root specified in the contract must match the
+Merkle root of the data that the renter uploaded. All of the parts of the file
 contract must match the contract terms that the renter sent, and the funding in
 the transaction must match the renter contribution specified in the contract
 terms. If anything is awry, the host writes an error and closes the connection.
