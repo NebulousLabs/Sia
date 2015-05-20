@@ -19,7 +19,9 @@ func newTestingGateway(name string, t *testing.T) *Gateway {
 	}
 	// Manually add myAddr as a node. This is necessary because g.addNode
 	// rejects loopback addresses.
+	id := g.mu.Lock()
 	g.nodes[g.myAddr] = struct{}{}
+	g.mu.Unlock(id)
 	return g
 }
 
