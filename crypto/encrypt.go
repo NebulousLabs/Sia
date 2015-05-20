@@ -28,14 +28,19 @@ func GenerateTwofishKey() (key TwofishKey, err error) {
 	return
 }
 
+// NewCipher creates a new Twofish cipher from the key.
+func (key TwofishKey) NewCipher() cipher.Block {
+	// NOTE: NewCipher only returns an error if len(key) != 16, 24, or 32.
+	cipher, _ := twofish.NewCipher(key[:])
+	return cipher
+}
+
 // EncryptBytes encrypts a []byte using the key. EncryptBytes uses GCM and
 // prepends the nonce (12 bytes) to the ciphertext.
 func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
 	// Create the cipher.
-	// NOTE: NewCipher only returns an error if len(key) != 16, 24, or 32.
 	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
-	twofishCipher, _ := twofish.NewCipher(key[:])
-	aead, _ := cipher.NewGCM(twofishCipher)
+	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Create the nonce.
 	nonce := make([]byte, aead.NonceSize())
@@ -53,8 +58,8 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
 // expected to be the first 12 bytes of the ciphertext.
 func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {
 	// Create the cipher.
-	twofishCipher, _ := twofish.NewCipher(key[:])
-	aead, _ := cipher.NewGCM(twofishCipher)
+	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Check for a nonce.
 	if len(ct) < aead.NonceSize() {
@@ -67,22 +72,18 @@ func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {
 
 // NewWriter returns a writer that encrypts or decrypts its input stream.
 func (key TwofishKey) NewWriter(w io.Writer) io.Writer {
-	block, _ := twofish.NewCipher(key[:])
-
 	// OK to use a zero IV if the key is unique for each ciphertext.
 	iv := make([]byte, twofish.BlockSize)
-	stream := cipher.NewOFB(block, iv) // TODO: is this the right mode to use?
+	stream := cipher.NewOFB(key.NewCipher(), iv)
 
 	return &cipher.StreamWriter{S: stream, W: w}
 }
 
-// NewReader returns a reader that decrypts or decrypts its input stream.
+// NewReader returns a reader that encrypts or decrypts its input stream.
 func (key TwofishKey) NewReader(r io.Reader) io.Reader {
-	block, _ := twofish.NewCipher(key[:])
-
 	// OK to use a zero IV if the key is unique for each ciphertext.
 	iv := make([]byte, twofish.BlockSize)
-	stream := cipher.NewOFB(block, iv)
+	stream := cipher.NewOFB(key.NewCipher(), iv)
 
 	return &cipher.StreamReader{S: stream, R: r}
 }
