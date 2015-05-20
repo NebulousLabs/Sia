@@ -42,9 +42,11 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 		HostSettings: host,
 		reliability:  InactiveReliability,
 	}
-	hdb.allHosts[entry.IPAddress] = entry
-
-	go hdb.threadedProbeHost(entry)
+	_, exists := hdb.allHosts[entry.IPAddress]
+	if !exists {
+		hdb.allHosts[entry.IPAddress] = entry
+		go hdb.threadedProbeHost(entry)
+	}
 }
 
 // Remove deletes an entry from the hostdb.

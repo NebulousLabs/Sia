@@ -41,8 +41,8 @@ type HostDB struct {
 	hostTree    *hostNode
 	activeHosts map[modules.NetAddress]*hostNode
 
-	//  allHosts is a simple list of all known hosts by their network
-	//  address, including hosts that are currently offline.
+	// allHosts is a simple list of all known hosts by their network address,
+	// including hosts that are currently offline.
 	allHosts map[modules.NetAddress]*hostEntry
 
 	subscribers []chan struct{}

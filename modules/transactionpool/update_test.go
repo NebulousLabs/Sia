@@ -30,6 +30,40 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	}
 }
 
+// testDataTransactions checks transactions that are data-only, and makes sure
+// that the data is put into the blockchain only a single time.
+func (tpt *tpoolTester) testDataTransactions() {
+	// Make a data transaction and put it into the blockchain.
+	txn := types.Transaction{
+		ArbitraryData: []string{"NonSiadata"},
+	}
+	err := tpt.tpool.AcceptTransaction(txn)
+	if err != nil {
+		tpt.t.Fatal(err)
+	}
+	tpt.tpUpdateWait()
+	b, _, err := tpt.miner.FindBlock()
+	if err != nil {
+		tpt.t.Fatal(err)
+	}
+	if len(b.Transactions) != 1 {
+		tpt.t.Error(len(b.Transactions))
+		tpt.t.Fatal("only expecting 1 transaction in the test block")
+	}
+	tpt.csUpdateWait()
+
+	// Mine a second block, this block should not have the data transaction.
+	b, _, err = tpt.miner.FindBlock()
+	if err != nil {
+		tpt.t.Fatal(err)
+	}
+	if len(b.Transactions) != 0 {
+		tpt.t.Fatal("Block should be empty after mining a data transaction")
+	}
+	tpt.csUpdateWait()
+
+}
+
 // testBlockConflicts adds a transaction to the unconfirmed set, and then adds
 // a conflicting transaction to the confirmed set, checking that the conflict
 // is properly handled by the pool.
@@ -241,6 +275,13 @@ func TestUpdateTransactionRemoval(t *testing.T) {
 	tpt.testUpdateTransactionRemoval()
 }
 
+// TestDataTransactions creates a tpoolTester and uses it to call
+// testDataTransactions.
+func TestDataTransactions(t *testing.T) {
+	tpt := newTpoolTester("TestDataTransactions", t)
+	tpt.testDataTransactions()
+}
+
 // TestBlockConflicts creates a tpoolTester and uses it to call
 // testBlockConflicts.
 func TestBlockConflicts(t *testing.T) {
@@ -255,8 +296,8 @@ func TestDependentUpdates(t *testing.T) {
 	tpt.testDependentUpdates()
 }
 
-// TestRewinding creates a tpoolTester and uses it to call testRewinding.
+// TestRewiding creates a tpoolTester and uses it to call testRewinding.
 func TestRewinding(t *testing.T) {
-	// tpt := newTpoolTester("TestRewinding", t)
-	// tpt.testRewinding()
+	tpt := newTpoolTester("TestRewinding", t)
+	tpt.testRewinding()
 }

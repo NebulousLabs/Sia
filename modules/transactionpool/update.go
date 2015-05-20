@@ -321,7 +321,8 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 		unconfirmedTxns = append(block.Transactions, unconfirmedTxns...)
 	}
 
-	// Delete the hashes of each transaction from the 'already seen' list.
+	// Delete the hashes of each unconfirmed transaction from the 'already
+	// seen' list.
 	for _, txn := range unconfirmedTxns {
 		// Sanity check - transaction should be in the list of already seen
 		// transactions.
@@ -383,6 +384,10 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	// Add all potential unconfirmed transactions back into the pool after
 	// checking that they are still valid.
 	for _, txn := range unconfirmedTxns {
+		_, exists := tp.transactions[crypto.HashObject(txn)]
+		if exists {
+			continue
+		}
 		err := tp.validUnconfirmedTransaction(txn)
 		if err != nil {
 			continue
