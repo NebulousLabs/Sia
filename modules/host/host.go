@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
@@ -97,19 +96,13 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
+	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
-	h.myAddr = modules.NetAddress(h.listener.Addr().String())
-
-	// discover external IP (during testing, use the loopback address)
-	if build.Release == "testing" {
-		h.myAddr = modules.NetAddress(net.JoinHostPort("::1", h.myAddr.Port()))
-	} else {
-		// potentially slow
-		go h.getExternalIP()
-	}
+	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
+	h.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
 
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {

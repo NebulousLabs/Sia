@@ -2,36 +2,11 @@ package host
 
 import (
 	"errors"
-	"io"
-	"net"
-	"net/http"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// getExternalIP learns the host's hostname from a centralized service,
-// myexternalip.com.
-func (h *Host) getExternalIP() {
-	resp, err := http.Get("http://myexternalip.com/raw")
-	if err != nil {
-		// log?
-		return
-	}
-	defer resp.Body.Close()
-	buf := make([]byte, 64)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		// log?
-		return
-	}
-	hostname := string(buf[:n-1]) // trim newline
-
-	lockID := h.mu.Lock()
-	defer h.mu.Unlock(lockID)
-	h.myAddr = modules.NetAddress(net.JoinHostPort(hostname, h.myAddr.Port()))
-}
 
 // Announce creates a host announcement transaction, adding information to the
 // arbitrary data, signing the transaction, and submitting it to the
