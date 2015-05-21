@@ -24,9 +24,13 @@ func (s *State) threadedResynchronize() {
 			// NOTE: error is not checked, because nothing happens whether
 			// there is an error or not, the node continuously synchronizes
 			// to all peers.
-			_ = s.Synchronize(peer)
+			err := s.Synchronize(peer)
+			if err != nil {
+				continue
+			}
 			time.Sleep(ResynchronizeTimeout)
 		}
+		time.Sleep(ResynchronizeTimeout)
 	}
 }
 
@@ -181,6 +185,9 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 // both peers. From this starting height, it transmits blocks sequentially.
 // The requester then integrates these blocks into its consensus set. Multiple
 // such transmissions may be required to fully synchronize.
+//
+// TODO: Synchronize is a blocking call that involved network traffic. This
+// seems to break convention, but I'm not certain. It does seem weird though.
 func (s *State) Synchronize(peer modules.NetAddress) error {
 	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }

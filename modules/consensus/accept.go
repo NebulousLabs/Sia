@@ -140,9 +140,7 @@ func (s *State) acceptBlock(b types.Block) error {
 		return err
 	}
 
-	// Try adding the block to the tree. Though all transactions are
-	// intrinsically valid, they may contain double spends or spend outputs
-	// that don't exist.
+	// Try adding the block to the tree.
 	err = s.addBlockToTree(b)
 	if err != nil {
 		return err

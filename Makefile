@@ -67,7 +67,7 @@ test-long: clean fmt REBUILD
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do \
-		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html  \
 		&& rm cover/$$package.out ; \
 	done
