@@ -13,7 +13,7 @@ import (
 const (
 	MaxCatchUpBlocks       = 50
 	MaxSynchronizeAttempts = 8
-	ResynchronizeTimeout   = time.Second * 20
+	ResynchronizeTimeout   = time.Second * 30
 )
 
 // threadedResynchronize will call synchronize on up to 8 random peers.
@@ -117,14 +117,12 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 	found := false
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
-	{
-		for _, id := range knownBlocks {
-			bn, exists := s.blockMap[id]
-			if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
-				found = true
-				start = bn.height + 1 // start at child
-				break
-			}
+	for _, id := range knownBlocks {
+		bn, exists := s.blockMap[id]
+		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
+			found = true
+			start = bn.height + 1 // start at child
+			break
 		}
 	}
 	s.mu.RUnlock(lockID)

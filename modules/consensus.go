@@ -89,8 +89,5 @@ type ConsensusSet interface {
 
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
-	//
-	// QUESTION: Can you only supply an address that's a peer you are connected
-	// to, or can you supply any address?
 	Synchronize(NetAddress) error
 }
