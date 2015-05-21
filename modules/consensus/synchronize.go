@@ -15,7 +15,7 @@ import (
 const (
 	MaxCatchUpBlocks       = 50
 	MaxSynchronizeAttempts = 8
-	ResynchronizeTimeout   = time.Minute * 2
+	ResynchronizeTimeout   = time.Second * 20
 )
 
 // threadedResynchronize will call synchronize on up to 8 random peers.
@@ -23,26 +23,14 @@ func (s *State) threadedResynchronize() {
 	for {
 		go func() {
 			peers := s.gateway.Peers()
-			for i := 0; i < MaxSynchronizeAttempts && len(peers) > 0; i++ {
-				// Select a peer at random from the list of peers.
-				big, err := rand.Int(rand.Reader, big.NewInt(int64(len(peers))))
-				if err != nil && build.DEBUG {
-					panic("rand err!")
-				}
-
-				err = s.Synchronize(peers[big.Int64()])
-				if err == nil {
-					break
-				}
-
-				// After syncrhonizing with the peer, remove them from the list
-				// of selectable peers by replacing them with the first peer in
-				// the list, and then removing the first peer from the list.
-				peers[big.Int64()] = peers[0]
-				peers = peers[1:]
+			for i := range peers {
+				// NOTE: error is not checked, because nothing happens whether
+				// there is an error or not, the node continuously synchronizes
+				// to all peers.
+				_ = s.Synchronize(peers[big.Int64()])
+				time.Sleep(ResynchronizeTimeout)
 			}
 		}()
-		time.Sleep(ResynchronizeTimeout)
 	}
 }
 
