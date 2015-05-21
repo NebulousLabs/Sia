@@ -51,11 +51,6 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 	}
 
 	srv.host.SetSettings(config)
-	err := srv.host.Announce()
-	if err != nil {
-		writeError(w, "Could not announce host: "+err.Error(), http.StatusBadRequest)
-		return
-	}
 	writeSuccess(w)
 }
 
