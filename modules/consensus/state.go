@@ -16,6 +16,11 @@ import (
 // blockchain. Broadly speaking, it is responsible for maintaining consensus.
 // It accepts blocks and constructs a blockchain, forking when necessary.
 type State struct {
+	// fullVerification is a flag that tells the state whether or not to do
+	// transaction verification while accepting a block. This should help speed
+	// up loading blocks from memory.
+	fullVerification bool
+
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 

@@ -174,42 +174,47 @@ func (s *State) validSiafunds(t types.Transaction) (err error) {
 	return
 }
 
-// validTransaction checks that all fields are valid within the current
-// consensus state. If not an error is returned.
-func (s *State) validTransaction(t types.Transaction) (err error) {
-	// StandaloneValid will check things like signatures and properties that
-	// should be inherent to the transaction. (storage proof rules, etc.)
-	err = t.StandaloneValid(s.height())
-	if err != nil {
-		return
-	}
-
-	// Check that each portion of the transaction is legal given the current
-	// consensus set.
-	err = s.validSiacoins(t)
-	if err != nil {
-		return
-	}
-	err = s.validFileContractRevisions(t)
-	if err != nil {
-		return
-	}
-	err = s.validStorageProofs(t)
-	if err != nil {
-		return
-	}
-	err = s.validSiafunds(t)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 // ValidStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
 func (s *State) ValidStorageProofs(t types.Transaction) (err error) {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
 	return s.validStorageProofs(t)
+}
+
+// validTransaction checks that all fields are valid within the current
+// consensus state. If not an error is returned.
+func (s *State) validTransaction(t types.Transaction) error {
+	// Skip transaction verification if the State is accepting trusted blocks.
+	if !s.fullVerification {
+		return nil
+	}
+
+	// StandaloneValid will check things like signatures and properties that
+	// should be inherent to the transaction. (storage proof rules, etc.)
+	err := t.StandaloneValid(s.height())
+	if err != nil {
+		return err
+	}
+
+	// Check that each portion of the transaction is legal given the current
+	// consensus set.
+	err = s.validSiacoins(t)
+	if err != nil {
+		return err
+	}
+	err = s.validFileContractRevisions(t)
+	if err != nil {
+		return err
+	}
+	err = s.validStorageProofs(t)
+	if err != nil {
+		return err
+	}
+	err = s.validSiafunds(t)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

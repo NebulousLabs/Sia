@@ -49,9 +49,9 @@ func (s *State) threadedResynchronize() {
 // receiveBlocks is the calling end of the SendBlocks RPC.
 func (s *State) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
-	id := s.mu.RLock()
+	lockID := s.mu.RLock()
 	history := s.blockHistory()
-	s.mu.RUnlock(id)
+	s.mu.RUnlock(lockID)
 	if err := encoding.WriteObject(conn, history); err != nil {
 		return err
 	}
@@ -67,12 +67,16 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 			return err
 		}
 
-		// integrate received blocks
+		// integrate received blocks.
 		for _, block := range newBlocks {
-			// TODO: don't Broadcast these blocks
-			acceptErr := s.AcceptBlock(block)
+			// Blocks received during synchronize aren't trusted; activate full
+			// verification.
+			lockID := s.mu.RLock()
+			s.fullVerification = true
+			acceptErr := s.acceptBlock(block)
+			s.mu.RUnlock(lockID)
 			if acceptErr != nil {
-				return
+				return acceptErr
 			}
 		}
 	}
@@ -122,18 +126,20 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 	}
 
 	// Find the most recent block from knownBlocks in the current path.
-	id := s.mu.RLock()
 	found := false
 	var start types.BlockHeight
-	for _, id := range knownBlocks {
-		bn, exists := s.blockMap[id]
-		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
-			found = true
-			start = bn.height + 1 // start at child
-			break
+	lockID := s.mu.RLock()
+	{
+		for _, id := range knownBlocks {
+			bn, exists := s.blockMap[id]
+			if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
+				found = true
+				start = bn.height + 1 // start at child
+				break
+			}
 		}
 	}
-	s.mu.RUnlock(id)
+	s.mu.RUnlock(lockID)
 
 	// If no matching blocks are found, or if the caller has all known blocks,
 	// don't send any blocks.
@@ -152,7 +158,7 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 	for moreAvailable {
 		// Get the set of blocks to send.
 		var blocks []types.Block
-		id = s.mu.RLock()
+		lockID = s.mu.RLock()
 		{
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
@@ -168,7 +174,7 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 			moreAvailable = start+MaxCatchUpBlocks < height
 			start += MaxCatchUpBlocks
 		}
-		s.mu.RUnlock(id)
+		s.mu.RUnlock(lockID)
 
 		// Send a set of blocks to the caller + a flag indicating whether more
 		// are available.
