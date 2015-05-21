@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -101,6 +102,10 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 func (r *Renter) Upload(up modules.FileUploadParams) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
+
+	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
+		return errors.New("nickname and file name must have the same extension")
+	}
 
 	err := r.checkWalletBalance(up)
 	if err != nil {
