@@ -122,7 +122,6 @@ func (s *State) addBlockToTree(b types.Block) (err error) {
 // acceptBlock is the internal consensus function for adding blocks. There is
 // no block relaying.
 func (s *State) acceptBlock(b types.Block) error {
-	// Check maps for information about the block.
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
 		return ErrBadBlock
