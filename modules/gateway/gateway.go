@@ -83,7 +83,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 		peers:    make(map[modules.NetAddress]*peer),
 		nodes:    make(map[modules.NetAddress]struct{}),
 		saveDir:  saveDir,
-		mu:       sync.New(modules.SafeMutexDelay, 0),
+		mu:       sync.New(modules.SafeMutexDelay, 2),
 		log:      logger,
 	}
 

@@ -87,10 +87,10 @@ type ConsensusSet interface {
 	// This is a thread-safe way of managing updates.
 	ConsensusSetSubscribe(ConsensusSetSubscriber)
 
-	// Synchronize is a manual call that will reach out to peers looking for a
-	// longer fork. This is useful if synchronization gets stuck and the
-	// blockchain stays behind for extended periods of time. It is a bug if
-	// this call is required during typical use - synchronization should happen
-	// quickly and automatically.
+	// Synchronize will try to synchronize to a specific peer. During general
+	// use, this call should never be necessary.
+	//
+	// QUESTION: Can you only supply an address that's a peer you are connected
+	// to, or can you supply any address?
 	Synchronize(NetAddress) error
 }

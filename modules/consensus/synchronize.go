@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"crypto/rand"
-	"math/big"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -21,16 +19,14 @@ const (
 // threadedResynchronize will call synchronize on up to 8 random peers.
 func (s *State) threadedResynchronize() {
 	for {
-		go func() {
-			peers := s.gateway.Peers()
-			for i := range peers {
-				// NOTE: error is not checked, because nothing happens whether
-				// there is an error or not, the node continuously synchronizes
-				// to all peers.
-				_ = s.Synchronize(peers[big.Int64()])
-				time.Sleep(ResynchronizeTimeout)
-			}
-		}()
+		peers := s.gateway.Peers()
+		for _, peer := range peers {
+			// NOTE: error is not checked, because nothing happens whether
+			// there is an error or not, the node continuously synchronizes
+			// to all peers.
+			_ = s.Synchronize(peer)
+			time.Sleep(ResynchronizeTimeout)
+		}
 	}
 }
 
@@ -59,10 +55,10 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 		for _, block := range newBlocks {
 			// Blocks received during synchronize aren't trusted; activate full
 			// verification.
-			lockID := s.mu.RLock()
+			lockID := s.mu.Lock()
 			s.fullVerification = true
 			acceptErr := s.acceptBlock(block)
-			s.mu.RUnlock(lockID)
+			s.mu.Unlock(lockID)
 			if acceptErr != nil {
 				return acceptErr
 			}

@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -228,14 +229,16 @@ func (s *State) TryTransactions(txns []types.Transaction) error {
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
-	var diffHolder blockNode
+	var diffHolder *blockNode
 	defer s.commitDiffSet(diffHolder, modules.DiffRevert)
 
 	for _, txn := range txns {
-		err = s.validTransaction(txn)
+		err := s.validTransaction(txn)
 		if err != nil {
 			return err
 		}
 		s.applyTransaction(diffHolder, txn)
 	}
+
+	return nil
 }
