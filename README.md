@@ -5,18 +5,25 @@ Sia 0.3.1
 
 Binaries can be found at [our website](http://siacoin.com).
 
-Sia is a new cryptosystem designed to enable incentivized, decentralized
-storage in a Byzantine environment. The consensus protocol has been finished
-and is partially explained in Consensus.md. There is a working reference
-implementation in the consensus folder. While this implementation is well-
-tested, it is not guaranteed to be bug-free.
+Sia is a new decentralized cloud storage platform aimed at giving users control
+of their data. Data is split into hundreds of erasure coded pieces and
+encrypted locally, and then each piece is uploaded to a separate host. A
+blockchain is used to create cryptographic contracts ensuring that hosts will
+only get paid if they actually store the data. Out of hundreds of hosts, only a
+fraction are required to recover the original file.
 
-While many of the components of Sia are well understood and trusted
-cryptographic ideas, Sia itself has not had a lot of academic review. As such,
-Sia should be seen as highly experimental. As per the license, Sia is software
-that comes without any warranty, and the developers cannot be held responsible
-for any damages that occur. We encourage you to use Sia, but only with files
-and money that you are comfortable losing.
+Anybody can join the network as a host and get income from the storage they
+contribute. This openness allows Sia to build and take advantage of a global
+network of small datacenters. Combined with advanced algorithms for storing and
+retrieving data, Sia is poised to be a highly competitive cloud storage
+platform. More information about the technology can be found on our website and
+in the 'doc' folder of the repo.
+
+Sia is currently in beta, and will be launching the currency on June 7th, 2015.
+Even though the currency is launching, the storage platform itself will remain
+in beta. Sia is ready for use with small sums of money and non-critical files,
+but until the network has a more proven track record we advise against relying
+on Sia as a sole means of storing important data.
 
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol, and siac is a client that is
@@ -88,7 +95,7 @@ If your issue is not addressed above, you can get in touch with us personally:
   
   luke@nebulouslabs.com
   
-  IRC: #siacoin on freenode (ping Taek)
+  IRC: #siatalk on freenode (ping Taek)
 
 Version Information
 -------------------

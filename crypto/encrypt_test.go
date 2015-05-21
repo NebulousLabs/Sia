@@ -72,7 +72,39 @@ func TestTwofishEncryption(t *testing.T) {
 	// Try to trigger a panic with nil values.
 	key.EncryptBytes(nil)
 	key.DecryptBytes(nil)
+}
 
+func TestReadWrite(t *testing.T) {
+	// Get a key for encryption.
+	key, err := GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate plaintext.
+	const plaintextSize = 600
+	plaintext := make([]byte, plaintextSize)
+	_, err = rand.Read(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create writer and encrypt plaintext.
+	buf := new(bytes.Buffer)
+	key.NewWriter(buf).Write(plaintext)
+
+	// There should be no overhead present.
+	if buf.Len() != plaintextSize {
+		t.Fatalf("encryption introduced %v bytes of overhead", buf.Len()-plaintextSize)
+	}
+
+	// Create reader and decrypt ciphertext.
+	var decrypted = make([]byte, plaintextSize)
+	key.NewReader(buf).Read(decrypted)
+
+	if bytes.Compare(plaintext, decrypted) != 0 {
+		t.Error("couldn't decrypt encrypted stream")
+	}
 }
 
 // TestTwofishEntropy encrypts and then decrypts a zero plaintext, checking
@@ -85,7 +117,7 @@ func TestTwofishEntropy(t *testing.T) {
 	// Encrypt a larger zero plaintext and make sure that the outcome is high
 	// entropy. Entropy is measured by compressing the ciphertext with gzip.
 	// 10 * 1000 bytes was chosen to minimize the impact of gzip overhead.
-	cipherSize := int(10e3)
+	const cipherSize = 10e3
 	key, err := GenerateTwofishKey()
 	if err != nil {
 		t.Fatal(err)

@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+	"io"
 
 	"golang.org/x/crypto/twofish"
 )
@@ -27,42 +28,38 @@ func GenerateTwofishKey() (key TwofishKey, err error) {
 	return
 }
 
+// NewCipher creates a new Twofish cipher from the key.
+func (key TwofishKey) NewCipher() cipher.Block {
+	// NOTE: NewCipher only returns an error if len(key) != 16, 24, or 32.
+	cipher, _ := twofish.NewCipher(key[:])
+	return cipher
+}
+
 // EncryptBytes encrypts a []byte using the key. EncryptBytes uses GCM and
 // prepends the nonce (12 bytes) to the ciphertext.
-func (key TwofishKey) EncryptBytes(plaintext []byte) (ct Ciphertext, err error) {
-	// Create the cipher, encryptor, and nonce.
-	twofishCipher, err := twofish.NewCipher(key[:])
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(twofishCipher)
-	if err != nil {
-		return nil, err
-	}
+func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
+	// Create the cipher.
+	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	aead, _ := cipher.NewGCM(key.NewCipher())
+
+	// Create the nonce.
 	nonce := make([]byte, aead.NonceSize())
-	_, err = rand.Read(nonce)
+	_, err := rand.Read(nonce)
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt the data. No authenticated data is provided, as EncryptBytes is
 	// meant for file encryption.
-	ct = aead.Seal(nonce, nonce, plaintext, nil)
-	return ct, nil
+	return aead.Seal(nonce, nonce, plaintext, nil), nil
 }
 
 // DecryptBytes decrypts the ciphertext created by EncryptBytes. The nonce is
 // expected to be the first 12 bytes of the ciphertext.
-func (key TwofishKey) DecryptBytes(ct Ciphertext) (plaintext []byte, err error) {
+func (key TwofishKey) DecryptBytes(ct Ciphertext) ([]byte, error) {
 	// Create the cipher.
-	twofishCipher, err := twofish.NewCipher(key[:])
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(twofishCipher)
-	if err != nil {
-		return nil, err
-	}
+	// NOTE: NewGCM only returns an error if twofishCipher.BlockSize != 16.
+	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Check for a nonce.
 	if len(ct) < aead.NonceSize() {
@@ -70,9 +67,23 @@ func (key TwofishKey) DecryptBytes(ct Ciphertext) (plaintext []byte, err error) 
 	}
 
 	// Decrypt the data.
-	plaintext, err = aead.Open(nil, ct[:aead.NonceSize()], ct[aead.NonceSize():], nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
+	return aead.Open(nil, ct[:aead.NonceSize()], ct[aead.NonceSize():], nil)
+}
+
+// NewWriter returns a writer that encrypts or decrypts its input stream.
+func (key TwofishKey) NewWriter(w io.Writer) io.Writer {
+	// OK to use a zero IV if the key is unique for each ciphertext.
+	iv := make([]byte, twofish.BlockSize)
+	stream := cipher.NewOFB(key.NewCipher(), iv)
+
+	return &cipher.StreamWriter{S: stream, W: w}
+}
+
+// NewReader returns a reader that encrypts or decrypts its input stream.
+func (key TwofishKey) NewReader(r io.Reader) io.Reader {
+	// OK to use a zero IV if the key is unique for each ciphertext.
+	iv := make([]byte, twofish.BlockSize)
+	stream := cipher.NewOFB(key.NewCipher(), iv)
+
+	return &cipher.StreamReader{S: stream, R: r}
 }

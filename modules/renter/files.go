@@ -118,6 +118,8 @@ func (r *Renter) DeleteFile(nickname string) error {
 		return ErrUnknownNickname
 	}
 	delete(r.files, nickname)
+
+	r.save()
 	return nil
 }
 

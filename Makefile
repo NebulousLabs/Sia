@@ -41,7 +41,7 @@ release: REBUILD
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
-	goxc -arch="amd64" -bc="linux windows darwin" -d=release -pv=0.3.1          \
+	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.3.1  \
 		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
 		-main-dirs-exclude=siag	-tasks-=deb,deb-dev,deb-source,go-test
 
@@ -67,9 +67,9 @@ test-long: clean fmt REBUILD
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do \
-		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package ; \
-		go tool cover -html=cover/$$package.out -o=cover/$$package.html ; \
-		rm cover/$$package.out ; \
+		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html  \
+		&& rm cover/$$package.out ; \
 	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
