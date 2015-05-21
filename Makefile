@@ -12,6 +12,7 @@ dependencies:
 	go get -u github.com/dchest/blake2b
 	go get -u github.com/inconshreveable/go-update
 	go get -u github.com/inconshreveable/muxado
+	go get -u github.com/kardianos/osext
 	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/NebulousLabs/merkletree

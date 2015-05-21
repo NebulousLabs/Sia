@@ -4,12 +4,14 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/inconshreveable/go-update"
+	"github.com/kardianos/osext"
 )
 
 type UpdateInfo struct {
@@ -21,8 +23,6 @@ const VERSION = "0.3.1"
 
 // TODO: Updates need to be signed!
 // TODO: Updating on Windows may not work correctly.
-// TODO: Will this code properly handle the case where multiple versions in a
-// row have been missed?
 
 // Updates work like this: each version is stored in a folder on a Linode
 // server operated by the developers. The most recent version is stored in
@@ -85,19 +85,19 @@ func applyUpdate(version string) (err error) {
 		return
 	}
 
+	// Get the executable directory.
+	binDir, err := osext.ExecutableFolder()
+	if err != nil {
+		return
+	}
+
 	// Perform updates as indicated by the manifest.
 	for _, file := range manifest[1:] {
-		err, _ = update.New().Target(file).FromUrl(updateURL + "/" + version + "/" + file)
+		target := filepath.Join(binDir, file)
+		err, _ = update.New().Target(target).FromUrl(updateURL + "/" + version + "/" + file)
 		if err != nil {
 			return
 		}
-	}
-
-	// the binary must always be updated, because if nothing else, the version
-	// number has to be bumped.
-	err, _ = update.New().FromUrl(updateURL + "/" + version + "/siad")
-	if err != nil {
-		return
 	}
 
 	return
