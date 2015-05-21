@@ -61,14 +61,36 @@ type SiafundPoolDiff struct {
 	Adjusted types.Currency
 }
 
+// A ConsensusSet accepts blocks and builds an understanding of network
+// consensus.
 type ConsensusSet interface {
+	// AcceptBlock adds a block to consensus. An error will be returned if the
+	// block is invalid, has been seen before, is an orphan, or doesn't
+	// contribute to the heaviest fork known to the consensus set. If the block
+	// does not become the head of the heaviest known fork but is otherwise
+	// valid, it will be remembered by the consensus set but an error will
+	// still be returned.
 	AcceptBlock(types.Block) error
 
+	// ChildTarget returns the target required to extend the current heaviest
+	// fork. This function is typically used by miners looking to extend the
+	// heaviest fork.
 	ChildTarget(types.BlockID) (types.Target, bool)
 
+	// Close will shut down the consensus set, giving the module enough time to
+	// run any required closing routines.
 	Close() error
 
+	// ConsensusSetSubscribe will subscribe another module to the consensus
+	// set. Every time that there is a change to the consensus set, an update
+	// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
+	// This is a thread-safe way of managing updates.
 	ConsensusSetSubscribe(ConsensusSetSubscriber)
 
+	// Synchronize is a manual call that will reach out to peers looking for a
+	// longer fork. This is useful if synchronization gets stuck and the
+	// blockchain stays behind for extended periods of time. It is a bug if
+	// this call is required during typical use - synchronization should happen
+	// quickly and automatically.
 	Synchronize(NetAddress) error
 }
