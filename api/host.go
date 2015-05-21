@@ -20,15 +20,17 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request)
 func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
 	config := srv.host.Info().HostSettings
+	fmt.Println(config)
+	fmt.Println(req.URL)
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
-		"totalStorage": &config.TotalStorage,
-		"minFilesize":  &config.MinFilesize,
-		"maxFilesize":  &config.MaxFilesize,
-		"minDuration":  &config.MinDuration,
-		"maxDuration":  &config.MaxDuration,
-		"windowSize":   &config.WindowSize,
+		"totalstorage": &config.TotalStorage,
+		"minfilesize":  &config.MinFilesize,
+		"maxfilesize":  &config.MaxFilesize,
+		"minduration":  &config.MinDuration,
+		"maxduration":  &config.MaxDuration,
+		"windowsize":   &config.WindowSize,
 		"price":        &config.Price,
 		"collateral":   &config.Collateral,
 	}
@@ -50,6 +52,7 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 
+	fmt.Println(config)
 	srv.host.SetSettings(config)
 	writeSuccess(w)
 }
