@@ -20,6 +20,6 @@ func init() {
 	} else if build.Release == "standard" {
 		SafeMutexDelay = 8 * time.Second
 	} else if build.Release == "testing" {
-		SafeMutexDelay = 500 * time.Millisecond
+		SafeMutexDelay = 1200 * time.Millisecond
 	}
 }

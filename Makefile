@@ -61,7 +61,7 @@ pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus            
 	./modules/renter ./modules/transactionpool ./modules/wallet ./siad ./siag   \
 	./types
 test: clean fmt REBUILD
-	go test -short -tags='debug testing' -timeout=1s $(pkgs)
+	go test -short -tags='debug testing' -timeout=3s $(pkgs)
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
 cover: clean REBUILD
