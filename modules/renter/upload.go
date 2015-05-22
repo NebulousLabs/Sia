@@ -103,6 +103,8 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
+	// TODO: This type of restriction is something that should be handled by
+	// the frontend, not the backend.
 	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
 		return errors.New("nickname and file name must have the same extension")
 	}
