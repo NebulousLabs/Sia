@@ -13,7 +13,7 @@ func TestBlockBootstrap(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// Create a server and give it 2500 blocks.
+	// Create a server and give it some blocks.
 	st := newServerTester("TestBlockBootstrap1", t)
 	for i := 0; i < 2*consensus.MaxCatchUpBlocks+1; i++ {
 		_, _, err := st.miner.FindBlock()

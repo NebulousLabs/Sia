@@ -45,23 +45,12 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 	if m.desiredThreads == 0 && m.runningThreads == 0 {
 		info.State = "Off"
 	} else if m.desiredThreads == 0 && m.runningThreads > 0 {
+		// If there are bugs or if the computer is slow (i.e. raspi), turning
+		// off can take multiple seconds.
 		info.State = "Turning Off"
 	} else if m.desiredThreads == m.runningThreads {
 		info.State = "On"
-	} else if m.desiredThreads > m.runningThreads {
-		info.State = "Turning On"
-	} else if m.desiredThreads < m.runningThreads {
-		info.State = "Decreasing number of threads."
-	} else {
-		info.State = "Miner is in an ERROR state!"
 	}
 
 	return info
-}
-
-// Threads returns the number of threads being used by the miner.
-func (m *Miner) Threads() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.threads
 }

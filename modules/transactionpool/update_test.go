@@ -46,9 +46,9 @@ func (tpt *tpoolTester) testDataTransactions() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	if len(b.Transactions) != 1 {
+	if len(b.Transactions) != 2 {
 		tpt.t.Error(len(b.Transactions))
-		tpt.t.Fatal("only expecting 1 transaction in the test block")
+		tpt.t.Fatal("only expecting 2 transactions in the test block")
 	}
 	tpt.csUpdateWait()
 
@@ -57,8 +57,8 @@ func (tpt *tpoolTester) testDataTransactions() {
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
-	if len(b.Transactions) != 0 {
-		tpt.t.Fatal("Block should be empty after mining a data transaction")
+	if len(b.Transactions) != 1 {
+		tpt.t.Fatal("Block should contain only the uniqueness transaction after mining a data transaction")
 	}
 	tpt.csUpdateWait()
 

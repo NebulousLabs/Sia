@@ -195,7 +195,7 @@ func (s *State) RelayBlock(conn modules.PeerConn) error {
 	// known fork. Broadcast is not called and an error is returned.
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
-	height, exists := s.HeightOfBlock(b.ID())
+	height, exists := s.heightOfBlock(b.ID())
 	if !exists {
 		if build.DEBUG {
 			panic("could not get the height of a block that did not return an error when being accepted into the state")

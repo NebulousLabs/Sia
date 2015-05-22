@@ -202,13 +202,6 @@ func (s *State) Height() types.BlockHeight {
 	return s.height()
 }
 
-// HeightOfBlock returns the height of the block with the given ID.
-func (s *State) HeightOfBlock(bid types.BlockID) (height types.BlockHeight, exists bool) {
-	lockID := s.mu.RLock()
-	defer s.mu.RUnlock(lockID)
-	return s.heightOfBlock(bid)
-}
-
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
 func (s *State) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {

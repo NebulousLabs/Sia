@@ -10,6 +10,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	iterationsPerAttempt = 32 * 1024
+)
+
 type Miner struct {
 	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
@@ -23,14 +27,13 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	startTime int64
+	startTime time.Time
 	attempts  uint64
 	hashRate  int64
 
-	threads              int // how many threads the miner uses, shouldn't ever be 0.
-	desiredThreads       int // 0 if not mining.
-	runningThreads       int
-	iterationsPerAttempt uint64
+	threads        int // how many threads the miner uses, shouldn't ever be 0.
+	desiredThreads int // 0 if not mining.
+	runningThreads int
 
 	subscribers []chan struct{}
 
@@ -72,8 +75,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
 
-		threads:              1,
-		iterationsPerAttempt: 32 * 1024,
+		threads: 1,
 	}
 
 	// Get an address for the miner payout.
@@ -99,7 +101,7 @@ func (m *Miner) SetThreads(threads int) error {
 	}
 	m.threads = threads
 	m.attempts = 0
-	m.startTime = time.Now().UnixNano()
+	m.startTime = time.Now()
 
 	return nil
 }
