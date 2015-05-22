@@ -1,8 +1,6 @@
 package transactionpool
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -15,10 +13,6 @@ import (
 // added to the unconfirmed consensus set piecemeal, and then the transaction
 // itself is appended to the linked list of transactions, such that any
 // dependecies will appear earlier in the list.
-
-var (
-	ErrDuplicate = errors.New("transaction is a duplicate")
-)
 
 // applySiacoinInputs incorporates all of the siacoin inputs of a transaction
 // into the unconfirmed set.
@@ -214,7 +208,7 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	txnHash := crypto.HashObject(t)
 	_, exists := tp.transactions[txnHash]
 	if exists {
-		return ErrDuplicate
+		return modules.ErrTransactionPoolDuplicate
 	}
 
 	// Check that the transaction is legal given the unconfirmed consensus set

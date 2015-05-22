@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -102,6 +103,12 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	lockID := r.mu.Lock()
 	defer r.mu.Unlock(lockID)
 
+	// TODO: This type of restriction is something that should be handled by
+	// the frontend, not the backend.
+	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
+		return errors.New("nickname and file name must have the same extension")
+	}
+
 	err := r.checkWalletBalance(up)
 	if err != nil {
 		return err
@@ -111,6 +118,20 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	_, exists := r.files[up.Nickname]
 	if exists {
 		return errors.New("file with that nickname already exists")
+	}
+
+	// Check that the file exists and is less than 500mb.
+	fileInfo, err := os.Stat(up.Filename)
+	if err != nil {
+		return err
+	}
+	// NOTE: The upload max of 500mb is temporary and therefore does not have a
+	// constant. This should be removed once micropayments + upload resuming
+	// are in place. 512mib is chosen to prevent confusion - on anybody's
+	// machine any file appearing to be under 500mb will be below the hard
+	// limit.
+	if fileInfo.Size() > 512*1024*1024 {
+		return errors.New("cannot upload a file that's greater than 500mb")
 	}
 
 	// Check that the hostdb is sufficiently large to support an upload. Right

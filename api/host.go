@@ -23,12 +23,12 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
-		"totalStorage": &config.TotalStorage,
-		"minFilesize":  &config.MinFilesize,
-		"maxFilesize":  &config.MaxFilesize,
-		"minDuration":  &config.MinDuration,
-		"maxDuration":  &config.MaxDuration,
-		"windowSize":   &config.WindowSize,
+		"totalstorage": &config.TotalStorage,
+		"minfilesize":  &config.MinFilesize,
+		"maxfilesize":  &config.MaxFilesize,
+		"minduration":  &config.MinDuration,
+		"maxduration":  &config.MaxDuration,
+		"windowsize":   &config.WindowSize,
 		"price":        &config.Price,
 		"collateral":   &config.Collateral,
 	}
@@ -51,11 +51,6 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 	}
 
 	srv.host.SetSettings(config)
-	err := srv.host.Announce()
-	if err != nil {
-		writeError(w, "Could not announce host: "+err.Error(), http.StatusBadRequest)
-		return
-	}
 	writeSuccess(w)
 }
 
