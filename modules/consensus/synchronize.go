@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks       = 50
-	MaxSynchronizeAttempts = 8
-	ResynchronizeTimeout   = time.Second * 30
+	MaxCatchUpBlocks          = 50
+	MaxSynchronizeAttempts    = 8
+	ResynchronizePeerTimeout  = time.Second * 30
+	ResynchronizeBatchTimeout = time.Minute * 3
 )
 
 // threadedResynchronize will call synchronize on up to 8 random peers.
@@ -28,9 +29,9 @@ func (s *State) threadedResynchronize() {
 			if err != nil {
 				continue
 			}
-			time.Sleep(ResynchronizeTimeout)
+			time.Sleep(ResynchronizePeerTimeout)
 		}
-		time.Sleep(ResynchronizeTimeout)
+		time.Sleep(ResynchronizeBatchTimeout)
 	}
 }
 
