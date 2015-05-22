@@ -118,6 +118,20 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		return errors.New("file with that nickname already exists")
 	}
 
+	// Check that the file exists and is less than 500mb.
+	fileInfo, err := os.Stat(up.Filename)
+	if err != nil {
+		return err
+	}
+	// NOTE: The upload max of 500mb is temporary and therefore does not have a
+	// constant. This should be removed once micropayments + upload resuming
+	// are in place. 512mib is chosen to prevent confusion - on anybody's
+	// machine any file appearing to be under 500mb will be below the hard
+	// limit.
+	if fileInfo.Size() > 512 * 1024 * 1024  {
+		return errors.New("cannot upload a file that's greater than 500mb")
+	}
+
 	// Check that the hostdb is sufficiently large to support an upload. Right
 	// now that value is set to 3, but in the future the logic will be a bit
 	// more complex; once there is erasure coding we'll want to hit the minimum
