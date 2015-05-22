@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 )
@@ -87,7 +86,7 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 		log:      logger,
 	}
 
-	// Register RPCs
+	// Register RPCs.
 	g.RegisterRPC("ShareNodes", g.shareNodes)
 	g.RegisterRPC("RelayNode", g.relayNode)
 	g.RegisterConnectCall("ShareNodes", g.requestNodes)
@@ -95,26 +94,13 @@ func New(addr string, saveDir string) (g *Gateway, err error) {
 
 	g.log.Println("INFO: gateway created, started logging")
 
-	// Create the listener.
+	// Create listener and set address.
 	g.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
-	// Set myAddr (this is necessary if addr == ":0", in which case the OS
-	// will assign us a random open port).
-	g.myAddr = modules.NetAddress(g.listener.Addr().String())
-
-	// Discover our external IP. (During testing, return the loopback address.)
-	var hostname string
-	if build.Release == "testing" {
-		hostname = "::1"
-	} else {
-		hostname, err = getExternalIP()
-		if err != nil {
-			return nil, err
-		}
-	}
-	g.myAddr = modules.NetAddress(net.JoinHostPort(hostname, g.myAddr.Port()))
+	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
+	g.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
 
 	g.log.Println("INFO: our address is", g.myAddr)
 
