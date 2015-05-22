@@ -53,6 +53,7 @@ func (m *Miner) blockForWork() (types.Block, crypto.Hash) {
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
+// submitBlock should not be called with a lock.
 func (m *Miner) submitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
@@ -67,6 +68,7 @@ func (m *Miner) submitBlock(b types.Block) error {
 
 	// Grab a new address for the miner.
 	m.mu.Lock()
+	m.blocksFound = append(m.blocksFound, b.ID())
 	var addr types.UnlockHash
 	addr, _, err = m.wallet.CoinAddress()
 	if err == nil { // Special case: only update the address if there was no error.

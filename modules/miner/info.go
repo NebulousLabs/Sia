@@ -24,12 +24,15 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Using the hashrate and target, determine the number of blocks per month
+	// that could be mined.
 	floatMaxTarget, _ := big.NewRat(0, 1).SetInt(types.RootDepth.Int()).Float64()
 	floatCurTarget, _ := big.NewRat(0, 1).SetInt(m.target.Int()).Float64()
 	hashesRequired := math.Exp2(math.Log2(floatMaxTarget) - math.Log2(floatCurTarget))
 	hashesPerMonth := big.NewInt(0).Mul(big.NewInt(60*60*24*30), big.NewInt(m.hashRate))
 	floatHPM, _ := big.NewRat(0, 1).SetInt(hashesPerMonth).Float64()
 	blocksPerMonth := floatHPM / hashesRequired
+
 	info := modules.MinerInfo{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
@@ -37,11 +40,22 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 		HashRate:       m.hashRate,
 		BlocksPerMonth: blocksPerMonth,
 	}
-	if info.RunningThreads != 0 {
-		info.Mining = true
+
+	// Using the reference of all blocks that have been mined, determine how
+	// many blocks have been mined successfully and how many have been mined as
+	// orphans.
+	for _, blockID := range m.blocksFound {
+		if m.cs.InCurrentPath(blockID) {
+			info.BlocksMined++
+		} else {
+			info.OrphansMined++
+		}
 	}
 
 	// Set the running info based on desiredThreads vs. runningThreads.
+	if info.RunningThreads != 0 {
+		info.Mining = true
+	}
 	if m.desiredThreads == 0 && m.runningThreads == 0 {
 		info.State = "Off"
 	} else if m.desiredThreads == 0 && m.runningThreads > 0 {

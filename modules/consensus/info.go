@@ -202,6 +202,19 @@ func (s *State) Height() types.BlockHeight {
 	return s.height()
 }
 
+// InCurrentPath returns true if the block presented is in the current path,
+// false otherwise.
+func (s *State) InCurrentPath(bid types.BlockID) bool {
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
+
+	height, exists := s.heightOfBlock(bid)
+	if !exists {
+		return false
+	}
+	return s.currentPath[height] == bid
+}
+
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
 func (s *State) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {

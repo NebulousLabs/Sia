@@ -27,9 +27,10 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	startTime time.Time
-	attempts  uint64
-	hashRate  int64
+	startTime   time.Time
+	attempts    uint64
+	hashRate    int64
+	blocksFound []types.BlockID
 
 	threads        int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads int // 0 if not mining.
