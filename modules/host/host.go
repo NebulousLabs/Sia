@@ -79,8 +79,8 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 2e9,                      // 2 GB
-			MaxFilesize:  300e6,                    // 300 MB
+			TotalStorage: 5e9,                      // 5 GB
+			MaxFilesize:  1e9,                      // 1 GB
 			MaxDuration:  5e3,                      // Just over a month.
 			WindowSize:   288,                      // 48 hours.
 			Price:        types.NewCurrency64(1e9), // 10^9

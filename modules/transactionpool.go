@@ -1,7 +1,15 @@
 package modules
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	// ErrTransactionPoolDuplicate is returned when a duplicate transaction is
+	// submitted to the transaction pool.
+	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and

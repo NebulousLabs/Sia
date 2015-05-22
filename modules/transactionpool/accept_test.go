@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -73,7 +74,7 @@ func TestDuplicateTransaction(t *testing.T) {
 	tpt := newTpoolTester("TestDuplicateTransaction", t)
 	txn := tpt.addSiacoinTransactionToPool()
 	err := tpt.tpool.AcceptTransaction(txn)
-	if err != ErrDuplicate {
+	if err != modules.ErrTransactionPoolDuplicate {
 		t.Fatal("expecting ErrDuplicate got:", err)
 	}
 }

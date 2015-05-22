@@ -128,7 +128,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// are in place. 512mib is chosen to prevent confusion - on anybody's
 	// machine any file appearing to be under 500mb will be below the hard
 	// limit.
-	if fileInfo.Size() > 512 * 1024 * 1024  {
+	if fileInfo.Size() > 512*1024*1024 {
 		return errors.New("cannot upload a file that's greater than 500mb")
 	}
 

@@ -47,7 +47,7 @@ func (h *Host) Announce() error {
 	// create and encode the announcement and add it to the arbitrary data of
 	// the transaction.
 	lockID := h.mu.RLock()
-	if h.myAddr == "" {
+	if h.myAddr.Host() == "" {
 		h.mu.RUnlock(lockID)
 		return errors.New("can't announce without knowing external IP")
 	}
@@ -66,6 +66,9 @@ func (h *Host) Announce() error {
 
 	// Add the transaction to the transaction pool.
 	err = h.tpool.AcceptTransaction(t)
+	if err == modules.ErrTransactionPoolDuplicate {
+		return errors.New("You have already announced yourself.")
+	}
 	if err != nil {
 		return err
 	}
