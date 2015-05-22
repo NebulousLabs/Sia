@@ -15,6 +15,9 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 	defer m.mu.Unlock()
 	defer m.notifySubscribers()
 
+	m.height -= types.BlockHeight(len(revertedBlocks))
+	m.height += types.BlockHeight(len(appliedBlocks))
+
 	// The total encoded size of the transactions cannot exceed the block size.
 	m.transactions = nil
 	remainingSize := int(types.BlockSizeLimit - 5e3)

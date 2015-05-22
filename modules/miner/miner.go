@@ -2,7 +2,9 @@ package miner
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -16,10 +18,13 @@ type Miner struct {
 
 	// Block variables - helps the miner construct the next block.
 	parent            types.BlockID
+	height            types.BlockHeight
 	transactions      []types.Transaction
 	target            types.Target
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
+
+	attempts int
 
 	threads              int // how many threads the miner uses, shouldn't ever be 0.
 	desiredThreads       int // 0 if not mining.
@@ -56,7 +61,7 @@ func New(s *consensus.State, tpool modules.TransactionPool, w modules.Wallet) (m
 		earliestTimestamp: s.EarliestTimestamp(),
 
 		threads:              1,
-		iterationsPerAttempt: 16 * 1024,
+		iterationsPerAttempt: 64 * 1024,
 	}
 
 	addr, _, err := m.wallet.CoinAddress()
@@ -66,7 +71,24 @@ func New(s *consensus.State, tpool modules.TransactionPool, w modules.Wallet) (m
 	m.address = addr
 
 	m.tpool.TransactionPoolSubscribe(m)
+
+	go m.threadedPrintHashRate()
+
 	return
+}
+
+func (m *Miner) threadedPrintHashRate() {
+	for {
+		m.mu.Lock()
+		attempts := m.attempts
+		m.attempts = 0
+		m.mu.Unlock()
+
+		// Prints the number of kilohashes that second.
+		iterations := attempts * 16
+		fmt.Println(iterations)
+		time.Sleep(4 * time.Second)
+	}
 }
 
 // SetThreads establishes how many threads the miner will use when mining.

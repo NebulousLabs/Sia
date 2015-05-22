@@ -20,14 +20,7 @@ func (m *Miner) blockForWork() (b types.Block) {
 	}
 
 	// Calculate the subsidy and create the miner payout.
-	height, exists := m.state.HeightOfBlock(m.parent)
-	if !exists {
-		if build.DEBUG {
-			panic("parent is not in state?")
-		}
-		return
-	}
-	subsidy := types.CalculateCoinbase(height + 1)
+	subsidy := types.CalculateCoinbase(m.height + 1)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
 			subsidy = subsidy.Add(fee)
@@ -45,50 +38,8 @@ func (m *Miner) blockForWork() (b types.Block) {
 	return
 }
 
-// mine attempts to generate blocks, and will run until desiredThreads is
-// changd to be lower than `myThread`, which is set at the beginning of the
-// function.
-//
-// The threading is fragile. Edit with caution!
-func (m *Miner) threadedMine() {
-	// Increment the number of threads running, because this thread is spinning
-	// up. Also grab a number that will tell us when to shut down.
-	m.mu.Lock()
-	m.runningThreads++
-	myThread := m.runningThreads
-	m.mu.Unlock()
-
-	// Try to solve a block repeatedly.
-	for {
-		// Grab the number of threads that are supposed to be running.
-		m.mu.RLock()
-		desiredThreads := m.desiredThreads
-		m.mu.RUnlock()
-
-		// If we are allowed to be running, mine a block, otherwise shut down.
-		if desiredThreads >= myThread {
-			// Grab the necessary variables for mining, and then attempt to
-			// mine a block.
-			m.mu.RLock()
-			bfw := m.blockForWork()
-			target := m.target
-			iterations := m.iterationsPerAttempt
-			m.mu.RUnlock()
-			m.solveBlock(bfw, target, iterations)
-		} else {
-			m.mu.Lock()
-			// Need to check the mining status again, something might have
-			// changed while waiting for the lock.
-			if desiredThreads < myThread {
-				m.runningThreads--
-				m.mu.Unlock()
-				return
-			}
-			m.mu.Unlock()
-		}
-	}
-}
-
+// fastCheckTarget is a reimplementation of types.Block.ID that skips hashing
+// the block by taking a precalculated merkle root as an argument.
 func fastCheckTarget(target types.Target, b types.Block, bRoot crypto.Hash) bool {
 	id := crypto.HashAll(
 		b.ParentID,
@@ -134,6 +85,51 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 	}
 
 	return
+}
+
+// mine attempts to generate blocks, and will run until desiredThreads is
+// changd to be lower than `myThread`, which is set at the beginning of the
+// function.
+//
+// The threading is fragile. Edit with caution!
+func (m *Miner) threadedMine() {
+	// Increment the number of threads running, because this thread is spinning
+	// up. Also grab a number that will tell us when to shut down.
+	m.mu.Lock()
+	m.runningThreads++
+	myThread := m.runningThreads
+	m.mu.Unlock()
+
+	// Try to solve a block repeatedly.
+	for {
+		// Grab the number of threads that are supposed to be running.
+		m.mu.RLock()
+		desiredThreads := m.desiredThreads
+		m.mu.RUnlock()
+
+		// If we are allowed to be running, mine a block, otherwise shut down.
+		if desiredThreads >= myThread {
+			// Grab the necessary variables for mining, and then attempt to
+			// mine a block.
+			m.mu.RLock()
+			bfw := m.blockForWork()
+			target := m.target
+			iterations := m.iterationsPerAttempt
+			m.attempts++
+			m.mu.RUnlock()
+			m.solveBlock(bfw, target, iterations)
+		} else {
+			m.mu.Lock()
+			// Need to check the mining status again, something might have
+			// changed while waiting for the lock.
+			if desiredThreads < myThread {
+				m.runningThreads--
+				m.mu.Unlock()
+				return
+			}
+			m.mu.Unlock()
+		}
+	}
 }
 
 // FindBlock will attempt to solve a block and add it to the state. While less
