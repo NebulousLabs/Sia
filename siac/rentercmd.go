@@ -147,13 +147,17 @@ func renterfileslistcmd() {
 	}
 	fmt.Println("Tracking", len(files), "files:")
 	for _, file := range files {
-		fmt.Println("\t", file.Nickname)
+		if file.Available {
+			fmt.Println("\t", file.Nickname)
+		} else {
+			fmt.Println("\t", file.Nickname, "(uploading...)")
+		}
 	}
 }
 
 func renterfilesloadcmd(filename string) {
 	info := new(api.RenterFilesLoadResponse)
-	err := postResp("/renter/files/load", "filename="+filename, info)
+	err := postResp("/renter/files/load", "filename="+abs(filename), info)
 	if err != nil {
 		fmt.Println("Could not load file:", err)
 		return
@@ -206,7 +210,7 @@ func renterfilesshareasciicmd(nickname string) {
 }
 
 func renterfilesuploadcmd(source, nickname string) {
-	err := post("/renter/files/upload", fmt.Sprintf("source=%s&nickname=%s", source, nickname))
+	err := post("/renter/files/upload", fmt.Sprintf("source=%s&nickname=%s", abs(source), nickname))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
