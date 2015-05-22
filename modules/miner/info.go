@@ -1,7 +1,11 @@
 package miner
 
 import (
+	"math"
+	"math/big"
+
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Info() returns a MinerInfo struct which can be converted to JSON to be
@@ -20,12 +24,18 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	floatMaxTarget, _ := big.NewRat(0, 1).SetInt(types.RootDepth.Int()).Float64()
+	floatCurTarget, _ := big.NewRat(0, 1).SetInt(m.target.Int()).Float64()
+	hashesRequired := math.Exp2(math.Log2(floatMaxTarget) - math.Log2(floatCurTarget))
+	hashesPerMonth := big.NewInt(0).Mul(big.NewInt(60*60*24*30), big.NewInt(m.hashRate))
+	floatHPM, _ := big.NewRat(0, 1).SetInt(hashesPerMonth).Float64()
+	blocksPerMonth := floatHPM / hashesRequired
 	info := modules.MinerInfo{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
 		HashRate:       m.hashRate,
-		// Blocks per month left empty: not sure how to convert 'target' to 'hashes required'
+		BlocksPerMonth: blocksPerMonth,
 	}
 	if info.RunningThreads != 0 {
 		info.Mining = true
