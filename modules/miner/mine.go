@@ -2,7 +2,9 @@ package miner
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
+	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -38,30 +40,25 @@ func (m *Miner) blockForWork() (b types.Block) {
 	return
 }
 
-// fastCheckTarget is a reimplementation of types.Block.ID that skips hashing
-// the block by taking a precalculated merkle root as an argument.
-func fastCheckTarget(target types.Target, b types.Block, bRoot crypto.Hash) bool {
-	id := crypto.HashAll(
-		b.ParentID,
-		b.Nonce,
-		bRoot,
-	)
-	return bytes.Compare(target[:], id[:]) >= 0
-}
-
 // solveBlock takes a block, target, and number of iterations as input and
 // tries to find a block that meets the target. This function can take a long
 // time to complete, and should not be called with a lock.
 func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterations uint64) (b types.Block, solved bool, err error) {
-	// solveBlock could operate on a pointer, but it's not strictly necessary
-	// and it makes calling weirder/more opaque.
 	b = blockForWork
 	bRoot := b.MerkleRoot()
+	hashbytes := make([]byte, 72)
+	copy(hashbytes, b.ParentID[:])
+	copy(hashbytes[40:], bRoot[:])
 
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.
-	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
-		if fastCheckTarget(target, b, bRoot) {
+	nonce := (*uint64)(unsafe.Pointer(&hashbytes[32]))
+	*nonce = b.Nonce
+	for i := 0; i < int(iterations); i++ {
+		*nonce++
+		id := crypto.HashBytes(hashbytes)
+		if bytes.Compare(target[:], id[:]) >= 0 {
+			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:])
 			err = m.state.AcceptBlock(b)
 			if err != nil {
 				println("Mined a bad block " + err.Error())
@@ -103,20 +100,20 @@ func (m *Miner) threadedMine() {
 	// Try to solve a block repeatedly.
 	for {
 		// Grab the number of threads that are supposed to be running.
-		m.mu.RLock()
+		m.mu.Lock()
 		desiredThreads := m.desiredThreads
-		m.mu.RUnlock()
+		m.mu.Unlock()
 
 		// If we are allowed to be running, mine a block, otherwise shut down.
 		if desiredThreads >= myThread {
 			// Grab the necessary variables for mining, and then attempt to
 			// mine a block.
-			m.mu.RLock()
+			m.mu.Lock()
 			bfw := m.blockForWork()
 			target := m.target
 			iterations := m.iterationsPerAttempt
 			m.attempts++
-			m.mu.RUnlock()
+			m.mu.Unlock()
 			m.solveBlock(bfw, target, iterations)
 		} else {
 			m.mu.Lock()
@@ -147,9 +144,9 @@ func (m *Miner) FindBlock() (types.Block, bool, error) {
 // SolveBlock attempts to solve a block, returning the solved block without
 // submitting it to the state.
 func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b types.Block, solved bool) {
-	m.mu.RLock()
+	m.mu.Lock()
 	iterations := m.iterationsPerAttempt
-	m.mu.RUnlock()
+	m.mu.Unlock()
 
 	// Iterate through a bunch of nonces (from a random starting point) and try
 	// to find a winnning solution.

@@ -2,9 +2,7 @@ package miner
 
 import (
 	"errors"
-	"fmt"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -33,7 +31,7 @@ type Miner struct {
 
 	subscribers []chan struct{}
 
-	mu sync.RWMutex
+	mu sync.Mutex
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -72,23 +70,7 @@ func New(s *consensus.State, tpool modules.TransactionPool, w modules.Wallet) (m
 
 	m.tpool.TransactionPoolSubscribe(m)
 
-	go m.threadedPrintHashRate()
-
 	return
-}
-
-func (m *Miner) threadedPrintHashRate() {
-	for {
-		m.mu.Lock()
-		attempts := m.attempts
-		m.attempts = 0
-		m.mu.Unlock()
-
-		// Prints the number of kilohashes that second.
-		iterations := attempts * 16
-		fmt.Println(iterations)
-		time.Sleep(4 * time.Second)
-	}
 }
 
 // SetThreads establishes how many threads the miner will use when mining.

@@ -17,8 +17,8 @@ import (
 //
 // Address is the current address that is receiving block payouts.
 func (m *Miner) MinerInfo() modules.MinerInfo {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	info := modules.MinerInfo{
 		Threads:        m.threads,
@@ -49,7 +49,7 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 
 // Threads returns the number of threads being used by the miner.
 func (m *Miner) Threads() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.threads
 }
