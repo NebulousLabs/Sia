@@ -47,6 +47,16 @@ func (s *State) height() types.BlockHeight {
 	return types.BlockHeight(len(s.currentPath) - 1)
 }
 
+// heightOfBlock returns the height of the block with the given ID.
+func (s *State) heightOfBlock(bid types.BlockID) (height types.BlockHeight, exists bool) {
+	bn, exists := s.blockMap[bid]
+	if !exists {
+		return
+	}
+	height = bn.height
+	return
+}
+
 // output returns the unspent SiacoinOutput associated with the given ID. If
 // the output is not in the UTXO set, 'exists' will be false.
 func (s *State) output(id types.SiacoinOutputID) (sco types.SiacoinOutput, exists bool) {
@@ -194,15 +204,9 @@ func (s *State) Height() types.BlockHeight {
 
 // HeightOfBlock returns the height of the block with the given ID.
 func (s *State) HeightOfBlock(bid types.BlockID) (height types.BlockHeight, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-
-	bn, exists := s.blockMap[bid]
-	if !exists {
-		return
-	}
-	height = bn.height
-	return
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
+	return s.heightOfBlock(bid)
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

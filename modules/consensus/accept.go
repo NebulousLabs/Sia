@@ -202,7 +202,7 @@ func (s *State) RelayBlock(conn modules.PeerConn) error {
 		}
 		return errors.New("consensus set malfunction")
 	}
-	currentPathBlock, exists := s.BlockAtHeight(height)
+	currentPathBlock, exists := s.blockAtHeight(height)
 	if !exists || b.ID() != currentPathBlock.ID() {
 		return errors.New("block added, but it does not extend the consensus set height")
 	}
