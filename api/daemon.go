@@ -19,10 +19,11 @@ type UpdateInfo struct {
 	Version   string
 }
 
-const VERSION = "0.3.1"
+const (
+	VERSION = "0.3.1"
 
-// TODO: Updates need to be signed!
-// TODO: Updating on Windows may not work correctly.
+	developerKey = `TODO: GENERATE DEVELOPER KEY`
+)
 
 // Updates work like this: each version is stored in a folder on a Linode
 // server operated by the developers. The most recent version is stored in
@@ -50,15 +51,24 @@ func newerVersion(version string) bool {
 	return true
 }
 
+// getHTTP is a helper function that returns the full response of an HTTP call
+// to the update server.
+func getHTTP(version, filename string) ([]byte, error) {
+	resp, err := http.Get(updateURL + "/" + version + "/" + filename)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
+}
+
 // fetchManifest requests and parses the update manifest. It returns the
 // manifest (if available) as a slice of lines.
 func fetchManifest(version string) (lines []string, err error) {
-	resp, err := http.Get(updateURL + "/" + version + "/MANIFEST")
+	manifest, err := getHTTP(version, "MANIFEST")
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	manifest, _ := ioutil.ReadAll(resp.Body)
 	lines = strings.Split(strings.TrimSpace(string(manifest)), "\n")
 	if len(lines) == 0 {
 		err = errors.New("could not parse MANIFEST file")
@@ -91,10 +101,24 @@ func applyUpdate(version string) (err error) {
 		return
 	}
 
+	// Initialize the updater object.
+	up, err := update.New().VerifySignatureWithPEM([]byte(developerKey))
+	if err != nil {
+		// should never happen
+		return
+	}
+
 	// Perform updates as indicated by the manifest.
 	for _, file := range manifest[1:] {
+		// fetch the signature
+		var sig []byte
+		sig, err = getHTTP(version, file+".sig")
+		if err != nil {
+			return
+		}
+		// perform the update
 		target := filepath.Join(binDir, file)
-		err, _ = update.New().Target(target).FromUrl(updateURL + "/" + version + "/" + file)
+		err, _ = up.Target(target).VerifySignature(sig).FromUrl(updateURL + "/" + version + "/" + file)
 		if err != nil {
 			return
 		}
