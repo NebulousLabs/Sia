@@ -19,10 +19,10 @@ var (
 	port string
 )
 
-// get wraps a GET request with a status code check, such that if the GET does
+// apiGet wraps a GET request with a status code check, such that if the GET does
 // not return 200, the error will be read and returned. The response body is
 // not closed.
-func get(call string) (*http.Response, error) {
+func apiGet(call string) (*http.Response, error) {
 	resp, err := http.Get("http://localhost:" + port + call)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
@@ -41,7 +41,7 @@ func get(call string) (*http.Response, error) {
 
 // getAPI makes a GET API call and decodes the response.
 func getAPI(call string, obj interface{}) error {
-	resp, err := get(call)
+	resp, err := apiGet(call)
 	if err != nil {
 		return err
 	}
@@ -53,10 +53,20 @@ func getAPI(call string, obj interface{}) error {
 	return nil
 }
 
-// post wraps a POST request with a status code check, such that if the POST
+// get makes an API call and discards the response.
+func get(call string) error {
+	resp, err := apiGet(call)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+// apiPost wraps a POST request with a status code check, such that if the POST
 // does not return 200, the error will be read and returned. The response body
 // is not closed.
-func post(call, vals string) (*http.Response, error) {
+func apiPost(call, vals string) (*http.Response, error) {
 	data, err := url.ParseQuery(vals)
 	if err != nil {
 		return nil, errors.New("bad query string")
@@ -77,9 +87,9 @@ func post(call, vals string) (*http.Response, error) {
 	return resp, err
 }
 
-// postAPI makes a POST API call and decodes the response.
-func postAPI(call, vals string, obj interface{}) error {
-	resp, err := post(call, vals)
+// postResp makes a POST API call and decodes the response.
+func postResp(call, vals string, obj interface{}) error {
+	resp, err := apiPost(call, vals)
 	if err != nil {
 		return err
 	}
@@ -91,18 +101,8 @@ func postAPI(call, vals string, obj interface{}) error {
 	return nil
 }
 
-func postDiscard(call, vals string) error {
-	resp, err := post(call, vals)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	return nil
-}
-
-// callAPI makes an API call and discards the response.
-func callAPI(call string) error {
-	resp, err := get(call)
+func post(call, vals string) error {
+	resp, err := apiPost(call, vals)
 	if err != nil {
 		return err
 	}

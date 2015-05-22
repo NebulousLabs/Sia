@@ -25,7 +25,7 @@ var (
 )
 
 func consensussynchronizecmd() {
-	err := callAPI("/consensus/synchronize")
+	err := get("/consensus/synchronize")
 	if err != nil {
 		fmt.Println("Could not synchronize:", err)
 		return

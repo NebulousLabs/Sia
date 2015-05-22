@@ -117,7 +117,7 @@ func renterdownloadqueuecmd() {
 }
 
 func renterfilesdeletecmd(nickname string) {
-	err := postDiscard("/renter/files/delete", "nickname="+nickname)
+	err := post("/renter/files/delete", "nickname="+nickname)
 	if err != nil {
 		fmt.Println("Could not delete file:", err)
 		return
@@ -126,7 +126,7 @@ func renterfilesdeletecmd(nickname string) {
 }
 
 func renterfilesdownloadcmd(nickname, destination string) {
-	err := postDiscard("/renter/files/download", fmt.Sprintf("nickname=%s&destination=%s", nickname, abs(destination)))
+	err := post("/renter/files/download", fmt.Sprintf("nickname=%s&destination=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not download file:", err)
 		return
@@ -153,7 +153,7 @@ func renterfileslistcmd() {
 
 func renterfilesloadcmd(filename string) {
 	info := new(api.RenterFilesLoadResponse)
-	err := postAPI("/renter/files/load", "filename="+filename, info)
+	err := postResp("/renter/files/load", "filename="+filename, info)
 	if err != nil {
 		fmt.Println("Could not load file:", err)
 		return
@@ -178,7 +178,7 @@ func renterfilesloadasciicmd(data string) {
 }
 
 func renterfilesrenamecmd(nickname, newname string) {
-	err := postDiscard("/renter/files/rename", fmt.Sprintf("nickname=%s&newname=%s", nickname, newname))
+	err := post("/renter/files/rename", fmt.Sprintf("nickname=%s&newname=%s", nickname, newname))
 	if err != nil {
 		fmt.Println("Could not rename file:", err)
 		return
@@ -187,7 +187,7 @@ func renterfilesrenamecmd(nickname, newname string) {
 }
 
 func renterfilessharecmd(nickname, destination string) {
-	err := callAPI(fmt.Sprintf("/renter/files/share?nickname=%s&filepath=%s", nickname, abs(destination)))
+	err := get(fmt.Sprintf("/renter/files/share?nickname=%s&filepath=%s", nickname, abs(destination)))
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
@@ -206,7 +206,7 @@ func renterfilesshareasciicmd(nickname string) {
 }
 
 func renterfilesuploadcmd(source, nickname string) {
-	err := postDiscard("/renter/files/upload", fmt.Sprintf("source=%s&nickname=%s", source, nickname))
+	err := post("/renter/files/upload", fmt.Sprintf("source=%s&nickname=%s", source, nickname))
 	if err != nil {
 		fmt.Println("Could not upload file:", err)
 		return
