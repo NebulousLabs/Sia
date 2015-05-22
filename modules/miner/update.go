@@ -47,8 +47,8 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 
 	// Update the parent, target, and earliest timestamp fields for the miner.
 	m.parent = appliedBlocks[len(appliedBlocks)-1].ID()
-	target, exists1 := m.state.ChildTarget(m.parent)
-	timestamp, exists2 := m.state.EarliestChildTimestamp(m.parent)
+	target, exists1 := m.cs.ChildTarget(m.parent)
+	timestamp, exists2 := m.cs.EarliestChildTimestamp(m.parent)
 	if build.DEBUG {
 		if !exists1 {
 			panic("could not get child target")

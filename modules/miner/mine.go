@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
+	"time"
 	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -59,7 +60,7 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 		id := crypto.HashBytes(hashbytes)
 		if bytes.Compare(target[:], id[:]) >= 0 {
 			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:])
-			err = m.state.AcceptBlock(b)
+			err = m.cs.AcceptBlock(b)
 			if err != nil {
 				println("Mined a bad block " + err.Error())
 				m.tpool.PurgeTransactionPool()
@@ -82,6 +83,20 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 	}
 
 	return
+}
+
+// increaseAttempts is the miner's way of guaging it's own hashrate. After it's
+// made 100 attempts to find a block, it calculates a hashrate based on how
+// much time has passed. The number of attempts in progress is set to 0
+// whenever mining starts or stops, which prevents weird low values from
+// cropping up.
+func (m *Miner) increaseAttempts() {
+	m.attempts++
+	if m.attempts >= 100 {
+		m.hashRate = int64((m.attempts * m.iterationsPerAttempt * 1e9)) / (time.Now().UnixNano() - m.startTime)
+		m.startTime = time.Now().UnixNano()
+		m.attempts = 0
+	}
 }
 
 // mine attempts to generate blocks, and will run until desiredThreads is
@@ -112,7 +127,7 @@ func (m *Miner) threadedMine() {
 			bfw := m.blockForWork()
 			target := m.target
 			iterations := m.iterationsPerAttempt
-			m.attempts++
+			m.increaseAttempts()
 			m.mu.Unlock()
 			m.solveBlock(bfw, target, iterations)
 		} else {
@@ -158,30 +173,4 @@ func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b typ
 		}
 	}
 	return
-}
-
-// StartMining spawns a bunch of mining threads which will mine until stop is
-// called.
-func (m *Miner) StartMining() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Increase the number of threads to m.desiredThreads.
-	m.desiredThreads = m.threads
-	for i := m.runningThreads; i < m.desiredThreads; i++ {
-		go m.threadedMine()
-	}
-
-	return nil
-}
-
-// StopMining sets desiredThreads to 0, a value which is polled by mining
-// threads. When set to 0, the mining threads will all cease mining.
-func (m *Miner) StopMining() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Set desiredThreads to 0. The miners will shut down automatically.
-	m.desiredThreads = 0
-	return nil
 }

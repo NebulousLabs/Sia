@@ -24,6 +24,8 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
+		HashRate:       m.hashRate,
+		// Blocks per month left empty: not sure how to convert 'target' to 'hashes required'
 	}
 	if info.RunningThreads != 0 {
 		info.Mining = true
