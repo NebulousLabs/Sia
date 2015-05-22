@@ -8,6 +8,17 @@ const (
 	ConsensusDir = "consensus"
 )
 
+// A ConsensusSetSubscriber is an object that receives updates to the consensus
+// set every time there is a change in consensus.
+type ConsensusSetSubscriber interface {
+	// ReceiveConsensusSetUpdate sends a consensus update to a module through a
+	// function call. Updates will always be sent in the correct order.
+	// Usually, the function receiving the updates will also process the
+	// changes. If the function blocks indefinitely, the state will still
+	// function.
+	ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
+}
+
 // A DiffDirection indicates the "direction" of a diff, either applied or
 // reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool
@@ -48,4 +59,35 @@ type SiafundOutputDiff struct {
 type SiafundPoolDiff struct {
 	Previous types.Currency
 	Adjusted types.Currency
+}
+
+// A ConsensusSet accepts blocks and builds an understanding of network
+// consensus.
+type ConsensusSet interface {
+	// AcceptBlock adds a block to consensus. An error will be returned if the
+	// block is invalid, has been seen before, is an orphan, or doesn't
+	// contribute to the heaviest fork known to the consensus set. If the block
+	// does not become the head of the heaviest known fork but is otherwise
+	// valid, it will be remembered by the consensus set but an error will
+	// still be returned.
+	AcceptBlock(types.Block) error
+
+	// ChildTarget returns the target required to extend the current heaviest
+	// fork. This function is typically used by miners looking to extend the
+	// heaviest fork.
+	ChildTarget(types.BlockID) (types.Target, bool)
+
+	// Close will shut down the consensus set, giving the module enough time to
+	// run any required closing routines.
+	Close() error
+
+	// ConsensusSetSubscribe will subscribe another module to the consensus
+	// set. Every time that there is a change to the consensus set, an update
+	// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
+	// This is a thread-safe way of managing updates.
+	ConsensusSetSubscribe(ConsensusSetSubscriber)
+
+	// Synchronize will try to synchronize to a specific peer. During general
+	// use, this call should never be necessary.
+	Synchronize(NetAddress) error
 }

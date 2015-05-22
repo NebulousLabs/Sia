@@ -5,12 +5,14 @@ import (
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A Server is essentially a collection of modules and an API server to talk
 // to them all.
 type Server struct {
-	cs      *consensus.State
+	cs      modules.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
 	hostdb  modules.HostDB
@@ -19,7 +21,13 @@ type Server struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
+	// Consensus set variables.
+	blockchainHeight types.BlockHeight
+	currentBlock     types.Block
+
 	apiServer *graceful.Server
+
+	mu *sync.RWMutex
 }
 
 // NewServer creates a new API server from the provided modules.
@@ -33,7 +41,11 @@ func NewServer(APIaddr string, s *consensus.State, g modules.Gateway, h modules.
 		renter:  r,
 		tpool:   tp,
 		wallet:  w,
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+
+	srv.cs.ConsensusSetSubscribe(srv)
 
 	// Register API handlers
 	srv.initAPI(APIaddr)

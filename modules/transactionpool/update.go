@@ -308,8 +308,8 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 // ReceiveConsensusSetUpdate gets called to inform the transaction pool of
 // changes to the consensus set.
 func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks []types.Block) {
-	id := tp.mu.Lock()
-	defer tp.mu.Unlock(id)
+	lockID := tp.mu.Lock()
+	defer tp.mu.Unlock(lockID)
 
 	// Save all of the reverted transactions. Transactions need to appear in
 	// 'unconfirmedTxns' in the same order that they would appear in the

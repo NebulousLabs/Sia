@@ -61,13 +61,13 @@ pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus            
 	./modules/renter ./modules/transactionpool ./modules/wallet ./siad ./siag   \
 	./types
 test: clean fmt REBUILD
-	go test -short -tags='debug testing' -timeout=1s $(pkgs)
+	go test -short -tags='debug testing' -timeout=3s $(pkgs)
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do \
-		go test -tags='testing debug' -timeout=35s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		go test -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html  \
 		&& rm cover/$$package.out ; \
 	done

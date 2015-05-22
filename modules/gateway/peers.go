@@ -193,3 +193,13 @@ func (g *Gateway) makeOutboundConnections() {
 		time.Sleep(5 * time.Second)
 	}
 }
+
+func (g *Gateway) Peers() []modules.NetAddress {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	var peers []modules.NetAddress
+	for addr := range g.peers {
+		peers = append(peers, addr)
+	}
+	return peers
+}

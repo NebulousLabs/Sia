@@ -119,14 +119,9 @@ func (s *State) addBlockToTree(b types.Block) (err error) {
 	return
 }
 
-// AcceptBlock will add a block to the state, forking the blockchain if it is
-// on a fork that is heavier than the current fork. If the block is accepted,
-// it will be relayed to connected peers.
-func (s *State) AcceptBlock(b types.Block) error {
-	counter := s.mu.Lock()
-	defer s.mu.Unlock(counter)
-
-	// Check maps for information about the block.
+// acceptBlock is the internal consensus function for adding blocks. There is
+// no block relaying.
+func (s *State) acceptBlock(b types.Block) error {
 	_, exists := s.badBlocks[b.ID()]
 	if exists {
 		return ErrBadBlock
@@ -136,16 +131,40 @@ func (s *State) AcceptBlock(b types.Block) error {
 		return ErrBlockKnown
 	}
 
+	// Check that the header is valid given the other blocks we know. This
+	// happens before checking that the transactions are intrinsically valid
+	// because it's a much cheaper operation for us to verify, and it's
+	// expensive for an attacker to spoof the header.
 	err := s.validHeader(b)
 	if err != nil {
 		return err
 	}
 
+	// Try adding the block to the tree.
 	err = s.addBlockToTree(b)
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// AcceptBlock will add a block to the state, forking the blockchain if it is
+// on a fork that is heavier than the current fork. If the block is accepted,
+// it will be relayed to connected peers. This function should only be called
+// for new blocks.
+func (s *State) AcceptBlock(b types.Block) error {
+	lockID := s.mu.Lock()
+	defer s.mu.Unlock(lockID)
+
+	// Set the flag to do full verification.
+	s.fullVerification = true
+	err := s.acceptBlock(b)
+	if err != nil {
+		return err
+	}
+
+	// Broadcast the new block to all peers. This is an expensive operation, and not necessary during synchronize or
 	go s.gateway.Broadcast("RelayBlock", b)
 
 	return nil
@@ -153,21 +172,29 @@ func (s *State) AcceptBlock(b types.Block) error {
 
 // RelayBlock is an RPC that accepts a block from a peer.
 func (s *State) RelayBlock(conn modules.PeerConn) error {
+	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
 
+	// Submit the block to the state.
 	err = s.AcceptBlock(b)
 	if err == ErrOrphan {
+		// If the block is an orphan, try to find the parents. The block is
+		// thrown away, will be received again during the synchronize.
 		go s.Synchronize(modules.NetAddress(conn.RemoteAddr().String()))
 	}
 	if err != nil {
 		return err
 	}
 
-	// Check if b is in the current path.
+	// Check if the block is in the current path (sanity check first). If the
+	// block is not in the current path, then it not a part of the longest
+	// known fork. Broadcast is not called and an error is returned.
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
 	height, exists := s.HeightOfBlock(b.ID())
 	if !exists {
 		if build.DEBUG {
@@ -179,5 +206,6 @@ func (s *State) RelayBlock(conn modules.PeerConn) error {
 	if !exists || b.ID() != currentPathBlock.ID() {
 		return errors.New("block added, but it does not extend the consensus set height")
 	}
+
 	return nil
 }

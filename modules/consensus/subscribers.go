@@ -1,20 +1,10 @@
 package consensus
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// A ConsensusSetSubscriber is an object that receives updates to the consensus
-// set every time there is a change in consensus.
-type ConsensusSetSubscriber interface {
-	// ReceiveConsensusSetUpdate sends a consensus update to a module through a
-	// function call. Updates will always be sent in the correct order.
-	// Usually, the function receiving the updates will also process the
-	// changes. If the function blocks indefinitely, the state will still
-	// function.
-	ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
-}
 
 // threadedSendUpdates sends updates to a specific subscriber as they become
 // available. One thread is needed per subscriber. A separate function was
@@ -29,7 +19,7 @@ type ConsensusSetSubscriber interface {
 // consensus set while it makes a blocking call to the subscriber. If the
 // subscriber deadlocks or has problems, the thread will stall indefinitely,
 // but the rest of consensus will not be disrupted.
-func (s *State) threadedSendUpdates(update chan struct{}, subscriber ConsensusSetSubscriber) {
+func (s *State) threadedSendUpdates(update chan struct{}, subscriber modules.ConsensusSetSubscriber) {
 	i := 0
 	for {
 		id := s.mu.RLock()
@@ -60,6 +50,13 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber ConsensusSe
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
 func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
+	// Sanity check - len(appliedNodes) should never be 0.
+	if build.DEBUG {
+		if len(appliedNodes) == 0 {
+			panic("cannot have len(appliedNodes) = 0 in consensus set - blockchain must always get heavier")
+		}
+	}
+
 	// Add the changes to the change set.
 	s.revertUpdates = append(s.revertUpdates, revertedNodes)
 	s.applyUpdates = append(s.applyUpdates, appliedNodes)
@@ -86,7 +83,7 @@ func (s *State) ConsensusSetNotify() <-chan struct{} {
 
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
 // ReceiveConsensusSetUpdate every time there is a change in the consensus set.
-func (s *State) ConsensusSetSubscribe(subscriber ConsensusSetSubscriber) {
+func (s *State) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	c := make(chan struct{}, 1)
 	id := s.mu.Lock()
 	s.subscriptions = append(s.subscriptions, c)

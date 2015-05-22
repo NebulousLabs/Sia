@@ -11,47 +11,36 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks = 50
+	MaxCatchUpBlocks          = 50
+	MaxSynchronizeAttempts    = 8
+	ResynchronizePeerTimeout  = time.Second * 30
+	ResynchronizeBatchTimeout = time.Minute * 3
 )
 
-// threadedResynchronize continuously calls Synchronize on a random peer every
-// few minutes. This helps prevent unintentional desychronization in the event
-// that broadcasts start failing.
+// threadedResynchronize will call synchronize on up to 8 random peers.
 func (s *State) threadedResynchronize() {
 	for {
-		go func() {
-			// The set of connected peers is small and randomly ordered, so
-			// just naively iterate through them until a Synchronize succeeds.
-			for _, peer := range s.gateway.Peers() {
-				if s.Synchronize(peer) == nil {
-					break
-				}
+		peers := s.gateway.Peers()
+		for _, peer := range peers {
+			// NOTE: error is not checked, because nothing happens whether
+			// there is an error or not, the node continuously synchronizes
+			// to all peers.
+			err := s.Synchronize(peer)
+			if err != nil {
+				continue
 			}
-		}()
-		time.Sleep(time.Minute * 2)
+			time.Sleep(ResynchronizePeerTimeout)
+		}
+		time.Sleep(ResynchronizeBatchTimeout)
 	}
-}
-
-// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
-// the network consensus set. The process is as follows: synchronize asks a
-// peer for new blocks. The requester sends 32 block IDs, starting with the 12
-// most recent and then progressing exponentially backwards to the genesis
-// block. The receiver uses these blocks to find the most recent block seen by
-// both peers. From this starting height, it transmits blocks sequentially.
-// The requester then integrates these blocks into its consensus set. Multiple
-// such transmissions may be required to fully synchronize.
-//
-// TODO: don't run two Synchronize threads at the same time
-func (s *State) Synchronize(peer modules.NetAddress) error {
-	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
 func (s *State) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
-	id := s.mu.RLock()
+	lockID := s.mu.RLock()
 	history := s.blockHistory()
-	s.mu.RUnlock(id)
+	s.mu.RUnlock(lockID)
 	if err := encoding.WriteObject(conn, history); err != nil {
 		return err
 	}
@@ -67,87 +56,17 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 			return err
 		}
 
-		// integrate received blocks
+		// integrate received blocks.
 		for _, block := range newBlocks {
-			// TODO: don't Broadcast these blocks
-			acceptErr := s.AcceptBlock(block)
+			// Blocks received during synchronize aren't trusted; activate full
+			// verification.
+			lockID := s.mu.Lock()
+			s.fullVerification = true
+			acceptErr := s.acceptBlock(block)
+			s.mu.Unlock(lockID)
 			if acceptErr != nil {
-				// TODO: If the error is a FutureTimestampErr, need to wait before trying the
-				// block again.
+				return acceptErr
 			}
-		}
-	}
-
-	return nil
-}
-
-// sendBlocks is the receiving end of the SendBlocks RPC. It returns a
-// sequential set of blocks based on the 32 input block IDs. The most recent
-// known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
-// that BlockHeight onwards are returned. It also sends a boolean indicating
-// whether more blocks are available.
-func (s *State) sendBlocks(conn modules.PeerConn) error {
-	// Read known blocks.
-	var knownBlocks [32]types.BlockID
-	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
-	if err != nil {
-		return err
-	}
-
-	// Find the most recent block from knownBlocks that is in our current path.
-	id := s.mu.RLock()
-	found := false
-	var start types.BlockHeight
-	for _, id := range knownBlocks {
-		bn, exists := s.blockMap[id]
-		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
-			found = true
-			start = bn.height + 1 // start at child
-			break
-		}
-	}
-	s.mu.RUnlock(id)
-
-	// If we didn't find any matching blocks, or if we're already
-	// synchronized, don't send any blocks. The genesis block should be
-	// included in knownBlocks, so if no matching blocks are found, the caller
-	// is probably on a different blockchain altogether.
-	if !found || start > s.Height() {
-		// Send 0 blocks.
-		err = encoding.WriteObject(conn, []types.Block{})
-		if err != nil {
-			return err
-		}
-		// Indicate that no more blocks are available.
-		return encoding.WriteObject(conn, false)
-	}
-
-	moreAvailable := true
-	for moreAvailable {
-		// Fetch blocks to send.
-		id = s.mu.RLock()
-		height := s.height()
-		var blocks []types.Block
-		for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-			node, exists := s.blockMap[s.currentPath[i]]
-			if !exists {
-				if build.DEBUG {
-					panic("blockMap is missing a block whose ID is in the currentPath")
-				}
-				break
-			}
-			blocks = append(blocks, node.block)
-		}
-		s.mu.RUnlock(id)
-		moreAvailable = start+MaxCatchUpBlocks < height
-		start += MaxCatchUpBlocks
-
-		// Write blocks + moreAvailable.
-		if err = encoding.WriteObject(conn, blocks); err != nil {
-			return err
-		}
-		if err = encoding.WriteObject(conn, moreAvailable); err != nil {
-			return err
 		}
 	}
 
@@ -180,4 +99,94 @@ func (s *State) blockHistory() (blockIDs [32]types.BlockID) {
 
 	copy(blockIDs[:], knownBlocks)
 	return
+}
+
+// sendBlocks is the receiving end of the SendBlocks RPC. It returns a
+// sequential set of blocks based on the 32 input block IDs. The most recent
+// known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
+// that BlockHeight onwards are returned. It also sends a boolean indicating
+// whether more blocks are available.
+func (s *State) sendBlocks(conn modules.PeerConn) error {
+	// Read known blocks.
+	var knownBlocks [32]types.BlockID
+	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
+	if err != nil {
+		return err
+	}
+
+	// Find the most recent block from knownBlocks in the current path.
+	found := false
+	var start types.BlockHeight
+	lockID := s.mu.RLock()
+	for _, id := range knownBlocks {
+		bn, exists := s.blockMap[id]
+		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
+			found = true
+			start = bn.height + 1 // start at child
+			break
+		}
+	}
+	s.mu.RUnlock(lockID)
+
+	// If no matching blocks are found, or if the caller has all known blocks,
+	// don't send any blocks.
+	if !found || start > s.Height() {
+		// Send 0 blocks.
+		err = encoding.WriteObject(conn, []types.Block{})
+		if err != nil {
+			return err
+		}
+		// Indicate that no more blocks are available.
+		return encoding.WriteObject(conn, false)
+	}
+
+	// Send the caller all of the blocks that they are missing.
+	moreAvailable := true
+	for moreAvailable {
+		// Get the set of blocks to send.
+		var blocks []types.Block
+		lockID = s.mu.RLock()
+		{
+			height := s.height()
+			// TODO: unit test for off-by-one errors here
+			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
+				node, exists := s.blockMap[s.currentPath[i]]
+				if build.DEBUG && !exists {
+					panic("blockMap is missing a block whose ID is in the currentPath")
+				}
+				blocks = append(blocks, node.block)
+			}
+
+			// TODO: Check for off-by-one here too.
+			moreAvailable = start+MaxCatchUpBlocks < height
+			start += MaxCatchUpBlocks
+		}
+		s.mu.RUnlock(lockID)
+
+		// Send a set of blocks to the caller + a flag indicating whether more
+		// are available.
+		if err = encoding.WriteObject(conn, blocks); err != nil {
+			return err
+		}
+		if err = encoding.WriteObject(conn, moreAvailable); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
+// the network consensus set. The process is as follows: synchronize asks a
+// peer for new blocks. The requester sends 32 block IDs, starting with the 12
+// most recent and then progressing exponentially backwards to the genesis
+// block. The receiver uses these blocks to find the most recent block seen by
+// both peers. From this starting height, it transmits blocks sequentially.
+// The requester then integrates these blocks into its consensus set. Multiple
+// such transmissions may be required to fully synchronize.
+//
+// TODO: Synchronize is a blocking call that involved network traffic. This
+// seems to break convention, but I'm not certain. It does seem weird though.
+func (s *State) Synchronize(peer modules.NetAddress) error {
+	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }

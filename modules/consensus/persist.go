@@ -7,11 +7,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// load pulls all the blocks that have been saved to disk into memory, using
+// them to fill out the State.
 func (s *State) load(saveDir string) error {
 	db, err := persist.OpenDB(filepath.Join(saveDir, "chain.db"))
 	if err != nil {
 		return err
 	}
+
+	// Check the height. If the height is 0, then it's a new file and the
+	// genesis block should be added.
 	height, err := db.Height()
 	if err != nil {
 		return err
@@ -21,6 +26,7 @@ func (s *State) load(saveDir string) error {
 		s.db = db
 		return db.AddBlock(s.blockMap[s.currentPath[0]].block)
 	}
+
 	// load blocks from the db, starting after the genesis block
 	// NOTE: during load, the state uses the NilDB. This prevents AcceptBlock
 	// from adding duplicate blocks to the real database.
@@ -31,10 +37,13 @@ func (s *State) load(saveDir string) error {
 			// should never happen
 			return err
 		}
-		err = s.AcceptBlock(b)
-		if err == ErrBlockKnown {
-			println(i)
-		} else if err != nil {
+
+		// Blocks loaded from disk are trusted, don't bother with verification.
+		lockID := s.mu.Lock()
+		s.fullVerification = false
+		err = s.acceptBlock(b)
+		s.mu.Unlock(lockID)
+		if err != nil {
 			return err
 		}
 	}
