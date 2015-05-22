@@ -83,7 +83,11 @@ func getHTTP(version, filename string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+	data, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(string(data))
+	}
+	return data, err
 }
 
 // fetchManifest requests and parses the update manifest. It returns the
