@@ -1,7 +1,11 @@
 package miner
 
 import (
+	"math"
+	"math/big"
+
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Info() returns a MinerInfo struct which can be converted to JSON to be
@@ -17,13 +21,21 @@ import (
 //
 // Address is the current address that is receiving block payouts.
 func (m *Miner) MinerInfo() modules.MinerInfo {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	floatMaxTarget, _ := big.NewRat(0, 1).SetInt(types.RootDepth.Int()).Float64()
+	floatCurTarget, _ := big.NewRat(0, 1).SetInt(m.target.Int()).Float64()
+	hashesRequired := math.Exp2(math.Log2(floatMaxTarget) - math.Log2(floatCurTarget))
+	hashesPerMonth := big.NewInt(0).Mul(big.NewInt(60*60*24*30), big.NewInt(m.hashRate))
+	floatHPM, _ := big.NewRat(0, 1).SetInt(hashesPerMonth).Float64()
+	blocksPerMonth := floatHPM / hashesRequired
 	info := modules.MinerInfo{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
+		HashRate:       m.hashRate,
+		BlocksPerMonth: blocksPerMonth,
 	}
 	if info.RunningThreads != 0 {
 		info.Mining = true
@@ -49,7 +61,7 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 
 // Threads returns the number of threads being used by the miner.
 func (m *Miner) Threads() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.threads
 }

@@ -87,6 +87,16 @@ type ConsensusSet interface {
 	// This is a thread-safe way of managing updates.
 	ConsensusSetSubscribe(ConsensusSetSubscriber)
 
+	// CurrentBlock returns the most recent block on the heaviest fork known to
+	// the consensus set.
+	CurrentBlock() types.Block
+
+	// EarliestChildTimestamp returns the earliest timestamp that is acceptable
+	// on the current longest fork according to the consensus set. This is a
+	// required piece of information for the miner, who could otherwise be at
+	// risk of mining invalid blocks.
+	EarliestChildTimestamp(types.BlockID) (types.Timestamp, bool)
+
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error
