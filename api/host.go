@@ -20,8 +20,6 @@ func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request)
 func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request) {
 	// load current settings
 	config := srv.host.Info().HostSettings
-	fmt.Println(config)
-	fmt.Println(req.URL)
 
 	// map each query string to a field in the host announcement object
 	qsVars := map[string]interface{}{
@@ -52,7 +50,6 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	fmt.Println(config)
 	srv.host.SetSettings(config)
 	writeSuccess(w)
 }

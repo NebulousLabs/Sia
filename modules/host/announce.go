@@ -67,7 +67,7 @@ func (h *Host) Announce() error {
 	// Add the transaction to the transaction pool.
 	err = h.tpool.AcceptTransaction(t)
 	if err == modules.ErrTransactionPoolDuplicate {
-		return errors.New("You have already announced yourself.")
+		return errors.New("you have already announced yourself")
 	}
 	if err != nil {
 		return err
