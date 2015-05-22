@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -21,43 +22,92 @@ var (
 // get wraps a GET request with a status code check, such that if the GET does
 // not return 200, the error will be read and returned. The response body is
 // not closed.
-func get(call string) (resp *http.Response, err error) {
-	resp, err = http.Get("http://localhost:" + port + call)
+func get(call string) (*http.Response, error) {
+	resp, err := http.Get("http://localhost:" + port + call)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
 	// check error code
 	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close()
 		err = errors.New("API call not recognized: " + call)
 	} else if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
 		err = errors.New(strings.TrimSpace(string(errResp)))
 	}
-	return
+	return resp, err
 }
 
-// getAPI makes an API call and decodes the response.
-func getAPI(call string, obj interface{}) (err error) {
+// getAPI makes a GET API call and decodes the response.
+func getAPI(call string, obj interface{}) error {
 	resp, err := get(call)
 	if err != nil {
-		return
+		return err
 	}
 	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
-		return
+		return err
 	}
-	return
+	return nil
+}
+
+// post wraps a POST request with a status code check, such that if the POST
+// does not return 200, the error will be read and returned. The response body
+// is not closed.
+func post(call, vals string) (*http.Response, error) {
+	data, err := url.ParseQuery(vals)
+	if err != nil {
+		return nil, errors.New("bad query string")
+	}
+	resp, err := http.PostForm("http://localhost:"+port+call, data)
+	if err != nil {
+		return nil, errors.New("no response from daemon")
+	}
+	// check error code
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close()
+		err = errors.New("API call not recognized: " + call)
+	} else if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		err = errors.New(strings.TrimSpace(string(errResp)))
+	}
+	return resp, err
+}
+
+// postAPI makes a POST API call and decodes the response.
+func postAPI(call, vals string, obj interface{}) error {
+	resp, err := post(call, vals)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func postDiscard(call, vals string) error {
+	resp, err := post(call, vals)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }
 
 // callAPI makes an API call and discards the response.
-func callAPI(call string) (err error) {
+func callAPI(call string) error {
 	resp, err := get(call)
 	if err != nil {
-		return
+		return err
 	}
 	resp.Body.Close()
-	return
+	return nil
 }
 
 // wrap wraps a generic command with a check that the command has been

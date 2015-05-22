@@ -39,7 +39,7 @@ var (
 )
 
 func minerstartcmd(threads string) {
-	err := callAPI("/miner/start?threads=" + threads)
+	err := postDiscard("/miner/start", "threads="+threads)
 	if err != nil {
 		fmt.Println("Could not start miner:", err)
 		return
@@ -62,7 +62,7 @@ Address: %x
 }
 
 func minerstopcmd() {
-	err := callAPI("/miner/stop")
+	err := postDiscard("/miner/stop", "")
 	if err != nil {
 		fmt.Println("Could not stop miner:", err)
 		return

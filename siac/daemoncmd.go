@@ -72,7 +72,7 @@ func updatecheckcmd() {
 }
 
 func updateapplycmd(version string) {
-	err := callAPI("/daemon/updates/apply?version=" + version)
+	err := postDiscard("/daemon/updates/apply", "version="+version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
@@ -81,7 +81,7 @@ func updateapplycmd(version string) {
 }
 
 func stopcmd() {
-	err := callAPI("/daemon/stop")
+	err := postDiscard("/daemon/stop", "")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
