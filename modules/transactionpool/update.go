@@ -399,6 +399,9 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 }
 
+// PurgeTransactionPool deletes all transactions from the transaction pool.
+// It's a failsafe for when the transaction pool is producing invalid
+// transaction sets.
 func (tp *TransactionPool) PurgeTransactionPool() {
 	lockID := tp.mu.Lock()
 	defer tp.mu.Unlock(lockID)

@@ -10,7 +10,7 @@ import (
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
 	err := srv.host.Announce()
 	if err != nil {
-		writeError(w, "Could not announce host:"+err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeSuccess(w)

@@ -97,6 +97,10 @@ type ConsensusSet interface {
 	// risk of mining invalid blocks.
 	EarliestChildTimestamp(types.BlockID) (types.Timestamp, bool)
 
+	// InCurrentPath returns true if the block id presented is found in the
+	// current path, false otherwise.
+	InCurrentPath(types.BlockID) bool
+
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error

@@ -2,8 +2,9 @@ package miner
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
-	"math/rand" // We should probably switch to crypto/rand, but we should use benchmarks first.
+	"fmt"
 	"time"
 	"unsafe"
 
@@ -12,15 +13,26 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Creates a block that is ready for nonce grinding.
-func (m *Miner) blockForWork() (b types.Block) {
+// Creates a block ready for nonce grinding, also returning the MerkleRoot of
+// the block. Getting the MerkleRoot of a block requires encoding and hashing
+// in a specific way, which are implementation details we didn't want to
+// require external miners to need to worry about. All blocks returned are
+// unique, which means all miners can safely start at the '0' nonce.
+func (m *Miner) blockForWork() (types.Block, crypto.Hash, types.Target) {
 	// Fill out the block with potentially ready values.
-	b = types.Block{
-		ParentID:     m.parent,
-		Timestamp:    types.CurrentTimestamp(),
-		Nonce:        uint64(rand.Int()),
-		Transactions: m.transactions,
+	b := types.Block{
+		ParentID:  m.parent,
+		Timestamp: types.CurrentTimestamp(),
 	}
+
+	// Add a transaction with random arbitrary data so that all blocks returned
+	// by this function are unique - this means that miners can safely start at
+	// the 0 nonce.
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+	b.Transactions = append(m.transactions, types.Transaction{
+		ArbitraryData: []string{"NonSia" + string(randBytes)},
+	})
 
 	// Calculate the subsidy and create the miner payout.
 	subsidy := types.CalculateCoinbase(m.height + 1)
@@ -38,48 +50,64 @@ func (m *Miner) blockForWork() (b types.Block) {
 		b.Timestamp = m.earliestTimestamp
 	}
 
-	return
+	return b, b.MerkleRoot(), m.target
+}
+
+// submitBlock takes a solved block and submits it to the blockchain.
+// submitBlock should not be called with a lock.
+func (m *Miner) submitBlock(b types.Block) error {
+	// Give the block to the consensus set.
+	err := m.cs.AcceptBlock(b)
+	if err != nil {
+		m.mu.Lock()
+		fmt.Println("Mined a bad block:", err)
+		fmt.Println(b.ID())
+		childtarget, _ := m.cs.ChildTarget(b.ParentID)
+		fmt.Println(childtarget)
+		fmt.Println(b.Nonce)
+		m.tpool.PurgeTransactionPool()
+		m.mu.Unlock()
+		return err
+	}
+	if build.Release != "testing" {
+		fmt.Println("Found a block! Reward will be received in 50 blocks.")
+	}
+
+	// Grab a new address for the miner.
+	m.mu.Lock()
+	m.blocksFound = append(m.blocksFound, b.ID())
+	var addr types.UnlockHash
+	addr, _, err = m.wallet.CoinAddress()
+	if err == nil { // Special case: only update the address if there was no error.
+		m.address = addr
+	}
+	m.mu.Unlock()
+	return err
 }
 
 // solveBlock takes a block, target, and number of iterations as input and
 // tries to find a block that meets the target. This function can take a long
 // time to complete, and should not be called with a lock.
-func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterations uint64) (b types.Block, solved bool, err error) {
+func (m *Miner) solveBlock(blockForWork types.Block, blockMerkleRoot crypto.Hash, target types.Target) (b types.Block, solved bool, err error) {
 	b = blockForWork
-	bRoot := b.MerkleRoot()
 	hashbytes := make([]byte, 72)
 	copy(hashbytes, b.ParentID[:])
-	copy(hashbytes[40:], bRoot[:])
+	copy(hashbytes[40:], blockMerkleRoot[:])
 
-	// Iterate through a bunch of nonces (from a random starting point) and try
-	// to find a winnning solution.
 	nonce := (*uint64)(unsafe.Pointer(&hashbytes[32]))
 	*nonce = b.Nonce
-	for i := 0; i < int(iterations); i++ {
-		*nonce++
+	for i := 0; i < iterationsPerAttempt; i++ {
 		id := crypto.HashBytes(hashbytes)
 		if bytes.Compare(target[:], id[:]) >= 0 {
-			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:])
-			err = m.cs.AcceptBlock(b)
+			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:40])
+			err = m.submitBlock(b)
 			if err != nil {
-				println("Mined a bad block " + err.Error())
-				m.tpool.PurgeTransactionPool()
+				return
 			}
 			solved = true
-			if build.Release != "testing" {
-				println("Found a block! Reward will be received in 50 blocks.")
-			}
-
-			// Grab a new address for the miner.
-			m.mu.Lock()
-			var addr types.UnlockHash
-			addr, _, err = m.wallet.CoinAddress()
-			if err == nil { // Special case: only update the address if there was no error.
-				m.address = addr
-			}
-			m.mu.Unlock()
 			return
 		}
+		*nonce++
 	}
 
 	return
@@ -93,8 +121,8 @@ func (m *Miner) solveBlock(blockForWork types.Block, target types.Target, iterat
 func (m *Miner) increaseAttempts() {
 	m.attempts++
 	if m.attempts >= 100 {
-		m.hashRate = int64((m.attempts * m.iterationsPerAttempt * 1e9)) / (time.Now().UnixNano() - m.startTime)
-		m.startTime = time.Now().UnixNano()
+		m.hashRate = int64((m.attempts * iterationsPerAttempt * 1e9)) / (time.Now().UnixNano() - m.startTime.UnixNano())
+		m.startTime = time.Now()
 		m.attempts = 0
 	}
 }
@@ -124,12 +152,10 @@ func (m *Miner) threadedMine() {
 			// Grab the necessary variables for mining, and then attempt to
 			// mine a block.
 			m.mu.Lock()
-			bfw := m.blockForWork()
-			target := m.target
-			iterations := m.iterationsPerAttempt
+			bfw, blockMerkleRoot, target := m.blockForWork()
 			m.increaseAttempts()
 			m.mu.Unlock()
-			m.solveBlock(bfw, target, iterations)
+			m.solveBlock(bfw, blockMerkleRoot, target)
 		} else {
 			m.mu.Lock()
 			// Need to check the mining status again, something might have
@@ -144,33 +170,42 @@ func (m *Miner) threadedMine() {
 	}
 }
 
+// BlockForWork returns a block that is ready for nonce grinding, along with
+// the root hash of the block.
+func (m *Miner) BlockForWork() (types.Block, crypto.Hash, types.Target) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.blockForWork()
+}
+
 // FindBlock will attempt to solve a block and add it to the state. While less
 // efficient than StartMining, it is guaranteed to find at most one block.
 func (m *Miner) FindBlock() (types.Block, bool, error) {
 	m.mu.Lock()
-	bfw := m.blockForWork()
-	target := m.target
-	iterations := m.iterationsPerAttempt
+	bfw, blockMerkleRoot, target := m.blockForWork()
 	m.mu.Unlock()
 
-	return m.solveBlock(bfw, target, iterations)
+	return m.solveBlock(bfw, blockMerkleRoot, target)
 }
 
 // SolveBlock attempts to solve a block, returning the solved block without
-// submitting it to the state.
+// submitting it to the state. This function is primarily to help with testing,
+// and is very slow.
 func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b types.Block, solved bool) {
-	m.mu.Lock()
-	iterations := m.iterationsPerAttempt
-	m.mu.Unlock()
-
-	// Iterate through a bunch of nonces (from a random starting point) and try
-	// to find a winnning solution.
 	b = blockForWork
-	for maxNonce := b.Nonce + iterations; b.Nonce != maxNonce; b.Nonce++ {
+	for b.Nonce = 0; b.Nonce < iterationsPerAttempt; b.Nonce++ {
 		if b.CheckTarget(target) {
 			solved = true
 			return
 		}
 	}
 	return
+}
+
+// SubmitBlock accepts a block with a valid target and presents it to the
+// consensus set.
+func (m *Miner) SubmitBlock(b types.Block) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.submitBlock(b)
 }
