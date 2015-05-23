@@ -6,6 +6,9 @@ package types
 // it is cryptographically unlikely that any two objects would share an id.
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -223,4 +226,11 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	}
 
 	return
+}
+
+// MarshalJSON is implemented on the unlock hash to always produce a hex string
+// upon marshalling.
+func (uh *UnlockHash) MarshalJSON() ([]byte, error) {
+	str := fmt.Sprintf("%x", *uh)
+	return json.Marshal(str)
 }
