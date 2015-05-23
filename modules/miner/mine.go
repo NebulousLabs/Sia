@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"time"
 	"unsafe"
 
@@ -58,12 +59,18 @@ func (m *Miner) submitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
-		println("Mined a bad block " + err.Error())
+		m.mu.Lock()
+		fmt.Println("Mined a bad block:", err)
+		fmt.Println(b.ID())
+		childtarget, _ := m.cs.ChildTarget(b.ID())
+		fmt.Println(childtarget)
+		fmt.Println(b.Nonce)
 		m.tpool.PurgeTransactionPool()
+		m.mu.Unlock()
 		return err
 	}
 	if build.Release != "testing" {
-		println("Found a block! Reward will be received in 50 blocks.")
+		fmt.Println("Found a block! Reward will be received in 50 blocks.")
 	}
 
 	// Grab a new address for the miner.
