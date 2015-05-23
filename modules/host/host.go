@@ -80,8 +80,8 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		HostSettings: modules.HostSettings{
 			TotalStorage: 5e9,                      // 5 GB
 			MaxFilesize:  1e9,                      // 1 GB
-			MaxDuration:  5e3,                      // Just over a month.
-			WindowSize:   288,                      // 48 hours.
+			MaxDuration:  144 * 30,                 // 30 days
+			WindowSize:   288,                      // 48 hours
 			Price:        types.NewCurrency64(1e9), // 10^9
 			Collateral:   types.NewCurrency64(0),
 			UnlockHash:   coinAddr,

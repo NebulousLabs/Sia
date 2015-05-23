@@ -62,7 +62,7 @@ func (m *Miner) submitBlock(b types.Block) error {
 		m.mu.Lock()
 		fmt.Println("Mined a bad block:", err)
 		fmt.Println(b.ID())
-		childtarget, _ := m.cs.ChildTarget(b.ID())
+		childtarget, _ := m.cs.ChildTarget(b.ParentID)
 		fmt.Println(childtarget)
 		fmt.Println(b.Nonce)
 		m.tpool.PurgeTransactionPool()
