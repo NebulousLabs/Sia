@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -14,6 +15,15 @@ type MinerInfo struct {
 	HashRate       int64
 	BlocksPerMonth float64
 	Address        types.UnlockHash
+}
+
+// MinerWork is all the information a miner needs to do work
+type MinerWork struct {
+	Block      types.Block
+	ParentID   types.BlockID
+	Nonce      uint64
+	MerkleRoot crypto.Hash
+	Target     types.Target
 }
 
 // The Miner interface provides access to mining features.
@@ -39,6 +49,10 @@ type Miner interface {
 	// It will give up after a few seconds, returning the block, a bool
 	// indicating whether it has been solved, and an error.
 	SolveBlock(types.Block, types.Target) (types.Block, bool)
+
+	// GetWork() returns a MinerWork struct which can be converted to JSON to be
+	// parsed by external miners
+	GetWork() MinerWork
 
 	// StartMining turns on the miner, which will endlessly work for new
 	// blocks.

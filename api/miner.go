@@ -35,3 +35,8 @@ func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	srv.miner.StopMining()
 	writeSuccess(w)
 }
+
+// minerGetWorkHandler handles the API call that gets work for an external miner.
+func (srv *Server) minerGetWorkHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.miner.GetWork())
+}
