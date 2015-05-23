@@ -77,8 +77,8 @@ func (m *Miner) submitBlock(b types.Block) error {
 	m.mu.Lock()
 	m.blocksFound = append(m.blocksFound, b.ID())
 	var addr types.UnlockHash
-	addr, _, err = m.wallet.CoinAddress()
-	if err == nil { // Special case: only update the address if there was no error.
+	addr, _, err = m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	if err == nil {                            // Special case: only update the address if there was no error.
 		m.address = addr
 	}
 	m.mu.Unlock()

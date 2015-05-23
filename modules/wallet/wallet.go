@@ -60,9 +60,12 @@ type Wallet struct {
 	// Timelocked keys is a list of addresses found in `keys` that can't be
 	// spent until a certain height. The wallet will use `timelockedKeys` to
 	// mark keys as unspendable until the timelock has lifted.
-	age            int
-	keys           map[types.UnlockHash]*key
-	timelockedKeys map[types.BlockHeight][]types.UnlockHash
+	//
+	// Visible keys will be displayed to the user.
+	age              int
+	keys             map[types.UnlockHash]*key
+	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
+	visibleAddresses map[types.UnlockHash]struct{}
 
 	// transactions is a list of transactions that are currently being built by
 	// the wallet. Each transaction has a unique id, which is enforced by the
@@ -93,9 +96,10 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 
 		saveDir: saveDir,
 
-		age:            AgeDelay + 100,
-		keys:           make(map[types.UnlockHash]*key),
-		timelockedKeys: make(map[types.BlockHeight][]types.UnlockHash),
+		age:              AgeDelay + 100,
+		keys:             make(map[types.UnlockHash]*key),
+		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
+		visibleAddresses: make(map[types.UnlockHash]struct{}),
 
 		transactions: make(map[string]*openTransaction),
 

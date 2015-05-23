@@ -80,7 +80,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	}
 
 	// Get an address for the miner payout.
-	addr, _, err := m.wallet.CoinAddress()
+	addr, _, err := m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err != nil {
 		return
 	}

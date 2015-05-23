@@ -64,7 +64,7 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 
 	// Create and add the output that will be used to fund the standard
 	// transaction.
-	parentDest, parentSpendConds, err := w.coinAddress()
+	parentDest, parentSpendConds, err := w.coinAddress(false) // false indicates that the address should not be visible to the user
 	exactOutput := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: parentDest,
@@ -74,7 +74,7 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 	// Create a refund output if needed.
 	if amount.Cmp(fundingTotal) != 0 {
 		var refundDest types.UnlockHash
-		refundDest, _, err = w.coinAddress()
+		refundDest, _, err = w.coinAddress(false) // false indicates that the address should not be visible to the user
 		if err != nil {
 			return
 		}

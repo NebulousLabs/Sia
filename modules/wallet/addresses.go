@@ -8,7 +8,7 @@ import (
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
+func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	// Create the address + spend conditions.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
@@ -43,6 +43,11 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddr
 	// `unlockHeight`
 	w.timelockedKeys[unlockHeight] = append(w.timelockedKeys[unlockHeight], coinAddress)
 
+	// Put the address in the list of visible addresses if 'visible' is set.
+	if visible {
+		w.visibleAddresses[coinAddress] = struct{}{}
+	}
+
 	// Save the wallet state, which now includes the new address.
 	err = w.save()
 	if err != nil {
@@ -53,7 +58,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddr
 }
 
 // coinAddress returns a new address for receiving coins.
-func (w *Wallet) coinAddress() (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
+func (w *Wallet) coinAddress(visible bool) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
 	// Create the keys and address.
 	sk, pk, err := crypto.GenerateSignatureKeys()
 	if err != nil {
@@ -80,6 +85,10 @@ func (w *Wallet) coinAddress() (coinAddress types.UnlockHash, unlockConditions t
 	}
 	w.keys[coinAddress] = newKey
 
+	if visible {
+		w.visibleAddresses[coinAddress] = struct{}{}
+	}
+
 	// Save the wallet state, which now includes the new address.
 	err = w.save()
 	if err != nil {
@@ -91,15 +100,15 @@ func (w *Wallet) coinAddress() (coinAddress types.UnlockHash, unlockConditions t
 
 // TimelockedCoinAddress returns an address that can only be spent after block
 // `unlockHeight`.
-func (w *Wallet) TimelockedCoinAddress(unlockHeight types.BlockHeight) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
-	return w.timelockedCoinAddress(unlockHeight)
+func (w *Wallet) TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	return w.timelockedCoinAddress(unlockHeight, visible)
 }
 
 // CoinAddress implements the core.Wallet interface.
-func (w *Wallet) CoinAddress() (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
-	return w.coinAddress()
+func (w *Wallet) CoinAddress(visible bool) (coinAddress types.UnlockHash, unlockConditions types.UnlockConditions, err error) {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	return w.coinAddress(visible)
 }

@@ -11,7 +11,7 @@ import (
 
 // walletAddressHandler handles the API request for a new address.
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, _, err := srv.wallet.CoinAddress()
+	coinAddress, _, err := srv.wallet.CoinAddress(true) // true indicates that the address should be visible to the user
 	if err != nil {
 		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
 		return

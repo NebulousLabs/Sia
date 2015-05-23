@@ -14,5 +14,9 @@ func (w *Wallet) Info() modules.WalletInfo {
 	counter := w.mu.RLock()
 	wi.NumAddresses = len(w.keys)
 	w.mu.RUnlock(counter)
+
+	for va := range w.visibleAddresses {
+		wi.VisibleAddresses = append(wi.VisibleAddresses, va)
+	}
 	return wi
 }
