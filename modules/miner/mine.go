@@ -18,7 +18,7 @@ import (
 // in a specific way, which are implementation details we didn't want to
 // require external miners to need to worry about. All blocks returned are
 // unique, which means all miners can safely start at the '0' nonce.
-func (m *Miner) blockForWork() (types.Block, crypto.Hash) {
+func (m *Miner) blockForWork() (types.Block, crypto.Hash, types.Target) {
 	// Fill out the block with potentially ready values.
 	b := types.Block{
 		ParentID:  m.parent,
@@ -50,7 +50,7 @@ func (m *Miner) blockForWork() (types.Block, crypto.Hash) {
 		b.Timestamp = m.earliestTimestamp
 	}
 
-	return b, b.MerkleRoot()
+	return b, b.MerkleRoot(), m.target
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
@@ -152,8 +152,7 @@ func (m *Miner) threadedMine() {
 			// Grab the necessary variables for mining, and then attempt to
 			// mine a block.
 			m.mu.Lock()
-			bfw, blockMerkleRoot := m.blockForWork()
-			target := m.target
+			bfw, blockMerkleRoot, target := m.blockForWork()
 			m.increaseAttempts()
 			m.mu.Unlock()
 			m.solveBlock(bfw, blockMerkleRoot, target)
@@ -171,12 +170,19 @@ func (m *Miner) threadedMine() {
 	}
 }
 
+// BlockForWork returns a block that is ready for nonce grinding, along with
+// the root hash of the block.
+func (m *Miner) BlockForWork() (types.Block, crypto.Hash, types.Target) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.blockForWork()
+}
+
 // FindBlock will attempt to solve a block and add it to the state. While less
 // efficient than StartMining, it is guaranteed to find at most one block.
 func (m *Miner) FindBlock() (types.Block, bool, error) {
 	m.mu.Lock()
-	bfw, blockMerkleRoot := m.blockForWork()
-	target := m.target
+	bfw, blockMerkleRoot, target := m.blockForWork()
 	m.mu.Unlock()
 
 	return m.solveBlock(bfw, blockMerkleRoot, target)
@@ -194,4 +200,12 @@ func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b typ
 		}
 	}
 	return
+}
+
+// SubmitBlock accepts a block with a valid target and presents it to the
+// consensus set.
+func (m *Miner) SubmitBlock(b types.Block) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.submitBlock(b)
 }

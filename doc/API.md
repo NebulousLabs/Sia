@@ -244,9 +244,41 @@ Miner
 
 Queries:
 
+* /miner/blockforwork
 * /miner/start
 * /miner/status
 * /miner/stop
+* /miner/submitblock
+
+#### /miner/blockforwork
+
+Function: Provides a block that is ready for the blockchain except for having
+an invalid target. An external miner is expected to try nonces until a block
+with a valid target is found. Every block returned by this call will have a
+unique hash - miners can start at nonce 0 without worrying about trying the
+same block twice. The block id is calculated by appending Block.ParentID,
+Block.Nonce, and Block.MerkleRoot. The result is a 72 byte array that is fed
+into blake2b. See the miner package for a reference implementation.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Block types.Block
+	MerkleRoot [32]byte
+	Target [32]byte
+}
+```
+`Block` is a consensus block, and will have all fields such as transactions,
+miner payouts, etc. ready to go. The only thing that needs to be modified is
+the nonce.
+
+`MerkleRoot` is the Merkle root of the block structures. This can be computed
+from the block, but requires knowning how to encode a block. To keep external
+miners lightweight, this value is calculated for you.
+
+`Target` is the target that the block header hash needs to be less than. Once a nonce is found that produces a block id lower than the target, the block can be submitted to `/miner/submitblock`
 
 #### /miner/start
 
@@ -290,6 +322,18 @@ a block,
 Function: Stops the miner.
 
 Parameters: none
+
+Response: standard
+
+#### /miner/submitblock
+
+Function: Submits a block to the miner.
+
+Response Body:
+```
+Block types.Block
+```
+`Block` is a json encoded block that is put into the resonse body.
 
 Response: standard
 
