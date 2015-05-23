@@ -49,12 +49,12 @@ func TestGatewayPeerAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.callAPI("/gateway/peer/add?address=" + string(peer.Address()))
+	st.callAPI("/gateway/peers/add?address=" + string(peer.Address()))
 
 	var info GatewayInfo
 	st.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
-		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
+		t.Fatal("/gateway/peers/add did not add peer", peer.Address())
 	}
 }
 
@@ -64,15 +64,15 @@ func TestGatewayPeerRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.callAPI("/gateway/peer/add?address=" + string(peer.Address()))
+	st.callAPI("/gateway/peers/add?address=" + string(peer.Address()))
 
 	var info GatewayInfo
 	st.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 1 || info.Peers[0] != peer.Address() {
-		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
+		t.Fatal("/gateway/peers/add did not add peer", peer.Address())
 	}
 
-	st.callAPI("/gateway/peer/remove?address=" + string(peer.Address()))
+	st.callAPI("/gateway/peers/remove?address=" + string(peer.Address()))
 	st.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 0 {
 		t.Fatal("/gateway/peer/add did not add peer", peer.Address())

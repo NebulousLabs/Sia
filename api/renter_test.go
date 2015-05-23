@@ -27,7 +27,7 @@ func TestUploadAndDownload(t *testing.T) {
 
 	// Upload to the host.
 	uploadName := "api.go"
-	st.callAPI("/renter/upload?pieces=1&nickname=api.go&source=" + uploadName)
+	st.callAPI("/renter/files/upload?pieces=1&nickname=api.go&source=" + uploadName)
 
 	// Wait for the upload to finish - this is necessary due to the
 	// fact that zero-conf transactions aren't actually propagated properly.
@@ -44,7 +44,7 @@ func TestUploadAndDownload(t *testing.T) {
 
 	// Try to download the file.
 	downloadName := build.TempDir("api", "TestUploadAndDownload", "downloadTestData")
-	st.callAPI("/renter/download?nickname=api.go&destination=" + downloadName)
+	st.callAPI("/renter/files/download?nickname=api.go&destination=" + downloadName)
 	time.Sleep(time.Second * 2)
 
 	// Check that the downloaded file is equal to the uploaded file.

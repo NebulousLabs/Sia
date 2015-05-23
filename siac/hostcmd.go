@@ -47,7 +47,7 @@ Available settings:
 )
 
 func hostconfigcmd(param, value string) {
-	err := callAPI(fmt.Sprintf("/host/configure?%s=%s", param, value))
+	err := post("/host/configure", param+"="+value)
 	if err != nil {
 		fmt.Println("Could not update host settings:", err)
 		return
@@ -56,7 +56,7 @@ func hostconfigcmd(param, value string) {
 }
 
 func hostannouncecmd() {
-	err := callAPI("/host/announce")
+	err := post("/host/announce", "")
 	if err != nil {
 		fmt.Println("Could not announce host:", err)
 		return

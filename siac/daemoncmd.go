@@ -49,7 +49,7 @@ func updatecmd() {
 		fmt.Println("Already up to date.")
 		return
 	}
-	err = callAPI("/daemon/update/apply?version=" + update.Version)
+	err = get("/daemon/update/apply?version=" + update.Version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
@@ -72,7 +72,7 @@ func updatecheckcmd() {
 }
 
 func updateapplycmd(version string) {
-	err := callAPI("/daemon/updates/apply?version=" + version)
+	err := post("/daemon/updates/apply", "version="+version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
@@ -81,7 +81,7 @@ func updateapplycmd(version string) {
 }
 
 func stopcmd() {
-	err := callAPI("/daemon/stop")
+	err := post("/daemon/stop", "")
 	if err != nil {
 		fmt.Println("Could not stop daemon:", err)
 		return
