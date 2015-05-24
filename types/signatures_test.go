@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -352,5 +353,47 @@ func TestTransactionValidSignatures(t *testing.T) {
 	err = txn.validSignatures(10)
 	if err != ErrMissingSignatures {
 		t.Error(err)
+	}
+}
+
+// TestUnlockHashJSONMarshalling checks that when an unlock hash is marshalled
+// and unmarshalled using JSON, the result is what is expected.
+func TestUnlockHashJSONMarshalling(t *testing.T) {
+	// Create an unlock hash.
+	uc := UnlockConditions{
+		Timelock:           5,
+		SignaturesRequired: 3,
+	}
+	uh := uc.UnlockHash()
+
+	// Marshal the unlock hash.
+	marUH, err := json.Marshal(uh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal the unlock hash.
+	var umarUH UnlockHash
+	err = json.Unmarshal(marUH, &umarUH)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare the original to the unmarshalled.
+	if umarUH != uh {
+		t.Error("Marshalled and unmarshalled unlock hash are not equivalent")
+	}
+
+	// Try an input that's not correct hex.
+	marUH[7] = 255
+	err = umarUH.UnmarshalJSON(marUH)
+	if err == nil {
+		t.Error("Expecting error after corrupting input")
+	}
+
+	// Try an input of the wrong length.
+	err = (&umarUH).UnmarshalJSON(marUH[2:])
+	if err != ErrUnlockHashWrongLen {
+		t.Error("Got wrong error:", err)
 	}
 }

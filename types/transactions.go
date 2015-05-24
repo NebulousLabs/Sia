@@ -6,9 +6,6 @@ package types
 // it is cryptographically unlikely that any two objects would share an id.
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -34,12 +31,6 @@ type (
 	SiacoinOutputID crypto.Hash
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
-
-	// An UnlockHash is a specially constructed hash of the UnlockConditions
-	// type. "Locked" values can be unlocked by providing the UnlockConditions
-	// that hash to a given UnlockHash. See SpendConditions.UnlockHash for
-	// details on how the UnlockHash is constructed.
-	UnlockHash crypto.Hash
 
 	// A Transaction is an atomic component of a block. Transactions can contain
 	// inputs and outputs, file contracts, storage proofs, and even arbitrary
@@ -226,11 +217,4 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	}
 
 	return
-}
-
-// MarshalJSON is implemented on the unlock hash to always produce a hex string
-// upon marshalling.
-func (uh *UnlockHash) MarshalJSON() ([]byte, error) {
-	str := fmt.Sprintf("%x", *uh)
-	return json.Marshal(str)
 }
