@@ -25,10 +25,12 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 
 	// Using the hashrate and target, determine the number of blocks per month
 	// that could be mined.
-	hashesRequired, _ := big.NewRat(0, 1).SetFrac(types.RootDepth.Int(), m.target.Int()).Float64()
-	hashesPerWeek := big.NewInt(0).Mul(big.NewInt(60*60*24*7), big.NewInt(m.hashRate))
-	floatHPW, _ := big.NewRat(0, 1).SetInt(hashesPerWeek).Float64()
-	blocksPerWeek := floatHPW / hashesRequired
+	blocksPerWeek := float64(0)
+	if m.target.Int().Sign() > 0 {
+		hashesPerWeek := new(big.Int).Mul(big.NewInt(60*60*24*7), big.NewInt(m.hashRate))
+		hashesPerBlock := new(big.Int).Div(types.RootDepth.Int(), m.target.Int())
+		blocksPerWeek, _ = new(big.Rat).SetFrac(hashesPerWeek, hashesPerBlock).Float64()
+	}
 
 	info := modules.MinerInfo{
 		Threads:        m.threads,
