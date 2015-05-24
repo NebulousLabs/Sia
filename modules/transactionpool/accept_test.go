@@ -25,7 +25,7 @@ func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn types.Transaction) {
 // the unconfirmed siacoin output.
 func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, dependentTxn types.Transaction) {
 	// Get an address to receive coins.
-	addr, _, err := tpt.wallet.CoinAddress()
+	addr, _, err := tpt.wallet.CoinAddress(false) // false means hide the address from the user; doesn't matter for test.
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
