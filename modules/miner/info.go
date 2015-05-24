@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"math"
 	"math/big"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -26,19 +25,17 @@ func (m *Miner) MinerInfo() modules.MinerInfo {
 
 	// Using the hashrate and target, determine the number of blocks per month
 	// that could be mined.
-	floatMaxTarget, _ := big.NewRat(0, 1).SetInt(types.RootDepth.Int()).Float64()
-	floatCurTarget, _ := big.NewRat(0, 1).SetInt(m.target.Int()).Float64()
-	hashesRequired := math.Exp2(math.Log2(floatMaxTarget) - math.Log2(floatCurTarget))
-	hashesPerMonth := big.NewInt(0).Mul(big.NewInt(60*60*24*30), big.NewInt(m.hashRate))
-	floatHPM, _ := big.NewRat(0, 1).SetInt(hashesPerMonth).Float64()
-	blocksPerMonth := floatHPM / hashesRequired
+	hashesRequired, _ := big.NewRat(0, 1).SetFrac(types.RootDepth.Int(), m.target.Int()).Float64()
+	hashesPerWeek := big.NewInt(0).Mul(big.NewInt(60*60*24*7), big.NewInt(m.hashRate))
+	floatHPW, _ := big.NewRat(0, 1).SetInt(hashesPerWeek).Float64()
+	blocksPerWeek := floatHPW / hashesRequired
 
 	info := modules.MinerInfo{
 		Threads:        m.threads,
 		RunningThreads: m.runningThreads,
 		Address:        m.address,
 		HashRate:       m.hashRate,
-		BlocksPerMonth: blocksPerMonth,
+		BlocksPerWeek:  blocksPerWeek,
 	}
 
 	// Using the reference of all blocks that have been mined, determine how

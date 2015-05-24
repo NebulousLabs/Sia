@@ -13,7 +13,7 @@ type MinerInfo struct {
 	Threads        int
 	RunningThreads int
 	HashRate       int64
-	BlocksPerMonth float64
+	BlocksPerWeek  float64
 	BlocksMined    int
 	OrphansMined   int
 	Address        types.UnlockHash
