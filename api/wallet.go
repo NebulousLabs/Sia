@@ -20,9 +20,7 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 	// Since coinAddress is not a struct, we define one here so that writeJSON
 	// writes an object instead of a bare value. In addition, we transmit the
 	// coinAddress as a hex-encoded string rather than a byte array.
-	writeJSON(w, struct {
-		Address string
-	}{fmt.Sprintf("%x", coinAddress)})
+	writeJSON(w, struct{ Address types.UnlockHash }{coinAddress})
 }
 
 // walletSendHandler handles the API call to send coins to another address.

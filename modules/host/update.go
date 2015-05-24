@@ -64,6 +64,7 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
+	var shouldSave bool
 	for _ = range appliedBlocks {
 		h.blockHeight++
 
@@ -83,10 +84,13 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 				return
 			}
 			h.deallocate(uint64(stat.Size()), obligation.Path) // TODO: file might actually be the wrong size.
-
 			delete(h.obligationsByID, obligation.ID)
+			shouldSave = true
 		}
 		delete(h.obligationsByHeight, h.blockHeight)
+	}
+	if shouldSave {
+		_ = h.save() // TODO: Some way to communicate that the save failed.
 	}
 
 	h.updateSubscribers()
