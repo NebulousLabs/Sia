@@ -32,12 +32,6 @@ type (
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
 
-	// An UnlockHash is a specially constructed hash of the UnlockConditions
-	// type. "Locked" values can be unlocked by providing the UnlockConditions
-	// that hash to a given UnlockHash. See SpendConditions.UnlockHash for
-	// details on how the UnlockHash is constructed.
-	UnlockHash crypto.Hash
-
 	// A Transaction is an atomic component of a block. Transactions can contain
 	// inputs and outputs, file contracts, storage proofs, and even arbitrary
 	// data. They can also contain signatures to prove that a given party has

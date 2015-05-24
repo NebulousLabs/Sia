@@ -118,7 +118,7 @@ func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
 		mds.TransactionPool = true
 	}()
 	go func() {
-		srv.wallet.CoinAddress()
+		srv.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 		mds.Wallet = true
 	}()
 	time.Sleep(time.Second * 3)

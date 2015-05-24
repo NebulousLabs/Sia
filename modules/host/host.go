@@ -67,7 +67,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 		return
 	}
 
-	coinAddr, _, err := wallet.CoinAddress()
+	coinAddr, _, err := wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err != nil {
 		return
 	}
@@ -78,11 +78,11 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 5e9,                      // 5 GB
-			MaxFilesize:  1e9,                      // 1 GB
-			MaxDuration:  144 * 30,                 // 30 days
-			WindowSize:   288,                      // 48 hours
-			Price:        types.NewCurrency64(1e9), // 10^9
+			TotalStorage: 5e9,                       // 5 GB
+			MaxFilesize:  1e9,                       // 1 GB
+			MaxDuration:  144 * 30,                  // 30 days
+			WindowSize:   288,                       // 48 hours
+			Price:        types.NewCurrency64(1e15), // 1 siacoin / mb / week
 			Collateral:   types.NewCurrency64(0),
 			UnlockHash:   coinAddr,
 		},

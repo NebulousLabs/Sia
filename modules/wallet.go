@@ -16,9 +16,10 @@ var (
 
 // WalletInfo contains basic information about the wallet.
 type WalletInfo struct {
-	Balance      types.Currency
-	FullBalance  types.Currency
-	NumAddresses int
+	Balance          types.Currency
+	FullBalance      types.Currency
+	VisibleAddresses []types.UnlockHash
+	NumAddresses     int
 }
 
 // Wallet in an interface that helps to build and sign transactions. The user
@@ -31,11 +32,14 @@ type Wallet interface {
 	// have been spent in unconfirmed transactions.
 	Balance(full bool) types.Currency
 
-	// CoinAddress return an address into which coins can be paid.
-	CoinAddress() (types.UnlockHash, types.UnlockConditions, error)
+	// CoinAddress return an address into which coins can be paid. The bool
+	// indicates whether the address should be visible to the user.
+	CoinAddress(visible bool) (types.UnlockHash, types.UnlockConditions, error)
 
-	// TimelockedCoinAddress returns an address that can only be spent after block `unlockHeight`.
-	TimelockedCoinAddress(unlockHeight types.BlockHeight) (types.UnlockHash, types.UnlockConditions, error)
+	// TimelockedCoinAddress returns an address that can only be spent after
+	// block `unlockHeight`. The bool indicates whether the address should be
+	// visible to the user.
+	TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (types.UnlockHash, types.UnlockConditions, error)
 
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to

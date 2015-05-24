@@ -11,7 +11,7 @@ import (
 
 // walletAddressHandler handles the API request for a new address.
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, _, err := srv.wallet.CoinAddress()
+	coinAddress, _, err := srv.wallet.CoinAddress(true) // true indicates that the address should be visible to the user
 	if err != nil {
 		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
 		return
@@ -20,9 +20,7 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 	// Since coinAddress is not a struct, we define one here so that writeJSON
 	// writes an object instead of a bare value. In addition, we transmit the
 	// coinAddress as a hex-encoded string rather than a byte array.
-	writeJSON(w, struct {
-		Address string
-	}{fmt.Sprintf("%x", coinAddress)})
+	writeJSON(w, struct{ Address types.UnlockHash }{coinAddress})
 }
 
 // walletSendHandler handles the API call to send coins to another address.

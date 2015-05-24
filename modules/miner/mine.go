@@ -60,11 +60,6 @@ func (m *Miner) submitBlock(b types.Block) error {
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
 		m.mu.Lock()
-		fmt.Println("Mined a bad block:", err)
-		fmt.Println(b.ID())
-		childtarget, _ := m.cs.ChildTarget(b.ParentID)
-		fmt.Println(childtarget)
-		fmt.Println(b.Nonce)
 		m.tpool.PurgeTransactionPool()
 		m.mu.Unlock()
 		return err
@@ -77,8 +72,8 @@ func (m *Miner) submitBlock(b types.Block) error {
 	m.mu.Lock()
 	m.blocksFound = append(m.blocksFound, b.ID())
 	var addr types.UnlockHash
-	addr, _, err = m.wallet.CoinAddress()
-	if err == nil { // Special case: only update the address if there was no error.
+	addr, _, err = m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	if err == nil {                            // Special case: only update the address if there was no error.
 		m.address = addr
 	}
 	m.mu.Unlock()

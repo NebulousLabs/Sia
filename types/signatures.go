@@ -7,7 +7,9 @@ package types
 // called 'UnlockConditions'.
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -28,6 +30,7 @@ var (
 	ErrPrematureSignature        = errors.New("timelock on signature has not expired")
 	ErrPublicKeyOveruse          = errors.New("public key was used multiple times while signing transaction")
 	ErrSortedUniqueViolation     = errors.New("sorted unique violation")
+	ErrUnlockHashWrongLen        = errors.New("marshalled unlock hash is the wrong length")
 	ErrWholeTransactionViolation = errors.New("covered fields violation")
 
 	ZeroUnlockHash = UnlockHash{0}
@@ -109,6 +112,12 @@ type (
 		PublicKeys         []SiaPublicKey
 		SignaturesRequired uint64
 	}
+
+	// An UnlockHash is a specially constructed hash of the UnlockConditions
+	// type. "Locked" values can be unlocked by providing the UnlockConditions
+	// that hash to a given UnlockHash. See SpendConditions.UnlockHash for
+	// details on how the UnlockHash is constructed.
+	UnlockHash crypto.Hash
 
 	// Each input has a list of public keys and a required number of signatures.
 	// inputSignatures keeps track of which public keys have been used and how many
@@ -383,6 +392,32 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 			return ErrMissingSignatures
 		}
 	}
+
+	return nil
+}
+
+// MarshalJSON is implemented on the unlock hash to always produce a hex string
+// upon marshalling.
+func (uh UnlockHash) MarshalJSON() ([]byte, error) {
+	str := fmt.Sprintf("%x", uh)
+	return json.Marshal(str)
+}
+
+// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
+// that has been encoded to a hex string.
+func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
+	// Check the length of b.
+	if len(b) != crypto.HashSize*2+2 {
+		return ErrUnlockHashWrongLen
+	}
+
+	// Decode the input .
+	var byteUnlockHash []byte
+	_, err := fmt.Sscanf(string(b[1:crypto.HashSize*2+1]), "%x", &byteUnlockHash)
+	if err != nil {
+		return err
+	}
+	copy(uh[:], byteUnlockHash)
 
 	return nil
 }
