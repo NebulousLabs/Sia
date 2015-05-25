@@ -70,15 +70,31 @@ body {
 
 .extra-stuff .logo-container{
 	padding:25px;
+	padding-bottom: 10px;
 	text-align:center;
 }
 .extra-stuff .logo{
-	height:80px;;
+	height:80px;
 	text-align:center;
+	opacity:.95;
+	position: relative;
+	left: -3px;
+}
+
+.extra-stuff .social-media {
+	text-align:center;
+	opacity:.70;
+}
+
+.extra-stuff .social-media a {
+	text-align:center;
+	text-decoration: none;
 }
 
 .extra-stuff .download-links{
 	padding:30px;
+	top: 17px;
+	position: relative;
 }
 
 .footer{

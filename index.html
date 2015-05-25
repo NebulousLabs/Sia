@@ -9,6 +9,7 @@
 	<title>Sia</title>
 	<link href='http://fonts.googleapis.com/css?family=Roboto:300,400' rel='stylesheet' type='text/css'>
 	<link href="css/bootstrap.min.css" rel="stylesheet">
+	<link href="css/icon.min.css" rel="stylesheet">
 	<link href="css/sia.css" rel="stylesheet">
 	<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
 	<script src='js/screenshot.js'></script>
@@ -17,12 +18,11 @@
 	<div class='container'>
 		<div class='page'>
 			<div class='row header'>
-					<div class='col-md-3 logo-container'>
-					<img class='logo' src='assets/logo/sia.png'>
+				<div class='col-md-3 logo-container'>
+					<a href="index.html"><img class='logo' src='assets/logo/sia.png'></a>
 				</div>
 				<div class='col-md-9'>
 					<div class='header-links'>
-						<span class='item'><a href="index.html">Home</a></span>
 						<span class='item'><a href="about.html">About</a></span>
 						<span class='item'><a href="jobs.html">Jobs</a></span>
 						<span class='item'><a href="sia.pdf">Whitepaper</a></span>
@@ -44,35 +44,28 @@
 				<div class='col-xs-12'>
 					<div class='content'>
 						Sia is a new decentralized cloud storage platform aimed at giving users control of their data.
-						While uploading, data is split into hundreds of pieces and encrypted client-side.
-						Each piece is then uploaded to a separate host on the network.
-						A blockchain is used to create cryptographic contracts with each service, ensuring that they only get paid if they actually store the data.
-						Out of dozens of hosts, only a fraction need be available for the data to be recovered.
-						Even if many of the hosts are unreliable, the data is still safe.
+						Storage is pulled from a large network of hosts, each using Sia's blockchain to form storage contracts with clients.
+						When uploading, clients erasure code their data into many encrypted pieces and upload each piece to a different host.
+						The storage contracts on the blockchain ensure that the host will only get paid if they actually store the file (it's like a blockchain-based escrow).
+						Out of the hundreds of hosts, only a fraction need to be online for the data to be recovered.
+						Even in a network with many unreliable hosts, the data is safe.
 						<br><br>
-						Anybody can join as a host and make money.
-						This openness allows Sia to take advantage of all the unused storage available in the world, estimated to be millions upon millions of terabytes.
-						This creates a great opportunity for cheap storage.
-						Reliability is maintained by using redundancy and cryptography.
+						Anybody with spare storage space can join the network as a host and get income from that storage.
+						This openness allows Sia to tap into the mllions of terabytes of unused storage in the world.
+						The encryption combined with the geographic diversity of hosts gives users both privacy and high reliability.
 						<br><br>
-						Sia's decentralized approach to cloud storage results in a global network of computers that can be leveraged to improve upon price, efficiency, security, reliability, latency, and throughput over traditional cloud storage.
-						Many of these advantages come from leveraging the network to create advanced algorithms for storing and retrieving data.
-						Many advantages also result from directly correlating storage and bandwidth with income.
-						We saw a similar phenomenon with Bitcoin mining, where hashrate is very tightly correlated to income.
-						There is no marketing or customer service overhead for Bitcoin mining.
-						The result was that Bitcoin mining became absurdly efficient; today Bitcoin does more computation than the top 500 supercomputers combined.
-						Sia brings the same direct correlated between profit and efficient infrastructure.
-						Storage that is plugged into the network will make money for the owner, with no marketing or customer service overhead.
-						We believe that this, combined with intelligent algorithms for leveraging such a network, will create the best cloud storage platform the world has ever seen.
+						The long term goals of Sia involve leveraging a global network of hosts to improve upon existing cloud storage platforms.
+						We believe that we will see improvements in price, security, availability, latency, and throughput compared to traditional object stores.
+						Availability, latency, and throughput are all benefitted by storing data in hundreds of places at the same time.
+						Out of the hudreds of places, data only needs to be retrived from a handful, and the client can choose the closest and fastest hosts for retrieving the file.
+						For larger files, downloads can be done in parallel, using all of the hundreds of hosts simultaneously.
+						Even when the average host has a slow upload speed, the combined speed of hundreds of hosts means that downloads will be blazing fast.
+						In many ways, a global decentralized network of storage hosts is similar to a CDN.
 						More about the technology can be found on the <a href="about.html">about page →</a>
 						<br><br>
 						Sia is in the final few weeks of beta, the beta can be downloaded at the bottom of the page.
 						<br>
 						The full network will be launching on June 7th, 2015.
-						<br><br>
-						Stay up to date by following Nebulous on <a href="http://twitter.com/NebulousLabs">Twitter</a> and <a href="http://facebook.com/NebulousLabs">Facebook</a>.
-						<br>
-						We also invite you to join us at #siatalk on freenode.
 
 						<div class='screenshots'>
 								<span class='img-container'><img src='assets/screenshots/main.png'/></span>
@@ -87,22 +80,34 @@
 				<div class='row'>
 					<div class='col-md-6'>
 						<div class='logo-container'>
-							<img class='logo' src='assets/logo/sia.png'>
+							<a href="index.html"><img class='logo' src='assets/logo/sia.png'></a>
+						</div>
+						<div class='social-media'>
+							<a href="http://facebook.com/NebulousLabs"><i class='black large bordered facebook icon'></i></a>
+							<a href="http://twitter.com/NebulousLabs"><i class='black large bordered twitter icon'></i></a>
+							<a href="http://siatalk-slackin.herokuapp.com"><i class='black large bordered slack icon'></i></a>
+							<a href="http://eepurl.com/bonKaL"><i class='black large bordered mail icon'></i></a>
+							<a href="http://github.com/NebulousLabs/Sia"><i class='black large bordered github alternate icon'></i></a>
+							<br> We also invite you to #siatalk on freenode.
 						</div>
 					</div>
 					<div class='col-md-6'>
 						<div class='download-links'>
 							Download Sia for
-							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-win64.zip" class='link'>Windows</a>
-							<span style="font-size: 0.8em">(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_windows_amd64.zip" class='link'>CLI only</a>)</span>
-							<br/>
+							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-win64.zip" class='link'>Windows 64bit</a>
+							<span style="font-size: 0.8em">&nbsp;(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_windows_amd64.zip" class='link'>CLI only</a>)</span>
+							<br>
 							Download Sia for
-							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-linux64.tar.xz" class='link'>Linux</a>
-							<span style="font-size: 0.8em">(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_linux_amd64.tar.gz" class='link'>CLI only</a>)</span>
-							<br/>
+							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-linux64.tar.xz" class='link'>Linux 64bit</a>
+							<span style="font-size: 0.8em">&nbsp;(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_linux_amd64.tar.gz" class='link'>CLI only</a>)</span>
+							<br>
 							Download Sia for
-							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-darwin.tar.xz" class='link'>OS X</a>
-							<span style="font-size: 0.8em">(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_darwin_amd64.zip" class='link'>CLI only</a>)</span>
+							<a href="https://github.com/NebulousLabs/Sia-UI/releases/download/v0.3.0-beta/Sia-UI-v0.3.0-beta-darwin.tar.xz" class='link'>OS X 64bit</a>
+							<span style="font-size: 0.8em">&nbsp;(<a href="https://github.com/NebulousLabs/Sia/releases/download/v0.3.1/Sia_0.3.1-release.beta_darwin_amd64.zip" class='link'>CLI only</a>)</span>
+							<br>
+							Download Sia for
+							<a href="https://github.com/NebulousLabs/Sia-UI/releases/v0.3.0-beta/" class='link'>Other Platforms</a>
+							<span style="font-size: 0.8em">&nbsp;(<a href="https://github.com/NebulousLabs/Sia/releases/v0.3.1/" class='link'>CLI only</a>)</span>
 						</div>
 					</div>
 				</div>
@@ -115,7 +120,7 @@
 					<div class='footer-links'>
 						<span class='link'><a href="index.html">Home</a></span>
 						<span class='link'><a href="about.html">About</a></span>
-						<span class='item'><a href="jobs.html">Jobs</a></span>
+						<span class='link'><a href="jobs.html">Jobs</a></span>
 						<span class='link'><a href="sia.pdf">Whitepaper</a></span>
 						<span class='link'><a href="http://github.com/NebulousLabs/Sia">GitHub</a></span>
 					</div>
