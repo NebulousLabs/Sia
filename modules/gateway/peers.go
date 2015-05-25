@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -51,6 +52,20 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.listenPeer(p)
 }
 
+func (g *Gateway) randomPeer() modules.NetAddress {
+	if len(g.peers) > 0 {
+		r := rand.Intn(len(g.peers))
+		for node := range g.peers {
+			if r == 0 {
+				return node
+			}
+			r--
+		}
+	}
+
+	return ""
+}
+
 // listen handles incoming connection requests. If the connection is accepted,
 // the peer will be added to the Gateway's peer list.
 func (g *Gateway) listen() {
@@ -65,7 +80,6 @@ func (g *Gateway) listen() {
 }
 
 // acceptConn adds a connecting node as a peer.
-// TODO: reject when we have too many active connections
 func (g *Gateway) acceptConn(conn net.Conn) {
 	g.log.Printf("INFO: %v wants to connect", conn.RemoteAddr())
 
@@ -78,28 +92,33 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// decide whether to accept
-	id := g.mu.RLock()
-	numPeers := len(g.peers)
-	g.mu.RUnlock(id)
-	if numPeers >= fullyConnectedThreshold {
-		encoding.WriteObject(conn, "reject")
-		conn.Close()
-		g.log.Printf("INFO: rejected connection from %v (already have %v peers)", conn.RemoteAddr(), len(g.peers))
-		return
-	}
-	// TODO: reject old versions
-
-	// send ack
+	// TODO: for now we always accept. Eventually we should start rejecting old versions.
 	if err := encoding.WriteObject(conn, "accept"); err != nil {
 		conn.Close()
 		g.log.Printf("INFO: could not write ack to %v: %v", conn.RemoteAddr(), err)
 		return
 	}
 
+	// If we are already fully connected, kick out an old peer to make room
+	// for the new one. Among other things, this ensures that bootstrap nodes
+	// will always be connectible. Worst case, you'll connect, receive a node
+	// list, and immediately get booted. But once you have the node list you
+	// should be able to connect to less full peers.
+	//
+	// NOTE: this is attackable. It's less attackable if we start rejecting
+	// duplicate IPs, and even less attackable if we pick a random *recently
+	// added peer* instead of any peer. These should be implemented soon.
+	id := g.mu.Lock()
+	if len(g.peers) >= fullyConnectedThreshold {
+		oldPeer := g.randomPeer()
+		g.log.Printf("INFO: disconnecting from %v to make room for %v", oldPeer, conn.RemoteAddr())
+		g.peers[oldPeer].sess.Close()
+		delete(g.peers, oldPeer)
+	}
 	// add the peer
-	id = g.mu.Lock()
 	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
+
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", conn.RemoteAddr(), remoteVersion)
 }
 
