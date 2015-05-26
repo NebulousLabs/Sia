@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 
@@ -26,6 +28,7 @@ type peer struct {
 	strikes uint32
 	addr    modules.NetAddress
 	sess    muxado.Session
+	inbound bool
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -51,6 +54,25 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.listenPeer(p)
 }
 
+// randomInboundPeer returns a random peer that initiated its connection.
+func (g *Gateway) randomInboundPeer() modules.NetAddress {
+	if len(g.peers) > 0 {
+		r := rand.Intn(len(g.peers))
+		for addr, peer := range g.peers {
+			// only select inbound peers
+			if !peer.inbound {
+				continue
+			}
+			if r == 0 {
+				return addr
+			}
+			r--
+		}
+	}
+
+	return ""
+}
+
 // listen handles incoming connection requests. If the connection is accepted,
 // the peer will be added to the Gateway's peer list.
 func (g *Gateway) listen() {
@@ -65,42 +87,57 @@ func (g *Gateway) listen() {
 }
 
 // acceptConn adds a connecting node as a peer.
-// TODO: reject when we have too many active connections
 func (g *Gateway) acceptConn(conn net.Conn) {
-	g.log.Printf("INFO: %v wants to connect", conn.RemoteAddr())
+	addr := modules.NetAddress(conn.RemoteAddr().String())
+	g.log.Printf("INFO: %v wants to connect", addr)
+
+	// don't connect to an IP address more than once
+	if build.Release != "testing" {
+		id := g.mu.RLock()
+		for p := range g.peers {
+			if p.Host() == addr.Host() {
+				g.mu.RUnlock(id)
+				conn.Close()
+				g.log.Printf("INFO: rejected connection from %v: already connected", addr)
+				return
+			}
+		}
+		g.mu.RUnlock(id)
+	}
 
 	// read version
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", conn.RemoteAddr(), err)
+		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
 		return
 	}
 
 	// decide whether to accept
-	id := g.mu.RLock()
-	numPeers := len(g.peers)
-	g.mu.RUnlock(id)
-	if numPeers >= fullyConnectedThreshold {
-		encoding.WriteObject(conn, "reject")
-		conn.Close()
-		g.log.Printf("INFO: rejected connection from %v (already have %v peers)", conn.RemoteAddr(), len(g.peers))
-		return
-	}
-	// TODO: reject old versions
-
-	// send ack
+	// TODO: for now we always accept. Eventually we should start rejecting old versions.
 	if err := encoding.WriteObject(conn, "accept"); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: could not write ack to %v: %v", conn.RemoteAddr(), err)
+		g.log.Printf("INFO: could not write ack to %v: %v", addr, err)
 		return
 	}
 
+	// If we are already fully connected, kick out an old inbound peer to make
+	// room for the new one. Among other things, this ensures that bootstrap
+	// nodes will always be connectible. Worst case, you'll connect, receive a
+	// node list, and immediately get booted. But once you have the node list
+	// you should be able to connect to less full peers.
+	id := g.mu.Lock()
+	if len(g.peers) >= fullyConnectedThreshold {
+		oldPeer := g.randomInboundPeer()
+		g.peers[oldPeer].sess.Close()
+		delete(g.peers, oldPeer)
+		g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
+	}
 	// add the peer
-	id = g.mu.Lock()
-	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
 	g.mu.Unlock(id)
-	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", conn.RemoteAddr(), remoteVersion)
+
+	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
@@ -136,7 +173,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.log.Println("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn), inbound: false})
 	g.mu.Unlock(id)
 
 	// call initRPCs
