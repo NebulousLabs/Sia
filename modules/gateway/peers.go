@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 
@@ -81,13 +82,28 @@ func (g *Gateway) listen() {
 
 // acceptConn adds a connecting node as a peer.
 func (g *Gateway) acceptConn(conn net.Conn) {
-	g.log.Printf("INFO: %v wants to connect", conn.RemoteAddr())
+	addr := modules.NetAddress(conn.RemoteAddr().String())
+	g.log.Printf("INFO: %v wants to connect", addr)
+
+	// don't connect to an IP address more than once
+	if build.Release != "testing" {
+		id := g.mu.RLock()
+		for p := range g.peers {
+			if p.Host() == addr.Host() {
+				g.mu.RUnlock(id)
+				conn.Close()
+				g.log.Printf("INFO: rejected connection from %v: already connected", addr)
+				return
+			}
+		}
+		g.mu.RUnlock(id)
+	}
 
 	// read version
 	var remoteVersion string
 	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", conn.RemoteAddr(), err)
+		g.log.Printf("INFO: %v wanted to connect, but we could not read their version: %v", addr, err)
 		return
 	}
 
@@ -95,7 +111,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	// TODO: for now we always accept. Eventually we should start rejecting old versions.
 	if err := encoding.WriteObject(conn, "accept"); err != nil {
 		conn.Close()
-		g.log.Printf("INFO: could not write ack to %v: %v", conn.RemoteAddr(), err)
+		g.log.Printf("INFO: could not write ack to %v: %v", addr, err)
 		return
 	}
 
@@ -111,15 +127,15 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
 		oldPeer := g.randomPeer()
-		g.log.Printf("INFO: disconnecting from %v to make room for %v", oldPeer, conn.RemoteAddr())
 		g.peers[oldPeer].sess.Close()
 		delete(g.peers, oldPeer)
+		g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
 	}
 	// add the peer
-	g.addPeer(&peer{addr: modules.NetAddress(conn.RemoteAddr().String()), sess: muxado.Server(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
 	g.mu.Unlock(id)
 
-	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", conn.RemoteAddr(), remoteVersion)
+	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
 }
 
 // Connect establishes a persistent connection to a peer, and adds it to the
