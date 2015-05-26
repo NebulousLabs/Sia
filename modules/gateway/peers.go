@@ -28,6 +28,7 @@ type peer struct {
 	strikes uint32
 	addr    modules.NetAddress
 	sess    muxado.Session
+	inbound bool
 }
 
 func (p *peer) open() (modules.PeerConn, error) {
@@ -53,12 +54,17 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.listenPeer(p)
 }
 
-func (g *Gateway) randomPeer() modules.NetAddress {
+// randomInboundPeer returns a random peer that initiated its connection.
+func (g *Gateway) randomInboundPeer() modules.NetAddress {
 	if len(g.peers) > 0 {
 		r := rand.Intn(len(g.peers))
-		for node := range g.peers {
+		for addr, peer := range g.peers {
+			// only select inbound peers
+			if !peer.inbound {
+				continue
+			}
 			if r == 0 {
-				return node
+				return addr
 			}
 			r--
 		}
@@ -115,24 +121,20 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		return
 	}
 
-	// If we are already fully connected, kick out an old peer to make room
-	// for the new one. Among other things, this ensures that bootstrap nodes
-	// will always be connectible. Worst case, you'll connect, receive a node
-	// list, and immediately get booted. But once you have the node list you
-	// should be able to connect to less full peers.
-	//
-	// NOTE: this is attackable. It's less attackable if we start rejecting
-	// duplicate IPs, and even less attackable if we pick a random *recently
-	// added peer* instead of any peer. These should be implemented soon.
+	// If we are already fully connected, kick out an old inbound peer to make
+	// room for the new one. Among other things, this ensures that bootstrap
+	// nodes will always be connectible. Worst case, you'll connect, receive a
+	// node list, and immediately get booted. But once you have the node list
+	// you should be able to connect to less full peers.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		oldPeer := g.randomPeer()
+		oldPeer := g.randomInboundPeer()
 		g.peers[oldPeer].sess.Close()
 		delete(g.peers, oldPeer)
 		g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
 	}
 	// add the peer
-	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
 	g.mu.Unlock(id)
 
 	g.log.Printf("INFO: accepted connection from new peer %v (v%v)", addr, remoteVersion)
@@ -171,7 +173,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	g.log.Println("INFO: connected to new peer", addr)
 
 	id = g.mu.Lock()
-	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn)})
+	g.addPeer(&peer{addr: addr, sess: muxado.Client(conn), inbound: false})
 	g.mu.Unlock(id)
 
 	// call initRPCs
