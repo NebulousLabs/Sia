@@ -88,9 +88,9 @@ func (d *Download) downloadPiece(piece filePiece) error {
 	// Simultaneously download, decrypt, and calculate the Merkle root of the file.
 	tee := io.TeeReader(
 		// Use a LimitedReader to ensure we don't read indefinitely.
-		piece.EncryptionKey.NewReader(io.LimitReader(conn, int64(piece.Contract.FileSize))),
-		// Each byte we read from tee will also be written to file.
-		d,
+		io.LimitReader(conn, int64(piece.Contract.FileSize)),
+		// Write the decrypted bytes to the file.
+		piece.EncryptionKey.NewWriter(d),
 	)
 	merkleRoot, err := crypto.ReaderMerkleRoot(tee)
 	if err != nil {
@@ -119,6 +119,7 @@ func (d *Download) start() {
 			// Reset seek, since the file may have been partially written. The
 			// next attempt will overwrite these bytes.
 			d.file.Seek(0, 0)
+			atomic.SwapUint64(&d.received, 0)
 		}
 
 		// This iteration failed, no hosts returned the piece. Try again
