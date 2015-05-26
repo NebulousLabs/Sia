@@ -10,33 +10,25 @@ import (
 // result.
 func TestNewerVersion(t *testing.T) {
 	// If the VERSION is changed, these tests might no longer be valid.
-	if VERSION != "0.3.1" {
+	if VERSION != "0.3.2" {
 		t.Fatal("Need to update version tests")
 	}
 
-	if newerVersion(VERSION) {
-		t.Error("Comparing to the current version should return false.")
+	versionMap := map[string]bool{
+		VERSION:   false,
+		"0.1":     false,
+		"0.1.1":   false,
+		"1":       true,
+		"0.9":     true,
+		"0.3.1.9": false,
+		"0.3.2.0": true,
+		"0.3.2.1": true,
 	}
-	if newerVersion("0.1") {
-		t.Error("Comparing to 0.1 should return false")
-	}
-	if newerVersion("0.1.1") {
-		t.Error("Comparing to 0.1.1 should return false")
-	}
-	if !newerVersion("1") {
-		t.Error("Comparing to 1 should return true")
-	}
-	if !newerVersion("0.9") {
-		t.Error("Comparing to 0.3 should return true")
-	}
-	if !newerVersion("0.3.2") {
-		t.Error("Comparing to 0.3.2 should return true")
-	}
-	if !newerVersion("0.3.1.0") {
-		t.Error("Comparing to 0.3.0.0 should return true")
-	}
-	if !newerVersion("0.3.1.1") {
-		t.Error("Comparing to 0.3.0.1 should return true")
+
+	for version, expected := range versionMap {
+		if newerVersion(version) != expected {
+			t.Error("Comparing %v to %v should return %v", version, VERSION, expected)
+		}
 	}
 }
 

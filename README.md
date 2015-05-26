@@ -1,4 +1,4 @@
-Sia 0.3.1
+Sia 0.3.2
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -117,6 +117,8 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+v0.3.2: Fourth open beta release.
 
 v0.3.1: Third open beta release.
 
