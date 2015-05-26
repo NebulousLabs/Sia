@@ -42,9 +42,15 @@ release: REBUILD
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
 xc: dependencies test test-long REBUILD
-	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.3.1  \
+	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.3.2  \
 		-br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
-		-main-dirs-exclude=siag	-tasks-=deb,deb-dev,deb-source,go-test
+		-main-dirs-exclude=siag	-tasks-=deb,deb-dev,deb-source,go-test          \
+		-n=Sia_CLI
+xc-siag: dependencies test test-long REBUILD
+	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=1.0    \
+		-br=release -include=LICENSE,README.md,doc/API.md                       \
+		-main-dirs-exclude=siad,siac -tasks-=deb,deb-dev,deb-source,go-test     \
+		-n=Sia_Address_Generator
 
 # clean removes all directories that get automatically created during
 # development.
