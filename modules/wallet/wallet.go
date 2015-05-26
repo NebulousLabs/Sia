@@ -118,6 +118,11 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 	err = w.load()
 	if os.IsNotExist(err) {
 		err = nil
+		// No wallet file exists... make a visible address for the user.
+		_, _, err = w.coinAddress(true)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err != nil {
 		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
