@@ -87,14 +87,14 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 			UnlockHash:   coinAddr,
 		},
 
-		saveDir:        saveDir,
-		spaceRemaining: 2e9,
+		saveDir: saveDir,
 
 		obligationsByID:     make(map[types.FileContractID]contractObligation),
 		obligationsByHeight: make(map[types.BlockHeight][]contractObligation),
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
+	h.spaceRemaining = h.TotalStorage
 
 	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
@@ -123,6 +123,7 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 func (h *Host) SetSettings(settings modules.HostSettings) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
+	h.spaceRemaining += settings.TotalStorage - h.TotalStorage
 	h.HostSettings = settings
 	h.save()
 }
