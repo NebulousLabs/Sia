@@ -21,12 +21,12 @@ var (
 		Short: "Modify host settings",
 		Long: `Modify host settings.
 Available settings:
-	totalStorage
-	minFilesize
-	maxFilesize
-	minDuration
-	maxDuration
-	windowSize
+	totalstorage
+	minfilesize
+	maxfilesize
+	minduration
+	maxduration
+	windowsize
 	price
 	collateral`,
 		Run: wrap(hostconfigcmd),
