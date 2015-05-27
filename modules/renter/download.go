@@ -26,6 +26,7 @@ type Download struct {
 	// correctly on ARM and x86-32.
 	received uint64
 
+	startTime   time.Time
 	complete    bool
 	filesize    uint64
 	destination string
@@ -33,6 +34,11 @@ type Download struct {
 
 	pieces []filePiece
 	file   *os.File
+}
+
+// StartTime returns when the download was initiated.
+func (d *Download) StartTime() time.Time {
+	return d.startTime
 }
 
 // Complete returns whether the file is ready to be used.
@@ -126,7 +132,8 @@ func newDownload(file *file, destination string) (*Download, error) {
 	}
 
 	return &Download{
-		complete: false,
+		startTime: time.Now(),
+		complete:  false,
 		// for now, all the pieces are equivalent
 		filesize:    file.Pieces[0].Contract.FileSize,
 		received:    0,

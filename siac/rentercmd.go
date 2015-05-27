@@ -112,7 +112,7 @@ func renterdownloadqueuecmd() {
 	}
 	fmt.Println("Download Queue:")
 	for _, file := range queue {
-		fmt.Printf("%5.1f%% %s -> %s\n", 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
+		fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 2 3:04 PM"), 100*float32(file.Received)/float32(file.Filesize), file.Nickname, file.Destination)
 	}
 }
 
@@ -131,7 +131,7 @@ func renterfilesdownloadcmd(nickname, destination string) {
 		fmt.Println("Could not download file:", err)
 		return
 	}
-	fmt.Printf("Started downloading '%s' to %s.\n", nickname, abs(destination))
+	fmt.Printf("Downloaded '%s' to %s.\n", nickname, abs(destination))
 }
 
 func renterfileslistcmd() {
