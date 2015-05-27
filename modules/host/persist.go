@@ -8,18 +8,16 @@ import (
 )
 
 type savedHost struct {
-	SpaceRemaining int64
-	FileCounter    int
-	Obligations    []contractObligation
-	HostSettings   modules.HostSettings
+	FileCounter  int
+	Obligations  []contractObligation
+	HostSettings modules.HostSettings
 }
 
 func (h *Host) save() (err error) {
 	sHost := savedHost{
-		SpaceRemaining: h.spaceRemaining,
-		FileCounter:    h.fileCounter,
-		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
-		HostSettings:   h.HostSettings,
+		FileCounter:  h.fileCounter,
+		Obligations:  make([]contractObligation, 0, len(h.obligationsByID)),
+		HostSettings: h.HostSettings,
 	}
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
@@ -35,7 +33,7 @@ func (h *Host) load() error {
 		return err
 	}
 
-	h.spaceRemaining = sHost.SpaceRemaining
+	h.spaceRemaining = sHost.HostSettings.TotalStorage
 	h.fileCounter = sHost.FileCounter
 	h.HostSettings = sHost.HostSettings
 	// recreate maps
@@ -43,6 +41,8 @@ func (h *Host) load() error {
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
+		// update spaceRemaining
+		h.spaceRemaining -= int64(obligation.FileContract.FileSize)
 	}
 
 	return nil
