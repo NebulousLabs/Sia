@@ -9,7 +9,7 @@ import (
 // automatically added by the miner) and adds it to the consnesus set.
 func (cst *consensusSetTester) testSimpleBlock() error {
 	// Get the starting hash of the consenesus set.
-	initialCSSum := cst.cs.StateHash()
+	initialCSSum := cst.cs.consensusSetHash()
 
 	// Mine and submit a block
 	block, _, err := cst.miner.FindBlock()
@@ -19,7 +19,7 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	cst.csUpdateWait()
 
 	// Get the ending hash of the consensus set.
-	resultingCSSum := cst.cs.StateHash()
+	resultingCSSum := cst.cs.consensusSetHash()
 	if initialCSSum == resultingCSSum {
 		return errors.New("state hash is unchanged after mining a block")
 	}
@@ -36,15 +36,18 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 
 	// Revert the block that was just added to the consensus set and check for
 	// parity with the original state of consensus.
-	cst.cs.revertToNode(newNode.parent)
-	if cst.cs.StateHash() != initialCSSum {
+	_, _, err = cst.cs.forkBlockchain(newNode.parent)
+	if err != nil {
+		return err
+	}
+	if cst.cs.consensusSetHash() != initialCSSum {
 		return errors.New("adding and reverting a block changed the consensus set")
 	}
 	// Re-add the block and check for parity with the first time it was added.
 	// This test is useful because a different codepath is followed if the
 	// diffs have already been generated.
-	cst.cs.applyUntilNode(newNode)
-	if cst.cs.StateHash() != resultingCSSum {
+	_, _, err = cst.cs.forkBlockchain(newNode)
+	if cst.cs.consensusSetHash() != resultingCSSum {
 		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
 	}
 

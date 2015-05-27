@@ -98,7 +98,7 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the State is only updated if the
 // function returns nil.
-func (s *State) forkBlockchain(newNode *blockNode) (err error) {
+func (s *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
@@ -109,15 +109,12 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 
 	// revert to the common parent
 	commonParent := s.backtrackToCurrentPath(newNode)[0]
-	revertedNodes := s.revertToNode(commonParent)
+	revertedNodes = s.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	appliedNodes, err := s.applyUntilNode(newNode)
+	appliedNodes, err = s.applyUntilNode(newNode)
 	if err == nil {
-		// If application succeeded, notify the subscribers and return. Error
-		// handling happens outside this if statement.
-		s.updateSubscribers(revertedNodes, appliedNodes)
-		return
+		return revertedNodes, appliedNodes, err
 	}
 
 	// restore old path
@@ -130,5 +127,5 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 			panic("state hash changed after an unsuccessful fork attempt")
 		}
 	}
-	return
+	return nil, nil, err
 }

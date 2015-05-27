@@ -102,7 +102,7 @@ func (s *State) validHeader(b types.Block) (err error) {
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
 // parent's list of children. If the new blockNode is heavier than the current
 // node, the blockchain is forked.
-func (s *State) addBlockToTree(b types.Block) (err error) {
+func (s *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := s.blockMap[b.ParentID]
 	newNode := parentNode.newChild(b)
 
@@ -110,13 +110,13 @@ func (s *State) addBlockToTree(b types.Block) (err error) {
 	s.blockMap[b.ID()] = newNode
 
 	if newNode.heavierThan(s.currentBlockNode()) {
-		err = s.forkBlockchain(newNode)
+		revertedNodes, appliedNodes, err = s.forkBlockchain(newNode)
 		if err != nil {
-			return
+			return nil, nil, err
 		}
+		return revertedNodes, appliedNodes, nil
 	}
-
-	return
+	return nil, nil, nil
 }
 
 // acceptBlock is the internal consensus function for adding blocks. There is
@@ -141,9 +141,20 @@ func (s *State) acceptBlock(b types.Block) error {
 	}
 
 	// Try adding the block to the tree.
-	err = s.addBlockToTree(b)
+	revertedNodes, appliedNodes, err := s.addBlockToTree(b)
 	if err != nil {
 		return err
+	}
+	if len(appliedNodes) > 0 {
+		s.updateSubscribers(revertedNodes, appliedNodes)
+	}
+
+	// Sanity check, if applied nodes is len 0, revertedNodes should also be
+	// len 0.
+	if build.DEBUG {
+		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
+			panic("appliedNodes and revertedNodes are mismatched!")
+		}
 	}
 
 	return nil
