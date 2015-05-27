@@ -141,4 +141,12 @@ type ConsensusSet interface {
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error
+
+	// ValidStorageProofs checks that all the storage proofs in a transaction
+	// are valid in the context of the current consensus set. An error is
+	// returned if not.
+	//
+	// NOTE: For synchronization reasons, this call is not recommended and
+	// should be deprecated.
+	ValidStorageProofs(types.Transaction) error
 }

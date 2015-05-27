@@ -62,7 +62,7 @@ func (w *Wallet) load() error {
 		}
 	}
 
-	height := w.state.Height()
+	height := w.consensusHeight
 	for _, skey := range savedKeys {
 		// Create an entry in w.keys for each savedKey.
 		w.keys[skey.UnlockConditions.UnlockHash()] = &key{

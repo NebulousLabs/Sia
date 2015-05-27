@@ -32,7 +32,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight, visible b
 	// needs to go in both though in case there is a reorganization of the
 	// blockchain.
 	w.keys[coinAddress] = &key{
-		spendable:        w.state.Height() >= unlockHeight,
+		spendable:        w.consensusHeight >= unlockHeight,
 		unlockConditions: unlockConditions,
 		secretKey:        sk,
 

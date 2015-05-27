@@ -76,9 +76,12 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []ty
 		w.applyDiff(diff, modules.DiffApply)
 	}
 
-	// Update the wallet age.
+	// Update the wallet age and consensus height. Though they update together,
+	// the wallet age can be altered/reset, but the consensus height cannot.
 	w.age -= len(cc.RevertedBlocks)
+	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	w.age += len(cc.AppliedBlocks)
+	w.consensusHeight += types.BlockHeight(len(cc.RevertedBlocks))
 
 	w.notifySubscribers()
 }

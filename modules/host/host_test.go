@@ -14,6 +14,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// A hostTester is the helper object for host testing, including helper modules
+// and methods for controlling synchronization.
 type hostTester struct {
 	cs      *consensus.State
 	gateway modules.Gateway
@@ -114,6 +116,5 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 		}
 		ht.csUpdateWait()
 	}
-
 	return ht
 }
