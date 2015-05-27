@@ -7,7 +7,17 @@ import (
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
+// The node being deleted should not be a part of the current path.
 func (s *State) deleteNode(node *blockNode) {
+	// Sanity check - the node being deleted should not be in the current path.
+	if build.DEBUG {
+		if s.currentPath[node.height] == node.block.ID() {
+			panic("cannot call 'deleteNode' on a node in the current path.")
+		}
+	}
+
+	// Recusively call 'deleteNode' on of the input node's children, then
+	// delete the input node.
 	for i := range node.children {
 		s.deleteNode(node.children[i])
 	}
@@ -42,8 +52,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 }
 
 // revertToNode will revert blocks from the State's current path until 'bn' is
-// the current block. The list returned is in reversed order; the first block
-// in the list was the first reverted, and has the highest height.
+// the current block. Blocks are returned in the order that they were reverted.
 func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {

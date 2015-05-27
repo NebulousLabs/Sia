@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -24,53 +23,6 @@ func (ct *ConsensusTester) testBlockTimestamps() {
 	err = ct.AcceptBlock(block)
 	if err != ErrFutureTimestamp {
 		ct.Error("unexpected error when submitting a too-early timestamp:", err)
-	}
-}
-
-// testEmptyBlock adds an empty block to the state and checks for errors.
-func (ct *ConsensusTester) testEmptyBlock() {
-	// Get the hash of the state before the block was added.
-	beforeStateHash := ct.StateHash()
-
-	// Mine and submit a block
-	block := ct.MineAndApplyValidBlock()
-
-	// Get the hash of the state after the block was added.
-	afterStateHash := ct.StateHash()
-	if afterStateHash == beforeStateHash {
-		ct.Error("state hash is unchanged after mining a block")
-	}
-
-	// Check that the newly mined block is recognized as the current block.
-	if ct.CurrentBlock().ID() != block.ID() {
-		ct.Error("the state's current block is not reporting as the recently mined block.")
-	}
-
-	// These functions break the convention of only using exported functions.
-	// But they provide useful checks by making sure that the internals of the
-	// state have established in the necessary ways.
-	if ct.currentPath[ct.Height()] != block.ID() {
-		ct.Error("the state's current path didn't update correctly after accepting a new block")
-	}
-	bn, exists := ct.blockMap[block.ID()]
-	if !exists {
-		ct.Error("the state's block map did not update correctly after getting an empty block")
-	}
-	if !bn.diffsGenerated {
-		ct.Error("diffs were not generated on the new block")
-	}
-
-	// These functions manipulate the state using unexported functions, which
-	// breaks proposed conventions. However, they provide useful information
-	// about the accuracy of invertRecentBlock and applyBlockNode.
-	cbn := ct.currentBlockNode()
-	ct.commitDiffSet(cbn, modules.DiffRevert)
-	if beforeStateHash != ct.StateHash() {
-		ct.Error("state is different after applying and removing diffs")
-	}
-	ct.commitDiffSet(cbn, modules.DiffApply)
-	if afterStateHash != ct.StateHash() {
-		ct.Error("state is different after generateApply, remove, and applying diffs")
 	}
 }
 
@@ -232,13 +184,6 @@ func TestBlockTimestamps(t *testing.T) {
 
 	ct := NewTestingEnvironment("TestBlockTimestamps", t)
 	ct.testBlockTimestamps()
-}
-
-// TestEmptyBlock creates a new testing environment and uses it to call
-// testEmptyBlock.
-func TestEmptyBlock(t *testing.T) {
-	ct := NewTestingEnvironment("TestEmptyBlock", t)
-	ct.testEmptyBlock()
 }
 
 // TestLargeBlock creates a new testing environment and uses it to call
