@@ -142,8 +142,6 @@ func newDownload(file *file, destination string) (*Download, error) {
 // specified.
 func (r *Renter) Download(nickname, destination string) error {
 	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-
 	// Lookup the file associated with the nickname.
 	file, exists := r.files[nickname]
 	if !exists {
@@ -158,6 +156,7 @@ func (r *Renter) Download(nickname, destination string) error {
 
 	// Add the download to the download queue.
 	r.downloadQueue = append(r.downloadQueue, d)
+	r.mu.Unlock(lockID)
 
 	// Download the file. We only need one piece, so iterate through the hosts
 	// until a download succeeds.
