@@ -60,6 +60,8 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
 	handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
 	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
+	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
+	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitBlockHandler)
 
 	// Renter API Calls
 	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
