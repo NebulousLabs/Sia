@@ -82,8 +82,7 @@ type TransactionPool struct {
 	// up. To prevent deadlocks in the transaction pool, subscribers are
 	// updated in a separate thread which does not guarantee that a subscriber
 	// is always fully synchronized to the transaction pool.
-	revertBlocksUpdates     [][]types.Block
-	applyBlocksUpdates      [][]types.Block
+	consensusChanges        []modules.ConsensusChange
 	unconfirmedTransactions [][]types.Transaction
 	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
 	subscribers             []chan struct{}

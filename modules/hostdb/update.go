@@ -49,12 +49,12 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 
 // ReceiveConsensusSetUpdate accepts an update from the consensus set which
 // contains new blocks.
-func (hdb *HostDB) ReceiveConsensusSetUpdate(_, appliedBlocks []types.Block) {
+func (hdb *HostDB) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 
 	// Add hosts announced in blocks that were applied.
-	for _, block := range appliedBlocks {
+	for _, block := range cc.AppliedBlocks {
 		for _, host := range findHostAnnouncements(block) {
 			hdb.insertHost(host)
 		}

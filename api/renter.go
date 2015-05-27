@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	duration   = 1000 // Duration that hosts will hold onto the file.
-	redundancy = 12   // Redundancy of files uploaded to the network.
+	duration   = 20 // Duration that hosts will hold onto the file.
+	redundancy = 12 // Redundancy of files uploaded to the network.
 )
 
 // DownloadInfo is a helper struct for the downloadqueue API call.

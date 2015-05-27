@@ -33,8 +33,8 @@ type State struct {
 	// The currentPath is the longest known blockchain.
 	currentPath []types.BlockID
 
-	// These are the consensus variables, referred to as the "consensus set."
-	// All nodes with the same current path must have the same consensus set.
+	// These are the consensus variables. All nodes with the same current path
+	// will also have these variables matching.
 	//
 	// The siafundPool tracks the total number of siacoins that have been
 	// taxed from file contracts. Unless a reorg occurs, the siafundPool
@@ -54,12 +54,10 @@ type State struct {
 	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
-	// Updates to the state are stored as a list, pointing to the block nodes
-	// that were added and removed at each step. Modules subscribed to the
-	// state will receive the changes in order that they occur.
-	revertUpdates [][]*blockNode
-	applyUpdates  [][]*blockNode
-	subscriptions []chan struct{}
+	// Modules subscribed to the consensus set will receive an ordered list of
+	// changes that occur to the consensus set.
+	consensusChanges []modules.ConsensusChange
+	subscriptions    []chan struct{}
 
 	// block database, used for saving/loading the current path
 	db persist.DB

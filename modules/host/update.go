@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -56,16 +57,16 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 
 // RecieveConsensusSetUpdate will be called by the consensus set every time
 // there is a new block or a fork of some kind.
-func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block) {
+func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
-	h.blockHeight -= types.BlockHeight(len(revertedBlocks))
+	h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
 	shouldSave := false
-	for _ = range appliedBlocks {
+	for _ = range cc.AppliedBlocks {
 		h.blockHeight++
 
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {

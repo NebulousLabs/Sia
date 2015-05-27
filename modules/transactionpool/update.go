@@ -307,7 +307,7 @@ func (tp *TransactionPool) applyDiffs(scods []modules.SiacoinOutputDiff, fcds []
 
 // ReceiveConsensusSetUpdate gets called to inform the transaction pool of
 // changes to the consensus set.
-func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks []types.Block) {
+func (tp *TransactionPool) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := tp.mu.Lock()
 	defer tp.mu.Unlock(lockID)
 
@@ -317,7 +317,7 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	// height), so each time a new block processed, the transactions need to be
 	// prepended to the list of unconfirmed transactions.
 	var unconfirmedTxns []types.Transaction
-	for _, block := range revertedBlocks {
+	for _, block := range cc.RevertedBlocks {
 		unconfirmedTxns = append(block.Transactions, unconfirmedTxns...)
 	}
 
@@ -345,58 +345,41 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(revertedBlocks, appliedBloc
 	// blockchain.
 	tp.purge()
 
-	// Apply all of the reverted diffs to the unconfirmed set. revertedBlocks
-	// is already in reverse order; the first block has the highest height.
-	for _, block := range revertedBlocks {
-		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
-		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			}
-		}
-		tp.applyDiffs(scods, fcds, sfods, modules.DiffRevert)
+	// Apply consensus set diffs and adjust the height.
+	tp.applyDiffs(cc.SiacoinOutputDiffs, cc.FileContractDiffs, cc.SiafundOutputDiffs, modules.DiffApply)
+	tp.consensusSetHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	tp.consensusSetHeight += types.BlockHeight(len(cc.AppliedBlocks))
 
-		tp.consensusSetHeight--
-	}
-
-	// Handle applied blocks. The consensus set height needs to be incremented
-	// at the beginning so that all of the invalidations are looking at the
-	// correct height. The diffs need to be applied at the end so that removing
-	// unconfirmed transactions don't result in diff conflicts.
-	for _, block := range appliedBlocks {
-		// Add all of the diffs to the unconfirmed set.
-		scods, fcds, sfods, _, err := tp.consensusSet.BlockDiffs(block.ID())
-		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			}
-		}
-		tp.applyDiffs(scods, fcds, sfods, modules.DiffApply)
-
-		// Mark all of the applied transactions as 'already seen'.
+	// Mark all of the newly applied transactions as 'already seen'.
+	for _, block := range cc.AppliedBlocks {
 		for _, txn := range block.Transactions {
 			tp.transactions[crypto.HashObject(txn)] = struct{}{}
 		}
-
-		tp.consensusSetHeight++
 	}
 
 	// Add all potential unconfirmed transactions back into the pool after
 	// checking that they are still valid.
 	for _, txn := range unconfirmedTxns {
+		// Skip transactions that are now in the consensus set or are otherwise
+		// repeats.
 		_, exists := tp.transactions[crypto.HashObject(txn)]
 		if exists {
 			continue
 		}
+
+		// Check that the transaction is still valid given the updated
+		// consensus set.
 		err := tp.validUnconfirmedTransaction(txn)
 		if err != nil {
 			continue
 		}
+
+		// Add the transaction back to the pool.
 		tp.addTransactionToPool(txn)
 	}
 
-	// Inform the subscribers that an update has executed.
-	tp.updateSubscribers(revertedBlocks, appliedBlocks, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
+	// Inform subscribers that an update has executed.
+	tp.updateSubscribers(cc, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 }
 
 // PurgeTransactionPool deletes all transactions from the transaction pool.

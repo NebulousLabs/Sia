@@ -221,7 +221,7 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	// Add the transaction to the pool, notify all subscribers, and broadcast
 	// the transaction.
 	tp.addTransactionToPool(t)
-	tp.updateSubscribers(nil, nil, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
+	tp.updateSubscribers(modules.ConsensusChange{}, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 	go tp.gateway.Broadcast("RelayTransaction", t)
 	return
 }

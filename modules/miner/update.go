@@ -10,13 +10,13 @@ import (
 // ReceiveTransactionPoolUpdate listens to the transaction pool for changes in
 // the transaction pool. These changes will be applied to the blocks being
 // mined.
-func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, _ []modules.SiacoinOutputDiff) {
+func (m *Miner) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, unconfirmedTransactions []types.Transaction, _ []modules.SiacoinOutputDiff) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	defer m.notifySubscribers()
 
-	m.height -= types.BlockHeight(len(revertedBlocks))
-	m.height += types.BlockHeight(len(appliedBlocks))
+	m.height -= types.BlockHeight(len(cc.RevertedBlocks))
+	m.height += types.BlockHeight(len(cc.AppliedBlocks))
 
 	// The total encoded size of the transactions cannot exceed the block size.
 	m.transactions = nil
@@ -36,9 +36,9 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 
 	// If no blocks have been applied, the block variables do not need to be
 	// updated.
-	if len(appliedBlocks) == 0 {
+	if len(cc.AppliedBlocks) == 0 {
 		if build.DEBUG {
-			if len(revertedBlocks) != 0 {
+			if len(cc.RevertedBlocks) != 0 {
 				panic("blocks reverted without being added")
 			}
 		}
@@ -46,7 +46,7 @@ func (m *Miner) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []typ
 	}
 
 	// Update the parent, target, and earliest timestamp fields for the miner.
-	m.parent = appliedBlocks[len(appliedBlocks)-1].ID()
+	m.parent = cc.AppliedBlocks[len(cc.AppliedBlocks)-1].ID()
 	target, exists1 := m.cs.ChildTarget(m.parent)
 	timestamp, exists2 := m.cs.EarliestChildTimestamp(m.parent)
 	if build.DEBUG {
