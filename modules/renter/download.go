@@ -201,9 +201,10 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	// order from most recent to least recent
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
-		downloads[i] = r.downloadQueue[i]
+		downloads[i] = r.downloadQueue[len(r.downloadQueue)-i-1]
 	}
 	return downloads
 }
