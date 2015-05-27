@@ -64,7 +64,7 @@ func init() {
 		// low enough that it doesn't waste time.
 		MaturityDelay = 10
 
-		RootTarget = Target{0, 0, 64} // Standard developer CPUs should be able to mine blocks.
+		RootTarget = Target{0, 0, 4} // Standard developer CPUs should be able to mine blocks.
 		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
 		// The difficulty will adjust quickly.
