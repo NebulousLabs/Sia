@@ -195,6 +195,13 @@ func (s *State) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Times
 	return
 }
 
+// GenesisBlock returns the genesis block.
+func (s *State) GenesisBlock() types.Block {
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
+	return s.blockMap[s.currentPath[0]].block
+}
+
 // Height returns the height of the current blockchain (the longest fork).
 func (s *State) Height() types.BlockHeight {
 	counter := s.mu.RLock()

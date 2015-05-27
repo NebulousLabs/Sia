@@ -45,6 +45,8 @@ func NewServer(APIaddr string, s *consensus.State, g modules.Gateway, h modules.
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
+	// Set the genesis block and start listening to the consensus package.
+	srv.currentBlock = srv.cs.GenesisBlock()
 	srv.cs.ConsensusSetSubscribe(srv)
 
 	// Register API handlers

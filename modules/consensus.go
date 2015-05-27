@@ -97,6 +97,9 @@ type ConsensusSet interface {
 	// risk of mining invalid blocks.
 	EarliestChildTimestamp(types.BlockID) (types.Timestamp, bool)
 
+	// GenesisBlock returns the genesis block.
+	GenesisBlock() types.Block
+
 	// InCurrentPath returns true if the block id presented is found in the
 	// current path, false otherwise.
 	InCurrentPath(types.BlockID) bool
