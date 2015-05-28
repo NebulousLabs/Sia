@@ -126,17 +126,6 @@ func (ct *ConsensusTester) testMissedTarget() {
 	}
 }
 
-// testOrphan submits an orphan block to the state and checks that an orphan
-// error is returned.
-func (ct *ConsensusTester) testOrphan() {
-	block := ct.MineCurrentBlock(nil)
-	block.ParentID[0]++
-	err := ct.AcceptBlock(block)
-	if err != ErrOrphan {
-		ct.Error("unexpected error, expecting OrphanErr:", err)
-	}
-}
-
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
@@ -190,10 +179,4 @@ func TestMissedTarget(t *testing.T) {
 
 	ct := NewTestingEnvironment("TestMissedTarget", t)
 	ct.testMissedTarget()
-}
-
-// TestOrphan creates a new testing environment and uses it to call testOrphan.
-func TestOrphan(t *testing.T) {
-	ct := NewTestingEnvironment("TestOrphan", t)
-	ct.testOrphan()
 }

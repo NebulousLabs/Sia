@@ -3,6 +3,8 @@ package consensus
 import (
 	"errors"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // testSimpleBlock mines a simple block (no transactions except those
@@ -166,5 +168,26 @@ func TestBlockKnownHandling(t *testing.T) {
 	err = cst.testBlockKnownHandling()
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// TestOrphanHandling passes an orphan block to the consensus set.
+func TestOrphanHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst, err := createConsensusSetTester("TestOrphanHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphan := types.Block{}
+	err = cst.cs.acceptBlock(orphan)
+	if err != ErrOrphan {
+		t.Error("expecting ErrOrphan:", err)
+	}
+	err = cst.cs.acceptBlock(orphan)
+	if err != ErrOrphan {
+		t.Error("expecting ErrOrphan:", err)
 	}
 }
