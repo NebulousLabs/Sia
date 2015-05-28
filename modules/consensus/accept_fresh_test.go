@@ -191,3 +191,24 @@ func TestOrphanHandling(t *testing.T) {
 		t.Error("expecting ErrOrphan:", err)
 	}
 }
+
+// testMissedTarget submits a block that does not meet the required target.
+func (cst *consensusSetTester) TestMissedTarget(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Mine a block that doesn't meet the target.
+	block, _, target := cst.miner.BlockForWork()
+	for block.CheckTarget(target) {
+		block.Nonce++
+	}
+	if block.CheckTarget(target) {
+		t.Fatal("unable to find a failing target (lol)")
+	}
+
+	err := cst.cs.acceptBlock(block)
+	if err != ErrMissedTarget {
+		t.Error("expecting ErrMissedTarget:", err)
+	}
+}

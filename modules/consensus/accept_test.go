@@ -108,24 +108,6 @@ func (ct *ConsensusTester) testMultipleFeesMultiplePayouts() {
 	}
 }
 
-// testMissedTarget tries to submit a block that does not meet the target for
-// the next block and verifies that the block gets rejected.
-func (ct *ConsensusTester) testMissedTarget() {
-	// Mine a block that doesn't meet the target.
-	block := ct.MineCurrentBlock(nil)
-	for block.CheckTarget(ct.CurrentTarget()) && block.Nonce < 1000*1000 {
-		block.Nonce++
-	}
-	if block.CheckTarget(ct.CurrentTarget()) {
-		panic("unable to mine a block with a failing target (lol)")
-	}
-
-	err := ct.AcceptBlock(block)
-	if err != ErrMissedTarget {
-		ct.Error("Block with low target is not being rejected")
-	}
-}
-
 // TestBlockTimestamps creates a new testing environment and uses it to call
 // testBlockTimestamps.
 func TestBlockTimestamps(t *testing.T) {
@@ -168,15 +150,4 @@ func TestMultipleFeesMultiplePayouts(t *testing.T) {
 
 	ct := NewTestingEnvironment("TestMultipleFeesMultiplePayouts", t)
 	ct.testMultipleFeesMultiplePayouts()
-}
-
-// TestMissedTarget creates a new testing environment and uses it to call
-// testMissedTarget.
-func TestMissedTarget(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	ct := NewTestingEnvironment("TestMissedTarget", t)
-	ct.testMissedTarget()
 }
