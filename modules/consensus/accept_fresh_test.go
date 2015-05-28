@@ -176,11 +176,12 @@ func TestOrphanHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst, err := createConsensusSetTester("TestOrphanHandling")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// The empty block is an orphan.
 	orphan := types.Block{}
 	err = cst.cs.acceptBlock(orphan)
 	if err != ErrOrphan {
@@ -192,10 +193,14 @@ func TestOrphanHandling(t *testing.T) {
 	}
 }
 
-// testMissedTarget submits a block that does not meet the required target.
-func (cst *consensusSetTester) TestMissedTarget(t *testing.T) {
+// TestMissedTarget submits a block that does not meet the required target.
+func TestMissedTarget(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestMissedTarget")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Mine a block that doesn't meet the target.
@@ -206,9 +211,35 @@ func (cst *consensusSetTester) TestMissedTarget(t *testing.T) {
 	if block.CheckTarget(target) {
 		t.Fatal("unable to find a failing target (lol)")
 	}
-
-	err := cst.cs.acceptBlock(block)
+	err = cst.cs.acceptBlock(block)
 	if err != ErrMissedTarget {
 		t.Error("expecting ErrMissedTarget:", err)
+	}
+}
+
+// testLargeBlock creates a block that is too large to be accepted by the state
+// and checks that it actually gets rejected.
+func TestLargeBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestLargeBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction that puts the block over the size limit.
+	bigData := string(make([]byte, types.BlockSizeLimit))
+	txn := types.Transaction{
+		ArbitraryData: []string{bigData},
+	}
+
+	// Fetch a block and add the transaction, then submit the block.
+	block, _, target := cst.miner.BlockForWork()
+	block.Transactions = append(block.Transactions, txn)
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.acceptBlock(solvedBlock)
+	if err != ErrLargeBlock {
+		t.Error(err)
 	}
 }

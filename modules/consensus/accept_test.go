@@ -25,24 +25,6 @@ func (ct *ConsensusTester) testBlockTimestamps() {
 	}
 }
 
-// testLargeBlock creates a block that is too large to be accepted by the state
-// and checks that it actually gets rejected.
-func (ct *ConsensusTester) testLargeBlock() {
-	// Create a transaction that puts the block over the size limit.
-	txns := make([]types.Transaction, 1)
-	bigData := string(make([]byte, types.BlockSizeLimit))
-	txns[0] = types.Transaction{
-		ArbitraryData: []string{bigData},
-	}
-
-	// Mine and submit a block, checking for the too large error.
-	block := ct.MineCurrentBlock(txns)
-	err := ct.AcceptBlock(block)
-	if err != ErrLargeBlock {
-		ct.Error(err)
-	}
-}
-
 // testSinglePayout creates a block with a single miner payout. An incorrect
 // and a correct payout get submitted.
 func (ct *ConsensusTester) testSingleNoFeePayout() {
@@ -117,17 +99,6 @@ func TestBlockTimestamps(t *testing.T) {
 
 	ct := NewTestingEnvironment("TestBlockTimestamps", t)
 	ct.testBlockTimestamps()
-}
-
-// TestLargeBlock creates a new testing environment and uses it to call
-// testLargeBlock.
-func TestLargeBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	ct := NewTestingEnvironment("TestLargeBlock", t)
-	ct.testLargeBlock()
 }
 
 // TestSingleNoFeePayouts creates a new testing environment and uses it to call
