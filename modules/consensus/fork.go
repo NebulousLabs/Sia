@@ -4,14 +4,16 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
 // The node being deleted should not be a part of the current path.
-func (s *State) deleteNode(node *blockNode) {
+func (cs *State) deleteNode(node *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
-		if s.currentPath[node.height] == node.block.ID() {
+		if types.BlockHeight(len(cs.currentPath)) > node.height &&
+			cs.currentPath[node.height] == node.block.ID() {
 			panic("cannot call 'deleteNode' on a node in the current path.")
 		}
 	}
@@ -19,9 +21,9 @@ func (s *State) deleteNode(node *blockNode) {
 	// Recusively call 'deleteNode' on of the input node's children, then
 	// delete the input node.
 	for i := range node.children {
-		s.deleteNode(node.children[i])
+		cs.deleteNode(node.children[i])
 	}
-	delete(s.blockMap, node.block.ID())
+	delete(cs.blockMap, node.block.ID())
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in

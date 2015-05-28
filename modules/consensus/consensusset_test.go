@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // A consensusSetTester is the helper object for consensus set testing,
@@ -87,5 +88,39 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		walletUpdateChan: w.WalletNotify(),
 	}
+
+	// Mine until the wallet has money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		_, _, err = cst.miner.FindBlock()
+		if err != nil {
+			return nil, err
+		}
+		cst.csUpdateWait()
+	}
 	return cst, nil
+}
+
+// MineDoSBlock will create a dos block and perform nonce grinding.
+func (cst *consensusSetTester) MineDoSBlock() (types.Block, error) {
+	// Create a transaction that is funded but the funds are never spent. This
+	// transaction is invalid in a way that triggers the DoS block detection.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return types.Block{}, err
+	}
+	_, err = cst.wallet.FundTransaction(id, types.NewCurrency64(50))
+	if err != nil {
+		return types.Block{}, err
+	}
+	cst.tpUpdateWait()
+	txn, err := cst.wallet.SignTransaction(id, true) // true indicates that the whole transaction should be signed.
+	if err != nil {
+		return types.Block{}, err
+	}
+
+	// Get a block, insert the transaction, and submit the block.
+	block, _, target := cst.miner.BlockForWork()
+	block.Transactions = append(block.Transactions, txn)
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	return solvedBlock, nil
 }

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrBadBlock        = errors.New("block is known to be invalid")
+	ErrDoSBlock        = errors.New("block is known to be invalid")
 	ErrBlockKnown      = errors.New("block exists in block map")
 	ErrEarlyTimestamp  = errors.New("block timestamp is too early")
 	ErrFutureTimestamp = errors.New("block timestamp too far in future")
@@ -122,9 +122,9 @@ func (s *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*bl
 // acceptBlock is the internal consensus function for adding blocks. There is
 // no block relaying.
 func (s *State) acceptBlock(b types.Block) error {
-	_, exists := s.badBlocks[b.ID()]
+	_, exists := s.dosBlocks[b.ID()]
 	if exists {
-		return ErrBadBlock
+		return ErrDoSBlock
 	}
 	_, exists = s.blockMap[b.ID()]
 	if exists {

@@ -65,3 +65,42 @@ func TestSimpleBlock(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// testDoSBlockHandling checks that saved bad blocks are correctly ignored.
+func (cst *consensusSetTester) testDoSBlockHandling() error {
+	// Mine a DoS block and submit it to the state, expect a normal error.
+	dosBlock, err := cst.MineDoSBlock()
+	if err != nil {
+		return err
+	}
+	err = cst.cs.AcceptBlock(dosBlock)
+	// The error is mostly irrelevant, it just needs to have the block flagged
+	// as a DoS block in future attempts.
+	if err != ErrSiacoinInputOutputMismatch {
+		return errors.New("expecting invalid signature:" + err.Error())
+	}
+
+	// Submit the same DoS block to the state again, expect ErrDoSBlock.
+	err = cst.cs.AcceptBlock(dosBlock)
+	if err != ErrDoSBlock {
+		return errors.New("expecting bad block:" + err.Error())
+	}
+	return nil
+}
+
+// TestDoSBlockHandling creates a new testing environment and uses it to call
+// testDoSBlockHandling.
+func TestDoSBlockHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst, err := createConsensusSetTester("TestDoSBlockHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testDoSBlockHandling()
+	if err != nil {
+		t.Error(err)
+	}
+}

@@ -29,7 +29,8 @@ type Miner interface {
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few
 	// seconds, returning a block, a bool indicating whether the block is
-	// sovled, and an error.
+	// sovled, and an error. FindBlock will submit the block to the consensus
+	// set.
 	FindBlock() (types.Block, bool, error)
 
 	// MinerInfo returns a MinerInfo struct, containing information about the
@@ -45,7 +46,8 @@ type Miner interface {
 
 	// SolveBlock will have the miner make 1 attempt to solve the input block.
 	// It will give up after a few seconds, returning the block, a bool
-	// indicating whether it has been solved, and an error.
+	// indicating whether it has been solved, and an error. SolveBlock is very
+	// slow, and will not submit the block the the consensus set.
 	SolveBlock(types.Block, types.Target) (types.Block, bool)
 
 	// StartMining turns on the miner, which will endlessly work for new

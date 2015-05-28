@@ -24,11 +24,12 @@ type State struct {
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
-	// blockMap and badBlocks keep track of seen blocks. blockMap holds all
-	// valid blocks, including those not on the main blockchain. badBlocks
-	// is a "blacklist" of blocks known to be invalid.
+	// blockMap and dosBlocks keep track of seen blocks. blockMap holds all
+	// valid blocks, including those not on the main blockchain. dosBlocks is a
+	// "blacklist" of blocks known to be invalid, but expensive to prove
+	// invalid.
 	blockMap  map[types.BlockID]*blockNode
-	badBlocks map[types.BlockID]struct{}
+	dosBlocks map[types.BlockID]struct{}
 
 	// The currentPath is the longest known blockchain.
 	currentPath []types.BlockID
@@ -85,7 +86,7 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	// Create the State object.
 	s := &State{
 		blockMap:  make(map[types.BlockID]*blockNode),
-		badBlocks: make(map[types.BlockID]struct{}),
+		dosBlocks: make(map[types.BlockID]struct{}),
 
 		currentPath: make([]types.BlockID, 1),
 

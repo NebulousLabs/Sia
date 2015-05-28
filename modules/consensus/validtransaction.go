@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	ErrMissingSiacoinOutput = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingFileContract  = errors.New("transaction terminates a nonexisting file contract")
-	ErrMissingSiafundOutput = errors.New("transaction spends a nonexisting siafund output")
+	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingFileContract        = errors.New("transaction terminates a nonexisting file contract")
+	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
@@ -34,7 +35,7 @@ func (s *State) validSiacoins(t types.Transaction) (err error) {
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if inputSum.Cmp(t.SiacoinOutputSum()) != 0 {
-		return errors.New("inputs do not equal outputs for transaction")
+		return ErrSiacoinInputOutputMismatch
 	}
 	return
 }
