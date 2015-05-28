@@ -98,6 +98,7 @@ func (g *Gateway) relayNode(conn modules.PeerConn) error {
 	if err := g.addNode(addr); err != nil {
 		return err
 	}
+	g.save()
 	// relay
 	go g.Broadcast("RelayNode", addr)
 	return nil
