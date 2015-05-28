@@ -73,22 +73,22 @@ func (cst *consensusSetTester) testDoSBlockHandling() error {
 	if err != nil {
 		return err
 	}
-	err = cst.cs.AcceptBlock(dosBlock)
+	err = cst.cs.acceptBlock(dosBlock)
 	// The error is mostly irrelevant, it just needs to have the block flagged
 	// as a DoS block in future attempts.
 	if err != ErrSiacoinInputOutputMismatch {
-		return errors.New("expecting invalid signature:" + err.Error())
+		return errors.New("expecting invalid signature err: " + err.Error())
 	}
 
 	// Submit the same DoS block to the state again, expect ErrDoSBlock.
-	err = cst.cs.AcceptBlock(dosBlock)
+	err = cst.cs.acceptBlock(dosBlock)
 	if err != ErrDoSBlock {
-		return errors.New("expecting bad block:" + err.Error())
+		return errors.New("expecting bad block err: " + err.Error())
 	}
 	return nil
 }
 
-// TestDoSBlockHandling creates a new testing environment and uses it to call
+// TestDoSBlockHandling creates a new consensus set tester and uses it to call
 // testDoSBlockHandling.
 func TestDoSBlockHandling(t *testing.T) {
 	if testing.Short() {
@@ -100,6 +100,70 @@ func TestDoSBlockHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.testDoSBlockHandling()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// testBlockKnownHandling submits known blocks to the consensus set.
+func (cst *consensusSetTester) testBlockKnownHandling() error {
+	// Get a block destined to be stale.
+	block, _, target := cst.miner.BlockForWork()
+	staleBlock, _ := cst.miner.SolveBlock(block, target)
+
+	// Add two new blocks to the consensus set to block the stale block.
+	block1, _, err := cst.miner.FindBlock()
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	block2, _, err := cst.miner.FindBlock()
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Submit the stale block.
+	err = cst.cs.acceptBlock(staleBlock)
+	if err != nil {
+		return err
+	}
+
+	// Submit block1 and block2 again, looking for a 'BlockKnown' error.
+	err = cst.cs.acceptBlock(block1)
+	if err != ErrBlockKnown {
+		return errors.New("expecting known block err: " + err.Error())
+	}
+	err = cst.cs.acceptBlock(block2)
+	if err != ErrBlockKnown {
+		return errors.New("expecting known block err: " + err.Error())
+	}
+	err = cst.cs.acceptBlock(staleBlock)
+	if err != ErrBlockKnown {
+		return errors.New("expecting known block err: " + err.Error())
+	}
+
+	// Try the genesis block edge case.
+	genesisBlock := cst.cs.blockMap[cst.cs.currentPath[0]].block
+	err = cst.cs.acceptBlock(genesisBlock)
+	if err != ErrBlockKnown {
+		return errors.New("expecting known block err: " + err.Error())
+	}
+	return nil
+}
+
+// TestBlockKnownHandling creates a new consensus set tester and uses it to
+// call testBlockKnownHandling.
+func TestBlockKnownHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	cst, err := createConsensusSetTester("TestBlockKnownHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testBlockKnownHandling()
 	if err != nil {
 		t.Error(err)
 	}

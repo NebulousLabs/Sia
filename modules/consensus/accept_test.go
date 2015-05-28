@@ -126,28 +126,6 @@ func (ct *ConsensusTester) testMissedTarget() {
 	}
 }
 
-// testRepeatBlock submits a block to the state, and then submits the same
-// block to the state, expecting nothing to change in the consensus set.
-func (ct *ConsensusTester) testRepeatBlock() {
-	// Add a non-repeat block to the state.
-	block := ct.MineCurrentBlock(nil)
-	err := ct.AcceptBlock(block)
-	if err != nil {
-		ct.Fatal(err)
-	}
-
-	// Get the consensus set hash, submit the block, then check that the
-	// consensus set hash hasn't changed.
-	chash := ct.StateHash()
-	err = ct.AcceptBlock(block)
-	if err != ErrBlockKnown {
-		ct.Error("expecting BlockKnownErr, got", err)
-	}
-	if chash != ct.StateHash() {
-		ct.Error("consensus set hash changed after submitting a repeat block.")
-	}
-}
-
 // testOrphan submits an orphan block to the state and checks that an orphan
 // error is returned.
 func (ct *ConsensusTester) testOrphan() {
@@ -212,17 +190,6 @@ func TestMissedTarget(t *testing.T) {
 
 	ct := NewTestingEnvironment("TestMissedTarget", t)
 	ct.testMissedTarget()
-}
-
-// TestRepeatBlock creates a new testing environment and uses it to call
-// testRepeatBlock.
-func TestRepeatBlock(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	ct := NewTestingEnvironment("TestRepeatBlock", t)
-	ct.testRepeatBlock()
 }
 
 // TestOrphan creates a new testing environment and uses it to call testOrphan.
