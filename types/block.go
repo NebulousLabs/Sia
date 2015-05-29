@@ -33,7 +33,7 @@ type (
 // equation is:
 //
 //     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * CoinbaseAugment
-func CalculateCoinbase(height BlockHeight) (c Currency) {
+func CalculateCoinbase(height BlockHeight) Currency {
 	base := InitialCoinbase - uint64(height)
 	if uint64(height) > InitialCoinbase || base < MinimumCoinbase {
 		base = MinimumCoinbase
@@ -50,6 +50,38 @@ func (b Block) ID() BlockID {
 		b.Nonce,
 		b.MerkleRoot(),
 	))
+}
+
+// CalculateSubsidy takes a block and a height and determines the block
+// subsidy.
+func (b Block) CalculateSubsidy(height BlockHeight) Currency {
+	subsidy := CalculateCoinbase(height)
+	for _, txn := range b.Transactions {
+		for _, fee := range txn.MinerFees {
+			subsidy = subsidy.Add(fee)
+		}
+	}
+	return subsidy
+}
+
+// CheckMinerPayouts compares the miner payouts to the subsidy and returns true
+// if they are equal, false otherwise.
+func (b Block) CheckMinerPayouts(height BlockHeight) bool {
+	// Add up the payouts and check that all values are legal.
+	var payoutSum Currency
+	for _, payout := range b.MinerPayouts {
+		if payout.Value.IsZero() {
+			return false
+		}
+		payoutSum = payoutSum.Add(payout.Value)
+	}
+
+	// Compare the payouts to the subsidy.
+	subsidy := b.CalculateSubsidy(height)
+	if subsidy.Cmp(payoutSum) != 0 {
+		return false
+	}
+	return true
 }
 
 // CheckTarget returns true if the block's ID meets the given target.
