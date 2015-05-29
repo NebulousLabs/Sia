@@ -103,3 +103,48 @@ func TestApplySiacoinInput(t *testing.T) {
 		t.Error("inconsistency after rewinding a diff set")
 	}
 }
+
+// TestMisuseApplySiacoinInput misuses applySiacoinInput and checks that a
+// panic was triggered.
+func TestMisuseApplysiacoinInput(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create a consensus set and get it to 3 siacoin outputs. The consensus
+	// set starts with 2 siacoin outputs, mining a block will add another.
+	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a block node to use with application.
+	bn := new(blockNode)
+
+	// Fetch the output id's of each siacoin output in the consensus set.
+	var ids []types.SiacoinOutputID
+	for id, _ := range cst.cs.siacoinOutputs {
+		ids = append(ids, id)
+	}
+
+	// Apply a transaction with a single siacoin input.
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{
+			types.SiacoinInput{
+				ParentID: ids[0],
+			},
+		},
+	}
+	cst.cs.applySiacoinInputs(bn, txn)
+
+	// Trigger the panic that occurs when an output is applied incorrectly, and
+	// perform a catch to read the error that is created.
+	defer func() {
+		r := recover()
+		if r != ErrMisuseApplySiacoinInput {
+			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error(r)
+		}
+	}()
+	cst.cs.applySiacoinInputs(bn, txn)
+}
