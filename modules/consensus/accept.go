@@ -70,7 +70,7 @@ func (cs *State) validHeader(b types.Block) error {
 			time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
 			lockID := cs.mu.Lock()
 			defer cs.mu.Unlock(lockID)
-			cs.acceptBlock(b) // TODO: How does this error get handled?
+			cs.acceptBlock(b) // NOTE: Error is not handled.
 		}()
 		return ErrFutureTimestamp
 	}
@@ -87,13 +87,8 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 
 	// Add the node to the block map
 	cs.blockMap[b.ID()] = newNode
-
 	if newNode.heavierThan(cs.currentBlockNode()) {
-		revertedNodes, appliedNodes, err = cs.forkBlockchain(newNode)
-		if err != nil {
-			return nil, nil, err
-		}
-		return revertedNodes, appliedNodes, nil
+		return cs.forkBlockchain(newNode)
 	}
 	return nil, nil, nil
 }

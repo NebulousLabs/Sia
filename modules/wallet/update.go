@@ -81,7 +81,7 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []ty
 	w.age -= len(cc.RevertedBlocks)
 	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	w.age += len(cc.AppliedBlocks)
-	w.consensusHeight += types.BlockHeight(len(cc.RevertedBlocks))
+	w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
 
 	w.notifySubscribers()
 }
