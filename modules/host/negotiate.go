@@ -42,8 +42,11 @@ func (h *Host) deallocate(filesize uint64, path string) {
 // within acceptable bounds, as defined by the host.
 func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	switch {
-	case terms.FileSize < h.MinFilesize || terms.FileSize > h.MaxFilesize:
-		return errors.New("file is of incorrect size")
+	case terms.FileSize < h.MinFilesize:
+		return errors.New("file is too small")
+
+	case terms.FileSize > h.MaxFilesize:
+		return errors.New("file is too large")
 
 	case terms.FileSize > uint64(h.spaceRemaining):
 		return HostCapacityErr
