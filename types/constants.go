@@ -45,55 +45,45 @@ var (
 // init checks which build constant is in place and initializes the variables
 // accordingly.
 func init() {
-	if build.Release == "dev" {
-		BlockSizeLimit = 1e6          // 1 MB
-		BlockFrequency = 6            // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
-		TargetWindow = 40             // Difficulty is adjusted based on prior 40 blocks.
-		MedianTimestampWindow = 11    // 11 Blocks.
-		FutureThreshold = 3 * 60 * 60 // 3 hours.
-		SiafundCount = 10e3           // 10,000 total siafunds.
-		SiafundPortion = 0.039
+	// Constants that are consistent regardless of the build settings.
+	BlockSizeLimit = 1e6       // 1 MB
+	MedianTimestampWindow = 11 // 11 Blocks.
+	RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-		InitialCoinbase = 300e3
+	SiafundCount = 10e3 // 10,000 total siafunds.
+	SiafundPortion = 0.039
+	InitialCoinbase = 300e3
+	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
+	GenesisSiafundUnlockHash = ZeroUnlockHash
+	GenesisClaimUnlockHash = ZeroUnlockHash
+
+	// Constants that depend on build settings.
+	if build.Release == "dev" {
+		// 'dev' settings are for small developer testnets, usually on the same
+		// computer. Settings are slow enough that a small team of developers
+		// can coordinate their actions over a the developer testnets, but fast
+		// enough that there isn't much time wasted on waiting for things to
+		// happen.
+		BlockFrequency = 6 // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
+		TargetWindow = 40  // Difficulty is adjusted based on prior 40 blocks.
+		MaturityDelay = 10
+		FutureThreshold = 2 * 60                 // 2 minutes.
+		GenesisTimestamp = Timestamp(1424139000) // Approx. Feb 16th, 2015
+
+		MaxAdjustmentUp = big.NewRat(102, 100)
+		MaxAdjustmentDown = big.NewRat(98, 100)
+		RootTarget = Target{0, 0, 4} // Standard developer CPUs should be able to mine blocks.
 		MinimumCoinbase = 30e3
 
 		RenterZeroConfDelay = 60 * time.Second
-
-		// Some types of siacoin outputs cannot be collected for 10 blocks, this is
-		// high enough for developers to easily see that it works (1 minute), but
-		// low enough that it doesn't waste time.
-		MaturityDelay = 10
-
-		RootTarget = Target{0, 0, 4} // Standard developer CPUs should be able to mine blocks.
-		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
-
-		// The difficulty will adjust quickly.
-		MaxAdjustmentUp = big.NewRat(102, 100)
-		MaxAdjustmentDown = big.NewRat(98, 100)
-
-		CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
-
-		GenesisTimestamp = Timestamp(1424139000) // Approx. Feb 16th, 2015
-		GenesisSiafundUnlockHash = ZeroUnlockHash
-		GenesisClaimUnlockHash = ZeroUnlockHash
 	} else if build.Release == "testing" {
-		BlockSizeLimit = 1e6
+		// 'testing' settings are for automatic testing, and create much faster
+		// environments than a humand can interact with.
 		BlockFrequency = 1  // As fast as possible
 		TargetWindow = 10e3 // Large to prevent the difficulty from increasing during testing.
-		MedianTimestampWindow = 11
-		FutureThreshold = 3 * 60 * 60
-		SiafundCount = 10e3
-		SiafundPortion = 0.039
-
-		InitialCoinbase = 300e3
-		MinimumCoinbase = 299990 // Minimum coinbase is hit after 10 blocks to make testing minimum-coinbase code easier.
-
-		RenterZeroConfDelay = 2 * time.Second
-
 		MaturityDelay = 3
-
-		RootTarget = Target{64} // Takes an expected 4 hashes; very fast for testing but still probes 'bad hash' code.
-		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
+		FutureThreshold = 5 // 5 seconds
+		GenesisTimestamp = CurrentTimestamp()
 
 		// A really restrictive difficulty clamp prevents the difficulty from
 		// climbing during testing, as the resolution on the difficulty
@@ -101,30 +91,18 @@ func init() {
 		// substantially faster than that.
 		MaxAdjustmentUp = big.NewRat(10001, 10000)
 		MaxAdjustmentDown = big.NewRat(9999, 10000)
+		RootTarget = Target{64}  // Takes an expected 4 hashes; very fast for testing but still probes 'bad hash' code.
+		MinimumCoinbase = 299990 // Minimum coinbase is hit after 10 blocks to make testing minimum-coinbase code easier.
 
-		CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
-
-		GenesisTimestamp = CurrentTimestamp()
-		GenesisSiafundUnlockHash = ZeroUnlockHash
-		GenesisClaimUnlockHash = ZeroUnlockHash
+		RenterZeroConfDelay = 2 * time.Second
 	} else if build.Release == "standard" {
-		BlockSizeLimit = 1e6          // 1MB
-		BlockFrequency = 600          // 1 block per 10 minutes.
-		TargetWindow = 1e3            // Number of blocks to use when calculating the target.
-		MedianTimestampWindow = 11    // 11 blocks - number of blocks used when calculating the minimum allowed timestamp.
-		FutureThreshold = 3 * 60 * 60 // Seconds into the future block timestamps are valid.
-		SiafundCount = 10e3           // The total (static) number of siafunds.
-		SiafundPortion = 0.039        // Percent of all contract payouts that go to the siafund pool.
-
-		InitialCoinbase = 300e3
-		MinimumCoinbase = 30e3
-
-		RenterZeroConfDelay = 60 * time.Second
-
-		MaturityDelay = 50 // 8 hours.
-
-		RootTarget = Target{0, 0, 0, 64}
-		RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
+		// 'standard' settings are for the full network. They are slow enough
+		// that the network is secure in a real-world byzantine environment.
+		BlockFrequency = 600                     // 1 block per 10 minutes.
+		TargetWindow = 1e3                       // Number of blocks to use when calculating the target.
+		MaturityDelay = 50                       // 8 hours.
+		FutureThreshold = 3 * 60 * 60            // Seconds into the future block timestamps are valid.
+		GenesisTimestamp = Timestamp(1431000000) // 12:00pm UTC May 7th 2015
 
 		// A difficulty clamp to make long range attacks difficult. Quadrupling the
 		// difficulty will take 3000x work of finding a single block of the
@@ -133,11 +111,9 @@ func init() {
 		// the original difficulty.
 		MaxAdjustmentUp = big.NewRat(1001, 1000)
 		MaxAdjustmentDown = big.NewRat(999, 1000)
+		RootTarget = Target{0, 0, 0, 64}
+		MinimumCoinbase = 30e3
 
-		CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
-
-		GenesisTimestamp = Timestamp(1431000000) // 12:00pm UTC May 7th 2015
-		GenesisSiafundUnlockHash = ZeroUnlockHash
-		GenesisClaimUnlockHash = ZeroUnlockHash
+		RenterZeroConfDelay = 60 * time.Second
 	}
 }

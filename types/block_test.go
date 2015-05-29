@@ -65,6 +65,136 @@ func TestBlockID(t *testing.T) {
 	}
 }
 
+// TestBlockCalculateSubsidy probes the CalculateSubsidy function of the block
+// type.
+func TestBlockCalculateSubsidy(t *testing.T) {
+	// All tests are done at height = 0.
+	coinbase := CalculateCoinbase(0)
+
+	// Calculate the subsidy on a block with 0 fees at height 0. Result should
+	// be 300,000.
+	var b Block
+	if b.CalculateSubsidy(0).Cmp(coinbase) != 0 {
+		t.Error("subsidy is miscalculated for an empty block")
+	}
+
+	// Calculate when there is a fee in a transcation.
+	expected := coinbase.Add(NewCurrency64(123))
+	txn := Transaction{
+		MinerFees: []Currency{NewCurrency64(123)},
+	}
+	b.Transactions = append(b.Transactions, txn)
+	if b.CalculateSubsidy(0).Cmp(expected) != 0 {
+		t.Error("subsidy is miscalculated for a block with a single transaction")
+	}
+
+	// Add a single no-fee transaction and check again.
+	txn = Transaction{
+		ArbitraryData: []string{"NonSia"},
+	}
+	b.Transactions = append(b.Transactions, txn)
+	if b.CalculateSubsidy(0).Cmp(expected) != 0 {
+		t.Error("subsidy is miscalculated with empty transactions.")
+	}
+
+	// Add a transaction with multiple fees.
+	expected = expected.Add(NewCurrency64(1 + 2 + 3))
+	txn = Transaction{
+		MinerFees: []Currency{
+			NewCurrency64(1),
+			NewCurrency64(2),
+			NewCurrency64(3),
+		},
+	}
+	b.Transactions = append(b.Transactions, txn)
+	if b.CalculateSubsidy(0).Cmp(expected) != 0 {
+		t.Error("subsidy is miscalculated for a block with a single transaction")
+	}
+
+	// Add an empty transaction to the beginning.
+	txn = Transaction{
+		ArbitraryData: []string{"NonSia"},
+	}
+	b.Transactions = append([]Transaction{txn}, b.Transactions...)
+	if b.CalculateSubsidy(0).Cmp(expected) != 0 {
+		t.Error("subsidy is miscalculated with empty transactions.")
+	}
+}
+
+// TestBlockCheckMinerPayouts probes the CheckMinerPayouts function of the
+// block type.
+func TestBlockCheckMinerPayouts(t *testing.T) {
+	// All tests are done at height = 0.
+	coinbase := CalculateCoinbase(0)
+
+	// Create a block with a single valid payout.
+	b := Block{
+		MinerPayouts: []SiacoinOutput{
+			SiacoinOutput{
+				Value: coinbase,
+			},
+		},
+	}
+	if !b.CheckMinerPayouts(0) {
+		t.Error("payouts evaluated incorrectly when there is only one payout.")
+	}
+
+	// Try a block with an incorrect payout.
+	b = Block{
+		MinerPayouts: []SiacoinOutput{
+			SiacoinOutput{
+				Value: coinbase.Sub(NewCurrency64(1)),
+			},
+		},
+	}
+	if b.CheckMinerPayouts(0) {
+		t.Error("payouts evaluated incorrectly when there is a too-small payout")
+	}
+
+	// Try a block with 2 payouts.
+	b = Block{
+		MinerPayouts: []SiacoinOutput{
+			SiacoinOutput{
+				Value: coinbase.Sub(NewCurrency64(1)),
+			},
+			SiacoinOutput{
+				Value: NewCurrency64(1),
+			},
+		},
+	}
+	if !b.CheckMinerPayouts(0) {
+		t.Error("payouts evaluated incorrectly when there are 2 payouts")
+	}
+
+	// Try a block with 2 payouts that are too large.
+	b = Block{
+		MinerPayouts: []SiacoinOutput{
+			SiacoinOutput{
+				Value: coinbase,
+			},
+			SiacoinOutput{
+				Value: coinbase,
+			},
+		},
+	}
+	if b.CheckMinerPayouts(0) {
+		t.Error("payouts evaluated incorrectly when there are two large payouts")
+	}
+
+	// Create a block with an empty payout.
+	b = Block{
+		MinerPayouts: []SiacoinOutput{
+			SiacoinOutput{
+				Value: coinbase,
+			},
+			SiacoinOutput{},
+		},
+	}
+	if b.CheckMinerPayouts(0) {
+		t.Error("payouts evaluated incorrectly when there is only one payout.")
+	}
+}
+
 // TestBlockCheckTarget probes the CheckTarget function of the block type.
 func TestBlockCheckTarget(t *testing.T) {
 	var b Block
