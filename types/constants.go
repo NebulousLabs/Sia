@@ -14,13 +14,14 @@ import (
 )
 
 var (
-	BlockSizeLimit        uint64
-	BlockFrequency        BlockHeight
-	TargetWindow          BlockHeight
-	MedianTimestampWindow int
-	FutureThreshold       Timestamp
-	SiafundCount          uint64
-	SiafundPortion        float64
+	BlockSizeLimit         uint64
+	BlockFrequency         BlockHeight
+	TargetWindow           BlockHeight
+	MedianTimestampWindow  int
+	ExtremeFutureThreshold Timestamp
+	FutureThreshold        Timestamp
+	SiafundCount           uint64
+	SiafundPortion         float64
 
 	InitialCoinbase uint64
 	MinimumCoinbase uint64
@@ -68,6 +69,7 @@ func init() {
 		TargetWindow = 40  // Difficulty is adjusted based on prior 40 blocks.
 		MaturityDelay = 10
 		FutureThreshold = 2 * 60                 // 2 minutes.
+		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
 		GenesisTimestamp = Timestamp(1424139000) // Approx. Feb 16th, 2015
 
 		MaxAdjustmentUp = big.NewRat(102, 100)
@@ -82,7 +84,8 @@ func init() {
 		BlockFrequency = 1  // As fast as possible
 		TargetWindow = 10e3 // Large to prevent the difficulty from increasing during testing.
 		MaturityDelay = 3
-		FutureThreshold = 5 // 5 seconds
+		FutureThreshold = 3        // 3 seconds
+		ExtremeFutureThreshold = 6 // 6 seconds
 		GenesisTimestamp = CurrentTimestamp()
 
 		// A really restrictive difficulty clamp prevents the difficulty from
@@ -100,8 +103,9 @@ func init() {
 		// that the network is secure in a real-world byzantine environment.
 		BlockFrequency = 600                     // 1 block per 10 minutes.
 		TargetWindow = 1e3                       // Number of blocks to use when calculating the target.
-		MaturityDelay = 50                       // 8 hours.
-		FutureThreshold = 3 * 60 * 60            // Seconds into the future block timestamps are valid.
+		MaturityDelay = 50                       // 8 hours - 50 blocks.
+		FutureThreshold = 3 * 60 * 60            // 3 hours.
+		ExtremeFutureThreshold = 5 * 60 * 60     // 5 hours.
 		GenesisTimestamp = Timestamp(1431000000) // 12:00pm UTC May 7th 2015
 
 		// A difficulty clamp to make long range attacks difficult. Quadrupling the

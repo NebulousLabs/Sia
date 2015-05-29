@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -10,14 +11,15 @@ import (
 )
 
 var (
-	ErrDoSBlock        = errors.New("block is known to be invalid")
-	ErrBlockKnown      = errors.New("block exists in block map")
-	ErrEarlyTimestamp  = errors.New("block timestamp is too early")
-	ErrFutureTimestamp = errors.New("block timestamp too far in future")
-	ErrOrphan          = errors.New("block has no known parent")
-	ErrLargeBlock      = errors.New("block is too large to be accepted")
-	ErrBadMinerPayouts = errors.New("miner payout sum does not equal block subsidy")
-	ErrMissedTarget    = errors.New("block does not meet target")
+	ErrDoSBlock               = errors.New("block is known to be invalid")
+	ErrBlockKnown             = errors.New("block exists in block map")
+	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
+	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
+	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	ErrOrphan                 = errors.New("block has no known parent")
+	ErrLargeBlock             = errors.New("block is too large to be accepted")
+	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
+	ErrMissedTarget           = errors.New("block does not meet target")
 )
 
 // validHeader does some early, low computation verification on the block.
@@ -45,17 +47,31 @@ func (cs *State) validHeader(b types.Block) error {
 		return ErrEarlyTimestamp
 	}
 
+	// If the block is in the extreme future, return an error and do nothing
+	// more with the block. There is an assumption that by the time the extreme
+	// future arrives, this block will no longer be a part of the longest fork
+	// because it will have been ignored by all of the miners.
+	if b.Timestamp > types.CurrentTimestamp()+types.ExtremeFutureThreshold {
+		return ErrExtremeFutureTimestamp
+	}
+
 	// Verify that the miner payouts sum to the total amount of fees allowed to
 	// be collected by the miners.
 	if !b.CheckMinerPayouts(parent.height + 1) {
 		return ErrBadMinerPayouts
 	}
 
-	// Check that the block is not too far in the future. An external process
-	// will need to be responsible for resubmitting the block once it is no
-	// longer in the future. Future timestamps are the last thing checked in
-	// the header because they are somewhat expensive to keep.
+	// If the block is in the near future, but too far to be acceptable, then
+	// the block will be saved and added to the consensus set after it is no
+	// longer too far in the future. This is the last check because it's an
+	// expensive check, and not worth performing if the payouts are incorrect.
 	if b.Timestamp > types.CurrentTimestamp()+types.FutureThreshold {
+		go func() {
+			time.Sleep(time.Duration(b.Timestamp-(types.CurrentTimestamp()+types.FutureThreshold)) * time.Second)
+			lockID := cs.mu.Lock()
+			defer cs.mu.Unlock(lockID)
+			cs.acceptBlock(b) // TODO: How does this error get handled?
+		}()
 		return ErrFutureTimestamp
 	}
 

@@ -3,6 +3,7 @@ package consensus
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -267,6 +268,38 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	}
 }
 
+// TestExtremeFutureTimestampHandling checks that blocks with extreme future
+// timestamps handled correclty.
+func TestExtremeFutureTimestampHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestExtremeFutureTimestampHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Submit a block with a timestamp in the extreme future.
+	block, _, target := cst.miner.BlockForWork()
+	block.Timestamp = types.CurrentTimestamp() + 2 + types.ExtremeFutureThreshold
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.acceptBlock(solvedBlock)
+	if err != ErrExtremeFutureTimestamp {
+		t.Error("Expecting ErrExtremeFutureTimestamp", err)
+	}
+
+	// Check that after waiting until the block is no longer in the future, the
+	// block still has not been added to the consensus set (prove that the
+	// block was correctly discarded).
+	time.Sleep(time.Second * time.Duration(3+types.ExtremeFutureThreshold))
+	lockID := cst.cs.mu.RLock()
+	defer cst.cs.mu.RUnlock(lockID)
+	_, exists := cst.cs.blockMap[solvedBlock.ID()]
+	if exists {
+		t.Error("extreme future block made it into the consensus set after waiting")
+	}
+}
+
 // TestMinerPayoutHandling checks that blocks with incorrect payouts are
 // rejected.
 func TestMinerPayoutHandling(t *testing.T) {
@@ -290,8 +323,43 @@ func TestMinerPayoutHandling(t *testing.T) {
 	}
 }
 
-// Create a block with a timestamp in the future - the block should be held
-// until that future has arrived, and then it should be added to the
-// consensus set. If the timestamp is more than ExtremeFutureThreshold then
-// the block should be discarded outright.
-// types.CurrentTimestamp(), types.FutureThreshold, types.ExtremeFutureThreshold
+// testFutureTimestampHandling checks that blocks in the future (but not
+// extreme future) are handled correctly.
+func (cst *consensusSetTester) testFutureTimestampHandling() error {
+	// Submit a block with a timestamp in the future, but not the extreme
+	// future.
+	block, _, target := cst.miner.BlockForWork()
+	block.Timestamp = types.CurrentTimestamp() + 2 + types.FutureThreshold
+	solvedBlock, _ := cst.miner.SolveBlock(block, target)
+	err := cst.cs.acceptBlock(solvedBlock)
+	if err != ErrFutureTimestamp {
+		return errors.New("Expecting ErrExtremeFutureTimestamp: " + err.Error())
+	}
+
+	// Check that after waiting until the block is no longer too far in the
+	// future, the block gets added to the consensus set.
+	time.Sleep(time.Second * 3) // 3 seconds, as the block was originally 2 seconds too far into the future.
+	lockID := cst.cs.mu.RLock()
+	defer cst.cs.mu.RUnlock(lockID)
+	_, exists := cst.cs.blockMap[solvedBlock.ID()]
+	if !exists {
+		return errors.New("future block was not added to the consensus set after waiting the appropriate amount of time.")
+	}
+	return nil
+}
+
+// TestFutureTimestampHandling creates a consensus set tester and uses it to
+// call testFutureTimestampHandling.
+func TestFutureTimestampHandling(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestFutureTimestampHandling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testFutureTimestampHandling()
+	if err != nil {
+		t.Error(err)
+	}
+}
