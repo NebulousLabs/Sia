@@ -1,9 +1,15 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	ErrMisuseApplySiacoinInput = errors.New("applying a transaction with an invalid unspend siacoin output")
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
@@ -15,7 +21,7 @@ func (s *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 		if build.DEBUG {
 			_, exists := s.siacoinOutputs[sci.ParentID]
 			if !exists {
-				panic("Applying a transaction with an invalid unspent output!")
+				panic(ErrMisuseApplySiacoinInput)
 			}
 		}
 

@@ -67,6 +67,14 @@ func TestSimpleBlock(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	if testing.Short() {
+		t.SkipNow()
+	}
+	err = cst.checkConsistency()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 // testDoSBlockHandling checks that saved bad blocks are correctly ignored.
@@ -359,6 +367,14 @@ func TestFutureTimestampHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cst.testFutureTimestampHandling()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if testing.Short() {
+		t.SkipNow()
+	}
+	err = cst.checkConsistency()
 	if err != nil {
 		t.Error(err)
 	}
