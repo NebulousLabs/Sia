@@ -176,14 +176,9 @@ func TestTransactionValidSignatures(t *testing.T) {
 	// entropy type, which should never be accepted.
 	uc := UnlockConditions{
 		PublicKeys: []SiaPublicKey{
-			SiaPublicKey{
-				Algorithm: SignatureEd25519,
-				Key:       string(pk[:]),
-			},
-			SiaPublicKey{},
-			SiaPublicKey{
-				Algorithm: SignatureEntropy,
-			},
+			{Algorithm: SignatureEd25519, Key: string(pk[:])},
+			{},
+			{Algorithm: SignatureEntropy},
 		},
 		SignaturesRequired: 2,
 	}
@@ -191,13 +186,13 @@ func TestTransactionValidSignatures(t *testing.T) {
 	// Create a transaction with each type of unlock condition.
 	txn := Transaction{
 		SiacoinInputs: []SiacoinInput{
-			SiacoinInput{UnlockConditions: uc},
+			{UnlockConditions: uc},
 		},
 		FileContractRevisions: []FileContractRevision{
-			FileContractRevision{UnlockConditions: uc},
+			{UnlockConditions: uc},
 		},
 		SiafundInputs: []SiafundInput{
-			SiafundInput{UnlockConditions: uc},
+			{UnlockConditions: uc},
 		},
 	}
 	txn.FileContractRevisions[0].ParentID[0] = 1 // can't overlap with other objects
@@ -206,22 +201,22 @@ func TestTransactionValidSignatures(t *testing.T) {
 	// Create the signatures that spend the output.
 	txn.TransactionSignatures = []TransactionSignature{
 		// First signatures use cryptography.
-		TransactionSignature{
+		{
 			Timelock:      5,
 			CoveredFields: CoveredFields{WholeTransaction: true},
 		},
-		TransactionSignature{
+		{
 			CoveredFields: CoveredFields{WholeTransaction: true},
 		},
-		TransactionSignature{
+		{
 			CoveredFields: CoveredFields{WholeTransaction: true},
 		},
 
 		// The second signatures should always work for being unrecognized
 		// types.
-		TransactionSignature{PublicKeyIndex: 1},
-		TransactionSignature{PublicKeyIndex: 1},
-		TransactionSignature{PublicKeyIndex: 1},
+		{PublicKeyIndex: 1},
+		{PublicKeyIndex: 1},
+		{PublicKeyIndex: 1},
 	}
 	txn.TransactionSignatures[1].ParentID[0] = 1
 	txn.TransactionSignatures[2].ParentID[0] = 2
