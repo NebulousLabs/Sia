@@ -25,6 +25,16 @@ type (
 		Transactions []Transaction
 	}
 
+	// A BlockHeader, when encoded, is an 80-byte constant size field
+	// containing enough information to do headers-first block downloading.
+	// Hashing the header results in the block ID.
+	BlockHeader struct {
+		ParentID   BlockID
+		Nonce      BlockNonce
+		Timestamp  Timestamp
+		MerkleRoot crypto.Hash
+	}
+
 	BlockHeight uint64
 	BlockID     crypto.Hash
 	BlockNonce  [8]byte
@@ -40,17 +50,6 @@ func CalculateCoinbase(height BlockHeight) Currency {
 		base = MinimumCoinbase
 	}
 	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
-}
-
-// ID returns the ID of a Block, which is calculated by hashing the
-// concatenation of the block's parent's ID, nonce, and the result of the
-// b.MerkleRoot().
-func (b Block) ID() BlockID {
-	return BlockID(crypto.HashAll(
-		b.ParentID,
-		b.Nonce,
-		b.MerkleRoot(),
-	))
 }
 
 // CalculateSubsidy takes a block and a height and determines the block
@@ -91,12 +90,28 @@ func (b Block) CheckTarget(target Target) bool {
 	return bytes.Compare(target[:], blockHash[:]) >= 0
 }
 
+// Header returns the header of a block.
+func (b Block) Header() BlockHeader {
+	return BlockHeader{
+		ParentID:   b.ParentID,
+		Nonce:      b.Nonce,
+		Timestamp:  b.Timestamp,
+		MerkleRoot: b.MerkleRoot(),
+	}
+}
+
+// ID returns the ID of a Block, which is calculated by hashing the
+// concatenation of the block's parent's ID, nonce, and the result of the
+// b.MerkleRoot().
+func (b Block) ID() BlockID {
+	return BlockID(crypto.HashObject(b.Header()))
+}
+
 // MerkleRoot calculates the Merkle root of a Block. The leaves of the Merkle
 // tree are composed of the Timestamp, the miner outputs (one leaf per
 // payout), and the transactions (one leaf per transaction).
 func (b Block) MerkleRoot() crypto.Hash {
 	tree := crypto.NewTree()
-	tree.PushObject(b.Timestamp)
 	for _, payout := range b.MinerPayouts {
 		tree.PushObject(payout)
 	}

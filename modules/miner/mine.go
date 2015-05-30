@@ -3,6 +3,7 @@ package miner
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -83,9 +84,10 @@ func (m *Miner) submitBlock(b types.Block) error {
 // time to complete, and should not be called with a lock.
 func (m *Miner) solveBlock(blockForWork types.Block, blockMerkleRoot crypto.Hash, target types.Target) (b types.Block, solved bool, err error) {
 	b = blockForWork
-	hashbytes := make([]byte, 72)
+	hashbytes := make([]byte, 80)
 	copy(hashbytes, b.ParentID[:])
-	copy(hashbytes[40:], blockMerkleRoot[:])
+	binary.LittleEndian.PutUint64(hashbytes[40:48], uint64(b.Timestamp))
+	copy(hashbytes[48:], blockMerkleRoot[:])
 
 	nonce := hashbytes[32:40]
 	for i := 0; i < 255; i++ {
