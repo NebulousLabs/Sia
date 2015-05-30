@@ -166,6 +166,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 			errChan <- r.threadedUploadPiece(up, piece)
 		}(&r.files[up.Nickname].Pieces[i])
 	}
+	reqPieces := r.files[up.Nickname].PiecesRequired
 	r.mu.Unlock(lockID)
 
 	// Wait for success or failure. Since we are (currently) using full
@@ -173,7 +174,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// means "zero pieces were uploaded."
 	for i := 0; i < up.Pieces; i++ {
 		if <-errChan == nil {
-			return nil
+			reqPieces--
+			if reqPieces <= 0 {
+				return nil
+			}
 		}
 	}
 
