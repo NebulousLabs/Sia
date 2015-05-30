@@ -214,8 +214,8 @@ func TestMissedTarget(t *testing.T) {
 
 	// Mine a block that doesn't meet the target.
 	block, _, target := cst.miner.BlockForWork()
-	for block.CheckTarget(target) {
-		block.Nonce++
+	for block.CheckTarget(target) && block.Nonce[0] != 255 {
+		block.Nonce[0]++
 	}
 	if block.CheckTarget(target) {
 		t.Fatal("unable to find a failing target (lol)")

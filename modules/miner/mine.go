@@ -3,10 +3,8 @@ package miner
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"time"
-	"unsafe"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -89,20 +87,22 @@ func (m *Miner) solveBlock(blockForWork types.Block, blockMerkleRoot crypto.Hash
 	copy(hashbytes, b.ParentID[:])
 	copy(hashbytes[40:], blockMerkleRoot[:])
 
-	nonce := (*uint64)(unsafe.Pointer(&hashbytes[32]))
-	*nonce = b.Nonce
-	for i := 0; i < iterationsPerAttempt; i++ {
-		id := crypto.HashBytes(hashbytes)
-		if bytes.Compare(target[:], id[:]) >= 0 {
-			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:40])
-			err = m.submitBlock(b)
-			if err != nil {
+	nonce := hashbytes[32:40]
+	for i := 0; i < 255; i++ {
+		nonce[0] = byte(i)
+		for j := 0; j < iterationsPerAttempt/256; j++ {
+			nonce[1] = byte(j)
+			id := crypto.HashBytes(hashbytes)
+			if bytes.Compare(target[:], id[:]) >= 0 {
+				copy(b.Nonce[:], nonce)
+				err = m.submitBlock(b)
+				if err != nil {
+					return
+				}
+				solved = true
 				return
 			}
-			solved = true
-			return
 		}
-		*nonce++
 	}
 
 	return
@@ -188,13 +188,13 @@ func (m *Miner) FindBlock() (types.Block, bool, error) {
 // and is very slow.
 func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b types.Block, solved bool) {
 	b = blockForWork
-	for b.Nonce = 0; b.Nonce < iterationsPerAttempt; b.Nonce++ {
+	for i := 0; i < 255; i++ {
+		b.Nonce[0] = byte(i)
 		if b.CheckTarget(target) {
-			solved = true
-			return
+			return b, true
 		}
 	}
-	return
+	return b, false
 }
 
 // SubmitBlock accepts a block with a valid target and presents it to the
