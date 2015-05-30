@@ -9,25 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// testApplyFileContract gets a transaction with file contract creation and
-// puts it into the blockchain, then checks that the file contract has appeared
-// in the consensus set.
-func (ct *ConsensusTester) testApplyFileContract() {
-	// Grab a transction with a file contract and put it into the blockchain.
-	txn, _ := ct.FileContractTransaction(ct.Height()+2, ct.Height()+3)
-	block := ct.MineCurrentBlock([]types.Transaction{txn})
-	err := ct.AcceptBlock(block)
-	if err != nil {
-		ct.Fatal(err)
-	}
-
-	// Check for the file contract in the consensus set.
-	_, exists := ct.fileContracts[txn.FileContractID(0)]
-	if !exists {
-		ct.Fatal("file contract did not make it into the consensus set.")
-	}
-}
-
 // testApplyStorageProof gets a transaction with file contract creation and
 // puts it into the blockchain, then submits a storage proof for the file and
 // checks that the payout was properly distributed.
@@ -85,13 +66,6 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	if !exists {
 		ct.Fatal("delayed outputs don't seem to exist, but height map does")
 	}
-}
-
-// TestApplyFileContract creates a new testing environment and uses it to call
-// testApplyFileContract.
-func TestApplyFileContract(t *testing.T) {
-	ct := NewTestingEnvironment("TestApplyFileContract", t)
-	ct.testApplyFileContract()
 }
 
 // TestApplyStorageProof creates a new testing environment and uses it to call
