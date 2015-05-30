@@ -1,28 +1,19 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// MinerBlockforworkResp is the response struct returned by the API call
-// '/miner/blockforwork'.
-type MinerBlockforworkResp struct {
-	Block      types.Block
-	MerkleRoot crypto.Hash
-	Target     types.Target
-}
 
 // minerBlockforworkHandler handles the API call that retrieves a block for
 // work.
 func (srv *Server) minerBlockforworkHandler(w http.ResponseWriter, req *http.Request) {
-	var bfw MinerBlockforworkResp
-	bfw.Block, bfw.MerkleRoot, bfw.Target = srv.miner.BlockForWork()
-	writeJSON(w, bfw)
+	bfw, _, target := srv.miner.BlockForWork()
+	w.Write(encoding.MarshalAll(target, bfw.Header(), bfw))
 }
 
 // minerStartHandler handles the API call that starts the miner.
@@ -59,7 +50,11 @@ func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 // minerSubmitBlockHandler handles the API call to submit a block to the miner.
 func (srv *Server) minerSubmitBlockHandler(w http.ResponseWriter, req *http.Request) {
 	var b types.Block
-	err := json.NewDecoder(req.Body).Decode(&b)
+	encodedBlock, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+	}
+	err = encoding.Unmarshal(encodedBlock, &b)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 	}
