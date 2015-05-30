@@ -19,7 +19,7 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 					{Value: NewCurrency64(900e3)},
 				},
 				MissedProofOutputs: []SiacoinOutput{
-					{Value: NewCurrency64(100e3)},
+					{Value: NewCurrency64(70e3)},
 					{Value: NewCurrency64(900e3)},
 				},
 			},
@@ -66,17 +66,17 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	}
 	txn.FileContracts[0].ValidProofOutputs[0].Value = NewCurrency64(70e3)
 
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(99e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(69e3)
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractOutputSumViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(101e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(71e3)
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractOutputSumViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(100e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(70e3)
 
 	// Try the payouts when the value of the contract is too low to incur a
 	// fee.
