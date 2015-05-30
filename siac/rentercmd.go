@@ -150,7 +150,7 @@ func renterfileslistcmd() {
 		if file.Available {
 			fmt.Println("\t", file.Nickname)
 		} else {
-			fmt.Println("\t", file.Nickname, "(uploading...)")
+			fmt.Printf("\t%s (uploading, %0.2f%%)\n", file.Nickname, file.UploadProgress)
 		}
 	}
 }
@@ -215,5 +215,5 @@ func renterfilesuploadcmd(source, nickname string) {
 		fmt.Println("Could not upload file:", err)
 		return
 	}
-	fmt.Println("Upload initiated.")
+	fmt.Printf("Uploaded '%s' as %s.\n", abs(source), nickname)
 }

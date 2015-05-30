@@ -25,10 +25,11 @@ type DownloadInfo struct {
 
 // FileInfo is a helper struct for the files API call.
 type FileInfo struct {
-	Available     bool
-	Nickname      string
-	Repairing     bool
-	TimeRemaining types.BlockHeight
+	Available      bool
+	UploadProgress float32
+	Nickname       string
+	Repairing      bool
+	TimeRemaining  types.BlockHeight
 }
 
 // LoadedFiles lists files that were loaded into the renter.
@@ -72,10 +73,11 @@ func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Reque
 	fileSet := make([]FileInfo, 0, len(files))
 	for _, file := range files {
 		fileSet = append(fileSet, FileInfo{
-			Available:     file.Available(),
-			Nickname:      file.Nickname(),
-			Repairing:     file.Repairing(),
-			TimeRemaining: file.TimeRemaining(),
+			Available:      file.Available(),
+			UploadProgress: file.UploadProgress(),
+			Nickname:       file.Nickname(),
+			Repairing:      file.Repairing(),
+			TimeRemaining:  file.TimeRemaining(),
 		})
 	}
 

@@ -25,6 +25,12 @@ type FileInfo interface {
 	// not.
 	Available() bool
 
+	// UploadProgress is a percentage indicating the progress of the file as
+	// it is being uploaded. This percentage is calculated internally (unlike
+	// DownloadInfo) because redundancy schemes complicate the definition of
+	// "progress." As a rule, Available == true IFF UploadProgress == 100.0.
+	UploadProgress() float32
+
 	// Nickname gives the nickname of the file.
 	Nickname() string
 

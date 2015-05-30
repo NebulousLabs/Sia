@@ -48,6 +48,9 @@ type filePiece struct {
 	StartIndex uint64
 	EndIndex   uint64
 
+	Transferred uint64
+	PieceSize   uint64
+
 	PieceIndex    int // Indicates the erasure coding index of this piece.
 	EncryptionKey crypto.TwofishKey
 	Checksum      crypto.Hash
@@ -68,6 +71,22 @@ func (f *file) Available() bool {
 		}
 	}
 	return false
+}
+
+// UploadProgress indicates how close the file is to being available.
+func (f *file) UploadProgress() float32 {
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
+
+	// full replication means we just use the progress of most-uploaded piece.
+	var max float32
+	for _, piece := range f.Pieces {
+		progress := float32(piece.Transferred) / float32(piece.PieceSize)
+		if progress > max {
+			max = progress
+		}
+	}
+	return 100 * max
 }
 
 // Nickname returns the nickname of the file.
