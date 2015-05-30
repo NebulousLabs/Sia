@@ -280,14 +280,14 @@ Layout:
 
 32-111: header
 
-111+: block
+112+: block
 
 32-39 of header: header nonce
 
 32-39 of block: block nonce
 
 When submitting the block, update the nonce and submit only the block (bytes
-111+).
+112+).
 
 #### /miner/start
 
