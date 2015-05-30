@@ -236,16 +236,8 @@ func (s *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 // produces a set of diffs, which are stored in the blockNode containing the
 // transaction.
 func (s *State) applyTransaction(bn *blockNode, t types.Transaction) {
-	// Sanity check - the input transaction should be valid.
-	if build.DEBUG {
-		err := s.validTransaction(t)
-		if err != nil {
-			panic("applyTransaction called with an invalid transaction!")
-		}
-	}
-
-	// Apply each component of the transaction. Miner fees are handled as a
-	// separate process.
+	// Apply each component of the transaction. Miner fees are handled
+	// elsewhere.
 	s.applySiacoinInputs(bn, t)
 	s.applySiacoinOutputs(bn, t)
 	s.applyFileContracts(bn, t)
