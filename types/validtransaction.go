@@ -21,6 +21,7 @@ var (
 	ErrStorageProofWithOutputs          = errors.New("transaction has both a storage proof and other outputs")
 	ErrTimelockNotSatisfied             = errors.New("timelock has not been met")
 	ErrTransactionTooLarge              = errors.New("transaction is too large to fit in a block")
+	ErrZeroMinerFee                     = errors.New("transaction has a zero value miner fee")
 	ErrZeroOutput                       = errors.New("transaction cannot have an output or payout that has zero value")
 	ErrZeroRevision                     = errors.New("transaction has a file contract revision with RevisionNumber=0")
 )
@@ -127,6 +128,11 @@ func (t Transaction) followsMinimumValues() error {
 		}
 		if sfo.Value.IsZero() {
 			return ErrZeroOutput
+		}
+	}
+	for _, fee := range t.MinerFees {
+		if fee.IsZero() {
+			return ErrZeroMinerFee
 		}
 	}
 	return nil
