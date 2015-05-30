@@ -42,7 +42,7 @@ func TestBlockID(t *testing.T) {
 	ids = append(ids, b.ID())
 	b.ParentID[0] = 1
 	ids = append(ids, b.ID())
-	b.Nonce = 45
+	b.Nonce[0] = 45
 	ids = append(ids, b.ID())
 	b.Timestamp = CurrentTimestamp()
 	ids = append(ids, b.ID())

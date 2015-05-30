@@ -19,7 +19,7 @@ type (
 	// given Target.
 	Block struct {
 		ParentID     BlockID
-		Nonce        uint64
+		Nonce        BlockNonce
 		Timestamp    Timestamp
 		MinerPayouts []SiacoinOutput
 		Transactions []Transaction
@@ -27,6 +27,7 @@ type (
 
 	BlockHeight uint64
 	BlockID     crypto.Hash
+	BlockNonce  [8]byte
 )
 
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase
