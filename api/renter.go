@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -14,6 +15,7 @@ const (
 
 // DownloadInfo is a helper struct for the downloadqueue API call.
 type DownloadInfo struct {
+	StartTime   time.Time
 	Complete    bool
 	Filesize    uint64
 	Received    uint64
@@ -52,6 +54,7 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 	downloadSet := make([]DownloadInfo, 0, len(downloads))
 	for _, dl := range downloads {
 		downloadSet = append(downloadSet, DownloadInfo{
+			StartTime:   dl.StartTime(),
 			Complete:    dl.Complete(),
 			Filesize:    dl.Filesize(),
 			Received:    dl.Received(),

@@ -18,13 +18,15 @@ var (
 	downloadAttempts = 5
 )
 
-// A Download is a file download that has been queued by the renter.
+// A Download is a file download that has been queued by the renter. It
+// implements the modules.DownloadInfo interface.
 type Download struct {
 	// Implementation note: received is declared first to ensure that it is
 	// 64-bit aligned. This is necessary to ensure that atomic operations work
 	// correctly on ARM and x86-32.
 	received uint64
 
+	startTime   time.Time
 	complete    bool
 	filesize    uint64
 	destination string
@@ -32,6 +34,11 @@ type Download struct {
 
 	pieces []filePiece
 	file   *os.File
+}
+
+// StartTime returns when the download was initiated.
+func (d *Download) StartTime() time.Time {
+	return d.startTime
 }
 
 // Complete returns whether the file is ready to be used.
@@ -64,6 +71,7 @@ func (d *Download) Nickname() string {
 func (d *Download) Write(b []byte) (int, error) {
 	n, err := d.file.Write(b)
 	// atomically update d.received
+	// TODO: atomic operations may not be necessary
 	atomic.AddUint64(&d.received, uint64(n))
 	return n, err
 }
@@ -104,36 +112,6 @@ func (d *Download) downloadPiece(piece filePiece) error {
 	return nil
 }
 
-// start initiates the download of a File.
-func (d *Download) start() {
-	// We only need one piece, so iterate through the hosts until a download
-	// succeeds.
-	for i := 0; i < downloadAttempts; i++ {
-		for _, piece := range d.pieces {
-			downloadErr := d.downloadPiece(piece)
-			if downloadErr == nil {
-				d.complete = true
-				d.file.Close()
-				return
-			}
-			// Reset seek, since the file may have been partially written. The
-			// next attempt will overwrite these bytes.
-			d.file.Seek(0, 0)
-			atomic.SwapUint64(&d.received, 0)
-		}
-
-		// This iteration failed, no hosts returned the piece. Try again
-		// after waiting a random amount of time.
-		randSource := make([]byte, 1)
-		rand.Read(randSource)
-		time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
-	}
-
-	// File could not be downloaded; delete the copy on disk.
-	d.file.Close()
-	os.Remove(d.destination)
-}
-
 // newDownload initializes a new Download object.
 func newDownload(file *file, destination string) (*Download, error) {
 	// Create the download destination file.
@@ -154,7 +132,8 @@ func newDownload(file *file, destination string) (*Download, error) {
 	}
 
 	return &Download{
-		complete: false,
+		startTime: time.Now(),
+		complete:  false,
 		// for now, all the pieces are equivalent
 		filesize:    file.Pieces[0].Contract.FileSize,
 		received:    0,
@@ -170,9 +149,7 @@ func newDownload(file *file, destination string) (*Download, error) {
 // specified.
 func (r *Renter) Download(nickname, destination string) error {
 	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-
-	// Lookup the File associated with the nickname.
+	// Lookup the file associated with the nickname.
 	file, exists := r.files[nickname]
 	if !exists {
 		return errors.New("no file of that nickname")
@@ -183,11 +160,40 @@ func (r *Renter) Download(nickname, destination string) error {
 	if err != nil {
 		return err
 	}
-	go d.start()
 
 	// Add the download to the download queue.
 	r.downloadQueue = append(r.downloadQueue, d)
-	return nil
+	r.mu.Unlock(lockID)
+
+	// Download the file. We only need one piece, so iterate through the hosts
+	// until a download succeeds.
+	for i := 0; i < downloadAttempts; i++ {
+		for _, piece := range d.pieces {
+			downloadErr := d.downloadPiece(piece)
+			if downloadErr == nil {
+				// done
+				d.complete = true
+				d.file.Close()
+				return nil
+			}
+			// Reset seek, since the file may have been partially written. The
+			// next attempt will overwrite these bytes.
+			d.file.Seek(0, 0)
+			atomic.SwapUint64(&d.received, 0)
+		}
+
+		// This iteration failed, no hosts returned the piece. Try again
+		// after waiting a random amount of time.
+		randSource := make([]byte, 1)
+		rand.Read(randSource)
+		time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
+	}
+
+	// File could not be downloaded; delete the copy on disk.
+	d.file.Close()
+	os.Remove(destination)
+
+	return errors.New("could not download any file pieces")
 }
 
 // DownloadQueue returns the list of downloads in the queue.
@@ -195,9 +201,10 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	// order from most recent to least recent
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
-		downloads[i] = r.downloadQueue[i]
+		downloads[i] = r.downloadQueue[len(r.downloadQueue)-i-1]
 	}
 	return downloads
 }

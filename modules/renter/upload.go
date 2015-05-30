@@ -51,7 +51,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // uploadPiece will give up. The file uploading can be continued using a repair
 // tool. Upon completion, the memory containg the piece's information is
 // updated.
-func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePiece) {
+func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePiece) error {
 	// Set 'Repairing' for the piece to true.
 	lockID := r.mu.Lock()
 	piece.Repairing = true
@@ -62,47 +62,46 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 		// Select a host. An error here is unrecoverable.
 		host, err := r.hostDB.RandomHost()
 		if err != nil {
-			return
+			return err
 		}
 
 		// Negotiate the contract with the host. If the negotiation is
-		// unsuccessful, we need to try again with a new host. Otherwise, the
-		// file will be uploaded and we'll be done.
+		// unsuccessful, we need to try again with a new host.
 		contract, contractID, key, err := r.negotiateContract(host, up)
-		if err != nil {
-			// The previous attempt didn't work. We will try again after
-			// sleeping for a randomized amount of time to increase our chances
-			// of success. This will help spread things out if there are
-			// problems with network congestion or other randomized issues.
-			randSource := make([]byte, 1)
-			rand.Read(randSource)
-			time.Sleep(time.Duration(attempts) * time.Duration(attempts) * 250 * time.Millisecond * time.Duration(randSource[0]))
-			continue
+		if err == nil {
+			// Negotiation was successful; update the filePiece.
+			lockID := r.mu.Lock()
+			*piece = filePiece{
+				Active:     true,
+				Repairing:  false,
+				Contract:   contract,
+				ContractID: contractID,
+
+				HostIP: host.IPAddress,
+
+				EncryptionKey: key,
+			}
+			r.save()
+			r.mu.Unlock(lockID)
+			return nil
 		}
 
-		lockID := r.mu.Lock()
-		*piece = filePiece{
-			Active:     true,
-			Repairing:  false,
-			Contract:   contract,
-			ContractID: contractID,
-
-			HostIP: host.IPAddress,
-
-			EncryptionKey: key,
-		}
-		r.save()
-		r.mu.Unlock(lockID)
-		return
+		// The previous attempt didn't work. We will try again after
+		// sleeping for a randomized amount of time to increase our chances
+		// of success. This will help spread things out if there are
+		// problems with network congestion or other randomized issues.
+		randSource := make([]byte, 1)
+		rand.Read(randSource)
+		time.Sleep(time.Duration(attempts) * time.Duration(attempts) * 250 * time.Millisecond * time.Duration(randSource[0]))
 	}
+
+	// All attempts failed.
+	return errors.New("failed to upload filePiece")
 }
 
 // Upload takes an upload parameters, which contain a file to upload, and then
 // creates a redundant copy of the file on the Sia network.
 func (r *Renter) Upload(up modules.FileUploadParams) error {
-	lockID := r.mu.Lock()
-	defer r.mu.Unlock(lockID)
-
 	// TODO: This type of restriction is something that should be handled by
 	// the frontend, not the backend.
 	if filepath.Ext(up.Filename) != filepath.Ext(up.Nickname) {
@@ -115,23 +114,25 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Check for a nickname conflict.
+	lockID := r.mu.RLock()
 	_, exists := r.files[up.Nickname]
+	r.mu.RUnlock(lockID)
 	if exists {
 		return errors.New("file with that nickname already exists")
 	}
 
-	// Check that the file exists and is less than 500mb.
+	// Check that the file exists and is less than 500 MiB.
 	fileInfo, err := os.Stat(up.Filename)
 	if err != nil {
 		return err
 	}
-	// NOTE: The upload max of 500mb is temporary and therefore does not have a
+	// NOTE: The upload max of 500 MiB is temporary and therefore does not have a
 	// constant. This should be removed once micropayments + upload resuming
-	// are in place. 512mib is chosen to prevent confusion - on anybody's
-	// machine any file appearing to be under 500mb will be below the hard
+	// are in place. 500 MiB is chosen to prevent confusion - on anybody's
+	// machine any file appearing to be under 500 MB will be below the hard
 	// limit.
-	if fileInfo.Size() > 512*1024*1024 {
-		return errors.New("cannot upload a file that's greater than 500mb")
+	if fileInfo.Size() > 500*1024*1024 {
+		return errors.New("cannot upload a file larger than 500 MB")
 	}
 
 	// Check that the hostdb is sufficiently large to support an upload. Right
@@ -140,11 +141,11 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// number of pieces plus some buffer before we decide that an upload is
 	// okay.
 	if len(r.hostDB.ActiveHosts()) < 1 {
-		return errors.New("not enough hosts on the network to upload a file :( - maybe you need to upgrade your software")
+		return errors.New("not enough hosts on the network to upload a file")
 	}
 
-	// Upload a piece to every host on the network.
-	r.files[up.Nickname] = &file{
+	// Create file object.
+	f := &file{
 		Name: up.Nickname,
 
 		PiecesRequired: 1,
@@ -152,13 +153,42 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		UploadParams:   up,
 		renter:         r,
 	}
-	for i := range r.files[up.Nickname].Pieces {
-		// threadedUploadPiece will change the memory that the piece points to,
-		// which is useful because it means the file itself can be renamed but
-		// will still point to the same underlying pieces.
-		go r.threadedUploadPiece(up, &r.files[up.Nickname].Pieces[i])
-	}
-	r.save()
 
-	return nil
+	// Add file to renter.
+	lockID = r.mu.Lock()
+	r.files[up.Nickname] = f
+	r.save()
+	r.mu.Unlock(lockID)
+
+	// Upload a piece to every host on the network.
+	errChan := make(chan error, len(f.Pieces))
+	for i := range f.Pieces {
+		// threadedUploadPiece will change the memory that the piece points
+		// to, which is useful because it means the file can be renamed
+		// without disrupting the upload process.
+		go func(piece *filePiece) {
+			errChan <- r.threadedUploadPiece(up, piece)
+		}(&f.Pieces[i])
+	}
+
+	// Wait for success or failure. Since we are (currently) using full
+	// replication, success means "one piece was uploaded," while failure
+	// means "zero pieces were uploaded."
+	reqPieces := f.PiecesRequired
+	for i := 0; i < up.Pieces; i++ {
+		if <-errChan == nil {
+			reqPieces--
+			if reqPieces <= 0 {
+				return nil
+			}
+		}
+	}
+
+	// All uploads failed. Remove the file object.
+	lockID = r.mu.Lock()
+	delete(r.files, up.Nickname)
+	r.save()
+	r.mu.Unlock(lockID)
+
+	return errors.New("failed to upload any file pieces")
 }
