@@ -116,10 +116,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	// Check for a nickname conflict.
 	lockID := r.mu.RLock()
 	_, exists := r.files[up.Nickname]
+	r.mu.RUnlock(lockID)
 	if exists {
 		return errors.New("file with that nickname already exists")
 	}
-	r.mu.RUnlock(lockID)
 
 	// Check that the file exists and is less than 500 MiB.
 	fileInfo, err := os.Stat(up.Filename)
@@ -145,8 +145,7 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	}
 
 	// Create file object.
-	lockID = r.mu.Lock()
-	r.files[up.Nickname] = &file{
+	f := &file{
 		Name: up.Nickname,
 
 		PiecesRequired: 1,
@@ -154,24 +153,28 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		UploadParams:   up,
 		renter:         r,
 	}
+
+	// Add file to renter.
+	lockID = r.mu.Lock()
+	r.files[up.Nickname] = f
 	r.save()
+	r.mu.Unlock(lockID)
 
 	// Upload a piece to every host on the network.
-	errChan := make(chan error, len(r.files[up.Nickname].Pieces))
-	for i := range r.files[up.Nickname].Pieces {
+	errChan := make(chan error, len(f.Pieces))
+	for i := range f.Pieces {
 		// threadedUploadPiece will change the memory that the piece points
 		// to, which is useful because it means the file can be renamed
 		// without disrupting the upload process.
 		go func(piece *filePiece) {
 			errChan <- r.threadedUploadPiece(up, piece)
-		}(&r.files[up.Nickname].Pieces[i])
+		}(&f.Pieces[i])
 	}
-	reqPieces := r.files[up.Nickname].PiecesRequired
-	r.mu.Unlock(lockID)
 
 	// Wait for success or failure. Since we are (currently) using full
 	// replication, success means "one piece was uploaded," while failure
 	// means "zero pieces were uploaded."
+	reqPieces := f.PiecesRequired
 	for i := 0; i < up.Pieces; i++ {
 		if <-errChan == nil {
 			reqPieces--
@@ -186,8 +189,6 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	delete(r.files, up.Nickname)
 	r.save()
 	r.mu.Unlock(lockID)
-
-	close(errChan)
 
 	return errors.New("failed to upload any file pieces")
 }
