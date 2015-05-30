@@ -2,6 +2,9 @@ package types
 
 import (
 	"testing"
+
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TestCalculateCoinbase probes the CalculateCoinbase function. The test code
@@ -29,6 +32,30 @@ func TestCalculateCoinbase(t *testing.T) {
 		t.Error(c)
 		t.Error(NewCurrency64(MinimumCoinbase).Mul(NewCurrency(CoinbaseAugment)))
 		t.Error("Unexpected CalculateCoinbase result")
+	}
+}
+
+// TestBlockHeader checks that BlockHeader returns the correct value, and that
+// the hash is consistent with the old method for obtaining the hash.
+func TestBlockHeader(t *testing.T) {
+	var b Block
+	b.ParentID[1] = 1
+	b.Nonce[2] = 2
+	b.Timestamp = 3
+	b.MinerPayouts = []SiacoinOutput{{Value: NewCurrency64(4)}}
+	b.Transactions = []Transaction{{ArbitraryData: []string{"5"}}}
+
+	id1 := b.ID()
+	id2 := BlockID(crypto.HashBytes(encoding.Marshal(b.Header())))
+	id3 := BlockID(crypto.HashAll(
+		b.ParentID,
+		b.Nonce,
+		b.Timestamp,
+		b.MerkleRoot(),
+	))
+
+	if id1 != id2 || id2 != id3 || id3 != id1 {
+		t.Error("Methods for getting block id don't return the same results")
 	}
 }
 
