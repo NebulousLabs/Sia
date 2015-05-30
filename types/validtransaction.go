@@ -39,9 +39,8 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 			return ErrFileContractWindowEndViolation
 		}
 
-		// Check that the valid proof outputs sum to the payout after the
-		// siafund fee has been applied, and check that the missed proof
-		// outputs sum to the full payout.
+		// Check that the proof outputs sum to the payout after the
+		// siafund fee has been applied.
 		var validProofOutputSum, missedProofOutputSum Currency
 		for _, output := range fc.ValidProofOutputs {
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
@@ -53,7 +52,7 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return ErrFileContractOutputSumViolation
 		}
-		if missedProofOutputSum.Cmp(fc.Payout) != 0 {
+		if missedProofOutputSum.Cmp(outputPortion) != 0 {
 			return ErrFileContractOutputSumViolation
 		}
 	}
