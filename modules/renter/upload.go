@@ -67,22 +67,8 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 
 		// Negotiate the contract with the host. If the negotiation is
 		// unsuccessful, we need to try again with a new host.
-		contract, contractID, key, err := r.negotiateContract(host, up)
+		err = r.negotiateContract(host, up, piece)
 		if err == nil {
-			// Negotiation was successful; update the filePiece.
-			lockID := r.mu.Lock()
-			*piece = filePiece{
-				Active:     true,
-				Repairing:  false,
-				Contract:   contract,
-				ContractID: contractID,
-
-				HostIP: host.IPAddress,
-
-				EncryptionKey: key,
-			}
-			r.save()
-			r.mu.Unlock(lockID)
 			return nil
 		}
 
@@ -152,6 +138,10 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 		Pieces:         make([]filePiece, up.Pieces),
 		UploadParams:   up,
 		renter:         r,
+	}
+	for i := range f.Pieces {
+		f.Pieces[i].Repairing = true
+		f.Pieces[i].PieceSize = uint64(fileInfo.Size())
 	}
 
 	// Add file to renter.
