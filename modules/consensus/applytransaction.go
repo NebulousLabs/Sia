@@ -9,51 +9,54 @@ import (
 )
 
 var (
-	ErrMisuseApplySiacoinInput = errors.New("applying a transaction with an invalid unspend siacoin output")
+	ErrMisuseApplySiacoinInput  = errors.New("applying a transaction with an invalid unspent siacoin output")
+	ErrMisuseApplySiacoinOutput = errors.New("applying a transaction with an invalid siacoin output")
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (s *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
+func (cs *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if build.DEBUG {
-			_, exists := s.siacoinOutputs[sci.ParentID]
+			_, exists := cs.siacoinOutputs[sci.ParentID]
 			if !exists {
 				panic(ErrMisuseApplySiacoinInput)
 			}
 		}
 
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, modules.SiacoinOutputDiff{
+		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sci.ParentID,
-			SiacoinOutput: s.siacoinOutputs[sci.ParentID],
-		})
-		delete(s.siacoinOutputs, sci.ParentID)
+			SiacoinOutput: cs.siacoinOutputs[sci.ParentID],
+		}
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 	}
 }
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (s *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
+func (cs *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
 		scoid := t.SiacoinOutputID(i)
 		if build.DEBUG {
-			_, exists := s.siacoinOutputs[scoid]
+			_, exists := cs.siacoinOutputs[scoid]
 			if exists {
-				panic("applying a siacoin output when the output already exists")
+				panic(ErrMisuseApplySiacoinOutput)
 			}
 		}
 
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, modules.SiacoinOutputDiff{
+		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            scoid,
 			SiacoinOutput: sco,
-		})
-		s.siacoinOutputs[scoid] = sco
+		}
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 	}
 }
 
