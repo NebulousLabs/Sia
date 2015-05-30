@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"sort"
-
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -99,75 +97,9 @@ func (ct *ConsensusTester) ConsistencyChecks() {
 	ct.CurrencyCheck()
 }
 
-// stateHash returns the Merkle root of the current state of consensus.
-func (s *State) consensusSetHash() crypto.Hash {
-	// Items of interest:
-	// 1.	genesis block
-	// 2.	current block id
-	// 3.	current height
-	// 4.	current target
-	// 5.	current depth
-	// 6.	earliest allowed timestamp of next block
-	// 7.	current path, ordered by height.
-	// 8.	unspent siacoin outputs, sorted by id.
-	// 9.	open file contracts, sorted by id.
-	// 10.	unspent siafund outputs, sorted by id.
-	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
-
-	// Create a slice of hashes representing all items of interest.
-	tree := crypto.NewTree()
-	tree.PushObject(s.blockRoot.block)
-	tree.PushObject(s.height())
-	tree.PushObject(s.currentBlockNode().target)
-	tree.PushObject(s.currentBlockNode().depth)
-	tree.PushObject(s.currentBlockNode().earliestChildTimestamp())
-
-	// Add all the blocks in the current path.
-	for i := 0; i < len(s.currentPath); i++ {
-		tree.PushObject(s.currentPath[types.BlockHeight(i)])
-	}
-
-	// Get the set of siacoin outputs in sorted order and add them.
-	sortedUscos := s.sortedUscoSet()
-	for _, output := range sortedUscos {
-		tree.PushObject(output)
-	}
-
-	// Sort the open contracts by ID.
-	var openContracts crypto.HashSlice
-	for contractID := range s.fileContracts {
-		openContracts = append(openContracts, crypto.Hash(contractID))
-	}
-	sort.Sort(openContracts)
-
-	// Add the open contracts in sorted order.
-	for _, id := range openContracts {
-		tree.PushObject(id)
-	}
-
-	// Get the set of siafund outputs in sorted order and add them.
-	for _, output := range s.sortedUsfoSet() {
-		tree.PushObject(output)
-	}
-
-	// Get the set of delayed siacoin outputs, sorted by maturity height then
-	// sorted by id and add them.
-	for i := types.BlockHeight(0); i <= s.height(); i++ {
-		var delayedOutputs crypto.HashSlice
-		for id := range s.delayedSiacoinOutputs[i] {
-			delayedOutputs = append(delayedOutputs, crypto.Hash(id))
-		}
-		sort.Sort(delayedOutputs)
-
-		for _, output := range delayedOutputs {
-			tree.PushObject(output)
-		}
-	}
-
-	return tree.Root()
-}
-
 // StateHash returns the markle root of the current state of consensus.
+//
+// TODO: Deprecated
 func (s *State) StateHash() crypto.Hash {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)

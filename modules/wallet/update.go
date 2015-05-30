@@ -55,47 +55,33 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 // ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
-func (w *Wallet) ReceiveTransactionPoolUpdate(revertedBlocks, appliedBlocks []types.Block, _ []types.Transaction, unconfirmedSiacoinDiffs []modules.SiacoinOutputDiff) {
+func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []types.Transaction, unconfirmedSiacoinDiffs []modules.SiacoinOutputDiff) {
 	id := w.mu.Lock()
 	defer w.mu.Unlock(id)
 
+	// Remove all of the current unconfirmed diffs - they are being replaced
+	// wholesale.
 	for _, diff := range w.unconfirmedDiffs {
 		w.applyDiff(diff, modules.DiffRevert)
 	}
 
-	for _, block := range revertedBlocks {
-		w.age--
-
-		scods, err := w.state.BlockOutputDiffs(block.ID())
-		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			}
-			continue
-		}
-		for _, scod := range scods {
-			w.applyDiff(scod, modules.DiffRevert)
-		}
-	}
-	for _, block := range appliedBlocks {
-		w.age++
-
-		scods, err := w.state.BlockOutputDiffs(block.ID())
-		if err != nil {
-			if build.DEBUG {
-				panic(err)
-			}
-			continue
-		}
-		for _, scod := range scods {
-			w.applyDiff(scod, modules.DiffApply)
-		}
+	// Adjust the confirmed set of diffs.
+	for _, scod := range cc.SiacoinOutputDiffs {
+		w.applyDiff(scod, modules.DiffApply)
 	}
 
+	// Add all of the unconfirmed diffs to the wallet.
 	w.unconfirmedDiffs = unconfirmedSiacoinDiffs
 	for _, diff := range w.unconfirmedDiffs {
 		w.applyDiff(diff, modules.DiffApply)
 	}
+
+	// Update the wallet age and consensus height. Though they update together,
+	// the wallet age can be altered/reset, but the consensus height cannot.
+	w.age -= len(cc.RevertedBlocks)
+	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	w.age += len(cc.AppliedBlocks)
+	w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
 
 	w.notifySubscribers()
 }

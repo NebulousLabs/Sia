@@ -73,19 +73,18 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 	for {
 		// Determine how many total updates there are to send.
 		id := tp.mu.RLock()
-		updateCount := len(tp.revertBlocksUpdates)
+		updateCount := len(tp.consensusChanges)
 		tp.mu.RUnlock(id)
 
 		// Send each of the updates in order, starting from the first update
 		// that has not yet been sent to the subscriber.
 		for i < updateCount {
 			id := tp.mu.RLock()
-			revertBlocks := tp.revertBlocksUpdates[i]
-			applyBlocks := tp.applyBlocksUpdates[i]
+			cc := tp.consensusChanges[i]
 			unconfirmedTransactions := tp.unconfirmedTransactions[i]
 			unconfirmedDiffs := tp.unconfirmedSiacoinDiffs[i]
 			tp.mu.RUnlock(id)
-			subscriber.ReceiveTransactionPoolUpdate(revertBlocks, applyBlocks, unconfirmedTransactions, unconfirmedDiffs)
+			subscriber.ReceiveTransactionPoolUpdate(cc, unconfirmedTransactions, unconfirmedDiffs)
 			i++
 		}
 
@@ -96,10 +95,9 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
-func (tp *TransactionPool) updateSubscribers(revertedBlocks, appliedBlocks []types.Block, unconfirmedTransactions []types.Transaction, diffs []modules.SiacoinOutputDiff) {
+func (tp *TransactionPool) updateSubscribers(cc modules.ConsensusChange, unconfirmedTransactions []types.Transaction, diffs []modules.SiacoinOutputDiff) {
 	// Add the changes to the update set.
-	tp.revertBlocksUpdates = append(tp.revertBlocksUpdates, revertedBlocks)
-	tp.applyBlocksUpdates = append(tp.applyBlocksUpdates, appliedBlocks)
+	tp.consensusChanges = append(tp.consensusChanges, cc)
 	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
 	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
 

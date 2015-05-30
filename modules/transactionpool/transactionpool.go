@@ -5,7 +5,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -46,7 +45,7 @@ type TransactionPool struct {
 	// Depedencies of the transaction pool. The state height is needed
 	// separately from the state because the transaction pool may not be
 	// synchronized to the state.
-	consensusSet       *consensus.State
+	consensusSet       modules.ConsensusSet
 	gateway            modules.Gateway
 	consensusSetHeight types.BlockHeight
 
@@ -82,8 +81,7 @@ type TransactionPool struct {
 	// up. To prevent deadlocks in the transaction pool, subscribers are
 	// updated in a separate thread which does not guarantee that a subscriber
 	// is always fully synchronized to the transaction pool.
-	revertBlocksUpdates     [][]types.Block
-	applyBlocksUpdates      [][]types.Block
+	consensusChanges        []modules.ConsensusChange
 	unconfirmedTransactions [][]types.Transaction
 	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
 	subscribers             []chan struct{}
@@ -92,7 +90,7 @@ type TransactionPool struct {
 }
 
 // New creates a transaction pool that is ready to receive transactions.
-func New(cs *consensus.State, g modules.Gateway) (tp *TransactionPool, err error) {
+func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err error) {
 	// Check that the input modules are non-nil.
 	if cs == nil {
 		err = errors.New("transaction pool cannot use a nil state")

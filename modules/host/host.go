@@ -15,7 +15,7 @@ const (
 	// StorageProofReorgDepth states how many blocks to wait before submitting
 	// a storage proof. This reduces the chance of needing to resubmit because
 	// of a reorg.
-	StorageProofReorgDepth = 20
+	StorageProofReorgDepth = 10
 	maxContractLen         = 1 << 16 // The maximum allowed size of a file contract coming in over the wire. This does not include the file.
 )
 

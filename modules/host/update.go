@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -56,21 +57,21 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 
 // RecieveConsensusSetUpdate will be called by the consensus set every time
 // there is a new block or a fork of some kind.
-func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block) {
+func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
-	h.blockHeight -= types.BlockHeight(len(revertedBlocks))
+	h.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
-	var shouldSave bool
-	for _ = range appliedBlocks {
+	shouldSave := false
+	for _ = range cc.AppliedBlocks {
 		h.blockHeight++
 
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
 			// Submit a storage proof for the obligation.
-			err := h.createStorageProof(obligation, h.cs.Height())
+			err := h.createStorageProof(obligation, h.blockHeight)
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -84,7 +85,6 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 				return
 			}
 			h.deallocate(uint64(stat.Size()), obligation.Path) // TODO: file might actually be the wrong size.
-			delete(h.obligationsByID, obligation.ID)
 			shouldSave = true
 		}
 		delete(h.obligationsByHeight, h.blockHeight)
@@ -93,5 +93,5 @@ func (h *Host) ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBl
 		_ = h.save() // TODO: Some way to communicate that the save failed.
 	}
 
-	h.updateSubscribers()
+	go h.updateSubscribers()
 }

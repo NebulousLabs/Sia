@@ -3,9 +3,11 @@ package consensus
 import (
 	"errors"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
@@ -24,17 +26,18 @@ type State struct {
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
-	// blockMap and badBlocks keep track of seen blocks. blockMap holds all
-	// valid blocks, including those not on the main blockchain. badBlocks
-	// is a "blacklist" of blocks known to be invalid.
+	// blockMap and dosBlocks keep track of seen blocks. blockMap holds all
+	// valid blocks, including those not on the main blockchain. dosBlocks is a
+	// "blacklist" of blocks known to be invalid, but expensive to prove
+	// invalid.
 	blockMap  map[types.BlockID]*blockNode
-	badBlocks map[types.BlockID]struct{}
+	dosBlocks map[types.BlockID]struct{}
 
 	// The currentPath is the longest known blockchain.
 	currentPath []types.BlockID
 
-	// These are the consensus variables, referred to as the "consensus set."
-	// All nodes with the same current path must have the same consensus set.
+	// These are the consensus variables. All nodes with the same current path
+	// will also have these variables matching.
 	//
 	// The siafundPool tracks the total number of siacoins that have been
 	// taxed from file contracts. Unless a reorg occurs, the siafundPool
@@ -54,12 +57,10 @@ type State struct {
 	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
-	// Updates to the state are stored as a list, pointing to the block nodes
-	// that were added and removed at each step. Modules subscribed to the
-	// state will receive the changes in order that they occur.
-	revertUpdates [][]*blockNode
-	applyUpdates  [][]*blockNode
-	subscriptions []chan struct{}
+	// Modules subscribed to the consensus set will receive an ordered list of
+	// changes that occur to the consensus set.
+	consensusChanges []modules.ConsensusChange
+	subscriptions    []chan struct{}
 
 	// block database, used for saving/loading the current path
 	db persist.DB
@@ -85,9 +86,9 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	}
 
 	// Create the State object.
-	s := &State{
+	cs := &State{
 		blockMap:  make(map[types.BlockID]*blockNode),
-		badBlocks: make(map[types.BlockID]struct{}),
+		dosBlocks: make(map[types.BlockID]struct{}),
 
 		currentPath: make([]types.BlockID, 1),
 
@@ -105,22 +106,22 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	genesisBlock := types.Block{
 		Timestamp: types.GenesisTimestamp,
 	}
-	s.blockRoot = &blockNode{
+	cs.blockRoot = &blockNode{
 		block:  genesisBlock,
 		target: types.RootTarget,
 		depth:  types.RootDepth,
 
 		diffsGenerated: true,
 	}
-	s.blockMap[genesisBlock.ID()] = s.blockRoot
+	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
 
 	// Fill out the consensus information for the genesis block.
-	s.currentPath[0] = genesisBlock.ID()
-	s.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
+	cs.currentPath[0] = genesisBlock.ID()
+	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.ZeroUnlockHash,
 	}
-	s.siafundOutputs[types.SiafundOutputID{0}] = types.SiafundOutput{
+	cs.siafundOutputs[types.SiafundOutputID{0}] = types.SiafundOutput{
 		Value:           types.NewCurrency64(types.SiafundCount),
 		UnlockHash:      types.GenesisSiafundUnlockHash,
 		ClaimUnlockHash: types.GenesisClaimUnlockHash,
@@ -134,27 +135,95 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 
 	// During short tests, use an in-memory database.
 	if build.Release == "testing" && testing.Short() {
-		s.db = persist.NilDB
+		cs.db = persist.NilDB
 	} else {
 		// Otherwise, try to load an existing database from disk.
-		err = s.load(saveDir)
+		err = cs.load(saveDir)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Register RPCs
-	gateway.RegisterRPC("SendBlocks", s.sendBlocks)
-	gateway.RegisterRPC("RelayBlock", s.RelayBlock)
-	gateway.RegisterConnectCall("SendBlocks", s.receiveBlocks)
+	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
+	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
+	gateway.RegisterConnectCall("SendBlocks", cs.receiveBlocks)
 
 	// spawn resynchronize loop
-	go s.threadedResynchronize()
+	go cs.threadedResynchronize()
 
-	return s, nil
+	return cs, nil
 }
 
 // Close safely closes the block database.
-func (s *State) Close() error {
-	return s.db.Close()
+func (cs *State) Close() error {
+	return cs.db.Close()
+}
+
+// consensusSetHash returns the Merkle root of the current state of consensus.
+func (cs *State) consensusSetHash() crypto.Hash {
+	// Items of interest:
+	// 1.	genesis block
+	// 2.	current block id
+	// 3.	current height
+	// 4.	current target
+	// 5.	current depth
+	// 6.	earliest allowed timestamp of next block
+	// 7.	current path, ordered by height.
+	// 8.	unspent siacoin outputs, sorted by id.
+	// 9.	open file contracts, sorted by id.
+	// 10.	unspent siafund outputs, sorted by id.
+	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
+
+	// Create a slice of hashes representing all items of interest.
+	tree := crypto.NewTree()
+	tree.PushObject(cs.blockRoot.block)
+	tree.PushObject(cs.height())
+	tree.PushObject(cs.currentBlockNode().target)
+	tree.PushObject(cs.currentBlockNode().depth)
+	tree.PushObject(cs.currentBlockNode().earliestChildTimestamp())
+
+	// Add all the blocks in the current path.
+	for i := 0; i < len(cs.currentPath); i++ {
+		tree.PushObject(cs.currentPath[types.BlockHeight(i)])
+	}
+
+	// Get the set of siacoin outputs in sorted order and add them.
+	sortedUscos := cs.sortedUscoSet()
+	for _, output := range sortedUscos {
+		tree.PushObject(output)
+	}
+
+	// Sort the open contracts by ID.
+	var openContracts crypto.HashSlice
+	for contractID := range cs.fileContracts {
+		openContracts = append(openContracts, crypto.Hash(contractID))
+	}
+	sort.Sort(openContracts)
+
+	// Add the open contracts in sorted order.
+	for _, id := range openContracts {
+		tree.PushObject(id)
+	}
+
+	// Get the set of siafund outputs in sorted order and add them.
+	for _, output := range cs.sortedUsfoSet() {
+		tree.PushObject(output)
+	}
+
+	// Get the set of delayed siacoin outputs, sorted by maturity height then
+	// sorted by id and add them.
+	for i := types.BlockHeight(0); i <= cs.height(); i++ {
+		var delayedOutputs crypto.HashSlice
+		for id := range cs.delayedSiacoinOutputs[i] {
+			delayedOutputs = append(delayedOutputs, crypto.Hash(id))
+		}
+		sort.Sort(delayedOutputs)
+
+		for _, output := range delayedOutputs {
+			tree.PushObject(output)
+		}
+	}
+
+	return tree.Root()
 }

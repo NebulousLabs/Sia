@@ -1,13 +1,11 @@
 package consensus
 
 import (
-	"errors"
 	"math/big"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -129,24 +127,6 @@ func (s *State) Block(bid types.BlockID) (b types.Block, exists bool) {
 	return
 }
 
-// BlockOutputDiffs returns the SiacoinOutputDiffs for a given block.
-func (s *State) BlockOutputDiffs(id types.BlockID) (scods []modules.SiacoinOutputDiff, err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-
-	node, exists := s.blockMap[id]
-	if !exists {
-		err = errors.New("requested an unknown block")
-		return
-	}
-	if !node.diffsGenerated {
-		err = errors.New("diffs have not been generated for the requested block")
-		return
-	}
-	scods = node.siacoinOutputDiffs
-	return
-}
-
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
@@ -193,6 +173,13 @@ func (s *State) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Times
 	}
 	timestamp = bn.earliestChildTimestamp()
 	return
+}
+
+// GenesisBlock returns the genesis block.
+func (s *State) GenesisBlock() types.Block {
+	lockID := s.mu.RLock()
+	defer s.mu.RUnlock(lockID)
+	return s.blockMap[s.currentPath[0]].block
 }
 
 // Height returns the height of the current blockchain (the longest fork).

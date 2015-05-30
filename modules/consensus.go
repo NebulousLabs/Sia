@@ -6,6 +6,11 @@ import (
 
 const (
 	ConsensusDir = "consensus"
+
+	// DiffApply and DiffRevert are the names given to the variables
+	// corresponding to applying and reverting diffs.
+	DiffApply  DiffDirection = true
+	DiffRevert DiffDirection = false
 )
 
 // A ConsensusSetSubscriber is an object that receives updates to the consensus
@@ -16,17 +21,46 @@ type ConsensusSetSubscriber interface {
 	// Usually, the function receiving the updates will also process the
 	// changes. If the function blocks indefinitely, the state will still
 	// function.
-	ReceiveConsensusSetUpdate(revertedBlocks []types.Block, appliedBlocks []types.Block)
+	ReceiveConsensusSetUpdate(ConsensusChange)
+}
+
+// A ConsensusChange enumerates a set of changes that occured to the consensus set.
+type ConsensusChange struct {
+	// RevertedBlocks is the list of blocks that were reverted by the change.
+	// The reverted blocks were always all reverted before the applied blocks
+	// were applied. The revered blocks are presented in the order that they
+	// were reverted.
+	RevertedBlocks []types.Block
+
+	// AppliedBlocks is the list of blocks that were applied by the change. The
+	// applied blocks are always all applied after all the reverted blocks were
+	// reverted. The applied blocks are presented in the order that they were
+	// applied.
+	AppliedBlocks []types.Block
+
+	// SiacoinOutputDiffs contains the set of siacoin diffs that were applied
+	// to the consensus set in the recent change. The direction for the set of
+	// diffs is 'DiffApply'.
+	SiacoinOutputDiffs []SiacoinOutputDiff
+
+	// FileContractDiffs contains the set of file contract diffs that were
+	// applied to the consensus set in the recent change. The direction for the
+	// set of diffs is 'DiffApply'.
+	FileContractDiffs []FileContractDiff
+
+	// SiafundOutputDiffs contains the set of siafund diffs that were applied
+	// to the consensus set in the recent change. The direction for the set of
+	// diffs is 'DiffApply'.
+	SiafundOutputDiffs []SiafundOutputDiff
+
+	// SiafundPoolDiff is the siafund pool diff that was applied to the
+	// consensus set in the recent change.
+	SiafundPoolDiff SiafundPoolDiff
 }
 
 // A DiffDirection indicates the "direction" of a diff, either applied or
 // reverted. A bool is used to restrict the value to these two possibilities.
 type DiffDirection bool
-
-const (
-	DiffApply  DiffDirection = true
-	DiffRevert DiffDirection = false
-)
 
 // A SiacoinOutputDiff indicates the addition or removal of a SiacoinOutput in
 // the consensus set.
@@ -97,6 +131,9 @@ type ConsensusSet interface {
 	// risk of mining invalid blocks.
 	EarliestChildTimestamp(types.BlockID) (types.Timestamp, bool)
 
+	// GenesisBlock returns the genesis block.
+	GenesisBlock() types.Block
+
 	// InCurrentPath returns true if the block id presented is found in the
 	// current path, false otherwise.
 	InCurrentPath(types.BlockID) bool
@@ -104,4 +141,12 @@ type ConsensusSet interface {
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error
+
+	// ValidStorageProofs checks that all the storage proofs in a transaction
+	// are valid in the context of the current consensus set. An error is
+	// returned if not.
+	//
+	// NOTE: For synchronization reasons, this call is not recommended and
+	// should be deprecated.
+	ValidStorageProofs(types.Transaction) error
 }

@@ -429,3 +429,18 @@ The genesis block does not need to meet a particular target.
 The genesis state needs to have an output to the zero address from the genesis
 block, and a siafund output to the Nebulous Genesis Address for 10,000
 siafunds (both the spend hash and the claim destination), having the zero id.
+
+Terms
+-----
+
+Bad Block - a block that appears valid to an SPV node. Namely, all signatures
+are valid, all headers are valid, but contained within the block is some form
+of invalid transaction that is only detectable as a full node.
+
+DoS Block - a block that is invalid, but requries using heavy computational
+resources to determine invalidity.
+
+Stale Block - a block that appears on a fork which is not the longest fork. The
+block is stale because it is unlikely to every be on the longest fork.
+
+Orphan Block - a block whose parent is unknown.

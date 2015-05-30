@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -38,7 +37,7 @@ const (
 // thus the transaction does not need to be spent for the transaction builder
 // to be able to use any refunds.
 type Wallet struct {
-	state            *consensus.State
+	state            modules.ConsensusSet
 	tpool            modules.TransactionPool
 	unconfirmedDiffs []modules.SiacoinOutputDiff
 
@@ -62,6 +61,7 @@ type Wallet struct {
 	// mark keys as unspendable until the timelock has lifted.
 	//
 	// Visible keys will be displayed to the user.
+	consensusHeight  types.BlockHeight
 	age              int
 	keys             map[types.UnlockHash]*key
 	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
@@ -80,8 +80,8 @@ type Wallet struct {
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) (w *Wallet, err error) {
-	if state == nil {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string) (w *Wallet, err error) {
+	if cs == nil {
 		err = errors.New("wallet cannot use a nil state")
 		return
 	}
@@ -91,7 +91,7 @@ func New(state *consensus.State, tpool modules.TransactionPool, saveDir string) 
 	}
 
 	w = &Wallet{
-		state: state,
+		state: cs,
 		tpool: tpool,
 
 		saveDir: saveDir,

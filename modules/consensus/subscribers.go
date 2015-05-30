@@ -3,7 +3,6 @@ package consensus
 import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // threadedSendUpdates sends updates to a specific subscriber as they become
@@ -23,22 +22,16 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber modules.Con
 	i := 0
 	for {
 		id := s.mu.RLock()
-		updateCount := len(s.revertUpdates)
+		updateCount := len(s.consensusChanges)
 		s.mu.RUnlock(id)
 		for i < updateCount {
 			// Get the set of blocks that changed since the previous update.
 			id := s.mu.RLock()
-			var revertedBlocks, appliedBlocks []types.Block
-			for _, node := range s.revertUpdates[i] {
-				revertedBlocks = append(revertedBlocks, node.block)
-			}
-			for _, node := range s.applyUpdates[i] {
-				appliedBlocks = append(appliedBlocks, node.block)
-			}
+			cc := s.consensusChanges[i]
 			s.mu.RUnlock(id)
 
 			// Update the subscriber with the changes.
-			subscriber.ReceiveConsensusSetUpdate(revertedBlocks, appliedBlocks)
+			subscriber.ReceiveConsensusSetUpdate(cc)
 			i++
 		}
 
@@ -57,9 +50,49 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 		}
 	}
 
+	// Take the nodes and condense them into a consensusChange object.
+	var cc modules.ConsensusChange
+	for _, rn := range revertedNodes {
+		// Because the direction is 'revert', the order of the diffs needs to
+		// be flipped and the direction of the diffs also needs to be flipped.
+		cc.RevertedBlocks = append(cc.RevertedBlocks, rn.block)
+		for i := len(rn.siacoinOutputDiffs) - 1; i >= 0; i-- {
+			scod := rn.siacoinOutputDiffs[i]
+			scod.Direction = !scod.Direction
+			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
+		}
+		for i := len(rn.fileContractDiffs) - 1; i >= 0; i-- {
+			fcd := rn.fileContractDiffs[i]
+			fcd.Direction = !fcd.Direction
+			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
+		}
+		for i := len(rn.siafundOutputDiffs) - 1; i >= 0; i-- {
+			sfod := rn.siafundOutputDiffs[i]
+			sfod.Direction = !sfod.Direction
+			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
+		}
+	}
+	for _, an := range appliedNodes {
+		cc.AppliedBlocks = append(cc.AppliedBlocks, an.block)
+		for _, scod := range an.siacoinOutputDiffs {
+			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
+		}
+		for _, fcd := range an.fileContractDiffs {
+			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
+		}
+		for _, sfod := range an.siafundOutputDiffs {
+			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
+		}
+	}
+	// Handle the siafund pool diff - handling depends on whether there are
+	// reverted nodes.
+	if len(revertedNodes) != 0 {
+		cc.SiafundPoolDiff.Previous = revertedNodes[0].siafundPoolDiff.Adjusted
+	} else {
+		cc.SiafundPoolDiff.Previous = appliedNodes[0].siafundPoolDiff.Previous
+	}
 	// Add the changes to the change set.
-	s.revertUpdates = append(s.revertUpdates, revertedNodes)
-	s.applyUpdates = append(s.applyUpdates, appliedNodes)
+	s.consensusChanges = append(s.consensusChanges, cc)
 
 	// Notify each update channel that a new update is ready.
 	for _, subscriber := range s.subscriptions {

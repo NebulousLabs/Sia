@@ -4,14 +4,26 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
-func (s *State) deleteNode(node *blockNode) {
-	for i := range node.children {
-		s.deleteNode(node.children[i])
+// The node being deleted should not be a part of the current path.
+func (cs *State) deleteNode(node *blockNode) {
+	// Sanity check - the node being deleted should not be in the current path.
+	if build.DEBUG {
+		if types.BlockHeight(len(cs.currentPath)) > node.height &&
+			cs.currentPath[node.height] == node.block.ID() {
+			panic("cannot call 'deleteNode' on a node in the current path.")
+		}
 	}
-	delete(s.blockMap, node.block.ID())
+
+	// Recusively call 'deleteNode' on of the input node's children, then
+	// delete the input node.
+	for i := range node.children {
+		cs.deleteNode(node.children[i])
+	}
+	delete(cs.blockMap, node.block.ID())
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
@@ -42,8 +54,7 @@ func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 }
 
 // revertToNode will revert blocks from the State's current path until 'bn' is
-// the current block. The list returned is in reversed order; the first block
-// in the list was the first reverted, and has the highest height.
+// the current block. Blocks are returned in the order that they were reverted.
 func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {
@@ -89,7 +100,7 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the State is only updated if the
 // function returns nil.
-func (s *State) forkBlockchain(newNode *blockNode) (err error) {
+func (s *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
@@ -100,15 +111,12 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 
 	// revert to the common parent
 	commonParent := s.backtrackToCurrentPath(newNode)[0]
-	revertedNodes := s.revertToNode(commonParent)
+	revertedNodes = s.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	appliedNodes, err := s.applyUntilNode(newNode)
+	appliedNodes, err = s.applyUntilNode(newNode)
 	if err == nil {
-		// If application succeeded, notify the subscribers and return. Error
-		// handling happens outside this if statement.
-		s.updateSubscribers(revertedNodes, appliedNodes)
-		return
+		return revertedNodes, appliedNodes, err
 	}
 
 	// restore old path
@@ -121,5 +129,5 @@ func (s *State) forkBlockchain(newNode *blockNode) (err error) {
 			panic("state hash changed after an unsuccessful fork attempt")
 		}
 	}
-	return
+	return nil, nil, err
 }
