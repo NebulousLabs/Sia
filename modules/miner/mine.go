@@ -54,7 +54,7 @@ func (m *Miner) blockForWork() (types.Block, crypto.Hash, types.Target) {
 
 // submitBlock takes a solved block and submits it to the blockchain.
 // submitBlock should not be called with a lock.
-func (m *Miner) submitBlock(b types.Block) error {
+func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
@@ -97,7 +97,7 @@ func (m *Miner) solveBlock(blockForWork types.Block, blockMerkleRoot crypto.Hash
 			id := crypto.HashBytes(hashbytes)
 			if bytes.Compare(target[:], id[:]) >= 0 {
 				copy(b.Nonce[:], nonce)
-				err = m.submitBlock(b)
+				err = m.SubmitBlock(b)
 				if err != nil {
 					return
 				}
@@ -197,12 +197,4 @@ func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b typ
 		}
 	}
 	return b, false
-}
-
-// SubmitBlock accepts a block with a valid target and presents it to the
-// consensus set.
-func (m *Miner) SubmitBlock(b types.Block) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.submitBlock(b)
 }
