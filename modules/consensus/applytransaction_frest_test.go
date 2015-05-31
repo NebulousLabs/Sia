@@ -16,14 +16,14 @@ func (cst *consensusSetTester) checkRevertApplyNode(initialSum crypto.Hash, bn *
 	resultingSum := cst.cs.consensusSetHash()
 
 	// Revert and reapply the diffs and check that consistency is maintained.
-	for _, diff := range bn.siacoinOutputDiffs {
-		cst.cs.commitSiacoinOutputDiff(diff, modules.DiffRevert)
+	for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
+		cst.cs.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], modules.DiffRevert)
 	}
-	for _, diff := range bn.fileContractDiffs {
-		cst.cs.commitFileContractDiff(diff, modules.DiffRevert)
+	for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
+		cst.cs.commitFileContractDiff(bn.fileContractDiffs[i], modules.DiffRevert)
 	}
-	for _, diff := range bn.siafundOutputDiffs {
-		cst.cs.commitSiafundOutputDiff(diff, modules.DiffRevert)
+	for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
+		cst.cs.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], modules.DiffRevert)
 	}
 	if initialSum != cst.cs.consensusSetHash() {
 		return errors.New("inconsistency after rewinding a diff set")
@@ -260,7 +260,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	cst.cs.applySiacoinOutputs(bn, txn)
 }
 
-// TestApplyFileContracts probes the appliyFileContracts method of the
+// TestApplyFileContracts probes the applyFileContracts method of the
 // consensus set.
 func TestApplyFileContracts(t *testing.T) {
 	if testing.Short() {
@@ -362,7 +362,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	cst.cs.applyFileContracts(bn, txn)
 }
 
-// TestApplyFileContractRevisions probes the appliyFileContractRevisions method
+// TestApplyFileContractRevisions probes the applyFileContractRevisions method
 // of the consensus set.
 func TestApplyFileContractRevisions(t *testing.T) {
 	if testing.Short() {
@@ -467,6 +467,164 @@ func TestApplyFileContractRevisions(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestApplyStorageProofs probes the applyStorageProofs method of the consensus
+// set.
+func TestApplyStorageProofs(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestApplyFileContracts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab the inital hash of the consensus set.
+	initialSum := cst.cs.consensusSetHash()
+
+	// Create a block node to use with application.
+	bn := new(blockNode)
+	bn.delayedSiacoinOutputs = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+
+	// Apply a transaction with two file contracts - there is a reason to
+	// create a storage proof.
+	txn := types.Transaction{
+		FileContracts: []types.FileContract{
+			{
+				Payout: types.NewCurrency64(300e3),
+				ValidProofOutputs: []types.SiacoinOutput{
+					{Value: types.NewCurrency64(290e3)},
+				},
+			},
+			{},
+			{
+				Payout: types.NewCurrency64(600e3),
+				ValidProofOutputs: []types.SiacoinOutput{
+					{Value: types.NewCurrency64(280e3)},
+					{Value: types.NewCurrency64(300e3)},
+				},
+			},
+		},
+	}
+	cst.cs.applyFileContracts(bn, txn)
+	fcid0 := txn.FileContractID(0)
+	fcid1 := txn.FileContractID(1)
+	fcid2 := txn.FileContractID(2)
+
+	// Apply a single storage proof.
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{ParentID: fcid0}},
+	}
+	cst.cs.applyStorageProofs(bn, txn)
+	_, exists := cst.cs.fileContracts[fcid0]
+	if exists {
+		t.Error("Storage proof did not disable a file contract.")
+	}
+	if len(cst.cs.fileContracts) != 2 {
+		t.Error("file contracts not correctly updated")
+	}
+	if len(bn.fileContractDiffs) != 4 { // 3 creating the initial contracts, 1 for the storage proof.
+		t.Error("block node was not updated for single element transaction")
+	}
+	if bn.fileContractDiffs[3].Direction != modules.DiffRevert {
+		t.Error("wrong diff direction applied when revising a file contract")
+	}
+	if bn.fileContractDiffs[3].ID != fcid0 {
+		t.Error("wrong id used when revising a file contract")
+	}
+	spoid0 := fcid0.StorageProofOutputID(true, 0) // true indicates that the proof was valid.
+	sco, exists := cst.cs.delayedSiacoinOutputs[cst.cs.height()][spoid0]
+	if !exists {
+		t.Error("storage proof output not created after applying a storage proof")
+	}
+	if sco.Value.Cmp(types.NewCurrency64(290e3)) != 0 {
+		t.Error("storage proof output was created with the wrong value")
+	}
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
+		t.Error("siafund pool was not correctly updated when applying a storage proof")
+	}
+
+	// Apply a transaction with 2 storage proofs.
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{
+			{ParentID: fcid1},
+			{ParentID: fcid2},
+		},
+	}
+	cst.cs.applyStorageProofs(bn, txn)
+	_, exists = cst.cs.fileContracts[fcid1]
+	if exists {
+		t.Error("Storage proof failed to consume file contract.")
+	}
+	_, exists = cst.cs.fileContracts[fcid2]
+	if exists {
+		t.Error("storage proof did not consume file contract")
+	}
+	if len(cst.cs.fileContracts) != 0 {
+		t.Error("file contracts not correctly updated")
+	}
+	if len(bn.fileContractDiffs) != 6 {
+		t.Error("block node was not updated correctly")
+	}
+	spoid1 := fcid1.StorageProofOutputID(true, 0)
+	_, exists = cst.cs.siacoinOutputs[spoid1]
+	if exists {
+		t.Error("output created when file contract had no corresponding output")
+	}
+	spoid2 := fcid2.StorageProofOutputID(true, 0)
+	sco, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()][spoid2]
+	if !exists {
+		t.Error("no output created by first output of file contract")
+	}
+	if sco.Value.Cmp(types.NewCurrency64(280e3)) != 0 {
+		t.Error("first siacoin output created has wrong value")
+	}
+	spoid3 := fcid2.StorageProofOutputID(true, 1)
+	sco, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()][spoid3]
+	if !exists {
+		t.Error("second output not created for storage proof")
+	}
+	if sco.Value.Cmp(types.NewCurrency64(300e3)) != 0 {
+		t.Error("second siacoin output has wrong value")
+	}
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(30e3)) != 0 {
+		t.Error("siafund pool not being added up correctly")
+	}
+
+	err = cst.checkRevertApplyNode(initialSum, bn)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+/*
+// TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
+// checks that a panic was triggered.
+func TestMisuseApplyFileContractRevisions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a block node to use with application.
+	bn := new(blockNode)
+
+	// Trigger a panic from revising a nonexistent file contract.
+	defer func() {
+		r := recover()
+		if r != ErrMisuseApplyFileContractRevisions {
+			t.Error("no panic occured when misusing applySiacoinInput")
+		}
+	}()
+	txn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{}},
+	}
+	cst.cs.applyFileContractRevisions(bn, txn)
+}
+*/
 
 // TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
 // checks that a panic was triggered.

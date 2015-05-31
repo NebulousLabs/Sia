@@ -153,16 +153,16 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, output := range fc.ValidProofOutputs {
 			// Sanity check - output should not already exist.
-			id := sp.ParentID.StorageProofOutputID(true, i)
+			spoid := sp.ParentID.StorageProofOutputID(true, i)
 			if build.DEBUG {
-				_, exists := cs.siacoinOutputs[id]
+				_, exists := cs.siacoinOutputs[spoid]
 				if exists {
 					panic("storage proof output already exists")
 				}
 			}
 
-			cs.delayedSiacoinOutputs[cs.height()][id] = output
-			bn.delayedSiacoinOutputs[id] = output
+			cs.delayedSiacoinOutputs[cs.height()][spoid] = output
+			bn.delayedSiacoinOutputs[spoid] = output
 		}
 
 		fcd := modules.FileContractDiff{
