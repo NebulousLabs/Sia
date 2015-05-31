@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"bytes"
 	"testing"
@@ -7,25 +8,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// testApplySiacoinOutput gets a transaction with a siacoin output and puts the
-// transaction into the blockchain, then checks that the output made it into
-// the consensus set.
-func (ct *ConsensusTester) testApplySiacoinOutput() {
-	// Grab a transcation with a siacoin output and put it into the blockchain.
-	txn := ct.SiacoinOutputTransaction()
-	block := ct.MineCurrentBlock([]types.Transaction{txn})
-	err := ct.AcceptBlock(block)
-	if err != nil {
-		ct.Fatal(err)
-	}
-
-	// Check that the output got added to the consensus set.
-	_, exists := ct.siacoinOutputs[txn.SiacoinOutputID(0)]
-	if !exists {
-		ct.Fatal("siacoin output did not make it into the consensus set.")
-	}
-}
 
 // testApplyFileContract gets a transaction with file contract creation and
 // puts it into the blockchain, then checks that the file contract has appeared
@@ -105,13 +87,6 @@ func (ct *ConsensusTester) testApplyStorageProof() {
 	}
 }
 
-// TestApplySiacoinOutput creates a new testing environment and uses it to call
-// testApplySiacoinOutput.
-func TestApplySiacoinOutput(t *testing.T) {
-	ct := NewTestingEnvironment("TestApplySiacoinOutput", t)
-	ct.testApplySiacoinOutput()
-}
-
 // TestApplyFileContract creates a new testing environment and uses it to call
 // testApplyFileContract.
 func TestApplyFileContract(t *testing.T) {
@@ -129,3 +104,4 @@ func TestApplyStorageProof(t *testing.T) {
 	ct := NewTestingEnvironment("TestApplyStorageProof", t)
 	ct.testApplyStorageProof()
 }
+*/

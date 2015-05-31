@@ -1,53 +1,62 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	ErrMisuseApplySiacoinInput  = errors.New("applying a transaction with an invalid unspent siacoin output")
+	ErrMisuseApplySiacoinOutput = errors.New("applying a transaction with an invalid siacoin output")
+)
+
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (s *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
+func (cs *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if build.DEBUG {
-			_, exists := s.siacoinOutputs[sci.ParentID]
+			_, exists := cs.siacoinOutputs[sci.ParentID]
 			if !exists {
-				panic("Applying a transaction with an invalid unspent output!")
+				panic(ErrMisuseApplySiacoinInput)
 			}
 		}
 
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, modules.SiacoinOutputDiff{
+		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sci.ParentID,
-			SiacoinOutput: s.siacoinOutputs[sci.ParentID],
-		})
-		delete(s.siacoinOutputs, sci.ParentID)
+			SiacoinOutput: cs.siacoinOutputs[sci.ParentID],
+		}
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 	}
 }
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (s *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
+func (cs *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
 		scoid := t.SiacoinOutputID(i)
 		if build.DEBUG {
-			_, exists := s.siacoinOutputs[scoid]
+			_, exists := cs.siacoinOutputs[scoid]
 			if exists {
-				panic("applying a siacoin output when the output already exists")
+				panic(ErrMisuseApplySiacoinOutput)
 			}
 		}
 
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, modules.SiacoinOutputDiff{
+		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            scoid,
 			SiacoinOutput: sco,
-		})
-		s.siacoinOutputs[scoid] = sco
+		}
+		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 	}
 }
 
@@ -227,16 +236,8 @@ func (s *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 // produces a set of diffs, which are stored in the blockNode containing the
 // transaction.
 func (s *State) applyTransaction(bn *blockNode, t types.Transaction) {
-	// Sanity check - the input transaction should be valid.
-	if build.DEBUG {
-		err := s.validTransaction(t)
-		if err != nil {
-			panic("applyTransaction called with an invalid transaction!")
-		}
-	}
-
-	// Apply each component of the transaction. Miner fees are handled as a
-	// separate process.
+	// Apply each component of the transaction. Miner fees are handled
+	// elsewhere.
 	s.applySiacoinInputs(bn, t)
 	s.applySiacoinOutputs(bn, t)
 	s.applyFileContracts(bn, t)

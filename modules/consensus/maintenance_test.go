@@ -1,5 +1,6 @@
 package consensus
 
+/*
 import (
 	"testing"
 
@@ -47,3 +48,4 @@ func TestApplyMissedProof(t *testing.T) {
 	ct := NewTestingEnvironment("TestApplyMissedProof", t)
 	ct.testApplyMissedProof()
 }
+*/

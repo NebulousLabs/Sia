@@ -130,9 +130,7 @@ func TestBlockCheckMinerPayouts(t *testing.T) {
 	// Create a block with a single valid payout.
 	b := Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: coinbase,
-			},
+			{Value: coinbase},
 		},
 	}
 	if !b.CheckMinerPayouts(0) {
@@ -142,9 +140,7 @@ func TestBlockCheckMinerPayouts(t *testing.T) {
 	// Try a block with an incorrect payout.
 	b = Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: coinbase.Sub(NewCurrency64(1)),
-			},
+			{Value: coinbase.Sub(NewCurrency64(1))},
 		},
 	}
 	if b.CheckMinerPayouts(0) {
@@ -154,12 +150,8 @@ func TestBlockCheckMinerPayouts(t *testing.T) {
 	// Try a block with 2 payouts.
 	b = Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: coinbase.Sub(NewCurrency64(1)),
-			},
-			SiacoinOutput{
-				Value: NewCurrency64(1),
-			},
+			{Value: coinbase.Sub(NewCurrency64(1))},
+			{Value: NewCurrency64(1)},
 		},
 	}
 	if !b.CheckMinerPayouts(0) {
@@ -169,12 +161,8 @@ func TestBlockCheckMinerPayouts(t *testing.T) {
 	// Try a block with 2 payouts that are too large.
 	b = Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: coinbase,
-			},
-			SiacoinOutput{
-				Value: coinbase,
-			},
+			{Value: coinbase},
+			{Value: coinbase},
 		},
 	}
 	if b.CheckMinerPayouts(0) {
@@ -184,10 +172,8 @@ func TestBlockCheckMinerPayouts(t *testing.T) {
 	// Create a block with an empty payout.
 	b = Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: coinbase,
-			},
-			SiacoinOutput{},
+			{Value: coinbase},
+			{},
 		},
 	}
 	if b.CheckMinerPayouts(0) {
@@ -220,12 +206,8 @@ func TestBlockMinerPayoutID(t *testing.T) {
 	var ids []SiacoinOutputID
 	b := Block{
 		MinerPayouts: []SiacoinOutput{
-			SiacoinOutput{
-				Value: CalculateCoinbase(0),
-			},
-			SiacoinOutput{
-				Value: CalculateCoinbase(0),
-			},
+			{Value: CalculateCoinbase(0)},
+			{Value: CalculateCoinbase(0)},
 		},
 	}
 	ids = append(ids, b.MinerPayoutID(1), b.MinerPayoutID(2))

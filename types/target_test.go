@@ -142,7 +142,6 @@ func TestTargetNegativeIntToTarget(t *testing.T) {
 			t.Error("no panic occured when trying to create a negative target")
 		}
 	}()
-
 	b := big.NewInt(-3)
 	_ = IntToTarget(b)
 }
@@ -158,7 +157,6 @@ func TestTargetNegativeRatToTarget(t *testing.T) {
 			t.Error("no panic occured when trying to create a negative target")
 		}
 	}()
-
 	r := big.NewRat(3, -5)
 	_ = RatToTarget(r)
 }
