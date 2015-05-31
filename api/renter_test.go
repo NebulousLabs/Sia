@@ -19,8 +19,10 @@ func TestUploadAndDownload(t *testing.T) {
 
 	// Create a server and add a host to the network.
 	st := newServerTester("TestUploadAndDownload", t)
-	st.announceHost()
-
+	err := st.announceHost()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for len(st.server.hostdb.ActiveHosts()) == 0 {
 		time.Sleep(time.Millisecond)
 	}

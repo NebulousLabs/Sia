@@ -77,7 +77,7 @@ func init() {
 		RootTarget = Target{0, 0, 4} // Standard developer CPUs should be able to mine blocks.
 		MinimumCoinbase = 30e3
 
-		RenterZeroConfDelay = 60 * time.Second
+		RenterZeroConfDelay = 15 * time.Second
 	} else if build.Release == "testing" {
 		// 'testing' settings are for automatic testing, and create much faster
 		// environments than a humand can interact with.

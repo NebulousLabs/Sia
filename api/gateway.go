@@ -13,7 +13,11 @@ type GatewayInfo struct {
 
 // gatewayStatusHandler handles the API call asking for the gatway status.
 func (srv *Server) gatewayStatusHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, GatewayInfo{srv.gateway.Address(), srv.gateway.Peers()})
+	peers := srv.gateway.Peers()
+	if peers == nil {
+		peers = make([]modules.NetAddress, 0)
+	}
+	writeJSON(w, GatewayInfo{srv.gateway.Address(), peers})
 }
 
 // gatewayPeersAddHandler handles the API call to add a peer to the gateway.

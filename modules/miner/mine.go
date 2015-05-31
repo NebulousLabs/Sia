@@ -19,35 +19,41 @@ import (
 // require external miners to need to worry about. All blocks returned are
 // unique, which means all miners can safely start at the '0' nonce.
 func (m *Miner) blockForWork() (types.Block, crypto.Hash, types.Target) {
-	// Fill out the block with potentially ready values.
-	b := types.Block{
-		ParentID:  m.parent,
-		Timestamp: types.CurrentTimestamp(),
+	// Determine the timestamp.
+	blockTimestamp := types.CurrentTimestamp()
+	if blockTimestamp < m.earliestTimestamp {
+		blockTimestamp = m.earliestTimestamp
 	}
 
-	// Add a transaction with random arbitrary data so that all blocks returned
-	// by this function are unique - this means that miners can safely start at
-	// the 0 nonce.
-	randBytes := make([]byte, 16)
-	rand.Read(randBytes)
-	b.Transactions = append(m.transactions, types.Transaction{
-		ArbitraryData: []string{"NonSia" + string(randBytes)},
-	})
-
-	// Calculate the subsidy and create the miner payout.
+	// Create the miner payouts.
 	subsidy := types.CalculateCoinbase(m.height + 1)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
 			subsidy = subsidy.Add(fee)
 		}
 	}
-	output := types.SiacoinOutput{Value: subsidy, UnlockHash: m.address}
-	b.MinerPayouts = []types.SiacoinOutput{output}
+	blockPayouts := []types.SiacoinOutput{types.SiacoinOutput{Value: subsidy, UnlockHash: m.address}}
 
-	// If we've got a time earlier than the earliest legal timestamp, set the
-	// timestamp equal to the earliest legal timestamp.
-	if b.Timestamp < m.earliestTimestamp {
-		b.Timestamp = m.earliestTimestamp
+	// Create the list of transacitons, including the randomized transaction.
+	// The transactions are assembled by calling append(singleElem,
+	// existingSlic) because doing it the reverse way has some side effects,
+	// creating a race condition and ultimately changing the block hash for
+	// other parts of the program. This is related to the fact that slices are
+	// pointers, and not immutable objects. Use of the builtin `copy` function
+	// when passing objects like blocks around may fix this problem.
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+	randTxn := types.Transaction{
+		ArbitraryData: []string{"NonSia" + string(randBytes)},
+	}
+	blockTransactions := append([]types.Transaction{randTxn}, m.transactions...)
+
+	// Assemble the block
+	b := types.Block{
+		ParentID:     m.parent,
+		Timestamp:    blockTimestamp,
+		MinerPayouts: blockPayouts,
+		Transactions: blockTransactions,
 	}
 
 	return b, b.MerkleRoot(), m.target
