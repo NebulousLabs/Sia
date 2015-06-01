@@ -27,7 +27,7 @@ func TestNewerVersion(t *testing.T) {
 
 	for version, expected := range versionMap {
 		if newerVersion(version) != expected {
-			t.Error("Comparing %v to %v should return %v", version, VERSION, expected)
+			t.Errorf("Comparing %v to %v should return %v", version, VERSION, expected)
 		}
 	}
 }
