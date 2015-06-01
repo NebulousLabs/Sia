@@ -1,5 +1,3 @@
-// Package blockdb provides read/write access to an on-disk block database
-// blockdb uses Bolt as its underlying database, but this is subject to change.
 package persist
 
 import (
@@ -30,6 +28,7 @@ type boltDB struct {
 	*bolt.DB
 }
 
+// Block returns the block at the given height.
 func (db *boltDB) Block(height types.BlockHeight) (types.Block, error) {
 	key := encoding.EncUint64(uint64(height))
 	var block types.Block
@@ -46,6 +45,8 @@ func (db *boltDB) Block(height types.BlockHeight) (types.Block, error) {
 	return block, err
 }
 
+// AddBlock inserts a block into the database at the "end" of the chain, i.e.
+// the current height + 1.
 func (db *boltDB) AddBlock(block types.Block) error {
 	value := encoding.Marshal(block)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -55,6 +56,8 @@ func (db *boltDB) AddBlock(block types.Block) error {
 	})
 }
 
+// RemoveBlock removes a block from the "end" of the chain, i.e. the block
+// with the largest height.
 func (db *boltDB) RemoveBlock() error {
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("chain"))
@@ -63,6 +66,7 @@ func (db *boltDB) RemoveBlock() error {
 	})
 }
 
+// Height returns the current blockchain height.
 func (db *boltDB) Height() (types.BlockHeight, error) {
 	var height types.BlockHeight
 	err := db.View(func(tx *bolt.Tx) error {
