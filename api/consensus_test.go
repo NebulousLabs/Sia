@@ -9,7 +9,7 @@ import (
 // TestBlockBootstrap checks that consensus.Synchronize probably synchronizes
 // the consensus set of a bootstrapping peer.
 func TestBlockBootstrap(t *testing.T) {
-	t.Skip("Test probably broken - code may be though")
+	t.Skip("transaction pool is too slow - deadlock detector triggers a false positive")
 	if testing.Short() {
 		t.SkipNow()
 	}
