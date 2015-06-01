@@ -76,7 +76,9 @@ func (uw *uploadWriter) Write(b []byte) (int, error) {
 // requests of the host. There is an assumption that only hosts with acceptable
 // terms will be put into the hostdb.
 func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUploadParams, piece *filePiece) error {
+	lockID := r.mu.RLock()
 	height := r.blockHeight
+	r.mu.RUnlock(lockID)
 
 	key, err := crypto.GenerateTwofishKey()
 	if err != nil {
@@ -218,7 +220,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	// file contract made it.
 
 	// Negotiation was successful; update the filePiece.
-	lockID := r.mu.Lock()
+	lockID = r.mu.Lock()
 	piece.Active = true
 	piece.Repairing = false
 	piece.Contract = signedTxn.FileContracts[0]

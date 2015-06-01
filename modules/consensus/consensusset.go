@@ -14,14 +14,32 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// fullVerification indicates that a block should be fully verified when
+	// being loaded from disk.
+	fullVerification verificationRigor = 0
+
+	// partialVerification indicates that transaction verification can be
+	// skipped. Transaction verification is computationally intensive, and
+	// skipping such a step noticably increases speed when loading many blocks
+	// at once. Usually, partialVerification is used when loading blocks from
+	// disk.
+	partialVerification verificationRigor = 1
+)
+
+// verificationRigor is a type indicating the intensity of verification that
+// should be using while accepting a block. For blocks that come from trusted
+// sources, the computationally expensive steps can be skipped.
+type verificationRigor byte
+
 // The State is the object responsible for tracking the current status of the
 // blockchain. Broadly speaking, it is responsible for maintaining consensus.
 // It accepts blocks and constructs a blockchain, forking when necessary.
 type State struct {
-	// fullVerification is a flag that tells the state whether or not to do
+	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
 	// up loading blocks from memory.
-	fullVerification bool
+	verificationRigor verificationRigor
 
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode

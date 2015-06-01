@@ -9,11 +9,13 @@ import (
 )
 
 var (
+	ErrDuplicateValidProofOutput        = errors.New("applying a storage proof created a duplicate proof output")
 	ErrMisuseApplySiacoinInput          = errors.New("applying a transaction with an invalid unspent siacoin output")
 	ErrMisuseApplySiacoinOutput         = errors.New("applying a transaction with an invalid siacoin output")
 	ErrMisuseApplyFileContracts         = errors.New("applying a transaction with an invalid file contract")
 	ErrMisuseApplyFileContractRevisions = errors.New("applying a revision for a nonexistant file contract")
 	ErrMisuseApplySiafundOutput         = errors.New("applying a transaction with an invalid siafund output")
+	ErrNonexistentStorageProof          = errors.New("applying a storage proof for a nonexistent file contract")
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
@@ -95,11 +97,10 @@ func (cs *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) 
 	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - termination should affect an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
-		if !exists {
-			if build.DEBUG {
+		if build.DEBUG {
+			if !exists {
 				panic(ErrMisuseApplyFileContractRevisions)
 			}
-			continue
 		}
 
 		// Add the diff to delete the old file contract.
@@ -142,7 +143,7 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		fc, exists := cs.fileContracts[sp.ParentID]
 		if build.DEBUG {
 			if !exists {
-				panic("storage proof submitted for a file contract that doesn't exist?")
+				panic(ErrNonexistentStorageProof)
 			}
 		}
 
@@ -151,18 +152,24 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		cs.siafundPool = cs.siafundPool.Add(fc.Tax())
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
-		for i, output := range fc.ValidProofOutputs {
+		for i, vpo := range fc.ValidProofOutputs {
 			// Sanity check - output should not already exist.
-			id := sp.ParentID.StorageProofOutputID(true, i)
+			spoid := sp.ParentID.StorageProofOutputID(true, i)
 			if build.DEBUG {
-				_, exists := cs.siacoinOutputs[id]
+				_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 				if exists {
-					panic("storage proof output already exists")
+					panic(ErrDuplicateValidProofOutput)
 				}
 			}
 
-			cs.delayedSiacoinOutputs[cs.height()][id] = output
-			bn.delayedSiacoinOutputs[id] = output
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffApply,
+				ID:             spoid,
+				SiacoinOutput:  vpo,
+				MaturityHeight: bn.height + types.MaturityDelay,
+			}
+			bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+			cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 		}
 
 		fcd := modules.FileContractDiff{
@@ -199,8 +206,14 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 			UnlockHash: sfo.ClaimUnlockHash,
 		}
 		scoid := sfi.ParentID.SiaClaimOutputID()
-		cs.delayedSiacoinOutputs[cs.height()][scoid] = sco
-		bn.delayedSiacoinOutputs[scoid] = sco
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             scoid,
+			SiacoinOutput:  sco,
+			MaturityHeight: bn.height + types.MaturityDelay,
+		}
+		bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.
@@ -243,7 +256,7 @@ func (cs *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 
 // applyTransaction applies the contents of a transaction to the State. This
 // produces a set of diffs, which are stored in the blockNode containing the
-// transaction.
+// transaction. No verification is done by this function.
 func (cs *State) applyTransaction(bn *blockNode, t types.Transaction) {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.

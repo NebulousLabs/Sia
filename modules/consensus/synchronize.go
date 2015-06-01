@@ -61,10 +61,10 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 			// Blocks received during synchronize aren't trusted; activate full
 			// verification.
 			lockID := s.mu.Lock()
-			s.fullVerification = true
+			s.verificationRigor = fullVerification
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
-			if acceptErr != nil {
+			if acceptErr != nil && acceptErr != modules.ErrNonExtendingBlock {
 				return acceptErr
 			}
 		}

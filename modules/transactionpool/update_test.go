@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -240,7 +241,7 @@ func (tpt *tpoolTester) testRewinding() {
 
 	// Fork around the block with the transaction.
 	err := tpt.cs.AcceptBlock(forkStart)
-	if err != nil {
+	if err != nil && err != modules.ErrNonExtendingBlock {
 		tpt.t.Fatal(err)
 	}
 	target = tpt.cs.CurrentTarget()

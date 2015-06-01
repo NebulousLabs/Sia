@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -11,6 +13,10 @@ const (
 	// corresponding to applying and reverting diffs.
 	DiffApply  DiffDirection = true
 	DiffRevert DiffDirection = false
+)
+
+var (
+	ErrNonExtendingBlock = errors.New("block does not extend the longest fork.")
 )
 
 // A ConsensusSetSubscriber is an object that receives updates to the consensus
@@ -53,6 +59,8 @@ type ConsensusChange struct {
 	// diffs is 'DiffApply'.
 	SiafundOutputDiffs []SiafundOutputDiff
 
+	// DelayedSiacoinOutputDiffs contains the set of delayed siacoin output diffs that were applied to the consensus set in the recent change.
+
 	// SiafundPoolDiff is the siafund pool diff that was applied to the
 	// consensus set in the recent change.
 	SiafundPoolDiff SiafundPoolDiff
@@ -84,6 +92,13 @@ type SiafundOutputDiff struct {
 	Direction     DiffDirection
 	ID            types.SiafundOutputID
 	SiafundOutput types.SiafundOutput
+}
+
+type DelayedSiacoinOutputDiff struct {
+	Direction      DiffDirection
+	ID             types.SiacoinOutputID
+	SiacoinOutput  types.SiacoinOutput
+	MaturityHeight types.BlockHeight
 }
 
 // A SiafundPoolDiff contains the value of the siafundPool before the block
