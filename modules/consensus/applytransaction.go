@@ -95,11 +95,10 @@ func (cs *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) 
 	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - termination should affect an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
-		if !exists {
-			if build.DEBUG {
+		if build.DEBUG {
+			if !exists {
 				panic(ErrMisuseApplyFileContractRevisions)
 			}
-			continue
 		}
 
 		// Add the diff to delete the old file contract.
