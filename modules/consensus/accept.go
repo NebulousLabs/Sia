@@ -79,7 +79,8 @@ func (cs *State) validHeader(b types.Block) error {
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
 // parent's list of children. If the new blockNode is heavier than the current
 // node, the blockchain is forked to put the new block and its parents at the
-// tip.
+// tip. An error will be returned if block verification fails or if the block
+// does not extend the longest fork.
 func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
 	newNode := parentNode.newChild(b)
@@ -87,7 +88,7 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 	if newNode.heavierThan(cs.currentBlockNode()) {
 		return cs.forkBlockchain(newNode)
 	}
-	return nil, nil, nil
+	return nil, nil, modules.ErrNonExtendingBlock
 }
 
 // acceptBlock is the internal consensus function for adding blocks. There is
@@ -100,6 +101,7 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 // saved to disk. The value of 'cs.verificationRigor' should be set before
 // 'acceptBlock' is called.
 func (cs *State) acceptBlock(b types.Block) error {
+	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
 		return ErrDoSBlock
@@ -109,16 +111,18 @@ func (cs *State) acceptBlock(b types.Block) error {
 		return ErrBlockKnown
 	}
 
-	// Check that the header is valid given the other blocks we know. This
-	// happens before checking that the transactions are intrinsically valid
-	// because it's a much cheaper operation for us to verify, and it's
-	// expensive for an attacker to spoof the header.
+	// Check that the header is valid. The header is checked first because it
+	// is not computationally expensive to verify, but it is computationally
+	// expensive to create.
 	err := cs.validHeader(b)
 	if err != nil {
 		return err
 	}
 
-	// Try adding the block to the tree.
+	// Try adding the block to the block tree. This call will perform
+	// verification on the block before adding the block to the block tree. An
+	// error is returned if verification fails or if the block does not extend
+	// the longest fork.
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
 		return err
@@ -127,7 +131,7 @@ func (cs *State) acceptBlock(b types.Block) error {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
 
-	// Sanity check, if applied nodes is len 0, revertedNodes should also be
+	// Sanity check - if applied nodes is len 0, revertedNodes should also be
 	// len 0.
 	if build.DEBUG {
 		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
@@ -141,7 +145,7 @@ func (cs *State) acceptBlock(b types.Block) error {
 // AcceptBlock will add a block to the state, forking the blockchain if it is
 // on a fork that is heavier than the current fork. If the block is accepted,
 // it will be relayed to connected peers. This function should only be called
-// for new blocks.
+// for new, untrusted blocks.
 func (cs *State) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
@@ -168,33 +172,16 @@ func (cs *State) RelayBlock(conn modules.PeerConn) error {
 		return err
 	}
 
-	// Submit the block to the state.
+	// Submit the block to the consensus set.
 	err = cs.AcceptBlock(b)
 	if err == ErrOrphan {
-		// If the block is an orphan, try to find the parents. The block is
-		// thrown away, will be received again during the synchronize.
+		// If the block is an orphan, try to find the parents. The block
+		// received from the peer is discarded and will be downloaded again if
+		// the parent is found.
 		go cs.Synchronize(modules.NetAddress(conn.RemoteAddr().String()))
 	}
 	if err != nil {
 		return err
 	}
-
-	// Check if the block is in the current path (sanity check first). If the
-	// block is not in the current path, then it not a part of the longest
-	// known fork. Broadcast is not called and an error is returned.
-	lockID := cs.mu.RLock()
-	defer cs.mu.RUnlock(lockID)
-	height, exists := cs.heightOfBlock(b.ID())
-	if !exists {
-		if build.DEBUG {
-			panic("could not get the height of a block that did not return an error when being accepted into the state")
-		}
-		return errors.New("consensus set malfunction")
-	}
-	currentPathBlock, exists := cs.blockAtHeight(height)
-	if !exists || b.ID() != currentPathBlock.ID() {
-		return errors.New("block added, but it does not extend the consensus set height")
-	}
-
 	return nil
 }

@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -11,6 +13,10 @@ const (
 	// corresponding to applying and reverting diffs.
 	DiffApply  DiffDirection = true
 	DiffRevert DiffDirection = false
+)
+
+var (
+	ErrNonExtendingBlock = errors.New("block does not extend the longest fork.")
 )
 
 // A ConsensusSetSubscriber is an object that receives updates to the consensus

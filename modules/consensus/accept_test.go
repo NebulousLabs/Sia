@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -136,7 +137,7 @@ func (cst *consensusSetTester) testBlockKnownHandling() error {
 
 	// Submit the stale block.
 	err = cst.cs.acceptBlock(staleBlock)
-	if err != nil {
+	if err != nil && err != modules.ErrNonExtendingBlock {
 		return err
 	}
 
