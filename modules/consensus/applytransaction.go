@@ -256,7 +256,7 @@ func (cs *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 
 // applyTransaction applies the contents of a transaction to the State. This
 // produces a set of diffs, which are stored in the blockNode containing the
-// transaction.
+// transaction. No verification is done by this function.
 func (cs *State) applyTransaction(bn *blockNode, t types.Transaction) {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
