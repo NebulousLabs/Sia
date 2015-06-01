@@ -9,29 +9,22 @@ import (
 	"github.com/NebulousLabs/Sia/persist"
 )
 
-func (g *Gateway) save() error {
-	meta := persist.Metadata{
-		Header:   "Sia Node List",
-		Version:  "0.3.3",
-		Filename: filepath.Join(g.saveDir, "nodes.json"),
-	}
+var persistMetadata = persist.Metadata{
+	Header:  "Sia Node List",
+	Version: "0.3.3",
+}
 
+func (g *Gateway) save() error {
 	var nodes []modules.NetAddress
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	return persist.Save(meta, nodes)
+	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.saveDir, "nodes.json"))
 }
 
 func (g *Gateway) load() error {
-	meta := persist.Metadata{
-		Header:   "Sia Node List",
-		Version:  "0.3.3",
-		Filename: filepath.Join(g.saveDir, "nodes.json"),
-	}
-
 	var nodes []modules.NetAddress
-	err := persist.Load(meta, &nodes)
+	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.saveDir, "nodes.json"))
 	if err != nil {
 		return err
 	}
