@@ -106,7 +106,7 @@ func init() {
 		MaturityDelay = 50                       // 8 hours - 50 blocks.
 		FutureThreshold = 3 * 60 * 60            // 3 hours.
 		ExtremeFutureThreshold = 5 * 60 * 60     // 5 hours.
-		GenesisTimestamp = Timestamp(1431000000) // 12:00pm UTC May 7th 2015
+		GenesisTimestamp = Timestamp(1433600000) // June 6th, 2015 @ 2:13pm UTC.
 
 		// A difficulty clamp to make long range attacks difficult. Quadrupling the
 		// difficulty will take 3000x work of finding a single block of the

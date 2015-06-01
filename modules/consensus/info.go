@@ -37,7 +37,7 @@ func (s *State) currentBlockNode() *blockNode {
 
 // currentBlockWeight returns the weight of the current block.
 func (s *State) currentBlockWeight() *big.Rat {
-	return s.currentBlockNode().target.Inverse()
+	return s.currentBlockNode().childTarget.Inverse()
 }
 
 // height returns the current height of the state.
@@ -144,7 +144,7 @@ func (s *State) ChildTarget(bid types.BlockID) (target types.Target, exists bool
 	if !exists {
 		return
 	}
-	target = bn.target
+	target = bn.childTarget
 	return
 }
 
@@ -153,7 +153,7 @@ func (s *State) ChildTarget(bid types.BlockID) (target types.Target, exists bool
 func (s *State) CurrentTarget() types.Target {
 	id := s.mu.RLock()
 	defer s.mu.RUnlock(id)
-	return s.currentBlockNode().target
+	return s.currentBlockNode().childTarget
 }
 
 func (s *State) EarliestTimestamp() types.Timestamp {

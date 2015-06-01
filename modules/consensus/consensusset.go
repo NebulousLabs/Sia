@@ -125,9 +125,9 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		Timestamp: types.GenesisTimestamp,
 	}
 	cs.blockRoot = &blockNode{
-		block:  genesisBlock,
-		target: types.RootTarget,
-		depth:  types.RootDepth,
+		block:       genesisBlock,
+		childTarget: types.RootTarget,
+		depth:       types.RootDepth,
 
 		diffsGenerated: true,
 	}
@@ -197,7 +197,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	tree := crypto.NewTree()
 	tree.PushObject(cs.blockRoot.block)
 	tree.PushObject(cs.height())
-	tree.PushObject(cs.currentBlockNode().target)
+	tree.PushObject(cs.currentBlockNode().childTarget)
 	tree.PushObject(cs.currentBlockNode().depth)
 	tree.PushObject(cs.currentBlockNode().earliestChildTimestamp())
 
