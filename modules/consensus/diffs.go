@@ -67,6 +67,24 @@ func (s *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modu
 	}
 }
 
+// commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
+func (cs *State) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
+	// Sanity check - should not be adding an output twoice, or deleting an
+	// output that does not exist.
+	if build.DEBUG {
+		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
+		if exists == (dscod.Direction == dir) {
+			panic("rogue delayed siacoin output in commitDelayedSiacoinOutputDiff")
+		}
+	}
+
+	if dscod.Direction == dir {
+		cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID] = dscod.SiacoinOutput
+	} else {
+		delete(cs.delayedSiacoinOutputs[dscod.MaturityHeight], dscod.ID)
+	}
+}
+
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
 func (s *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
@@ -98,6 +116,16 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		}
 	}
 
+	// Create the filling delayed siacoin output map.
+	if dir == modules.DiffApply {
+		s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	} else {
+		// Skip creating maps for height's that can't have delayed outputs.
+		if bn.height > types.MaturityDelay {
+			s.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+		}
+	}
+
 	// Apply each of the diffs.
 	if dir == modules.DiffApply {
 		for _, scod := range bn.siacoinOutputDiffs {
@@ -109,6 +137,9 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		for _, sfod := range bn.siafundOutputDiffs {
 			s.commitSiafundOutputDiff(sfod, dir)
 		}
+		for _, dscod := range bn.delayedSiacoinOutputDiffs {
+			s.commitDelayedSiacoinOutputDiff(dscod, dir)
+		}
 	} else {
 		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
 			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
@@ -119,18 +150,42 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
 			s.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
 		}
+		for i := len(bn.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			s.commitDelayedSiacoinOutputDiff(bn.delayedSiacoinOutputDiffs[i], dir)
+		}
 	}
 	s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 
-	// Update the State's metadata
+	// Delete the emptied siacoin output map.
+	if dir == modules.DiffApply {
+		// There are no outputs that mature in the first MaturityDelay blocks.
+		if bn.height > types.MaturityDelay {
+			// Sanity check - the map being deleted should be empty.
+			if build.DEBUG {
+				if len(s.delayedSiacoinOutputs[bn.height]) != 0 {
+					panic("trying to delete a set of delayed outputs that is not empty.")
+				}
+			}
+			delete(s.delayedSiacoinOutputs, bn.height)
+		}
+	} else {
+		// Sanity check - the map being deleted should be empty
+		if build.DEBUG {
+			if len(s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]) != 0 {
+				panic("trying to delete a set of delayed outputs that is not empty.")
+			}
+		}
+		delete(s.delayedSiacoinOutputs, bn.height+types.MaturityDelay)
+
+	}
+
+	// Update the current path.
 	if dir == modules.DiffApply {
 		s.currentPath = append(s.currentPath, bn.block.ID())
 		s.db.AddBlock(bn.block)
-		s.delayedSiacoinOutputs[bn.height] = bn.delayedSiacoinOutputs
 	} else {
 		s.currentPath = s.currentPath[:len(s.currentPath)-1]
 		s.db.RemoveBlock()
-		delete(s.delayedSiacoinOutputs, bn.height)
 	}
 }
 
@@ -139,7 +194,7 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
+func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	// Sanity check
 	if build.DEBUG {
 		// Generate should only be called if the diffs have not yet been
@@ -157,7 +212,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// Update the state to point to the new block.
 	s.currentPath = append(s.currentPath, bn.block.ID())
 	s.db.AddBlock(bn.block)
-	s.delayedSiacoinOutputs[s.height()] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
@@ -172,12 +227,12 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range bn.block.Transactions {
-		err = s.validTransaction(txn)
+		err := s.validTransaction(txn)
 		if err != nil {
 			s.dosBlocks[bn.block.ID()] = struct{}{}
 			s.commitDiffSet(bn, modules.DiffRevert)
 			s.deleteNode(bn)
-			return
+			return err
 		}
 
 		s.applyTransaction(bn, txn)
@@ -193,7 +248,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) (err error) {
 	// siafund pool ended up.
 	bn.siafundPoolDiff.Adjusted = s.siafundPool
 
-	return
+	return nil
 }
 
 // BlockDiffs returns the diffs created by the input block.

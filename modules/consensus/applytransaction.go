@@ -151,7 +151,7 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		cs.siafundPool = cs.siafundPool.Add(fc.Tax())
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
-		for i, output := range fc.ValidProofOutputs {
+		for i, vpo := range fc.ValidProofOutputs {
 			// Sanity check - output should not already exist.
 			spoid := sp.ParentID.StorageProofOutputID(true, i)
 			if build.DEBUG {
@@ -161,8 +161,14 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 				}
 			}
 
-			cs.delayedSiacoinOutputs[cs.height()][spoid] = output
-			bn.delayedSiacoinOutputs[spoid] = output
+			dscod := modules.DelayedSiacoinOutputDiff{
+				Direction:      modules.DiffApply,
+				ID:             spoid,
+				SiacoinOutput:  vpo,
+				MaturityHeight: bn.height + types.MaturityDelay,
+			}
+			bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+			cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 		}
 
 		fcd := modules.FileContractDiff{
@@ -199,8 +205,14 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 			UnlockHash: sfo.ClaimUnlockHash,
 		}
 		scoid := sfi.ParentID.SiaClaimOutputID()
-		cs.delayedSiacoinOutputs[cs.height()][scoid] = sco
-		bn.delayedSiacoinOutputs[scoid] = sco
+		dscod := modules.DelayedSiacoinOutputDiff{
+			Direction:      modules.DiffApply,
+			ID:             scoid,
+			SiacoinOutput:  sco,
+			MaturityHeight: bn.height + types.MaturityDelay,
+		}
+		bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 
 		// Create the siafund output diff and remove the output from the
 		// consensus set.

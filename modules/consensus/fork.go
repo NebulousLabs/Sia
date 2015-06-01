@@ -68,6 +68,15 @@ func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 		node := s.currentBlockNode()
 		s.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
+
+		// Sanity check - check that the delayed siacoin outputs map structure
+		// matches the expected strucutre.
+		if build.DEBUG {
+			err := s.checkDelayedSiacoinOutputMaps()
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 	return
 }
@@ -91,6 +100,15 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 			}
 		}
 		appliedNodes = append(appliedNodes, node)
+
+		// Sanity check - check that the delayed siacoin outputs map structure
+		// matches the expected strucutre.
+		if build.DEBUG {
+			err = s.checkDelayedSiacoinOutputMaps()
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	return

@@ -38,12 +38,12 @@ type blockNode struct {
 	// Note that diffsGenerated == true iff the node has ever been in the
 	// State's currentPath; this is because diffs must be generated to apply
 	// the node.
-	diffsGenerated        bool
-	siafundPoolDiff       modules.SiafundPoolDiff
-	siacoinOutputDiffs    []modules.SiacoinOutputDiff
-	fileContractDiffs     []modules.FileContractDiff
-	siafundOutputDiffs    []modules.SiafundOutputDiff
-	delayedSiacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
+	diffsGenerated            bool
+	siacoinOutputDiffs        []modules.SiacoinOutputDiff
+	fileContractDiffs         []modules.FileContractDiff
+	siafundOutputDiffs        []modules.SiafundOutputDiff
+	delayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
+	siafundPoolDiff           modules.SiafundPoolDiff
 }
 
 // childDepth returns the depth of a blockNode's child nodes. The depth is the
@@ -97,8 +97,6 @@ func (bn *blockNode) newChild(b types.Block) *blockNode {
 
 		height: bn.height + 1,
 		depth:  bn.childDepth(),
-
-		delayedSiacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
 	}
 
 	// Calculate the target for the new node. To calculate the target, we need
