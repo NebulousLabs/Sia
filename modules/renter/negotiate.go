@@ -23,15 +23,11 @@ const (
 // signed.
 func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, id string, err error) {
 	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
-	var payout types.Currency
-	for _, output := range terms.MissedProofOutputs {
-		payout = payout.Add(output.Value)
-	}
-
-	// Get the cost to the client as per the terms in the contract.
 	sizeCurrency := types.NewCurrency64(terms.FileSize)
 	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	clientCost := terms.Price.Mul(sizeCurrency).Mul(durationCurrency)
+	hostCollateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
+	payout := clientCost.Add(hostCollateral)
 
 	// Fill out the contract.
 	contract := types.FileContract{
@@ -122,7 +118,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		},
 
 		MissedProofOutputs: []types.SiacoinOutput{
-			{Value: payout, UnlockHash: types.ZeroUnlockHash},
+			{Value: validOutputValue, UnlockHash: types.ZeroUnlockHash},
 		},
 	}
 

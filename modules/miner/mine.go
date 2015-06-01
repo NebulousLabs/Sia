@@ -55,7 +55,7 @@ func (m *Miner) blockForWork() (types.Block, crypto.Hash, types.Target) {
 
 // submitBlock takes a solved block and submits it to the blockchain.
 // submitBlock should not be called with a lock.
-func (m *Miner) submitBlock(b types.Block) error {
+func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
@@ -85,17 +85,17 @@ func (m *Miner) submitBlock(b types.Block) error {
 // time to complete, and should not be called with a lock.
 func (m *Miner) solveBlock(blockForWork types.Block, blockMerkleRoot crypto.Hash, target types.Target) (b types.Block, solved bool, err error) {
 	b = blockForWork
-	hashbytes := make([]byte, 72)
+	hashbytes := make([]byte, 80)
 	copy(hashbytes, b.ParentID[:])
-	copy(hashbytes[40:], blockMerkleRoot[:])
+	binary.LittleEndian.PutUint64(hashbytes[40:48], uint64(b.Timestamp))
+	copy(hashbytes[48:], blockMerkleRoot[:])
 
 	nonce := (*uint64)(unsafe.Pointer(&hashbytes[32]))
-	*nonce = b.Nonce
 	for i := 0; i < iterationsPerAttempt; i++ {
 		id := crypto.HashBytes(hashbytes)
 		if bytes.Compare(target[:], id[:]) >= 0 {
-			b.Nonce = binary.LittleEndian.Uint64(hashbytes[32:40])
-			err = m.submitBlock(b)
+			copy(b.Nonce[:], hashbytes[32:40])
+			err = m.SubmitBlock(b)
 			if err != nil {
 				return
 			}
@@ -188,19 +188,20 @@ func (m *Miner) FindBlock() (types.Block, bool, error) {
 // and is very slow.
 func (m *Miner) SolveBlock(blockForWork types.Block, target types.Target) (b types.Block, solved bool) {
 	b = blockForWork
-	for b.Nonce = 0; b.Nonce < iterationsPerAttempt; b.Nonce++ {
-		if b.CheckTarget(target) {
-			solved = true
-			return
-		}
-	}
-	return
-}
+	blockMerkleRoot := b.MerkleRoot()
+	hashbytes := make([]byte, 80)
+	copy(hashbytes, b.ParentID[:])
+	binary.LittleEndian.PutUint64(hashbytes[40:48], uint64(b.Timestamp))
+	copy(hashbytes[48:], blockMerkleRoot[:])
 
-// SubmitBlock accepts a block with a valid target and presents it to the
-// consensus set.
-func (m *Miner) SubmitBlock(b types.Block) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.submitBlock(b)
+	nonce := (*uint64)(unsafe.Pointer(&hashbytes[32]))
+	for i := 0; i < iterationsPerAttempt; i++ {
+		id := crypto.HashBytes(hashbytes)
+		if bytes.Compare(target[:], id[:]) >= 0 {
+			copy(b.Nonce[:], hashbytes[32:40])
+			return b, true
+		}
+		*nonce++
+	}
+	return b, false
 }

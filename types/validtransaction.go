@@ -21,6 +21,7 @@ var (
 	ErrStorageProofWithOutputs          = errors.New("transaction has both a storage proof and other outputs")
 	ErrTimelockNotSatisfied             = errors.New("timelock has not been met")
 	ErrTransactionTooLarge              = errors.New("transaction is too large to fit in a block")
+	ErrZeroMinerFee                     = errors.New("transaction has a zero value miner fee")
 	ErrZeroOutput                       = errors.New("transaction cannot have an output or payout that has zero value")
 	ErrZeroRevision                     = errors.New("transaction has a file contract revision with RevisionNumber=0")
 )
@@ -38,9 +39,8 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 			return ErrFileContractWindowEndViolation
 		}
 
-		// Check that the valid proof outputs sum to the payout after the
-		// siafund fee has been applied, and check that the missed proof
-		// outputs sum to the full payout.
+		// Check that the proof outputs sum to the payout after the
+		// siafund fee has been applied.
 		var validProofOutputSum, missedProofOutputSum Currency
 		for _, output := range fc.ValidProofOutputs {
 			validProofOutputSum = validProofOutputSum.Add(output.Value)
@@ -52,7 +52,7 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 		if validProofOutputSum.Cmp(outputPortion) != 0 {
 			return ErrFileContractOutputSumViolation
 		}
-		if missedProofOutputSum.Cmp(fc.Payout) != 0 {
+		if missedProofOutputSum.Cmp(outputPortion) != 0 {
 			return ErrFileContractOutputSumViolation
 		}
 	}
@@ -127,6 +127,11 @@ func (t Transaction) followsMinimumValues() error {
 		}
 		if sfo.Value.IsZero() {
 			return ErrZeroOutput
+		}
+	}
+	for _, fee := range t.MinerFees {
+		if fee.IsZero() {
+			return ErrZeroMinerFee
 		}
 	}
 	return nil

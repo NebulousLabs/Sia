@@ -64,6 +64,9 @@ func (s *State) applyMissedProof(bn *blockNode, fcid types.FileContractID) {
 		return
 	}
 
+	// Add the siafund tax to the siafund pool.
+	s.siafundPool = s.siafundPool.Add(fc.Tax())
+
 	// Add all of the outputs in the missed proof outputs to the consensus set.
 	for i, output := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.

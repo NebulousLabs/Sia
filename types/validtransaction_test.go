@@ -19,7 +19,7 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 					{Value: NewCurrency64(900e3)},
 				},
 				MissedProofOutputs: []SiacoinOutput{
-					{Value: NewCurrency64(100e3)},
+					{Value: NewCurrency64(70e3)},
 					{Value: NewCurrency64(900e3)},
 				},
 			},
@@ -66,17 +66,17 @@ func TestTransactionCorrectFileContracts(t *testing.T) {
 	}
 	txn.FileContracts[0].ValidProofOutputs[0].Value = NewCurrency64(70e3)
 
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(99e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(69e3)
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractOutputSumViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(101e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(71e3)
 	err = txn.correctFileContracts(30)
 	if err != ErrFileContractOutputSumViolation {
 		t.Error(err)
 	}
-	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(100e3)
+	txn.FileContracts[0].MissedProofOutputs[0].Value = NewCurrency64(70e3)
 
 	// Try the payouts when the value of the contract is too low to incur a
 	// fee.
@@ -162,6 +162,7 @@ func TestTransactionFollowsMinimumValues(t *testing.T) {
 		SiacoinOutputs: []SiacoinOutput{{Value: NewCurrency64(1)}},
 		FileContracts:  []FileContract{{Payout: NewCurrency64(1)}},
 		SiafundOutputs: []SiafundOutput{{Value: NewCurrency64(1)}},
+		MinerFees:      []Currency{NewCurrency64(1)},
 	}
 	err := txn.followsMinimumValues()
 	if err != nil {
@@ -187,6 +188,12 @@ func TestTransactionFollowsMinimumValues(t *testing.T) {
 		t.Error(err)
 	}
 	txn.SiafundOutputs[0].Value = NewCurrency64(1)
+	txn.MinerFees[0] = ZeroCurrency
+	err = txn.followsMinimumValues()
+	if err != ErrZeroMinerFee {
+		t.Error(err)
+	}
+	txn.MinerFees[0] = NewCurrency64(1)
 
 	// Try a non-zero value for the ClaimStart field of a siafund output.
 	txn.SiafundOutputs[0].ClaimStart = NewCurrency64(1)
