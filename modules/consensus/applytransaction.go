@@ -9,11 +9,13 @@ import (
 )
 
 var (
+	ErrDuplicateValidProofOutput        = errors.New("applying a storage proof created a duplicate proof output")
 	ErrMisuseApplySiacoinInput          = errors.New("applying a transaction with an invalid unspent siacoin output")
 	ErrMisuseApplySiacoinOutput         = errors.New("applying a transaction with an invalid siacoin output")
 	ErrMisuseApplyFileContracts         = errors.New("applying a transaction with an invalid file contract")
 	ErrMisuseApplyFileContractRevisions = errors.New("applying a revision for a nonexistant file contract")
 	ErrMisuseApplySiafundOutput         = errors.New("applying a transaction with an invalid siafund output")
+	ErrNonexistentStorageProof          = errors.New("applying a storage proof for a nonexistent file contract")
 )
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
@@ -141,7 +143,7 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		fc, exists := cs.fileContracts[sp.ParentID]
 		if build.DEBUG {
 			if !exists {
-				panic("storage proof submitted for a file contract that doesn't exist?")
+				panic(ErrNonexistentStorageProof)
 			}
 		}
 
@@ -154,9 +156,9 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 			// Sanity check - output should not already exist.
 			spoid := sp.ParentID.StorageProofOutputID(true, i)
 			if build.DEBUG {
-				_, exists := cs.siacoinOutputs[spoid]
+				_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 				if exists {
-					panic("storage proof output already exists")
+					panic(ErrDuplicateValidProofOutput)
 				}
 			}
 

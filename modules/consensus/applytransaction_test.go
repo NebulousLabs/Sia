@@ -52,7 +52,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 
 	// Create a consensus set and get it to 3 siacoin outputs. The consensus
 	// set starts with 2 siacoin outputs, mining a block will add another.
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestApplySiacoinInputs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestMisuseApplySiacoinInputs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestApplySiacoinOutputs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestMisuseApplySiacoinOutputs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestMisuseApplyFileContracts")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +368,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyFileContracts")
+	cst, err := createConsensusSetTester("TestApplyFileContractRevisions")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,13 +468,40 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	}
 }
 
+// TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
+// checks that a panic was triggered.
+func TestMisuseApplyFileContractRevisions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestMisuseApplyFileContractRevisions")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a block node to use with application.
+	bn := new(blockNode)
+
+	// Trigger a panic from revising a nonexistent file contract.
+	defer func() {
+		r := recover()
+		if r != ErrMisuseApplyFileContractRevisions {
+			t.Error("no panic occured when misusing applySiacoinInput")
+		}
+	}()
+	txn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{}},
+	}
+	cst.cs.applyFileContractRevisions(bn, txn)
+}
+
 // TestApplyStorageProofs probes the applyStorageProofs method of the consensus
 // set.
 func TestApplyStorageProofs(t *testing.T) {
 	if testing.Short() {
 		// t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplyFileContracts")
+	cst, err := createConsensusSetTester("TestApplyStorageProofs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -597,14 +624,13 @@ func TestApplyStorageProofs(t *testing.T) {
 	}
 }
 
-/*
-// TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
-// checks that a panic was triggered.
-func TestMisuseApplyFileContractRevisions(t *testing.T) {
+// TestNonexistentStorageProof applies a storage proof which points to a
+// nonextentent parent.
+func TestNonexistentStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestNonexistentStorageProof")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,45 +638,64 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	// Create a block node to use with application.
 	bn := new(blockNode)
 
-	// Trigger a panic from revising a nonexistent file contract.
+	// Trigger a panic by applying a storage proof for a nonexistent file
+	// contract.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplyFileContractRevisions {
+		if r != ErrNonexistentStorageProof {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
 	txn := types.Transaction{
-		FileContractRevisions: []types.FileContractRevision{{}},
+		StorageProofs: []types.StorageProof{{}},
 	}
-	cst.cs.applyFileContractRevisions(bn, txn)
+	cst.cs.applyStorageProofs(bn, txn)
 }
-*/
 
-// TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
-// checks that a panic was triggered.
-func TestMisuseApplyFileContractRevisions(t *testing.T) {
+// TestDuplicateStorageProof applies a storage proof which has already been
+// applied.
+func TestDuplicateStorageProof(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestDuplicateStorageProof")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create a block node to use with application.
+	// Create a block node.
 	bn := new(blockNode)
+	bn.height = cst.cs.height()
 
-	// Trigger a panic from revising a nonexistent file contract.
+	// Create a file contract for the storage proof to prove.
+	txn0 := types.Transaction{
+		FileContracts: []types.FileContract{
+			{
+				Payout: types.NewCurrency64(300e3),
+				ValidProofOutputs: []types.SiacoinOutput{
+					{Value: types.NewCurrency64(290e3)},
+				},
+			},
+		},
+	}
+	cst.cs.applyFileContracts(bn, txn0)
+	fcid := txn0.FileContractID(0)
+
+	// Apply a single storage proof.
+	txn1 := types.Transaction{
+		StorageProofs: []types.StorageProof{{ParentID: fcid}},
+	}
+	cst.cs.applyStorageProofs(bn, txn1)
+
+	// Trigger a panic by applying the storage proof again.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplyFileContractRevisions {
-			t.Error("no panic occured when misusing applySiacoinInput")
+		if r != ErrDuplicateValidProofOutput {
+			t.Error("failed to trigger ErrDuplicateValidProofOutput:", r)
 		}
 	}()
-	txn := types.Transaction{
-		FileContractRevisions: []types.FileContractRevision{{}},
-	}
-	cst.cs.applyFileContractRevisions(bn, txn)
+	cst.cs.applyFileContracts(bn, txn0) // File contract was consumed by the first proof.
+	cst.cs.applyStorageProofs(bn, txn1)
 }
 
 /*
@@ -774,7 +819,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestApplySiafundOutputs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -849,7 +894,7 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestApplySiacoinInput")
+	cst, err := createConsensusSetTester("TestMisuseApplySiafundOutputs")
 	if err != nil {
 		t.Fatal(err)
 	}
