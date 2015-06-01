@@ -220,7 +220,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	// file contract made it.
 
 	// Negotiation was successful; update the filePiece.
-	lockID := r.mu.Lock()
+	lockID = r.mu.Lock()
 	piece.Active = true
 	piece.Repairing = false
 	piece.Contract = signedTxn.FileContracts[0]
