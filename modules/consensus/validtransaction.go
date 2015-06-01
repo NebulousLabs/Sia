@@ -188,7 +188,7 @@ func (s *State) ValidStorageProofs(t types.Transaction) (err error) {
 // consensus state. If not an error is returned.
 func (s *State) validTransaction(t types.Transaction) error {
 	// Skip transaction verification if the State is accepting trusted blocks.
-	if !s.fullVerification {
+	if s.verificationRigor != fullVerification {
 		return nil
 	}
 

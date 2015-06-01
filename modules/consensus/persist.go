@@ -40,7 +40,7 @@ func (s *State) load(saveDir string) error {
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := s.mu.Lock()
-		s.fullVerification = false
+		s.verificationRigor = partialVerification
 		err = s.acceptBlock(b)
 		s.mu.Unlock(lockID)
 		if err != nil {

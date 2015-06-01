@@ -24,25 +24,24 @@ var (
 
 // validHeader does some early, low computation verification on the block.
 func (cs *State) validHeader(b types.Block) error {
-	// Grab the parent of the block.
+	// Grab the parent of the block and verify the ID of the child meets the
+	// target. This is done as early as possible to enforce that any
+	// block-related DoS must use blocks that have sufficient work.
 	parent, exists := cs.blockMap[b.ParentID]
 	if !exists {
 		return ErrOrphan
 	}
-
-	// Check the ID meets the target. This is one of the earliest checks to
-	// enforce that blocks need to have committed to a large amount of work
-	// before being verified - a DoS protection.
 	if !b.CheckTarget(parent.target) {
 		return ErrMissedTarget
 	}
 
-	// Check that the block is the correct size.
+	// Check that the block is below the size limit.
 	if uint64(len(encoding.Marshal(b))) > types.BlockSizeLimit {
 		return ErrLargeBlock
 	}
 
-	// If timestamp is too far in the past, reject and put in bad blocks.
+	// Check that the timestamp is not in 'the past', where the past is defined
+	// by earliestChildTimestamp.
 	if parent.earliestChildTimestamp() > b.Timestamp {
 		return ErrEarlyTimestamp
 	}
@@ -55,8 +54,7 @@ func (cs *State) validHeader(b types.Block) error {
 		return ErrExtremeFutureTimestamp
 	}
 
-	// Verify that the miner payouts sum to the total amount of fees allowed to
-	// be collected by the miners.
+	// Verify that the miner payouts are valid.
 	if !b.CheckMinerPayouts(parent.height + 1) {
 		return ErrBadMinerPayouts
 	}
@@ -80,12 +78,11 @@ func (cs *State) validHeader(b types.Block) error {
 
 // addBlockToTree inserts a block into the blockNode tree by adding it to its
 // parent's list of children. If the new blockNode is heavier than the current
-// node, the blockchain is forked.
+// node, the blockchain is forked to put the new block and its parents at the
+// tip.
 func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
 	newNode := parentNode.newChild(b)
-
-	// Add the node to the block map
 	cs.blockMap[b.ID()] = newNode
 	if newNode.heavierThan(cs.currentBlockNode()) {
 		return cs.forkBlockchain(newNode)
@@ -94,7 +91,14 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 }
 
 // acceptBlock is the internal consensus function for adding blocks. There is
-// no block relaying.
+// no block relaying. The speed of 'acceptBlock' is effected by the value of
+// 'cs.verificationRigor'. If rigor is set to 'fullVerification', all of the
+// transactions will be checked and verified. This is a requirement when
+// receiving blocks from untrusted sources. When set to 'partialVerification',
+// verification of transactions is skipped. This is acceptable when receiving
+// blocks from a trust source, such as blocks that were previously verified and
+// saved to disk. The value of 'cs.verificationRigor' should be set before
+// 'acceptBlock' is called.
 func (cs *State) acceptBlock(b types.Block) error {
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
@@ -143,7 +147,7 @@ func (cs *State) AcceptBlock(b types.Block) error {
 	defer cs.mu.Unlock(lockID)
 
 	// Set the flag to do full verification.
-	cs.fullVerification = true
+	cs.verificationRigor = fullVerification
 	err := cs.acceptBlock(b)
 	if err != nil {
 		return err
