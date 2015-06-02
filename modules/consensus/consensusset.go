@@ -231,7 +231,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 
 	// Get the set of delayed siacoin outputs, sorted by maturity height then
 	// sorted by id and add them.
-	for i := cs.height(); i <= cs.height()+types.MaturityDelay; i++ {
+	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
 		var delayedOutputs crypto.HashSlice
 		for id := range cs.delayedSiacoinOutputs[i] {
 			delayedOutputs = append(delayedOutputs, crypto.Hash(id))

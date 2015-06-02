@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"fmt"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -43,10 +41,8 @@ func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules
 	}
 
 	if fcd.Direction == dir {
-		fmt.Println("applying", fcd.ID)
 		s.fileContracts[fcd.ID] = fcd.FileContract
 	} else {
-		fmt.Println("deleting", fcd.ID)
 		delete(s.fileContracts, fcd.ID)
 	}
 }
@@ -120,10 +116,22 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 
 	// Create the filling delayed siacoin output map.
 	if dir == modules.DiffApply {
+		if build.DEBUG {
+			_, exists := s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+			if exists {
+				panic("trying to create a map that already exists")
+			}
+		}
 		s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	} else {
 		// Skip creating maps for height's that can't have delayed outputs.
 		if bn.height > types.MaturityDelay {
+			if build.DEBUG {
+				_, exists := s.delayedSiacoinOutputs[bn.height]
+				if exists {
+					panic("trying to create a map that already exists")
+				}
+			}
 			s.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 		}
 	}
@@ -231,8 +239,9 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	for _, txn := range bn.block.Transactions {
 		err := s.validTransaction(txn)
 		if err != nil {
-			s.dosBlocks[bn.block.ID()] = struct{}{}
+			s.applyMaturedSiacoinOutputs(bn)
 			s.commitDiffSet(bn, modules.DiffRevert)
+			s.dosBlocks[bn.block.ID()] = struct{}{}
 			s.deleteNode(bn)
 			return err
 		}
