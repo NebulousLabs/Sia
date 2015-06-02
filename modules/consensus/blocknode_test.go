@@ -72,7 +72,7 @@ func TestEarliestChildTimestamp(t *testing.T) {
 	}
 }
 
-// TestHeavierThan probes the heavierThan method of the blockNode.
+// TestHeavierThan probes the heavierThan method of the blockNode type.
 func TestHeavierThan(t *testing.T) {
 	// Create a light node.
 	bnLight := new(blockNode)
@@ -114,5 +114,23 @@ func TestHeavierThan(t *testing.T) {
 	// bnHeavy should be heavier than bnMiddle.
 	if !bnHeavy.heavierThan(bnMiddle) {
 		t.Error("heavy is not heavier than middle")
+	}
+}
+
+// TestChildDepth probes the childDeath method of the blockNode type.
+func TestChildDept(t *testing.T) {
+	bn := new(blockNode)
+	bn.depth[0] = 64
+	bn.childTarget[0] = 64
+	childDepth := bn.childDepth()
+	if childDepth[0] != 32 {
+		t.Error("unexpected child depth")
+	}
+
+	bn.depth[0] = 24
+	bn.childTarget[0] = 48
+	childDepth = bn.childDepth()
+	if childDepth[0] != 16 {
+		t.Error("unexpected child depth")
 	}
 }
