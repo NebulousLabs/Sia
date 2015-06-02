@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"math/big"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -16,15 +15,6 @@ type StateInfo struct {
 	Target       types.Target
 }
 
-// blockAtHeight returns the block on the current path with the given height.
-func (s *State) blockAtHeight(height types.BlockHeight) (b types.Block, exists bool) {
-	exists = height <= s.height()
-	if exists {
-		b = s.blockMap[s.currentPath[height]].block
-	}
-	return
-}
-
 // currentBlockID returns the ID of the current block.
 func (s *State) currentBlockID() types.BlockID {
 	return s.currentPath[s.height()]
@@ -35,24 +25,9 @@ func (s *State) currentBlockNode() *blockNode {
 	return s.blockMap[s.currentBlockID()]
 }
 
-// currentBlockWeight returns the weight of the current block.
-func (s *State) currentBlockWeight() *big.Rat {
-	return s.currentBlockNode().childTarget.Inverse()
-}
-
 // height returns the current height of the state.
 func (s *State) height() types.BlockHeight {
 	return types.BlockHeight(len(s.currentPath) - 1)
-}
-
-// heightOfBlock returns the height of the block with the given ID.
-func (s *State) heightOfBlock(bid types.BlockID) (height types.BlockHeight, exists bool) {
-	bn, exists := s.blockMap[bid]
-	if !exists {
-		return
-	}
-	height = bn.height
-	return
 }
 
 // output returns the unspent SiacoinOutput associated with the given ID. If
@@ -107,26 +82,6 @@ func (s *State) sortedUsfoSet() []types.SiafundOutput {
 	return sortedOutputs
 }
 
-// BlockAtHeight returns the block on the current path with the given height.
-func (s *State) BlockAtHeight(height types.BlockHeight) (b types.Block, exists bool) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.blockAtHeight(height)
-}
-
-// Block returns the block associated with the given id.
-func (s *State) Block(bid types.BlockID) (b types.Block, exists bool) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-
-	node, exists := s.blockMap[bid]
-	if !exists {
-		return
-	}
-	b = node.block
-	return
-}
-
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
@@ -148,21 +103,7 @@ func (s *State) ChildTarget(bid types.BlockID) (target types.Target, exists bool
 	return
 }
 
-// CurrentTarget returns the target of the next block that needs to be submitted
-// to the state.
-func (s *State) CurrentTarget() types.Target {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-	return s.currentBlockNode().childTarget
-}
-
-func (s *State) EarliestTimestamp() types.Timestamp {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-	return s.currentBlockNode().earliestChildTimestamp()
-}
-
-// EarliestTimestamp returns the earliest timestamp that the next block can
+// EarliestChildTimestamp returns the earliest timestamp that the next block can
 // have in order for it to be considered valid.
 func (s *State) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
 	id := s.mu.RLock()
@@ -195,11 +136,11 @@ func (s *State) InCurrentPath(bid types.BlockID) bool {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
 
-	height, exists := s.heightOfBlock(bid)
+	node, exists := s.blockMap[bid]
 	if !exists {
 		return false
 	}
-	return s.currentPath[height] == bid
+	return s.currentPath[node.height] == bid
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for
