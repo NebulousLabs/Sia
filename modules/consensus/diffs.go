@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -41,8 +43,10 @@ func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules
 	}
 
 	if fcd.Direction == dir {
+		fmt.Println("applying", fcd.ID)
 		s.fileContracts[fcd.ID] = fcd.FileContract
 	} else {
+		fmt.Println("deleting", fcd.ID)
 		delete(s.fileContracts, fcd.ID)
 	}
 }

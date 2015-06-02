@@ -1,47 +1,11 @@
 package consensus
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// checkRewindApplyNode is a helper function that reverts and reapplies a block
-// node, checking for consistency with the original and resulting consensus
-// hashes.
-func (cst *consensusSetTester) checkRevertApplyNode(initialSum crypto.Hash, bn *blockNode) error {
-	resultingSum := cst.cs.consensusSetHash()
-
-	// Revert and reapply the diffs and check that consistency is maintained.
-	for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], modules.DiffRevert)
-	}
-	for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitFileContractDiff(bn.fileContractDiffs[i], modules.DiffRevert)
-	}
-	for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], modules.DiffRevert)
-	}
-	if initialSum != cst.cs.consensusSetHash() {
-		return errors.New("inconsistency after rewinding a diff set")
-	}
-	for _, diff := range bn.siacoinOutputDiffs {
-		cst.cs.commitSiacoinOutputDiff(diff, modules.DiffApply)
-	}
-	for _, diff := range bn.fileContractDiffs {
-		cst.cs.commitFileContractDiff(diff, modules.DiffApply)
-	}
-	for _, diff := range bn.siafundOutputDiffs {
-		cst.cs.commitSiafundOutputDiff(diff, modules.DiffApply)
-	}
-	if resultingSum != cst.cs.consensusSetHash() {
-		return errors.New("inconsistency after reapplying a diff set")
-	}
-	return nil
-}
 
 // TestApplySiacoinInputs probes the applySiacoinInputs method of the consensus
 // set.
@@ -61,9 +25,6 @@ func TestApplySiacoinInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	cst.csUpdateWait()
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -111,11 +72,6 @@ func TestApplySiacoinInputs(t *testing.T) {
 	}
 	if len(bn.siacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated for single transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
@@ -169,9 +125,6 @@ func TestApplySiacoinOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
 
@@ -222,11 +175,6 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if len(bn.siacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplySiacoinOutputs misuses applySiacoinOutputs and checks that a
@@ -270,9 +218,6 @@ func TestApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -324,11 +269,6 @@ func TestApplyFileContracts(t *testing.T) {
 	if len(bn.fileContractDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplyFileContracts misuses applyFileContracts and checks that a
@@ -372,9 +312,6 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -461,11 +398,6 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if len(bn.fileContractDiffs) != 8 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
@@ -505,9 +437,6 @@ func TestApplyStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -617,11 +546,6 @@ func TestApplyStorageProofs(t *testing.T) {
 	if cst.cs.siafundPool.Cmp(types.NewCurrency64(30e3)) != 0 {
 		t.Error("siafund pool not being added up correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestNonexistentStorageProof applies a storage proof which points to a
@@ -716,9 +640,6 @@ func TestApplySiafundInputs(t *testing.T) {
 	}
 	cst.csUpdateWait()
 
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
 
@@ -765,11 +686,6 @@ func TestApplySiafundInputs(t *testing.T) {
 	}
 	if len(bn.siacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated for single transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
@@ -825,9 +741,6 @@ func TestApplySiafundOutputs(t *testing.T) {
 	}
 	cst.cs.siafundPool = types.NewCurrency64(101)
 
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
 
@@ -880,11 +793,6 @@ func TestApplySiafundOutputs(t *testing.T) {
 	}
 	if len(bn.siafundOutputDiffs) != 3 {
 		t.Error("block node was not updated for single element transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
