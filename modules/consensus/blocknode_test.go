@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -212,5 +213,65 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	}
 	if adjustment != 2 {
 		t.Error("got wrong long-range adjustment")
+	}
+}
+
+// TestClampTargetAdjustment probes the clampTargetAdjustment function.
+func TestClampTargetAdjustment(t *testing.T) {
+	// Check that the MaxAdjustmentUp and MaxAdjustmentDown constants match the
+	// test's expectations.
+	if types.MaxAdjustmentUp.Cmp(big.NewRat(10001, 10000)) != 0 {
+		t.Fatal("MaxAdjustmentUp changed - test now invalid")
+	}
+	if types.MaxAdjustmentDown.Cmp(big.NewRat(9999, 10000)) != 0 {
+		t.Fatal("MaxAdjustmentDown changed - test now invalid")
+	}
+
+	// Check high and low clamping.
+	initial := big.NewRat(2, 1)
+	clamped := clampTargetAdjustment(initial)
+	if clamped.Cmp(big.NewRat(10001, 10000)) != 0 {
+		t.Error("clamp not applied to large target adjustment")
+	}
+	initial = big.NewRat(1, 2)
+	clamped = clampTargetAdjustment(initial)
+	if clamped.Cmp(big.NewRat(9999, 10000)) != 0 {
+		t.Error("clamp not applied to small target adjustment")
+	}
+
+	// Check middle clamping (or lack thereof).
+	initial = big.NewRat(10002, 10001)
+	clamped = clampTargetAdjustment(initial)
+	if clamped.Cmp(initial) != 0 {
+		t.Error("clamp applied to safe target adjustment")
+	}
+	initial = big.NewRat(99999, 100000)
+	clamped = clampTargetAdjustment(initial)
+	if clamped.Cmp(initial) != 0 {
+		t.Error("clamp applied to safe target adjustment")
+	}
+}
+
+// TestSetChildTarget probes the setChildTarget method of the block node type.
+func TestSetChildTarget(t *testing.T) {
+	// Create a genesis node and a child that took 2x as long as expected.
+	genesisNode := &blockNode{
+		block: types.Block{Timestamp: 10000},
+	}
+	genesisNode.childTarget[0] = 64
+	doubleTimeNode := &blockNode{
+		block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*2)},
+	}
+	doubleTimeNode.parent = genesisNode
+
+	// Check the resulting childTarget of the new node and see that the clamp
+	// was applied.
+	doubleTimeNode.setChildTarget()
+	if doubleTimeNode.childTarget.Cmp(genesisNode.childTarget) <= 0 {
+		t.Error("double time node target did not increase")
+	}
+	fullAdjustment := genesisNode.childTarget.MulDifficulty(big.NewRat(1, 2))
+	if doubleTimeNode.childTarget.Cmp(fullAdjustment) >= 0 {
+		t.Error("clamp was not applied when adjusting target")
 	}
 }
