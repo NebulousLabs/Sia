@@ -71,3 +71,48 @@ func TestEarliestChildTimestamp(t *testing.T) {
 		t.Error("incorrect child timestamp")
 	}
 }
+
+// TestHeavierThan probes the heavierThan method of the blockNode.
+func TestHeavierThan(t *testing.T) {
+	// Create a light node.
+	bnLight := new(blockNode)
+	bnLight.depth[0] = 64
+	bnLight.childTarget[0] = 200
+
+	// Create a node that's heavier, but not enough to beat the surpass
+	// threshold.
+	bnMiddle := new(blockNode)
+	bnMiddle.depth[0] = 60
+	bnMiddle.childTarget[0] = 200
+
+	// Create a node that's heavy enough to break the surpass threshold.
+	bnHeavy := new(blockNode)
+	bnHeavy.depth[0] = 16
+	bnHeavy.childTarget[0] = 200
+
+	// bnLight should not be heavier than bnHeavy.
+	if bnLight.heavierThan(bnHeavy) {
+		t.Error("light heavier than heavy")
+	}
+	// bnLight should not be heavier than middle.
+	if bnLight.heavierThan(bnMiddle) {
+		t.Error("light heavier than middle")
+	}
+	// bnLight should not be heavier than itself.
+	if bnLight.heavierThan(bnLight) {
+		t.Error("light heavier than itself")
+	}
+
+	// bnMiddle should not be heavier than bnLight.
+	if bnMiddle.heavierThan(bnLight) {
+		t.Error("middle heaver than light - surpass threshold should not have been broken")
+	}
+	// bnHeavy should be heaver than bnLight.
+	if !bnHeavy.heavierThan(bnLight) {
+		t.Error("heavy is not heavier than light")
+	}
+	// bnHeavy should be heavier than bnMiddle.
+	if !bnHeavy.heavierThan(bnMiddle) {
+		t.Error("heavy is not heavier than middle")
+	}
+}
