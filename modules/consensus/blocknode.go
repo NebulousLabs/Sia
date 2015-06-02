@@ -83,9 +83,9 @@ func (bn *blockNode) childDepth() types.Target {
 	return bn.depth.Add(bn.childTarget)
 }
 
-// childTarget computes the target of a blockNode's child. All children of a
-// node have the same target.
-func (bn *blockNode) setChildTarget() {
+// setTarget computes the target of a blockNode's child. All children of a node
+// have the same target.
+func (bn *blockNode) setTarget() {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
@@ -137,7 +137,7 @@ func (bn *blockNode) newChild(b types.Block) *blockNode {
 		height: bn.height + 1,
 		depth:  bn.childDepth(),
 	}
-	child.setChildTarget()
+	child.setTarget()
 
 	// Add the child to the parent.
 	bn.children = append(bn.children, child)

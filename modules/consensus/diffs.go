@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -249,22 +247,4 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	bn.siafundPoolDiff.Adjusted = s.siafundPool
 
 	return nil
-}
-
-// BlockDiffs returns the diffs created by the input block.
-func (s *State) BlockDiffs(bid types.BlockID) (scods []modules.SiacoinOutputDiff, fcds []modules.FileContractDiff, sfods []modules.SiafundOutputDiff, sfpd modules.SiafundPoolDiff, err error) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-
-	bn, exists := s.blockMap[bid]
-	if !exists {
-		err = errors.New("could not find block")
-		return
-	}
-
-	scods = bn.siacoinOutputDiffs
-	fcds = bn.fileContractDiffs
-	sfods = bn.siafundOutputDiffs
-	sfpd = bn.siafundPoolDiff
-	return
 }
