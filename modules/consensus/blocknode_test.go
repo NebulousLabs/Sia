@@ -120,6 +120,7 @@ func TestHeavierThan(t *testing.T) {
 
 // TestChildDepth probes the childDeath method of the blockNode type.
 func TestChildDept(t *testing.T) {
+	// Try adding to equal weight nodes, result should be half.
 	bn := new(blockNode)
 	bn.depth[0] = 64
 	bn.childTarget[0] = 64
@@ -128,6 +129,7 @@ func TestChildDept(t *testing.T) {
 		t.Error("unexpected child depth")
 	}
 
+	// Try adding nodes of different weights.
 	bn.depth[0] = 24
 	bn.childTarget[0] = 48
 	childDepth = bn.childDepth()
@@ -273,5 +275,31 @@ func TestSetChildTarget(t *testing.T) {
 	fullAdjustment := genesisNode.childTarget.MulDifficulty(big.NewRat(1, 2))
 	if doubleTimeNode.childTarget.Cmp(fullAdjustment) >= 0 {
 		t.Error("clamp was not applied when adjusting target")
+	}
+}
+
+// TestNewChild probes the newChild method of the block node type.
+func TestNewChild(t *testing.T) {
+	parent := &blockNode{
+		height: 12,
+	}
+	parent.depth[0] = 45
+	parent.block.Timestamp = 100
+	parent.childTarget[0] = 90
+
+	child := parent.newChild(types.Block{Timestamp: types.Timestamp(100 + types.BlockFrequency)})
+	if child.parent != parent {
+		t.Error("parent-child relationship incorrect")
+	}
+	if child.height != 13 {
+		t.Error("child height set incorrectly")
+	}
+	var expectedDepth types.Target
+	expectedDepth[0] = 30
+	if child.depth.Cmp(expectedDepth) != 0 {
+		t.Error("child depth did not adjust correctly")
+	}
+	if child.childTarget.Cmp(parent.childTarget) != 0 {
+		t.Error("child childTarget not adjusted correctly")
 	}
 }
