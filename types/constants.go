@@ -81,8 +81,8 @@ func init() {
 	} else if build.Release == "testing" {
 		// 'testing' settings are for automatic testing, and create much faster
 		// environments than a humand can interact with.
-		BlockFrequency = 1  // As fast as possible
-		TargetWindow = 10e3 // Large to prevent the difficulty from increasing during testing.
+		BlockFrequency = 1 // As fast as possible
+		TargetWindow = 200
 		MaturityDelay = 3
 		FutureThreshold = 3        // 3 seconds
 		ExtremeFutureThreshold = 6 // 6 seconds

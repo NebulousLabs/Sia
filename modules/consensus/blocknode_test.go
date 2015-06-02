@@ -134,3 +134,83 @@ func TestChildDept(t *testing.T) {
 		t.Error("unexpected child depth")
 	}
 }
+
+// TestTargetAdjustmentBase probes the targetAdjustmentBase method of the block
+// node type.
+func TestTargetAdjustmentBase(t *testing.T) {
+	// Create a genesis node at timestamp 10,000
+	genesisNode := &blockNode{
+		block: types.Block{Timestamp: 10000},
+	}
+	exactTimeNode := &blockNode{
+		block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency)},
+	}
+	exactTimeNode.parent = genesisNode
+
+	// Base adjustment for the exactTimeNode should be 1.
+	adjustment, exact := exactTimeNode.targetAdjustmentBase().Float64()
+	if !exact {
+		t.Fatal("did not get an exact target adjustment")
+	}
+	if adjustment != 1 {
+		t.Error("block did not adjust itself to the same target")
+	}
+
+	// Create a double-speed node and get the base adjustment.
+	doubleSpeedNode := &blockNode{
+		block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency)},
+	}
+	doubleSpeedNode.parent = exactTimeNode
+	adjustment, exact = doubleSpeedNode.targetAdjustmentBase().Float64()
+	if !exact {
+		t.Fatal("did not get an exact adjustment")
+	}
+	if adjustment != 0.5 {
+		t.Error("double speed node did not get a base to halve the target")
+	}
+
+	// Create a half-speed node and get the base adjustment.
+	halfSpeedNode := &blockNode{
+		block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*6)},
+	}
+	halfSpeedNode.parent = doubleSpeedNode
+	adjustment, exact = halfSpeedNode.targetAdjustmentBase().Float64()
+	if !exact {
+		t.Fatal("did not get an exact adjustment")
+	}
+	if adjustment != 2 {
+		t.Error("double speed node did not get a base to halve the target")
+	}
+
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Create a chain of nodes so that the genesis node is no longer the point
+	// of comparison.
+	comparisonNode := &blockNode{
+		block: types.Block{Timestamp: 125000},
+	}
+	comparisonNode.parent = halfSpeedNode
+	startingNode := comparisonNode
+	for i := types.BlockHeight(0); i < types.TargetWindow; i++ {
+		newNode := new(blockNode)
+		newNode.parent = startingNode
+		startingNode = newNode
+	}
+	startingNode.block.Timestamp = types.Timestamp(125000 + types.BlockFrequency*types.TargetWindow)
+	adjustment, exact = startingNode.targetAdjustmentBase().Float64()
+	if !exact {
+		t.Error("failed to get exact result")
+	}
+	if adjustment != 1 {
+		t.Error("got wrong long-range adjustment")
+	}
+	startingNode.block.Timestamp = types.Timestamp(125000 + 2*types.BlockFrequency*types.TargetWindow)
+	adjustment, exact = startingNode.targetAdjustmentBase().Float64()
+	if !exact {
+		t.Error("failed to get exact result")
+	}
+	if adjustment != 2 {
+		t.Error("got wrong long-range adjustment")
+	}
+}
