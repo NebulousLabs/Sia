@@ -7,6 +7,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/blockexplorer"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
@@ -58,6 +59,10 @@ func startDaemon() error {
 		return err
 	}
 	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet)
+	if err != nil {
+		return err
+	}
+	_, err = blockexplorer.New(state)
 	if err != nil {
 		return err
 	}
