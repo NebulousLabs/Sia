@@ -375,7 +375,7 @@ may be used for soft forks, paired with 'anyone can spend' transactions. In the
 meantime, it is an easy way for third party applications to make use of the
 siacoin blockchain.
 
-Signatures
+Transaction Signatures
 ----------
 
 Each signature points to a single public key index in a single unlock
