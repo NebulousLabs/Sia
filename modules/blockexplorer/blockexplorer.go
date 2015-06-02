@@ -2,7 +2,6 @@ package blockexplorer
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -25,7 +24,6 @@ type ExplorerBlockchain struct {
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
 func New(cs modules.ConsensusSet) (bc *ExplorerBlockchain, err error) {
-	fmt.Println("Created an instance of the module")
 
 	// Check that input modules are non-nil
 	if cs == nil {
@@ -33,12 +31,9 @@ func New(cs modules.ConsensusSet) (bc *ExplorerBlockchain, err error) {
 		return
 	}
 
+	// Need to figure out how to query the entire blockchain.
 	bc = &ExplorerBlockchain{
-		// TODO
-		// Currently 1000 is completely arbitrary.  To change,
-		// get the current number of blocks from consensus
-		// somehow and initilize as that size
-		Blocks: make([]types.Block, 1000),
+		Blocks: make([]types.Block, 0),
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
