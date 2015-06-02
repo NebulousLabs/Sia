@@ -14,11 +14,11 @@ func TestTargetAdd(t *testing.T) {
 	target5[crypto.HashSize-1] = 5
 	target10[crypto.HashSize-1] = 10
 
-	expect5 := target10.Add(target10)
+	expect5 := target10.AddDifficulties(target10)
 	if expect5 != target5 {
 		t.Error("Target.Add not working as expected")
 	}
-	expect3 := target10.Add(target5)
+	expect3 := target10.AddDifficulties(target5)
 	if expect3 != target3 {
 		t.Error("Target.Add not working as expected")
 	}
@@ -87,21 +87,21 @@ func TestTargetMul(t *testing.T) {
 
 	// Multiplying the difficulty of a target at '10' by 5 will yeild a target
 	// of '2'. Similar math follows for the remaining checks.
-	expect2 := target10.Mul(big.NewRat(5, 1))
+	expect2 := target10.MulDifficulty(big.NewRat(5, 1))
 	if expect2 != target2 {
 		t.Error(expect2)
 		t.Error(target2)
 		t.Error("Target.Mul did not work as expected")
 	}
-	expect6 := target10.Mul(big.NewRat(3, 2))
+	expect6 := target10.MulDifficulty(big.NewRat(3, 2))
 	if expect6 != target6 {
 		t.Error("Target.Mul did not work as expected")
 	}
-	expect14 := target10.Mul(big.NewRat(7, 10))
+	expect14 := target10.MulDifficulty(big.NewRat(7, 10))
 	if expect14 != target14 {
 		t.Error("Target.Mul did not work as expected")
 	}
-	expect20 := target10.Mul(big.NewRat(1, 2))
+	expect20 := target10.MulDifficulty(big.NewRat(1, 2))
 	if expect20 != target20 {
 		t.Error("Target.Mul did not work as expected")
 	}

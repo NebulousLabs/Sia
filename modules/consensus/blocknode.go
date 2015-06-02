@@ -72,7 +72,7 @@ func (bn *blockNode) earliestChildTimestamp() types.Timestamp {
 // that the weight of 'bn' exceeds the weight of 'cmp' by:
 //		(the target of 'cmp' * 'Surpass Threshold')
 func (bn *blockNode) heavierThan(cmp *blockNode) bool {
-	requirement := cmp.depth.Add(cmp.childTarget.Mul(SurpassThreshold))
+	requirement := cmp.depth.AddDifficulties(cmp.childTarget.MulDifficulty(SurpassThreshold))
 	return requirement.Cmp(bn.depth) > 0 // Inversed, because the smaller target is actually heavier.
 }
 
@@ -80,7 +80,7 @@ func (bn *blockNode) heavierThan(cmp *blockNode) bool {
 // "sum" of the current depth and current difficulty. See target.Add for more
 // detailed information.
 func (bn *blockNode) childDepth() types.Target {
-	return bn.depth.Add(bn.childTarget)
+	return bn.depth.AddDifficulties(bn.childTarget)
 }
 
 // targetAdjustmentBase returns the magnitude that the target should be
@@ -125,7 +125,7 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // setTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (bn *blockNode) setTarget() {
+func (bn *blockNode) setChildTarget() {
 	adjustment := clampTargetAdjustment(bn.targetAdjustmentBase())
 	adjustedRatTarget := new(big.Rat).Mul(bn.parent.childTarget.Rat(), adjustment)
 	bn.childTarget = types.RatToTarget(adjustedRatTarget)
@@ -142,7 +142,7 @@ func (bn *blockNode) newChild(b types.Block) *blockNode {
 		height: bn.height + 1,
 		depth:  bn.childDepth(),
 	}
-	child.setTarget()
+	child.setChildTarget()
 
 	// Add the child to the parent.
 	bn.children = append(bn.children, child)
