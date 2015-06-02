@@ -83,9 +83,9 @@ func (bn *blockNode) childDepth() types.Target {
 	return bn.depth.Add(bn.childTarget)
 }
 
-// setTarget computes the target of a blockNode's child. All children of a node
-// have the same target.
-func (bn *blockNode) setTarget() {
+// targetAdjustmentBase returns the magnitude that the target should be
+// adjusted by before a clamp is applied.
+func (bn *blockNode) targetAdjustmentBase() *big.Rat {
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
@@ -106,23 +106,28 @@ func (bn *blockNode) setTarget() {
 	// target.
 	timePassed := bn.block.Timestamp - windowStart.block.Timestamp
 	expectedTimePassed := types.BlockFrequency * windowSize
-	targetAdjustment := big.NewRat(int64(timePassed), int64(expectedTimePassed))
+	return big.NewRat(int64(timePassed), int64(expectedTimePassed))
+}
 
-	// The target is clamped to adjust a maximum of ~7x per week. This provides
-	// against attacks such as the difficulty raising attack. It ensures that
-	// raising the difficulty requires a minimum amount of work, regardless of
-	// what the timestamp is set to.
-	if targetAdjustment.Cmp(types.MaxAdjustmentUp) > 0 {
-		targetAdjustment = types.MaxAdjustmentUp
-	} else if targetAdjustment.Cmp(types.MaxAdjustmentDown) < 0 {
-		targetAdjustment = types.MaxAdjustmentDown
+// clampTargetAdjustment returns a clamped version of the base adjustment
+// value. The clamp keeps the maximum adjustment to ~7x every 2000 blocks. This
+// ensures that raising and lowering the difficulty requires a minimum amount
+// of total work, which prevents certain classes of difficulty adjusting
+// attacks.
+func clampTargetAdjustment(base *big.Rat) *big.Rat {
+	if base.Cmp(types.MaxAdjustmentUp) > 0 {
+		return types.MaxAdjustmentUp
+	} else if base.Cmp(types.MaxAdjustmentDown) < 0 {
+		return types.MaxAdjustmentDown
 	}
+	return base
+}
 
-	// Multiply the parent's target by the adjustment factor. The big.Rat keeps
-	// infinite precision during the calculation. Once the calculation is
-	// complete, the big.Rat is converted back into a target, which is just an
-	// int.
-	adjustedRatTarget := new(big.Rat).Mul(bn.parent.childTarget.Rat(), targetAdjustment)
+// setTarget computes the target of a blockNode's child. All children of a node
+// have the same target.
+func (bn *blockNode) setTarget() {
+	adjustment := clampTargetAdjustment(bn.targetAdjustmentBase())
+	adjustedRatTarget := new(big.Rat).Mul(bn.parent.childTarget.Rat(), adjustment)
 	bn.childTarget = types.RatToTarget(adjustedRatTarget)
 }
 
