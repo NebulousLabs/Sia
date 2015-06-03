@@ -12,6 +12,7 @@ var (
 	ErrBadHeader  = errors.New("wrong header")
 )
 
+// Metadata contains the header and version of the data being stored.
 type Metadata struct {
 	Header, Version string
 }
@@ -60,6 +61,7 @@ func Load(meta Metadata, data interface{}, r io.Reader) error {
 	return nil
 }
 
+// SaveFile saves data to a file.
 func SaveFile(meta Metadata, data interface{}, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -69,6 +71,7 @@ func SaveFile(meta Metadata, data interface{}, filename string) error {
 	return Save(meta, data, file)
 }
 
+// LoadFile loads data from a file.
 func LoadFile(meta Metadata, data interface{}, filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
