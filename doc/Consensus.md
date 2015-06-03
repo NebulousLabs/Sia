@@ -38,7 +38,7 @@ threshold signatures.
 
 #### Hashing: blake2b
 
-  blake2b has been chosen as a hashing algorithm because it is fast, it has had
+  [blake2b](http://en.wikipedia.org/wiki/BLAKE_%28hash_function%29#BLAKE2 "Wiki page") has been chosen as a hashing algorithm because it is fast, it has had
   substantial review, and it has invulnerability to length extension attacks.
   Another particularly important feature of BLAKE2b is that it is not SHA-2. We
   wish to avoid merge mining with Bitcoin, because that may result in many
@@ -375,7 +375,7 @@ may be used for soft forks, paired with 'anyone can spend' transactions. In the
 meantime, it is an easy way for third party applications to make use of the
 siacoin blockchain.
 
-Signatures
+Transaction Signatures
 ----------
 
 Each signature points to a single public key index in a single unlock
