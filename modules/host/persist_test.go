@@ -1,21 +1,19 @@
 package host
 
 import (
-// "testing"
+	"testing"
 )
 
-/*
 // TestSaveLoad tests that saving and loading a Host restores its data.
 func TestSaveLoad(t *testing.T) {
 	ht := CreateHostTester("TestSaveLoad", t)
-	ht.testObligation()
-	err := ht.save()
+	ht.testAllocation()
+	err := ht.host.save()
 	if err != nil {
-		ht.Fatal(err)
+		ht.t.Fatal(err)
 	}
-	err = ht.load()
+	err = ht.host.load()
 	if err != nil {
-		ht.Fatal(err)
+		ht.t.Fatal(err)
 	}
 }
-*/
