@@ -28,7 +28,7 @@ var (
 // added together. Note that the difficulty is the inverse of the target. The
 // sum is defined by:
 //		sum(x, y) = 1/(1/x + 1/y)
-func (x Target) Add(y Target) (t Target) {
+func (x Target) AddDifficulties(y Target) (t Target) {
 	sumDifficulty := new(big.Rat).Add(x.Inverse(), y.Inverse())
 	return RatToTarget(new(big.Rat).Inv(sumDifficulty))
 }
@@ -73,7 +73,7 @@ func (t Target) Inverse() *big.Rat {
 
 // Mul multiplies the difficulty of a target by y. The product is defined by:
 //		y / x
-func (x Target) Mul(y *big.Rat) (t Target) {
+func (x Target) MulDifficulty(y *big.Rat) (t Target) {
 	product := new(big.Rat).Mul(y, x.Inverse())
 	product = product.Inv(product)
 	return RatToTarget(product)

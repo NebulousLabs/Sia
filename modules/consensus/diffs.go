@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"errors"
-
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -118,10 +116,22 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 
 	// Create the filling delayed siacoin output map.
 	if dir == modules.DiffApply {
+		if build.DEBUG {
+			_, exists := s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+			if exists {
+				panic("trying to create a map that already exists")
+			}
+		}
 		s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	} else {
 		// Skip creating maps for height's that can't have delayed outputs.
 		if bn.height > types.MaturityDelay {
+			if build.DEBUG {
+				_, exists := s.delayedSiacoinOutputs[bn.height]
+				if exists {
+					panic("trying to create a map that already exists")
+				}
+			}
 			s.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 		}
 	}
@@ -229,8 +239,9 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	for _, txn := range bn.block.Transactions {
 		err := s.validTransaction(txn)
 		if err != nil {
-			s.dosBlocks[bn.block.ID()] = struct{}{}
+			s.applyMaturedSiacoinOutputs(bn)
 			s.commitDiffSet(bn, modules.DiffRevert)
+			s.dosBlocks[bn.block.ID()] = struct{}{}
 			s.deleteNode(bn)
 			return err
 		}
@@ -249,22 +260,4 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	bn.siafundPoolDiff.Adjusted = s.siafundPool
 
 	return nil
-}
-
-// BlockDiffs returns the diffs created by the input block.
-func (s *State) BlockDiffs(bid types.BlockID) (scods []modules.SiacoinOutputDiff, fcds []modules.FileContractDiff, sfods []modules.SiafundOutputDiff, sfpd modules.SiafundPoolDiff, err error) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-
-	bn, exists := s.blockMap[bid]
-	if !exists {
-		err = errors.New("could not find block")
-		return
-	}
-
-	scods = bn.siacoinOutputDiffs
-	fcds = bn.fileContractDiffs
-	sfods = bn.siafundOutputDiffs
-	sfpd = bn.siafundPoolDiff
-	return
 }

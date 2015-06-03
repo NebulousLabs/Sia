@@ -109,7 +109,10 @@ func (tpt *tpoolTester) testBlockConflicts() {
 	tset := tpt.tpool.TransactionSet()
 	tset = tset[:len(tset)-2]     // strip 'parent' and 'dependent'
 	tset = append(tset, conflict) // add 'conflict'
-	target := tpt.cs.CurrentTarget()
+	target, exists := tpt.cs.ChildTarget(tpt.cs.CurrentBlock().ID())
+	if !exists {
+		tpt.t.Fatal("unable to recover child target")
+	}
 	block := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
 		Timestamp: types.Timestamp(time.Now().Unix()),
@@ -169,7 +172,10 @@ func (tpt *tpoolTester) testDependentUpdates() {
 	// Mine a block to put the parent into the confirmed set.
 	tset := tpt.tpool.TransactionSet()
 	tset = tset[:len(tset)-1] // strip 'dependent'
-	target := tpt.cs.CurrentTarget()
+	target, exists := tpt.cs.ChildTarget(tpt.cs.CurrentBlock().ID())
+	if !exists {
+		tpt.t.Fatal("unable to recover child target")
+	}
 	block := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
 		Timestamp: types.Timestamp(time.Now().Unix()),
@@ -208,7 +214,10 @@ func (tpt *tpoolTester) testRewinding() {
 	}
 
 	// Prepare an empty block to cause a rewind (by forking).
-	target := tpt.cs.CurrentTarget()
+	target, exists := tpt.cs.ChildTarget(tpt.cs.CurrentBlock().ID())
+	if !exists {
+		tpt.t.Fatal("unable to recover child target")
+	}
 	forkStart := types.Block{
 		ParentID:  tpt.cs.CurrentBlock().ID(),
 		Timestamp: types.Timestamp(time.Now().Unix()),
@@ -244,7 +253,10 @@ func (tpt *tpoolTester) testRewinding() {
 	if err != nil && err != modules.ErrNonExtendingBlock {
 		tpt.t.Fatal(err)
 	}
-	target = tpt.cs.CurrentTarget()
+	target, exists = tpt.cs.ChildTarget(tpt.cs.CurrentBlock().ID())
+	if !exists {
+		tpt.t.Fatal("unable to recover child target")
+	}
 	forkCommit := types.Block{
 		ParentID:  forkStart.ID(),
 		Timestamp: types.Timestamp(time.Now().Unix()),
