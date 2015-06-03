@@ -431,7 +431,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 // set.
 func TestApplyStorageProofs(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestApplyStorageProofs")
 	if err != nil {
@@ -622,7 +622,6 @@ func TestDuplicateStorageProof(t *testing.T) {
 	cst.cs.applyStorageProofs(bn, txn1)
 }
 
-/*
 // TestApplySiafundInputs probes the applySiafundInputs method of the consensus
 // set.
 func TestApplySiafundInputs(t *testing.T) {
@@ -634,64 +633,62 @@ func TestApplySiafundInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = cst.miner.FindBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cst.csUpdateWait()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
+	bn.height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
-	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	var ids []types.SiafundOutputID
+	for id, _ := range cst.cs.siafundOutputs {
 		ids = append(ids, id)
 	}
 
-	// Apply a transaction with a single siacoin input.
+	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
-	_, exists := cst.cs.siacoinOutputs[ids[0]]
+	cst.cs.applySiafundInputs(bn, txn)
+	_, exists := cst.cs.siafundOutputs[ids[0]]
 	if exists {
-		t.Error("Failed to conusme a siacoin output")
+		t.Error("Failed to conusme a siafund output")
 	}
-	if len(cst.cs.siacoinOutputs) != 2 {
-		t.Error("siacoin outputs not correctly updated")
+	if len(cst.cs.siafundOutputs) != 46 {
+		t.Error("siafund outputs not correctly updated")
 	}
-	if len(bn.siacoinOutputDiffs) != 1 {
+	if len(bn.siafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
 	}
-	if bn.siacoinOutputDiffs[0].Direction != modules.DiffRevert {
-		t.Error("wrong diff direction applied when consuming a siacoin output")
+	if bn.siafundOutputDiffs[0].Direction != modules.DiffRevert {
+		t.Error("wrong diff direction applied when consuming a siafund output")
 	}
-	if bn.siacoinOutputDiffs[0].ID != ids[0] {
-		t.Error("wrong id used when consuming a siacoin output")
+	if bn.siafundOutputDiffs[0].ID != ids[0] {
+		t.Error("wrong id used when consuming a siafund output")
+	}
+	if len(cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay]) != 2 { // 1 for a block subsidy, 1 for the siafund claim.
+		t.Error("siafund claim was not created")
 	}
 
-	// Apply a transaction with two siacoin inputs.
+	// Apply a transaction with two siafund inputs.
 	txn = types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[1]},
 			{ParentID: ids[2]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
-	if len(cst.cs.siacoinOutputs) != 0 {
+	cst.cs.applySiafundInputs(bn, txn)
+	if len(cst.cs.siafundOutputs) != 44 {
 		t.Error("failed to consume all siacoin outputs in the consensus set")
 	}
-	if len(bn.siacoinOutputDiffs) != 3 {
+	if len(bn.siafundOutputDiffs) != 3 {
 		t.Error("block node was not updated for single transaction")
 	}
 }
 
-// TestMisuseApplySiacoinInputs misuses applySiacoinInput and checks that a
+// TestMisuseApplySiafundInputs misuses applySiafundInputs and checks that a
 // panic was triggered.
-func TestMisuseApplySiacoinInputs(t *testing.T) {
+func TestMisuseApplySiafundInputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -702,32 +699,33 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
+	bn.height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
-	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	var ids []types.SiafundOutputID
+	for id, _ := range cst.cs.siafundOutputs {
 		ids = append(ids, id)
 	}
 
-	// Apply a transaction with a single siacoin input.
+	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
+	cst.cs.applySiafundInputs(bn, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplySiacoinInput {
+		if r != ErrMisuseApplySiafundInput {
 			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error(r)
 		}
 	}()
-	cst.cs.applySiacoinInputs(bn, txn)
+	cst.cs.applySiafundInputs(bn, txn)
 }
-*/
 
 // TestApplySiafundOutputs probes the applySiafundOutputs method of the
 // consensus set.

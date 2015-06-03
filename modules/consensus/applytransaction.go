@@ -14,6 +14,7 @@ var (
 	ErrMisuseApplySiacoinOutput         = errors.New("applying a transaction with an invalid siacoin output")
 	ErrMisuseApplyFileContracts         = errors.New("applying a transaction with an invalid file contract")
 	ErrMisuseApplyFileContractRevisions = errors.New("applying a revision for a nonexistant file contract")
+	ErrMisuseApplySiafundInput          = errors.New("applying a transaction with invalid siafund input")
 	ErrMisuseApplySiafundOutput         = errors.New("applying a transaction with an invalid siafund output")
 	ErrNonexistentStorageProof          = errors.New("applying a storage proof for a nonexistent file contract")
 )
@@ -191,9 +192,8 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 		if build.DEBUG {
 			_, exists := cs.siafundOutputs[sfi.ParentID]
 			if !exists {
-				panic("applying a transaction with an invalid unspent siafund output")
+				panic(ErrMisuseApplySiafundInput)
 			}
-			continue
 		}
 
 		// Calculate the volume of siacoins to put in the claim output.
