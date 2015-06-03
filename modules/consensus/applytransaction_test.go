@@ -754,7 +754,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 2 { // TODO: This value needs to be updated when siafunds are added.
+	if len(cst.cs.siafundOutputs) != 48 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
@@ -788,7 +788,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 4 { // TODO: This value needs to be added when genesis siafunds are added.
+	if len(cst.cs.siafundOutputs) != 50 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 3 {

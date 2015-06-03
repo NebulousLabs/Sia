@@ -127,6 +127,9 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	// Create the genesis block and add it as the BlockRoot.
 	genesisBlock := types.Block{
 		Timestamp: types.GenesisTimestamp,
+		Transactions: []types.Transaction{
+			{SiafundOutputs: types.GenesisSiafundAllocation},
+		},
 	}
 	cs.blockRoot = &blockNode{
 		block:       genesisBlock,
@@ -146,11 +149,8 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 
 	// Allocate the Siafund addresses by putting them all in a big transaction
 	// and applying the diffs.
-	starterTxn := types.Transaction{
-		SiafundOutputs: types.GenesisSiafundAllocation,
-	}
-	for i, siafundOutput := range starterTxn.SiafundOutputs {
-		sfid := starterTxn.SiafundOutputID(i)
+	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
+		sfid := genesisBlock.Transactions[0].SiafundOutputID(i)
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            sfid,
@@ -205,6 +205,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	// 9.	open file contracts, sorted by id.
 	// 10.	unspent siafund outputs, sorted by id.
 	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
+	// TODO: Add the diff set ?
 
 	// Create a slice of hashes representing all items of interest.
 	tree := crypto.NewTree()
