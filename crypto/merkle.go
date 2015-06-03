@@ -46,9 +46,8 @@ func MerkleRoot(leaves [][]byte) (h Hash) {
 	return
 }
 
-// Calculates the number of segments in the file when building a Merkle tree.
-// Should probably be renamed to CountLeaves() or something.
-func CalculateSegments(fileSize uint64) (numSegments uint64) {
+// Calculates the number of leaves in the file when building a Merkle tree.
+func CalculateLeaves(fileSize uint64) (numSegments uint64) {
 	numSegments = fileSize / SegmentSize
 	if fileSize%SegmentSize != 0 {
 		numSegments++

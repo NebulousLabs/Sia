@@ -10,26 +10,29 @@ import (
 )
 
 var (
-	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
-	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingFileContract        = errors.New("transaction terminates a nonexisting file contract")
-	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
+	ErrSiacoinInputOutputMismatch         = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrMissingSiacoinOutput               = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingFileContract                = errors.New("transaction terminates a nonexisting file contract")
+	ErrMissingSiafundOutput               = errors.New("transaction spends a nonexisting siafund output")
+	ErrUnfinishedFileContract             = errors.New("file contract window has not yet openend")
+	ErrUnrecognizedFileContractID         = errors.New("cannot fetch storage proof segment for unknown file contract")
+	ErrWrongSiacoinOutputUnlockConditions = errors.New("transaction contains a siacoin output with incorrect unlock conditions")
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (s *State) validSiacoins(t types.Transaction) (err error) {
+func (cs *State) validSiacoins(t types.Transaction) (err error) {
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
-		sco, exists := s.siacoinOutputs[sci.ParentID]
+		sco, exists := cs.siacoinOutputs[sci.ParentID]
 		if !exists {
 			return ErrMissingSiacoinOutput
 		}
 
 		// Check that the unlock conditions match the required unlock hash.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return errors.New("siacoin unlock conditions do not meet required unlock hash")
+			return ErrWrongSiacoinOutputUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
@@ -42,21 +45,19 @@ func (s *State) validSiacoins(t types.Transaction) (err error) {
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func (s *State) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	// Get the file contract associated with the input id.
-	fc, exists := s.fileContracts[fcid]
+	fc, exists := cs.fileContracts[fcid]
 	if !exists {
-		err = errors.New("unrecognized file contract id")
-		return
+		return 0, ErrUnrecognizedFileContractID
 	}
 
 	// Get the ID of the trigger block.
 	triggerHeight := fc.WindowStart - 1
-	if triggerHeight > s.height() {
-		err = errors.New("no block found at contract trigger block height")
-		return
+	if triggerHeight > cs.height() {
+		return 0, ErrUnfinishedFileContract
 	}
-	triggerID := s.currentPath[triggerHeight]
+	triggerID := cs.currentPath[triggerHeight]
 
 	// Get the index by appending the file contract ID to the trigger block and
 	// taking the hash, then converting the hash to a numerical value and
@@ -66,24 +67,24 @@ func (s *State) storageProofSegment(fcid types.FileContractID) (index uint64, er
 	// size difference between the number of segments and the random number
 	// being modded, the difference is too small to make any practical
 	// difference.
-	seed := crypto.HashBytes(append(triggerID[:], fcid[:]...))
-	numSegments := int64(crypto.CalculateSegments(fc.FileSize))
+	seed := crypto.HashAll(triggerID, fcid)
+	numSegments := int64(crypto.CalculateLeaves(fc.FileSize))
 	seedInt := new(big.Int).SetBytes(seed[:])
 	index = seedInt.Mod(seedInt, big.NewInt(numSegments)).Uint64()
-	return
+	return index, nil
 }
 
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (s *State) validStorageProofs(t types.Transaction) error {
+func (cs *State) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
-		fc, exists := s.fileContracts[sp.ParentID]
+		fc, exists := cs.fileContracts[sp.ParentID]
 		if !exists {
 			return errors.New("unrecognized file contract ID in storage proof")
 		}
 
 		// Check that the storage proof itself is valid.
-		segmentIndex, err := s.storageProofSegment(sp.ParentID)
+		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ func (s *State) validStorageProofs(t types.Transaction) error {
 		verified := crypto.VerifySegment(
 			sp.Segment,
 			sp.HashSet,
-			crypto.CalculateSegments(fc.FileSize),
+			crypto.CalculateLeaves(fc.FileSize),
 			segmentIndex,
 			fc.FileMerkleRoot,
 		)
