@@ -102,7 +102,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
-	spoid := types.FileContractID{}.StorageProofOutputID(false, 0)
+	spoid := types.FileContractID{}.StorageProofOutputID(types.ProofMissed, 0)
 	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 	if !exists {
 		t.Error("missed proof output was never created")
@@ -147,7 +147,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
-	spoid := types.FileContractID{}.StorageProofOutputID(false, 0)
+	spoid := types.FileContractID{}.StorageProofOutputID(types.ProofMissed, 0)
 	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 	if !exists {
 		t.Error("missed proof output was never created")

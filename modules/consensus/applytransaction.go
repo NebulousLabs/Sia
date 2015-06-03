@@ -155,7 +155,7 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
 			// Sanity check - output should not already exist.
-			spoid := sp.ParentID.StorageProofOutputID(true, i)
+			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, i)
 			if build.DEBUG {
 				_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 				if exists {

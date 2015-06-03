@@ -111,7 +111,7 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 	// Add all of the outputs in the missed proof outputs to the consensus set.
 	for i, mpo := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
-		spid := fcid.StorageProofOutputID(false, i)
+		spid := fcid.StorageProofOutputID(types.ProofMissed, i)
 		if build.DEBUG {
 			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spid]
 			if exists {

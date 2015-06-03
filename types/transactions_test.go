@@ -18,8 +18,8 @@ func TestIDs(t *testing.T) {
 	scoid := txn.SiacoinOutputID(0)
 	fcid := txn.FileContractID(0)
 	fctpid := fcid.FileContractTerminationPayoutID(0)
-	spidT := fcid.StorageProofOutputID(true, 0)
-	spidF := fcid.StorageProofOutputID(false, 0)
+	spidT := fcid.StorageProofOutputID(ProofValid, 0)
+	spidF := fcid.StorageProofOutputID(ProofMissed, 0)
 	sfoid := txn.SiafundOutputID(0)
 	scloid := sfoid.SiaClaimOutputID()
 

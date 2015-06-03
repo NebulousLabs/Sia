@@ -488,7 +488,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if bn.fileContractDiffs[3].ID != fcid0 {
 		t.Error("wrong id used when revising a file contract")
 	}
-	spoid0 := fcid0.StorageProofOutputID(true, 0) // true indicates that the proof was valid.
+	spoid0 := fcid0.StorageProofOutputID(types.ProofValid, 0)
 	sco, exists := cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid0]
 	if !exists {
 		t.Error("storage proof output not created after applying a storage proof")
@@ -522,12 +522,12 @@ func TestApplyStorageProofs(t *testing.T) {
 	if len(bn.fileContractDiffs) != 6 {
 		t.Error("block node was not updated correctly")
 	}
-	spoid1 := fcid1.StorageProofOutputID(true, 0)
+	spoid1 := fcid1.StorageProofOutputID(types.ProofValid, 0)
 	_, exists = cst.cs.siacoinOutputs[spoid1]
 	if exists {
 		t.Error("output created when file contract had no corresponding output")
 	}
-	spoid2 := fcid2.StorageProofOutputID(true, 0)
+	spoid2 := fcid2.StorageProofOutputID(types.ProofValid, 0)
 	sco, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid2]
 	if !exists {
 		t.Error("no output created by first output of file contract")
@@ -535,7 +535,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if sco.Value.Cmp(types.NewCurrency64(280e3)) != 0 {
 		t.Error("first siacoin output created has wrong value")
 	}
-	spoid3 := fcid2.StorageProofOutputID(true, 1)
+	spoid3 := fcid2.StorageProofOutputID(types.ProofValid, 1)
 	sco, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid3]
 	if !exists {
 		t.Error("second output not created for storage proof")
