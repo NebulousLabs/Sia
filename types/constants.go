@@ -105,7 +105,7 @@ func init() {
 		// that the network is secure in a real-world byzantine environment.
 		BlockFrequency = 600                     // 1 block per 10 minutes.
 		TargetWindow = 1e3                       // Number of blocks to use when calculating the target.
-		MaturityDelay = 50                       // 8 hours - 50 blocks.
+		MaturityDelay = 144                      // Certain payouts take 1 day to mature.
 		FutureThreshold = 3 * 60 * 60            // 3 hours.
 		ExtremeFutureThreshold = 5 * 60 * 60     // 5 hours.
 		GenesisTimestamp = Timestamp(1433600000) // June 6th, 2015 @ 2:13pm UTC.

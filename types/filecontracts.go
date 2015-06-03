@@ -83,6 +83,8 @@ type (
 		Segment  [crypto.SegmentSize]byte
 		HashSet  []crypto.Hash
 	}
+
+	// TODO TODO TODO: Switch proof valid to an enum
 )
 
 // FileContractTerminationPayoutID returns the ID of a file contract

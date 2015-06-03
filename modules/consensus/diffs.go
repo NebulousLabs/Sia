@@ -239,7 +239,7 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	for _, txn := range bn.block.Transactions {
 		err := s.validTransaction(txn)
 		if err != nil {
-			s.applyMaturedSiacoinOutputs(bn)
+			s.applyMaturedSiacoinOutputs(bn) // Awkward: need to apply the matured outputs otherwise the diff structure malforms.
 			s.commitDiffSet(bn, modules.DiffRevert)
 			s.dosBlocks[bn.block.ID()] = struct{}{}
 			s.deleteNode(bn)
