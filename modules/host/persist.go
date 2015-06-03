@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 var persistMetadata = persist.Metadata{
