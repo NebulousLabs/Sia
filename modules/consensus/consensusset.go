@@ -27,6 +27,10 @@ const (
 	partialVerification verificationRigor = 1
 )
 
+var (
+	ErrNilGateway = errors.New("cannot have a nil gateway as input")
+)
+
 // verificationRigor is a type indicating the intensity of verification that
 // should be using while accepting a block. For blocks that come from trusted
 // sources, the computationally expensive steps can be skipped.
@@ -100,7 +104,7 @@ type State struct {
 // a new database will be created.
 func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	if gateway == nil {
-		return nil, errors.New("cannot have nil gateway")
+		return nil, ErrNilGateway
 	}
 
 	// Create the State object.
@@ -139,10 +143,20 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.ZeroUnlockHash,
 	}
-	cs.siafundOutputs[types.SiafundOutputID{0}] = types.SiafundOutput{
-		Value:           types.NewCurrency64(types.SiafundCount),
-		UnlockHash:      types.GenesisSiafundUnlockHash,
-		ClaimUnlockHash: types.GenesisClaimUnlockHash,
+
+	// Allocate the Siafund addresses by putting them all in a big transaction
+	// and applying the diffs.
+	starterTxn := types.Transaction{
+		SiafundOutputs: types.GenesisSiafundAllocation,
+	}
+	for i, siafundOutput := range starterTxn.SiafundOutputs {
+		sfid := starterTxn.SiafundOutputID(i)
+		sfod := modules.SiafundOutputDiff{
+			Direction:     modules.DiffApply,
+			ID:            sfid,
+			SiafundOutput: siafundOutput,
+		}
+		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 	}
 
 	// Create the consensus directory.
@@ -182,7 +196,6 @@ func (cs *State) Close() error {
 func (cs *State) consensusSetHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
-	// 2.	current block id
 	// 3.	current height
 	// 4.	current target
 	// 5.	current depth
@@ -206,40 +219,68 @@ func (cs *State) consensusSetHash() crypto.Hash {
 		tree.PushObject(cs.currentPath[types.BlockHeight(i)])
 	}
 
-	// Get the set of siacoin outputs in sorted order and add them.
-	sortedUscos := cs.sortedUscoSet()
-	for _, output := range sortedUscos {
-		tree.PushObject(output)
+	// Add all of the siacoin outputs, sorted by id.
+	var openSiacoinOutputs crypto.HashSlice
+	for siacoinOutputID, _ := range cs.siacoinOutputs {
+		openSiacoinOutputs = append(openSiacoinOutputs, crypto.Hash(siacoinOutputID))
 	}
-
-	// Sort the open contracts by ID.
-	var openContracts crypto.HashSlice
-	for contractID := range cs.fileContracts {
-		openContracts = append(openContracts, crypto.Hash(contractID))
-	}
-	sort.Sort(openContracts)
-
-	// Add the open contracts in sorted order.
-	for _, id := range openContracts {
+	sort.Sort(openSiacoinOutputs)
+	for _, id := range openSiacoinOutputs {
+		sco, exists := cs.siacoinOutputs[types.SiacoinOutputID(id)]
+		if !exists {
+			panic("trying to push nonexistent siacoin output")
+		}
 		tree.PushObject(id)
+		tree.PushObject(sco)
 	}
 
-	// Get the set of siafund outputs in sorted order and add them.
-	for _, output := range cs.sortedUsfoSet() {
-		tree.PushObject(output)
+	// Add all of the file contracts, sorted by id.
+	var openFileContracts crypto.HashSlice
+	for fileContractID, _ := range cs.fileContracts {
+		openFileContracts = append(openFileContracts, crypto.Hash(fileContractID))
+	}
+	sort.Sort(openFileContracts)
+	for _, id := range openFileContracts {
+		// Sanity Check - file contract should exist.
+		fc, exists := cs.fileContracts[types.FileContractID(id)]
+		if !exists {
+			panic("trying to push a nonexistent file contract")
+		}
+		tree.PushObject(id)
+		tree.PushObject(fc)
+	}
+
+	// Add all of the siafund outputs, sorted by id.
+	var openSiafundOutputs crypto.HashSlice
+	for siafundOutputID, _ := range cs.siafundOutputs {
+		openSiafundOutputs = append(openSiafundOutputs, crypto.Hash(siafundOutputID))
+	}
+	sort.Sort(openSiafundOutputs)
+	for _, id := range openSiafundOutputs {
+		sco, exists := cs.siafundOutputs[types.SiafundOutputID(id)]
+		if !exists {
+			panic("trying to push nonexistent siafund output")
+		}
+		tree.PushObject(id)
+		tree.PushObject(sco)
 	}
 
 	// Get the set of delayed siacoin outputs, sorted by maturity height then
 	// sorted by id and add them.
 	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
-		var delayedOutputs crypto.HashSlice
+		var delayedSiacoinOutputs crypto.HashSlice
 		for id := range cs.delayedSiacoinOutputs[i] {
-			delayedOutputs = append(delayedOutputs, crypto.Hash(id))
+			delayedSiacoinOutputs = append(delayedSiacoinOutputs, crypto.Hash(id))
 		}
-		sort.Sort(delayedOutputs)
+		sort.Sort(delayedSiacoinOutputs)
 
-		for _, output := range delayedOutputs {
-			tree.PushObject(output)
+		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {
+			delayedSiacoinOutput, exists := cs.delayedSiacoinOutputs[i][types.SiacoinOutputID(delayedSiacoinOutputID)]
+			if !exists {
+				panic("trying to push nonexistent delayed siacoin output")
+			}
+			tree.PushObject(delayedSiacoinOutput)
+			tree.PushObject(delayedSiacoinOutputID)
 		}
 	}
 

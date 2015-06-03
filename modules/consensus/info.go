@@ -1,10 +1,6 @@
 package consensus
 
 import (
-	"sort"
-
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -35,51 +31,6 @@ func (s *State) height() types.BlockHeight {
 func (s *State) output(id types.SiacoinOutputID) (sco types.SiacoinOutput, exists bool) {
 	sco, exists = s.siacoinOutputs[id]
 	return
-}
-
-// sortedUscoSet returns all of the unspent siacoin outputs sorted
-// according to the numerical value of their id.
-func (s *State) sortedUscoSet() []types.SiacoinOutput {
-	// Get all of the outputs in string form and sort the strings.
-	unspentOutputs := make(crypto.HashSlice, len(s.siacoinOutputs))
-	for outputID := range s.siacoinOutputs {
-		unspentOutputs = append(unspentOutputs, crypto.Hash(outputID))
-	}
-	sort.Sort(unspentOutputs)
-
-	// Get the outputs in order according to their sorted form.
-	sortedOutputs := make([]types.SiacoinOutput, len(unspentOutputs))
-	for i, outputID := range unspentOutputs {
-		output, _ := s.output(types.SiacoinOutputID(outputID))
-		sortedOutputs[i] = output
-	}
-	return sortedOutputs
-}
-
-// Sorted UsfoSet returns all of the unspent siafund outputs sorted according
-// to the numerical value of their id.
-func (s *State) sortedUsfoSet() []types.SiafundOutput {
-	// Get all of the outputs in string form and sort the strings.
-	outputIDs := make(crypto.HashSlice, len(s.siafundOutputs))
-	for outputID := range s.siafundOutputs {
-		outputIDs = append(outputIDs, crypto.Hash(outputID))
-	}
-	sort.Sort(outputIDs)
-
-	// Get the outputs in order according to their sorted string form.
-	sortedOutputs := make([]types.SiafundOutput, len(outputIDs))
-	for i, outputID := range outputIDs {
-		// Sanity check - the output should exist.
-		output, exists := s.siafundOutputs[types.SiafundOutputID(outputID)]
-		if build.DEBUG {
-			if !exists {
-				panic("output doesn't exist")
-			}
-		}
-
-		sortedOutputs[i] = output
-	}
-	return sortedOutputs
 }
 
 // CurrentBlock returns the highest block on the tallest fork.
