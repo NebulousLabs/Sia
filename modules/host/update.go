@@ -77,6 +77,9 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 				return
 			}
 
+			// Storage proof was successful, so increment profit tracking
+			h.profit += obligation.FileContract.Payout
+
 			// Delete the obligation.
 			fullpath := filepath.Join(h.saveDir, obligation.Path)
 			stat, err := os.Stat(fullpath)
