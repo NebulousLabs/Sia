@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"io"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -68,6 +69,9 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base [SegmentSize]byte, h
 	_, proofSet, _, err := merkletree.BuildReaderProof(r, NewHash(), SegmentSize, proofIndex)
 	if err != nil {
 		return
+	}
+	if len(proofSet) == 0 {
+		return base, nil, errors.New("reader was empty")
 	}
 	// convert proofSet to base and hashSet
 	copy(base[:], proofSet[0])

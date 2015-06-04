@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	ErrSiacoinInputOutputMismatch         = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrInvalidStorageProof                = errors.New("provided storage proof is invalid")
 	ErrMissingSiacoinOutput               = errors.New("transaction spends a nonexisting siacoin output")
 	ErrMissingFileContract                = errors.New("transaction terminates a nonexisting file contract")
 	ErrMissingSiafundOutput               = errors.New("transaction spends a nonexisting siafund output")
+	ErrSiacoinInputOutputMismatch         = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
 	ErrUnfinishedFileContract             = errors.New("file contract window has not yet openend")
 	ErrUnrecognizedFileContractID         = errors.New("cannot fetch storage proof segment for unknown file contract")
 	ErrWrongSiacoinOutputUnlockConditions = errors.New("transaction contains a siacoin output with incorrect unlock conditions")
@@ -97,7 +98,7 @@ func (cs *State) validStorageProofs(t types.Transaction) error {
 			fc.FileMerkleRoot,
 		)
 		if !verified {
-			return errors.New("provided storage proof is invalid")
+			return ErrInvalidStorageProof
 		}
 	}
 
