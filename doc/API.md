@@ -16,6 +16,9 @@ There may be functional API calls which are not documented. These are not
 guaranteed to be supported beyond the current release, and should not be used
 in production.
 
+The default port for the API is "localhost:9980". This can be changed using the
+'-a' flag when running siad.
+
 Consensus
 ---------
 
