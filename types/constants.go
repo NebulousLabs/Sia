@@ -115,9 +115,9 @@ func init() {
 		// original difficulty. This can be compared to Bitcoin's clamp, in which
 		// quadrupling the difficulty takes 2000x work of finding a single block of
 		// the original difficulty.
-		MaxAdjustmentUp = big.NewRat(1001, 1000)
-		MaxAdjustmentDown = big.NewRat(999, 1000)
-		RootTarget = Target{0, 0, 0, 64}
+		MaxAdjustmentUp = big.NewRat(25, 10)
+		MaxAdjustmentDown = big.NewRat(10, 25)
+		RootTarget = Target{0, 0, 0, 4}
 		MinimumCoinbase = 30e3
 
 		RenterZeroConfDelay = 60 * time.Second

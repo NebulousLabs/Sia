@@ -86,6 +86,11 @@ func (bn *blockNode) childDepth() types.Target {
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
 func (bn *blockNode) targetAdjustmentBase() *big.Rat {
+	// Target only adjusts twice per window.
+	if bn.height%(types.TargetWindow/2) != 0 {
+		return big.NewRat(1, 1)
+	}
+
 	// Grab the block that was generated 'TargetWindow' blocks prior to the
 	// parent. If there are not 'TargetWindow' blocks yet, stop at the genesis
 	// block.
