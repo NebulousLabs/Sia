@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/persist"
@@ -9,7 +10,7 @@ import (
 
 // load pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the State.
-func (s *State) load(saveDir string) error {
+func (cs *State) load(saveDir string) error {
 	db, err := persist.OpenDB(filepath.Join(saveDir, "chain.db"))
 	if err != nil {
 		return err
@@ -23,14 +24,32 @@ func (s *State) load(saveDir string) error {
 	}
 	if height == 0 {
 		// add genesis block
-		s.db = db
-		return db.AddBlock(s.blockMap[s.currentPath[0]].block)
+		cs.db = db
+		return db.AddBlock(cs.blockRoot.block)
+	}
+
+	// Check that the db's genesis block matches our genesis block.
+	b, err := db.Block(0)
+	if err != nil {
+		return err
+	}
+	// If this happens, print a warning and start a new db.
+	if b.ID() != cs.currentPath[0] {
+		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
+		db.Close()
+		err := os.Rename(filepath.Join(saveDir, "chain.db"), filepath.Join(saveDir, "chain.db.bck"))
+		if err != nil {
+			return err
+		}
+		// Now that chain.db no longer exists, recursing will create a new
+		// empty db and add the genesis block to it.
+		return cs.load(saveDir)
 	}
 
 	// load blocks from the db, starting after the genesis block
 	// NOTE: during load, the state uses the NilDB. This prevents AcceptBlock
 	// from adding duplicate blocks to the real database.
-	s.db = persist.NilDB
+	cs.db = persist.NilDB
 	for i := types.BlockHeight(1); i < height; i++ {
 		b, err := db.Block(i)
 		if err != nil {
@@ -39,15 +58,15 @@ func (s *State) load(saveDir string) error {
 		}
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
-		lockID := s.mu.Lock()
-		s.verificationRigor = partialVerification
-		err = s.acceptBlock(b)
-		s.mu.Unlock(lockID)
+		lockID := cs.mu.Lock()
+		cs.verificationRigor = partialVerification
+		err = cs.acceptBlock(b)
+		cs.mu.Unlock(lockID)
 		if err != nil {
 			return err
 		}
 	}
 	// start using the real db
-	s.db = db
+	cs.db = db
 	return nil
 }
