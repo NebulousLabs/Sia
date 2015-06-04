@@ -4,94 +4,54 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/NebulousLabs/Sia/persist"
 )
 
 const (
-	PersistFilename = "renter.dat"
-	PersistHeader   = "Renter Persistence"
-	PersistVersion  = "0.2"
-
-	ShareExtension = ".sia"
-	ShareHeader    = "Sia Shared File"
-	ShareVersion   = "0.1"
+	PersistFilename = "renter.json"
+	ShareExtension  = ".sia"
 )
 
 var (
-	ErrUnrecognizedHeader  = errors.New("renter persistence file has unrecognized header")
-	ErrUnrecognizedVersion = errors.New("renter persistence file has unrecognized version")
-
 	ErrNoNicknames    = errors.New("at least one nickname must be supplied")
 	ErrNonShareSuffix = errors.New("suffix of file must be " + ShareExtension)
+
+	shareMetadata = persist.Metadata{
+		Header:  "Sia Shared File",
+		Version: "0.1",
+	}
+
+	saveMetadata = persist.Metadata{
+		Header:  "Renter Persistence",
+		Version: "0.2",
+	}
 )
-
-// RenterPersistence is the struct that gets written to and read from disk as
-// the renter is saved and loaded.
-type RenterPersistence struct {
-	Header  string
-	Version string
-	Files   []file
-}
-
-// RenterSharedFile is the struct that gets written to and read from disk when
-// sharing files.
-type RenterSharedFile struct {
-	Header  string
-	Version string
-	Files   []file
-}
 
 // save stores the current renter data to disk.
 func (r *Renter) save() error {
-	rp := RenterPersistence{
-		Header:  PersistHeader,
-		Version: PersistVersion,
-		Files:   make([]file, 0, len(r.files)),
-	}
+	var files []file
 	for _, file := range r.files {
-		rp.Files = append(rp.Files, *file)
+		files = append(files, *file)
 	}
-
-	file, err := os.Create(filepath.Join(r.saveDir, PersistFilename))
-	if err != nil {
-		return err
-	}
-
-	err = json.NewEncoder(file).Encode(rp)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return persist.SaveFile(saveMetadata, files, filepath.Join(r.saveDir, PersistFilename))
 }
 
 // load fetches the saved renter data from disk.
 func (r *Renter) load() error {
-	file, err := os.Open(filepath.Join(r.saveDir, PersistFilename))
+	var files []file
+	err := persist.LoadFile(saveMetadata, &files, filepath.Join(r.saveDir, PersistFilename))
 	if err != nil {
 		return err
 	}
-
-	var rp RenterPersistence
-	err = json.NewDecoder(file).Decode(&rp)
-	if err != nil {
-		return err
-	}
-
-	if rp.Header != PersistHeader {
-		return ErrUnrecognizedHeader
-	}
-	if rp.Version != PersistVersion {
-		return ErrUnrecognizedVersion
-	}
-	for i := range rp.Files {
-		rp.Files[i].renter = r
-		r.files[rp.Files[i].Name] = &rp.Files[i]
+	for i := range files {
+		files[i].renter = r
+		r.files[files[i].Name] = &files[i]
 	}
 	return nil
 }
@@ -104,11 +64,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		return ErrNoNicknames
 	}
 
-	rsf := RenterSharedFile{
-		Header:  ShareHeader,
-		Version: ShareVersion,
-		Files:   make([]file, 0, len(nicknames)),
-	}
+	var files []file
 	for _, nickname := range nicknames {
 		file, exists := r.files[nickname]
 		if !exists {
@@ -123,12 +79,12 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if active < 3 {
 			return errors.New("Cannot share an inactive file")
 		}
-		rsf.Files = append(rsf.Files, *file)
+		files = append(files, *file)
 	}
 
 	// pipe data through json -> gzip -> w
 	zip, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	err := json.NewEncoder(zip).Encode(rsf)
+	err := persist.Save(shareMetadata, files, zip)
 	if err != nil {
 		return err
 	}
@@ -182,32 +138,27 @@ func (r *Renter) loadSharedFile(reader io.Reader) ([]string, error) {
 		return nil, err
 	}
 
-	var rsf RenterSharedFile
-	err = json.NewDecoder(zip).Decode(&rsf)
+	var files []file
+	err = persist.Load(shareMetadata, &files, zip)
 	if err != nil {
 		return nil, err
 	}
 
-	if rsf.Header != ShareHeader {
-		return nil, ErrUnrecognizedHeader
-	} else if rsf.Version != ShareVersion {
-		return nil, ErrUnrecognizedVersion
-	}
 	var fileList []string
-	for i := range rsf.Files {
+	for i := range files {
 		dupCount := 0
-		origName := rsf.Files[i].Name
+		origName := files[i].Name
 		for {
-			_, exists := r.files[rsf.Files[i].Name]
+			_, exists := r.files[files[i].Name]
 			if !exists {
 				break
 			}
 			dupCount++
-			rsf.Files[i].Name = origName + "_" + strconv.Itoa(dupCount)
+			files[i].Name = origName + "_" + strconv.Itoa(dupCount)
 		}
-		rsf.Files[i].renter = r
-		r.files[rsf.Files[i].Name] = &rsf.Files[i]
-		fileList = append(fileList, rsf.Files[i].Name)
+		files[i].renter = r
+		r.files[files[i].Name] = &files[i]
+		fileList = append(fileList, files[i].Name)
 	}
 	r.save()
 

@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -98,56 +97,13 @@ func TestRenterSaveAndLoad(t *testing.T) {
 	// Check that the mutex for the files was set correctly.
 	_ = r.files["1"].Nickname() // will panic if mutex is wrong.
 
-	// Read the file into the persist structure and try various forms of
-	// corruption.
+	// Corrupt the renter file and try to reload it.
 	persistFile := filepath.Join(r.saveDir, PersistFilename)
 	persistBytes, err := ioutil.ReadFile(persistFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var rp RenterPersistence
-	err = json.Unmarshal(persistBytes, &rp)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Change the header.
-	rp.Header = "bad"
-	badBytes, err := json.Marshal(rp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(persistFile, badBytes, 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lockID = rt.renter.mu.Lock()
-	err = r.load()
-	rt.renter.mu.Unlock(lockID)
-	if err != ErrUnrecognizedHeader {
-		t.Error("Expecting ErrUnrecognizedHeader:", err)
-	}
-
-	// Change the version.
-	rp.Header = PersistHeader
-	rp.Version = "bad"
-	badBytes, err = json.Marshal(rp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = ioutil.WriteFile(persistFile, badBytes, 0660)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lockID = rt.renter.mu.Lock()
-	err = r.load()
-	rt.renter.mu.Unlock(lockID)
-	if err != ErrUnrecognizedVersion {
-		t.Error("Expecting ErrUnrecognizedVersion:", err)
-	}
-
-	// Corrupt the file
-	err = ioutil.WriteFile(persistFile, badBytes[1:], 0660)
+	err = ioutil.WriteFile(persistFile, persistBytes[1:], 0660)
 	if err != nil {
 		t.Fatal(err)
 	}

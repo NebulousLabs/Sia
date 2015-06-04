@@ -1,38 +1,30 @@
 package gateway
 
 import (
-	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 )
+
+var persistMetadata = persist.Metadata{
+	Header:  "Sia Node List",
+	Version: "0.3.3",
+}
 
 func (g *Gateway) save() error {
 	var nodes []modules.NetAddress
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	data, err := json.MarshalIndent(nodes, "", "\t")
-	if err != nil {
-		return err
-	}
-	file, err := os.Create(filepath.Join(g.saveDir, "nodes.json"))
-	if err != nil {
-		return err
-	}
-	_, err = file.Write(data)
-	return err
+	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.saveDir, "nodes.json"))
 }
 
 func (g *Gateway) load() error {
-	file, err := os.Open(filepath.Join(g.saveDir, "nodes.json"))
-	if err != nil {
-		return err
-	}
 	var nodes []modules.NetAddress
-	err = json.NewDecoder(file).Decode(&nodes)
+	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.saveDir, "nodes.json"))
 	if err != nil {
 		return err
 	}
@@ -42,9 +34,8 @@ func (g *Gateway) load() error {
 	return nil
 }
 
-// create logger
-// TODO: when is the logFile closed? Does it need to be closed?
 func makeLogger(saveDir string) (*log.Logger, error) {
+	// if the log file already exists, append to it
 	logFile, err := os.OpenFile(filepath.Join(saveDir, "gateway.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 	if err != nil {
 		return nil, err

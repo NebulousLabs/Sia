@@ -3,39 +3,42 @@ package host
 import (
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 )
 
-type savedHost struct {
-	SpaceRemaining int64
-	FileCounter    int
-	Obligations    []contractObligation
-	HostSettings   modules.HostSettings
+var persistMetadata = persist.Metadata{
+	Header:  "Sia Host",
+	Version: "0.3.3",
 }
 
-func (h *Host) save() (err error) {
+type savedHost struct {
+	FileCounter  int
+	Obligations  []contractObligation
+	HostSettings modules.HostSettings
+}
+
+func (h *Host) save() error {
 	sHost := savedHost{
-		SpaceRemaining: h.spaceRemaining,
-		FileCounter:    h.fileCounter,
-		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
-		HostSettings:   h.HostSettings,
+		FileCounter:  h.fileCounter,
+		Obligations:  make([]contractObligation, 0, len(h.obligationsByID)),
+		HostSettings: h.HostSettings,
 	}
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
 	}
 
-	return encoding.WriteFile(filepath.Join(h.saveDir, "settings.dat"), sHost)
+	return persist.SaveFile(persistMetadata, sHost, filepath.Join(h.saveDir, "settings.json"))
 }
 
 func (h *Host) load() error {
 	var sHost savedHost
-	err := encoding.ReadFile(filepath.Join(h.saveDir, "settings.dat"), &sHost)
+	err := persist.LoadFile(persistMetadata, &sHost, filepath.Join(h.saveDir, "settings.json"))
 	if err != nil {
 		return err
 	}
 
-	h.spaceRemaining = sHost.SpaceRemaining
+	h.spaceRemaining = sHost.HostSettings.TotalStorage
 	h.fileCounter = sHost.FileCounter
 	h.HostSettings = sHost.HostSettings
 	// recreate maps
@@ -43,6 +46,8 @@ func (h *Host) load() error {
 		height := obligation.FileContract.WindowStart + StorageProofReorgDepth
 		h.obligationsByHeight[height] = append(h.obligationsByHeight[height], obligation)
 		h.obligationsByID[obligation.ID] = obligation
+		// update spaceRemaining
+		h.spaceRemaining -= int64(obligation.FileContract.FileSize)
 	}
 
 	return nil
