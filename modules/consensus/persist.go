@@ -37,7 +37,10 @@ func (cs *State) load(saveDir string) error {
 	if b.ID() != cs.currentPath[0] {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		db.Close()
-		os.Rename(filepath.Join(saveDir, "chain.db"), filepath.Join(saveDir, "chain.db.bck"))
+		err := os.Rename(filepath.Join(saveDir, "chain.db"), filepath.Join(saveDir, "chain.db.bck"))
+		if err != nil {
+			return err
+		}
 		// Now that chain.db no longer exists, recursing will create a new
 		// empty db and add the genesis block to it.
 		return cs.load(saveDir)
