@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrInvalidStorageProof                = errors.New("provided storage proof is invalid")
+	ErrLowRevisionNumber                  = errors.New("transaction has a file contract with an outdated revision number")
 	ErrMissingSiacoinOutput               = errors.New("transaction spends a nonexisting siacoin output")
 	ErrMissingFileContract                = errors.New("transaction terminates a nonexisting file contract")
 	ErrMissingSiafundOutput               = errors.New("transaction spends a nonexisting siafund output")
@@ -107,10 +108,10 @@ func (cs *State) validStorageProofs(t types.Transaction) error {
 
 // validFileContractRevision checks that each file contract revision is valid
 // in the context of the current consensus set.
-func (s *State) validFileContractRevisions(t types.Transaction) (err error) {
+func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 	for _, fcr := range t.FileContractRevisions {
 		// Check that the revision revises an existing contract.
-		fc, exists := s.fileContracts[fcr.ParentID]
+		fc, exists := cs.fileContracts[fcr.ParentID]
 		if !exists {
 			return ErrMissingFileContract
 		}
@@ -118,14 +119,14 @@ func (s *State) validFileContractRevisions(t types.Transaction) (err error) {
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
-		if s.height() > fc.WindowStart {
+		if cs.height() > fc.WindowStart {
 			return errors.New("contract revision submitted too late")
 		}
 
 		// Check that the revision number of the revision is greater than the
 		// revision number of the existing file contract.
 		if fc.RevisionNumber >= fcr.NewRevisionNumber {
-			return errors.New("contract revision has an outdated revision number")
+			return ErrLowRevisionNumber
 		}
 
 		// Check that the unlock conditions match the unlock hash.

@@ -121,3 +121,84 @@ func TestValidStorageProofs(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestValidFileContractRevisions probes the validFileContractRevisions method
+// of the consensus set.
+func TestValidFileContractRevisions(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidStorageProofs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Grab an address + unlock conditions for the transaction.
+	unlockHash, unlockConditions, err := cst.wallet.CoinAddress(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file contract for which a storage proof can be created.
+	var fcid types.FileContractID
+	fcid[0] = 12
+	simFile := make([]byte, 64*1024)
+	rand.Read(simFile)
+	buffer := bytes.NewReader(simFile)
+	root, err := crypto.ReaderMerkleRoot(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := types.FileContract{
+		FileSize:       64 * 1024,
+		FileMerkleRoot: root,
+		WindowStart:    102,
+		WindowEnd:      1200,
+		UnlockHash:     unlockHash,
+		RevisionNumber: 1,
+	}
+	cst.cs.fileContracts[fcid] = fc
+
+	// Try a working file contract revision.
+	txn := types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{
+			{
+				ParentID:          fcid,
+				UnlockConditions:  unlockConditions,
+				NewRevisionNumber: 2,
+			},
+		},
+	}
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Try a transaction with an insufficient revision number.
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{
+			{
+				ParentID:          fcid,
+				UnlockConditions:  unlockConditions,
+				NewRevisionNumber: 1,
+			},
+		},
+	}
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrLowRevisionNumber {
+		t.Error(err)
+	}
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{
+			{
+				ParentID:          fcid,
+				UnlockConditions:  unlockConditions,
+				NewRevisionNumber: 0,
+			},
+		},
+	}
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrLowRevisionNumber {
+		t.Error(err)
+	}
+}
