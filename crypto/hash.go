@@ -26,6 +26,7 @@ type (
 	HashSlice []Hash
 )
 
+// NewHash returns a blake2b 256bit hasher.
 func NewHash() hash.Hash {
 	return blake2b.New256()
 }
