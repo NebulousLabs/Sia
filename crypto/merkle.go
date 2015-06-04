@@ -16,17 +16,22 @@ type tree struct {
 	*merkletree.Tree
 }
 
+// NewTree returns a tree object that can be used to get the merkle root of a
+// dataset.
+func NewTree() tree {
+	return tree{merkletree.New(NewHash())}
+}
+
+// PushObject encodes and adds the hash of the encoded object to the tree as a
+// leaf.
 func (t tree) PushObject(obj interface{}) {
 	t.Push(encoding.Marshal(obj))
 }
 
+// Root returns the Merkle root of all the objects pushed to the tree.
 func (t tree) Root() (h Hash) {
 	copy(h[:], t.Tree.Root())
 	return
-}
-
-func NewTree() tree {
-	return tree{merkletree.New(NewHash())}
 }
 
 // MerkleRoot calculates the "root hash" formed by repeatedly concatenating
@@ -46,9 +51,8 @@ func MerkleRoot(leaves [][]byte) (h Hash) {
 	return
 }
 
-// Calculates the number of segments in the file when building a Merkle tree.
-// Should probably be renamed to CountLeaves() or something.
-func CalculateSegments(fileSize uint64) (numSegments uint64) {
+// Calculates the number of leaves in the file when building a Merkle tree.
+func CalculateLeaves(fileSize uint64) (numSegments uint64) {
 	numSegments = fileSize / SegmentSize
 	if fileSize%SegmentSize != 0 {
 		numSegments++
@@ -56,6 +60,7 @@ func CalculateSegments(fileSize uint64) (numSegments uint64) {
 	return
 }
 
+// ReaderMerkleRoot returns the merkle root of a reader.
 func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {
 	root, err := merkletree.ReaderRoot(r, NewHash(), SegmentSize)
 	if err != nil {
@@ -65,6 +70,7 @@ func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {
 	return
 }
 
+// BuildReaderProof will build a storage proof when given a reader.
 func BuildReaderProof(r io.Reader, proofIndex uint64) (base [SegmentSize]byte, hashSet []Hash, err error) {
 	_, proofSet, _, err := merkletree.BuildReaderProof(r, NewHash(), SegmentSize, proofIndex)
 	if err != nil {
@@ -79,6 +85,8 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base [SegmentSize]byte, h
 	return
 }
 
+// VerifySegment will verify that a segment, given the proof, is a part of a
+// merkle root.
 func VerifySegment(base [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, root Hash) bool {
 	// convert base and hashSet to proofSet
 	proofSet := make([][]byte, len(hashSet)+1)

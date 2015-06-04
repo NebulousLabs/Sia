@@ -1,47 +1,11 @@
 package consensus
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// checkRewindApplyNode is a helper function that reverts and reapplies a block
-// node, checking for consistency with the original and resulting consensus
-// hashes.
-func (cst *consensusSetTester) checkRevertApplyNode(initialSum crypto.Hash, bn *blockNode) error {
-	resultingSum := cst.cs.consensusSetHash()
-
-	// Revert and reapply the diffs and check that consistency is maintained.
-	for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], modules.DiffRevert)
-	}
-	for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitFileContractDiff(bn.fileContractDiffs[i], modules.DiffRevert)
-	}
-	for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
-		cst.cs.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], modules.DiffRevert)
-	}
-	if initialSum != cst.cs.consensusSetHash() {
-		return errors.New("inconsistency after rewinding a diff set")
-	}
-	for _, diff := range bn.siacoinOutputDiffs {
-		cst.cs.commitSiacoinOutputDiff(diff, modules.DiffApply)
-	}
-	for _, diff := range bn.fileContractDiffs {
-		cst.cs.commitFileContractDiff(diff, modules.DiffApply)
-	}
-	for _, diff := range bn.siafundOutputDiffs {
-		cst.cs.commitSiafundOutputDiff(diff, modules.DiffApply)
-	}
-	if resultingSum != cst.cs.consensusSetHash() {
-		return errors.New("inconsistency after reapplying a diff set")
-	}
-	return nil
-}
 
 // TestApplySiacoinInputs probes the applySiacoinInputs method of the consensus
 // set.
@@ -61,9 +25,6 @@ func TestApplySiacoinInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	cst.csUpdateWait()
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -111,11 +72,6 @@ func TestApplySiacoinInputs(t *testing.T) {
 	}
 	if len(bn.siacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated for single transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
@@ -169,9 +125,6 @@ func TestApplySiacoinOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
 
@@ -222,11 +175,6 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if len(bn.siacoinOutputDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplySiacoinOutputs misuses applySiacoinOutputs and checks that a
@@ -270,9 +218,6 @@ func TestApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -324,11 +269,6 @@ func TestApplyFileContracts(t *testing.T) {
 	if len(bn.fileContractDiffs) != 3 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplyFileContracts misuses applyFileContracts and checks that a
@@ -372,9 +312,6 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -461,11 +398,6 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if len(bn.fileContractDiffs) != 8 {
 		t.Error("block node was not updated correctly")
 	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestMisuseApplyFileContractRevisions misuses applyFileContractRevisions and
@@ -499,15 +431,12 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 // set.
 func TestApplyStorageProofs(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestApplyStorageProofs")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -559,7 +488,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if bn.fileContractDiffs[3].ID != fcid0 {
 		t.Error("wrong id used when revising a file contract")
 	}
-	spoid0 := fcid0.StorageProofOutputID(true, 0) // true indicates that the proof was valid.
+	spoid0 := fcid0.StorageProofOutputID(types.ProofValid, 0)
 	sco, exists := cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid0]
 	if !exists {
 		t.Error("storage proof output not created after applying a storage proof")
@@ -593,12 +522,12 @@ func TestApplyStorageProofs(t *testing.T) {
 	if len(bn.fileContractDiffs) != 6 {
 		t.Error("block node was not updated correctly")
 	}
-	spoid1 := fcid1.StorageProofOutputID(true, 0)
+	spoid1 := fcid1.StorageProofOutputID(types.ProofValid, 0)
 	_, exists = cst.cs.siacoinOutputs[spoid1]
 	if exists {
 		t.Error("output created when file contract had no corresponding output")
 	}
-	spoid2 := fcid2.StorageProofOutputID(true, 0)
+	spoid2 := fcid2.StorageProofOutputID(types.ProofValid, 0)
 	sco, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid2]
 	if !exists {
 		t.Error("no output created by first output of file contract")
@@ -606,7 +535,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if sco.Value.Cmp(types.NewCurrency64(280e3)) != 0 {
 		t.Error("first siacoin output created has wrong value")
 	}
-	spoid3 := fcid2.StorageProofOutputID(true, 1)
+	spoid3 := fcid2.StorageProofOutputID(types.ProofValid, 1)
 	sco, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid3]
 	if !exists {
 		t.Error("second output not created for storage proof")
@@ -616,11 +545,6 @@ func TestApplyStorageProofs(t *testing.T) {
 	}
 	if cst.cs.siafundPool.Cmp(types.NewCurrency64(30e3)) != 0 {
 		t.Error("siafund pool not being added up correctly")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
@@ -698,7 +622,6 @@ func TestDuplicateStorageProof(t *testing.T) {
 	cst.cs.applyStorageProofs(bn, txn1)
 }
 
-/*
 // TestApplySiafundInputs probes the applySiafundInputs method of the consensus
 // set.
 func TestApplySiafundInputs(t *testing.T) {
@@ -710,72 +633,62 @@ func TestApplySiafundInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = cst.miner.FindBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cst.csUpdateWait()
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
-
 	// Create a block node to use with application.
 	bn := new(blockNode)
+	bn.height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
-	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	var ids []types.SiafundOutputID
+	for id, _ := range cst.cs.siafundOutputs {
 		ids = append(ids, id)
 	}
 
-	// Apply a transaction with a single siacoin input.
+	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
-	_, exists := cst.cs.siacoinOutputs[ids[0]]
+	cst.cs.applySiafundInputs(bn, txn)
+	_, exists := cst.cs.siafundOutputs[ids[0]]
 	if exists {
-		t.Error("Failed to conusme a siacoin output")
+		t.Error("Failed to conusme a siafund output")
 	}
-	if len(cst.cs.siacoinOutputs) != 2 {
-		t.Error("siacoin outputs not correctly updated")
+	if len(cst.cs.siafundOutputs) != 46 {
+		t.Error("siafund outputs not correctly updated")
 	}
-	if len(bn.siacoinOutputDiffs) != 1 {
+	if len(bn.siafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
 	}
-	if bn.siacoinOutputDiffs[0].Direction != modules.DiffRevert {
-		t.Error("wrong diff direction applied when consuming a siacoin output")
+	if bn.siafundOutputDiffs[0].Direction != modules.DiffRevert {
+		t.Error("wrong diff direction applied when consuming a siafund output")
 	}
-	if bn.siacoinOutputDiffs[0].ID != ids[0] {
-		t.Error("wrong id used when consuming a siacoin output")
+	if bn.siafundOutputDiffs[0].ID != ids[0] {
+		t.Error("wrong id used when consuming a siafund output")
+	}
+	if len(cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay]) != 2 { // 1 for a block subsidy, 1 for the siafund claim.
+		t.Error("siafund claim was not created")
 	}
 
-	// Apply a transaction with two siacoin inputs.
+	// Apply a transaction with two siafund inputs.
 	txn = types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[1]},
 			{ParentID: ids[2]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
-	if len(cst.cs.siacoinOutputs) != 0 {
+	cst.cs.applySiafundInputs(bn, txn)
+	if len(cst.cs.siafundOutputs) != 44 {
 		t.Error("failed to consume all siacoin outputs in the consensus set")
 	}
-	if len(bn.siacoinOutputDiffs) != 3 {
+	if len(bn.siafundOutputDiffs) != 3 {
 		t.Error("block node was not updated for single transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 
-// TestMisuseApplySiacoinInputs misuses applySiacoinInput and checks that a
+// TestMisuseApplySiafundInputs misuses applySiafundInputs and checks that a
 // panic was triggered.
-func TestMisuseApplySiacoinInputs(t *testing.T) {
+func TestMisuseApplySiafundInputs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -786,32 +699,33 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
+	bn.height = cst.cs.height()
 
 	// Fetch the output id's of each siacoin output in the consensus set.
-	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	var ids []types.SiafundOutputID
+	for id, _ := range cst.cs.siafundOutputs {
 		ids = append(ids, id)
 	}
 
-	// Apply a transaction with a single siacoin input.
+	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
+		SiafundInputs: []types.SiafundInput{
 			{ParentID: ids[0]},
 		},
 	}
-	cst.cs.applySiacoinInputs(bn, txn)
+	cst.cs.applySiafundInputs(bn, txn)
 
 	// Trigger the panic that occurs when an output is applied incorrectly, and
 	// perform a catch to read the error that is created.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplySiacoinInput {
+		if r != ErrMisuseApplySiafundInput {
 			t.Error("no panic occured when misusing applySiacoinInput")
+			t.Error(r)
 		}
 	}()
-	cst.cs.applySiacoinInputs(bn, txn)
+	cst.cs.applySiafundInputs(bn, txn)
 }
-*/
 
 // TestApplySiafundOutputs probes the applySiafundOutputs method of the
 // consensus set.
@@ -824,9 +738,6 @@ func TestApplySiafundOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	cst.cs.siafundPool = types.NewCurrency64(101)
-
-	// Grab the inital hash of the consensus set.
-	initialSum := cst.cs.consensusSetHash()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)
@@ -841,7 +752,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 2 { // TODO: This value needs to be updated when siafunds are added.
+	if len(cst.cs.siafundOutputs) != 48 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
@@ -875,16 +786,11 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 4 { // TODO: This value needs to be added when genesis siafunds are added.
+	if len(cst.cs.siafundOutputs) != 50 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 3 {
 		t.Error("block node was not updated for single element transaction")
-	}
-
-	err = cst.checkRevertApplyNode(initialSum, bn)
-	if err != nil {
-		t.Error(err)
 	}
 }
 

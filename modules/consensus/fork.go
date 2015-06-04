@@ -118,32 +118,32 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the State is only updated if the
 // function returns nil.
-func (s *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
+func (cs *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
 	if build.DEBUG {
-		oldHash = s.consensusSetHash()
+		oldHash = cs.consensusSetHash()
 	}
-	oldHead := s.currentBlockNode()
+	oldHead := cs.currentBlockNode()
 
 	// revert to the common parent
-	commonParent := s.backtrackToCurrentPath(newNode)[0]
-	revertedNodes = s.revertToNode(commonParent)
+	commonParent := cs.backtrackToCurrentPath(newNode)[0]
+	revertedNodes = cs.revertToNode(commonParent)
 
 	// fast-forward to newNode
-	appliedNodes, err = s.applyUntilNode(newNode)
+	appliedNodes, err = cs.applyUntilNode(newNode)
 	if err == nil {
 		return revertedNodes, appliedNodes, err
 	}
 
 	// restore old path
-	s.revertToNode(commonParent)
-	_, errReapply := s.applyUntilNode(oldHead)
+	cs.revertToNode(commonParent)
+	_, errReapply := cs.applyUntilNode(oldHead)
 	if build.DEBUG {
 		if errReapply != nil {
 			panic("couldn't reapply previously applied diffs")
-		} else if s.consensusSetHash() != oldHash {
+		} else if cs.consensusSetHash() != oldHash {
 			panic("state hash changed after an unsuccessful fork attempt")
 		}
 	}

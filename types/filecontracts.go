@@ -7,6 +7,11 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+var (
+	ProofValid  ProofStatus = true
+	ProofMissed ProofStatus = false
+)
+
 type (
 	// A FileContract is a public record of a storage agreement between a "host"
 	// and a "renter." It mandates that a host must submit a storage proof to the
@@ -83,6 +88,8 @@ type (
 		Segment  [crypto.SegmentSize]byte
 		HashSet  []crypto.Hash
 	}
+
+	ProofStatus bool
 )
 
 // FileContractTerminationPayoutID returns the ID of a file contract
@@ -104,11 +111,11 @@ func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputI
 // the file contract that the proof is for, a boolean indicating whether the
 // proof was valid (true) or missed (false), and the index of the output
 // within the file contract.
-func (fcid FileContractID) StorageProofOutputID(proofValid bool, i int) SiacoinOutputID {
+func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierStorageProofOutput,
 		fcid,
-		proofValid,
+		proofStatus,
 		i,
 	))
 }

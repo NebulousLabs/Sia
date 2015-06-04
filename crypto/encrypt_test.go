@@ -74,7 +74,8 @@ func TestTwofishEncryption(t *testing.T) {
 	key.DecryptBytes(nil)
 }
 
-func TestReadWrite(t *testing.T) {
+// TestReaderWriter probes the NewReader and NewWriter methods of the key type.
+func TestReaderWriter(t *testing.T) {
 	// Get a key for encryption.
 	key, err := GenerateTwofishKey()
 	if err != nil {

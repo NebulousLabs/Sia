@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"sort"
 	"testing"
 )
 
@@ -49,5 +50,34 @@ func TestHashing(t *testing.T) {
 	h2 := HashBytes(data)
 	if h2 == emptyHash {
 		t.Error("HashObject returned the zero hash!")
+	}
+}
+
+// TestHashSorting takes a set of hashses and checks that they can be sorted.
+func TestHashSorting(t *testing.T) {
+	// Created an unsorted list of hashes.
+	hashes := make([]Hash, 5)
+	hashes[0][0] = 12
+	hashes[1][0] = 7
+	hashes[2][0] = 13
+	hashes[3][0] = 14
+	hashes[4][0] = 1
+
+	// Sort the hashes.
+	sort.Sort(HashSlice(hashes))
+	if hashes[0][0] != 1 {
+		t.Error("bad sort")
+	}
+	if hashes[1][0] != 7 {
+		t.Error("bad sort")
+	}
+	if hashes[2][0] != 12 {
+		t.Error("bad sort")
+	}
+	if hashes[3][0] != 13 {
+		t.Error("bad sort")
+	}
+	if hashes[4][0] != 14 {
+		t.Error("bad sort")
 	}
 }

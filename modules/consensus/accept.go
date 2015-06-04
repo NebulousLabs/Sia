@@ -31,7 +31,7 @@ func (cs *State) validHeader(b types.Block) error {
 	if !exists {
 		return ErrOrphan
 	}
-	if !b.CheckTarget(parent.target) {
+	if !b.CheckTarget(parent.childTarget) {
 		return ErrMissedTarget
 	}
 
