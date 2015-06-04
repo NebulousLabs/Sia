@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	PersistFilename = "renter.dat"
+	PersistFilename = "renter.json"
 	ShareExtension  = ".sia"
 )
 
