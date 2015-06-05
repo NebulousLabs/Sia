@@ -53,9 +53,11 @@ type HostDB interface {
 	// InsertHost adds a host to the database.
 	InsertHost(HostSettings) error
 
-	// RandomHost pulls a host entry at random from the database, weighted
-	// according to whatever score is assigned the hosts.
-	RandomHost() (HostSettings, error)
+	// RandomHosts will pull up to 'num' random hosts from the hostdb. There
+	// will be no repeats, but the length of the slice returned may be less
+	// than 'num', and may even be 0. The hosts returned first have the higher
+	// priority.
+	RandomHosts(num int) []HostSettings
 
 	// Remove deletes the host with the input address from the database.
 	RemoveHost(NetAddress) error
