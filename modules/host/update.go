@@ -86,6 +86,7 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 			}
 			h.deallocate(uint64(stat.Size()), obligation.Path) // TODO: file might actually be the wrong size.
 			shouldSave = true
+			delete(h.obligationsByID, obligation.ID)
 		}
 		delete(h.obligationsByHeight, h.blockHeight)
 	}
