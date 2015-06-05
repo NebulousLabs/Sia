@@ -22,11 +22,15 @@ type ContractTerms struct {
 	MissedProofOutputs []types.SiacoinOutput // Where the money goes if the storage proof fails.
 }
 
+// HostInfo contains HostSettings and details pertinent to the host's understanding
+// of their offered services
 type HostInfo struct {
 	HostSettings
 
 	StorageRemaining int64
 	NumContracts     int
+	Profit           types.Currency
+	PotentialProfit  types.Currency
 }
 
 type Host interface {
