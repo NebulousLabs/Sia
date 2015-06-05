@@ -29,7 +29,7 @@ func (h *Host) save() error {
 		FileCounter:    h.fileCounter,
 		Profit:         h.profit,
 		HostSettings:   h.HostSettings,
-		Obligations:    make([]contractObligation, 0, len(h.obligationsByID))
+		Obligations:    make([]contractObligation, 0, len(h.obligationsByID)),
 	}
 	for _, obligation := range h.obligationsByID {
 		sHost.Obligations = append(sHost.Obligations, obligation)
