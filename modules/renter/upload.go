@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -151,51 +150,30 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.save()
 	r.mu.Unlock(lockID)
 
-	// Choose 3*redundancy hosts and upload a piece to 'redundancy' of them.
-	// This allows a significant portion of the hostdb to be outdated.
-	hostPool := r.hostDB.RandomHosts(3 * redundancy)
-	piecePool := f.Pieces
-	poolClosed := false
-	poolMutex := sync.New(250*time.Millisecond, 1)
+	// Upload to hosts in parallel. To facilitate this, we create channels of
+	// hosts and file pieces, and spawn goroutines that attempt to match each
+	// piece to a host.
+	hostPool := make(chan modules.HostSettings, 3*redundancy)
+	for _, host := range r.hostDB.RandomHosts(3 * redundancy) {
+		hostPool <- host
+	}
+	piecePool := make(chan *filePiece, len(f.Pieces))
+	for i := range f.Pieces {
+		piecePool <- &f.Pieces[i]
+	}
 	errChan := make(chan error, len(f.Pieces))
 	for i := 0; i < parallelUploads; i++ {
 		go func() {
-			pieceFinished := true
-			var piece *filePiece
-			for {
-				lockID := poolMutex.Lock()
-				if len(hostPool) == 0 || len(piecePool) == 0 {
-					if !pieceFinished {
-						errChan <- errors.New("upload for piece failed")
+			for piece := range piecePool {
+				var err error
+				for host := range hostPool {
+					err = r.threadedUploadPiece(host, up, piece)
+					if err == nil {
+						break
 					}
-					poolMutex.Unlock(lockID)
-					return
 				}
-				if pieceFinished {
-					piece = &piecePool[0]
-					piecePool = piecePool[1:]
-					pieceFinished = false
-				}
-				host := hostPool[0]
-				hostPool = hostPool[1:]
-				poolMutex.Unlock(lockID)
-
-				err := r.threadedUploadPiece(host, up, piece)
-				if err != nil {
-					continue
-				}
-				pieceFinished = true
-				errChan <- nil
+				errChan <- err
 			}
-
-			lockID = poolMutex.Lock()
-			if !poolClosed {
-				for _ = range piecePool {
-					errChan <- errors.New("upload for piece failed")
-				}
-				poolClosed = true
-			}
-			poolMutex.Unlock(lockID)
 		}()
 	}
 

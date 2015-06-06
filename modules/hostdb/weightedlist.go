@@ -159,7 +159,7 @@ func (hdb *HostDB) RandomHosts(count int) (hosts []modules.HostSettings) {
 
 	var removedEntries []*hostEntry
 	for len(hosts) < count {
-		if hdb.hostTree.weight.IsZero() {
+		if hdb.hostTree == nil || hdb.hostTree.weight.IsZero() {
 			break
 		}
 		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
