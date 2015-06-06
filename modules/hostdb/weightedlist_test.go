@@ -42,11 +42,11 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 		selectionMap := make(map[modules.NetAddress]int)
 		expected := 100
 		for i := 0; i < expected*numEntries; i++ {
-			entry, err := hdbt.hostdb.RandomHost()
-			if err != nil {
-				return err
+			entries := hdbt.hostdb.RandomHosts(1)
+			if len(entries) == 0 {
+				return errors.New("no hosts!")
 			}
-			selectionMap[entry.IPAddress] = selectionMap[entry.IPAddress] + 1
+			selectionMap[entries[0].IPAddress] = selectionMap[entries[0].IPAddress] + 1
 		}
 
 		// See if each host was selected enough times.
@@ -57,6 +57,31 @@ func (hdbt *hdbTester) uniformTreeVerification(numEntries int) error {
 				return errors.New("error bound was breached")
 			}
 		}
+	}
+
+	// Try removing an re-adding all hosts.
+	var removedEntries []*hostEntry
+	for {
+		if hdbt.hostdb.hostTree.weight.IsZero() {
+			break
+		}
+		randWeight, err := rand.Int(rand.Reader, hdbt.hostdb.hostTree.weight.Big())
+		if err != nil {
+			break
+		}
+		node, err := hdbt.hostdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
+		if err != nil {
+			break
+		}
+		node.removeNode()
+		delete(hdbt.hostdb.activeHosts, node.hostEntry.IPAddress)
+
+		// remove the entry from the hostdb so it won't be selected as a
+		// repeat.
+		removedEntries = append(removedEntries, node.hostEntry)
+	}
+	for _, entry := range removedEntries {
+		hdbt.hostdb.insertNode(entry)
 	}
 	return nil
 }
@@ -137,7 +162,7 @@ func TestVariedWeights(t *testing.T) {
 	// per weight added to the tree, the total number of selections necessary
 	// will be tallied up as hosts are created.
 	hostCount := 5
-	expectedPerWeight := int(100e3)
+	expectedPerWeight := int(10e3)
 	selections := 0
 	for i := 0; i < hostCount; i++ {
 		entry := hostEntry{
@@ -152,20 +177,20 @@ func TestVariedWeights(t *testing.T) {
 	// time.
 	selectionMap := make(map[string]int)
 	for i := 0; i < selections; i++ {
-		randEntry, err := hdbt.hostdb.RandomHost()
-		if err != nil {
-			t.Fatal(err)
+		randEntry := hdbt.hostdb.RandomHosts(1)
+		if len(randEntry) == 0 {
+			t.Fatal("no hosts!")
 		}
-		node, exists := hdbt.hostdb.activeHosts[randEntry.IPAddress]
+		node, exists := hdbt.hostdb.activeHosts[randEntry[0].IPAddress]
 		if !exists {
 			t.Fatal("can't find randomly selected node in tree")
 		}
-		selectionMap[node.weight.String()] += 1
+		selectionMap[node.hostEntry.weight.String()] += 1
 	}
 
 	// Check that each host was selected an expected number of times. An error
 	// will be reported if the host of 0 weight is ever selected.
-	acceptableError := 0.1
+	acceptableError := 0.2
 	for weight, timesSelected := range selectionMap {
 		intWeight, err := strconv.Atoi(weight)
 		if err != nil {
@@ -173,8 +198,10 @@ func TestVariedWeights(t *testing.T) {
 		}
 
 		expectedSelected := float64(intWeight * expectedPerWeight)
-		if float64(expectedSelected) < float64(timesSelected)*acceptableError || float64(expectedSelected) > float64(timesSelected)/acceptableError {
-			t.Error("weighted list does not appear to be selecting in a uniform distribution based on weight")
+		if float64(expectedSelected)*acceptableError > float64(timesSelected) || float64(expectedSelected)/acceptableError < float64(timesSelected) {
+			t.Error("weighted list not selecting in a uniform distribution based on weight")
+			t.Error(expectedSelected)
+			t.Error(timesSelected)
 		}
 	}
 }
@@ -194,5 +221,92 @@ func TestRepeatInsert(t *testing.T) {
 	hdbt.hostdb.insertNode(&entry2)
 	if len(hdbt.hostdb.activeHosts) != 1 {
 		t.Error("insterting the same entry twice should result in only 1 entry in the hostdb")
+	}
+}
+
+// TestRandomHosts probles the RandomHosts function.
+func TestRandomHosts(t *testing.T) {
+	hdbt := newHDBTester("TestRandomHosts", t)
+
+	// Insert 3 hosts to be selected.
+	entry1 := hostEntry{
+		HostSettings: modules.HostSettings{IPAddress: fakeAddr(1)},
+		weight:       types.NewCurrency64(1),
+	}
+	entry2 := hostEntry{
+		HostSettings: modules.HostSettings{IPAddress: fakeAddr(2)},
+		weight:       types.NewCurrency64(2),
+	}
+	entry3 := hostEntry{
+		HostSettings: modules.HostSettings{IPAddress: fakeAddr(3)},
+		weight:       types.NewCurrency64(3),
+	}
+	hdbt.hostdb.insertNode(&entry1)
+	hdbt.hostdb.insertNode(&entry2)
+	hdbt.hostdb.insertNode(&entry3)
+
+	if len(hdbt.hostdb.activeHosts) != 3 {
+		t.Error("wrong number of hosts")
+	}
+	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+		t.Error("unexpected weight at initialization")
+		t.Error(hdbt.hostdb.hostTree.weight)
+	}
+
+	// Grab 1 random host.
+	randHosts := hdbt.hostdb.RandomHosts(1)
+	if len(randHosts) != 1 {
+		t.Error("didn't get 1 hosts")
+	}
+	if len(hdbt.hostdb.activeHosts) != 3 {
+		t.Error("wrong number of hosts")
+	}
+	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+		t.Error("unexpected weight at initialization")
+	}
+
+	// Grab 2 random hosts.
+	randHosts = hdbt.hostdb.RandomHosts(2)
+	if len(randHosts) != 2 {
+		t.Error("didn't get 2 hosts")
+	}
+	if len(hdbt.hostdb.activeHosts) != 3 {
+		t.Error("wrong number of hosts")
+	}
+	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+		t.Error("unexpected weight at initialization")
+	}
+	if randHosts[0].IPAddress == randHosts[1].IPAddress {
+		t.Error("doubled up")
+	}
+
+	// Grab 3 random hosts.
+	randHosts = hdbt.hostdb.RandomHosts(3)
+	if len(randHosts) != 3 {
+		t.Error("didn't get 3 hosts")
+	}
+	if len(hdbt.hostdb.activeHosts) != 3 {
+		t.Error("wrong number of hosts")
+	}
+	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+		t.Error("unexpected weight at initialization")
+	}
+	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
+		t.Error("doubled up")
+	}
+
+	// Grab 4 random hosts. 3 should be returned.
+	randHosts = hdbt.hostdb.RandomHosts(4)
+	if len(randHosts) != 3 {
+		t.Error("didn't get 3 hosts")
+	}
+	if len(hdbt.hostdb.activeHosts) != 3 {
+		t.Error("wrong number of hosts")
+	}
+	if hdbt.hostdb.hostTree.weight.Cmp(types.NewCurrency64(6)) != 0 {
+		t.Error("unexpected weight at initialization")
+	}
+	if randHosts[0].IPAddress == randHosts[1].IPAddress || randHosts[0].IPAddress == randHosts[2].IPAddress || randHosts[1].IPAddress == randHosts[2].IPAddress {
+		t.Error("doubled up")
 	}
 }

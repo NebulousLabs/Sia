@@ -12,7 +12,14 @@ import (
 )
 
 const (
-	maxUploadAttempts = 8
+	maxUploadAttempts = 3
+	parallelUploads   = 3
+)
+
+var (
+	errUploadFailed = errors.New("failed to upload to the desired host")
+
+	redundancy = 12
 )
 
 // checkWalletBalance looks at an upload and determines if there is enough
@@ -26,15 +33,11 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	}
 	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
 
-	// TODO: Change average to median so that outliers are ignored.
-	sampleSize := 12
 	var averagePrice types.Currency
-	for i := 0; i < sampleSize; i++ {
-		potentialHost, err := r.hostDB.RandomHost()
-		if err != nil {
-			return err
-		}
-		averagePrice = averagePrice.Add(potentialHost.Price)
+	sampleSize := redundancy * 2
+	hosts := r.hostDB.RandomHosts(sampleSize)
+	for _, host := range hosts {
+		averagePrice = averagePrice.Add(host.Price)
 	}
 	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(sampleSize)))
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
@@ -51,7 +54,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // uploadPiece will give up. The file uploading can be continued using a repair
 // tool. Upon completion, the memory containg the piece's information is
 // updated.
-func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePiece) error {
+func (r *Renter) threadedUploadPiece(host modules.HostSettings, up modules.FileUploadParams, piece *filePiece) error {
 	// Set 'Repairing' for the piece to true.
 	lockID := r.mu.Lock()
 	piece.Repairing = true
@@ -59,16 +62,13 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 
 	// Try 'maxUploadAttempts' hosts before giving up.
 	for attempts := 0; attempts < maxUploadAttempts; attempts++ {
-		// Select a host. An error here is unrecoverable.
-		host, err := r.hostDB.RandomHost()
-		if err != nil {
-			return err
-		}
-
 		// Negotiate the contract with the host. If the negotiation is
 		// unsuccessful, we need to try again with a new host.
-		err = r.negotiateContract(host, up, piece)
+		err := r.negotiateContract(host, up, piece)
 		if err == nil {
+			lockID := r.mu.Lock()
+			piece.Repairing = false
+			r.mu.Unlock(lockID)
 			return nil
 		}
 
@@ -78,7 +78,7 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 		// problems with network congestion or other randomized issues.
 		randSource := make([]byte, 1)
 		rand.Read(randSource)
-		time.Sleep(time.Duration(attempts) * time.Duration(attempts) * 250 * time.Millisecond * time.Duration(randSource[0]))
+		time.Sleep(100 * time.Millisecond * time.Duration(randSource[0]))
 	}
 
 	// All attempts failed.
@@ -150,15 +150,31 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.save()
 	r.mu.Unlock(lockID)
 
-	// Upload a piece to every host on the network.
-	errChan := make(chan error, len(f.Pieces))
+	// Upload to hosts in parallel. To facilitate this, we create channels of
+	// hosts and file pieces, and spawn goroutines that attempt to match each
+	// piece to a host.
+	hostPool := make(chan modules.HostSettings, 3*redundancy)
+	for _, host := range r.hostDB.RandomHosts(3 * redundancy) {
+		hostPool <- host
+	}
+	piecePool := make(chan *filePiece, len(f.Pieces))
 	for i := range f.Pieces {
-		// threadedUploadPiece will change the memory that the piece points
-		// to, which is useful because it means the file can be renamed
-		// without disrupting the upload process.
-		go func(piece *filePiece) {
-			errChan <- r.threadedUploadPiece(up, piece)
-		}(&f.Pieces[i])
+		piecePool <- &f.Pieces[i]
+	}
+	errChan := make(chan error, len(f.Pieces))
+	for i := 0; i < parallelUploads; i++ {
+		go func() {
+			for piece := range piecePool {
+				var err error
+				for host := range hostPool {
+					err = r.threadedUploadPiece(host, up, piece)
+					if err == nil {
+						break
+					}
+				}
+				errChan <- err
+			}
+		}()
 	}
 
 	// Wait for success or failure. Since we are (currently) using full

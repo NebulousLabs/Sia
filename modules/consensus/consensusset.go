@@ -1,5 +1,11 @@
 package consensus
 
+// All changes to the consenuss set are made via diffs, specifically by calling
+// a commitDiff function. This means that future modifications (such as
+// replacing in-memory versions of the utxo set with on-disk versions of the
+// utxo set) should be relatively easy to verify for correctness. Modifying the
+// commitDiff functions will be sufficient.
+
 import (
 	"errors"
 	"os"
