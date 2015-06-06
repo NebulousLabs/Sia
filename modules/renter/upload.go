@@ -160,10 +160,8 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	errChan := make(chan error, len(f.Pieces))
 	for i := 0; i < parallelUploads; i++ {
 		go func() {
-			lockID := poolMutex.Lock()
 			pieceFinished := true
 			var piece *filePiece
-			poolMutex.Unlock(lockID)
 			for {
 				lockID := poolMutex.Lock()
 				if len(hostPool) == 0 || len(piecePool) == 0 {
