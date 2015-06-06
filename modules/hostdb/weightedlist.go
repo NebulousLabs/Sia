@@ -51,27 +51,24 @@ func createNode(parent *hostNode, entry *hostEntry) *hostNode {
 	}
 }
 
-// entryAtWeight grabs an element in the tree that appears at the given
-// weight. Though the tree has an arbitrary sorting, a sufficiently random
-// weight will pull a random element. The tree is searched through in a
-// post-ordered way.
-func (hn *hostNode) entryAtWeight(weight types.Currency) (entry *hostEntry, err error) {
-	// Sanity check - entryAtWeight should never be called with a too-large
-	// weight.
+// nodeAtWeight grabs an element in the tree that appears at the given weight.
+// Though the tree has an arbitrary sorting, a sufficiently random weight will
+// pull a random element. The tree is searched through in a post-ordered way.
+func (hn *hostNode) nodeAtWeight(weight types.Currency) (*hostNode, error) {
+	// Sanity check - weight must be less than the total weight of the tree.
 	if weight.Cmp(hn.weight) > 0 {
-		err = ErrOverweight
-		return
+		return nil, ErrOverweight
 	}
 
 	// Check if the left or right child should be returned.
 	if hn.left != nil {
 		if weight.Cmp(hn.left.weight) < 0 {
-			return hn.left.entryAtWeight(weight)
+			return hn.left.nodeAtWeight(weight)
 		}
 		weight = weight.Sub(hn.left.weight) // Search from 0th index of right side.
 	}
 	if hn.right != nil && weight.Cmp(hn.right.weight) < 0 {
-		return hn.right.entryAtWeight(weight)
+		return hn.right.nodeAtWeight(weight)
 	}
 
 	// Sanity check
@@ -82,8 +79,7 @@ func (hn *hostNode) entryAtWeight(weight types.Currency) (entry *hostEntry, err 
 	}
 
 	// Return the root entry.
-	entry = hn.hostEntry
-	return
+	return hn, nil
 }
 
 // recursiveInsert is a recurisve function for adding a hostNode to an existing tree
@@ -153,23 +149,39 @@ func (hn *hostNode) removeNode() {
 	}
 }
 
-// RandomHost pulls a random host from the hostdb weighted according to the
-// internal metrics of the hostdb.
-func (hdb *HostDB) RandomHost() (host modules.HostSettings, err error) {
+// RandomHosts will pull up to 'num' random hosts from the hostdb. There will
+// be no repeats, but the length of the slice returned may be less than 'num',
+// and may even be 0. The hosts that get returned first have the higher
+// priority.
+func (hdb *HostDB) RandomHosts(count int) (hosts []modules.HostSettings) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 
-	if len(hdb.activeHosts) == 0 {
-		err = errors.New("no hosts found")
-		return
+	var removedEntries []*hostEntry
+	for len(hosts) < count {
+		if hdb.hostTree.weight.IsZero() {
+			break
+		}
+		randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
+		if err != nil {
+			break
+		}
+		node, err := hdb.hostTree.nodeAtWeight(types.NewCurrency(randWeight))
+		if err != nil {
+			break
+		}
+		hosts = append(hosts, node.hostEntry.HostSettings)
+		node.removeNode()
+		delete(hdb.activeHosts, node.hostEntry.IPAddress)
+
+		// remove the entry from the hostdb so it won't be selected as a
+		// repeat.
+		removedEntries = append(removedEntries, node.hostEntry)
 	}
 
-	// Get a random number between 0 and state.TotalWeight and then scroll
-	// through state.HostList until at least that much weight has been passed.
-	randWeight, err := rand.Int(rand.Reader, hdb.hostTree.weight.Big())
-	if err != nil {
-		return
+	// Add back all of the entries that got removed.
+	for _, entry := range removedEntries {
+		hdb.insertNode(entry)
 	}
-	entry, err := hdb.hostTree.entryAtWeight(types.NewCurrency(randWeight))
-	return entry.HostSettings, err
+	return hosts
 }

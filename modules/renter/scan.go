@@ -6,7 +6,10 @@ func (r *Renter) scanAllFiles() {
 	for _, file := range r.files {
 		for i := range file.Pieces {
 			if !file.Pieces[i].Active && !file.Pieces[i].Repairing {
-				go r.threadedUploadPiece(file.UploadParams, &file.Pieces[i])
+				hosts := r.hostDB.RandomHosts(1)
+				if len(hosts) == 1 {
+					go r.threadedUploadPiece(hosts[0], file.UploadParams, &file.Pieces[i])
+				}
 			}
 		}
 	}
