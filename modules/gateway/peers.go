@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	version = "0.1"
+	version = "0.3.3"
 
 	dialTimeout = 10 * time.Second
 	// the gateway will not make outbound connections above this threshold
