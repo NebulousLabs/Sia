@@ -80,6 +80,7 @@ type (
 	SiafundInput struct {
 		ParentID         SiafundOutputID
 		UnlockConditions UnlockConditions
+		ClaimUnlockHash  UnlockHash
 	}
 
 	// A SiafundOutput holds a volume of siafunds. Outputs must be spent
@@ -96,10 +97,9 @@ type (
 	// equal zero. While the transaction is being processed, the ClaimStart is set
 	// to the value of the SiafundPool.
 	SiafundOutput struct {
-		Value           Currency
-		UnlockHash      UnlockHash
-		ClaimUnlockHash UnlockHash
-		ClaimStart      Currency
+		Value      Currency
+		UnlockHash UnlockHash
+		ClaimStart Currency
 	}
 )
 
