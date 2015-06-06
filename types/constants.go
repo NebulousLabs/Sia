@@ -14,47 +14,44 @@ import (
 )
 
 var (
-	BlockSizeLimit         uint64
-	BlockFrequency         BlockHeight
+	BlockSizeLimit   uint64
+	BlockFrequency   BlockHeight
+	MaturityDelay    BlockHeight
+	GenesisTimestamp Timestamp
+	RootTarget       Target
+	RootDepth        Target
+
 	TargetWindow           BlockHeight
 	MedianTimestampWindow  int
-	ExtremeFutureThreshold Timestamp
+	MaxAdjustmentUp        *big.Rat
+	MaxAdjustmentDown      *big.Rat
 	FutureThreshold        Timestamp
-	SiafundCount           uint64
-	SiafundPortion         float64
+	ExtremeFutureThreshold Timestamp
 
+	SiafundCount    uint64
+	SiafundPortion  float64
 	InitialCoinbase uint64
 	MinimumCoinbase uint64
-
-	RenterZeroConfDelay time.Duration // TODO: This shouldn't exist here.
-
-	MaturityDelay BlockHeight
-
-	GenesisTimestamp Timestamp
-
-	RootTarget Target
-	RootDepth  Target
-
-	MaxAdjustmentUp   *big.Rat
-	MaxAdjustmentDown *big.Rat
-
 	CoinbaseAugment *big.Int
 
 	GenesisSiafundAllocation []SiafundOutput
+
+	RenterZeroConfDelay time.Duration // TODO: This shouldn't exist here.
 )
 
 // init checks which build constant is in place and initializes the variables
 // accordingly.
 func init() {
 	// Constants that are consistent regardless of the build settings.
-	BlockSizeLimit = 1e6       // 1 MB
-	MedianTimestampWindow = 11 // 11 Blocks.
+	BlockSizeLimit = 2e6 // 1 MB
 	RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 
-	SiafundCount = 10e3 // 10,000 total siafunds.
-	SiafundPortion = 0.039
-	InitialCoinbase = 300e3
-	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil)
+	MedianTimestampWindow = 11 // 11 Blocks.
+
+	SiafundCount = 10e3                                                     // 10,000 total siafunds.
+	SiafundPortion = 0.039                                                  // 3.9% fee on all file contract payouts.
+	InitialCoinbase = 300e3                                                 // 300,000 Siacoins per block
+	CoinbaseAugment = new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil) // Siacoin is divisible by 10^24
 
 	// Constants that depend on build settings.
 	if build.Release == "dev" {
@@ -63,60 +60,105 @@ func init() {
 		// can coordinate their actions over a the developer testnets, but fast
 		// enough that there isn't much time wasted on waiting for things to
 		// happen.
-		BlockFrequency = 6 // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
-		TargetWindow = 40  // Difficulty is adjusted based on prior 40 blocks.
-		MaturityDelay = 10
+		BlockFrequency = 6                       // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
+		MaturityDelay = 10                       // 60 seconds before a delayed output matures.
+		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
+		RootTarget = Target{0, 0, 4}             // Standard developer CPUs will be able to mine blocks.
+
+		TargetWindow = 40                        // Difficulty is adjusted based on prior 40 blocks.
+		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.
+		MaxAdjustmentDown = big.NewRat(100, 120) // Difficulty adjusts quickly.
 		FutureThreshold = 2 * 60                 // 2 minutes.
 		ExtremeFutureThreshold = 4 * 60          // 4 minutes.
-		GenesisTimestamp = Timestamp(1424139000) // Approx. Feb 16th, 2015
 
-		MaxAdjustmentUp = big.NewRat(102, 100)
-		MaxAdjustmentDown = big.NewRat(98, 100)
-		RootTarget = Target{0, 0, 4} // Standard developer CPUs should be able to mine blocks.
 		MinimumCoinbase = 30e3
 
-		RenterZeroConfDelay = 15 * time.Second
+		RenterZeroConfDelay = 15 * time.Second // TODO: This doesn't belong here.
 	} else if build.Release == "testing" {
 		// 'testing' settings are for automatic testing, and create much faster
 		// environments than a humand can interact with.
 		BlockFrequency = 1 // As fast as possible
-		TargetWindow = 200
 		MaturityDelay = 3
-		FutureThreshold = 3        // 3 seconds
-		ExtremeFutureThreshold = 6 // 6 seconds
 		GenesisTimestamp = CurrentTimestamp()
+		RootTarget = Target{64} // Takes an expected 4 hashes; very fast for testing but still probes 'bad hash' code.
 
-		// A really restrictive difficulty clamp prevents the difficulty from
-		// climbing during testing, as the resolution on the difficulty
-		// adjustment is only 1 second and testing mining should be happening
-		// substantially faster than that.
+		// A restrictive difficulty clamp prevents the difficulty from climbing
+		// during testing, as the resolution on the difficulty adjustment is
+		// only 1 second and testing mining should be happening substantially
+		// faster than that.
+		TargetWindow = 200
 		MaxAdjustmentUp = big.NewRat(10001, 10000)
 		MaxAdjustmentDown = big.NewRat(9999, 10000)
-		RootTarget = Target{64}  // Takes an expected 4 hashes; very fast for testing but still probes 'bad hash' code.
+		FutureThreshold = 3        // 3 seconds
+		ExtremeFutureThreshold = 6 // 6 seconds
+
 		MinimumCoinbase = 299990 // Minimum coinbase is hit after 10 blocks to make testing minimum-coinbase code easier.
 
-		RenterZeroConfDelay = 2 * time.Second
+		RenterZeroConfDelay = 2 * time.Second // TODO: This doesn't belong here.
 	} else if build.Release == "standard" {
 		// 'standard' settings are for the full network. They are slow enough
 		// that the network is secure in a real-world byzantine environment.
-		BlockFrequency = 600                     // 1 block per 10 minutes.
-		TargetWindow = 1e3                       // Number of blocks to use when calculating the target.
-		MaturityDelay = 144                      // Certain payouts take 1 day to mature.
-		FutureThreshold = 3 * 60 * 60            // 3 hours.
-		ExtremeFutureThreshold = 5 * 60 * 60     // 5 hours.
+
+		// A block time of 1 block per 10 minutes is chosen to follow Bitcoin's
+		// example. The security lost by lowering the block time is not
+		// insignificant, and the convenience gained by lowering the blocktime
+		// even down to 90 seconds is not significant. I do feel that 10
+		// minutes could even be too short, but it has worked well for Bitcoin.
+		BlockFrequency = 600
+
+		// Payouts take 1 day to mature. This is to prevent a class of double
+		// spending attacks parties unintentionally spend coins that will stop
+		// existing after a blockchain reorganization. There are multiple
+		// classes of payouts in Sia that depend on a previous block - if that
+		// block changes, then the output changes and the previously existing
+		// output ceases to exist. This delay stops both unintentional double
+		// spending and stops a small set of long-range mining attacks.
+		MaturityDelay = 144
+
+		// The genesis timestamp is set to June 6th, because that is when the
+		// 100-block developer premine started. The trailing zeroes are a
+		// bonus, and make the timestamp easier to memorize.
 		GenesisTimestamp = Timestamp(1433600000) // June 6th, 2015 @ 2:13pm UTC.
 
-		// A difficulty clamp to make long range attacks difficult. Quadrupling the
-		// difficulty will take 3000x work of finding a single block of the
-		// original difficulty. This can be compared to Bitcoin's clamp, in which
-		// quadrupling the difficulty takes 2000x work of finding a single block of
-		// the original difficulty.
+		// The RootTarget was set such that the developers could reasonable
+		// premine 100 blocks in a day. It was known to the developrs at launch
+		// this this was at least one and perhaps two orders of magnitude too
+		// small.
+		RootTarget = Target{0, 0, 0, 4}
+
+		// When the difficulty is adjusted, it is adjusted by looking at the
+		// timestamp of the 1000th previous block. This minimizes the abilities
+		// of miners to attack the network using rogue timestamps.
+		TargetWindow = 1e3
+
+		// The difficutly adjustment is clamped to 2.5x every 500 blocks. This
+		// corresponds to 6.25x every 2 weeks, which can be compared to
+		// Bitcoin's clamp of 4x every 2 weeks. The difficulty clamp is
+		// primarily to stop difficulty raising attacks. Sia's safety margin is
+		// similar to Bitcoin's despite the looser clamp because Sia's
+		// difficulty is adjusted four times as often. This does result in
+		// greater difficulty oscillation, a tradeoff that was chosen to be
+		// acceptable due to Sia's more vulnerable position as an altcoin.
 		MaxAdjustmentUp = big.NewRat(25, 10)
 		MaxAdjustmentDown = big.NewRat(10, 25)
-		RootTarget = Target{0, 0, 0, 4}
+
+		// Blocks will not be accepted if their timestamp is more than 3 hours
+		// into the future, but will be accepted as soon as they are no longer
+		// 3 hours into the future. Blocks that are greater than 5 hours into
+		// the future are rejected outright, as it is assumed that by the time
+		// 2 hours have passed, those blocks will no longer be on the longest
+		// chain. Blocks cannot be kept forever because this opens a DoS
+		// vector.
+		FutureThreshold = 3 * 60 * 60        // 3 hours.
+		ExtremeFutureThreshold = 5 * 60 * 60 // 5 hours.
+
+		// The minimum coinbase is set to 30,000. Because the coinbase
+		// decreases by 1 every time, it means that Sia's coinbase will have an
+		// increasingly potent dropoff for about 5 years, until inflation more
+		// or less permanently settles around 2%.
 		MinimumCoinbase = 30e3
 
-		RenterZeroConfDelay = 60 * time.Second
+		RenterZeroConfDelay = 60 * time.Second // TODO: This doesn't belong here.
 	}
 
 	GenesisSiafundAllocation = []SiafundOutput{
