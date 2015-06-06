@@ -203,7 +203,7 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{
 			Value:      claimPortion,
-			UnlockHash: sfo.ClaimUnlockHash,
+			UnlockHash: sfi.ClaimUnlockHash,
 		}
 		scoid := sfi.ParentID.SiaClaimOutputID()
 		dscod := modules.DelayedSiacoinOutputDiff{
