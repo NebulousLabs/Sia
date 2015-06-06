@@ -39,6 +39,7 @@ type Host struct {
 	saveDir        string
 	spaceRemaining int64
 	fileCounter    int
+	profit         types.Currency
 
 	listener net.Listener
 
@@ -149,6 +150,13 @@ func (h *Host) Info() modules.HostInfo {
 
 		StorageRemaining: h.spaceRemaining,
 		NumContracts:     len(h.obligationsByID),
+		Profit:           h.profit,
 	}
+	// sum up the current obligations to calculate PotentialProfit
+	for _, obligation := range h.obligationsByID {
+		fc := obligation.FileContract
+		info.PotentialProfit = fc.Payout.Sub(fc.Tax())
+	}
+
 	return info
 }
