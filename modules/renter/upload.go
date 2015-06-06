@@ -14,6 +14,7 @@ import (
 
 const (
 	maxUploadAttempts = 3
+	parallelUploads   = 3
 )
 
 var (
@@ -150,13 +151,14 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.save()
 	r.mu.Unlock(lockID)
 
-	// Upload a piece to every host on the network.
+	// Choose 3*redundancy hosts and upload a piece to 'redundancy' of them.
+	// This allows a significant portion of the hostdb to be outdated.
 	hostPool := r.hostDB.RandomHosts(3 * redundancy)
 	piecePool := f.Pieces
 	poolClosed := false
 	poolMutex := sync.New(250*time.Millisecond, 1)
 	errChan := make(chan error, len(f.Pieces))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < parallelUploads; i++ {
 		go func() {
 			lockID := poolMutex.Lock()
 			pieceFinished := true
