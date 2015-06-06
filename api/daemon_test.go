@@ -10,7 +10,7 @@ import (
 // result.
 func TestNewerVersion(t *testing.T) {
 	// If the VERSION is changed, these tests might no longer be valid.
-	if VERSION != "0.3.2" {
+	if VERSION != "0.3.3" {
 		t.Fatal("Need to update version tests")
 	}
 
@@ -20,9 +20,9 @@ func TestNewerVersion(t *testing.T) {
 		"0.1.1":   false,
 		"1":       true,
 		"0.9":     true,
-		"0.3.1.9": false,
-		"0.3.2.0": true,
-		"0.3.2.1": true,
+		"0.3.2.9": false,
+		"0.3.3.0": true,
+		"0.3.3.1": true,
 	}
 
 	for version, expected := range versionMap {

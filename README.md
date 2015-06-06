@@ -1,4 +1,4 @@
-Sia 0.3.2
+Sia 0.3.3
 =========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -78,10 +78,6 @@ Troubleshooting
   mined blocks. If you still have not received the block reward after 50
   blocks, it means your block did not made it into the blockchain.
 
-- I joined the network, but my block height is 0.
-
-  Sia does not immediately synchronize upon joining the network. Please allow 5 minutes for synchronization to begin. Alternatively, you can force early synchronization by running `siac sync`.
-
 - siad complains about "locks held too long."
 
   This is debugging output, and should not occur during normal use. Please
@@ -117,6 +113,8 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+v0.3.3: Stable currency release.
 
 v0.3.2: Fourth open beta release.
 
