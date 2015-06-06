@@ -8,11 +8,18 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	maxUploadAttempts = 8
+	maxUploadAttempts = 3
+)
+
+var (
+	errUploadFailed = errors.New("failed to upload to the desired host")
+
+	redundancy = 12
 )
 
 // checkWalletBalance looks at an upload and determines if there is enough
@@ -26,15 +33,11 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	}
 	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
 
-	// TODO: Change average to median so that outliers are ignored.
-	sampleSize := 12
 	var averagePrice types.Currency
-	for i := 0; i < sampleSize; i++ {
-		potentialHost, err := r.hostDB.RandomHost()
-		if err != nil {
-			return err
-		}
-		averagePrice = averagePrice.Add(potentialHost.Price)
+	sampleSize := redundancy * 2
+	hosts := r.hostDB.RandomHosts(sampleSize)
+	for _, host := range hosts {
+		averagePrice = averagePrice.Add(host.Price)
 	}
 	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(sampleSize)))
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
@@ -51,7 +54,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 // uploadPiece will give up. The file uploading can be continued using a repair
 // tool. Upon completion, the memory containg the piece's information is
 // updated.
-func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePiece) error {
+func (r *Renter) threadedUploadPiece(host modules.HostSettings, up modules.FileUploadParams, piece *filePiece) error {
 	// Set 'Repairing' for the piece to true.
 	lockID := r.mu.Lock()
 	piece.Repairing = true
@@ -59,16 +62,13 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 
 	// Try 'maxUploadAttempts' hosts before giving up.
 	for attempts := 0; attempts < maxUploadAttempts; attempts++ {
-		// Select a host. An error here is unrecoverable.
-		host, err := r.hostDB.RandomHost()
-		if err != nil {
-			return err
-		}
-
 		// Negotiate the contract with the host. If the negotiation is
 		// unsuccessful, we need to try again with a new host.
-		err = r.negotiateContract(host, up, piece)
+		err := r.negotiateContract(host, up, piece)
 		if err == nil {
+			lockID := r.mu.Lock()
+			piece.Repairing = false
+			r.mu.Unlock(lockID)
 			return nil
 		}
 
@@ -78,7 +78,7 @@ func (r *Renter) threadedUploadPiece(up modules.FileUploadParams, piece *filePie
 		// problems with network congestion or other randomized issues.
 		randSource := make([]byte, 1)
 		rand.Read(randSource)
-		time.Sleep(time.Duration(attempts) * time.Duration(attempts) * 250 * time.Millisecond * time.Duration(randSource[0]))
+		time.Sleep(100 * time.Millisecond * time.Duration(randSource[0]))
 	}
 
 	// All attempts failed.
@@ -151,14 +151,52 @@ func (r *Renter) Upload(up modules.FileUploadParams) error {
 	r.mu.Unlock(lockID)
 
 	// Upload a piece to every host on the network.
+	hostPool := r.hostDB.RandomHosts(3 * redundancy)
+	piecePool := f.Pieces
+	poolClosed := false
+	poolMutex := sync.New(250*time.Millisecond, 1)
 	errChan := make(chan error, len(f.Pieces))
-	for i := range f.Pieces {
-		// threadedUploadPiece will change the memory that the piece points
-		// to, which is useful because it means the file can be renamed
-		// without disrupting the upload process.
-		go func(piece *filePiece) {
-			errChan <- r.threadedUploadPiece(up, piece)
-		}(&f.Pieces[i])
+	for i := 0; i < 3; i++ {
+		go func() {
+			lockID := poolMutex.Lock()
+			pieceFinished := true
+			var piece *filePiece
+			poolMutex.Unlock(lockID)
+			for {
+				lockID := poolMutex.Lock()
+				if len(hostPool) == 0 || len(piecePool) == 0 {
+					if !pieceFinished {
+						errChan <- errors.New("upload for piece failed")
+					}
+					poolMutex.Unlock(lockID)
+					return
+				}
+				if pieceFinished {
+					piece = &piecePool[0]
+					piecePool = piecePool[1:]
+					pieceFinished = false
+				}
+				host := hostPool[0]
+				hostPool = hostPool[1:]
+				poolMutex.Unlock(lockID)
+
+				err := r.threadedUploadPiece(host, up, piece)
+				if err != nil {
+					continue
+				}
+				pieceFinished = true
+				errChan <- nil
+			}
+
+			lockID = poolMutex.Lock()
+			if !poolClosed {
+				for _ = range piecePool {
+					errChan <- errors.New("upload for piece failed")
+				}
+				poolClosed = true
+			}
+			poolMutex.Unlock(lockID)
+		}()
 	}
 
 	// Wait for success or failure. Since we are (currently) using full
