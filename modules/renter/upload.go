@@ -19,7 +19,7 @@ const (
 var (
 	errUploadFailed = errors.New("failed to upload to the desired host")
 
-	redundancy = 12
+	redundancy = 15
 )
 
 // checkWalletBalance looks at an upload and determines if there is enough
