@@ -114,10 +114,17 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// decide whether to accept
-	// TODO: for now we always accept. Eventually we should start rejecting old versions.
-	if err := encoding.WriteObject(conn, "accept"); err != nil {
+	if remoteVersion != version {
+		encoding.WriteObject(conn, "reject")
 		conn.Close()
-		g.log.Printf("INFO: could not write ack to %v: %v", addr, err)
+		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
+		return
+	}
+
+	// respond with our version
+	if err := encoding.WriteObject(conn, version); err != nil {
+		conn.Close()
+		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
 	}
 
@@ -162,12 +169,17 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 	if err := encoding.WriteObject(conn, version); err != nil {
 		return err
 	}
-	// read ack
-	var ack string
-	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+	// read version ack
+	var remoteVersion string
+	if err := encoding.ReadObject(conn, &remoteVersion, maxAddrLength); err != nil {
 		return err
-	} else if ack != "accept" {
+	} else if remoteVersion == "reject" {
 		return errors.New("peer rejected connection")
+	}
+	// decide whether to accept this version
+	if remoteVersion != version {
+		conn.Close()
+		return errors.New("unacceptable version: " + remoteVersion)
 	}
 
 	g.log.Println("INFO: connected to new peer", addr)

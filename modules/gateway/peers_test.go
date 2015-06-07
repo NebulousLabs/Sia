@@ -40,7 +40,7 @@ func TestListen(t *testing.T) {
 	var ack string
 	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
 		t.Fatal(err)
-	} else if ack != "accept" {
+	} else if ack == "reject" {
 		t.Fatal("gateway should have given ack")
 	}
 
