@@ -53,15 +53,18 @@ func (srv *Server) minerSubmitBlockHandler(w http.ResponseWriter, req *http.Requ
 	encodedBlock, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	err = encoding.Unmarshal(encodedBlock, &b)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	err = srv.miner.SubmitBlock(b)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	writeSuccess(w)
 }
