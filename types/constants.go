@@ -124,7 +124,7 @@ func init() {
 		// premine 100 blocks in a day. It was known to the developrs at launch
 		// this this was at least one and perhaps two orders of magnitude too
 		// small.
-		RootTarget = Target{0, 0, 0, 4}
+		RootTarget = Target{0, 0, 0, 0, 32}
 
 		// When the difficulty is adjusted, it is adjusted by looking at the
 		// timestamp of the 1000th previous block. This minimizes the abilities
