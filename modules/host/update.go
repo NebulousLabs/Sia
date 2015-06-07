@@ -10,48 +10,13 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// threadedCreateStorageProof creates a storage proof for a file contract
-// obligation and submits it to the blockchain.
-func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
-	fullpath := filepath.Join(h.saveDir, obligation.Path)
-	file, err := os.Open(fullpath)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer file.Close()
-
-	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
-	if err != nil {
-		fmt.Println(err)
-	}
-	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	sp := types.StorageProof{obligation.ID, base, hashSet}
-
-	// Create and send the transaction.
-	id, err := h.wallet.RegisterTransaction(types.Transaction{})
-	if err != nil {
-		fmt.Println(err)
-	}
-	_, _, err = h.wallet.AddStorageProof(id, sp)
-	if err != nil {
-		fmt.Println(err)
-	}
-	t, err := h.wallet.SignTransaction(id, true)
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = h.tpool.AcceptTransaction(t)
-	if err != nil {
-		fmt.Println(err)
-	}
-
+// threadedDeleteObligation deletes a file obligation.
+func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 	// Delete the obligation.
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
+
+	fullpath := filepath.Join(h.saveDir, obligation.Path)
 	stat, err := os.Stat(fullpath)
 	if err != nil {
 		fmt.Println(err)
@@ -63,6 +28,55 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 	h.profit = h.profit.Add(obligation.FileContract.Payout)
 
 	_ = h.save() // TODO: Some way to communicate that the save failed.
+}
+
+// threadedCreateStorageProof creates a storage proof for a file contract
+// obligation and submits it to the blockchain.
+func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
+	defer h.threadedDeleteObligation(obligation)
+
+	fullpath := filepath.Join(h.saveDir, obligation.Path)
+	file, err := os.Open(fullpath)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	sp := types.StorageProof{obligation.ID, base, hashSet}
+
+	// Create and send the transaction.
+	id, err := h.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_, _, err = h.wallet.AddStorageProof(id, sp)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	t, err := h.wallet.SignTransaction(id, true)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = h.tpool.AcceptTransaction(t)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }
 
 // RecieveConsensusSetUpdate will be called by the consensus set every time
