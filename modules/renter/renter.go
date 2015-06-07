@@ -95,6 +95,9 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	for _, host := range hosts {
 		averagePrice = averagePrice.Add(host.Price)
 	}
+	if len(hosts) == 0 {
+		return
+	}
 	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
 	// HACK: 6000 is the duration (set by the API), and 1024^3 is a GB. Price
 	// is reported as per GB, no timeframe is given.
