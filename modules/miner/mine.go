@@ -8,7 +8,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -68,10 +67,8 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 		m.mu.Lock()
 		m.tpool.PurgeTransactionPool()
 		m.mu.Unlock()
+		fmt.Println("Error: an invalid block was submitted:", err)
 		return err
-	}
-	if build.Release != "testing" {
-		fmt.Println("Found a block! Reward will be received in 50 blocks.")
 	}
 
 	// Grab a new address for the miner.
