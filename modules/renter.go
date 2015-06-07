@@ -71,6 +71,7 @@ type DownloadInfo interface {
 // RentInfo contains a list of all files by nickname. (deprecated)
 type RentInfo struct {
 	Files []string
+	Price types.Currency
 }
 
 // A Renter uploads, tracks, repairs, and downloads a set of files for the
