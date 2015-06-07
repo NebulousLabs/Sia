@@ -5,28 +5,52 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Create a proof of storage for a contract, using the state height to
-// determine the random seed. Create proof must be under a host and state lock.
-func (h *Host) createStorageProof(obligation contractObligation, heightForProof types.BlockHeight) (err error) {
+// threadedDeleteObligation deletes a file obligation.
+func (h *Host) threadedDeleteObligation(obligation contractObligation) {
+	// Delete the obligation.
+	lockID := h.mu.Lock()
+	defer h.mu.Unlock(lockID)
+
+	fullpath := filepath.Join(h.saveDir, obligation.Path)
+	stat, err := os.Stat(fullpath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	h.deallocate(uint64(stat.Size()), obligation.Path)
+	delete(h.obligationsByID, obligation.ID)
+
+	// Storage proof was successful, so increment profit tracking
+	h.profit = h.profit.Add(obligation.FileContract.Payout)
+
+	_ = h.save() // TODO: Some way to communicate that the save failed.
+}
+
+// threadedCreateStorageProof creates a storage proof for a file contract
+// obligation and submits it to the blockchain.
+func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
+	defer h.threadedDeleteObligation(obligation)
+
 	fullpath := filepath.Join(h.saveDir, obligation.Path)
 	file, err := os.Open(fullpath)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	defer file.Close()
 
 	segmentIndex, err := h.cs.StorageProofSegment(obligation.ID)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	base, hashSet, err := crypto.BuildReaderProof(file, segmentIndex)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
@@ -35,24 +59,24 @@ func (h *Host) createStorageProof(obligation contractObligation, heightForProof 
 	// Create and send the transaction.
 	id, err := h.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	_, _, err = h.wallet.AddStorageProof(id, sp)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	t, err := h.wallet.SignTransaction(id, true)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	err = h.tpool.AcceptTransaction(t)
 	if err != nil {
-		if build.DEBUG {
-			panic(err)
-		}
+		fmt.Println(err)
+		return
 	}
-
-	return
 }
 
 // RecieveConsensusSetUpdate will be called by the consensus set every time
@@ -65,36 +89,14 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 
 	// Check the applied blocks and see if any of the contracts we have are
 	// ready for storage proofs.
-	shouldSave := false
 	for _ = range cc.AppliedBlocks {
 		h.blockHeight++
-
 		for _, obligation := range h.obligationsByHeight[h.blockHeight] {
-			// Submit a storage proof for the obligation.
-			err := h.createStorageProof(obligation, h.blockHeight)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-
-			// Storage proof was successful, so increment profit tracking
-			h.profit.Add(obligation.FileContract.Payout)
-
-			// Delete the obligation.
-			fullpath := filepath.Join(h.saveDir, obligation.Path)
-			stat, err := os.Stat(fullpath)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			h.deallocate(uint64(stat.Size()), obligation.Path) // TODO: file might actually be the wrong size.
-			shouldSave = true
-			delete(h.obligationsByID, obligation.ID)
+			go h.threadedCreateStorageProof(obligation, h.blockHeight)
 		}
+		// TODO: If something happens while the storage proofs are being
+		// created, those files will never get cleared from the host.
 		delete(h.obligationsByHeight, h.blockHeight)
-	}
-	if shouldSave {
-		_ = h.save() // TODO: Some way to communicate that the save failed.
 	}
 
 	go h.updateSubscribers()
