@@ -66,9 +66,6 @@ func (r *Renter) threadedUploadPiece(host modules.HostSettings, up modules.FileU
 		// unsuccessful, we need to try again with a new host.
 		err := r.negotiateContract(host, up, piece)
 		if err == nil {
-			lockID := r.mu.Lock()
-			piece.Repairing = false
-			r.mu.Unlock(lockID)
 			return nil
 		}
 
