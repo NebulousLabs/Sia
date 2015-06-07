@@ -83,8 +83,22 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	lockID := r.mu.RLock()
 	defer r.mu.RUnlock(lockID)
 
+	// Include the list of files the renter knows about.
 	for filename := range r.files {
 		ri.Files = append(ri.Files, filename)
 	}
+
+	// Calculate the average cost of a file.
+	var averagePrice types.Currency
+	sampleSize := redundancy * 2
+	hosts := r.hostDB.RandomHosts(sampleSize)
+	for _, host := range hosts {
+		averagePrice = averagePrice.Add(host.Price)
+	}
+	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(6000)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
+	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
+	ri.Price = bufferedCost
+
 	return
 }

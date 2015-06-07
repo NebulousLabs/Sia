@@ -74,6 +74,7 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
 	handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
 	handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
+	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler) // TODO: alter
 
 	// TransactionPool API Calls
 	handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)

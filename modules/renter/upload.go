@@ -39,7 +39,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	for _, host := range hosts {
 		averagePrice = averagePrice.Add(host.Price)
 	}
-	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(sampleSize)))
+	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
 
