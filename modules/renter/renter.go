@@ -90,7 +90,7 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	// Calculate the average cost of a file.
 	var averagePrice types.Currency
-	sampleSize := redundancy * 2
+	sampleSize := redundancy * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
 		averagePrice = averagePrice.Add(host.Price)
@@ -104,6 +104,9 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(6000)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
 	ri.Price = bufferedCost
+
+	// Report the number of known hosts.
+	ri.KnownHosts = len(r.hostDB.ActiveHosts())
 
 	return
 }
