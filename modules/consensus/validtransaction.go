@@ -208,11 +208,11 @@ func (s *State) validTransaction(t types.Transaction) error {
 	if err != nil {
 		return err
 	}
-	err = s.validFileContractRevisions(t)
+	err = s.validStorageProofs(t)
 	if err != nil {
 		return err
 	}
-	err = s.validStorageProofs(t)
+	err = s.validFileContractRevisions(t)
 	if err != nil {
 		return err
 	}

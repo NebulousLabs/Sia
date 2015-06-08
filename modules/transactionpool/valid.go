@@ -149,9 +149,8 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t types.Transaction) (err
 		return
 	}
 
-	// Check that the transaction follows general rules - this check looks at
-	// rules for transactions contianing storage proofs, the rules for file
-	// contracts, and the rules for signatures.
+	// StandaloneValid will check things like signatures and properties that
+	// should be inherent to the transaction. (storage proof rules, etc.)
 	err = t.StandaloneValid(tp.consensusSetHeight)
 	if err != nil {
 		return
@@ -167,9 +166,6 @@ func (tp *TransactionPool) validUnconfirmedTransaction(t types.Transaction) (err
 	if err != nil {
 		return
 	}
-	// File contracts don't need to be checked as all potential problems are
-	// checked by a combination of StandaloneValid and
-	// ValidUnconfirmedSiacoins.
 	err = tp.validUnconfirmedFileContractRevisions(t)
 	if err != nil {
 		return
