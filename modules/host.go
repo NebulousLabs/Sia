@@ -31,6 +31,8 @@ type HostInfo struct {
 	NumContracts     int
 	Profit           types.Currency
 	PotentialProfit  types.Currency
+
+	Competition types.Currency
 }
 
 type Host interface {

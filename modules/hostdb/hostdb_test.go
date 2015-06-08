@@ -100,7 +100,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	}
 
 	// Create the host.
-	h, err := host.New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
