@@ -85,11 +85,11 @@ func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool,
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 10e9,                      // 10 GB
-			MaxFilesize:  1e9,                       // 1 GB
-			MaxDuration:  144 * 60,                  // 60 days
-			WindowSize:   288,                       // 48 hours
-			Price:        types.NewCurrency64(1e15), // 3 siacoin / mb / week
+			TotalStorage: 10e9,                        // 10 GB
+			MaxFilesize:  1e9,                         // 1 GB
+			MaxDuration:  144 * 60,                    // 60 days
+			WindowSize:   288,                         // 48 hours
+			Price:        types.NewCurrency64(100e12), // 0.1 siacoin / mb / week
 			Collateral:   types.NewCurrency64(0),
 			UnlockHash:   coinAddr,
 		},
