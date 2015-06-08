@@ -13,17 +13,21 @@ import (
 
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
-type ExplorerBlockchain struct {
+type ExplorerState struct {
 	// The current state of all the blocks should be stored in
 	// this slice.
 	Blocks []types.Block
+
+	// cs provides a link to the current consensus so that it can
+	// be queried real time. Used mostly in CurBlock
+	cs modules.ConsensusSet
 
 	mu *sync.RWMutex
 }
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet) (bc *ExplorerBlockchain, err error) {
+func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
 
 	// Check that input modules are non-nil
 	if cs == nil {
@@ -31,14 +35,18 @@ func New(cs modules.ConsensusSet) (bc *ExplorerBlockchain, err error) {
 		return
 	}
 
-	// Need to figure out how to query the entire blockchain.
-	bc = &ExplorerBlockchain{
+	//
+	bc = &ExplorerState{
 		Blocks: make([]types.Block, 0),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		cs:     cs,
+		mu:     sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	cs.ConsensusSetSubscribe(bc)
 
 	return
+}
+
+func (es *ExplorerState) CurrentBlock() types.Block {
+	return es.cs.CurrentBlock()
 }

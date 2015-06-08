@@ -86,6 +86,9 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
 
+	// BlockExplorer API Calls
+	handleHTTPRequest(mux, "/blockexplorer/currentblock", srv.blockexplorerCurrentBlockHandler)
+
 	// create graceful HTTP server
 	srv.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
