@@ -8,19 +8,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// The blockexplore module provides a glimpse into what the blockchain
-// currently looks like. It stores a copy of the blockchain
+// The blockexplorer module provides a glimpse into what the blockchain
+// currently looks like.
 
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
 type ExplorerState struct {
-	// The current state of all the blocks should be stored in
-	// this slice.
-	Blocks []types.Block
+	// CurBlock is the current highest block on the blockchain,
+	// kept update via a subscription to consensus
+	currentBlock types.Block
 
-	// cs provides a link to the current consensus so that it can
-	// be queried real time. Used mostly in CurBlock
-	cs modules.ConsensusSet
+	// Used for caching the current blockchain height
+	blockchainHeight types.BlockHeight
 
 	mu *sync.RWMutex
 }
@@ -35,11 +34,11 @@ func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
 		return
 	}
 
-	//
+	// Initilize the module state
 	bc = &ExplorerState{
-		Blocks: make([]types.Block, 0),
-		cs:     cs,
-		mu:     sync.New(modules.SafeMutexDelay, 1),
+		currentBlock:     cs.CurrentBlock(),
+		blockchainHeight: 0,
+		mu:               sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	cs.ConsensusSetSubscribe(bc)
@@ -47,6 +46,10 @@ func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
 	return
 }
 
+// Returns the current block, as known by the current ExplorerState
 func (es *ExplorerState) CurrentBlock() types.Block {
-	return es.cs.CurrentBlock()
+	lockID := es.mu.RLock()
+	defer es.mu.RUnlock(lockID)
+
+	return es.currentBlock
 }
