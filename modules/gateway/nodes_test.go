@@ -49,39 +49,45 @@ func TestRemoveNode(t *testing.T) {
 func TestRandomNode(t *testing.T) {
 	g := newTestingGateway("TestRandomNode", t)
 	defer g.Close()
-	id := g.mu.RLock()
 
+	id := g.mu.RLock()
 	if addr, err := g.randomNode(); err != nil {
 		t.Fatal("randomNode failed:", err)
 	} else if addr != g.Address() {
 		t.Fatal("randomNode returned wrong address:", addr)
 	}
 	g.mu.RUnlock(id)
-	g.removeNode(g.Address())
+
 	id = g.mu.Lock()
+	g.removeNode(g.myAddr)
+	g.mu.Unlock(id)
+
+	id = g.mu.RLock()
 	if _, err := g.randomNode(); err != errNoPeers {
 		t.Fatalf("randomNode returned wrong error: expected %v, got %v", errNoPeers, err)
 	}
+	g.mu.RUnlock(id)
 
 	nodes := map[modules.NetAddress]int{
 		"111.111.111.111:1111": 0,
 		"111.111.111.111:2222": 0,
 		"111.111.111.111:3333": 0,
 	}
+	id = g.mu.Lock()
 	for addr := range nodes {
 		g.addNode(addr)
 	}
 	g.mu.Unlock(id)
 
+	id = g.mu.RLock()
 	for i := 0; i < len(nodes)*10; i++ {
-		id = g.mu.RLock()
 		addr, err := g.randomNode()
-		g.mu.RUnlock(id)
 		if err != nil {
 			t.Fatal("randomNode failed:", err)
 		}
 		nodes[addr]++
 	}
+	g.mu.RUnlock(id)
 	for node, count := range nodes {
 		if count == 0 { // 1-in-200000 chance of occuring naturally
 			t.Errorf("node %v was never selected", node)
@@ -96,7 +102,9 @@ func TestShareNodes(t *testing.T) {
 	defer g2.Close()
 
 	// add a node to g2
+	id := g2.mu.Lock()
 	g2.addNode(dummyNode)
+	g2.mu.Unlock(id)
 
 	// connect
 	err := g1.Connect(g2.Address())
@@ -110,8 +118,12 @@ func TestShareNodes(t *testing.T) {
 	}
 
 	// remove all nodes from both peers
+	id = g1.mu.Lock()
 	g1.nodes = map[modules.NetAddress]struct{}{}
+	g1.mu.Unlock(id)
+	id = g2.mu.Lock()
 	g2.nodes = map[modules.NetAddress]struct{}{}
+	g2.mu.Unlock(id)
 
 	// SharePeers should now return no peers
 	var nodes []modules.NetAddress
@@ -150,7 +162,9 @@ func TestRelayNodes(t *testing.T) {
 
 	// overwrite g3's address with a non-loopback address;
 	// otherwise it will be rejected
+	id := g3.mu.Lock()
 	g3.myAddr = dummyNode
+	g3.mu.Unlock(id)
 
 	// connect g2 to g1
 	err := g2.Connect(g1.Address())
@@ -166,7 +180,7 @@ func TestRelayNodes(t *testing.T) {
 
 	// g2 should have received g3's address from g1
 	time.Sleep(100 * time.Millisecond)
-	id := g2.mu.RLock()
+	id = g2.mu.RLock()
 	defer g2.mu.RUnlock(id)
 	if _, ok := g2.nodes[g3.Address()]; !ok {
 		t.Fatal("node was not relayed:", g2.nodes)

@@ -81,7 +81,9 @@ func TestConnect(t *testing.T) {
 	defer bootstrap.Close()
 
 	// give it a node
+	id := bootstrap.mu.Lock()
 	bootstrap.addNode(dummyNode)
+	bootstrap.mu.Unlock(id)
 
 	// create peer who will connect to bootstrap
 	g := newTestingGateway("TestConnect2", t)
@@ -112,7 +114,7 @@ func TestConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	// g should have the node
-	id := g.mu.RLock()
+	id = g.mu.RLock()
 	defer g.mu.RUnlock(id)
 	if _, ok := g.nodes[dummyNode]; !ok {
 		t.Fatal("bootstrapper should have received dummyNode:", g.nodes)
