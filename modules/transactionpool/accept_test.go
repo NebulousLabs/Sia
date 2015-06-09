@@ -75,6 +75,48 @@ func TestDuplicateTransaction(t *testing.T) {
 	txn := tpt.addSiacoinTransactionToPool()
 	err := tpt.tpool.AcceptTransaction(txn)
 	if err != modules.ErrTransactionPoolDuplicate {
-		t.Fatal("expecting ErrDuplicate got:", err)
+		t.Fatal("expecting ErrTransactionPoolDuplicate got:", err)
+	}
+}
+
+/* TODO: Implement wallet fee adding to test ErrLargeTransactionPool
+func TestLargePoolTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	tpt := newTpoolTester("TestLargePoolTransaction", t)
+	// Needed: for loop to add Transactions until transactionPoolSize = 60 MB?
+	txn := tpt.addSiacoinTransactionToPool()
+
+	// Test the transaction that should be rejected at >60 MB
+	err := tpt.tpool.AcceptTransaction(txn)
+	if err != ErrLargeTransactionPool {
+		t.Fatal("expecting ErrLargeTransactionPool got:", err)
+	}
+}
+*/
+
+func TestLowFeeTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	tpt := newTpoolTester("TestLowFeeTransaction", t)
+	emptyData := string(make([]byte, 15e3))
+	txn := types.Transaction{
+		ArbitraryData: []string{"NonSia" + emptyData},
+	}
+	emptyTransSize := len(encoding.Marshal(txn))
+
+	// Fill to 20 MB
+	for i := 0; j < TransactionPoolSizeForFee/emptyTransSize; j++ {
+		tpt.tpool.AcceptTransaction(txn)
+	}
+
+	// Should be the straw to break the camel's back (i.e. the transaction at >20 MB)
+	err := tpt.tpool.AcceptTransaction(txn)
+	if err != ErrLowMinerFees {
+		t.Fatal("expecting ErrLowMinerFees got:", err)
 	}
 }

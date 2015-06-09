@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	transactionPoolSizeLimit  = 60 * 1024 * 1024
-	transactionPoolSizeForFee = 20 * 1024 * 1024
+	TransactionPoolSizeLimit  = 60 * 1024 * 1024
+	TransactionPoolSizeForFee = 20 * 1024 * 1024
 )
 
 var (
 	ErrLargeTransactionPool = errors.New("transaction size limit reached within pool")
 	ErrLowMinerFees         = errors.New("transaction miner fees too low to be accepted")
-	transactionMinFee       = types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
+	TransactionMinFee       = types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
 )
 
 // accept.go is responsible for applying a transaction to the transaction pool.
@@ -196,15 +196,15 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
 	transactionPoolSize := len(encoding.Marshal(tp.TransactionSet()))
 
-	if transactionPoolSize > transactionPoolSizeLimit {
+	if transactionPoolSize > TransactionPoolSizeLimit {
 		return ErrLargeTransactionPool
 	}
-	if transactionPoolSize > transactionPoolSizeForFee {
+	if transactionPoolSize > TransactionPoolSizeForFee {
 		var feeSum types.Currency
 		for _, fee := range t.MinerFees {
 			feeSum = feeSum.Add(fee)
 		}
-		if feeSum.Cmp(transactionMinFee) < 0 {
+		if feeSum.Cmp(TransactionMinFee) < 0 {
 			return ErrLowMinerFees
 		}
 	}
