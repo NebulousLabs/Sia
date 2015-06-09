@@ -96,10 +96,17 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 // updateSubscribers adds another entry to the update list and informs the
 // update threads (via channels) that there's a new update to send.
 func (tp *TransactionPool) updateSubscribers(cc modules.ConsensusChange, unconfirmedTransactions []types.Transaction, diffs []modules.SiacoinOutputDiff) {
-	// Add the changes to the update set.
+	// Copy tp.unconfirmedTransactions to a separate memory slice -
+	// tp.unconfirmedTransactions is constantly changing. cc should have
+	// already been made safe by the consensus package.
+	safeTxns := make([]types.Transaction, len(unconfirmedTransactions))
+	safeDiffs := make([]modules.SiacoinOutputDiff, len(diffs))
+	copy(safeTxns, unconfirmedTransactions)
+	copy(safeDiffs, diffs)
+
 	tp.consensusChanges = append(tp.consensusChanges, cc)
-	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, unconfirmedTransactions)
-	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, diffs)
+	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, safeTxns)
+	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, safeDiffs)
 
 	// Pass the update to every subscriber.
 	for _, subscriber := range tp.subscribers {
