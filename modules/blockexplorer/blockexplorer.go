@@ -22,26 +22,20 @@ type BlockExplorer struct {
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
 
-	// currencySent and currencySpent keep a sum of transaction volumes
-	// To get a total transaction volume, programs can simply sum them up
-	//
-	// currencySent keeps track of ordinary transactions
+	// currencySent keeps track of how much currency has been
 	// i.e. sending siacoin to somebody else
 	currencySent types.Currency
 
-	// currencySpent holds a sum of currency spent on file contracts
-	currencySpent types.Currency
+	// fileContracts holds the current number of file contracts
+	fileContracts uint64
 
-	// Store the timestamps of the most recent block, so that we
-	// can caluculate a moving average of the time it took to mine
-	// a block
-	//
-	// Note: the TimestampSlice is not being used, due to this not
-	// being a particularly formal setting.
-	timestamps []types.Timestamp
+	// fileContractCost hold the amout of currency tied up in file
+	// contracts
+	fileContractCost types.Currency
 
-	// Store the block sizes, so that it can be queried later
-	blockSizes []uint64
+	// Stores a few data points for each block:
+	// Timestamp, target and size
+	blocks []modules.BlockData
 
 	// Keep a reference to the consensus for queries
 	cs modules.ConsensusSet
@@ -67,9 +61,9 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 		currentBlock:     cs.GenesisBlock(),
 		blockchainHeight: 0,
 		currencySent:     types.NewCurrency64(0),
-		currencySpent:    types.NewCurrency64(0),
-		timestamps:       make([]types.Timestamp, 0),
-		blockSizes:       make([]uint64, 0),
+		fileContracts:    0,
+		fileContractCost: types.NewCurrency64(0),
+		blocks:           make([]modules.BlockData, 0),
 		cs:               cs,
 		mu:               sync.New(modules.SafeMutexDelay, 1),
 	}

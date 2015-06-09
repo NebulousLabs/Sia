@@ -4,13 +4,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-type ExplorerInfo struct {
-	CurrentBlock   types.Block       // The most recent block from consensus
-	Target         types.Target      // The current target
-	BlockchainSize types.BlockHeight // The height of the highest block
-	CurrencyTotal  types.Currency    // The total amount of currency in circulation
-	CurrencySent   types.Currency    // How much currency has been sent to other people
-	CurrencySpent  types.Currency    // How much has been spent on file contracts
+type BlockData struct {
+	Timestamp types.Timestamp // The timestamp on the block
+	Target    types.Target    // The target the block was mined for
+	Size      uint64          // The size in bytes of the marshalled block
 }
 
 // The BlockExplorer interface provides access to the block explorer
