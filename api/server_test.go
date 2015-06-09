@@ -100,13 +100,13 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
-	h, err := host.New(cs, tp, w, ":0", filepath.Join(testdir, "host"))
-	if err != nil {
-		t.Fatal("Failed to create host:", err)
-	}
 	hdb, err := hostdb.New(cs, g)
 	if err != nil {
 		t.Fatal("Failed to create hostdb:", err)
+	}
+	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, "host"))
+	if err != nil {
+		t.Fatal("Failed to create host:", err)
 	}
 	r, err := renter.New(cs, hdb, w, filepath.Join(testdir, "renter"))
 	if err != nil {

@@ -45,11 +45,11 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	host, err := host.New(state, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
+	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
 		return err
 	}
-	hostdb, err := hostdb.New(state, gateway)
+	host, err := host.New(state, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
 	if err != nil {
 		return err
 	}

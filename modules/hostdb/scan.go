@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	DefaultScanSleep = 15 * time.Hour
-	MaxScanSleep     = 20 * time.Hour
-	MinScanSleep     = 4 * time.Hour
+	DefaultScanSleep = 4 * time.Hour
+	MaxScanSleep     = 8 * time.Hour
+	MinScanSleep     = 1 * time.Hour
 
 	MaxActiveHosts              = 200
 	InactiveHostCheckupQuantity = 100

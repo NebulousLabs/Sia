@@ -31,6 +31,7 @@ type contractObligation struct {
 // performing the storage proofs on the received files.
 type Host struct {
 	cs          *consensus.State
+	hostdb      modules.HostDB
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
@@ -54,9 +55,13 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (h *Host, err error) {
+func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (h *Host, err error) {
 	if cs == nil {
 		err = errors.New("host cannot use a nil state")
+		return
+	}
+	if hdb == nil {
+		err = errors.New("host cannot use a nil hostdb")
 		return
 	}
 	if tpool == nil {
@@ -74,16 +79,17 @@ func New(cs *consensus.State, tpool modules.TransactionPool, wallet modules.Wall
 	}
 	h = &Host{
 		cs:     cs,
+		hostdb: hdb,
 		tpool:  tpool,
 		wallet: wallet,
 
 		// default host settings
 		HostSettings: modules.HostSettings{
-			TotalStorage: 10e9,                      // 10 GB
-			MaxFilesize:  1e9,                       // 1 GB
-			MaxDuration:  144 * 60,                  // 60 days
-			WindowSize:   288,                       // 48 hours
-			Price:        types.NewCurrency64(3e15), // 3 siacoin / mb / week
+			TotalStorage: 10e9,                        // 10 GB
+			MaxFilesize:  1e9,                         // 1 GB
+			MaxDuration:  144 * 60,                    // 60 days
+			WindowSize:   288,                         // 48 hours
+			Price:        types.NewCurrency64(100e12), // 0.1 siacoin / mb / week
 			Collateral:   types.NewCurrency64(0),
 			UnlockHash:   coinAddr,
 		},
@@ -157,6 +163,23 @@ func (h *Host) Info() modules.HostInfo {
 		fc := obligation.FileContract
 		info.PotentialProfit = info.PotentialProfit.Add(fc.Payout.Sub(fc.Tax()))
 	}
+
+	// Calculate estimated competition (reported in per GB per month). Price
+	// calculated by taking the average of 8 ranomly selected weighted hosts.
+	var averagePrice types.Currency
+	// TODO: 8 is the sample size - to be made a constant.
+	hosts := h.hostdb.RandomHosts(8)
+	for _, host := range hosts {
+		averagePrice = averagePrice.Add(host.Price)
+	}
+	if len(hosts) == 0 {
+		return info
+	}
+	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	// HACK: 4320 is one month, and 1024^3 is a GB. Price is reported as per GB
+	// per month.
+	estimatedCost := averagePrice.Mul(types.NewCurrency64(4320)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
+	info.Competition = estimatedCost
 
 	return info
 }

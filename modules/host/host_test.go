@@ -8,6 +8,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -53,38 +54,32 @@ func (ht *hostTester) tpUpdateWait() {
 func CreateHostTester(name string, t *testing.T) *hostTester {
 	testdir := build.TempDir(modules.HostDir, name)
 
-	// Create the gateway.
+	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the transaction pool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the host.
-	h, err := New(cs, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
+	hdb, err := hostdb.New(cs, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}

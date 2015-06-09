@@ -89,21 +89,24 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 	}
 
 	// Calculate the average cost of a file.
-	var averagePrice types.Currency
-	sampleSize := redundancy * 2
+	var totalPrice types.Currency
+	sampleSize := redundancy * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
-		averagePrice = averagePrice.Add(host.Price)
+		totalPrice = totalPrice.Add(host.Price)
 	}
 	if len(hosts) == 0 {
 		return
 	}
-	averagePrice = averagePrice.Div(types.NewCurrency64(uint64(len(hosts))))
+	averagePrice := totalPrice.Mul(types.NewCurrency64(2)).Div(types.NewCurrency64(3))
 	// HACK: 6000 is the duration (set by the API), and 1024^3 is a GB. Price
 	// is reported as per GB, no timeframe is given.
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(6000)).Mul(types.NewCurrency64(1024 * 1024 * 1024))
-	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
+	bufferedCost := estimatedCost.Mul(types.NewCurrency64(4)).Div(types.NewCurrency64(3))
 	ri.Price = bufferedCost
+
+	// Report the number of known hosts.
+	ri.KnownHosts = len(r.hostDB.ActiveHosts())
 
 	return
 }

@@ -19,7 +19,7 @@ const (
 var (
 	errUploadFailed = errors.New("failed to upload to the desired host")
 
-	redundancy = 15
+	redundancy = 8
 )
 
 // checkWalletBalance looks at an upload and determines if there is enough
@@ -34,7 +34,7 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	curSize := types.NewCurrency64(uint64(fileInfo.Size()))
 
 	var averagePrice types.Currency
-	sampleSize := redundancy * 2
+	sampleSize := redundancy * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {
 		averagePrice = averagePrice.Add(host.Price)
