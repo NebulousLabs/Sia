@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -110,8 +111,11 @@ func TestLowFeeTransaction(t *testing.T) {
 	emptyTransSize := len(encoding.Marshal(txn))
 
 	// Fill to 20 MB
-	for i := 0; j < TransactionPoolSizeForFee/emptyTransSize; j++ {
-		tpt.tpool.AcceptTransaction(txn)
+	for i := 0; i < TransactionPoolSizeForFee/emptyTransSize; i++ {
+		err := tpt.tpool.AcceptTransaction(txn)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	// Should be the straw to break the camel's back (i.e. the transaction at >20 MB)

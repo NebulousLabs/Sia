@@ -194,7 +194,7 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 // checkMinerFees checks that all MinerFees are valid within the context of the
 // transactionpool given parameters to prevention DoS
 func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
-	transactionPoolSize := len(encoding.Marshal(tp.TransactionSet()))
+	transactionPoolSize := len(encoding.Marshal(tp.transactionList))
 
 	if transactionPoolSize > TransactionPoolSizeLimit {
 		return ErrLargeTransactionPool
