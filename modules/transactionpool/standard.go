@@ -20,12 +20,12 @@ import (
 //   Purpose: Leave room for more involved soft-forks in the future.
 
 const (
-	PrefixNonSia         	    = "NonSia"
-	TransactionSizeLimit 	    = 16 * 1024
+	PrefixNonSia         = "NonSia"
+	TransactionSizeLimit = 16 * 1024
 )
 
 var (
-	ErrLargeTransaction 		= errors.New("transaction is too large")
+	ErrLargeTransaction = errors.New("transaction is too large")
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
