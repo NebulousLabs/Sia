@@ -52,7 +52,8 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock(id)
 	}
 
-	conn.Close()
+	// a simple 'conn.Close' would not obey the muxado disconnect protocol
+	muxado.Client(conn).Close()
 
 	// g should remove the peer
 	for ok {
@@ -166,15 +167,19 @@ func TestMakeOutboundConnections(t *testing.T) {
 	id := g1.mu.Lock()
 	for i := 0; i < 8; i++ {
 		peerAddr := modules.NetAddress("foo" + strconv.Itoa(i))
-		g1.addPeer(&peer{addr: peerAddr, sess: muxado.Client(nil)})
+		g1.peers[peerAddr] = &peer{addr: peerAddr, sess: nil}
 	}
 	g1.mu.Unlock(id)
 
 	// makeOutboundConnections should now sleep for 5 seconds
 	time.Sleep(1 * time.Second)
+
 	// remove a peer while makeOutboundConnections is asleep, and add a new
 	// connectable address to the node list
-	g1.Disconnect("foo1")
+	id = g1.mu.Lock()
+	delete(g1.peers, "foo1")
+	g1.mu.Unlock(id)
+
 	g2 := newTestingGateway("TestMakeOutboundConnections2", t)
 	defer g2.Close()
 	id = g1.mu.Lock()

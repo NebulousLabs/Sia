@@ -104,11 +104,6 @@ func TestRPC(t *testing.T) {
 	if err := g1.RPC(g2.Address(), "Foo", nil); err == nil {
 		t.Fatal("RPC on closed peer connection succeeded")
 	}
-
-	err = g1.Disconnect(g2.Address())
-	if err != nil {
-		t.Fatal("failed to disconnect:", err)
-	}
 }
 
 func TestThreadedHandleConn(t *testing.T) {
