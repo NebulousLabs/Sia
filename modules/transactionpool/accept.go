@@ -9,6 +9,17 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	transactionPoolSizeLimit  = 60 * 1024 * 1024
+	transactionPoolSizeForFee = 20 * 1024 * 1024
+)
+
+var (
+	ErrLargeTransactionPool = errors.New("transaction size limit reached within pool")
+	ErrLowMinerFees         = errors.New("transaction miner fees too low to be accepted")
+	transactionMinFee       = types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
+)
+
 // accept.go is responsible for applying a transaction to the transaction pool.
 // Validation is handled by valid.go. The componenets of the transcation are
 // added to the unconfirmed consensus set piecemeal, and then the transaction
@@ -183,13 +194,10 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 // checkMinerFees checks that all MinerFees are valid within the context of the
 // transactionpool given parameters to prevention DoS
 func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
-	const transactionPoolSizeLimit = 60 * 1024 * 1024
-	const transactionPoolSizeForFee = 20 * 1024 * 1024
-	transactionPoolSize := len(encoding.Marshal(t))
-	transactionMinFee := types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
+	transactionPoolSize := len(encoding.Marshal(tp.TransactionSet()))
 
 	if transactionPoolSize > transactionPoolSizeLimit {
-		return errors.New("transaction limit reached within pool")
+		return ErrLargeTransactionPool
 	}
 	if transactionPoolSize > transactionPoolSizeForFee {
 		var feeSum types.Currency
@@ -197,7 +205,7 @@ func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
 			feeSum = feeSum.Add(fee)
 		}
 		if feeSum.Cmp(transactionMinFee) < 0 {
-			return errors.New("miner fees too low for transaction")
+			return ErrLowMinerFees
 		}
 	}
 	return

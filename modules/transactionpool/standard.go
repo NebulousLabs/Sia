@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	errLargeTransaction 	= errors.New("transaction is too large")
+	ErrLargeTransaction 		= errors.New("transaction is too large")
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -55,7 +55,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// more difficult for attackers to exploid this DOS vector, though a miner
 	// with sufficient power could still create unfriendly blocks.
 	if len(encoding.Marshal(t)) > TransactionSizeLimit {
-		return errLargeTransaction
+		return ErrLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all
