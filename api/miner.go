@@ -16,6 +16,13 @@ func (srv *Server) minerBlockforworkHandler(w http.ResponseWriter, req *http.Req
 	w.Write(encoding.MarshalAll(target, bfw.Header(), bfw))
 }
 
+// minerHeaderforworkHandler handles the API call that retrieves a block header
+// for work.
+func (srv *Server) minerHeaderforworkHandler(w http.ResponseWriter, req *http.Request) {
+	bhfw, target := srv.miner.HeaderForWork()
+	w.Write(encoding.MarshalAll(target, bhfw))
+}
+
 // minerStartHandler handles the API call that starts the miner.
 func (srv *Server) minerStartHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan for the number of threads.
@@ -47,8 +54,8 @@ func (srv *Server) minerStopHandler(w http.ResponseWriter, req *http.Request) {
 	writeSuccess(w)
 }
 
-// minerSubmitBlockHandler handles the API call to submit a block to the miner.
-func (srv *Server) minerSubmitBlockHandler(w http.ResponseWriter, req *http.Request) {
+// minerSubmitblockHandler handles the API call to submit a block to the miner.
+func (srv *Server) minerSubmitblockHandler(w http.ResponseWriter, req *http.Request) {
 	var b types.Block
 	encodedBlock, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -62,6 +69,28 @@ func (srv *Server) minerSubmitBlockHandler(w http.ResponseWriter, req *http.Requ
 	}
 
 	err = srv.miner.SubmitBlock(b)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// minerSubmitheaderHandler handles the API call to submit a block header to the
+// miner.
+func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Request) {
+	var bh types.BlockHeader
+	encodedHeader, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = encoding.Unmarshal(encodedHeader, &bh)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.miner.SubmitHeader(bh)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
