@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"errors"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -179,6 +180,29 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 	}
 }
 
+// checkMinerFees checks that all MinerFees are valid within the context of the
+// transactionpool given parameters to prevention DoS
+func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
+	const transactionPoolSizeLimit = 60 * 1024 * 1024
+	const transactionPoolSizeForFee = 20 * 1024 * 1024
+	transactionPoolSize := len(encoding.Marshal(t))
+	transactionMinFee := types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
+
+	if transactionPoolSize > transactionPoolSizeLimit {
+		return errors.New("transaction limit reached within pool")
+	}
+	if transactionPoolSize > transactionPoolSizeForFee {
+		var feeSum types.Currency
+		for _, fee := range t.MinerFees {
+			feeSum = feeSum.Add(fee)
+		}
+		if feeSum.Cmp(transactionMinFee) < 0 {
+			return errors.New("miner fees too low for transaction")
+		}
+	}
+	return
+}
+
 // addTransactionToPool puts a transaction into the transaction pool, changing
 // the unconfirmed set and the transaction linked list to reflect the new
 // transaction.
@@ -209,6 +233,12 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	_, exists := tp.transactions[txnHash]
 	if exists {
 		return modules.ErrTransactionPoolDuplicate
+	}
+
+	// Check that the transaction against DoS prevention standards
+	err = tp.checkMinerFees(t)
+	if err != nil {
+		return
 	}
 
 	// Check that the transaction is legal given the unconfirmed consensus set
