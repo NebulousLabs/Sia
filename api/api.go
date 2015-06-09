@@ -60,8 +60,10 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
 	handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
 	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
-	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitBlockHandler)
+	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler) // Deprecated
+	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)   // Deprecated
+	handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
+	handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
 
 	// Renter API Calls
 	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)

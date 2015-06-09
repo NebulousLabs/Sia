@@ -12,6 +12,10 @@ import (
 
 const (
 	iterationsPerAttempt = 32 * 1024
+
+	// headerForWorkMemory is the number of previous calls to 'headerForWork'
+	// that are remembered.
+	headerForWorkMemory = 50
 )
 
 type Miner struct {
@@ -26,6 +30,14 @@ type Miner struct {
 	target            types.Target
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
+
+	// Memory variables - used in headerforwork. blockMem maps a header to the
+	// block that it is associated with. headerMem is a slice of headers used
+	// to remember which headers are the N most recent headers to be requested
+	// by external miners. Only the N most recent headers are kept in blockMem.
+	blockMem    map[types.BlockHeader]types.Block
+	headerMem   []types.BlockHeader
+	memProgress int
 
 	startTime   time.Time
 	attempts    uint64
@@ -75,6 +87,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		parent:            currentBlock,
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
+
+		blockMem:  make(map[types.BlockHeader]types.Block),
+		headerMem: make([]types.BlockHeader, headerForWorkMemory),
 
 		threads: 1,
 	}

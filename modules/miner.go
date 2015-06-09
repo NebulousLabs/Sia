@@ -33,6 +33,11 @@ type Miner interface {
 	// set.
 	FindBlock() (types.Block, bool, error)
 
+	// HeaderForWork returns a block header that can be grinded on and
+	// resubmitted to the miner. HeaderForWork() will remember the block that
+	// corresponds to the header for 50 calls.
+	HeaderForWork() (types.BlockHeader, types.Target)
+
 	// MinerInfo returns a MinerInfo struct, containing information about the
 	// miner.
 	MinerInfo() MinerInfo
@@ -60,4 +65,8 @@ type Miner interface {
 	// SubmitBlock takes a block that has been worked on and has a valid
 	// target. Typically used with external miners.
 	SubmitBlock(types.Block) error
+
+	// SubmitHeader takes a block header that has been worked on and has a
+	// valid target. A superior choice to SubmitBlock.
+	SubmitHeader(types.BlockHeader) error
 }
