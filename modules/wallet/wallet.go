@@ -153,7 +153,7 @@ func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t typ
 	if err != nil {
 		return
 	}
-	_, err = w.FundTransaction(id, amount)
+	_, err = w.FundTransaction(id, amount.Sub(10*types.CoinbaseAugment))
 	if err != nil {
 		return
 	}
