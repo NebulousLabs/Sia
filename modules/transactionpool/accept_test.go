@@ -104,7 +104,7 @@ func TestLowFeeTransaction(t *testing.T) {
 		t.SkipNow()
 	}
 
-	// Initialize reused variables
+	// Initialize variables to populate transaction pool
 	tpt := newTpoolTester("TestLowFeeTransaction", t)
 	emptyData := make([]byte, 15e3-16)
 	randData := make([]byte, 16) // not yet random
@@ -113,8 +113,8 @@ func TestLowFeeTransaction(t *testing.T) {
 	}
 	transSize := len(encoding.Marshal(emptyTxn))
 
-	// Fill to 20 MB
-	for i := 0; i < TransactionPoolSizeForFee/transSize; i++ {
+	// Fill it to 20 MB
+	for i := 0; i <= (TransactionPoolSizeForFee / transSize); i++ {
 		// Make a unique transaction to accept
 		rand.Read(randData)
 		uniqueTxn := types.Transaction{

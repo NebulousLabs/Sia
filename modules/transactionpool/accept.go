@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	TransactionPoolSizeLimit  = 60 * 1024 * 1024
-	TransactionPoolSizeForFee = 20 * 1024 * 1024
+	TransactionPoolSizeLimit  = 15 * 1024 * 1024
+	TransactionPoolSizeForFee = 5 * 1024 * 1024
 )
 
 var (
