@@ -569,7 +569,7 @@ struct {
 	Transactions []consensus.Transaction
 }
 ```
-Please see consensus/types.go for a more detailed explanation on what a
+Please see consensus/types/transactions.go for a more detailed explanation on what a
 transaction looks like. There are many fields.
 
 Wallet
