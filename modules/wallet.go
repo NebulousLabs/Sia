@@ -42,11 +42,29 @@ type Wallet interface {
 
 	Info() WalletInfo
 
+	// Sign transaction will sign the transaction associated with the id and
+	// then return the transaction. If wholeTransaction is set to true, then
+	// the wholeTransaction flag will be set in CoveredFields for each
+	// signature. After being signed, the transaction is deleted from the
+	// wallet and must be reregistered if more changes are to be made.
+	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
+
 	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
 	// WalletNotify will push a struct down the channel any time that the
 	// wallet updates.
 	WalletNotify() <-chan struct{}
+
+	// SiafundBalance returns the number of siafunds owned by the wallet, and
+	// the number of siacoins available through siafund claims.
+	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+
+	// SpendSiagSiafunds sends siafunds to another address. The siacoins stored
+	// in the siafunds are sent to an address in the wallet.
+	SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
+
+	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
+	WatchSiagSiafundAddress(keyfile string) error
 
 	// Close safely closes the wallet file.
 	Close() error
@@ -107,22 +125,4 @@ type TransactionBuilder interface {
 	// that were added by calling 'FundTransaction'. The updated transaction
 	// and the index of the new signature are returned.
 	AddTransactionSignature(id string, sig types.TransactionSignature) (types.Transaction, uint64, error)
-
-	// Sign transaction will sign the transaction associated with the id and
-	// then return the transaction. If wholeTransaction is set to true, then
-	// the wholeTransaction flag will be set in CoveredFields for each
-	// signature. After being signed, the transaction is deleted from the
-	// wallet and must be reregistered if more changes are to be made.
-	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
-
-	// SiafundBalance returns the number of siafunds owned by the wallet, and
-	// the number of siacoins available through siafund claims.
-	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
-
-	// SpendSiagSiafunds sends siafunds to another address. The siacoins stored
-	// in the siafunds are sent to an address in the wallet.
-	SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
-
-	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
-	WatchSiagSiafundAddress(keyfile string) error
 }
