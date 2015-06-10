@@ -32,7 +32,7 @@ var (
 	SiafundPortion   float64
 	InitialCoinbase  uint64
 	MinimumCoinbase  uint64
-	SiaCoinPrecision Currency
+	SiacoinPrecision Currency
 
 	GenesisSiafundAllocation []SiafundOutput
 
@@ -51,7 +51,7 @@ func init() {
 	SiafundCount = 10e3             // 10,000 total siafunds.
 	SiafundPortion = 0.039          // 3.9% fee on all file contract payouts.
 	InitialCoinbase = 300e3         // 300,000 Siacoins per block
-	SiaCoinPrecision = NewCurrency( // Siacoin is divisible by 10^24
+	SiacoinPrecision = NewCurrency( // Siacoin is divisible by 10^24
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil),
 	)
 

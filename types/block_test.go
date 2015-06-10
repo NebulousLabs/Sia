@@ -11,26 +11,26 @@ import (
 // is probably too similar to the function code to be of value.
 func TestCalculateCoinbase(t *testing.T) {
 	c := CalculateCoinbase(0)
-	if c.Cmp(NewCurrency64(InitialCoinbase).Mul(SiaCoinPrecision)) != 0 {
+	if c.Cmp(NewCurrency64(InitialCoinbase).Mul(SiacoinPrecision)) != 0 {
 		t.Error("Unexpected CalculateCoinbase result")
 	}
 
 	c = CalculateCoinbase(1)
-	if c.Cmp(NewCurrency64(InitialCoinbase-1).Mul(SiaCoinPrecision)) != 0 {
+	if c.Cmp(NewCurrency64(InitialCoinbase-1).Mul(SiacoinPrecision)) != 0 {
 		t.Error("Unexpected CalculateCoinbase result")
 	}
 
 	c = CalculateCoinbase(295000)
-	if c.Cmp(NewCurrency64(MinimumCoinbase).Mul(SiaCoinPrecision)) != 0 {
+	if c.Cmp(NewCurrency64(MinimumCoinbase).Mul(SiacoinPrecision)) != 0 {
 		t.Error(c)
-		t.Error(NewCurrency64(MinimumCoinbase).Mul(SiaCoinPrecision))
+		t.Error(NewCurrency64(MinimumCoinbase).Mul(SiacoinPrecision))
 		t.Error("Unexpected CalculateCoinbase result")
 	}
 
 	c = CalculateCoinbase(1000000000)
-	if c.Cmp(NewCurrency64(MinimumCoinbase).Mul(SiaCoinPrecision)) != 0 {
+	if c.Cmp(NewCurrency64(MinimumCoinbase).Mul(SiacoinPrecision)) != 0 {
 		t.Error(c)
-		t.Error(NewCurrency64(MinimumCoinbase).Mul(SiaCoinPrecision))
+		t.Error(NewCurrency64(MinimumCoinbase).Mul(SiacoinPrecision))
 		t.Error("Unexpected CalculateCoinbase result")
 	}
 }

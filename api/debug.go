@@ -33,7 +33,7 @@ type SiaConstants struct {
 	MaxAdjustmentUp   *big.Rat
 	MaxAdjustmentDown *big.Rat
 
-	SiaCoinPrecision types.Currency
+	SiacoinPrecision types.Currency
 }
 
 // ModuleDeadlockStatus is a struct containing a bool for each module, 'false'
@@ -65,7 +65,7 @@ func (srv *Server) debugConstantsHandler(w http.ResponseWriter, req *http.Reques
 
 		InitialCoinbase:  types.InitialCoinbase,
 		MinimumCoinbase:  types.MinimumCoinbase,
-		SiaCoinPrecision: types.SiaCoinPrecision,
+		SiacoinPrecision: types.SiacoinPrecision,
 
 		RootTarget: types.RootTarget,
 		RootDepth:  types.RootDepth,
