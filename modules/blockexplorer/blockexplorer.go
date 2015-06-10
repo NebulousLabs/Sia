@@ -57,9 +57,9 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	}
 
 	// Initilize the module state
-	bc = &BlockExplorer{
-		currentBlock:     cs.GenesisBlock(),
-		blockchainHeight: 0,
+	bc = &ExplorerState{
+		currentBlock:     cs.CurrentBlock(),
+		blockchainHeight: 1, // genesis block
 		currencySent:     types.NewCurrency64(0),
 		fileContracts:    0,
 		fileContractCost: types.NewCurrency64(0),
@@ -71,12 +71,4 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	cs.ConsensusSetSubscribe(bc)
 
 	return
-}
-
-// Returns the current block, as known by the current ExplorerState
-func (be *BlockExplorer) CurrentBlock() types.Block {
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
-
-	return be.currentBlock
 }
