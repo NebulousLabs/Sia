@@ -58,7 +58,11 @@ func minerstatuscmd() {
 State:   %s
 Threads: %d (%d active)
 Address: %x
-`, status.State, status.Threads, status.RunningThreads, status.Address)
+
+Hash Rate:    %0.2f MH/s (est. %0.2f blocks per week)
+Blocks Mined: %d (%d orphans)
+`, status.State, status.Threads, status.RunningThreads, status.Address,
+		float64(status.HashRate)/1e6, status.BlocksPerWeek, status.BlocksMined, status.OrphansMined)
 }
 
 func minerstopcmd() {
