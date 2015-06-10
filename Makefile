@@ -45,7 +45,7 @@ xc: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.3.3 \
 	     -br=release -pr=beta -include=LICENSE,README.md,doc/API.md            \
 	     -main-dirs-exclude=siag -tasks-=deb,deb-dev,deb-source,go-test        \
-	     -n=Sia_CLI
+	     -n=Sia
 xc-siag: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=1.0 \
 	     -br=release -include=LICENSE,README.md,doc/API.md                   \
