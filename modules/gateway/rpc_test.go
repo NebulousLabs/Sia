@@ -53,7 +53,6 @@ func TestRPC(t *testing.T) {
 		var i uint64
 		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
-			t.Error(err)
 			return err
 		} else if i == 0xdeadbeef {
 			return encoding.WriteObject(conn, "foo")
