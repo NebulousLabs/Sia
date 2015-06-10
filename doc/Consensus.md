@@ -13,8 +13,7 @@ If you wish to know more about the protocol and the consensus rules, you should
 read the documentation in the following order:
 
 - Consensus.md
-- consensus/types
-    - Here's the [auto-generated go-documentation](https://godoc.org/github.com/NebulousLabs/Sia/types)
+- consensus/types -- refer to [godoc](https://godoc.org/github.com/NebulousLabs/Sia/types)
 - consensus/state.go
 
 From there, you can start reading through the logic of the consensus package,
