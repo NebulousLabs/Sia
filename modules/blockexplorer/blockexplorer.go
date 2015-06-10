@@ -13,7 +13,7 @@ import (
 
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
-type ExplorerState struct {
+type BlockExplorer struct {
 	// CurBlock is the current highest block on the blockchain,
 	// kept update via a subscription to consensus
 	currentBlock types.Block
@@ -26,8 +26,7 @@ type ExplorerState struct {
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
-
+func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		err = errors.New("Blockchain explorer cannot use a nil ConsensusSet")
@@ -35,8 +34,8 @@ func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
 	}
 
 	// Initilize the module state
-	bc = &ExplorerState{
-		currentBlock:     cs.CurrentBlock(),
+	bc = &BlockExplorer{
+		currentBlock:     cs.GenesisBlock(),
 		blockchainHeight: 0,
 		mu:               sync.New(modules.SafeMutexDelay, 1),
 	}
@@ -47,9 +46,9 @@ func New(cs modules.ConsensusSet) (bc *ExplorerState, err error) {
 }
 
 // Returns the current block, as known by the current ExplorerState
-func (es *ExplorerState) CurrentBlock() types.Block {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) CurrentBlock() types.Block {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
-	return es.currentBlock
+	return be.currentBlock
 }
