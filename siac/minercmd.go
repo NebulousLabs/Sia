@@ -57,8 +57,13 @@ func minerstatuscmd() {
 	fmt.Printf(`Miner status:
 State:   %s
 Threads: %d (%d active)
+HashRate: %d
+BlocksPerWeek: %f
+BlocksMined: %d
+OrphansMined: %d
 Address: %x
-`, status.State, status.Threads, status.RunningThreads, status.Address)
+`, status.State, status.Threads, status.RunningThreads, status.HashRate, status.BlocksPerWeek,
+		status.BlocksMined, status.OrphansMined, status.Address)
 }
 
 func minerstopcmd() {
