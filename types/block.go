@@ -43,13 +43,13 @@ type (
 // CalculateCoinbase calculates the coinbase for a given height. The coinbase
 // equation is:
 //
-//     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * CoinbaseAugment
+//     coinbase := max(InitialCoinbase - height, MinimumCoinbase) * SiaCoinPrecision
 func CalculateCoinbase(height BlockHeight) Currency {
 	base := InitialCoinbase - uint64(height)
 	if uint64(height) > InitialCoinbase || base < MinimumCoinbase {
 		base = MinimumCoinbase
 	}
-	return NewCurrency64(base).Mul(NewCurrency(CoinbaseAugment))
+	return NewCurrency64(base).Mul(SiaCoinPrecision)
 }
 
 // CalculateSubsidy takes a block and a height and determines the block
