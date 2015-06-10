@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	TransactionPoolSizeLimit  = 15 * 1024 * 1024
+	TransactionPoolSizeLimit  = 10 * 1024 * 1024
 	TransactionPoolSizeForFee = 5 * 1024 * 1024
 )
 
