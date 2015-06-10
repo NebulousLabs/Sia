@@ -57,8 +57,8 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	}
 
 	// Initilize the module state
-	bc = &ExplorerState{
-		currentBlock:     cs.CurrentBlock(),
+	bc = &BlockExplorer{
+		currentBlock:     cs.GenesisBlock(),
 		blockchainHeight: 1, // genesis block
 		currencySent:     types.NewCurrency64(0),
 		fileContracts:    0,

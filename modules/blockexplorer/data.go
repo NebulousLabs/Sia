@@ -8,11 +8,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-func (es *ExplorerState) totalCurrency() types.Currency {
+func (be *BlockExplorer) totalCurrency() types.Currency {
 	totalCoins := uint64(0)
 	coinbase := uint64(300e3)
 	minCoinbase := uint64(30e3)
-	for i := types.BlockHeight(0); i < es.blockchainHeight; i++ {
+	for i := types.BlockHeight(0); i < be.blockchainHeight; i++ {
 		totalCoins += coinbase
 		if coinbase > minCoinbase {
 			coinbase--
@@ -22,34 +22,34 @@ func (es *ExplorerState) totalCurrency() types.Currency {
 }
 
 // Returns a partial slice of our stored data on the blockchain
-func (es *ExplorerState) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.BlockData, error) {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.BlockData, error) {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
 	// Error checking on the given range
 	if start > finish {
 		return nil, errors.New("The start block must be higher than the end block")
 	}
-	if finish > es.blockchainHeight {
+	if finish > be.blockchainHeight {
 		return nil, errors.New("Cannot get info on a block higher than the blockchain")
 	}
 
-	return es.blocks[start:finish], nil
+	return be.blocks[start:finish], nil
 }
 
-func (es *ExplorerState) BlockHeight() types.BlockHeight {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) BlockHeight() types.BlockHeight {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
-	return es.blockchainHeight
+	return be.blockchainHeight
 }
 
-func (es *ExplorerState) CurrentBlock() modules.CurrentBlockData {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) CurrentBlock() modules.CurrentBlockData {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
 	// Taken straight from api/consensus.go
-	currentTarget, exists := es.cs.ChildTarget(es.currentBlock.ID())
+	currentTarget, exists := be.cs.ChildTarget(be.currentBlock.ID())
 	if build.DEBUG {
 		if !exists {
 			panic("The state of the current block cannot be found")
@@ -57,27 +57,27 @@ func (es *ExplorerState) CurrentBlock() modules.CurrentBlockData {
 	}
 
 	return modules.CurrentBlockData{
-		Block:  es.currentBlock,
+		Block:  be.currentBlock,
 		Target: currentTarget,
 	}
 }
 
-func (es *ExplorerState) SiaCoins() modules.SiacoinData {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) SiaCoins() modules.SiacoinData {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
 	return modules.SiacoinData{
-		CurrencySent:  es.currencySent,
-		TotalCurrency: es.totalCurrency(),
+		CurrencySent:  be.currencySent,
+		TotalCurrency: be.totalCurrency(),
 	}
 }
 
-func (es *ExplorerState) FileContracts() modules.FileContractData {
-	lockID := es.mu.RLock()
-	defer es.mu.RUnlock(lockID)
+func (be *BlockExplorer) FileContracts() modules.FileContractData {
+	lockID := be.mu.RLock()
+	defer be.mu.RUnlock(lockID)
 
 	return modules.FileContractData{
-		FileContractCount: es.fileContracts,
-		FileContractCosts: es.fileContractCost,
+		FileContractCount: be.fileContracts,
+		FileContractCosts: be.fileContractCost,
 	}
 }
