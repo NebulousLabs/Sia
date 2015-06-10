@@ -174,23 +174,25 @@ func (cst *consensusSetTester) checkCurrentPath() error {
 // history and verifies that the result is the same as computed initially.
 func (cst *consensusSetTester) checkDiffStructure() error {
 	lockID := cst.cs.mu.RLock()
-	defer cst.cs.mu.RUnlock(lockID)
-
 	// Revert and reapply all diffs in place.
 	initialSum := cst.cs.consensusSetHash()
 	currentNode := cst.cs.currentBlockNode()
 	firstNode := cst.cs.blockMap[cst.cs.currentPath[0]]
 	_, _, err := cst.cs.forkBlockchain(firstNode)
 	if err != nil {
+		cst.cs.mu.RUnlock(lockID)
 		return err
 	}
 	_, _, err = cst.cs.forkBlockchain(currentNode)
 	if err != nil {
+		cst.cs.mu.RUnlock(lockID)
 		return err
 	}
 	if initialSum != cst.cs.consensusSetHash() {
+		cst.cs.mu.RUnlock(lockID)
 		return errors.New("reverting and reapplying resulted in mismatched consensus set hash")
 	}
+	cst.cs.mu.RUnlock(lockID)
 
 	// Try from a clean slate. Make a fresh blockchain and then apply all of
 	// the diffs and check for a consensus set match.
@@ -198,6 +200,9 @@ func (cst *consensusSetTester) checkDiffStructure() error {
 	if err != nil {
 		return err
 	}
+
+	lockID = cst.cs.mu.RLock()
+	defer cst.cs.mu.RUnlock(lockID)
 	for i := 1; i < len(cst.cs.currentPath); i++ {
 		node := cst.cs.blockMap[cst.cs.currentPath[i]]
 		cs.blockMap[node.block.ID()] = node
