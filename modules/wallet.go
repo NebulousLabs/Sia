@@ -22,11 +22,10 @@ type WalletInfo struct {
 	NumAddresses     int
 }
 
-// Wallet in an interface that helps to build and sign transactions. The user
-// can make a new transaction-in-progress by calling Register, and then can
-// add outputs, fees, etc. This gives other modules full flexibility in
-// creating dynamic transactions.
+// Wallet is an interface that keeps track of addresses and balance. Using
+// TransactionBuilder it also streamlines sending coins.
 type Wallet interface {
+	TransactionBuilder
 	// Balance returns the total number of coins accessible to the wallet. If
 	// full == true, the number of coins returned will also include coins that
 	// have been spent in unconfirmed transactions.
@@ -41,6 +40,22 @@ type Wallet interface {
 	// visible to the user.
 	TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (types.UnlockHash, types.UnlockConditions, error)
 
+	Info() WalletInfo
+
+	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
+
+	// WalletNotify will push a struct down the channel any time that the
+	// wallet updates.
+	WalletNotify() <-chan struct{}
+
+	// Close safely closes the wallet file.
+	Close() error
+}
+
+// TransactionBuilder is an interface in which transactions are registered,
+// detailed, and signed. This gives other modules, and wallet itself, full
+// flexibility in creating dynamic transactions.
+type TransactionBuilder interface {
 	// RegisterTransaction creates a transaction out of an existing transaction
 	// which can be modified by the wallet, returning an id that can be used to
 	// reference the transaction.
@@ -99,17 +114,6 @@ type Wallet interface {
 	// signature. After being signed, the transaction is deleted from the
 	// wallet and must be reregistered if more changes are to be made.
 	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
-
-	Info() WalletInfo
-
-	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
-
-	// WalletNotify will push a struct down the channel any time that the
-	// wallet updates.
-	WalletNotify() <-chan struct{}
-
-	// Close safely closes the wallet file.
-	Close() error
 
 	// SiafundBalance returns the number of siafunds owned by the wallet, and
 	// the number of siacoins available through siafund claims.
