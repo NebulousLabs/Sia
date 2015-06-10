@@ -22,7 +22,7 @@ func (be *BlockExplorer) totalCurrency() types.Currency {
 }
 
 // Returns a partial slice of our stored data on the blockchain
-func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.BlockData, error) {
+func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
@@ -44,7 +44,7 @@ func (be *BlockExplorer) BlockHeight() types.BlockHeight {
 	return be.blockchainHeight
 }
 
-func (be *BlockExplorer) CurrentBlock() modules.CurrentBlockData {
+func (be *BlockExplorer) CurrentBlock() modules.ExplorerCurrentBlockData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
@@ -56,27 +56,27 @@ func (be *BlockExplorer) CurrentBlock() modules.CurrentBlockData {
 		}
 	}
 
-	return modules.CurrentBlockData{
+	return modules.ExplorerCurrentBlockData{
 		Block:  be.currentBlock,
 		Target: currentTarget,
 	}
 }
 
-func (be *BlockExplorer) Siacoins() modules.SiacoinData {
+func (be *BlockExplorer) Siacoins() modules.ExplorerSiacoinData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
-	return modules.SiacoinData{
+	return modules.ExplorerSiacoinData{
 		CurrencySent:  be.currencySent,
 		TotalCurrency: be.totalCurrency(),
 	}
 }
 
-func (be *BlockExplorer) FileContracts() modules.FileContractData {
+func (be *BlockExplorer) FileContracts() modules.ExplorerFileContractData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
-	return modules.FileContractData{
+	return modules.ExplorerFileContractData{
 		FileContractCount: be.fileContracts,
 		FileContractCosts: be.fileContractCost,
 	}

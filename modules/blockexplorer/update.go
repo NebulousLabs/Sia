@@ -47,7 +47,7 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 			}
 		}
 
-		be.blocks = append(be.blocks, modules.BlockData{
+		be.blocks = append(be.blocks, modules.ExplorerBlockData{
 			Timestamp: block.Timestamp,
 			Target:    blocktarget,
 			Size:      uint64(len(encoding.Marshal(block))),

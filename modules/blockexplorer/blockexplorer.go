@@ -37,7 +37,7 @@ type BlockExplorer struct {
 
 	// Stores a few data points for each block:
 	// Timestamp, target and size
-	blocks []modules.BlockData
+	blocks []modules.ExplorerBlockData
 
 	// Keep a reference to the consensus for queries
 	cs modules.ConsensusSet
@@ -65,7 +65,7 @@ func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 		currencySent:     types.NewCurrency64(0),
 		fileContracts:    0,
 		fileContractCost: types.NewCurrency64(0),
-		blocks:           make([]modules.BlockData, 0),
+		blocks:           make([]modules.ExplorerBlockData, 0),
 		cs:               cs,
 		mu:               sync.New(modules.SafeMutexDelay, 1),
 	}
@@ -78,7 +78,7 @@ func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 			panic("Genesis block target not in consensus")
 		}
 	}
-	be.blocks = append(be.blocks, modules.BlockData{
+	be.blocks = append(be.blocks, modules.ExplorerBlockData{
 		Timestamp: be.currentBlock.Timestamp,
 		Target:    blocktarget,
 		Size:      uint64(len(encoding.Marshal(be.currentBlock))),

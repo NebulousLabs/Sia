@@ -5,25 +5,25 @@ import (
 )
 
 // Used for the BlockInfo call
-type BlockData struct {
+type ExplorerBlockData struct {
 	Timestamp types.Timestamp // The timestamp on the block
 	Target    types.Target    // The target the block was mined for
 	Size      uint64          // The size in bytes of the marshalled block
 }
 
 // Used for the CurrentBlock call
-type CurrentBlockData struct {
+type ExplorerCurrentBlockData struct {
 	Block  types.Block
 	Target types.Target
 }
 
 // Used for SiaCoins call
-type SiacoinData struct {
+type ExplorerSiacoinData struct {
 	CurrencySent  types.Currency
 	TotalCurrency types.Currency
 }
 
-type FileContractData struct {
+type ExplorerFileContractData struct {
 	FileContractCount uint64
 	FileContractCosts types.Currency
 }
@@ -32,19 +32,21 @@ type FileContractData struct {
 type BlockExplorer interface {
 	// Returns a slice of data points about blocks. Called
 	// primarly by the blockdata api call
-	BlockInfo(types.BlockHeight, types.BlockHeight) ([]BlockData, error)
+	BlockInfo(types.BlockHeight, types.BlockHeight) ([]ExplorerBlockData, error)
 
 	// Returns the current hegiht of the blockchain
 	BlockHeight() types.BlockHeight
 
 	// CurrentBlock returns the current block and target
-	CurrentBlock() CurrentBlockData
+	CurrentBlock() ExplorerCurrentBlockData
 
 	// SiaCoins retuns high level data about the siacoins in circulation
-	Siacoins() SiacoinData
+	Siacoins() ExplorerSiacoinData
 
-	// FileContracts
-	FileContracts() FileContractData
+	// FileContracts returns a struct containing the total number
+	// of file contracts, and the amount that has been spent on
+	// them
+	FileContracts() ExplorerFileContractData
 
 	// Sends notifications when the module updates
 	BlockExplorerNotify() <-chan struct{}
