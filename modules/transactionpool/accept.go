@@ -17,7 +17,7 @@ const (
 var (
 	ErrLargeTransactionPool = errors.New("transaction size limit reached within pool")
 	ErrLowMinerFees         = errors.New("transaction miner fees too low to be accepted")
-	TransactionMinFee       = types.NewCurrency(types.CoinbaseAugment).Mul(types.NewCurrency64(3))
+	TransactionMinFee       = types.NewCurrency64(3).Mul(types.SiacoinPrecision)
 )
 
 // accept.go is responsible for applying a transaction to the transaction pool.
