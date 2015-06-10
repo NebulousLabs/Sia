@@ -91,7 +91,11 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
 
 	// BlockExplorer API Calls
-	handleHTTPRequest(mux, "/blockexplorer/currentblock", srv.blockexplorerCurrentBlockHandler)
+	handleHTTPRequest(mux, "/blockexplorer/blockchain", srv.blockexplorerBlockchainHandler)
+	handleHTTPRequest(mux, "/blockexplorer/current", srv.blockexplorerCurrentBlockHandler)
+	handleHTTPRequest(mux, "/blockexplorer/siacoins", srv.blockexplorerSiacoinsHandler)
+	handleHTTPRequest(mux, "/blockexplorer/filecontracts", srv.blockexplorerFileContractHandler)
+	handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
 
 	// create graceful HTTP server
 	srv.apiServer = &graceful.Server{

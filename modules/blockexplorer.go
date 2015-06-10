@@ -41,7 +41,7 @@ type BlockExplorer interface {
 	CurrentBlock() CurrentBlockData
 
 	// SiaCoins retuns high level data about the siacoins in circulation
-	SiaCoins() SiacoinData
+	Siacoins() SiacoinData
 
 	// FileContracts
 	FileContracts() FileContractData

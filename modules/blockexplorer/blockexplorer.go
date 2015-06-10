@@ -3,6 +3,8 @@ package blockexplorer
 import (
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -49,7 +51,7 @@ type BlockExplorer struct {
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
+func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		err = errors.New("Blockchain explorer cannot use a nil ConsensusSet")
@@ -57,9 +59,9 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	}
 
 	// Initilize the module state
-	bc = &BlockExplorer{
+	be = &BlockExplorer{
 		currentBlock:     cs.GenesisBlock(),
-		blockchainHeight: 1, // genesis block
+		blockchainHeight: 0,
 		currencySent:     types.NewCurrency64(0),
 		fileContracts:    0,
 		fileContractCost: types.NewCurrency64(0),
@@ -68,7 +70,21 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 		mu:               sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	cs.ConsensusSetSubscribe(bc)
+	// Put the genesis block onto the block list
+	// At this point in time, currentBlock refers to the genesis block
+	blocktarget, exists := be.cs.ChildTarget(be.currentBlock.ID())
+	if build.DEBUG {
+		if !exists {
+			panic("Genesis block target not in consensus")
+		}
+	}
+	be.blocks = append(be.blocks, modules.BlockData{
+		Timestamp: be.currentBlock.Timestamp,
+		Target:    blocktarget,
+		Size:      uint64(len(encoding.Marshal(be.currentBlock))),
+	})
+
+	cs.ConsensusSetSubscribe(be)
 
 	return
 }

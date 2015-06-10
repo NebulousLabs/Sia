@@ -30,7 +30,7 @@ func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHe
 	if start > finish {
 		return nil, errors.New("The start block must be higher than the end block")
 	}
-	if finish > be.blockchainHeight {
+	if finish > be.blockchainHeight+1 {
 		return nil, errors.New("Cannot get info on a block higher than the blockchain")
 	}
 
@@ -62,7 +62,7 @@ func (be *BlockExplorer) CurrentBlock() modules.CurrentBlockData {
 	}
 }
 
-func (be *BlockExplorer) SiaCoins() modules.SiacoinData {
+func (be *BlockExplorer) Siacoins() modules.SiacoinData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
