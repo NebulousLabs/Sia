@@ -153,6 +153,9 @@ func (w *Wallet) Close() error {
 // SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+	tPoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
+	amount = amount.Sub(tPoolFee)
+
 	// Create and send the transaction.
 	output := types.SiacoinOutput{
 		Value:      amount,
@@ -167,6 +170,11 @@ func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t typ
 		return
 	}
 	_, _, err = w.AddSiacoinOutput(id, output)
+	_, _, err = w.AddMinerFee(id, tPoolFee)
+	if err != nil {
+		return
+	}
+	_, _, err = w.AddOutput(id, output)
 	if err != nil {
 		return
 	}
