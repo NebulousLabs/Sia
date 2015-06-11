@@ -235,5 +235,10 @@ func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
-	return tp.AcceptTransaction(t)
+	err = tp.AcceptTransaction(t)
+	// ErrTransactionPoolDuplicate is benign
+	if err == modules.ErrTransactionPoolDuplicate {
+		err = nil
+	}
+	return err
 }
