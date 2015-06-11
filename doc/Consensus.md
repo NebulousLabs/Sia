@@ -13,7 +13,7 @@ If you wish to know more about the protocol and the consensus rules, you should
 read the documentation in the following order:
 
 - Consensus.md
-- consensus/types.go
+- consensus/types -- refer to [godoc](https://godoc.org/github.com/NebulousLabs/Sia/types)
 - consensus/state.go
 
 From there, you can start reading through the logic of the consensus package,
@@ -60,7 +60,7 @@ threshold signatures.
   breakthroughs in areas like verification speed, ring signatures, etc.
 
   Allowed algorithms:
-  
+
   ed25519: The specifier must match the string "ed25519". The public key
   must be encoded into 32 bytes. Signatures and public keys will need to
   follow the ed25519 specification. More information can be found at
@@ -70,7 +70,7 @@ threshold signatures.
   always be invalid. This provides a way to add entropy buffers to
   SpendCondition objects to protect low entropy information, while being able
   to prove that the entropy buffers are invalid public keys.
-  
+
   There are plans to also add ECDSA secp256k1 and Schnorr secp256k1. New
   signing algorithms can be added to Sia through a soft fork, because
   unrecognized algorithm types are always considered to have valid signatures.
