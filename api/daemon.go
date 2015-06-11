@@ -151,6 +151,11 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 	srv.apiServer.Stop(time.Second)
 }
 
+// daemonVersionHandler handles the API call that requests the daemon's version.
+func (srv *Server) daemonVersionHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, build.Version)
+}
+
 // daemonUpdatesCheckHandler handles the API call to check for daemon updates.
 func (srv *Server) daemonUpdatesCheckHandler(w http.ResponseWriter, req *http.Request) {
 	available, version, err := checkForUpdate()

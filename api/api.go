@@ -35,6 +35,7 @@ func (srv *Server) initAPI(addr string) {
 
 	// Daemon API Calls
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
+	handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
 	handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
 	handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
 

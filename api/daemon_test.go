@@ -59,3 +59,12 @@ func TestSignedUpdate(t *testing.T) {
 		t.Error("expected internal server error, got", resp.StatusCode)
 	}
 }
+
+func TestVersion(t *testing.T) {
+	st := newServerTester("TestSignedUpdate", t)
+	var version string
+	st.getAPI("/daemon/version", &version)
+	if version != build.Version {
+		t.Fatalf("/daemon/version reporting bad version: expected %v, got %v", build.Version, version)
+	}
+}
