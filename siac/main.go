@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 var (
@@ -138,14 +138,14 @@ func wrap(fn interface{}) func(*cobra.Command, []string) {
 }
 
 func version(*cobra.Command, []string) {
-	println("Sia Client v" + api.VERSION)
+	println("Sia Client v" + build.Version)
 }
 
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Client v" + api.VERSION,
-		Long:  "Sia Client v" + api.VERSION,
+		Short: "Sia Client v" + build.Version,
+		Long:  "Sia Client v" + build.Version,
 		Run:   version,
 	}
 

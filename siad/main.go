@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NebulousLabs/Sia/api"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 var (
@@ -42,15 +42,15 @@ func init() {
 
 // versionCmd is a cobra command that prints the version of siad.
 func versionCmd(*cobra.Command, []string) {
-	fmt.Println("Sia Daemon v" + api.VERSION)
+	fmt.Println("Sia Daemon v" + build.Version)
 }
 
 // main establishes a set of commands and flags using the cobra package.
 func main() {
 	root := &cobra.Command{
 		Use:   os.Args[0],
-		Short: "Sia Daemon v" + api.VERSION,
-		Long:  "Sia Daemon v" + api.VERSION,
+		Short: "Sia Daemon v" + build.Version,
+		Long:  "Sia Daemon v" + build.Version,
 		Run:   startDaemonCmd,
 	}
 

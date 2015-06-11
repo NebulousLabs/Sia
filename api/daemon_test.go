@@ -4,33 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/NebulousLabs/Sia/build"
 )
-
-// TestNewerVersion checks that in all cases, newerVesion returns the correct
-// result.
-func TestNewerVersion(t *testing.T) {
-	// If the VERSION is changed, these tests might no longer be valid.
-	if VERSION != "0.3.3" {
-		t.Fatal("Need to update version tests")
-	}
-
-	versionMap := map[string]bool{
-		VERSION:   false,
-		"0.1":     false,
-		"0.1.1":   false,
-		"1":       true,
-		"0.9":     true,
-		"0.3.2.9": false,
-		"0.3.3.0": true,
-		"0.3.3.1": true,
-	}
-
-	for version, expected := range versionMap {
-		if newerVersion(version) != expected {
-			t.Errorf("Comparing %v to %v should return %v", version, VERSION, expected)
-		}
-	}
-}
 
 type updateHandler struct {
 	version string
@@ -60,7 +36,7 @@ func TestSignedUpdate(t *testing.T) {
 	updateURL = "http://localhost:8080"
 
 	// same version
-	uh.version = VERSION
+	uh.version = build.Version
 	var info UpdateInfo
 	st.getAPI("/daemon/updates/check", &info)
 	if info.Available {
@@ -68,7 +44,7 @@ func TestSignedUpdate(t *testing.T) {
 	}
 
 	// newer version
-	uh.version = "0.4"
+	uh.version = "100.0"
 	st.getAPI("/daemon/updates/check", &info)
 	if !info.Available {
 		t.Error("new version should be available")
