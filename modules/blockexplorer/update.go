@@ -32,21 +32,22 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 		}
 	}
 
-	// Reverting all the data from reverted blocks
+	// Reverting the blockheight and block data structs from reverted blocks
 	be.blockchainHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	be.blocks = be.blocks[:len(be.blocks)-len(cc.RevertedBlocks)]
 
 	// Handle incoming blocks
 	for _, block := range cc.AppliedBlocks {
-
-		// Must do some error checking in consensus
+		// Highly unlikely that consensus wouldn't have info
+		// on a block it just published
 		blocktarget, exists := be.cs.ChildTarget(block.ID())
 		if build.DEBUG {
 			if !exists {
-				panic("Applied block not in consensus")
+				panic("Applied nblock not in consensus")
 			}
 		}
 
+		// Marshall is used to get an exact byte size of the block
 		be.blocks = append(be.blocks, modules.ExplorerBlockData{
 			Timestamp: block.Timestamp,
 			Target:    blocktarget,

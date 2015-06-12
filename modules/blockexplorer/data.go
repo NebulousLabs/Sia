@@ -8,20 +8,23 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// Calculates the total number of coins that have ever been created
+// from the bockheight
 func (be *BlockExplorer) totalCurrency() types.Currency {
 	totalCoins := uint64(0)
-	coinbase := uint64(300e3)
-	minCoinbase := uint64(30e3)
+	coinbase := types.InitialCoinbase
+	minCoinbase := types.MinimumCoinbase
 	for i := types.BlockHeight(0); i < be.blockchainHeight; i++ {
 		totalCoins += coinbase
 		if coinbase > minCoinbase {
 			coinbase--
 		}
 	}
-	return types.NewCurrency64(totalCoins).Mul(types.NewCurrency(types.CoinbaseAugment))
+	return types.NewCurrency64(totalCoins).Mul(types.SiacoinPrecision)
 }
 
-// Returns a partial slice of our stored data on the blockchain
+// Returns a partial slice of our stored data on the blockchain. Data
+// obtained from consensus updates
 func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
@@ -44,11 +47,13 @@ func (be *BlockExplorer) BlockHeight() types.BlockHeight {
 	return be.blockchainHeight
 }
 
+// Returns a data structure with the current block, and its child target
 func (be *BlockExplorer) CurrentBlock() modules.ExplorerCurrentBlockData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
 
-	// Taken straight from api/consensus.go
+	// No reason that consensus should broadcast a block that it
+	// doesn't have information on
 	currentTarget, exists := be.cs.ChildTarget(be.currentBlock.ID())
 	if build.DEBUG {
 		if !exists {
@@ -62,6 +67,8 @@ func (be *BlockExplorer) CurrentBlock() modules.ExplorerCurrentBlockData {
 	}
 }
 
+// Returns a struct containing the total currency in the system and
+// amount which has been part of a transaction
 func (be *BlockExplorer) Siacoins() modules.ExplorerSiacoinData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
@@ -72,6 +79,8 @@ func (be *BlockExplorer) Siacoins() modules.ExplorerSiacoinData {
 	}
 }
 
+// Returns a struct containing the number of file contracts in the
+// blockchain so far and how much they costed
 func (be *BlockExplorer) FileContracts() modules.ExplorerFileContractData {
 	lockID := be.mu.RLock()
 	defer be.mu.RUnlock(lockID)
