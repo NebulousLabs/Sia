@@ -50,19 +50,19 @@ type Wallet interface {
 	// transaction is returned with an error.
 	FundTransaction(id string, amount types.Currency) (types.Transaction, error)
 
+	// AddMinerFee adds a single miner fee of value `fee`. The transaction is
+	// returned, along with the index that the added fee ended up at.
+	AddMinerFee(id string, fee types.Currency) (types.Transaction, uint64, error)
+
 	// AddSiacoinInput adds a siacoin input to the transaction. When
 	// 'SignTransaction' gets called, this input will be left unsigned. The
 	// updated transaction is returned along with the index of the new siacoin
 	// input within the transaction.
 	AddSiacoinInput(id string, input types.SiacoinInput) (types.Transaction, uint64, error)
 
-	// AddMinerFee adds a single miner fee of value `fee`. The transaction is
-	// returned, along with the index that the added fee ended up at.
-	AddMinerFee(id string, fee types.Currency) (types.Transaction, uint64, error)
-
-	// AddOutput adds an output to a transaction. It returns the transaction
+	// AddSiacoinOutput adds an output to a transaction. It returns the transaction
 	// with index of the output that got added.
-	AddOutput(id string, output types.SiacoinOutput) (types.Transaction, uint64, error)
+	AddSiacoinOutput(id string, output types.SiacoinOutput) (types.Transaction, uint64, error)
 
 	// AddFileContract adds a file contract to a transaction, returning the
 	// transaction and the index that the file contract was put at.
@@ -72,16 +72,26 @@ type Wallet interface {
 	// transaction and the index that the storage proof was put at.
 	AddStorageProof(id string, sp types.StorageProof) (types.Transaction, uint64, error)
 
+	// AddSiafundInput adds a siacoin input to the transaction. When
+	// 'SignTransaction' gets called, this input will be left unsigned. The
+	// updated transaction is returned along with the index of the new siacoin
+	// input within the transaction.
+	AddSiafundInput(id string, input types.SiafundInput) (types.Transaction, uint64, error)
+
+	// AddSiafundOutput adds an output to a transaction. It returns the transaction
+	// with index of the output that got added.
+	AddSiafundOutput(id string, output types.SiafundOutput) (types.Transaction, uint64, error)
+
 	// AddArbitraryData adds a byte slice to the arbitrary data section of the
 	// transaction, returning the transaction and the index of the new
 	// arbitrary data.
 	AddArbitraryData(id string, arb string) (types.Transaction, uint64, error)
 
-	// AddSignature adds a signature to the transaction, the signature should
-	// already be valid, and shouldn't sign any of the inputs that were added
-	// by calling 'FundTransaction'. The updated transaction and the index of
-	// the new signature are returned.
-	AddSignature(id string, sig types.TransactionSignature) (types.Transaction, uint64, error)
+	// AddTransactionSignature adds a signature to the transaction, the
+	// signature should already be valid, and shouldn't sign any of the inputs
+	// that were added by calling 'FundTransaction'. The updated transaction
+	// and the index of the new signature are returned.
+	AddTransactionSignature(id string, sig types.TransactionSignature) (types.Transaction, uint64, error)
 
 	// Sign transaction will sign the transaction associated with the id and
 	// then return the transaction. If wholeTransaction is set to true, then
@@ -104,4 +114,11 @@ type Wallet interface {
 	// SiafundBalance returns the number of siafunds owned by the wallet, and
 	// the number of siacoins available through siafund claims.
 	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+
+	// AddSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
+	AddSiagSiafundAddress(keyfile string) error
+
+	// SpendSiagSiafunds sends siafunds to another address. The siacoins stored
+	// in the siafunds are sent to an address in the wallet.
+	SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
 }

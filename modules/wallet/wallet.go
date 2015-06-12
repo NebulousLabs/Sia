@@ -17,6 +17,11 @@ const (
 	// blockchain immediately, and ones that take more than AgeDelay blocks
 	// have probably failed in some way.
 	AgeDelay = 80
+
+	// TransactionFee is yet another deprecated-on-arrival constant that says
+	// how large the transaction fees should be. This should really be a
+	// function supplied by the transaction pool.
+	TransactionFee = 10
 )
 
 // A Wallet uses the state and transaction pool to track the unconfirmed
@@ -159,7 +164,7 @@ func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t typ
 	if err != nil {
 		return
 	}
-	_, _, err = w.AddOutput(id, output)
+	_, _, err = w.AddSiacoinOutput(id, output)
 	if err != nil {
 		return
 	}

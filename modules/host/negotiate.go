@@ -254,7 +254,7 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	// Add the signatures from the renter signed transaction, and then sign the
 	// transaction, then submit the transaction.
 	for _, sig := range signedTxn.TransactionSignatures {
-		_, _, err = h.wallet.AddSignature(txnID, sig)
+		_, _, err = h.wallet.AddTransactionSignature(txnID, sig)
 		if err != nil {
 			return
 		}

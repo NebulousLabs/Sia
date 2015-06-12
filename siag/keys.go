@@ -38,7 +38,7 @@ var (
 type KeyPair struct {
 	Header           string
 	Version          string
-	Index            int
+	Index            int // should be uint64 - too late now
 	SecretKey        crypto.SecretKey
 	UnlockConditions types.UnlockConditions
 }
