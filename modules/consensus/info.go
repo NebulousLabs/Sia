@@ -94,10 +94,17 @@ func (s *State) InCurrentPath(bid types.BlockID) bool {
 	return s.currentPath[node.height] == bid
 }
 
+// SiafundPool returns the size of the siafund pool.
+func (cs *State) SiafundPool() types.Currency {
+	lockID := cs.mu.RLock()
+	defer cs.mu.RUnlock(lockID)
+	return cs.siafundPool
+}
+
 // StorageProofSegment returns the segment to be used in the storage proof for
 // a given file contract.
-func (s *State) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
-	counter := s.mu.RLock()
-	defer s.mu.RUnlock(counter)
-	return s.storageProofSegment(fcid)
+func (cs *State) StorageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+	lockID := cs.mu.RLock()
+	defer cs.mu.RUnlock(lockID)
+	return cs.storageProofSegment(fcid)
 }

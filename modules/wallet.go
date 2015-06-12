@@ -100,4 +100,8 @@ type Wallet interface {
 
 	// Close safely closes the wallet file.
 	Close() error
+
+	// SiafundBalance returns the number of siafunds owned by the wallet, and
+	// the number of siacoins available through siafund claims.
+	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 }

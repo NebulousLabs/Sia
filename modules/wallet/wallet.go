@@ -66,6 +66,8 @@ type Wallet struct {
 	keys             map[types.UnlockHash]*key
 	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
 	visibleAddresses map[types.UnlockHash]struct{}
+	siafundAddresses map[types.UnlockHash]struct{}
+	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
 	// transactions is a list of transactions that are currently being built by
 	// the wallet. Each transaction has a unique id, which is enforced by the

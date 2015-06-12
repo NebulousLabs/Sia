@@ -56,8 +56,8 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
 func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []types.Transaction, unconfirmedSiacoinDiffs []modules.SiacoinOutputDiff) {
-	id := w.mu.Lock()
-	defer w.mu.Unlock(id)
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
 
 	// Remove all of the current unconfirmed diffs - they are being replaced
 	// wholesale.
@@ -82,6 +82,14 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []ty
 	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	w.age += len(cc.AppliedBlocks)
 	w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
+
+	// Update the siafund addresses.
+	for _, diff := range cc.SiafundOutputDiffs {
+		_, exists := w.siafundAddresses[diff.SiafundOutput.UnlockHash]
+		if exists {
+			w.applySiafundDiff(diff, modules.DiffApply)
+		}
+	}
 
 	w.notifySubscribers()
 }
