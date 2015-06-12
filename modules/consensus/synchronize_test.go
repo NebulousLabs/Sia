@@ -83,10 +83,13 @@ func TestSynchronize(t *testing.T) {
 	lockID := cst2.cs.mu.Lock()
 	cst2.cs.currentPath = append(cst2.cs.currentPath, cst2.cs.currentPath[0])
 	cst2.cs.mu.Unlock(lockID)
-
+	// ErrBlockKnown will be converted to nil
 	err = cst1.cs.Synchronize(cst2.gateway.Address())
-	if err != ErrBlockKnown {
-		t.Fatal("expected ErrBlockKnown, got", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cst1.cs.Height() == cst2.cs.Height() {
+		t.Fatal("cst1 did not reject bad block")
 	}
 }
 

@@ -53,7 +53,6 @@ func TestRPC(t *testing.T) {
 		var i uint64
 		err := encoding.ReadObject(conn, &i, 8)
 		if err != nil {
-			t.Error(err)
 			return err
 		} else if i == 0xdeadbeef {
 			return encoding.WriteObject(conn, "foo")
@@ -103,11 +102,6 @@ func TestRPC(t *testing.T) {
 	g1.peers[g2.Address()].sess.Close()
 	if err := g1.RPC(g2.Address(), "Foo", nil); err == nil {
 		t.Fatal("RPC on closed peer connection succeeded")
-	}
-
-	err = g1.Disconnect(g2.Address())
-	if err != nil {
-		t.Fatal("failed to disconnect:", err)
 	}
 }
 

@@ -51,15 +51,16 @@ func (wt *walletTester) testFundTransaction() {
 	if err != nil {
 		wt.t.Fatal(err)
 	}
+	wt.csUpdateWait()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
-	// the unconfirmed balance of the wallet is 1.
+	// the unconfirmed balance of the wallet is 1 + BlockReward.
 	if len(t.SiacoinOutputs) != 0 {
 		wt.t.Error("more than zero siacoin outputs created in custom transaction")
 	}
-	if wt.wallet.Balance(true).Cmp(types.NewCurrency64(1)) != 0 {
-		wt.t.Error(wt.wallet.Balance(true))
-		wt.t.Error("wallet balance not reporting at one?")
+	expectedBalance := types.CalculateCoinbase(2).Add(types.NewCurrency64(1))
+	if bal := wt.wallet.Balance(true); bal.Cmp(expectedBalance) != 0 {
+		wt.t.Errorf("expected wallet balance of %v, got %v", expectedBalance, bal)
 	}
 }
 

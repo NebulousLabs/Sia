@@ -32,7 +32,8 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
+	// TODO: change to debug log
+	//g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
 	id := g.mu.RLock()
 	peer, ok := g.peers[addr]
 	g.mu.RUnlock(id)
@@ -112,7 +113,8 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 		return
 	}
 
-	g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
+	// TODO: change to debug log
+	//g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
 	if err := fn(conn); err != nil {
 		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}

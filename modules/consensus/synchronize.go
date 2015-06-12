@@ -64,7 +64,11 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 			s.verificationRigor = fullVerification
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
-			if acceptErr != nil && acceptErr != modules.ErrNonExtendingBlock {
+			// these errors are benign
+			if acceptErr == modules.ErrNonExtendingBlock || acceptErr == ErrBlockKnown {
+				acceptErr = nil
+			}
+			if acceptErr != nil {
 				return acceptErr
 			}
 		}
