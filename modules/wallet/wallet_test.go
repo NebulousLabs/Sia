@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"path/filepath"
-	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -25,89 +24,83 @@ type walletTester struct {
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
-
-	t *testing.T
 }
 
 // spendCoins sends the desired amount of coins to the desired address, calling
 // wait at all of the appropriate places to assist synchronization.
-func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error) {
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	id, err := wt.wallet.RegisterTransaction(t)
+	id, err := wt.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {
-		return
+		return types.Transaction{}, err
 	}
 	_, err = wt.wallet.FundTransaction(id, amount)
 	if err != nil {
-		return
+		return types.Transaction{}, err
 	}
 	wt.tpUpdateWait()
-	_, _, err = wt.wallet.AddOutput(id, output)
+	_, _, err = wt.wallet.AddSiacoinOutput(id, output)
 	if err != nil {
-		return
+		return types.Transaction{}, err
 	}
-	t, err = wt.wallet.SignTransaction(id, true)
+	txn, err := wt.wallet.SignTransaction(id, true)
 	if err != nil {
-		return
+		return types.Transaction{}, err
 	}
-	err = wt.tpool.AcceptTransaction(t)
+	err = wt.tpool.AcceptTransaction(txn)
 	if err != nil {
-		return
+		return types.Transaction{}, err
 	}
 	wt.tpUpdateWait()
-	return
+	return txn, nil
 }
 
+// csUpdateWait should be called any time that an update is pushed from the
+// consensus package. This will keep all of the modules synchronized.
 func (wt *walletTester) csUpdateWait() {
 	<-wt.csUpdateChan
 	wt.tpUpdateWait()
 }
 
+// tpUpdateWait should be called any time an update is pushed from the
+// transaction pool. This will keep all of the modules synchronized.
 func (wt *walletTester) tpUpdateWait() {
 	<-wt.tpoolUpdateChan
 	<-wt.minerUpdateChan
 	<-wt.walletUpdateChan
 }
 
-// NewWalletTester takes a testing.T and creates a WalletTester.
-func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
+// createWalletTester takes a testing.T and creates a WalletTester.
+func createWalletTester(name string) (*walletTester, error) {
 	testdir := build.TempDir("wallet", name)
 
-	// Create the gateway.
+	// Create the modules
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the transaction pool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the wallet.
 	w, err := New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	// Assemble all componenets into a wallet tester.
-	wt = &walletTester{
+	wt := &walletTester{
 		cs:     cs,
 		tpool:  tp,
 		miner:  m,
@@ -117,18 +110,16 @@ func NewWalletTester(name string, t *testing.T) (wt *walletTester) {
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),
-
-		t: t,
 	}
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
 		_, _, err = wt.miner.FindBlock()
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 		wt.csUpdateWait()
 	}
 
-	return
+	return wt, nil
 }

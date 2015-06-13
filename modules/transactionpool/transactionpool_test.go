@@ -93,7 +93,7 @@ func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash)
 		return
 	}
 	tpt.tpUpdateWait()
-	_, _, err = tpt.wallet.AddOutput(id, output)
+	_, _, err = tpt.wallet.AddSiacoinOutput(id, output)
 	if err != nil {
 		return
 	}
