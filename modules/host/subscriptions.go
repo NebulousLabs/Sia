@@ -5,7 +5,10 @@ import (
 )
 
 // updateSubscribers will inform all subscribers of the new update to the host.
-func (h *Host) updateSubscribers() {
+func (h *Host) threadedUpdateSubscribers() {
+	lockID := h.mu.RLock()
+	defer h.mu.RUnlock(lockID)
+
 	for _, subscriber := range h.subscriptions {
 		select {
 		case subscriber <- struct{}{}:

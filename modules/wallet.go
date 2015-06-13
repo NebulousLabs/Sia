@@ -115,10 +115,10 @@ type Wallet interface {
 	// the number of siacoins available through siafund claims.
 	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
-	// AddSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
-	AddSiagSiafundAddress(keyfile string) error
-
 	// SpendSiagSiafunds sends siafunds to another address. The siacoins stored
 	// in the siafunds are sent to an address in the wallet.
 	SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
+
+	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
+	WatchSiagSiafundAddress(keyfile string) error
 }

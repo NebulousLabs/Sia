@@ -11,15 +11,15 @@ import (
 )
 
 var (
-	ErrDoSBlock               = errors.New("block is known to be invalid")
+	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
 	ErrBlockKnown             = errors.New("block exists in block map")
+	ErrDoSBlock               = errors.New("block is known to be invalid")
 	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
 	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
 	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
-	ErrOrphan                 = errors.New("block has no known parent")
 	ErrLargeBlock             = errors.New("block is too large to be accepted")
-	ErrBadMinerPayouts        = errors.New("miner payout sum does not equal block subsidy")
 	ErrMissedTarget           = errors.New("block does not meet target")
+	ErrOrphan                 = errors.New("block has no known parent")
 )
 
 // validHeader does some early, low computation verification on the block.

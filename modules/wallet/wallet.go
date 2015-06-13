@@ -107,6 +107,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		keys:             make(map[types.UnlockHash]*key),
 		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
 		visibleAddresses: make(map[types.UnlockHash]struct{}),
+		siafundAddresses: make(map[types.UnlockHash]struct{}),
+		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		transactions: make(map[string]*openTransaction),
 

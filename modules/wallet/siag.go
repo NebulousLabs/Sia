@@ -33,30 +33,6 @@ type SiagKeyPair struct {
 	UnlockConditions types.UnlockConditions
 }
 
-// AddSiagSiafundAddress loads a siafund address from a siag key. The private
-// key is NOT loaded.
-func (w *Wallet) AddSiagSiafundAddress(keyfile string) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	var skp SiagKeyPair
-	err := encoding.ReadFile(keyfile, &skp)
-	if err != nil {
-		return err
-	}
-	if skp.Header != SiagFileHeader {
-		return ErrUnknownHeader
-	}
-	if skp.Version != SiagFileVersion {
-		return ErrUnknownVersion
-	}
-	w.siafundAddresses[skp.UnlockConditions.UnlockHash()] = struct{}{}
-	// Janky println... but it's important to get this message to the user.
-	println("Loaded a siafund address. Please note that the private key was not loaded, you must KEEP the original keyfile. You must restart said before your balance can be displayed.")
-	w.save()
-	return nil
-}
-
 // SpendSiagSiafunds sends siafunds to another address. The siacoins stored in
 // the siafunds are sent to an address in the wallet.
 func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (txn types.Transaction, err error) {
@@ -207,4 +183,28 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 		return types.Transaction{}, err
 	}
 	return txn, nil
+}
+
+// WatchSiagSiafundAddress loads a siafund address from a siag key. The private
+// key is NOT loaded.
+func (w *Wallet) WatchSiagSiafundAddress(keyfile string) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+
+	var skp SiagKeyPair
+	err := encoding.ReadFile(keyfile, &skp)
+	if err != nil {
+		return err
+	}
+	if skp.Header != SiagFileHeader {
+		return ErrUnknownHeader
+	}
+	if skp.Version != SiagFileVersion {
+		return ErrUnknownVersion
+	}
+	w.siafundAddresses[skp.UnlockConditions.UnlockHash()] = struct{}{}
+	// Janky println... but it's important to get this message to the user.
+	println("Loaded a siafund address. Please note that the private key was not loaded, you must KEEP the original keyfile. You must restart said before your balance can be displayed.")
+	w.save()
+	return nil
 }

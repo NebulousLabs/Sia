@@ -21,7 +21,7 @@ func TestSiagKeyLoading(t *testing.T) {
 	}
 
 	// Load the 1-of-1 key and see if it is recognized after restart.
-	err := wt.wallet.AddSiagSiafundAddress("../../types.go/siag0of1of1.siakey")
+	err = wt.wallet.WatchSiagSiafundAddress("../../types/siag0of1of1.siakey")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -99,5 +99,5 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 		delete(h.obligationsByHeight, h.blockHeight)
 	}
 
-	go h.updateSubscribers()
+	go h.threadedUpdateSubscribers()
 }

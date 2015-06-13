@@ -163,6 +163,7 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 			SiafundOutput: siafundOutput,
 		}
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
 
 	// Create the consensus directory.
@@ -187,8 +188,11 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
 	gateway.RegisterConnectCall("SendBlocks", cs.receiveBlocks)
 
-	// spawn resynchronize loop
+	// Spawn resynchronize loop.
 	go cs.threadedResynchronize()
+
+	// Send out genesis block update.
+	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
 
 	return cs, nil
 }
