@@ -40,7 +40,8 @@ func (srv *Server) initAPI(addr string) {
 
 	// Debugging API Calls
 	handleHTTPRequest(mux, "/debug/constants", srv.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", srv.mutexTestHandler)
+	handleHTTPRequest(mux, "/debug/mutextest", srv.debugMutextestHandler)
+	handleHTTPRequest(mux, "/debug/siafundsendtest", srv.debugSiafundsendtestHandler)
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)

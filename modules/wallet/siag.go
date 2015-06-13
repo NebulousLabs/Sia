@@ -42,7 +42,7 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 
 	// Load the siafund keys and verify they are sufficient to sign the
 	// transaction.
-	var skps []SiagKeyPair
+	skps := make([]SiagKeyPair, len(keyfiles))
 	for i, keyfile := range keyfiles {
 		err = encoding.ReadFile(keyfile, &skps[i])
 		if err != nil {
@@ -97,9 +97,9 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 	}
 	// Add a miner fee - if funding the transaction fails, we'll just send a
 	// transaction with no fee.
-	_, err = w.FundTransaction(id, types.NewCurrency64(TransactionFee))
+	txn, err = w.FundTransaction(id, types.NewCurrency64(TransactionFee))
 	if err == nil {
-		_, _, err = w.AddMinerFee(id, types.NewCurrency64(TransactionFee))
+		txn, _, err = w.AddMinerFee(id, types.NewCurrency64(TransactionFee))
 		if err != nil {
 			return types.Transaction{}, err
 		}
@@ -120,7 +120,7 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 			UnlockConditions: skps[0].UnlockConditions,
 			ClaimUnlockHash:  claimDest,
 		}
-		_, _, err = w.AddSiafundInput(id, sfi)
+		txn, _, err = w.AddSiafundInput(id, sfi)
 		if err != nil {
 			return types.Transaction{}, err
 		}
@@ -130,18 +130,18 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	_, _, err = w.AddSiafundOutput(id, sfo)
+	txn, _, err = w.AddSiafundOutput(id, sfo)
 	if err != nil {
 		return types.Transaction{}, err
 	}
 	// Add a refund siafund output if needed.
 	if amount.Cmp(availableSiafunds) != 0 {
-		refund := amount.Sub(availableSiafunds)
+		refund := availableSiafunds.Sub(amount)
 		sfo := types.SiafundOutput{
 			Value:      refund,
 			UnlockHash: baseUnlockHash,
 		}
-		_, _, err = w.AddSiafundOutput(id, sfo)
+		txn, _, err = w.AddSiafundOutput(id, sfo)
 		if err != nil {
 			return types.Transaction{}, err
 		}
