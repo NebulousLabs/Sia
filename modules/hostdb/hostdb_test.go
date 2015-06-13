@@ -131,6 +131,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 
 		t: t,
 	}
+	hdbt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {

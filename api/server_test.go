@@ -140,6 +140,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 
 		t: t,
 	}
+	st.csUpdateWait()
 
 	// TODO: A more reasonable way of listening for server errors.
 	go func() {

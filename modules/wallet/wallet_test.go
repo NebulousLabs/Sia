@@ -115,6 +115,7 @@ func createWalletTester(name string) (*walletTester, error) {
 
 		persistDir: testdir,
 	}
+	wt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {

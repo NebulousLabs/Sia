@@ -20,8 +20,11 @@ func (h *Host) threadedUpdateSubscribers() {
 // HostNotify returns a channel that will be sent a struct{} every time there
 // is an update received from another module.
 func (h *Host) HostNotify() <-chan struct{} {
-	lockID := h.mu.Lock()
 	c := make(chan struct{}, modules.NotifyBuffer)
+	lockID := h.mu.Lock()
+	if h.consensusHeight > 0 {
+		c <- struct{}{}
+	}
 	h.subscriptions = append(h.subscriptions, c)
 	h.mu.Unlock(lockID)
 	return c

@@ -98,6 +98,8 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 		// created, those files will never get cleared from the host.
 		delete(h.obligationsByHeight, h.blockHeight)
 	}
+	h.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	h.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
 
 	go h.threadedUpdateSubscribers()
 }

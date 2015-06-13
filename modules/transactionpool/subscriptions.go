@@ -125,6 +125,9 @@ func (tp *TransactionPool) updateSubscribers(cc modules.ConsensusChange, unconfi
 func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	id := tp.mu.Lock()
+	if len(tp.consensusChanges) != 0 {
+		c <- struct{}{}
+	}
 	tp.subscribers = append(tp.subscribers, c)
 	tp.mu.Unlock(id)
 	return c

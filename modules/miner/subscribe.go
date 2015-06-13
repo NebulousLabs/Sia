@@ -19,6 +19,9 @@ func (m *Miner) notifySubscribers() {
 func (m *Miner) MinerNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	m.mu.Lock()
+	if m.height > 0 {
+		c <- struct{}{}
+	}
 	m.subscribers = append(m.subscribers, c)
 	m.mu.Unlock()
 	return c

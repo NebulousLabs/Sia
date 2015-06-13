@@ -38,8 +38,9 @@ type HostDB struct {
 	// corresponding node, as the hostTree is unsorted. A host is active if
 	// it is currently responding to queries about price and other
 	// settings.
-	hostTree    *hostNode
-	activeHosts map[modules.NetAddress]*hostNode
+	hostTree        *hostNode
+	activeHosts     map[modules.NetAddress]*hostNode
+	consensusHeight int
 
 	// allHosts is a simple list of all known hosts by their network address,
 	// including hosts that are currently offline.

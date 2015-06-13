@@ -94,6 +94,7 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		walletUpdateChan: w.WalletNotify(),
 	}
+	cst.csUpdateWait()
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {

@@ -5,7 +5,6 @@ package types
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -80,8 +79,6 @@ func (b Block) CheckMinerPayouts(height BlockHeight) bool {
 	// Compare the payouts to the subsidy.
 	subsidy := b.CalculateSubsidy(height)
 	if subsidy.Cmp(payoutSum) != 0 {
-		fmt.Println(subsidy)
-		fmt.Println(payoutSum)
 		return false
 	}
 	return true

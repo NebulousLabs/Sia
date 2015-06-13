@@ -107,8 +107,9 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 // ConsensusSetNotify returns a channel that will be sent an empty struct every
 // time the consensus set changes.
 func (s *State) ConsensusSetNotify() <-chan struct{} {
-	id := s.mu.Lock()
 	c := make(chan struct{}, modules.NotifyBuffer)
+	c <- struct{}{} // Notify subscriber about the genesis block.
+	id := s.mu.Lock()
 	s.subscriptions = append(s.subscriptions, c)
 	s.mu.Unlock(id)
 	return c
@@ -117,7 +118,8 @@ func (s *State) ConsensusSetNotify() <-chan struct{} {
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
 // ReceiveConsensusSetUpdate every time there is a change in the consensus set.
 func (s *State) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
-	c := make(chan struct{}, 1)
+	c := make(chan struct{}, modules.NotifyBuffer)
+	c <- struct{}{} // Notify subscriber about the genesis block.
 	id := s.mu.Lock()
 	s.subscriptions = append(s.subscriptions, c)
 	s.mu.Unlock(id)
