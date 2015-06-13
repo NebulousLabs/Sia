@@ -24,6 +24,8 @@ type walletTester struct {
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
+
+	persistDir string
 }
 
 // spendCoins sends the desired amount of coins to the desired address, calling
@@ -110,6 +112,8 @@ func createWalletTester(name string) (*walletTester, error) {
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),
+
+		persistDir: testdir,
 	}
 
 	// Mine blocks until there is money in the wallet.
