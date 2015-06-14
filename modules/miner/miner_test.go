@@ -96,6 +96,7 @@ func TestManyBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	minerChan := m.MinerNotify()
+	<-minerChan
 
 	for i := 0; i < 200; i++ {
 		_, _, err = m.FindBlock()
