@@ -40,7 +40,7 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	for _, block := range cc.AppliedBlocks {
 		// Highly unlikely that consensus wouldn't have info
 		// on a block it just published
-		blocktarget, exists := be.cs.ChildTarget(block.ID())
+		blocktarget, exists := be.cs.ChildTarget(block.ParentID)
 		if build.DEBUG {
 			if !exists {
 				panic("Applied nblock not in consensus")
@@ -54,8 +54,8 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 			Size:      uint64(len(encoding.Marshal(block))),
 		})
 	}
-	es.blockchainHeight += types.BlockHeight(len(cc.AppliedBlocks))
-	es.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
+	be.blockchainHeight += types.BlockHeight(len(cc.AppliedBlocks))
+	be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
 	be.updateSubscribers()

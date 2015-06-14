@@ -71,13 +71,9 @@ func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 	}
 
 	// Put the genesis block onto the block list
-	// At this point in time, currentBlock refers to the genesis block
-	blocktarget, exists := be.cs.ChildTarget(be.currentBlock.ID())
-	if build.DEBUG {
-		if !exists {
-			panic("Genesis block target not in consensus")
-		}
-	}
+	// The genesis block was never mined, so its target should be
+	// the highest possible
+	blocktarget := types.RootDepth
 	be.blocks = append(be.blocks, modules.ExplorerBlockData{
 		Timestamp: be.currentBlock.Timestamp,
 		Target:    blocktarget,

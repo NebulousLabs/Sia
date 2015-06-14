@@ -54,7 +54,7 @@ func (be *BlockExplorer) CurrentBlock() modules.ExplorerCurrentBlockData {
 
 	// No reason that consensus should broadcast a block that it
 	// doesn't have information on
-	currentTarget, exists := be.cs.ChildTarget(be.currentBlock.ID())
+	currentTarget, exists := be.cs.ChildTarget(be.currentBlock.ParentID)
 	if build.DEBUG {
 		if !exists {
 			panic("The state of the current block cannot be found")
