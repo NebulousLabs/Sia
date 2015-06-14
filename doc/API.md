@@ -677,3 +677,106 @@ struct {
 `FullBalance` is the balance of the wallet, including unconfirmed coins.
 
 `NumAddresses` is the number of addresses controlled by the wallet.
+
+Block Explorer
+--------------
+
+Queries:
+
+* /blockexplorer/blockchain
+* /blockexplorer/current
+* /blockexplorer/siacoins
+* /blockexplorer/filecontracts
+* /blockexplorer/blockdata
+
+### /blockexplorer/blockchain
+
+Function: Returns high level information about the blockchain
+
+Parameters: None
+
+Response:
+```
+BlockHeight int
+```
+`BlockHeight` is the current height of the blockchain.
+
+### /blockexplorer/current
+
+Function: Returns information on the current block.
+
+Parameters: None
+
+Response:
+```
+struct {
+       Block  types.Block
+       Target []byte
+}
+```
+`Block` is the most recently mined valid block. See types/block.go for
+a detailed specification of a block structure.
+
+`Target` is the target at which the current block has been mined at.
+
+### /blockexplorer/siacoins
+
+Function: Returns information about the currency in circulation
+
+Parameters: None
+
+Response:
+```
+struct {
+       CurrencySent  int
+       TotalCurrency int
+}
+```
+`CurrencySent` is the amount of siacoins that have ever been available to spend.
+
+`TotalCurrency` is the total amount of siacoins in ciculation
+
+### /blockexplorer/filecontracts
+
+Function: Returns information about the file contracts in the blockchain
+
+Parameters: None
+
+Response:
+```
+struct {
+       FileContractCount int
+       FileContractCosts int
+}
+```
+`FileContractCount` is the number of file contracts that are currently in place.9
+
+`FileContractCosts` is the amount of siacoins that are currently tied
+up in file contracts.
+
+### /blockexplorer/blockdata
+
+Function: Return information about specific blocks
+
+Parameters:
+```
+start  int
+finish int
+```
+`start` is the starting block height.
+
+`finish` is the finishing block height.
+
+Response:
+```
+[]struct {
+	 Timestamp int
+	 Target    int
+	 Size	   int
+}
+
+`Timestamp` is the timestamp registered on the block.
+
+`Target` is the target at which the block was mined at.
+
+`Size` is the size, in bytes of the marshalled block.
