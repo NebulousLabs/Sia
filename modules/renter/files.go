@@ -100,11 +100,13 @@ func (f *file) Nickname() string {
 func (f *file) Filesize() uint64 {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
-	if len(f.Pieces) == 0 {
-		return 0
-	}
 	// TODO: this will break when we switch to erasure coding.
-	return f.Pieces[0].Contract.FileSize
+	for i := range f.Pieces {
+		if f.Pieces[i].Contract.FileSize != 0 {
+			return f.Pieces[i].Contract.FileSize
+		}
+	}
+	return 0
 }
 
 // Repairing returns whether or not the file is actively being repaired.
