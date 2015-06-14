@@ -34,6 +34,9 @@ type FileInfo interface {
 	// Nickname gives the nickname of the file.
 	Nickname() string
 
+	// Filesize is the size of the file.
+	Filesize() uint64
+
 	// Repairing indicates whether the file is actively being repaired. If
 	// there are files being repaired, it is best to let them finish before
 	// shutting down the program.
