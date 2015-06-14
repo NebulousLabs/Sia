@@ -7,26 +7,14 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Handles the call to get high level information about the blockchain
-func (srv *Server) blockexplorerBlockchainHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.blocke.BlockHeight())
+// Handles the call to get information about the blockchain. Returns
+// several data points such as chain height, the current block, and
+// file contract info
+func (srv *Server) blockexplorerStatusHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, srv.blocke.ExplorerStatus())
 }
 
-// Handles the api call to get the current block from the block explorer
-func (srv *Server) blockexplorerCurrentBlockHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.blocke.CurrentBlock())
-}
-
-// Handles the api call to get information about the siacoins in circulation
-func (srv *Server) blockexplorerSiacoinsHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.blocke.Siacoins())
-}
-
-// Handles the api call to get information about the current file contracts
-func (srv *Server) blockexplorerFileContractHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.blocke.FileContracts())
-}
-
+// Handles the call to get many data points on blocks
 func (srv *Server) blockexplorerBlockDataHandler(w http.ResponseWriter, req *http.Request) {
 	// Extract the start and end point from the request
 	var start, finish types.BlockHeight

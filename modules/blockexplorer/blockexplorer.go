@@ -3,7 +3,6 @@ package blockexplorer
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -17,8 +16,12 @@ import (
 type BlockExplorer struct {
 	// CurBlock is the current highest block on the blockchain,
 	// kept update via a subscription to consensus
-	currentBlock  types.Block
-	previousBlock types.Block
+	currentBlock types.Block
+
+	// Stored to differentiate the special case of the genesis
+	// block when recieving updates from consensus, to avoid
+	// constant queries to consensus.
+	genesisBlockID types.BlockID
 
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
@@ -27,16 +30,21 @@ type BlockExplorer struct {
 	// i.e. sending siacoin to somebody else
 	currencySent types.Currency
 
-	// fileContracts holds the current number of file contracts
-	fileContracts uint64
+	// activeContracts and totalContracts hold the current number
+	// of file contracts now in effect and that ever have been,
+	// respectively
+	activeContracts uint64
+	totalContracts  uint64
 
-	// fileContractCost hold the amout of currency tied up in file
-	// contracts
-	fileContractCost types.Currency
+	// activeContracts and totalContracts hold the current sum
+	// cost of the file contracts now in effect and that ever have
+	// been, respectively
+	activeContractCost types.Currency
+	totalContractCost  types.Currency
 
 	// Stores a few data points for each block:
 	// Timestamp, target and size
-	blocks []modules.ExplorerBlockData
+	blockSummaries []modules.ExplorerBlockData
 
 	// Keep a reference to the consensus for queries
 	cs modules.ConsensusSet
@@ -59,25 +67,15 @@ func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 
 	// Initilize the module state
 	be = &BlockExplorer{
-		currentBlock:     cs.GenesisBlock(),
-		blockchainHeight: 0,
-		currencySent:     types.NewCurrency64(0),
-		fileContracts:    0,
-		fileContractCost: types.NewCurrency64(0),
-		blocks:           make([]modules.ExplorerBlockData, 0),
-		cs:               cs,
-		mu:               sync.New(modules.SafeMutexDelay, 1),
+		currentBlock:       cs.GenesisBlock(),
+		genesisBlockID:     cs.GenesisBlock().ID(),
+		blockchainHeight:   0,
+		currencySent:       types.NewCurrency64(0),
+		activeContractCost: types.NewCurrency64(0),
+		totalContractCost:  types.NewCurrency64(0),
+		cs:                 cs,
+		mu:                 sync.New(modules.SafeMutexDelay, 1),
 	}
-
-	// Put the genesis block onto the block list
-	// The genesis block was never mined, so its target should be
-	// the highest possible
-	blocktarget := types.RootDepth
-	be.blocks = append(be.blocks, modules.ExplorerBlockData{
-		Timestamp: be.currentBlock.Timestamp,
-		Target:    blocktarget,
-		Size:      uint64(len(encoding.Marshal(be.currentBlock))),
-	})
 
 	cs.ConsensusSetSubscribe(be)
 

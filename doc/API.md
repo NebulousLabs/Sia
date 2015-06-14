@@ -689,70 +689,46 @@ Queries:
 * /blockexplorer/filecontracts
 * /blockexplorer/blockdata
 
-### /blockexplorer/blockchain
+### /blockexplorer/status
 
-Function: Returns high level information about the blockchain
-
-Parameters: None
-
-Response:
-```
-BlockHeight int
-```
-`BlockHeight` is the current height of the blockchain.
-
-### /blockexplorer/current
-
-Function: Returns information on the current block.
+Function: Returns the status of the blockchain and some
+statistics. All Siacoin amounts are given in Hastings
 
 Parameters: None
 
 Response:
 ```
 struct {
-       Block  types.Block
+       Height int
+       Block  Types.Block
        Target []byte
+       CurrencySent  int
+       TotalCurrency int
+       ActiveContractCount int
+       ActiveContractcosts int
+	   TotalContractCount int
+       TotalContractcosts int
 }
 ```
+`Height` is the current height of the blockchain.
+
 `Block` is the most recently mined valid block. See types/block.go for
 a detailed specification of a block structure.
 
 `Target` is the target at which the current block has been mined at.
 
-### /blockexplorer/siacoins
-
-Function: Returns information about the currency in circulation
-
-Parameters: None
-
-Response:
-```
-struct {
-       CurrencySent  int
-       TotalCurrency int
-}
-```
-`CurrencySent` is the amount of siacoins that have ever been available to spend.
-
 `TotalCurrency` is the total amount of siacoins in ciculation
 
-### /blockexplorer/filecontracts
+`ActiveContractCount` is the number of file contracts that are currently in place.
 
-Function: Returns information about the file contracts in the blockchain
-
-Parameters: None
-
-Response:
-```
-struct {
-       FileContractCount int
-       FileContractCosts int
-}
-```
-`FileContractCount` is the number of file contracts that are currently in place.9
-
-`FileContractCosts` is the amount of siacoins that are currently tied
+`ActiveContractCosts` is the amount of siacoins that are currently tied
 up in file contracts.
+
+`TotalContractCount` is the number of file contracts that have ever
+took place
+
+`TotalContractCosts` is the amount of siacoins that have ever been
+spent on file contracts
 
 ### /blockexplorer/blockdata
 

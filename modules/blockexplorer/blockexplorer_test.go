@@ -95,6 +95,7 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 
 		t: t,
 	}
+
 	et.csUpdateWait()
 	return et
 }
