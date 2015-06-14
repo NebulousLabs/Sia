@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -134,6 +135,16 @@ func renterfilesdownloadcmd(nickname, destination string) {
 	fmt.Printf("Downloaded '%s' to %s.\n", nickname, abs(destination))
 }
 
+// filesize returns a string that displays a filesize in human-readable units.
+func filesizeUnits(size uint64) string {
+	if size == 0 {
+		return "0 B"
+	}
+	sizes := []string{"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+	i := int(math.Log10(float64(size)) / 3)
+	return fmt.Sprintf("%.*f %s", i, float64(size)/math.Pow10(3*i), sizes[i])
+}
+
 func renterfileslistcmd() {
 	var files []api.FileInfo
 	err := getAPI("/renter/files/list", &files)
@@ -149,9 +160,9 @@ func renterfileslistcmd() {
 	for _, file := range files {
 		// TODO: write a filesize() helper function to display proper units
 		if file.Available {
-			fmt.Printf("%12.2f MB  %s\n", float32(file.Filesize)/1e6, file.Nickname)
+			fmt.Printf("%13s  %s\n", filesizeUnits(file.Filesize), file.Nickname)
 		} else {
-			fmt.Printf("%12.2f MB  %s (uploading, %0.2f%%)\n", float32(file.Filesize)/1e6, file.Nickname, file.UploadProgress)
+			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(file.Filesize), file.Nickname, file.UploadProgress)
 		}
 	}
 }
