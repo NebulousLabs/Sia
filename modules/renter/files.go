@@ -96,6 +96,17 @@ func (f *file) Nickname() string {
 	return f.Name
 }
 
+// Filesize returns the size of the file.
+func (f *file) Filesize() uint64 {
+	lockID := f.renter.mu.RLock()
+	defer f.renter.mu.RUnlock(lockID)
+	if len(f.Pieces) == 0 {
+		return 0
+	}
+	// TODO: this will break when we switch to erasure coding.
+	return f.Pieces[0].Contract.FileSize
+}
+
 // Repairing returns whether or not the file is actively being repaired.
 func (f *file) Repairing() bool {
 	lockID := f.renter.mu.RLock()
