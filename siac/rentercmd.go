@@ -147,10 +147,11 @@ func renterfileslistcmd() {
 	}
 	fmt.Println("Tracking", len(files), "files:")
 	for _, file := range files {
+		// TODO: write a filesize() helper function to display proper units
 		if file.Available {
-			fmt.Println("\t", file.Nickname)
+			fmt.Printf("%12.2f MB  %s\n", float32(file.Filesize)/1e6, file.Nickname)
 		} else {
-			fmt.Printf("\t%s (uploading, %0.2f%%)\n", file.Nickname, file.UploadProgress)
+			fmt.Printf("%12.2f MB  %s (uploading, %0.2f%%)\n", float32(file.Filesize)/1e6, file.Nickname, file.UploadProgress)
 		}
 	}
 }
