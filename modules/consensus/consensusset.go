@@ -166,6 +166,9 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
 
+	// Send out genesis block update.
+	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
+
 	// Create the consensus directory.
 	err := os.MkdirAll(saveDir, 0700)
 	if err != nil {
@@ -190,9 +193,6 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 
 	// Spawn resynchronize loop.
 	go cs.threadedResynchronize()
-
-	// Send out genesis block update.
-	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
 
 	return cs, nil
 }
