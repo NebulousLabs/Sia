@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/inconshreveable/go-update"
 	"github.com/kardianos/osext"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
 type UpdateInfo struct {
@@ -20,8 +21,6 @@ type UpdateInfo struct {
 }
 
 const (
-	VERSION = "0.3.3"
-
 	developerKey = `-----BEGIN PUBLIC KEY-----
 MIIEIjANBgkqhkiG9w0BAQEFAAOCBA8AMIIECgKCBAEAsoQHOEU6s/EqMDtw5HvA
 YPTUaBgnviMFbG3bMsRqSCD8ug4XJYh+Ik6WP0xgq+OPDehPiaXK8ghAtBiW1EJK
@@ -57,23 +56,6 @@ bwIDAQAB
 // the version is newer, we download and apply the files listed in the update
 // manifest.
 var updateURL = "http://23.239.14.98/releases/" + runtime.GOOS + "_" + runtime.GOARCH
-
-// newerVersion returns true if version is "greater than" VERSION.
-func newerVersion(version string) bool {
-	remote := strings.Split(VERSION, ".")
-	local := strings.Split(version, ".")
-	for i := range remote {
-		ri, _ := strconv.Atoi(remote[i])
-		li, _ := strconv.Atoi(local[i])
-		if ri != li {
-			return ri < li
-		}
-		if len(local)-1 == i {
-			return false
-		}
-	}
-	return true
-}
 
 // getHTTP is a helper function that returns the full response of an HTTP call
 // to the update server.
@@ -113,7 +95,7 @@ func checkForUpdate() (bool, string, error) {
 		return false, "", err
 	}
 	version := manifest[0]
-	return newerVersion(version), version, nil
+	return build.VersionCmp(build.Version, version) < 0, version, nil
 }
 
 // applyUpdate downloads and applies an update.
@@ -167,6 +149,11 @@ func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
 
 	// send stop signal
 	srv.apiServer.Stop(time.Second)
+}
+
+// daemonVersionHandler handles the API call that requests the daemon's version.
+func (srv *Server) daemonVersionHandler(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, build.Version)
 }
 
 // daemonUpdatesCheckHandler handles the API call to check for daemon updates.

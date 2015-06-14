@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	version = "0.3.3"
-
 	dialTimeout = 10 * time.Second
 	// the gateway will not make outbound connections above this threshold
 	wellConnectedThreshold = 8
@@ -114,7 +112,9 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// decide whether to accept
-	if remoteVersion != version {
+	// NOTE: this version must be bumped whenever the gateway or consensus
+	// breaks compatibility.
+	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
 		encoding.WriteObject(conn, "reject")
 		conn.Close()
 		g.log.Printf("INFO: %v wanted to connect, but their version (%v) was unacceptable", addr, remoteVersion)
@@ -122,11 +122,13 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// respond with our version
-	if err := encoding.WriteObject(conn, version); err != nil {
+	if err := encoding.WriteObject(conn, build.Version); err != nil {
 		conn.Close()
 		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
 	}
+	// TODO: connecting peer may disconnect at this point if they reject our
+	// version. This could be handled more gracefully.
 
 	// If we are already fully connected, kick out an old inbound peer to make
 	// room for the new one. Among other things, this ensures that bootstrap
@@ -166,7 +168,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return err
 	}
 	// send our version
-	if err := encoding.WriteObject(conn, version); err != nil {
+	if err := encoding.WriteObject(conn, build.Version); err != nil {
 		return err
 	}
 	// read version ack
@@ -177,7 +179,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return errors.New("peer rejected connection")
 	}
 	// decide whether to accept this version
-	if remoteVersion != version {
+	if build.VersionCmp(remoteVersion, "0.3.3") < 0 {
 		conn.Close()
 		return errors.New("unacceptable version: " + remoteVersion)
 	}

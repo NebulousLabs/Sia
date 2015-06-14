@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inconshreveable/muxado"
+
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/inconshreveable/muxado"
 )
 
 func TestAddPeer(t *testing.T) {
@@ -33,7 +35,7 @@ func TestListen(t *testing.T) {
 	}
 	addr := modules.NetAddress(conn.LocalAddr().String())
 	// send version
-	if err := encoding.WriteObject(conn, version); err != nil {
+	if err := encoding.WriteObject(conn, build.Version); err != nil {
 		t.Fatal("couldn't write version")
 	}
 	// read ack
