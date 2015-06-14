@@ -18,4 +18,7 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	if len(cc.AppliedBlocks) > 0 {
 		be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 	}
+
+	// Notify subscribers about updates
+	be.updateSubscribers()
 }

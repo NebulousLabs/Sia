@@ -25,6 +25,7 @@ type explorerTester struct {
 	explorer *BlockExplorer
 
 	csUpdateChan     <-chan struct{}
+	beUpdateChan     <-chan struct{}
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
@@ -36,6 +37,7 @@ type explorerTester struct {
 // modules.
 func (et *explorerTester) csUpdateWait() {
 	<-et.csUpdateChan
+	<-et.beUpdateChan
 	et.tpUpdateWait()
 }
 
@@ -47,40 +49,30 @@ func (ht *explorerTester) tpUpdateWait() {
 	<-ht.walletUpdateChan
 }
 
-func CreateExplorerTester(name string, t *testing.T) *explorerTester {
+func createExplorerTester(name string, t *testing.T) *explorerTester {
 	testdir := build.TempDir(modules.HostDir, name)
 
-	// Create the gateway.
+	// Create the modules
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the transaction pool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the blockexplorer
 	be, err := New(cs)
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +88,7 @@ func CreateExplorerTester(name string, t *testing.T) *explorerTester {
 		explorer: be,
 
 		csUpdateChan:     cs.ConsensusSetNotify(),
+		beUpdateChan:     be.BlockExplorerNotify(),
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),

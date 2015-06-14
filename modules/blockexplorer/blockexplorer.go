@@ -21,6 +21,10 @@ type BlockExplorer struct {
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
 
+	// Subscriptions currently contain no data, but serve to
+	// notify other modules when changes occur
+	subscriptions []chan struct{}
+
 	mu *sync.RWMutex
 }
 

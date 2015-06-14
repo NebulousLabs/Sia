@@ -10,4 +10,7 @@ type BlockExplorer interface {
 	// the future the blockExplorer will store its own version of
 	// this block
 	CurrentBlock() types.Block
+
+	// Sends notifications when the module updates
+	BlockExplorerNotify() <-chan struct{}
 }
