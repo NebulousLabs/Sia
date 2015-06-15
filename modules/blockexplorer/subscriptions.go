@@ -19,7 +19,7 @@ func (be *BlockExplorer) updateSubscribers() {
 func (be *BlockExplorer) BlockExplorerNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	lockID := be.mu.Lock()
-	if int(be.blockchainHeight) > 0 {
+	if be.blockchainHeight > 0 {
 		c <- struct{}{}
 	}
 	be.subscriptions = append(be.subscriptions, c)
