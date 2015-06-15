@@ -42,13 +42,6 @@ type Wallet interface {
 
 	Info() WalletInfo
 
-	// Sign transaction will sign the transaction associated with the id and
-	// then return the transaction. If wholeTransaction is set to true, then
-	// the wholeTransaction flag will be set in CoveredFields for each
-	// signature. After being signed, the transaction is deleted from the
-	// wallet and must be reregistered if more changes are to be made.
-	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
-
 	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
 	// WalletNotify will push a struct down the channel any time that the
@@ -125,4 +118,11 @@ type TransactionBuilder interface {
 	// that were added by calling 'FundTransaction'. The updated transaction
 	// and the index of the new signature are returned.
 	AddTransactionSignature(id string, sig types.TransactionSignature) (types.Transaction, uint64, error)
+
+	// Sign transaction will sign the transaction associated with the id and
+	// then return the transaction. If wholeTransaction is set to true, then
+	// the wholeTransaction flag will be set in CoveredFields for each
+	// signature. After being signed, the transaction is deleted from the
+	// wallet and must be reregistered if more changes are to be made.
+	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
 }
