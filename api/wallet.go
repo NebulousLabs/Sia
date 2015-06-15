@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -13,6 +14,37 @@ import (
 type WalletSiafundsBalance struct {
 	SiafundBalance      types.Currency
 	SiacoinClaimBalance types.Currency
+}
+
+// scanAmount scans a types.Currency.
+func scanAmount(amountStr string) (amount types.Currency, err error) {
+	// exponential format
+	if strings.ContainsAny(amountStr, "Ee") {
+		amountRat := new(big.Rat)
+		_, err = fmt.Sscan(amountStr, amountRat)
+		if err != nil {
+			return
+		}
+		amount = types.NewCurrency(new(big.Int).Div(amountRat.Num(), amountRat.Denom()))
+		return
+	}
+
+	// standard format
+	_, err = fmt.Sscan(amountStr, &amount)
+	return
+}
+
+// scanAddres scans a types.UnlockHash.
+func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
+	var addrBytes []byte
+	_, err = fmt.Sscanf(addrStr, "%x", &addrBytes)
+	if err != nil {
+		return
+	}
+	if copy(addr[:], addrBytes) != len(addr) {
+		err = errors.New("Malformed coin address")
+	}
+	return
 }
 
 // walletAddressHandler handles the API request for a new address.
@@ -31,35 +63,19 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
-	// Scan the inputs.
-	var amount types.Currency
-	var dest types.UnlockHash
-	if strings.ContainsAny(req.FormValue("amount"), "Ee") {
-		// exponential format
-		amountRat := new(big.Rat)
-		_, err := fmt.Sscan(req.FormValue("amount"), amountRat)
-		if err != nil {
-			writeError(w, "Malformed amount", http.StatusBadRequest)
-			return
-		}
-		amount = types.NewCurrency(new(big.Int).Div(amountRat.Num(), amountRat.Denom()))
-	} else {
-		// standard format
-		_, err := fmt.Sscan(req.FormValue("amount"), &amount)
-		if err != nil {
-			writeError(w, "Malformed amount", http.StatusBadRequest)
-			return
-		}
+	// Scan the amount.
+	amount, err := scanAmount(req.FormValue("amount"))
+	if err != nil {
+		writeError(w, "Malformed amount", http.StatusBadRequest)
+		return
 	}
 
-	// Parse the string into an address.
-	var destAddressBytes []byte
-	_, err := fmt.Sscanf(req.FormValue("destination"), "%x", &destAddressBytes)
+	// Scan the destination address.
+	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
 		writeError(w, "Malformed coin address", http.StatusBadRequest)
 		return
 	}
-	copy(dest[:], destAddressBytes)
 
 	// Spend the coins.
 	_, err = srv.wallet.SpendCoins(amount, dest)
@@ -77,6 +93,38 @@ func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http
 	var wsb WalletSiafundsBalance
 	wsb.SiafundBalance, wsb.SiacoinClaimBalance = srv.wallet.SiafundBalance()
 	writeJSON(w, wsb)
+}
+
+// walletSiafundsSpendHandler handles the API request to spend siafunds.
+func (srv *Server) walletSiafundsSpendHandler(w http.ResponseWriter, req *http.Request) {
+	// Scan the amount.
+	amount, err := scanAmount(req.FormValue("amount"))
+	if err != nil {
+		writeError(w, "Malformed amount", http.StatusBadRequest)
+		return
+	}
+
+	// Scan the destination address.
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		writeError(w, "Malformed coin address", http.StatusBadRequest)
+		return
+	}
+
+	// Scan the keyfile list.
+	keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
+	if len(keyfiles) == 0 {
+		writeError(w, "Missing keyfiles", http.StatusBadRequest)
+		return
+	}
+
+	_, err = srv.wallet.SpendSiagSiafunds(amount, dest, keyfiles)
+	if err != nil {
+		writeError(w, "Failed to send siafunds: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeSuccess(w)
 }
 
 // walletSiafundsWatchsiagaddressHandler handles the API request to watch a
