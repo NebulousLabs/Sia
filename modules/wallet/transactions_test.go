@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -9,64 +10,70 @@ import (
 // testFundTransaction funds and completes a transaction using the
 // build-your-own transaction functions, checking that a no-refund transaction
 // is created that is valid.
-func (wt *walletTester) testFundTransaction() {
+func (wt *walletTester) testFundTransaction() error {
 	// Build a transaction that intentionally needs a refund.
 	id, err := wt.wallet.RegisterTransaction(types.Transaction{})
 	fund := wt.wallet.Balance(false).Sub(types.NewCurrency64(1))
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	_, err = wt.wallet.FundTransaction(id, fund)
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	wt.tpUpdateWait()
 	_, _, err = wt.wallet.AddMinerFee(id, fund)
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	t, err := wt.wallet.SignTransaction(id, true)
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	err = wt.tpool.AcceptTransaction(t)
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	wt.tpUpdateWait()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1.
 	if len(t.SiacoinOutputs) != 0 {
-		wt.t.Error("more than zero siacoin outputs created in custom transaction")
+		return errors.New("expecting 0 siacoin outputs, got non-zero result")
 	}
 	if wt.wallet.Balance(true).Cmp(types.NewCurrency64(1)) != 0 {
-		wt.t.Error(wt.wallet.Balance(true))
-		wt.t.Error("wallet balance not reporting at one?")
+		return errors.New("incorrect balance being reported")
 	}
 
 	// Dump the transaction pool into a block and see that the balance still
 	// registers correctly.
 	_, _, err = wt.miner.FindBlock()
 	if err != nil {
-		wt.t.Fatal(err)
+		return err
 	}
 	wt.csUpdateWait()
 
 	// Check that the length of the created transaction is 1 siacoin, and that
 	// the unconfirmed balance of the wallet is 1 + BlockReward.
 	if len(t.SiacoinOutputs) != 0 {
-		wt.t.Error("more than zero siacoin outputs created in custom transaction")
+		return errors.New("wrong number of siacoin outputs - expecting 0")
 	}
 	expectedBalance := types.CalculateCoinbase(2).Add(types.NewCurrency64(1))
 	if bal := wt.wallet.Balance(true); bal.Cmp(expectedBalance) != 0 {
-		wt.t.Errorf("expected wallet balance of %v, got %v", expectedBalance, bal)
+		return errors.New("did not arrive at the expected balance")
 	}
+	return nil
 }
 
 // TestFundTransaction creates a wallet tester and uses it to call
 // testFundTransaction.
 func TestFundTransaction(t *testing.T) {
-	wt := NewWalletTester("TestFundTransaction", t)
-	wt.testFundTransaction()
+	wt, err := createWalletTester("TestFundTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.testFundTransaction()
+	if err != nil {
+		t.Error(err)
+	}
 }

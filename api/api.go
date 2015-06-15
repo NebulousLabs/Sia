@@ -41,7 +41,7 @@ func (srv *Server) initAPI(addr string) {
 
 	// Debugging API Calls
 	handleHTTPRequest(mux, "/debug/constants", srv.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", srv.mutexTestHandler)
+	handleHTTPRequest(mux, "/debug/mutextest", srv.debugMutextestHandler)
 
 	// Gateway API Calls
 	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
@@ -86,6 +86,8 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
 	handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
+	handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
+	handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
 
 	// BlockExplorer API Calls
 	handleHTTPRequest(mux, "/blockexplorer/currentblock", srv.blockexplorerCurrentBlockHandler)

@@ -9,6 +9,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// WalletSiafundsBalance contains fields relating to the siafunds balance.
+type WalletSiafundsBalance struct {
+	SiafundBalance      types.Currency
+	SiacoinClaimBalance types.Currency
+}
+
 // walletAddressHandler handles the API request for a new address.
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
 	coinAddress, _, err := srv.wallet.CoinAddress(true) // true indicates that the address should be visible to the user
@@ -62,6 +68,25 @@ func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	writeSuccess(w)
+}
+
+// walletSiafundsBalanceHandler handles the API call querying the balance of
+// siafunds.
+func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http.Request) {
+	var wsb WalletSiafundsBalance
+	wsb.SiafundBalance, wsb.SiacoinClaimBalance = srv.wallet.SiafundBalance()
+	writeJSON(w, wsb)
+}
+
+// walletSiafundsWatchsiagaddressHandler handles the API request to watch a
+// siag address.
+func (srv *Server) walletSiafundsWatchsiagaddressHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.wallet.WatchSiagSiafundAddress(req.FormValue("keyfile"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	writeSuccess(w)
 }
 

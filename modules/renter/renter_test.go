@@ -118,6 +118,7 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 
 		t: t,
 	}
+	rt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {

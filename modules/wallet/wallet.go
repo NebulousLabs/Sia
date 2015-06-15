@@ -17,6 +17,11 @@ const (
 	// blockchain immediately, and ones that take more than AgeDelay blocks
 	// have probably failed in some way.
 	AgeDelay = 80
+
+	// TransactionFee is yet another deprecated-on-arrival constant that says
+	// how large the transaction fees should be. This should really be a
+	// function supplied by the transaction pool.
+	TransactionFee = 10
 )
 
 // A Wallet uses the state and transaction pool to track the unconfirmed
@@ -66,6 +71,8 @@ type Wallet struct {
 	keys             map[types.UnlockHash]*key
 	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
 	visibleAddresses map[types.UnlockHash]struct{}
+	siafundAddresses map[types.UnlockHash]struct{}
+	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
 	// transactions is a list of transactions that are currently being built by
 	// the wallet. Each transaction has a unique id, which is enforced by the
@@ -100,6 +107,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		keys:             make(map[types.UnlockHash]*key),
 		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
 		visibleAddresses: make(map[types.UnlockHash]struct{}),
+		siafundAddresses: make(map[types.UnlockHash]struct{}),
+		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		transactions: make(map[string]*openTransaction),
 
@@ -157,7 +166,7 @@ func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t typ
 	if err != nil {
 		return
 	}
-	_, _, err = w.AddOutput(id, output)
+	_, _, err = w.AddSiacoinOutput(id, output)
 	if err != nil {
 		return
 	}

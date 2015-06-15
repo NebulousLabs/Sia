@@ -30,7 +30,6 @@ func (w *Wallet) save() error {
 		_, exists := w.visibleAddresses[key.unlockConditions.UnlockHash()]
 		keySlice = append(keySlice, savedKey{key.secretKey, key.unlockConditions, exists})
 	}
-
 	// Write the wallet data to a backup file, in case something goes wrong
 	err := encoding.WriteFile(filepath.Join(w.saveDir, "wallet.backup"), keySlice)
 	if err != nil {
@@ -40,6 +39,25 @@ func (w *Wallet) save() error {
 	err = encoding.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), keySlice)
 	if err != nil {
 		// TODO: instruct user to recover wallet from the backup file
+		return err
+	}
+
+	// Create a second file for the siafunds. This is another
+	// deprecated-on-arrival file.
+	siafundSlice := make([]types.UnlockHash, 0, len(w.siafundAddresses))
+	for sa, _ := range w.siafundAddresses {
+		siafundSlice = append(siafundSlice, sa)
+	}
+	// outputs.dat is intentionally a bit of a misleading name. If I called it
+	// 'siafunds.dat' or something similar, people might think it's okay to
+	// delete their siafund keys, which is NOT okay. Instead of potentially
+	// having this confusion, I chose a less suggestive name.
+	err = encoding.WriteFile(filepath.Join(w.saveDir, "outputs.backup"), siafundSlice)
+	if err != nil {
+		return err
+	}
+	err = encoding.WriteFile(filepath.Join(w.saveDir, "outputs.dat"), siafundSlice)
+	if err != nil {
 		return err
 	}
 
@@ -88,6 +106,16 @@ func (w *Wallet) load() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Load the siafunds file, which is intentionally called 'outputs.dat'.
+	var siafundAddresses []types.UnlockHash
+	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.dat"), &siafundAddresses)
+	if err != nil {
+		return err
+	}
+	for _, sa := range siafundAddresses {
+		w.siafundAddresses[sa] = struct{}{}
 	}
 
 	return nil

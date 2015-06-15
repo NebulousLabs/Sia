@@ -153,6 +153,12 @@ type ConsensusSet interface {
 	// current path, false otherwise.
 	InCurrentPath(types.BlockID) bool
 
+	// SiafundPool is a deprecaated-on-arrival function that returns the
+	// current size of the siafund pool. The siafund pool management is
+	// undergoing some significant changes but there was not enough time to
+	// implement them fully before the release of the siafund tool.
+	SiafundPool() types.Currency
+
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error

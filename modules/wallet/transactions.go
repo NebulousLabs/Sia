@@ -146,25 +146,6 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 	return
 }
 
-// AddSiacoinInput will add a siacoin input to the transaction, returning the
-// index of the input within the transaction and the transaction itself. When
-// 'SignTransaction' is called, this input will not be signed.
-func (w *Wallet) AddSiacoinInput(id string, input types.SiacoinInput) (t types.Transaction, inputIndex uint64, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
-
-	openTxn, exists := w.transactions[id]
-	if !exists {
-		err = ErrInvalidID
-		return
-	}
-
-	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, input)
-	t = *openTxn.transaction
-	inputIndex = uint64(len(t.SiacoinInputs) - 1)
-	return
-}
-
 // AddMinerFee will add a miner fee to the transaction, but will not add any
 // inputs. The transaction and the index of the new miner fee within the
 // transaction are returned.
@@ -184,10 +165,29 @@ func (w *Wallet) AddMinerFee(id string, fee types.Currency) (t types.Transaction
 	return
 }
 
-// AddOutput adds an output to the transaction, but will not add any inputs.
+// AddSiacoinInput will add a siacoin input to the transaction, returning the
+// index of the input within the transaction and the transaction itself. When
+// 'SignTransaction' is called, this input will not be signed.
+func (w *Wallet) AddSiacoinInput(id string, input types.SiacoinInput) (t types.Transaction, inputIndex uint64, err error) {
+	counter := w.mu.Lock()
+	defer w.mu.Unlock(counter)
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, input)
+	t = *openTxn.transaction
+	inputIndex = uint64(len(t.SiacoinInputs) - 1)
+	return
+}
+
+// AddSiacoinOutput adds an output to the transaction, but will not add any inputs.
 // AddOutput returns the transaction and the index of the new output within the
 // transaction.
-func (w *Wallet) AddOutput(id string, output types.SiacoinOutput) (t types.Transaction, outputIndex uint64, err error) {
+func (w *Wallet) AddSiacoinOutput(id string, output types.SiacoinOutput) (t types.Transaction, outputIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -238,6 +238,44 @@ func (w *Wallet) AddStorageProof(id string, sp types.StorageProof) (t types.Tran
 	openTxn.transaction.StorageProofs = append(openTxn.transaction.StorageProofs, sp)
 	t = *openTxn.transaction
 	spIndex = uint64(len(t.StorageProofs) - 1)
+	return
+}
+
+// AddSiafundInput will add a siacoin input to the transaction, returning the
+// index of the input within the transaction and the transaction itself. When
+// 'SignTransaction' is called, this input will not be signed.
+func (w *Wallet) AddSiafundInput(id string, input types.SiafundInput) (t types.Transaction, inputIndex uint64, err error) {
+	counter := w.mu.Lock()
+	defer w.mu.Unlock(counter)
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.SiafundInputs = append(openTxn.transaction.SiafundInputs, input)
+	t = *openTxn.transaction
+	inputIndex = uint64(len(t.SiafundInputs) - 1)
+	return
+}
+
+// AddSiafundOutput adds an output to the transaction, but will not add any inputs.
+// AddOutput returns the transaction and the index of the new output within the
+// transaction.
+func (w *Wallet) AddSiafundOutput(id string, output types.SiafundOutput) (t types.Transaction, outputIndex uint64, err error) {
+	counter := w.mu.Lock()
+	defer w.mu.Unlock(counter)
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.SiafundOutputs = append(openTxn.transaction.SiafundOutputs, output)
+	t = *openTxn.transaction
+	outputIndex = uint64(len(t.SiafundOutputs) - 1)
 	return
 }
 
@@ -332,11 +370,12 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 	return
 }
 
-// AddSignature adds a signature to the transaction, presumably signing one of
-// the inputs that 'SignTransaction' will not sign automatically. This can be
-// useful for dealing with multiparty signatures, or for staged negotiations
-// which involve sending the transaction first and the signature later.
-func (w *Wallet) AddSignature(id string, sig types.TransactionSignature) (t types.Transaction, sigIndex uint64, err error) {
+// AddTransactionSignature adds a signature to the transaction, presumably
+// signing one of the inputs that 'SignTransaction' will not sign
+// automatically. This can be useful for dealing with multiparty signatures, or
+// for staged negotiations which involve sending the transaction first and the
+// signature later.
+func (w *Wallet) AddTransactionSignature(id string, sig types.TransactionSignature) (t types.Transaction, sigIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 

@@ -36,11 +36,12 @@ type Host struct {
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
 
-	myAddr         modules.NetAddress
-	saveDir        string
-	spaceRemaining int64
-	fileCounter    int
-	profit         types.Currency
+	consensusHeight types.BlockHeight
+	myAddr          modules.NetAddress
+	saveDir         string
+	spaceRemaining  int64
+	fileCounter     int
+	profit          types.Currency
 
 	listener net.Listener
 

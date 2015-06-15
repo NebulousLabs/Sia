@@ -654,8 +654,8 @@ func TestApplySiafundInputs(t *testing.T) {
 	if exists {
 		t.Error("Failed to conusme a siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 46 {
-		t.Error("siafund outputs not correctly updated")
+	if len(cst.cs.siafundOutputs) != 1 {
+		t.Error("siafund outputs not correctly updated", len(cst.cs.siafundOutputs))
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
@@ -668,21 +668,6 @@ func TestApplySiafundInputs(t *testing.T) {
 	}
 	if len(cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay]) != 2 { // 1 for a block subsidy, 1 for the siafund claim.
 		t.Error("siafund claim was not created")
-	}
-
-	// Apply a transaction with two siafund inputs.
-	txn = types.Transaction{
-		SiafundInputs: []types.SiafundInput{
-			{ParentID: ids[1]},
-			{ParentID: ids[2]},
-		},
-	}
-	cst.cs.applySiafundInputs(bn, txn)
-	if len(cst.cs.siafundOutputs) != 44 {
-		t.Error("failed to consume all siacoin outputs in the consensus set")
-	}
-	if len(bn.siafundOutputDiffs) != 3 {
-		t.Error("block node was not updated for single transaction")
 	}
 }
 
@@ -752,7 +737,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 48 {
+	if len(cst.cs.siafundOutputs) != 3 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
@@ -786,7 +771,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 50 {
+	if len(cst.cs.siafundOutputs) != 5 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 3 {

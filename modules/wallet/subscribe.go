@@ -19,6 +19,9 @@ func (w *Wallet) notifySubscribers() {
 func (w *Wallet) WalletNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	id := w.mu.Lock()
+	if w.consensusHeight > 0 {
+		c <- struct{}{}
+	}
 	w.subscribers = append(w.subscribers, c)
 	w.mu.Unlock(id)
 	return c

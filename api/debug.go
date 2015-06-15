@@ -85,7 +85,7 @@ func (srv *Server) debugConstantsHandler(w http.ResponseWriter, req *http.Reques
 // 'false' may merely indicate that it's taking longer than 3 seconds to
 // acquire a lock. For our purposes, this is deadlock, even if it may
 // eventually resolve.
-func (srv *Server) mutexTestHandler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) debugMutextestHandler(w http.ResponseWriter, req *http.Request) {
 	// Call functions that result in locks but use inputs that don't result in
 	// changes. After the blocking function unlocks, set the value to true.
 	var mds ModuleDeadlockStatus

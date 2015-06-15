@@ -60,7 +60,8 @@ func (hdb *HostDB) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 		}
 	}
 
+	hdb.consensusHeight -= len(cc.RevertedBlocks)
+	hdb.consensusHeight += len(cc.AppliedBlocks)
 	hdb.notifySubscribers()
-
 	return
 }
