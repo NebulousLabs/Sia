@@ -169,11 +169,11 @@ func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t typ
 	if err != nil {
 		return
 	}
-	_, _, err = w.AddSiacoinOutput(id, output)
+	_, _, err = w.AddMinerFee(id, tPoolFee)
 	if err != nil {
 		return
 	}
-	_, _, err = w.AddMinerFee(id, tPoolFee)
+	_, _, err = w.AddSiacoinOutput(id, output)
 	if err != nil {
 		return
 	}
