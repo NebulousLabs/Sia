@@ -18,8 +18,11 @@ func (be *BlockExplorer) updateSubscribers() {
 // struct every time there is an update recieved from from another module
 func (be *BlockExplorer) BlockExplorerNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
-	id := be.mu.Lock()
+	lockID := be.mu.Lock()
+	if int(be.blockchainHeight) > 0 {
+		c <- struct{}{}
+	}
 	be.subscriptions = append(be.subscriptions, c)
-	be.mu.Unlock(id)
+	be.mu.Unlock(lockID)
 	return c
 }
