@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -36,6 +37,13 @@ var (
 		Short: "Display siafunds balance",
 		Long:  "Display siafunds balance and siacoin claim balance.",
 		Run:   wrap(walletsiafundscmd),
+	}
+
+	walletSiafundsSpendCmd = &cobra.Command{
+		Use:   "spend [amount] [dest] [keyfiles]",
+		Short: "Send siafunds",
+		Long:  "Send siafunds to an address and transfer their siacoins to the wallet.",
+		Run:   walletsiafundsspendcmd, // see function docstring
 	}
 
 	walletSiafundsTrackCmd = &cobra.Command{
@@ -85,6 +93,23 @@ func walletsiafundscmd() {
 		return
 	}
 	fmt.Printf("Siafunds Balance: %s\nClaim Balance: %s\n", bal.SiafundBalance, bal.SiacoinClaimBalance)
+}
+
+// special because list of keyfiles is variadic
+func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
+	if len(args) < 3 {
+		cmd.Usage()
+		return
+	}
+	amount, dest, keyfiles := args[0], args[1], args[2:]
+	qs := fmt.Sprintf("?amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
+
+	err := post("/wallet/siafunds/spend", qs)
+	if err != nil {
+		fmt.Println("Could not track siafunds:", err)
+		return
+	}
+	fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
 }
 
 func walletsiafundstrackcmd(keyfile string) {
