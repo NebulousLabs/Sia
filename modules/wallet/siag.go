@@ -35,7 +35,7 @@ type SiagKeyPair struct {
 
 // SpendSiagSiafunds sends siafunds to another address. The siacoins stored in
 // the siafunds are sent to an address in the wallet.
-func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (txn types.Transaction, err error) {
+func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error) {
 	if len(keyfiles) < 1 {
 		return types.Transaction{}, ErrNoKeyfile
 	}
@@ -44,7 +44,7 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 	// transaction.
 	skps := make([]SiagKeyPair, len(keyfiles))
 	for i, keyfile := range keyfiles {
-		err = encoding.ReadFile(keyfile, &skps[i])
+		err := encoding.ReadFile(keyfile, &skps[i])
 		if err != nil {
 			return types.Transaction{}, err
 		}
@@ -91,13 +91,13 @@ func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash,
 	skps = skps[:skps[0].UnlockConditions.SignaturesRequired]
 
 	// Assemble the base transction, including a 10 siacoin fee if possible.
-	id, err := w.RegisterTransaction(txn)
+	id, err := w.RegisterTransaction(types.Transaction{})
 	if err != nil {
 		return types.Transaction{}, err
 	}
 	// Add a miner fee - if funding the transaction fails, we'll just send a
 	// transaction with no fee.
-	txn, err = w.FundTransaction(id, types.NewCurrency64(TransactionFee))
+	txn, err := w.FundTransaction(id, types.NewCurrency64(TransactionFee))
 	if err == nil {
 		txn, _, err = w.AddMinerFee(id, types.NewCurrency64(TransactionFee))
 		if err != nil {
@@ -204,7 +204,7 @@ func (w *Wallet) WatchSiagSiafundAddress(keyfile string) error {
 	}
 	w.siafundAddresses[skp.UnlockConditions.UnlockHash()] = struct{}{}
 	// Janky println... but it's important to get this message to the user.
-	println("Loaded a siafund address. Please note that the private key was not loaded, you must KEEP the original keyfile. You must restart said before your balance can be displayed.")
+	println("Loaded a siafund address. Please note that the private key was not loaded, you must KEEP the original keyfile. You must restart siad before your balance can be displayed.")
 	w.save()
 	return nil
 }

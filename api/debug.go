@@ -125,26 +125,3 @@ func (srv *Server) debugMutextestHandler(w http.ResponseWriter, req *http.Reques
 
 	writeJSON(w, mds)
 }
-
-// debugSiafundsendtestHandler is a debugging tool to check that siafund
-// sending works.
-func (srv *Server) debugSiafundsendtestHandler(w http.ResponseWriter, req *http.Request) {
-	dest2o3 := types.UnlockHash{209, 246, 228, 60, 248, 78, 242, 110, 9, 8, 227, 248, 225, 216, 163, 52, 142, 93, 47, 176, 103, 41, 137, 80, 212, 8, 132, 58, 241, 189, 2, 17}
-	_, err := srv.wallet.SpendSiagSiafunds(types.NewCurrency64(25), dest2o3, []string{"siag0of1of1.siakey"})
-	if err != nil {
-		return
-	}
-	writeSuccess(w)
-}
-
-// debugSiafundsendtestHandler2 is a debugging tool to check that siafund
-// sending works.
-func (srv *Server) debugSiafundsendtestHandler2(w http.ResponseWriter, req *http.Request) {
-	dest1o1 := types.UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223}
-	_, err := srv.wallet.SpendSiagSiafunds(types.NewCurrency64(30), dest1o1, []string{"siag0of2of3.siakey", "siag1of2of3.siakey"})
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeSuccess(w)
-}
