@@ -12,9 +12,9 @@ import (
 // addSiacoinTransactionToPool creates a transaction with siacoin outputs and
 // adds them to the pool, returning the transaction.
 func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn types.Transaction) {
-	// spendCoins will automatically add transaction(s) to the transaction pool.
+	// sendCoins will automatically add transaction(s) to the transaction pool.
 	// They will contain siacoin output(s).
-	txn, err := tpt.spendCoins(types.NewCurrency64(1), types.ZeroUnlockHash)
+	txn, err := tpt.sendCoins(types.NewCurrency64(1), types.ZeroUnlockHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -32,12 +32,12 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 		tpt.t.Fatal(err)
 	}
 
-	// spendCoins will automatically add transaction(s) to the transaction
+	// sendCoins will automatically add transaction(s) to the transaction
 	// pool. They will contain siacoin output(s). We send all of our coins to
 	// ourself to guarantee that the next transaction will depend on an
 	// existing unconfirmed transaction.
 	balance := tpt.wallet.Balance(false)
-	firstTxn, err = tpt.spendCoins(balance, addr)
+	firstTxn, err = tpt.sendCoins(balance, addr)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, depend
 	// Send the full balance to ourselves again. The second transaction will
 	// necesarily require the first transaction as a dependency, since we're
 	// sending all of the coins again.
-	dependentTxn, err = tpt.spendCoins(balance, addr)
+	dependentTxn, err = tpt.sendCoins(balance, addr)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}

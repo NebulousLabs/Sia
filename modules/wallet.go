@@ -42,7 +42,7 @@ type Wallet interface {
 
 	Info() WalletInfo
 
-	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
+	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
 	// WalletNotify will push a struct down the channel any time that the
 	// wallet updates.
