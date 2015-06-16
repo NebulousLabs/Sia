@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -36,14 +35,7 @@ func scanAmount(amountStr string) (amount types.Currency, err error) {
 
 // scanAddres scans a types.UnlockHash.
 func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
-	var addrBytes []byte
-	_, err = fmt.Sscanf(addrStr, "%x", &addrBytes)
-	if err != nil {
-		return
-	}
-	if copy(addr[:], addrBytes) != len(addr) {
-		err = errors.New("Malformed coin address")
-	}
+	err = addr.LoadString(addrStr)
 	return
 }
 
