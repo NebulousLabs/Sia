@@ -1,5 +1,5 @@
-Sia 0.3.3
-=========
+Sia 0.3.3.1
+===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
 
@@ -113,6 +113,8 @@ on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+v0.3.3.1: Hotfixed stable currency release.
 
 v0.3.3: Stable currency release.
 
