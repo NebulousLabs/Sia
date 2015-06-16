@@ -28,9 +28,9 @@ type walletTester struct {
 	persistDir string
 }
 
-// spendCoins sends the desired amount of coins to the desired address, calling
+// sendCoins sends the desired amount of coins to the desired address, calling
 // wait at all of the appropriate places to assist synchronization.
-func (wt *walletTester) spendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error) {
+func (wt *walletTester) sendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error) {
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
