@@ -60,6 +60,10 @@ type Encoder struct {
 	w io.Writer
 }
 
+const (
+	maxSliceLen = 4 * 1024 * 1024 // 4 MB
+)
+
 var (
 	errBadPointer = errors.New("cannot decode into invalid pointer")
 )
@@ -263,8 +267,13 @@ func (d *Decoder) decode(val reflect.Value) {
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
-		sliceLen := int(DecUint64(d.readN(8)))
-		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+		sliceLen := DecUint64(d.readN(8))
+		// sanity-check the sliceLen, otherwise you can crash a peer by making
+		// them allocate a massive slice
+		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > maxSliceLen {
+			panic("slice is too large")
+		}
+		val.Set(reflect.MakeSlice(val.Type(), int(sliceLen), int(sliceLen)))
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays (e.g. hashes)
