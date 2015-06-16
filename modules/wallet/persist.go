@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -38,15 +37,10 @@ func (w *Wallet) save() error {
 	if err != nil {
 		return err
 	}
-	// Overwrite the wallet file.
-	err = encoding.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), keySlice)
-	if err != nil {
-		// TODO: instruct user to recover wallet from the backup file
-		return err
-	}
 	// Save to home.
 	err = encoding.WriteFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), keySlice)
 	if err != nil {
+		// TODO: instruct user to recover wallet from the backup file
 		return err
 	}
 
@@ -61,10 +55,6 @@ func (w *Wallet) save() error {
 	// delete their siafund keys, which is NOT okay. Instead of potentially
 	// having this confusion, I chose a less suggestive name.
 	err = encoding.WriteFile(filepath.Join(w.saveDir, "outputs.backup"), siafundSlice)
-	if err != nil {
-		return err
-	}
-	err = encoding.WriteFile(filepath.Join(w.saveDir, "outputs.dat"), siafundSlice)
 	if err != nil {
 		return err
 	}
@@ -112,35 +102,14 @@ func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 
 // load reads the contents of a wallet from a file.
 func (w *Wallet) load() error {
-	// Check if 'wallet.dat' exists. If not, check for it in the homedir.
 	var savedKeys []savedKey
-	walletFile := filepath.Join(w.saveDir, "wallet.dat")
-	_, err := os.Stat(walletFile)
-	if os.IsNotExist(err) {
-		// Check the homedir file.
-		homedirFile := filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat")
-		_, err := os.Stat(homedirFile)
-		if err != nil {
-			return err
-		}
-		err = encoding.ReadFile(homedirFile, &savedKeys)
-		if err != nil {
-			return err
-		}
-		return w.loadKeys(savedKeys)
-	}
-
-	// Load the standard file.
-	err = encoding.ReadFile(walletFile, &savedKeys)
+	err := encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
 	if err != nil {
-		var legacyKeys []legacySavedKey
-		err = encoding.ReadFile(walletFile, &legacyKeys)
+		// try loading the backup
+		// TODO: display/log a warning?
+		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
 		if err != nil {
 			return err
-		}
-
-		for _, key := range legacyKeys {
-			savedKeys = append(savedKeys, savedKey{key.SecretKey, key.UnlockConditions, false})
 		}
 	}
 	err = w.loadKeys(savedKeys)
@@ -150,12 +119,18 @@ func (w *Wallet) load() error {
 
 	// Load the siafunds file, which is intentionally called 'outputs.dat'.
 	var siafundAddresses []types.UnlockHash
-	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.dat"), &siafundAddresses)
+	err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
 	if err != nil {
-		return err
+		// try loading the backup
+		// TODO: display/log a warning?
+		err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
+		if err != nil {
+			return err
+		}
 	}
 	for _, sa := range siafundAddresses {
 		w.siafundAddresses[sa] = struct{}{}
 	}
+
 	return nil
 }
