@@ -70,7 +70,7 @@ func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Spend the coins.
-	_, err = srv.wallet.SpendCoins(amount, dest)
+	_, err = srv.wallet.SendCoins(amount, dest)
 	if err != nil {
 		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
 		return
