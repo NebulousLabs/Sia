@@ -137,6 +137,18 @@ func TestDecode(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 
+	// big slice (larger than maxSliceLen)
+	err = Unmarshal(EncUint64(maxSliceLen+1), new([]byte))
+	if err == nil || err.Error() != "could not decode type []uint8: slice is too large" {
+		t.Error("expected error, got", err)
+	}
+
+	// massive slice (larger than MaxInt32)
+	err = Unmarshal(EncUint64(1<<32), new([]byte))
+	if err == nil || err.Error() != "could not decode type []uint8: slice is too large" {
+		t.Error("expected error, got", err)
+	}
+
 	// badReader should fail on every decode
 	dec := NewDecoder(new(badReader))
 	for i := range testEncodings {
