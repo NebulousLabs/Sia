@@ -105,7 +105,7 @@ func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
 	for i := range keyfiles {
 		keyfiles[i] = abs(keyfiles[i])
 	}
-	qs := fmt.Sprintf("?amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
+	qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
 	err := post("/wallet/siafunds/spend", qs)
 	if err != nil {
