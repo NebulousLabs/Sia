@@ -16,14 +16,6 @@ type savedKey struct {
 	Visible          bool
 }
 
-// legacySavedKey preserves compatibility with the other beta wallets. After
-// the full currency is launched, this struct and the related code can be
-// discarded.
-type legacySavedKey struct {
-	SecretKey        crypto.SecretKey
-	UnlockConditions types.UnlockConditions
-}
-
 // save writes the contents of a wallet to a file.
 func (w *Wallet) save() error {
 	// Convert the key map to a slice.
