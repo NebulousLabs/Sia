@@ -121,8 +121,8 @@ func TestDecode(t *testing.T) {
 
 	// bad boolean
 	err := Unmarshal([]byte{3}, new(bool))
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err == nil || err.Error() != "could not decode type bool: boolean value was not 0 or 1" {
+		t.Error("expected bool error, got", err)
 	}
 
 	// non-pointer
@@ -133,20 +133,20 @@ func TestDecode(t *testing.T) {
 
 	// unknown type
 	err = Unmarshal([]byte{1, 2, 3}, new(map[int]int))
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err == nil || err.Error() != "could not decode type map[int]int: unknown type" {
+		t.Error("expected unknown type error, got", err)
 	}
 
 	// big slice (larger than maxSliceLen)
 	err = Unmarshal(EncUint64(maxSliceLen+1), new([]byte))
 	if err == nil || err.Error() != "could not decode type []uint8: slice is too large" {
-		t.Error("expected error, got", err)
+		t.Error("expected large slice error, got", err)
 	}
 
 	// massive slice (larger than MaxInt32)
 	err = Unmarshal(EncUint64(1<<32), new([]byte))
 	if err == nil || err.Error() != "could not decode type []uint8: slice is too large" {
-		t.Error("expected error, got", err)
+		t.Error("expected large slice error, got", err)
 	}
 
 	// badReader should fail on every decode
@@ -159,8 +159,8 @@ func TestDecode(t *testing.T) {
 	}
 	// special case, not covered by testStructs
 	err = dec.Decode(new([3]byte))
-	if err == nil {
-		t.Error("expected error, got nil")
+	if err == nil || err.Error() != "could not decode type [3]uint8: EOF" {
+		t.Error("expected EOF error, got", err)
 	}
 
 }
