@@ -440,9 +440,7 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 // MarshalJSON is implemented on the unlock hash to always produce a hex string
 // upon marshalling.
 func (uh UnlockHash) MarshalJSON() ([]byte, error) {
-	uhChecksum := crypto.HashObject(uh)
-	str := fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
-	return json.Marshal(str)
+	return json.Marshal(uh.String())
 }
 
 // UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
