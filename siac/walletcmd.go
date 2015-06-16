@@ -102,6 +102,9 @@ func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
 		return
 	}
 	amount, dest, keyfiles := args[0], args[1], args[2:]
+	for i := range keyfiles {
+		keyfiles[i] = abs(keyfiles[i])
+	}
 	qs := fmt.Sprintf("?amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
 	err := post("/wallet/siafunds/spend", qs)
@@ -113,7 +116,7 @@ func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
 }
 
 func walletsiafundstrackcmd(keyfile string) {
-	err := post("/wallet/siafunds/watchsiagaddress", "keyfile="+keyfile)
+	err := post("/wallet/siafunds/watchsiagaddress", "keyfile="+abs(keyfile))
 	if err != nil {
 		fmt.Println("Could not track siafunds:", err)
 		return
