@@ -1,10 +1,13 @@
 package wallet
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -41,6 +44,11 @@ func (w *Wallet) save() error {
 		// TODO: instruct user to recover wallet from the backup file
 		return err
 	}
+	// Save to home.
+	err = encoding.WriteFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), keySlice)
+	if err != nil {
+		return err
+	}
 
 	// Create a second file for the siafunds. This is another
 	// deprecated-on-arrival file.
@@ -60,26 +68,17 @@ func (w *Wallet) save() error {
 	if err != nil {
 		return err
 	}
+	// Save to home.
+	err = encoding.WriteFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), siafundSlice)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-// load reads the contents of a wallet from a file.
-func (w *Wallet) load() error {
-	var savedKeys []savedKey
-	var legacyKeys []legacySavedKey
-	err := encoding.ReadFile(filepath.Join(w.saveDir, "wallet.dat"), &savedKeys)
-	if err != nil {
-		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.dat"), &legacyKeys)
-		if err != nil {
-			return err
-		}
-
-		for _, key := range legacyKeys {
-			savedKeys = append(savedKeys, savedKey{key.SecretKey, key.UnlockConditions, false})
-		}
-	}
-
+// loadKeys takes a set of keys and loads them into the wallet.
+func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 	height := w.consensusHeight
 	for _, skey := range savedKeys {
 		// Create an entry in w.keys for each savedKey.
@@ -108,6 +107,47 @@ func (w *Wallet) load() error {
 		}
 	}
 
+	return nil
+}
+
+// load reads the contents of a wallet from a file.
+func (w *Wallet) load() error {
+	// Check if 'wallet.dat' exists. If not, check for it in the homedir.
+	var savedKeys []savedKey
+	walletFile := filepath.Join(w.saveDir, "wallet.dat")
+	_, err := os.Stat(walletFile)
+	if os.IsNotExist(err) {
+		// Check the homedir file.
+		homedirFile := filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat")
+		_, err := os.Stat(homedirFile)
+		if err != nil {
+			return err
+		}
+		err = encoding.ReadFile(homedirFile, &savedKeys)
+		if err != nil {
+			return err
+		}
+		return w.loadKeys(savedKeys)
+	}
+
+	// Load the standard file.
+	err = encoding.ReadFile(walletFile, &savedKeys)
+	if err != nil {
+		var legacyKeys []legacySavedKey
+		err = encoding.ReadFile(walletFile, &legacyKeys)
+		if err != nil {
+			return err
+		}
+
+		for _, key := range legacyKeys {
+			savedKeys = append(savedKeys, savedKey{key.SecretKey, key.UnlockConditions, false})
+		}
+	}
+	err = w.loadKeys(savedKeys)
+	if err != nil {
+		return err
+	}
+
 	// Load the siafunds file, which is intentionally called 'outputs.dat'.
 	var siafundAddresses []types.UnlockHash
 	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.dat"), &siafundAddresses)
@@ -117,6 +157,5 @@ func (w *Wallet) load() error {
 	for _, sa := range siafundAddresses {
 		w.siafundAddresses[sa] = struct{}{}
 	}
-
 	return nil
 }
