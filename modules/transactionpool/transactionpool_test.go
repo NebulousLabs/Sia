@@ -77,8 +77,8 @@ func (tpt *tpoolTester) tpUpdateWait() {
 	<-tpt.walletUpdateChan
 }
 
-// spendCoins sends the desired amount of coins to the desired address, calling
-// wait at all of the appropriate places to assist synchronization.
+// An exact clone of wallet's SpendCoins(). The difference is the use of
+// tpUpdateWait() for testing purposes.
 func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	output := types.SiacoinOutput{
 		Value:      amount,

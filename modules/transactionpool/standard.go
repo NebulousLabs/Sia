@@ -11,11 +11,13 @@ import (
 
 // standard.go adds extra rules to transactions which help preserve network
 // health and provides flexibility for future soft forks and tweaks to the
-// network. Specifically, the transaction size is limited to minimize DOS
-// vectors but maximize future flexibility, foreign signature algorithms are
-// ignored to prevent violating future rules wehre new signature algorithms are
-// added, and the types of allowed arbitrary data are limited to leave room for
-// more involved soft-forks in the future.
+// network.
+// Rule: Transaction size is limited
+//   Purpose: Minimizes DOS vectors but maximizes future flexibility
+// Rule: Foreign signature algorithms are ignored
+//   Purpose: Prevent violating future rules where new signature algorithms
+// Rule: The types of allowed arbitrary data are limited
+//   Purpose: Leave room for more involved soft-forks in the future.
 
 const (
 	PrefixNonSia         = "NonSia"
@@ -23,7 +25,7 @@ const (
 )
 
 var (
-	errLargeTransaction = errors.New("transaction is too large")
+	ErrLargeTransaction = errors.New("transaction is too large")
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -53,7 +55,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// more difficult for attackers to exploid this DOS vector, though a miner
 	// with sufficient power could still create unfriendly blocks.
 	if len(encoding.Marshal(t)) > TransactionSizeLimit {
-		return errLargeTransaction
+		return ErrLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all

@@ -1,11 +1,23 @@
 package transactionpool
 
 import (
+	"errors"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+const (
+	TransactionPoolSizeLimit  = 10 * 1024 * 1024
+	TransactionPoolSizeForFee = 5 * 1024 * 1024
+)
+
+var (
+	ErrLargeTransactionPool = errors.New("transaction size limit reached within pool")
+	ErrLowMinerFees         = errors.New("transaction miner fees too low to be accepted")
+	TransactionMinFee       = types.NewCurrency64(3).Mul(types.SiacoinPrecision)
 )
 
 // accept.go is responsible for applying a transaction to the transaction pool.
@@ -179,6 +191,26 @@ func (tp *TransactionPool) applySiafundOutputs(t types.Transaction) {
 	}
 }
 
+// checkMinerFees checks that all MinerFees are valid within the context of the
+// transactionpool given parameters to prevention DoS
+func (tp *TransactionPool) checkMinerFees(t types.Transaction) (err error) {
+	transactionPoolSize := len(encoding.Marshal(tp.transactionList))
+
+	if transactionPoolSize > TransactionPoolSizeLimit {
+		return ErrLargeTransactionPool
+	}
+	if transactionPoolSize > TransactionPoolSizeForFee {
+		var feeSum types.Currency
+		for _, fee := range t.MinerFees {
+			feeSum = feeSum.Add(fee)
+		}
+		if feeSum.Cmp(TransactionMinFee) < 0 {
+			return ErrLowMinerFees
+		}
+	}
+	return
+}
+
 // addTransactionToPool puts a transaction into the transaction pool, changing
 // the unconfirmed set and the transaction linked list to reflect the new
 // transaction.
@@ -209,6 +241,12 @@ func (tp *TransactionPool) AcceptTransaction(t types.Transaction) (err error) {
 	_, exists := tp.transactions[txnHash]
 	if exists {
 		return modules.ErrTransactionPoolDuplicate
+	}
+
+	// Check that the transaction against DoS prevention standards
+	err = tp.checkMinerFees(t)
+	if err != nil {
+		return
 	}
 
 	// Check that the transaction is legal given the unconfirmed consensus set

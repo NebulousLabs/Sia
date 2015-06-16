@@ -21,13 +21,13 @@ func TestLargeTransaction(t *testing.T) {
 
 	// Check IsStandard.
 	err := tpt.tpool.IsStandardTransaction(txn)
-	if err != errLargeTransaction {
+	if err != ErrLargeTransaction {
 		t.Error("expecting errLargeTransaction, got:", err)
 	}
 
 	// Check that transaction is rejected when calling 'accept'.
 	err = tpt.tpool.AcceptTransaction(txn)
-	if err != errLargeTransaction {
+	if err != ErrLargeTransaction {
 		t.Error("expecting errLargeTransaction, got:", err)
 	}
 	if len(tpt.tpool.TransactionSet()) != 0 {

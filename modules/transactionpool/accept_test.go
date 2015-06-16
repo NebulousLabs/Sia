@@ -1,8 +1,10 @@
 package transactionpool
 
 import (
+	"crypto/rand"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -75,6 +77,60 @@ func TestDuplicateTransaction(t *testing.T) {
 	txn := tpt.addSiacoinTransactionToPool()
 	err := tpt.tpool.AcceptTransaction(txn)
 	if err != modules.ErrTransactionPoolDuplicate {
-		t.Fatal("expecting ErrDuplicate got:", err)
+		t.Fatal("expecting ErrTransactionPoolDuplicate got:", err)
+	}
+}
+
+/* TODO: Implement wallet fee adding to test ErrLargeTransactionPool
+func TestLargePoolTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	tpt := newTpoolTester("TestLargePoolTransaction", t)
+	// Needed: for loop to add Transactions until transactionPoolSize = 60 MB?
+	txn := tpt.addSiacoinTransactionToPool()
+
+	// Test the transaction that should be rejected at >60 MB
+	err := tpt.tpool.AcceptTransaction(txn)
+	if err != ErrLargeTransactionPool {
+		t.Fatal("expecting ErrLargeTransactionPool got:", err)
+	}
+}
+*/
+
+func TestLowFeeTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Initialize variables to populate transaction pool
+	tpt := newTpoolTester("TestLowFeeTransaction", t)
+	emptyData := make([]byte, 15e3-16)
+	randData := make([]byte, 16) // not yet random
+	emptyTxn := types.Transaction{
+		ArbitraryData: []string{"NonSia" + string(append(emptyData, randData...))},
+	}
+	transSize := len(encoding.Marshal(emptyTxn))
+
+	// Fill it to 20 MB
+	for i := 0; i <= (TransactionPoolSizeForFee / transSize); i++ {
+		// Make a unique transaction to accept
+		rand.Read(randData)
+		uniqueTxn := types.Transaction{
+			ArbitraryData: []string{"NonSia" + string(append(emptyData, randData...))},
+		}
+
+		// Accept said transaction
+		err := tpt.tpool.AcceptTransaction(uniqueTxn)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	// Should be the straw to break the camel's back (i.e. the transaction at >20 MB)
+	err := tpt.tpool.AcceptTransaction(emptyTxn)
+	if err != ErrLowMinerFees {
+		t.Fatal("expecting ErrLowMinerFees got:", err)
 	}
 }

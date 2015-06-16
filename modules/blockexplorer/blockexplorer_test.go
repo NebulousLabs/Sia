@@ -43,10 +43,10 @@ func (et *explorerTester) csUpdateWait() {
 
 // tpUpdateWait blocks until a transaction pool update has propagated to all
 // modules.
-func (ht *explorerTester) tpUpdateWait() {
-	<-ht.tpoolUpdateChan
-	<-ht.minerUpdateChan
-	<-ht.walletUpdateChan
+func (et *explorerTester) tpUpdateWait() {
+	<-et.tpoolUpdateChan
+	<-et.minerUpdateChan
+	<-et.walletUpdateChan
 }
 
 func createExplorerTester(name string, t *testing.T) *explorerTester {
@@ -95,5 +95,6 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 
 		t: t,
 	}
+	et.csUpdateWait()
 	return et
 }
