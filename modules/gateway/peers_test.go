@@ -145,7 +145,7 @@ func TestDisconnect(t *testing.T) {
 		conn.Close()
 	}()
 	// skip standard connection protocol
-	conn, err := net.Dial("tcp", string(g.Address()))
+	conn, err := net.Dial("tcp", l.Addr().String())
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
