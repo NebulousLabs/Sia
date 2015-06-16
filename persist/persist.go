@@ -4,16 +4,20 @@ import (
 	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
+
+	"github.com/NebulousLabs/Sia/build"
 )
 
-var (
-	HomeFolder string
-)
+var HomeFolder = func() string {
+	// use a special folder during testing
+	if build.Release == "testing" {
+		return filepath.Join(build.SiaTestingDir, "home")
+	}
 
-func init() {
 	home, err := homedir.Dir()
 	if err != nil {
 		println("could not find homedir: " + err.Error()) // TODO: better error handling
+		return ""
 	}
-	HomeFolder = filepath.Join(home, ".config", "Sia")
-}
+	return filepath.Join(home, ".config", "Sia")
+}()
