@@ -103,11 +103,11 @@ func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 // load reads the contents of a wallet from a file.
 func (w *Wallet) load() error {
 	var savedKeys []savedKey
-	err := encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
+	err := encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
 	if err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
-		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
+		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
 		if err != nil {
 			return err
 		}
@@ -119,11 +119,11 @@ func (w *Wallet) load() error {
 
 	// Load the siafunds file, which is intentionally called 'outputs.dat'.
 	var siafundAddresses []types.UnlockHash
-	err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
+	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
 	if err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
-		err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
+		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
 		if err != nil {
 			return err
 		}
