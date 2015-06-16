@@ -32,11 +32,11 @@ func (srv *Server) blockexplorerBlockDataHandler(w http.ResponseWriter, req *htt
 	}
 
 	// Bounds checking is done inside BlockInfo
-	blocks, err := srv.blocke.BlockInfo(start, finish)
+	blockSummaries, err := srv.blocke.BlockInfo(start, finish)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	writeJSON(w, blocks)
+	writeJSON(w, blockSummaries)
 }

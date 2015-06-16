@@ -683,10 +683,7 @@ Block Explorer
 
 Queries:
 
-* /blockexplorer/blockchain
-* /blockexplorer/current
-* /blockexplorer/siacoins
-* /blockexplorer/filecontracts
+* /blockexplorer/status
 * /blockexplorer/blockdata
 
 ### /blockexplorer/status
@@ -699,15 +696,15 @@ Parameters: None
 Response:
 ```
 struct {
-       Height int
-       Block  Types.Block
-       Target []byte
-       CurrencySent  int
-       TotalCurrency int
-       ActiveContractCount int
-       ActiveContractcosts int
-	   TotalContractCount int
-       TotalContractcosts int
+	Height int
+	Block  Types.Block
+	Target []byte
+	CurrencySent  int
+	TotalCurrency int
+	ActiveContractCount int
+	ActiveContractcosts int
+	TotalContractCount int
+	TotalContractcosts int
 }
 ```
 `Height` is the current height of the blockchain.
