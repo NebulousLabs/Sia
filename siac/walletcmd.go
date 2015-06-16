@@ -39,11 +39,11 @@ var (
 		Run:   wrap(walletsiafundscmd),
 	}
 
-	walletSiafundsSpendCmd = &cobra.Command{
-		Use:   "spend [amount] [dest] [keyfiles]",
+	walletSiafundsSendCmd = &cobra.Command{
+		Use:   "send [amount] [dest] [keyfiles]",
 		Short: "Send siafunds",
 		Long:  "Send siafunds to an address and transfer their siacoins to the wallet.",
-		Run:   walletsiafundsspendcmd, // see function docstring
+		Run:   walletsiafundssendcmd, // see function docstring
 	}
 
 	walletSiafundsTrackCmd = &cobra.Command{
@@ -96,7 +96,7 @@ func walletsiafundscmd() {
 }
 
 // special because list of keyfiles is variadic
-func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
+func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 	if len(args) < 3 {
 		cmd.Usage()
 		return
@@ -107,7 +107,7 @@ func walletsiafundsspendcmd(cmd *cobra.Command, args []string) {
 	}
 	qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
-	err := post("/wallet/siafunds/spend", qs)
+	err := post("/wallet/siafunds/send", qs)
 	if err != nil {
 		fmt.Println("Could not track siafunds:", err)
 		return
@@ -136,7 +136,7 @@ func walletstatuscmd() {
 		return
 	}
 	fmt.Printf(`Wallet status:
-Balance:   %v (confirmed) 
+Balance:   %v (confirmed)
            %v (unconfirmed)
 Addresses: %d
 `, status.Balance, status.FullBalance, status.NumAddresses)

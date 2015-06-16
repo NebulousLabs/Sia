@@ -33,9 +33,9 @@ type SiagKeyPair struct {
 	UnlockConditions types.UnlockConditions
 }
 
-// SpendSiagSiafunds sends siafunds to another address. The siacoins stored in
+// SendSiagSiafunds sends siafunds to another address. The siacoins stored in
 // the siafunds are sent to an address in the wallet.
-func (w *Wallet) SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error) {
+func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error) {
 	if len(keyfiles) < 1 {
 		return types.Transaction{}, ErrNoKeyfile
 	}

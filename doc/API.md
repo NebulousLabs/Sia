@@ -580,7 +580,7 @@ Queries:
 * /wallet/address
 * /wallet/send
 * /wallet/siafunds/balance
-* /wallet/siafunds/spend
+* /wallet/siafunds/send
 * /wallet/siafunds/watchsiagaddress
 * /wallet/status
 
@@ -627,9 +627,9 @@ struct {
 }
 ```
 
-#### /wallet/siafunds/spend
+#### /wallet/siafunds/send
 
-Function: Spend siafunds tracked by the wallet. The siacoins stored in the
+Function: Send siafunds tracked by the wallet. The siacoins stored in the
 siafunds are sent to the wallet.
 
 Parameters:

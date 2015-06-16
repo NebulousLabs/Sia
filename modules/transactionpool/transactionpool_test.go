@@ -77,7 +77,7 @@ func (tpt *tpoolTester) tpUpdateWait() {
 	<-tpt.walletUpdateChan
 }
 
-// An exact clone of wallet's SpendCoins(). The difference is the use of
+// An exact clone of wallet's SendCoins(). The difference is the use of
 // tpUpdateWait() for testing purposes.
 func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	output := types.SiacoinOutput{

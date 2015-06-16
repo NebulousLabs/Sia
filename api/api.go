@@ -87,7 +87,7 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
 	handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
 	handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
-	handleHTTPRequest(mux, "/wallet/siafunds/spend", srv.walletSiafundsSpendHandler)
+	handleHTTPRequest(mux, "/wallet/siafunds/send", srv.walletSiafundsSendHandler)
 	handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
 
 	// BlockExplorer API Calls

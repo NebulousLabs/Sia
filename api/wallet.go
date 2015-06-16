@@ -69,7 +69,7 @@ func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Spend the coins.
+	// Send the coins.
 	_, err = srv.wallet.SendCoins(amount, dest)
 	if err != nil {
 		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
@@ -87,8 +87,8 @@ func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http
 	writeJSON(w, wsb)
 }
 
-// walletSiafundsSpendHandler handles the API request to spend siafunds.
-func (srv *Server) walletSiafundsSpendHandler(w http.ResponseWriter, req *http.Request) {
+// walletSiafundsSendHandler handles the API request to send siafunds.
+func (srv *Server) walletSiafundsSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the amount.
 	amount, err := scanAmount(req.FormValue("amount"))
 	if err != nil {
@@ -110,7 +110,7 @@ func (srv *Server) walletSiafundsSpendHandler(w http.ResponseWriter, req *http.R
 		return
 	}
 
-	_, err = srv.wallet.SpendSiagSiafunds(amount, dest, keyfiles)
+	_, err = srv.wallet.SendSiagSiafunds(amount, dest, keyfiles)
 	if err != nil {
 		writeError(w, "Failed to send siafunds: "+err.Error(), http.StatusInternalServerError)
 		return

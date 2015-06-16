@@ -24,9 +24,9 @@ func (tpt *tpoolTester) addConflictingSiacoinTransaction() {
 	}
 }
 
-// testFalseSiacoinSpend spends a nonexistent siacoin output in a transaction
+// testFalseSiacoinSend sends a nonexistent siacoin output in a transaction
 // and checks that the transaction is rejected.
-func (tpt *tpoolTester) testFalseSiacoinSpend() {
+func (tpt *tpoolTester) testFalseSiacoinSend() {
 	txn := tpt.emptyUnlockTransaction()
 	txn.SiacoinInputs[0].ParentID[0] -= 1
 	err := tpt.tpool.AcceptTransaction(txn)
@@ -70,11 +70,11 @@ func TestAddConflictingSiacoinTransaction(t *testing.T) {
 	tpt.addConflictingSiacoinTransaction()
 }
 
-// TestFalseSiacoinSpend creates a tpoolTester and uses it to call smaller
+// TestFalseSiacoinFeatures creates a tpoolTester and uses it to call smaller
 // tests that probe the siacoin verification rules.
 func TestFalseSiacoinFeatures(t *testing.T) {
 	tpt := newTpoolTester("TestFalseSiacoinFeatures", t)
-	tpt.testFalseSiacoinSpend()
+	tpt.testFalseSiacoinSend()
 	tpt.testBadSiacoinUnlock()
 	tpt.testOverspend()
 }
