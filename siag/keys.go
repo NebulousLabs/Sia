@@ -195,7 +195,7 @@ func siag(*cobra.Command, []string) {
 		return
 	}
 
-	fmt.Printf("Keys created for address: %s\n", unlockConditions.UnlockHash().String())
+	fmt.Printf("Keys created for address: %v\n", unlockConditions.UnlockHash())
 	fmt.Printf("%v file(s) created. KEEP THESE FILES. To spend money from this address, you will need at least %v of the files.\n", config.Siag.TotalKeys, config.Siag.RequiredKeys)
 }
 
@@ -215,7 +215,7 @@ func printKeyInfo(filename string) error {
 	}
 
 	fmt.Printf("Found a key for a %v of %v address.\n", kp.UnlockConditions.SignaturesRequired, len(kp.UnlockConditions.PublicKeys))
-	fmt.Printf("The address is: %s\n", kp.UnlockConditions.UnlockHash().String())
+	fmt.Printf("The address is: %v\n", kp.UnlockConditions.UnlockHash())
 	return nil
 }
 

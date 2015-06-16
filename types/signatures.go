@@ -405,54 +405,6 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	return nil
 }
 
-// MarshalJSON is implemented on the unlock hash to always produce a hex string
-// upon marshalling.
-func (uh UnlockHash) MarshalJSON() ([]byte, error) {
-	uhChecksum := crypto.HashObject(uh)
-	str := fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
-	return json.Marshal(str)
-}
-
-// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
-// that has been encoded to a hex string.
-func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
-	// Check the length of b.
-	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 {
-		return ErrUnlockHashWrongLen
-	}
-
-	// Decode the unlock hash.
-	var byteUnlockHash []byte
-	var checksum []byte
-	_, err := fmt.Sscanf(string(b[1:1+crypto.HashSize*2]), "%x", &byteUnlockHash)
-	if err != nil {
-		return err
-	}
-	// Decode the checksum.
-	_, err = fmt.Sscanf(string(b[1+crypto.HashSize*2:1+crypto.HashSize*2+UnlockHashChecksumSize*2]), "%x", &checksum)
-	if err != nil {
-		return err
-	}
-
-	// Verify the checksum - leave uh as-is unless the checksum is valid.
-	var unlockHash UnlockHash
-	copy(unlockHash[:], byteUnlockHash)
-	expectedChecksum := crypto.HashObject(unlockHash)
-	if bytes.Compare(expectedChecksum[:UnlockHashChecksumSize], checksum) != 0 {
-		return ErrInvalidUnlockHashChecksum
-	}
-	copy(uh[:], unlockHash[:])
-
-	return nil
-}
-
-// String returns the hex representation of the unlock hash as a string - this
-// includes a checksum.
-func (uh UnlockHash) String() string {
-	uhChecksum := crypto.HashObject(uh)
-	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
-}
-
 // LoadString loads a hex representation (including checksum) of an unlock hash
 // into an unlock hash object. An error is returned if the string is invalid or
 // fails the checksum.
@@ -470,19 +422,42 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 		return err
 	}
 	// Decode the checksum.
-	_, err = fmt.Sscanf(strUH[crypto.HashSize*2:crypto.HashSize*2+UnlockHashChecksumSize*2], "%x", &checksum)
+	_, err = fmt.Sscanf(strUH[crypto.HashSize*2:], "%x", &checksum)
 	if err != nil {
 		return err
 	}
 
 	// Verify the checksum - leave uh as-is unless the checksum is valid.
-	var unlockHash UnlockHash
-	copy(unlockHash[:], byteUnlockHash)
-	expectedChecksum := crypto.HashObject(unlockHash)
+	expectedChecksum := crypto.HashBytes(byteUnlockHash)
 	if bytes.Compare(expectedChecksum[:UnlockHashChecksumSize], checksum) != 0 {
 		return ErrInvalidUnlockHashChecksum
 	}
-	copy(uh[:], unlockHash[:])
+	copy(uh[:], byteUnlockHash[:])
 
 	return nil
+}
+
+// MarshalJSON is implemented on the unlock hash to always produce a hex string
+// upon marshalling.
+func (uh UnlockHash) MarshalJSON() ([]byte, error) {
+	uhChecksum := crypto.HashObject(uh)
+	str := fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
+	return json.Marshal(str)
+}
+
+// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
+// that has been encoded to a hex string.
+func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
+	// Check the length of b.
+	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 {
+		return ErrUnlockHashWrongLen
+	}
+	return uh.LoadString(string(b[1 : len(b)-1]))
+}
+
+// String returns the hex representation of the unlock hash as a string - this
+// includes a checksum.
+func (uh UnlockHash) String() string {
+	uhChecksum := crypto.HashObject(uh)
+	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
 }
