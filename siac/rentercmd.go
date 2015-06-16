@@ -75,7 +75,7 @@ var (
 	}
 
 	renterFilesShareASCIICmd = &cobra.Command{
-		Use:   "share [nickname]",
+		Use:   "shareascii [nickname]",
 		Short: "Export a file as an ASCII-encoded .sia file",
 		Long:  "Export a file as an ASCII-encoded .sia file.",
 		Run:   wrap(renterfilesshareasciicmd),
@@ -212,13 +212,13 @@ func renterfilessharecmd(nickname, destination string) {
 }
 
 func renterfilesshareasciicmd(nickname string) {
-	var data string
+	var data struct{ File string }
 	err := getAPI(fmt.Sprintf("/renter/files/shareascii?nickname=%s", nickname), &data)
 	if err != nil {
 		fmt.Println("Could not share file:", err)
 		return
 	}
-	fmt.Println(data)
+	fmt.Println(data.File)
 }
 
 func renterfilesuploadcmd(source, nickname string) {

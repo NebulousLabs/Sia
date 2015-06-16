@@ -579,6 +579,9 @@ Queries:
 
 * /wallet/address
 * /wallet/send
+* /wallet/siafunds/balance
+* /wallet/siafunds/spend
+* /wallet/siafunds/watchsiagaddress
 * /wallet/status
 
 #### /wallet/address
@@ -607,6 +610,51 @@ destination string
 `amount` is a volume of coins to send, in Hastings.
 
 `destination` is the hex representation of the recipient address.
+
+Response: standard
+
+#### /wallet/siafunds/balance
+
+Function: Display the balance of siafunds tracked by the wallet.
+
+Parameters: none
+
+Response:
+```
+struct {
+	SiafundBalance      int
+	SiacoinClaimBalance int
+}
+```
+
+#### /wallet/siafunds/spend
+
+Function: Spend siafunds tracked by the wallet. The siacoins stored in the
+siafunds are sent to the wallet.
+
+Parameters:
+```
+amount      int
+destination string
+keyfiles    string
+```
+`amount` is a volume of coins to send, in Hastings.
+
+`destination` is the hex representation of the recipient address.
+
+`keyfiles` is a comma-separated list of files containing the keys used to
+unlock the siafunds.
+
+#### /wallet/siafunds/watchsiagaddress
+
+Function: Track a new siafund address.
+
+Parameters:
+```
+keyfile string
+```
+`keyfile` is a file containing a key corresponding to the address.
+
 
 Response: standard
 

@@ -167,7 +167,9 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletStatusCmd)
+	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd)
+	walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
+	walletSiafundsCmd.AddCommand(walletSiafundsSpendCmd)
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterDownloadQueueCmd, renterFilesDeleteCmd, renterFilesDownloadCmd,
