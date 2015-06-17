@@ -16,10 +16,7 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 
 	// Modify the number of file contracts and how much they costed
 	for _, diff := range cc.FileContractDiffs {
-		// Diff direction is a bool representing if the file
-		// contract is new or getting removed. True signifies
-		// that it is a new file contract
-		if diff.Direction == true {
+		if diff.Direction == modules.DiffApply {
 			be.activeContracts += 1
 			be.totalContracts += 1
 			be.activeContractCost = be.activeContractCost.Add(diff.FileContract.Payout)
