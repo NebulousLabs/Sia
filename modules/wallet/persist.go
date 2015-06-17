@@ -98,7 +98,7 @@ func (w *Wallet) load() error {
 	var savedKeys []savedKey
 	err := encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
 	// never load from the home folder during testing
-	if build.Release == "testing" || err != nil {
+	if build.Release != "release" || err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
 		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
@@ -115,7 +115,7 @@ func (w *Wallet) load() error {
 	var siafundAddresses []types.UnlockHash
 	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
 	// never load from the home folder during testing
-	if build.Release == "testing" || err != nil {
+	if build.Release != "release" || err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
 		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
