@@ -54,50 +54,64 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 
 	// Host API Calls
-	handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
-	handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
-	handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
+	if srv.host != nil {
+		handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
+		handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
+		handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
+	}
 
 	// HostDB API Calls
-	handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
-	handleHTTPRequest(mux, "/hostdb/hosts/all", srv.hostdbHostsAllHandler)
+	if srv.hostdb != nil {
+		handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
+		handleHTTPRequest(mux, "/hostdb/hosts/all", srv.hostdbHostsAllHandler)
+	}
 
 	// Miner API Calls
-	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
-	handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
-	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
-	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)
-	handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
-	handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
+	if srv.miner != nil {
+		handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
+		handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
+		handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
+		handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
+		handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)
+		handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
+		handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
+	}
 
 	// Renter API Calls
-	handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
-	handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
-	handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
-	handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
-	handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
-	handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
-	handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
-	handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
-	handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
-	handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
-	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
+	if srv.renter != nil {
+		handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
+		handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
+		handleHTTPRequest(mux, "/renter/files/download", srv.renterFilesDownloadHandler)
+		handleHTTPRequest(mux, "/renter/files/list", srv.renterFilesListHandler)
+		handleHTTPRequest(mux, "/renter/files/load", srv.renterFilesLoadHandler)
+		handleHTTPRequest(mux, "/renter/files/loadascii", srv.renterFilesLoadAsciiHandler)
+		handleHTTPRequest(mux, "/renter/files/rename", srv.renterFilesRenameHandler)
+		handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
+		handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
+		handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
+		handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
+	}
 
 	// TransactionPool API Calls
-	handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+	if srv.tpool != nil {
+		handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
+	}
 
 	// Wallet API Calls
-	handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
-	handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
-	handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
-	handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
-	handleHTTPRequest(mux, "/wallet/siafunds/send", srv.walletSiafundsSendHandler)
-	handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
+	if srv.wallet != nil {
+		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
+		handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
+		handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
+		handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
+		handleHTTPRequest(mux, "/wallet/siafunds/send", srv.walletSiafundsSendHandler)
+		handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
+	}
 
 	// BlockExplorer API Calls
-	handleHTTPRequest(mux, "/blockexplorer/status", srv.blockexplorerStatusHandler)
-	handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
+	if srv.blocke != nil {
+		handleHTTPRequest(mux, "/blockexplorer/status", srv.blockexplorerStatusHandler)
+		handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
+	}
 
 	// create graceful HTTP server
 	srv.apiServer = &graceful.Server{

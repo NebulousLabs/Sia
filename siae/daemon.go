@@ -7,14 +7,9 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/blockexplorer"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/host"
-	"github.com/NebulousLabs/Sia/modules/hostdb"
-	"github.com/NebulousLabs/Sia/modules/miner"
-	"github.com/NebulousLabs/Sia/modules/renter"
-	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	"github.com/NebulousLabs/Sia/modules/wallet"
 
 	"github.com/spf13/cobra"
 )
@@ -25,39 +20,19 @@ func startDaemon() error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Create all of the modules.
-	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
+	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
 	if err != nil {
 		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
+	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
 	if err != nil {
 		return err
 	}
-	tpool, err := transactionpool.New(state, gateway)
+	explorer, err := blockexplorer.New(state)
 	if err != nil {
 		return err
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
-	if err != nil {
-		return err
-	}
-	miner, err := miner.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
-	if err != nil {
-		return err
-	}
-	hostdb, err := hostdb.New(state, gateway)
-	if err != nil {
-		return err
-	}
-	host, err := host.New(state, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
-	if err != nil {
-		return err
-	}
-	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
-	if err != nil {
-		return err
-	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, nil, nil, nil, nil, nil, explorer)
 	if err != nil {
 		return err
 	}
