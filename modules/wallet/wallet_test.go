@@ -96,7 +96,7 @@ func createWalletTester(name string) (*walletTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
 	}

@@ -71,7 +71,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal(err)
 	}

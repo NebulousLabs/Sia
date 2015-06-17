@@ -69,7 +69,7 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
 	}

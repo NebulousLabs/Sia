@@ -42,7 +42,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	miner, err := miner.New(state, tpool, wallet)
+	miner, err := miner.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, "miner"))
 	if err != nil {
 		return err
 	}

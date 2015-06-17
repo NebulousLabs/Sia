@@ -98,7 +98,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}

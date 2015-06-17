@@ -106,7 +106,7 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 	}
 
 	// Create the miner.
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal(err)
 	}

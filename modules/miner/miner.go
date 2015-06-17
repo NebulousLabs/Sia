@@ -2,6 +2,7 @@ package miner
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -32,13 +33,8 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	// A list of the blocks that the miner has found.
+	// A list of blocks that have been through SubmitBlock.
 	blocksFound []types.BlockID
-
-	// Memory variables - used in headerforwork. blockMem maps a header to the
-	// block that it is associated with. headerMem is a slice of headers used
-	// to remember which headers are the N most recent headers to be requested
-	// by external miners. Only the N most recent headers are kept in blockMem.
 
 	// BlockManager variables. The BlockManager passes out and receives unique
 	// block headers on each call, these variables help to map the received
@@ -66,11 +62,13 @@ type Miner struct {
 	// Subscription management variables.
 	subscribers []chan struct{}
 
-	mu *sync.RWMutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet) (*Miner, error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
 	// Create the miner and its dependencies.
 	if cs == nil {
 		return nil, errors.New("miner cannot use a nil state")
@@ -83,9 +81,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 	}
 
 	// Grab some starting block variables.
-	//
-	// TODO: Not all of this may be needed anymore.
-	currentBlock := cs.CurrentBlock().ID()
+	currentBlock := cs.GenesisBlock().ID()
 	currentTarget, exists1 := cs.ChildTarget(currentBlock)
 	earliestTimestamp, exists2 := cs.EarliestChildTimestamp(currentBlock)
 	if build.DEBUG {
@@ -115,7 +111,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		blockMem:  make(map[types.BlockHeader]types.Block),
 		headerMem: make([]types.BlockHeader, headerForWorkMemory),
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
+	}
+	err = m.initPersist()
+	if err != nil {
+		return nil, err
 	}
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
