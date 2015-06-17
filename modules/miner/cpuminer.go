@@ -52,7 +52,10 @@ func (m *Miner) threadedMine() {
 		m.mu.Unlock(lockID)
 		b, solved := m.SolveBlock(bfw, target)
 		if solved {
-			_ = m.SubmitBlock(b) // TODO: Log an error.
+			err := m.SubmitBlock(b)
+			if err != nil {
+				m.log.Println("ERROR: An error occurred while cpu mining:", err)
+			}
 		}
 	}
 }

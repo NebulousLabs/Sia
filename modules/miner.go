@@ -9,7 +9,7 @@ const (
 	MinerDir = "miner"
 )
 
-// A BlockBuilder contains functions that can interface with external miners,
+// A BlockManager contains functions that can interface with external miners,
 // providing and receiving blocks that have experienced nonce grinding.
 type BlockManager interface {
 	// BlockForWork returns a block that is ready for nonce grinding. All

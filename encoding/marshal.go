@@ -150,7 +150,6 @@ func NewEncoder(w io.Writer) *Encoder {
 
 // Marshal returns the encoding of v. For encoding details, see the package
 // docstring.
-// TODO: merge with MarshalAll?
 func Marshal(v interface{}) []byte {
 	b := new(bytes.Buffer)
 	NewEncoder(b).Encode(v) // no error possible when using a bytes.Buffer

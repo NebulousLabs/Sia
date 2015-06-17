@@ -3,7 +3,6 @@ package miner
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
@@ -95,7 +94,7 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
 		m.tpool.PurgeTransactionPool()
-		fmt.Println("Error: an invalid block was submitted:", err) // TODO: Change this to a log
+		m.log.Println("ERROR: an invalid block was submitted:", err)
 		return err
 	}
 
@@ -122,8 +121,9 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	b, exists := m.blockMem[lookupBH]
 	m.mu.Unlock(lockID)
 	if !exists {
-		fmt.Println("Block returned late - too many calls to the miner.")
-		return errors.New("block header returned late - block was cleared from memory")
+		err := errors.New("block header returned late - block was cleared from memory")
+		m.log.Println("ERROR:", err)
+		return err
 	}
 	b.Nonce = bh.Nonce
 	return m.SubmitBlock(b)
