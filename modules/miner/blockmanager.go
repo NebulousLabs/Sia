@@ -5,15 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// BlockForWork returns a block that is ready for nonce grinding, along with
-// the root hash of the block.
-func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+// Creates a block ready for nonce grinding, also returning the MerkleRoot of
+// the block. Getting the MerkleRoot of a block requires encoding and hashing
+// in a specific way, which are implementation details we didn't want to
+// require external miners to need to worry about. All blocks returned are
+// unique, which means all miners can safely start at the '0' nonce.
+func (m *Miner) blockForWork() (types.Block, types.Target) {
 	// Determine the timestamp.
 	blockTimestamp := types.CurrentTimestamp()
 	if blockTimestamp < m.earliestTimestamp {
@@ -50,37 +51,46 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 		MinerPayouts: blockPayouts,
 		Transactions: blockTransactions,
 	}
+	return b, m.target
+}
+
+// BlockForWork returns a block that is ready for nonce grinding, along with
+// the root hash of the block.
+func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	b, t = m.blockForWork()
+	merkleRoot = b.MerkleRoot()
+	return b, merkleRoot, t
+}
+
+// BlockForWork returns a block that is ready for nonce grinding, along with
+// the root hash of the block.
+func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Grab a block for work.
+	block, target := m.blockForWork()
 
 	// Save a mapping between the block and its header, replacing the block
 	// that was stored 'headerForWorkMemory' requests ago.
 	delete(m.blockMem, m.headerMem[m.memProgress])
-	m.blockMem[b.Header()] = b
-	m.headerMem[m.memProgress] = b.Header()
+	m.blockMem[block.Header()] = block
+	m.headerMem[m.memProgress] = block.Header()
 	m.memProgress++
 	if m.memProgress == headerForWorkMemory {
 		m.memProgress = 0
 	}
 
 	// Return the header and target.
-	return b.Header(), m.target
+	return block.Header(), target
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
 // submitBlock should not be called with a lock.
-func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
-	// Fetch the block from the blockMem.
-	var zeroNonce [8]byte
-	lookupBH := bh
-	lookupBH.Nonce = zeroNonce
-	m.mu.Lock()
-	b, exists := m.blockMem[lookupBH]
-	m.mu.Unlock()
-	if !exists {
-		fmt.Println("block returned too late - too many HeaderForWork().")
-		return errors.New("block returned too late - has already been cleared from memory")
-	}
-	b.Nonce = bh.Nonce
-
+func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
@@ -101,4 +111,22 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	}
 	m.mu.Unlock()
 	return err
+}
+
+// submitBlock takes a solved block and submits it to the blockchain.
+// submitBlock should not be called with a lock.
+func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
+	// Fetch the block from the blockMem.
+	var zeroNonce [8]byte
+	lookupBH := bh
+	lookupBH.Nonce = zeroNonce
+	m.mu.Lock()
+	b, exists := m.blockMem[lookupBH]
+	m.mu.Unlock()
+	if !exists {
+		fmt.Println("Block returned late - too many calls to the miner.")
+		return errors.New("block header returned late - block was cleared from memory")
+	}
+	b.Nonce = bh.Nonce
+	return m.SubmitBlock(b)
 }
