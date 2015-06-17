@@ -57,8 +57,8 @@ func (m *Miner) blockForWork() (types.Block, types.Target) {
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 
 	b, t = m.blockForWork()
 	merkleRoot = b.MerkleRoot()
@@ -68,8 +68,8 @@ func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.T
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 
 	// Grab a block for work.
 	block, target := m.blockForWork()
@@ -94,22 +94,20 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	// Give the block to the consensus set.
 	err := m.cs.AcceptBlock(b)
 	if err != nil {
-		m.mu.Lock()
 		m.tpool.PurgeTransactionPool()
-		m.mu.Unlock()
-		fmt.Println("Error: an invalid block was submitted:", err)
+		fmt.Println("Error: an invalid block was submitted:", err) // TODO: Change this to a log
 		return err
 	}
 
 	// Grab a new address for the miner.
-	m.mu.Lock()
+	lockID := m.mu.Lock()
 	m.blocksFound = append(m.blocksFound, b.ID())
 	var addr types.UnlockHash
 	addr, _, err = m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err == nil {                            // Special case: only update the address if there was no error.
 		m.address = addr
 	}
-	m.mu.Unlock()
+	m.mu.Unlock(lockID)
 	return err
 }
 
@@ -120,9 +118,9 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	var zeroNonce [8]byte
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
-	m.mu.Lock()
+	lockID := m.mu.Lock()
 	b, exists := m.blockMem[lookupBH]
-	m.mu.Unlock()
+	m.mu.Unlock(lockID)
 	if !exists {
 		fmt.Println("Block returned late - too many calls to the miner.")
 		return errors.New("block header returned late - block was cleared from memory")

@@ -2,11 +2,11 @@ package miner
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -66,7 +66,7 @@ type Miner struct {
 	// Subscription management variables.
 	subscribers []chan struct{}
 
-	mu sync.Mutex
+	mu *sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
@@ -114,6 +114,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 
 		blockMem:  make(map[types.BlockHeader]types.Block),
 		headerMem: make([]types.BlockHeader, headerForWorkMemory),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 	m.tpool.TransactionPoolSubscribe(m)
 	return m, nil
@@ -122,8 +124,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 // BlocksMined returns the number of good blocks and stale blocks that have
 // been mined by the miner.
 func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 
 	for _, blockID := range m.blocksFound {
 		if m.cs.InCurrentPath(blockID) {

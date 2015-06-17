@@ -28,31 +28,29 @@ func (m *Miner) increaseAttempts() {
 // only function that should be setting the mining flag to true.
 func (m *Miner) threadedMine() {
 	// There should not be another thread mining, and mining should be enabled.
-	m.mu.Lock()
+	lockID := m.mu.Lock()
 	if m.mining || !m.miningOn {
-		m.mu.Unlock()
+		m.mu.Unlock(lockID)
 		return
 	}
 	m.mining = true
-	m.mu.Unlock()
+	m.mu.Unlock(lockID)
 
 	// Solve blocks repeatedly.
 	for {
 		// Kill the thread if mining has been turned off.
-		m.mu.Lock()
+		lockID := m.mu.Lock()
 		if !m.miningOn {
 			m.mining = false
-			m.mu.Unlock()
+			m.mu.Unlock(lockID)
 			return
 		}
 
 		// Grab a block and try to solve it.
 		bfw, target := m.blockForWork()
 		m.increaseAttempts()
-		m.mu.Unlock()
+		m.mu.Unlock(lockID)
 		b, solved := m.SolveBlock(bfw, target)
-
-		// If solved, submit the block
 		if solved {
 			_ = m.SubmitBlock(b) // TODO: Log an error.
 		}
@@ -61,15 +59,15 @@ func (m *Miner) threadedMine() {
 
 // CPUHashrate returns the cpu hashrate.
 func (m *Miner) CPUHashrate() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 	return int(m.hashRate)
 }
 
 // CPUMining indicates whether a cpu miner is running.
 func (m *Miner) CPUMining() bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 	return m.mining
 }
 
@@ -78,9 +76,9 @@ func (m *Miner) CPUMining() bool {
 //
 // TODO: Block should not automatically be submitted to the consensus set.
 func (m *Miner) FindBlock() (types.Block, bool, error) {
-	m.mu.Lock()
+	lockID := m.mu.Lock()
 	bfw, target := m.blockForWork()
-	m.mu.Unlock()
+	m.mu.Unlock(lockID)
 
 	var err error
 	block, solved := m.SolveBlock(bfw, target)
@@ -116,8 +114,8 @@ func (m *Miner) SolveBlock(b types.Block, target types.Target) (types.Block, boo
 // StartMining will spawn a thread to begin mining. The thread will only start
 // mining if there is not another thread mining yet.
 func (m *Miner) StartCPUMining() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 	m.miningOn = true
 	go m.threadedMine()
 }
@@ -125,8 +123,8 @@ func (m *Miner) StartCPUMining() {
 // StopMining sets desiredThreads to 0, a value which is polled by mining
 // threads. When set to 0, the mining threads will all cease mining.
 func (m *Miner) StopCPUMining() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 	m.hashRate = 0
 	m.miningOn = false
 }
