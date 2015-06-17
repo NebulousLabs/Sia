@@ -163,7 +163,8 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = tpt.miner.FindBlock()
+		b, _ := tpt.miner.FindBlock()
+		err = tpt.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

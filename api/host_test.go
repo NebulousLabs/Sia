@@ -10,7 +10,8 @@ import (
 // announceHost puts a host announcement for the host into the blockchain.
 func (st *serverTester) announceHost() error {
 	st.callAPI("/host/announce")
-	_, _, err := st.miner.FindBlock()
+	b, _ := st.miner.FindBlock()
+	err := st.cs.AcceptBlock(b)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,11 @@ func TestStorageProofs(t *testing.T) {
 
 	// Mine 25 blocks - the file will expire. (special constants)
 	for i := 0; i < 25; i++ {
-		st.miner.FindBlock()
+		b, _ := st.miner.FindBlock()
+		err := st.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
 		st.csUpdateWait()
 		t.Error("found", i)
 	}
@@ -77,7 +82,11 @@ func TestStorageProofs(t *testing.T) {
 	// Mine 25 more blocks, waiting between each block. This will give the host
 	// time to submit a storage proof.
 	for i := 0; i < 25; i++ {
-		st.miner.FindBlock()
+		b, _ := st.miner.FindBlock()
+		err := st.cs.AcceptBlock(b)
+		if err != nil {
+			t.Fatal(err)
+		}
 		st.csUpdateWait()
 		time.Sleep(time.Millisecond * 50)
 		t.Error("2 - found", i)

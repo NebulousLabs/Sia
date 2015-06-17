@@ -16,7 +16,8 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 	initialCSSum := cst.cs.consensusSetHash()
 
 	// Mine and submit a block
-	block, _, err := cst.miner.FindBlock()
+	block, _ := cst.miner.FindBlock()
+	err := cst.cs.AcceptBlock(block)
 	if err != nil {
 		return err
 	}
@@ -124,12 +125,14 @@ func (cst *consensusSetTester) testBlockKnownHandling() error {
 	staleBlock, _ := cst.miner.SolveBlock(block, target)
 
 	// Add two new blocks to the consensus set to block the stale block.
-	block1, _, err := cst.miner.FindBlock()
+	block1, _ := cst.miner.FindBlock()
+	err := cst.cs.AcceptBlock(block1)
 	if err != nil {
 		return err
 	}
 	cst.csUpdateWait()
-	block2, _, err := cst.miner.FindBlock()
+	block2, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block2)
 	if err != nil {
 		return err
 	}

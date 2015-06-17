@@ -71,21 +71,12 @@ func (m *Miner) CPUMining() bool {
 	return m.mining
 }
 
-// FindBlock finds at most one block that extends the current blockchain and
-// then submits that block to the consensus set.
-//
-// TODO: Block should not automatically be submitted to the consensus set.
-func (m *Miner) FindBlock() (types.Block, bool, error) {
+// FindBlock finds at most one block that extends the current blockchain.
+func (m *Miner) FindBlock() (types.Block, bool) {
 	lockID := m.mu.Lock()
 	bfw, target := m.blockForWork()
 	m.mu.Unlock(lockID)
-
-	var err error
-	block, solved := m.SolveBlock(bfw, target)
-	if solved {
-		err = m.SubmitBlock(block)
-	}
-	return block, solved, err
+	return m.SolveBlock(bfw, target)
 }
 
 // SolveBlock takes a block, target, and number of iterations as input and

@@ -17,7 +17,8 @@ func (tpt *tpoolTester) testSiacoinTransactionDump() {
 
 	// Add the transaction set to a block and check that it is valid in the
 	// state by adding it to the state.
-	_, _, err := tpt.miner.FindBlock()
+	b, _ := tpt.miner.FindBlock()
+	err := tpt.cs.AcceptBlock(b)
 	if err != nil {
 		tpt.t.Error(err)
 	}

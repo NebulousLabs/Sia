@@ -20,7 +20,8 @@ func TestApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = cst.miner.FindBlock()
+	b, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}

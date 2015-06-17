@@ -24,7 +24,8 @@ func TestSynchronize(t *testing.T) {
 
 	// mine on cst2 until it is above cst1
 	for cst1.cs.Height() >= cst2.cs.Height() {
-		_, _, err = cst2.miner.FindBlock()
+		b, _ := cst2.miner.FindBlock()
+		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +62,8 @@ func TestSynchronize(t *testing.T) {
 	}
 	// TODO: more than 30 causes a race condition!
 	for cst2.cs.Height() < cst1.cs.Height()+20 {
-		_, _, err = cst2.miner.FindBlock()
+		b, _ := cst2.miner.FindBlock()
+		err = cst2.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -106,7 +108,8 @@ func TestResynchronize(t *testing.T) {
 	}
 
 	// TODO: without this extra block, sync fails. Why?
-	_, _, err = cst2.miner.FindBlock()
+	b, _ := cst2.miner.FindBlock()
+	err = cst2.cs.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +130,8 @@ func TestResynchronize(t *testing.T) {
 	}
 
 	// mine a block on cst2, but hide it from cst1 during reconnect
-	_, _, err = cst2.miner.FindBlock()
+	b, _ = cst2.miner.FindBlock()
+	err = cst2.cs.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +178,8 @@ func TestBlockHistory(t *testing.T) {
 
 	// mine until we have enough blocks to test blockHistory
 	for cst.cs.Height() < MaxCatchUpBlocks {
-		_, _, err = cst.miner.FindBlock()
+		b, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

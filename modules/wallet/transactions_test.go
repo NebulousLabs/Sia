@@ -47,7 +47,8 @@ func (wt *walletTester) testFundTransaction() error {
 
 	// Dump the transaction pool into a block and see that the balance still
 	// registers correctly.
-	_, _, err = wt.miner.FindBlock()
+	b, _ := wt.miner.FindBlock()
+	err = wt.cs.AcceptBlock(b)
 	if err != nil {
 		return err
 	}

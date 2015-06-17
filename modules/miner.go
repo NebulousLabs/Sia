@@ -37,13 +37,9 @@ type CPUMiner interface {
 
 	// FindBlock will have the miner make 1 attempt to find a solved block that
 	// builds on the current consensus set. It will give up after a few
-	// seconds, returning a block, a bool indicating whether the block is
-	// sovled, and an error. FindBlock will submit the block to the consensus
-	// set.
-	//
-	// TODO: Does it make sense to have FindBlock submit the block to the
-	// consensus set? I feel it does not.
-	FindBlock() (types.Block, bool, error)
+	// seconds, returning the block and a bool indicating whether the block is
+	// sovled.
+	FindBlock() (types.Block, bool)
 
 	// StartMining turns on the miner, which will endlessly work for new
 	// blocks.

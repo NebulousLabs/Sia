@@ -135,7 +135,8 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = hdbt.miner.FindBlock()
+		b, _ := hdbt.miner.FindBlock()
+		err = hdbt.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

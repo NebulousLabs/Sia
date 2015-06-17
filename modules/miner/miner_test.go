@@ -50,7 +50,8 @@ func TestMiner(t *testing.T) {
 	}
 
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = m.FindBlock()
+		b, _ := m.FindBlock()
+		err = s.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +100,8 @@ func TestManyBlocks(t *testing.T) {
 	<-minerChan
 
 	for i := 0; i < 200; i++ {
-		_, _, err = m.FindBlock()
+		b, _ := m.FindBlock()
+		err = s.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

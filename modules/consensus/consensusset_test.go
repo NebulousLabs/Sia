@@ -98,7 +98,8 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = cst.miner.FindBlock()
+		b, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(b)
 		if err != nil {
 			return nil, err
 		}

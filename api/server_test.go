@@ -159,7 +159,8 @@ func newServerTester(name string, t *testing.T) *serverTester {
 
 	// Mine blocks until the wallet has confirmed money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = st.miner.FindBlock()
+		b, _ := st.miner.FindBlock()
+		err := st.cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}
