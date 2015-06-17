@@ -24,9 +24,8 @@ type Config struct {
 	Siad struct {
 		NoBootstrap bool
 
-		APIaddr  string
-		RPCaddr  string
-		HostAddr string
+		APIaddr string
+		RPCaddr string
 
 		SiaDir string
 	}
@@ -65,7 +64,6 @@ func main() {
 	root.PersistentFlags().BoolVarP(&config.Siad.NoBootstrap, "no-bootstrap", "n", false, "disable bootstrapping on this run")
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
-	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
 
 	// Parse cmdline flags, overwriting both the default values and the config
