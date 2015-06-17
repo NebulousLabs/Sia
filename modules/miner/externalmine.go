@@ -21,7 +21,7 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	}
 
 	// Create the miner payouts.
-	subsidy := types.CalculateCoinbase(m.height + 1)
+	subsidy := types.CalculateCoinbase(m.height)
 	for _, txn := range m.transactions {
 		for _, fee := range txn.MinerFees {
 			subsidy = subsidy.Add(fee)
