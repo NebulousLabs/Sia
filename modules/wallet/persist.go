@@ -3,6 +3,7 @@ package wallet
 import (
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -95,11 +96,12 @@ func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 // load reads the contents of a wallet from a file.
 func (w *Wallet) load() error {
 	var savedKeys []savedKey
-	err := encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
-	if err != nil {
+	err := encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
+	// never load from the home folder during testing
+	if build.Release == "testing" || err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
-		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
+		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
 		if err != nil {
 			return err
 		}
@@ -112,7 +114,8 @@ func (w *Wallet) load() error {
 	// Load the siafunds file, which is intentionally called 'outputs.dat'.
 	var siafundAddresses []types.UnlockHash
 	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
-	if err != nil {
+	// never load from the home folder during testing
+	if build.Release == "testing" || err != nil {
 		// try loading the backup
 		// TODO: display/log a warning?
 		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
