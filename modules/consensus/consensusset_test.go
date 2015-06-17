@@ -52,27 +52,23 @@ func (cst *consensusSetTester) tpUpdateWait() {
 func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	testdir := build.TempDir(modules.ConsensusDir, name)
 
-	// Create the gateway.
+	// Create modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
 	}
-	// Create the consensus set.
 	cs, err := New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		return nil, err
 	}
-	// Create the transaction pool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		return nil, err
 	}
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
 	}
-	// Create the miner.
 	m, err := miner.New(cs, tp, w)
 	if err != nil {
 		return nil, err

@@ -5,6 +5,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	MinerDir = "miner"
+)
+
 // A BlockBuilder contains functions that can interface with external miners,
 // providing and receiving blocks that have experienced nonce grinding.
 type BlockManager interface {
