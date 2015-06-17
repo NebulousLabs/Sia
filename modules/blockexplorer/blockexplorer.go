@@ -18,8 +18,36 @@ type BlockExplorer struct {
 	// kept update via a subscription to consensus
 	currentBlock types.Block
 
+	// Stored to differentiate the special case of the genesis
+	// block when recieving updates from consensus, to avoid
+	// constant queries to consensus.
+	genesisBlockID types.BlockID
+
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
+
+	// currencySent keeps track of how much currency has been
+	// i.e. sending siacoin to somebody else
+	currencySent types.Currency
+
+	// activeContracts and totalContracts hold the current number
+	// of file contracts now in effect and that ever have been,
+	// respectively
+	activeContracts uint64
+	totalContracts  uint64
+
+	// activeContracts and totalContracts hold the current sum
+	// cost of the file contracts now in effect and that ever have
+	// been, respectively
+	activeContractCost types.Currency
+	totalContractCost  types.Currency
+
+	// Stores a few data points for each block:
+	// Timestamp, target and size
+	blockSummaries []modules.ExplorerBlockData
+
+	// Keep a reference to the consensus for queries
+	cs modules.ConsensusSet
 
 	// Subscriptions currently contain no data, but serve to
 	// notify other modules when changes occur
@@ -30,7 +58,7 @@ type BlockExplorer struct {
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
+func New(cs modules.ConsensusSet) (be *BlockExplorer, err error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		err = errors.New("Blockchain explorer cannot use a nil ConsensusSet")
@@ -38,21 +66,18 @@ func New(cs modules.ConsensusSet) (bc *BlockExplorer, err error) {
 	}
 
 	// Initilize the module state
-	bc = &BlockExplorer{
-		currentBlock:     cs.GenesisBlock(),
-		blockchainHeight: 0,
-		mu:               sync.New(modules.SafeMutexDelay, 1),
+	be = &BlockExplorer{
+		currentBlock:       cs.GenesisBlock(),
+		genesisBlockID:     cs.GenesisBlock().ID(),
+		blockchainHeight:   0,
+		currencySent:       types.NewCurrency64(0),
+		activeContractCost: types.NewCurrency64(0),
+		totalContractCost:  types.NewCurrency64(0),
+		cs:                 cs,
+		mu:                 sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	cs.ConsensusSetSubscribe(bc)
+	cs.ConsensusSetSubscribe(be)
 
 	return
-}
-
-// Returns the current block, as known by the current ExplorerState
-func (be *BlockExplorer) CurrentBlock() types.Block {
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
-
-	return be.currentBlock
 }

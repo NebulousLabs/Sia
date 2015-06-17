@@ -677,3 +677,79 @@ struct {
 `FullBalance` is the balance of the wallet, including unconfirmed coins.
 
 `NumAddresses` is the number of addresses controlled by the wallet.
+
+Block Explorer
+--------------
+
+Queries:
+
+* /blockexplorer/status
+* /blockexplorer/blockdata
+
+### /blockexplorer/status
+
+Function: Returns the status of the blockchain and some
+statistics. All Siacoin amounts are given in Hastings
+
+Parameters: None
+
+Response:
+```
+struct {
+	Height int
+	Block  Types.Block
+	Target []byte
+	CurrencySent  int
+	TotalCurrency int
+	ActiveContractCount int
+	ActiveContractcosts int
+	TotalContractCount int
+	TotalContractcosts int
+}
+```
+`Height` is the current height of the blockchain.
+
+`Block` is the most recently mined valid block. See types/block.go for
+a detailed specification of a block structure.
+
+`Target` is the target at which the current block has been mined at.
+
+`TotalCurrency` is the total amount of siacoins in ciculation
+
+`ActiveContractCount` is the number of file contracts that are currently in place.
+
+`ActiveContractCosts` is the amount of siacoins that are currently tied
+up in file contracts.
+
+`TotalContractCount` is the number of file contracts that have ever
+took place
+
+`TotalContractCosts` is the amount of siacoins that have ever been
+spent on file contracts
+
+### /blockexplorer/blockdata
+
+Function: Return information about specific blocks
+
+Parameters:
+```
+start  int
+finish int
+```
+`start` is the starting block height.
+
+`finish` is the finishing block height.
+
+Response:
+```
+[]struct {
+	 Timestamp int
+	 Target    int
+	 Size	   int
+}
+
+`Timestamp` is the timestamp registered on the block.
+
+`Target` is the target at which the block was mined at.
+
+`Size` is the size, in bytes of the marshalled block.
