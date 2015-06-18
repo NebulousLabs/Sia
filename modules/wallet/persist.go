@@ -3,8 +3,11 @@ package wallet
 import (
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -12,14 +15,6 @@ type savedKey struct {
 	SecretKey        crypto.SecretKey
 	UnlockConditions types.UnlockConditions
 	Visible          bool
-}
-
-// legacySavedKey preserves compatibility with the other beta wallets. After
-// the full currency is launched, this struct and the related code can be
-// discarded.
-type legacySavedKey struct {
-	SecretKey        crypto.SecretKey
-	UnlockConditions types.UnlockConditions
 }
 
 // save writes the contents of a wallet to a file.
@@ -35,8 +30,8 @@ func (w *Wallet) save() error {
 	if err != nil {
 		return err
 	}
-	// Overwrite the wallet file.
-	err = encoding.WriteFile(filepath.Join(w.saveDir, "wallet.dat"), keySlice)
+	// Save to home.
+	err = encoding.WriteFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), keySlice)
 	if err != nil {
 		// TODO: instruct user to recover wallet from the backup file
 		return err
@@ -56,7 +51,8 @@ func (w *Wallet) save() error {
 	if err != nil {
 		return err
 	}
-	err = encoding.WriteFile(filepath.Join(w.saveDir, "outputs.dat"), siafundSlice)
+	// Save to home.
+	err = encoding.WriteFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), siafundSlice)
 	if err != nil {
 		return err
 	}
@@ -64,22 +60,8 @@ func (w *Wallet) save() error {
 	return nil
 }
 
-// load reads the contents of a wallet from a file.
-func (w *Wallet) load() error {
-	var savedKeys []savedKey
-	var legacyKeys []legacySavedKey
-	err := encoding.ReadFile(filepath.Join(w.saveDir, "wallet.dat"), &savedKeys)
-	if err != nil {
-		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.dat"), &legacyKeys)
-		if err != nil {
-			return err
-		}
-
-		for _, key := range legacyKeys {
-			savedKeys = append(savedKeys, savedKey{key.SecretKey, key.UnlockConditions, false})
-		}
-	}
-
+// loadKeys takes a set of keys and loads them into the wallet.
+func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 	height := w.consensusHeight
 	for _, skey := range savedKeys {
 		// Create an entry in w.keys for each savedKey.
@@ -108,11 +90,38 @@ func (w *Wallet) load() error {
 		}
 	}
 
-	// Load the siafunds file, which is intentionally called 'outputs.dat'.
-	var siafundAddresses []types.UnlockHash
-	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.dat"), &siafundAddresses)
+	return nil
+}
+
+// load reads the contents of a wallet from a file.
+func (w *Wallet) load() error {
+	var savedKeys []savedKey
+	err := encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "wallet.dat"), &savedKeys)
+	// never load from the home folder during testing
+	if build.Release != "release" || err != nil {
+		// try loading the backup
+		// TODO: display/log a warning?
+		err = encoding.ReadFile(filepath.Join(w.saveDir, "wallet.backup"), &savedKeys)
+		if err != nil {
+			return err
+		}
+	}
+	err = w.loadKeys(savedKeys)
 	if err != nil {
 		return err
+	}
+
+	// Load the siafunds file, which is intentionally called 'outputs.dat'.
+	var siafundAddresses []types.UnlockHash
+	err = encoding.ReadFile(filepath.Join(w.saveDir, "outputs.backup"), &siafundAddresses)
+	// never load from the home folder during testing
+	if build.Release != "release" || err != nil {
+		// try loading the backup
+		// TODO: display/log a warning?
+		err = encoding.ReadFile(filepath.Join(persist.HomeFolder, modules.WalletDir, "outputs.dat"), &siafundAddresses)
+		if err != nil {
+			return err
+		}
 	}
 	for _, sa := range siafundAddresses {
 		w.siafundAddresses[sa] = struct{}{}

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -120,6 +122,11 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 	if err != nil {
 		return
 	}
+	homedir := filepath.Join(persist.HomeFolder, modules.WalletDir)
+	err = os.MkdirAll(homedir, 0700)
+	if err != nil {
+		return nil, err
+	}
 
 	// Try to load a previously saved wallet file. If it doesn't exist, assume
 	// that we're creating a new wallet file.
@@ -135,7 +142,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 	}
 	if err != nil {
 		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
-		// TODO: try to recover from wallet.backup?
 		return
 	}
 
