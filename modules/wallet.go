@@ -42,7 +42,7 @@ type Wallet interface {
 
 	Info() WalletInfo
 
-	SpendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
+	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
 	// WalletNotify will push a struct down the channel any time that the
 	// wallet updates.
@@ -52,9 +52,9 @@ type Wallet interface {
 	// the number of siacoins available through siafund claims.
 	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
-	// SpendSiagSiafunds sends siafunds to another address. The siacoins stored
+	// SendSiagSiafunds sends siafunds to another address. The siacoins stored
 	// in the siafunds are sent to an address in the wallet.
-	SpendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
+	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
 
 	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
 	WatchSiagSiafundAddress(keyfile string) error

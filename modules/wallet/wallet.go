@@ -156,9 +156,9 @@ func (w *Wallet) Close() error {
 	return w.save()
 }
 
-// SpendCoins creates a transaction sending 'amount' to 'dest'. The transaction
+// SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SpendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	tPoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 	amount = amount.Add(tPoolFee)
 

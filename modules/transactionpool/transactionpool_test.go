@@ -38,7 +38,7 @@ type tpoolTester struct {
 func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
 	// Send money to an anyone-can-spend address.
 	emptyHash := types.UnlockConditions{}.UnlockHash()
-	txn, err := tpt.spendCoins(types.NewCurrency64(1), emptyHash)
+	txn, err := tpt.sendCoins(types.NewCurrency64(1), emptyHash)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -77,9 +77,9 @@ func (tpt *tpoolTester) tpUpdateWait() {
 	<-tpt.walletUpdateChan
 }
 
-// An exact clone of wallet's SpendCoins(). The difference is the use of
+// An exact clone of wallet's SendCoins(). The difference is the use of
 // tpUpdateWait() for testing purposes.
-func (tpt *tpoolTester) spendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
