@@ -26,11 +26,11 @@ func startDaemon() error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Create all of the modules.
-	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
+	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
 	if err != nil {
 		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
+	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 	if err != nil {
 		return err
 	}
@@ -38,11 +38,11 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, "wallet"))
+	wallet, err := wallet.New(state, tpool, filepath.Join(config.Siad.SiaDir, modules.WalletDir))
 	if err != nil {
 		return err
 	}
-	miner, err := miner.New(state, tpool, wallet)
+	miner, err := miner.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
 	if err != nil {
 		return err
 	}
@@ -50,11 +50,11 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	host, err := host.New(state, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, "host"))
+	host, err := host.New(state, hostdb, tpool, wallet, config.Siad.HostAddr, filepath.Join(config.Siad.SiaDir, modules.HostDir))
 	if err != nil {
 		return err
 	}
-	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, "renter"))
+	renter, err := renter.New(state, hostdb, wallet, filepath.Join(config.Siad.SiaDir, modules.RenterDir))
 	if err != nil {
 		return err
 	}

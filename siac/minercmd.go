@@ -3,30 +3,30 @@ package main
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
+	"github.com/NebulousLabs/Sia/api"
 
-	"github.com/NebulousLabs/Sia/modules"
+	"github.com/spf13/cobra"
 )
 
 var (
 	minerCmd = &cobra.Command{
 		Use:   "miner",
 		Short: "Perform miner actions",
-		Long:  "Start mining, stop mining, or view the current mining status, including number of threads, deposit address, and more.",
+		Long:  "Interact with the miner",
 		Run:   wrap(minerstatuscmd),
 	}
 
 	minerStartCmd = &cobra.Command{
-		Use:   "start [threads]",
-		Short: "Start mining on 'threads' threads",
-		Long:  "Start mining on a specified number of threads. If the miner is already running, the number of threads is adjusted.",
+		Use:   "start",
+		Short: "Start cpu mining",
+		Long:  "Start cpu mining, if the miner is already running, this command does nothing",
 		Run:   wrap(minerstartcmd),
 	}
 
 	minerStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "View miner status",
-		Long:  "View the current mining status, including number of threads, deposit address, and more.",
+		Long:  "View the current mining status",
 		Run:   wrap(minerstatuscmd),
 	}
 
@@ -38,31 +38,32 @@ var (
 	}
 )
 
-func minerstartcmd(threads string) {
-	err := post("/miner/start", "threads="+threads)
+func minerstartcmd() {
+	err := post("/miner/start", "")
 	if err != nil {
 		fmt.Println("Could not start miner:", err)
 		return
 	}
-	fmt.Println("Now mining on " + threads + " threads.")
+	fmt.Println("CPU Miner is now running.")
 }
 
 func minerstatuscmd() {
-	status := new(modules.MinerInfo)
+	status := new(api.MinerStatus)
 	err := getAPI("/miner/status", status)
 	if err != nil {
 		fmt.Println("Could not get miner status:", err)
 		return
 	}
-	fmt.Printf(`Miner status:
-State:   %s
-Threads: %d (%d active)
-Address: %x
 
-Hash Rate:    %0.2f MH/s (est. %0.2f blocks per week)
-Blocks Mined: %d (%d orphans)
-`, status.State, status.Threads, status.RunningThreads, status.Address,
-		float64(status.HashRate)/1e6, status.BlocksPerWeek, status.BlocksMined, status.OrphansMined)
+	miningStr := "off"
+	if status.CPUMining {
+		miningStr = "on"
+	}
+	fmt.Printf(`Miner status:
+CPU Mining:   %s
+CPU Hashrate: %v KH/s
+Blocks Mined: %d (%d stale)
+`, miningStr, status.CPUHashrate/1000, status.BlocksMined, status.StaleBlocksMined)
 }
 
 func minerstopcmd() {

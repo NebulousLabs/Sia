@@ -69,7 +69,7 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		t.Fatal(err)
 	}

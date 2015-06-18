@@ -42,12 +42,9 @@ type Gateway struct {
 	// TODO: map to a timestamp?
 	nodes map[modules.NetAddress]struct{}
 
-	// saveDir is the path used to save/load peers.
-	saveDir string
-
-	log *log.Logger
-
-	mu *sync.RWMutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
@@ -63,27 +60,27 @@ func (g *Gateway) Close() error {
 }
 
 // New returns an initialized Gateway.
-func New(addr string, saveDir string) (g *Gateway, err error) {
+func New(addr string, persistDir string) (g *Gateway, err error) {
 	// Create the directory if it doesn't exist.
-	err = os.MkdirAll(saveDir, 0700)
+	err = os.MkdirAll(persistDir, 0700)
 	if err != nil {
 		return
 	}
 
 	// Create the logger.
-	logger, err := makeLogger(saveDir)
+	logger, err := makeLogger(persistDir)
 	if err != nil {
 		return
 	}
 
 	g = &Gateway{
-		handlers: make(map[rpcID]modules.RPCFunc),
-		initRPCs: make(map[string]modules.RPCFunc),
-		peers:    make(map[modules.NetAddress]*peer),
-		nodes:    make(map[modules.NetAddress]struct{}),
-		saveDir:  saveDir,
-		mu:       sync.New(modules.SafeMutexDelay, 2),
-		log:      logger,
+		handlers:   make(map[rpcID]modules.RPCFunc),
+		initRPCs:   make(map[string]modules.RPCFunc),
+		peers:      make(map[modules.NetAddress]*peer),
+		nodes:      make(map[modules.NetAddress]struct{}),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 2),
+		log:        logger,
 	}
 
 	// Register RPCs.

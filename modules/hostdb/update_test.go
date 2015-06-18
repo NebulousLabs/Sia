@@ -72,7 +72,8 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	}
 
 	// Mine a block to get the transaction into the consensus set.
-	_, _, err = hdbt.miner.FindBlock()
+	b, _ := hdbt.miner.FindBlock()
+	err = hdbt.cs.AcceptBlock(b)
 	if err != nil {
 		t.Fatal(err)
 	}

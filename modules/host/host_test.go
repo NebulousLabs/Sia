@@ -71,7 +71,7 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,8 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = m.FindBlock()
+		b, _ := m.FindBlock()
+		err := cs.AcceptBlock(b)
 		if err != nil {
 			t.Fatal(err)
 		}

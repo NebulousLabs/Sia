@@ -12,7 +12,8 @@ import (
 // addPeer creates a new serverTester and bootstraps it to st. It returns the
 // new peer.
 func (st *serverTester) addPeer(name string) *serverTester {
-	_, _, err := st.miner.FindBlock()
+	b, _ := st.miner.FindBlock()
+	err := st.cs.AcceptBlock(b)
 	if err != nil {
 		st.t.Fatal(err)
 	}

@@ -11,7 +11,8 @@ import (
 func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 	// 20 here is arbitrary
 	for i := types.BlockHeight(0); i < 20; i++ {
-		_, _, err := et.miner.FindBlock()
+		b, _ := et.miner.FindBlock()
+		err := et.cs.AcceptBlock(b)
 		if err != nil {
 			et.t.Fatal(err)
 		}

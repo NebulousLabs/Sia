@@ -19,7 +19,8 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 	}
 
 	// Mine a block to put the transactions into the confirmed set.
-	_, _, err := tpt.miner.FindBlock()
+	b, _ := tpt.miner.FindBlock()
+	err := tpt.cs.AcceptBlock(b)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -43,7 +44,8 @@ func (tpt *tpoolTester) testDataTransactions() {
 		tpt.t.Fatal(err)
 	}
 	tpt.tpUpdateWait()
-	b, _, err := tpt.miner.FindBlock()
+	b, _ := tpt.miner.FindBlock()
+	err = tpt.cs.AcceptBlock(b)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -54,7 +56,8 @@ func (tpt *tpoolTester) testDataTransactions() {
 	tpt.csUpdateWait()
 
 	// Mine a second block, this block should not have the data transaction.
-	b, _, err = tpt.miner.FindBlock()
+	b, _ = tpt.miner.FindBlock()
+	err = tpt.cs.AcceptBlock(b)
 	if err != nil {
 		tpt.t.Fatal(err)
 	}
@@ -234,14 +237,10 @@ func (tpt *tpoolTester) testRewinding() {
 	}
 
 	// Mine a block with the transaction.
-	for {
-		_, found, err := tpt.miner.FindBlock()
-		if err != nil {
-			tpt.t.Fatal(err)
-		}
-		if found {
-			break
-		}
+	b, _ := tpt.miner.FindBlock()
+	err := tpt.cs.AcceptBlock(b)
+	if err != nil {
+		tpt.t.Fatal(err)
 	}
 	tpt.csUpdateWait()
 	if len(tpt.tpool.TransactionSet()) != 0 {
@@ -249,7 +248,7 @@ func (tpt *tpoolTester) testRewinding() {
 	}
 
 	// Fork around the block with the transaction.
-	err := tpt.cs.AcceptBlock(forkStart)
+	err = tpt.cs.AcceptBlock(forkStart)
 	if err != nil && err != modules.ErrNonExtendingBlock {
 		tpt.t.Fatal(err)
 	}

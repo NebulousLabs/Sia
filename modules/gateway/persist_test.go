@@ -15,7 +15,7 @@ func TestLoad(t *testing.T) {
 	g.mu.Unlock(id)
 	g.Close()
 
-	g2, err := New(":0", g.saveDir)
+	g2, err := New(":0", g.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestLoadPeer(t *testing.T) {
 	g1.Close()
 
 	// g1 should reconnect to g2 upon load
-	g1, err = New(":0", g1.saveDir)
+	g1, err = New(":0", g1.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}

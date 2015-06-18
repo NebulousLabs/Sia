@@ -41,7 +41,8 @@ func (srv *Server) consensusSynchronizeHandler(w http.ResponseWriter, req *http.
 		return
 	}
 
-	// TODO: Do not select first peer every time.
+	// TODO: How should this be handled? Multiple simultaneous peers? First
+	// peer is a bad method.
 	go srv.cs.Synchronize(peers[0])
 
 	writeSuccess(w)

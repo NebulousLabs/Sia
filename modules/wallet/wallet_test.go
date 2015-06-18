@@ -96,7 +96,7 @@ func createWalletTester(name string) (*walletTester, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := miner.New(cs, tp, w)
+	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,8 @@ func createWalletTester(name string) (*walletTester, error) {
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		_, _, err = wt.miner.FindBlock()
+		b, _ := wt.miner.FindBlock()
+		err := wt.cs.AcceptBlock(b)
 		if err != nil {
 			return nil, err
 		}

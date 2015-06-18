@@ -19,12 +19,12 @@ func (g *Gateway) save() error {
 	for node := range g.nodes {
 		nodes = append(nodes, node)
 	}
-	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.saveDir, "nodes.json"))
+	return persist.SaveFile(persistMetadata, nodes, filepath.Join(g.persistDir, "nodes.json"))
 }
 
 func (g *Gateway) load() error {
 	var nodes []modules.NetAddress
-	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.saveDir, "nodes.json"))
+	err := persist.LoadFile(persistMetadata, &nodes, filepath.Join(g.persistDir, "nodes.json"))
 	if err != nil {
 		return err
 	}
@@ -34,9 +34,9 @@ func (g *Gateway) load() error {
 	return nil
 }
 
-func makeLogger(saveDir string) (*log.Logger, error) {
+func makeLogger(persistDir string) (*log.Logger, error) {
 	// if the log file already exists, append to it
-	logFile, err := os.OpenFile(filepath.Join(saveDir, "gateway.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	logFile, err := os.OpenFile(filepath.Join(persistDir, "gateway.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 	if err != nil {
 		return nil, err
 	}

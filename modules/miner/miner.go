@@ -2,16 +2,17 @@ package miner
 
 import (
 	"errors"
-	"sync"
+	"log"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	iterationsPerAttempt = 32 * 1024
+	iterationsPerAttempt = 16 * 1024
 
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
 	// that are remembered.
@@ -19,6 +20,7 @@ const (
 )
 
 type Miner struct {
+	// Module dependencies.
 	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
 	wallet modules.Wallet
@@ -31,44 +33,55 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	// Memory variables - used in headerforwork. blockMem maps a header to the
-	// block that it is associated with. headerMem is a slice of headers used
-	// to remember which headers are the N most recent headers to be requested
-	// by external miners. Only the N most recent headers are kept in blockMem.
+	// A list of blocks that have been through SubmitBlock.
+	blocksFound []types.BlockID
+
+	// BlockManager variables. The BlockManager passes out and receives unique
+	// block headers on each call, these variables help to map the received
+	// block header to the original block. The headers are passed instead of
+	// the block because a full block is 2mb and is a lot to send over http.
 	blockMem    map[types.BlockHeader]types.Block
 	headerMem   []types.BlockHeader
 	memProgress int
 
-	startTime   time.Time
-	attempts    uint64
-	hashRate    int64
-	blocksFound []types.BlockID
+	// CPUMiner variables. startTime, attempts, and hashRate are used to
+	// calculate the hashrate. When attempts reaches a certain threshold, the
+	// time is compared to the startTime, and divided against the number of
+	// hashes per attempt, returning an approximate hashrate.
+	//
+	// miningOn indicates whether the miner is supposed to be mining. 'mining'
+	// indicates whether these is a thread that is actively mining. There may
+	// be some lag between starting the miner and a thread actually beginning
+	// to mine.
+	startTime time.Time
+	attempts  uint64
+	hashRate  int64
+	miningOn  bool
+	mining    bool
 
-	threads        int // how many threads the miner uses, shouldn't ever be 0.
-	desiredThreads int // 0 if not mining.
-	runningThreads int
-
+	// Subscription management variables.
 	subscribers []chan struct{}
 
-	mu sync.Mutex
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet) (m *Miner, err error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
 	// Create the miner and its dependencies.
 	if cs == nil {
-		err = errors.New("miner cannot use a nil state")
-		return
+		return nil, errors.New("miner cannot use a nil state")
 	}
 	if tpool == nil {
-		err = errors.New("miner cannot use a nil transaction pool")
-		return
+		return nil, errors.New("miner cannot use a nil transaction pool")
 	}
 	if w == nil {
-		err = errors.New("miner cannot use a nil wallet")
-		return
+		return nil, errors.New("miner cannot use a nil wallet")
 	}
-	currentBlock := cs.CurrentBlock().ID()
+
+	// Grab some starting block variables.
+	currentBlock := cs.GenesisBlock().ID()
 	currentTarget, exists1 := cs.ChildTarget(currentBlock)
 	earliestTimestamp, exists2 := cs.EarliestChildTimestamp(currentBlock)
 	if build.DEBUG {
@@ -79,7 +92,13 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 			panic("could not get child earliest timestamp")
 		}
 	}
-	m = &Miner{
+	addr, _, err := w.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble the miner.
+	m := &Miner{
 		cs:     cs,
 		tpool:  tpool,
 		wallet: w,
@@ -87,64 +106,34 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		parent:            currentBlock,
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
+		address:           addr,
 
 		blockMem:  make(map[types.BlockHeader]types.Block),
 		headerMem: make([]types.BlockHeader, headerForWorkMemory),
 
-		threads: 1,
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
-
-	// Get an address for the miner payout.
-	addr, _, err := m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	err = m.initPersist()
 	if err != nil {
-		return
+		return nil, err
 	}
-	m.address = addr
-
-	// Subscribe to the transaction pool to get transactions to put in blocks.
 	m.tpool.TransactionPoolSubscribe(m)
+	return m, nil
+}
 
+// BlocksMined returns the number of good blocks and stale blocks that have
+// been mined by the miner.
+func (m *Miner) BlocksMined() (goodBlocks, staleBlocks int) {
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
+
+	for _, blockID := range m.blocksFound {
+		if m.cs.InCurrentPath(blockID) {
+			goodBlocks++
+		} else {
+			staleBlocks++
+		}
+	}
 	return
-}
-
-// SetThreads establishes how many threads the miner will use when mining.
-func (m *Miner) SetThreads(threads int) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if threads == 0 {
-		return errors.New("cannot have a miner with 0 threads.")
-	}
-	m.threads = threads
-	m.attempts = 0
-	m.startTime = time.Now()
-
-	return nil
-}
-
-// StartMining spawns a bunch of mining threads which will mine until stop is
-// called.
-func (m *Miner) StartMining() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Increase the number of threads to m.desiredThreads.
-	m.desiredThreads = m.threads
-	for i := m.runningThreads; i < m.desiredThreads; i++ {
-		go m.threadedMine()
-	}
-
-	return nil
-}
-
-// StopMining sets desiredThreads to 0, a value which is polled by mining
-// threads. When set to 0, the mining threads will all cease mining.
-func (m *Miner) StopMining() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Set desiredThreads to 0. The miners will shut down automatically.
-	m.desiredThreads = 0
-	m.hashRate = 0
-	return nil
 }

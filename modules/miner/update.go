@@ -11,8 +11,8 @@ import (
 // the transaction pool. These changes will be applied to the blocks being
 // mined.
 func (m *Miner) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, unconfirmedTransactions []types.Transaction, _ []modules.SiacoinOutputDiff) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	lockID := m.mu.Lock()
+	defer m.mu.Unlock(lockID)
 	defer m.notifySubscribers()
 
 	m.height -= types.BlockHeight(len(cc.RevertedBlocks))

@@ -63,10 +63,10 @@ func TestPeers(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	if _, err := New("", ""); err == nil {
-		t.Fatal("expecting saveDir error, got nil")
+		t.Fatal("expecting persistDir error, got nil")
 	}
 	if _, err := New(":0", ""); err == nil {
-		t.Fatal("expecting saveDir error, got nil")
+		t.Fatal("expecting persistDir error, got nil")
 	}
 	if g, err := New("foo", build.TempDir("gateway", "TestNew1")); err == nil {
 		t.Fatal("expecting listener error, got nil", g.myAddr)
