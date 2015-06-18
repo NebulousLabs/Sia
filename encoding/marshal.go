@@ -220,7 +220,7 @@ func (d *Decoder) readN(n int) []byte {
 // readPrefix reads a length-prefixed byte slice and panics if the read fails.
 func (d *Decoder) readPrefix() []byte {
 	// TODO: what should maxlen be?
-	b, err := ReadPrefix(d.r, 1<<32)
+	b, err := ReadPrefix(d.r, maxSliceLen)
 	if err != nil {
 		panic(err)
 	}
