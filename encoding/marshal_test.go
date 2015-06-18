@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -146,6 +147,13 @@ func TestDecode(t *testing.T) {
 	// massive slice (larger than MaxInt32)
 	err = Unmarshal(EncUint64(1<<32), new([]byte))
 	if err == nil || err.Error() != "could not decode type []uint8: slice is too large" {
+		t.Error("expected large slice error, got", err)
+	}
+
+	// many small slices (total larger than maxDecodeLen)
+	bigSlice := strings.Split(strings.Repeat("0123456789abcdefghijklmnopqrstuvwxyz", (maxSliceLen/16)-1), "0")
+	err = Unmarshal(Marshal(bigSlice), new([]string))
+	if err == nil || err.Error() != "could not decode type []string: encoded type exceeds size limit" {
 		t.Error("expected large slice error, got", err)
 	}
 
