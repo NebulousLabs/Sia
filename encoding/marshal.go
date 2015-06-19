@@ -187,6 +187,9 @@ type Decoder struct {
 	n int
 }
 
+// Read implements the io.Reader interface. It also keeps track of the total
+// number of bytes decoded, and panics if that number exceeds a global
+// maximum.
 func (d *Decoder) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
 	// enforce an absolute maximum size limit

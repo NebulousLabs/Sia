@@ -154,7 +154,7 @@ func TestDecode(t *testing.T) {
 	bigSlice := strings.Split(strings.Repeat("0123456789abcdefghijklmnopqrstuvwxyz", (maxSliceLen/16)-1), "0")
 	err = Unmarshal(Marshal(bigSlice), new([]string))
 	if err == nil || err.Error() != "could not decode type []string: encoded type exceeds size limit" {
-		t.Error("expected large slice error, got", err)
+		t.Error("expected size limit error, got", err)
 	}
 
 	// badReader should fail on every decode
