@@ -2,6 +2,7 @@ package persist
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -61,7 +62,8 @@ func TestSaveLoadFile(t *testing.T) {
 	var meta = Metadata{"TestSaveLoadFile", "0.1"}
 	var saveData int = 3
 
-	filename := build.TempDir("TestSaveLoadFile")
+	os.MkdirAll(build.TempDir("persist"), 0777)
+	filename := build.TempDir("persist", "TestSaveLoadFile")
 	err := SaveFile(meta, saveData, filename)
 	if err != nil {
 		t.Fatal(err)
