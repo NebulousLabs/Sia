@@ -60,6 +60,11 @@ type Encoder struct {
 	w io.Writer
 }
 
+const (
+	maxDecodeLen = 10 * 1024 * 1024 // 10 MB
+	maxSliceLen  = 4 * 1024 * 1024  // 4 MB
+)
+
 var (
 	errBadPointer = errors.New("cannot decode into invalid pointer")
 )
@@ -179,6 +184,19 @@ func WriteFile(filename string, v interface{}) error {
 // A Decoder reads and decodes values from an input stream.
 type Decoder struct {
 	r io.Reader
+	n int
+}
+
+// Read implements the io.Reader interface. It also keeps track of the total
+// number of bytes decoded, and panics if that number exceeds a global
+// maximum.
+func (d *Decoder) Read(p []byte) (int, error) {
+	n, err := d.r.Read(p)
+	// enforce an absolute maximum size limit
+	if d.n += n; d.n > maxDecodeLen {
+		panic("encoded type exceeds size limit")
+	}
+	return n, err
 }
 
 // Decode reads the next encoded value from its input stream and stores it in
@@ -199,6 +217,9 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 		}
 	}()
 
+	// reset the read count
+	d.n = 0
+
 	d.decode(pval.Elem())
 	return
 }
@@ -206,7 +227,7 @@ func (d *Decoder) Decode(v interface{}) (err error) {
 // readN reads n bytes and panics if the read fails.
 func (d *Decoder) readN(n int) []byte {
 	b := make([]byte, n)
-	_, err := io.ReadFull(d.r, b)
+	_, err := io.ReadFull(d, b)
 	if err != nil {
 		panic(err)
 	}
@@ -215,8 +236,7 @@ func (d *Decoder) readN(n int) []byte {
 
 // readPrefix reads a length-prefixed byte slice and panics if the read fails.
 func (d *Decoder) readPrefix() []byte {
-	// TODO: what should maxlen be?
-	b, err := ReadPrefix(d.r, 1<<32)
+	b, err := ReadPrefix(d, maxSliceLen)
 	if err != nil {
 		panic(err)
 	}
@@ -263,15 +283,20 @@ func (d *Decoder) decode(val reflect.Value) {
 	case reflect.Slice:
 		// slices are variable length, but otherwise the same as arrays.
 		// just have to allocate them first, then we can fallthrough to the array logic.
-		sliceLen := int(DecUint64(d.readN(8)))
-		val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+		sliceLen := DecUint64(d.readN(8))
+		// sanity-check the sliceLen, otherwise you can crash a peer by making
+		// them allocate a massive slice
+		if sliceLen > 1<<31-1 || sliceLen*uint64(val.Type().Elem().Size()) > maxSliceLen {
+			panic("slice is too large")
+		}
+		val.Set(reflect.MakeSlice(val.Type(), int(sliceLen), int(sliceLen)))
 		fallthrough
 	case reflect.Array:
 		// special case for byte arrays (e.g. hashes)
 		if val.Type().Elem().Kind() == reflect.Uint8 {
 			// convert val to a slice and read into it directly
 			b := val.Slice(0, val.Len())
-			_, err := io.ReadFull(d.r, b.Bytes())
+			_, err := io.ReadFull(d, b.Bytes())
 			if err != nil {
 				panic(err)
 			}
@@ -294,7 +319,7 @@ func (d *Decoder) decode(val reflect.Value) {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r}
+	return &Decoder{r, 0}
 }
 
 // Unmarshal decodes the encoded value b and stores it in v, which must be a
