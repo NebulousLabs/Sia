@@ -56,29 +56,25 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (h *Host, err error) {
+func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
 	if cs == nil {
-		err = errors.New("host cannot use a nil state")
-		return
+		return nil, errors.New("host cannot use a nil state")
 	}
 	if hdb == nil {
-		err = errors.New("host cannot use a nil hostdb")
-		return
+		return nil, errors.New("host cannot use a nil hostdb")
 	}
 	if tpool == nil {
-		err = errors.New("host cannot use a nil tpool")
-		return
+		return nil, errors.New("host cannot use a nil tpool")
 	}
 	if wallet == nil {
-		err = errors.New("host cannot use a nil wallet")
-		return
+		return nil, errors.New("host cannot use a nil wallet")
 	}
 
 	coinAddr, _, err := wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err != nil {
-		return
+		return nil, err
 	}
-	h = &Host{
+	h := &Host{
 		cs:     cs,
 		hostdb: hdb,
 		tpool:  tpool,
@@ -107,23 +103,26 @@ func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool,
 	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
 	h.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
 
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
-		return
+		return nil, err
 	}
-	h.load()
+	err = h.load()
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
 
 	// spawn listener
 	go h.listen()
 
 	h.cs.ConsensusSetSubscribe(h)
 
-	return
+	return h, nil
 }
 
 // SetConfig updates the host's internal HostSettings object. To modify

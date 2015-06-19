@@ -61,7 +61,10 @@ func New(cs *consensus.State, hdb modules.HostDB, wallet modules.Wallet, saveDir
 		return nil, err
 	}
 
-	r.load()
+	err = r.load()
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
 
 	// TODO: I'm worried about balances here. Because of the way that the
 	// re-try algorithm works, it won't be a problem, but without that we would
