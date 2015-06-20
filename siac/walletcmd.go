@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,27 @@ import (
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
 )
+
+// coinUnits converts a siacoin amount to base units.
+func coinUnits(amount string) (string, error) {
+	units := []string{"nS", "uS", "mS", "SC", "KS", "MS", "GS"}
+	for i, unit := range units {
+		if strings.HasSuffix(amount, unit) {
+			base := strings.TrimSuffix(amount, unit)
+			zeros := 27 + 3*(i-3)
+			// may need to adjust for non-integer values
+			if d := strings.IndexByte(base, '.'); d != -1 {
+				zeros -= len(base) - d - 1
+				if zeros < 0 {
+					return "", errors.New("non-integer number of hastings")
+				}
+				base = base[:d] + base[d+1:]
+			}
+			return base + strings.Repeat("0", zeros), nil
+		}
+	}
+	return amount, nil // hastings
+}
 
 var (
 	walletCmd = &cobra.Command{
@@ -28,8 +50,18 @@ var (
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
-		Long:  "Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.",
-		Run:   wrap(walletsendcmd),
+		Long: `Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.
+'amount' can be specified in units, e.g. 1.23KS. Supported units are:
+	nS (nano,  10^-9 SC)
+	uS (micro, 10^-6 SC)
+	mS (milli, 10^-3 SC)
+	SC
+	KS (kilo, 10^3 SC)
+	MS (mega, 10^6 SC)
+	GS (giga, 10^9 SC)
+If no unit is supplied, hastings (smallest possible unit, 10^-27 SC) will be assumed.
+`,
+		Run: wrap(walletsendcmd),
 	}
 
 	walletSiafundsCmd = &cobra.Command{
@@ -42,8 +74,9 @@ var (
 	walletSiafundsSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest] [keyfiles]",
 		Short: "Send siafunds",
-		Long:  "Send siafunds to an address and transfer their siacoins to the wallet.",
-		Run:   walletsiafundssendcmd, // see function docstring
+		Long: `Send siafunds to an address, and transfer their siacoins to the wallet.
+Run 'wallet send --help' to see a list of available units.`,
+		Run: walletsiafundssendcmd, // see function docstring
 	}
 
 	walletSiafundsTrackCmd = &cobra.Command{
@@ -77,12 +110,17 @@ func walletaddresscmd() {
 }
 
 func walletsendcmd(amount, dest string) {
-	err := post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
+	adjAmount, err := coinUnits(amount)
+	if err != nil {
+		fmt.Println("Could not parse amount:", err)
+		return
+	}
+	err = post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
 	}
-	fmt.Printf("Sent %s coins to %s\n", amount, dest)
+	fmt.Printf("Sent %s to %s\n", amount, dest)
 }
 
 func walletsiafundscmd() {
@@ -101,13 +139,19 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 		cmd.Usage()
 		return
 	}
-	amount, dest, keyfiles := args[0], args[1], args[2:]
+	amount, err := coinUnits(args[0])
+	if err != nil {
+		fmt.Println("Could not parse amount:", err)
+		return
+	}
+	dest, keyfiles := args[1], args[2:]
 	for i := range keyfiles {
 		keyfiles[i] = abs(keyfiles[i])
 	}
+
 	qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
-	err := post("/wallet/siafunds/send", qs)
+	err = post("/wallet/siafunds/send", qs)
 	if err != nil {
 		fmt.Println("Could not track siafunds:", err)
 		return
