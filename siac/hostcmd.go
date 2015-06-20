@@ -27,7 +27,7 @@ Available settings:
 	minduration
 	maxduration
 	windowsize
-	price
+	price (in hastings)
 	collateral`,
 		Run: wrap(hostconfigcmd),
 	}
