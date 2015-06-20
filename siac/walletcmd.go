@@ -141,19 +141,14 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 		cmd.Usage()
 		return
 	}
-	amount, err := coinUnits(args[0])
-	if err != nil {
-		fmt.Println("Could not parse amount:", err)
-		return
-	}
-	dest, keyfiles := args[1], args[2:]
+	amount, dest, keyfiles := args[0], args[1], args[2:]
 	for i := range keyfiles {
 		keyfiles[i] = abs(keyfiles[i])
 	}
 
 	qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
-	err = post("/wallet/siafunds/send", qs)
+	err := post("/wallet/siafunds/send", qs)
 	if err != nil {
 		fmt.Println("Could not track siafunds:", err)
 		return
