@@ -13,7 +13,7 @@ import (
 
 // coinUnits converts a siacoin amount to base units.
 func coinUnits(amount string) (string, error) {
-	units := []string{"nS", "uS", "mS", "SC", "KS", "MS", "GS"}
+	units := []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"}
 	for i, unit := range units {
 		if strings.HasSuffix(amount, unit) {
 			base := strings.TrimSuffix(amount, unit)
@@ -52,6 +52,7 @@ var (
 		Short: "Send coins to another wallet",
 		Long: `Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.
 'amount' can be specified in units, e.g. 1.23KS. Supported units are:
+	pS (pico,  10^-12 SC)
 	nS (nano,  10^-9 SC)
 	uS (micro, 10^-6 SC)
 	mS (milli, 10^-3 SC)
@@ -59,6 +60,7 @@ var (
 	KS (kilo, 10^3 SC)
 	MS (mega, 10^6 SC)
 	GS (giga, 10^9 SC)
+	TS (tera, 10^12 SC)
 If no unit is supplied, hastings (smallest possible unit, 10^-27 SC) will be assumed.
 `,
 		Run: wrap(walletsendcmd),
