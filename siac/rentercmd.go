@@ -136,7 +136,7 @@ func renterfilesdownloadcmd(nickname, destination string) {
 }
 
 // filesize returns a string that displays a filesize in human-readable units.
-func filesizeUnits(size uint64) string {
+func filesizeUnits(size int64) string {
 	if size == 0 {
 		return "0 B"
 	}
@@ -160,9 +160,9 @@ func renterfileslistcmd() {
 	for _, file := range files {
 		// TODO: write a filesize() helper function to display proper units
 		if file.Available {
-			fmt.Printf("%13s  %s\n", filesizeUnits(file.Filesize), file.Nickname)
+			fmt.Printf("%13s  %s\n", filesizeUnits(int64(file.Filesize)), file.Nickname)
 		} else {
-			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(file.Filesize), file.Nickname, file.UploadProgress)
+			fmt.Printf("%13s  %s (uploading, %0.2f%%)\n", filesizeUnits(int64(file.Filesize)), file.Nickname, file.UploadProgress)
 		}
 	}
 }

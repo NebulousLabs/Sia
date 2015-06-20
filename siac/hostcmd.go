@@ -72,11 +72,11 @@ func hoststatuscmd() {
 		return
 	}
 	fmt.Printf(`Host settings:
-Storage:      %v bytes (%v remaining)
+Storage:      %v (%v used)
 Price:        %v coins
 Collateral:   %v
 Max Filesize: %v
 Max Duration: %v
 Contracts:    %v
-`, info.TotalStorage, info.StorageRemaining, info.Price, info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
+`, filesizeUnits(info.TotalStorage), filesizeUnits(info.TotalStorage-info.StorageRemaining), info.Price, info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
 }
