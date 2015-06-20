@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -9,6 +11,30 @@ import (
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
 )
+
+// coinUnits converts a siacoin amount to base units.
+func coinUnits(amount string) (string, error) {
+	units := []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"}
+	for i, unit := range units {
+		if strings.HasSuffix(amount, unit) {
+			// scan into big.Rat
+			r, ok := new(big.Rat).SetString(strings.TrimSuffix(amount, unit))
+			if !ok {
+				return "", errors.New("malformed amount")
+			}
+			// convert units
+			exp := 24 + 3*(int64(i)-4)
+			mag := new(big.Int).Exp(big.NewInt(10), big.NewInt(exp), nil)
+			r.Mul(r, new(big.Rat).SetInt(mag))
+			// r must be an integer at this point
+			if !r.IsInt() {
+				return "", errors.New("non-integer number of hastings")
+			}
+			return r.RatString(), nil
+		}
+	}
+	return amount, nil // hastings
+}
 
 var (
 	walletCmd = &cobra.Command{
@@ -28,8 +54,19 @@ var (
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
-		Long:  "Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.",
-		Run:   wrap(walletsendcmd),
+		Long: `Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.
+'amount' can be specified in units, e.g. 1.23KS. Supported units are:
+	pS (pico,  10^-12 SC)
+	nS (nano,  10^-9 SC)
+	uS (micro, 10^-6 SC)
+	mS (milli, 10^-3 SC)
+	SC
+	KS (kilo, 10^3 SC)
+	MS (mega, 10^6 SC)
+	GS (giga, 10^9 SC)
+	TS (tera, 10^12 SC)
+If no unit is supplied, hastings (smallest possible unit, 10^-24 SC) will be assumed.`,
+		Run: wrap(walletsendcmd),
 	}
 
 	walletSiafundsCmd = &cobra.Command{
@@ -42,8 +79,9 @@ var (
 	walletSiafundsSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest] [keyfiles]",
 		Short: "Send siafunds",
-		Long:  "Send siafunds to an address and transfer their siacoins to the wallet.",
-		Run:   walletsiafundssendcmd, // see function docstring
+		Long: `Send siafunds to an address, and transfer their siacoins to the wallet.
+Run 'wallet send --help' to see a list of available units.`,
+		Run: walletsiafundssendcmd, // see function docstring
 	}
 
 	walletSiafundsTrackCmd = &cobra.Command{
@@ -77,12 +115,17 @@ func walletaddresscmd() {
 }
 
 func walletsendcmd(amount, dest string) {
-	err := post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", amount, dest))
+	adjAmount, err := coinUnits(amount)
+	if err != nil {
+		fmt.Println("Could not parse amount:", err)
+		return
+	}
+	err = post("/wallet/send", fmt.Sprintf("amount=%s&destination=%s", adjAmount, dest))
 	if err != nil {
 		fmt.Println("Could not send:", err)
 		return
 	}
-	fmt.Printf("Sent %s coins to %s\n", amount, dest)
+	fmt.Printf("Sent %s to %s\n", adjAmount, dest)
 }
 
 func walletsiafundscmd() {

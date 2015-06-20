@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
@@ -16,21 +15,14 @@ type WalletSiafundsBalance struct {
 }
 
 // scanAmount scans a types.Currency.
-func scanAmount(amountStr string) (amount types.Currency, err error) {
-	// exponential format
-	if strings.ContainsAny(amountStr, "Ee") {
-		amountRat := new(big.Rat)
-		_, err = fmt.Sscan(amountStr, amountRat)
-		if err != nil {
-			return
-		}
-		amount = types.NewCurrency(new(big.Int).Div(amountRat.Num(), amountRat.Denom()))
-		return
+func scanAmount(amount string) (types.Currency, bool) {
+	// use SetString manually to ensure that amount does not contain
+	// multiple values, which would confuse fmt.Scan
+	i, ok := new(big.Int).SetString(amount, 10)
+	if !ok {
+		return types.Currency{}, ok
 	}
-
-	// standard format
-	_, err = fmt.Sscan(amountStr, &amount)
-	return
+	return types.NewCurrency(i), true
 }
 
 // scanAddres scans a types.UnlockHash.
@@ -56,8 +48,8 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the amount.
-	amount, err := scanAmount(req.FormValue("amount"))
-	if err != nil {
+	amount, ok := scanAmount(req.FormValue("amount"))
+	if !ok {
 		writeError(w, "Malformed amount", http.StatusBadRequest)
 		return
 	}
@@ -90,8 +82,8 @@ func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http
 // walletSiafundsSendHandler handles the API request to send siafunds.
 func (srv *Server) walletSiafundsSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the amount.
-	amount, err := scanAmount(req.FormValue("amount"))
-	if err != nil {
+	amount, ok := scanAmount(req.FormValue("amount"))
+	if !ok {
 		writeError(w, "Malformed amount", http.StatusBadRequest)
 		return
 	}
