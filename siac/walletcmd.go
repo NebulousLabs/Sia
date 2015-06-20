@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -16,17 +17,20 @@ func coinUnits(amount string) (string, error) {
 	units := []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"}
 	for i, unit := range units {
 		if strings.HasSuffix(amount, unit) {
-			base := strings.TrimSuffix(amount, unit)
-			zeros := 27 + 3*(i-3)
-			// may need to adjust for non-integer values
-			if d := strings.IndexByte(base, '.'); d != -1 {
-				zeros -= len(base) - d - 1
-				if zeros < 0 {
-					return "", errors.New("non-integer number of hastings")
-				}
-				base = base[:d] + base[d+1:]
+			// scan into big.Rat
+			r, ok := new(big.Rat).SetString(strings.TrimSuffix(amount, unit))
+			if !ok {
+				return "", errors.New("malformed amount")
 			}
-			return base + strings.Repeat("0", zeros), nil
+			// convert units
+			exp := 27 + 3*(int64(i)-4)
+			mag := new(big.Int).Exp(big.NewInt(10), big.NewInt(exp), nil)
+			r.Mul(r, new(big.Rat).SetInt(mag))
+			// r must be an integer at this point
+			if !r.IsInt() {
+				return "", errors.New("non-integer number of hastings")
+			}
+			return r.RatString(), nil
 		}
 	}
 	return amount, nil // hastings
@@ -61,8 +65,7 @@ var (
 	MS (mega, 10^6 SC)
 	GS (giga, 10^9 SC)
 	TS (tera, 10^12 SC)
-If no unit is supplied, hastings (smallest possible unit, 10^-27 SC) will be assumed.
-`,
+If no unit is supplied, hastings (smallest possible unit, 10^-27 SC) will be assumed.`,
 		Run: wrap(walletsendcmd),
 	}
 
@@ -145,7 +148,6 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 	for i := range keyfiles {
 		keyfiles[i] = abs(keyfiles[i])
 	}
-
 	qs := fmt.Sprintf("amount=%s&destination=%s&keyfiles=%s", amount, dest, strings.Join(keyfiles, ","))
 
 	err := post("/wallet/siafunds/send", qs)
