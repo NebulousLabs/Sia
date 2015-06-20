@@ -23,7 +23,7 @@ func coinUnits(amount string) (string, error) {
 				return "", errors.New("malformed amount")
 			}
 			// convert units
-			exp := 27 + 3*(int64(i)-4)
+			exp := 24 + 3*(int64(i)-4)
 			mag := new(big.Int).Exp(big.NewInt(10), big.NewInt(exp), nil)
 			r.Mul(r, new(big.Rat).SetInt(mag))
 			// r must be an integer at this point
@@ -65,7 +65,7 @@ var (
 	MS (mega, 10^6 SC)
 	GS (giga, 10^9 SC)
 	TS (tera, 10^12 SC)
-If no unit is supplied, hastings (smallest possible unit, 10^-27 SC) will be assumed.`,
+If no unit is supplied, hastings (smallest possible unit, 10^-24 SC) will be assumed.`,
 		Run: wrap(walletsendcmd),
 	}
 
