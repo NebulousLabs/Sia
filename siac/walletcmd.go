@@ -122,7 +122,7 @@ func walletsendcmd(amount, dest string) {
 		fmt.Println("Could not send:", err)
 		return
 	}
-	fmt.Printf("Sent %s to %s\n", amount, dest)
+	fmt.Printf("Sent %s to %s\n", adjAmount, dest)
 }
 
 func walletsiafundscmd() {
