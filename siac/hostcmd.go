@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +28,7 @@ Available settings:
 	minduration
 	maxduration
 	windowsize
-	price (in hastings)
+	price (in hastings/byte/block)
 	collateral`,
 		Run: wrap(hostconfigcmd),
 	}
@@ -71,12 +72,16 @@ func hoststatuscmd() {
 		fmt.Println("Could not fetch host settings:", err)
 		return
 	}
+	// convert price to SC/GB/mo
+	price := new(big.Rat).SetInt(info.Price.Big())
+	price.Mul(price, big.NewRat(4320, 1e24/1e9))
 	fmt.Printf(`Host settings:
 Storage:      %v (%v used)
-Price:        %v coins
+Price:        %v SC per GB per month
 Collateral:   %v
 Max Filesize: %v
 Max Duration: %v
 Contracts:    %v
-`, filesizeUnits(info.TotalStorage), filesizeUnits(info.TotalStorage-info.StorageRemaining), info.Price, info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
+`, filesizeUnits(info.TotalStorage), filesizeUnits(info.TotalStorage-info.StorageRemaining),
+		price.FloatString(3), info.Collateral, info.MaxFilesize, info.MaxDuration, info.NumContracts)
 }
