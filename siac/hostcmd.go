@@ -28,7 +28,7 @@ Available settings:
 	minduration
 	maxduration
 	windowsize
-	price (in hastings/byte/block)
+	price (in SC per GB per month)
 	collateral`,
 		Run: wrap(hostconfigcmd),
 	}
@@ -48,6 +48,16 @@ Available settings:
 )
 
 func hostconfigcmd(param, value string) {
+	// convert price to hastings/byte/block
+	if param == "price" {
+		p, ok := new(big.Rat).SetString(value)
+		if !ok {
+			fmt.Println("could not parse price")
+			return
+		}
+		p.Mul(p, big.NewRat(1e24/1e9, 4320))
+		value = new(big.Int).Div(p.Num(), p.Denom()).String()
+	}
 	err := post("/host/configure", param+"="+value)
 	if err != nil {
 		fmt.Println("Could not update host settings:", err)
