@@ -33,7 +33,12 @@ func coinUnits(amount string) (string, error) {
 			return r.RatString(), nil
 		}
 	}
-	return amount, nil // hastings
+	// check for hastings separately
+	if strings.HasSuffix(amount, "H") {
+		return strings.TrimSuffix(amount, "H"), nil
+	}
+
+	return "", errors.New("amount is missing units; run 'wallet --help' for a list of units")
 }
 
 var (
