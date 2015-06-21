@@ -1,4 +1,4 @@
-Sia 0.3.3.1
+Sia 0.3.3.2
 ===========
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
@@ -74,8 +74,8 @@ Troubleshooting
 
 - I mined a block, but I didn't receive any money.
 
-  There is a 50-block confirmation delay before you will receive siacoins from
-  mined blocks. If you still have not received the block reward after 50
+  There is a 144-block confirmation delay before you will receive siacoins from
+  mined blocks. If you still have not received the block reward after 144
   blocks, it means your block did not made it into the blockchain.
 
 - siad complains about "locks held too long."
@@ -100,19 +100,14 @@ Version Information
   should do so before making your host announcement. The default host port is
   9982.
 
-- Please mine. Mining helps keep the network running smoothly. It can also
-  cause changes to propagate if they seem to be taking a while.
-
-- Uploading may take a long time, since the file contract needs to make it
-  into a block. The default redundancy is also set very high, so uploading may
-  be more expensive than expected.
-
 Please tell us about any problems you run into, and any features you want! The
 advantage of being a beta user is that your feedback will have a large impact
 on what we do in the next few months. Thank you!
 
 Version History
 ---------------
+
+v0.3.3.2: Second stable currency patch.
 
 v0.3.3.1: Hotfixed stable currency release.
 
