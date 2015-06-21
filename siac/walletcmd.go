@@ -40,8 +40,19 @@ var (
 	walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "Perform wallet actions",
-		Long:  "Generate a new address, send coins to another wallet, or view info about the wallet.",
-		Run:   wrap(walletstatuscmd),
+		Long: `Generate a new address, send coins to another wallet, or view info about the wallet.
+Units:
+The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Other supported units are:
+	pS (pico,  10^-12 SC)
+	nS (nano,  10^-9 SC)
+	uS (micro, 10^-6 SC)
+	mS (milli, 10^-3 SC)
+	SC
+	KS (kilo, 10^3 SC)
+	MS (mega, 10^6 SC)
+	GS (giga, 10^9 SC)
+	TS (tera, 10^12 SC)`,
+		Run: wrap(walletstatuscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
@@ -54,18 +65,9 @@ var (
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
-		Long: `Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.
-'amount' can be specified in units, e.g. 1.23KS. Supported units are:
-	pS (pico,  10^-12 SC)
-	nS (nano,  10^-9 SC)
-	uS (micro, 10^-6 SC)
-	mS (milli, 10^-3 SC)
-	SC
-	KS (kilo, 10^3 SC)
-	MS (mega, 10^6 SC)
-	GS (giga, 10^9 SC)
-	TS (tera, 10^12 SC)
-If no unit is supplied, hastings (smallest possible unit, 10^-24 SC) will be assumed.`,
+		Long: `Send coins to another wallet. 'dest' must be a 76-byte hexadecimal address.
+'amount' can be specified in units, e.g. 1.23KS. Run 'wallet --help' for a list of units.
+If no unit is supplied, hastings will be assumed.`,
 		Run: wrap(walletsendcmd),
 	}
 
