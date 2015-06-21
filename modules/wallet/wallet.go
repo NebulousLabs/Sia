@@ -150,6 +150,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 	return
 }
 
+// Close will save the wallet before shutting down.
 func (w *Wallet) Close() error {
 	id := w.mu.RLock()
 	defer w.mu.RUnlock(id)
@@ -159,8 +160,8 @@ func (w *Wallet) Close() error {
 // SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
-	tPoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
-	amount = amount.Add(tPoolFee)
+	// Add a transaction fee of 10 siacoins.
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 
 	// Create and send the transaction.
 	output := types.SiacoinOutput{
@@ -171,11 +172,11 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t type
 	if err != nil {
 		return
 	}
-	_, err = w.FundTransaction(id, amount)
+	_, err = w.FundTransaction(id, amount.Add(tpoolFee))
 	if err != nil {
 		return
 	}
-	_, _, err = w.AddMinerFee(id, tPoolFee)
+	_, _, err = w.AddMinerFee(id, tpoolFee)
 	if err != nil {
 		return
 	}
