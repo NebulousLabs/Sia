@@ -193,7 +193,7 @@ func walletstatuscmd() {
 	sc, _ := r.Float64()
 	fmt.Printf(`Wallet status:
 Balance:   %.2f SC
-Exact:     %v
+Exact:     %v H
 Addresses: %d
 `, sc, status.Balance, status.NumAddresses)
 }
