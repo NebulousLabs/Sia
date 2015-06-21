@@ -33,15 +33,32 @@ func coinUnits(amount string) (string, error) {
 			return r.RatString(), nil
 		}
 	}
-	return amount, nil // hastings
+	// check for hastings separately
+	if strings.HasSuffix(amount, "H") {
+		return strings.TrimSuffix(amount, "H"), nil
+	}
+
+	return "", errors.New("amount is missing units; run 'wallet --help' for a list of units")
 }
 
 var (
 	walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "Perform wallet actions",
-		Long:  "Generate a new address, send coins to another wallet, or view info about the wallet.",
-		Run:   wrap(walletstatuscmd),
+		Long: `Generate a new address, send coins to another wallet, or view info about the wallet.
+
+Units:
+The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Other supported units are:
+  pS (pico,  10^-12 SC)
+  nS (nano,  10^-9 SC)
+  uS (micro, 10^-6 SC)
+  mS (milli, 10^-3 SC)
+  SC
+  KS (kilo, 10^3 SC)
+  MS (mega, 10^6 SC)
+  GS (giga, 10^9 SC)
+  TS (tera, 10^12 SC)`,
+		Run: wrap(walletstatuscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
@@ -54,18 +71,11 @@ var (
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
-		Long: `Send coins to another wallet. 'dest' must be a 64-byte hexadecimal address.
-'amount' can be specified in units, e.g. 1.23KS. Supported units are:
-	pS (pico,  10^-12 SC)
-	nS (nano,  10^-9 SC)
-	uS (micro, 10^-6 SC)
-	mS (milli, 10^-3 SC)
-	SC
-	KS (kilo, 10^3 SC)
-	MS (mega, 10^6 SC)
-	GS (giga, 10^9 SC)
-	TS (tera, 10^12 SC)
-If no unit is supplied, hastings (smallest possible unit, 10^-24 SC) will be assumed.`,
+		Long: `Send coins to another wallet. 'dest' must be a 76-byte hexadecimal address.
+'amount' can be specified in units, e.g. 1.23KS. Run 'wallet --help' for a list of units.
+If no unit is supplied, hastings will be assumed.
+
+A miner fee of 10 SC is levied on all transactions.`,
 		Run: wrap(walletsendcmd),
 	}
 
@@ -125,7 +135,7 @@ func walletsendcmd(amount, dest string) {
 		fmt.Println("Could not send:", err)
 		return
 	}
-	fmt.Printf("Sent %s to %s\n", adjAmount, dest)
+	fmt.Printf("Sent %s hastings to %s\n", adjAmount, dest)
 }
 
 func walletsiafundscmd() {
@@ -178,9 +188,12 @@ func walletstatuscmd() {
 		fmt.Println("Could not get wallet status:", err)
 		return
 	}
+	// divide by 1e24 to get SC
+	r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	sc, _ := r.Float64()
 	fmt.Printf(`Wallet status:
-Balance:   %v (confirmed)
-           %v (unconfirmed)
+Balance:   %.2f SC
+Exact:     %v H
 Addresses: %d
-`, status.Balance, status.FullBalance, status.NumAddresses)
+`, sc, status.Balance, status.NumAddresses)
 }
