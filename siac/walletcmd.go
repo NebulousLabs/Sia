@@ -178,9 +178,12 @@ func walletstatuscmd() {
 		fmt.Println("Could not get wallet status:", err)
 		return
 	}
+	// divide by 1e24 to get SC
+	r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	sc, _ := r.Float64()
 	fmt.Printf(`Wallet status:
-Balance:   %v (confirmed)
-           %v (unconfirmed)
+Balance:   %.2f SC
+Exact:     %v
 Addresses: %d
-`, status.Balance, status.FullBalance, status.NumAddresses)
+`, sc, status.Balance, status.NumAddresses)
 }
