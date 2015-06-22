@@ -239,8 +239,9 @@ func (g *Gateway) makeOutboundConnections() {
 			if err != nil || numPeers >= wellConnectedThreshold {
 				break
 			}
-			if g.Connect(addr) != nil {
-				// aggressively remove unresponsive nodes
+			err = g.Connect(addr)
+			// aggressively remove unresponsive nodes
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				id = g.mu.Lock()
 				g.removeNode(addr)
 				g.mu.Unlock(id)
