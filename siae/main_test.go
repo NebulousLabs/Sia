@@ -22,9 +22,9 @@ func TestMain(t *testing.T) {
 		"siad",
 		"-n",
 		"-a",
-		"localhost:45150",
+		"localhost:45350",
 		"-r",
-		"localhost:45151",
+		"localhost:45351",
 		"-d",
 		testDir,
 	}
@@ -34,7 +34,7 @@ func TestMain(t *testing.T) {
 	// daemon.
 	<-started
 	time.Sleep(250 * time.Millisecond)
-	resp, err := http.Get("http://localhost:45150/daemon/stop")
+	resp, err := http.Get("http://localhost:45350/daemon/stop")
 	if err != nil {
 		t.Fatal(err)
 	}
