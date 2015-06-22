@@ -101,9 +101,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 
 	g.log.Println("INFO: our address is", g.myAddr)
 
-	// Add ourselves as a node.
-	g.addNode(g.myAddr)
-
 	// Spawn the primary listener.
 	go g.listen()
 
