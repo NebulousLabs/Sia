@@ -39,8 +39,13 @@ type Host interface {
 	// Address returns the host's network address
 	Address() NetAddress
 
-	// Announce announces the host on the blockchain.
+	// Announce announces the host on the blockchain, returning an error if the
+	// host cannot reach itself or if the external ip address is unknown.
 	Announce() error
+
+	// ForceAnnounce announces the host on the blockchain, regardless of
+	// connectivity.
+	ForceAnnounce() error
 
 	// HostNotify will push a struct down the channel every time that an update
 	// is received.

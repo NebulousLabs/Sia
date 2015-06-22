@@ -39,6 +39,12 @@ Available settings:
 		Long:  "Announce yourself as a host on the network.",
 		Run:   wrap(hostannouncecmd)}
 
+	hostForceAnnounceCmd = &cobra.Command{
+		Use:   "forceannounce",
+		Short: "Announce yourself as a host disregarding connectivity errors",
+		Long:  "Announce yourself as a host on the network, even if you are experiencing connectivity problems.",
+		Run:   wrap(hostannouncecmd)}
+
 	hostStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "View host settings",
@@ -68,6 +74,15 @@ func hostconfigcmd(param, value string) {
 
 func hostannouncecmd() {
 	err := post("/host/announce", "")
+	if err != nil {
+		fmt.Println("Could not announce host:", err)
+		return
+	}
+	fmt.Println("Host announcement submitted to network.")
+}
+
+func hostforceannouncecmd() {
+	err := post("/host/forceannounce", "")
 	if err != nil {
 		fmt.Println("Could not announce host:", err)
 		return

@@ -54,6 +54,17 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 	writeSuccess(w)
 }
 
+// hostForceAnnounceHandler handles the API call to get the host to announce
+// itself to the network. This call ignores connectivity checks.
+func (srv *Server) hostForceAnnounceHandler(w http.ResponseWriter, req *http.Request) {
+	err := srv.host.ForceAnnounce()
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
 // hostStatusHandler handles the API call that queries the host status.
 func (srv *Server) hostStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, srv.host.Info())
