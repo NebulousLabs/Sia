@@ -18,6 +18,11 @@ const (
 	// Hosts will not be removed if there are fewer than this many hosts.
 	// Eventually, this number should be in the low thousands.
 	MinHostThreshold = 5
+
+	// scanPoolSize sets the buffer size of the channel that holds hosts which
+	// need to be scanned. A thread pool pulls from the scan pool to query
+	// hosts that are due for an update.
+	scanPoolSize = 1000
 )
 
 var (
@@ -46,13 +51,20 @@ type HostDB struct {
 	// including hosts that are currently offline.
 	allHosts map[modules.NetAddress]*hostEntry
 
+	// the scanPool is a set of hosts that need to be scanned. There are a
+	// handful of goroutines constantly waiting on the channel for hosts to
+	// scan.
+	scanPool chan *hostEntry
+
 	subscribers []chan struct{}
 
 	mu *sync.RWMutex
 }
 
-// New returns an empty HostDatabase.
+// New returns a host database that will still crawling the hosts it finds on
+// the blockchain.
 func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
+	// Check for nil dependencies.
 	if cs == nil {
 		err = ErrNilConsensusSet
 		return
@@ -62,18 +74,25 @@ func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
 		return
 	}
 
+	// Build an empty hostdb.
 	hdb = &HostDB{
 		consensusSet: cs,
 		gateway:      g,
 
 		activeHosts: make(map[modules.NetAddress]*hostNode),
-		allHosts:    make(map[modules.NetAddress]*hostEntry),
+
+		allHosts: make(map[modules.NetAddress]*hostEntry),
+
+		scanPool: make(chan *hostEntry, scanPoolSize),
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	cs.ConsensusSetSubscribe(hdb)
+	// Begin listening to consensus and looking for hosts.
+	for i := 0; i < scanningThreads; i++ {
+		go hdb.threadedProbeHosts()
+	}
 	go hdb.threadedScan()
-
+	cs.ConsensusSetSubscribe(hdb)
 	return
 }

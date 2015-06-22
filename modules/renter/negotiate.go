@@ -110,7 +110,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	terms := modules.ContractTerms{
 		FileSize:      filesize,
 		Duration:      up.Duration,
-		DurationStart: height - 1,
+		DurationStart: height - 3,
 		WindowSize:    defaultWindowSize,
 		Price:         host.Price,
 		Collateral:    host.Collateral,
