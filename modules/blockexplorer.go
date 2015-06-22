@@ -4,6 +4,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	ExplorerDir = "explorer"
+)
+
 // Used for the BlockInfo call
 type ExplorerBlockData struct {
 	Timestamp types.Timestamp // The timestamp on the block
@@ -33,6 +37,9 @@ type BlockExplorer interface {
 	// Function to return status of a bunch of static variables,
 	// in the form of an ExplorerStatus struct
 	ExplorerStatus() ExplorerStatus
+
+	// Function to safely shut down the block explorer. Closes the database
+	Close() error
 
 	// Sends notifications when the module updates
 	BlockExplorerNotify() <-chan struct{}

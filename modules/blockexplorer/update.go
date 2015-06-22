@@ -1,6 +1,8 @@
 package blockexplorer
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -57,10 +59,40 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 			Target:    blocktarget,
 			Size:      uint64(len(encoding.Marshal(block))),
 		})
+
+		err := be.addBlock(block)
+		if err != nil {
+			fmt.Printf("Error when adding block to database: " + err.Error())
+		}
+		be.blockchainHeight += 1
 	}
-	be.blockchainHeight += types.BlockHeight(len(cc.AppliedBlocks))
 	be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
 	be.updateSubscribers()
+}
+
+func (be *BlockExplorer) addBlock(b types.Block) error {
+	// Special case for the genesis block, which does not have a valid parent
+	var blocktarget types.Target
+	if b.ID() == be.genesisBlockID {
+		blocktarget = types.RootDepth
+	} else {
+		var exists bool
+		blocktarget, exists = be.cs.ChildTarget(b.ParentID)
+		if build.DEBUG {
+			if !exists {
+				panic("Applied block not in consensus")
+			}
+		}
+	}
+
+	// Construct the struct that will be inside the database
+	blockStruct := blockData{
+		Block:  b,
+		Height: be.blockchainHeight,
+		Target: blocktarget,
+	}
+	err := be.db.InsertIntoBucket("Blocks", encoding.Marshal(b.ID()), encoding.Marshal(blockStruct))
+	return err
 }
