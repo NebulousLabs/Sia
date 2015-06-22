@@ -150,7 +150,12 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
-		cs.siafundPool = cs.siafundPool.Add(fc.Tax())
+		sfpd := modules.SiafundPoolDiff{
+			Previous: cs.siafundPool,
+			Adjusted: cs.siafundPool.Add(fc.Tax()),
+		}
+		bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
+		cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {

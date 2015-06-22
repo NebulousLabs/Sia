@@ -59,11 +59,13 @@ type ConsensusChange struct {
 	// diffs is 'DiffApply'.
 	SiafundOutputDiffs []SiafundOutputDiff
 
-	// DelayedSiacoinOutputDiffs contains the set of delayed siacoin output diffs that were applied to the consensus set in the recent change.
+	// DelayedSiacoinOutputDiffs contains the set of delayed siacoin output
+	// diffs that were applied to the consensus set in the recent change.
+	DelayedSiacoinOutputDiffs []DelayedSiacoinOutputDiff
 
-	// SiafundPoolDiff is the siafund pool diff that was applied to the
+	// SiafundPoolDiffs are the siafund pool diffs that were applied to the
 	// consensus set in the recent change.
-	SiafundPoolDiff SiafundPoolDiff
+	SiafundPoolDiffs []SiafundPoolDiff
 }
 
 // A DiffDirection indicates the "direction" of a diff, either applied or
@@ -94,6 +96,9 @@ type SiafundOutputDiff struct {
 	SiafundOutput types.SiafundOutput
 }
 
+// A DelayedSiacoinOutputDiff indicates the introduction of a siacoin output
+// that cannot be spent until after maturing for 144 blocks. When the output
+// has matured, a SiacoinOutputDiff will be provided.
 type DelayedSiacoinOutputDiff struct {
 	Direction      DiffDirection
 	ID             types.SiacoinOutputID

@@ -42,7 +42,7 @@ type blockNode struct {
 	fileContractDiffs         []modules.FileContractDiff
 	siafundOutputDiffs        []modules.SiafundOutputDiff
 	delayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
-	siafundPoolDiff           modules.SiafundPoolDiff
+	siafundPoolDiffs          []modules.SiafundPoolDiff
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node

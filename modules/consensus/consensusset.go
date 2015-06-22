@@ -9,11 +9,9 @@ package consensus
 import (
 	"errors"
 	"os"
-	"sort"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"

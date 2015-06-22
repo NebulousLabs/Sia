@@ -106,7 +106,12 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 	}
 
 	// Add the siafund tax to the siafund pool.
-	cs.siafundPool = cs.siafundPool.Add(fc.Tax())
+	sfpd := modules.SiafundPoolDiff{
+		Previous: cs.siafundPool,
+		Adjusted: cs.siafundPool.Add(fc.Tax()),
+	}
+	bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
+	cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)
 
 	// Add all of the outputs in the missed proof outputs to the consensus set.
 	for i, mpo := range fc.MissedProofOutputs {
