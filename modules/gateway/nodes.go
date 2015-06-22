@@ -25,7 +25,6 @@ func (g *Gateway) addNode(addr modules.NetAddress) error {
 		return errors.New("cannot add loopback address")
 	}
 	g.nodes[addr] = struct{}{}
-	g.log.Println("INFO: added node", addr)
 	return nil
 }
 
