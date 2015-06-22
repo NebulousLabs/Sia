@@ -49,7 +49,7 @@ func updatecmd() {
 		fmt.Println("Already up to date.")
 		return
 	}
-	err = get("/daemon/update/apply?version=" + update.Version)
+	err = get("/daemon/updates/apply?version=" + update.Version)
 	if err != nil {
 		fmt.Println("Could not apply update:", err)
 		return
