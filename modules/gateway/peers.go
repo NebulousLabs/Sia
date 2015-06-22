@@ -239,7 +239,12 @@ func (g *Gateway) makeOutboundConnections() {
 			if err != nil || numPeers >= wellConnectedThreshold {
 				break
 			}
-			g.Connect(addr)
+			if g.Connect(addr) != nil {
+				// aggressively remove unresponsive nodes
+				id = g.mu.Lock()
+				g.removeNode(addr)
+				g.mu.Unlock(id)
+			}
 		}
 		time.Sleep(5 * time.Second)
 	}
