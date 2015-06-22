@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -94,7 +95,9 @@ var ExternalIP = func() string {
 		return "::1"
 	}
 
-	resp, err := http.Get("http://myexternalip.com/raw")
+	// timeout after 3 seconds
+	client := http.Client{Timeout: time.Duration(3 * time.Second)}
+	resp, err := client.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "::1"
 	}

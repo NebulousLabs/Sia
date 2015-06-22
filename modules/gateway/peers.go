@@ -122,7 +122,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// respond with our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
+	if err := encoding.WriteObject(conn, "0.3.3"); err != nil {
 		conn.Close()
 		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
@@ -168,7 +168,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return err
 	}
 	// send our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
+	if err := encoding.WriteObject(conn, "0.3.3"); err != nil {
 		return err
 	}
 	// read version ack
@@ -239,7 +239,13 @@ func (g *Gateway) makeOutboundConnections() {
 			if err != nil || numPeers >= wellConnectedThreshold {
 				break
 			}
-			g.Connect(addr)
+			err = g.Connect(addr)
+			// aggressively remove unresponsive nodes
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				id = g.mu.Lock()
+				g.removeNode(addr)
+				g.mu.Unlock(id)
+			}
 		}
 		time.Sleep(5 * time.Second)
 	}
