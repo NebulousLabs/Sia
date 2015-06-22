@@ -88,27 +88,30 @@ func (hdb *HostDB) threadedProbeHosts() {
 		// Now that network communication is done, lock the hostdb to modify the
 		// host entry.
 		id := hdb.mu.Lock()
-		defer hdb.mu.Unlock(id)
-		if err != nil {
-			hdb.decrementReliability(hostEntry.IPAddress, UnreachablePenalty)
-			return
-		}
+		{
+			if err != nil {
+				hdb.decrementReliability(hostEntry.IPAddress, UnreachablePenalty)
+				hdb.mu.Unlock(id)
+				continue
+			}
 
-		// Update the host settings, reliability, and weight. The old IPAddress
-		// must be preserved.
-		settings.IPAddress = hostEntry.HostSettings.IPAddress
-		hostEntry.HostSettings = settings
-		hostEntry.reliability = MaxReliability
-		hostEntry.weight = hdb.hostWeight(*hostEntry)
+			// Update the host settings, reliability, and weight. The old IPAddress
+			// must be preserved.
+			settings.IPAddress = hostEntry.HostSettings.IPAddress
+			hostEntry.HostSettings = settings
+			hostEntry.reliability = MaxReliability
+			hostEntry.weight = hdb.hostWeight(*hostEntry)
 
-		// If the host is not already in the database and 'MaxActiveHosts' has not
-		// been reached, add the host to the database.
-		_, exists1 := hdb.activeHosts[hostEntry.IPAddress]
-		_, exists2 := hdb.allHosts[hostEntry.IPAddress]
-		if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
-			hdb.insertNode(hostEntry)
-			hdb.notifySubscribers()
+			// If the host is not already in the database and 'MaxActiveHosts' has not
+			// been reached, add the host to the database.
+			_, exists1 := hdb.activeHosts[hostEntry.IPAddress]
+			_, exists2 := hdb.allHosts[hostEntry.IPAddress]
+			if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
+				hdb.insertNode(hostEntry)
+				hdb.notifySubscribers()
+			}
 		}
+		hdb.mu.Unlock(id)
 	}
 }
 
