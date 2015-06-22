@@ -250,7 +250,7 @@ func TestApplyFileContracts(t *testing.T) {
 	txn = types.Transaction{
 		FileContracts: []types.FileContract{
 			{Payout: types.NewCurrency64(1)},
-			{Payout: types.NewCurrency64(2)},
+			{Payout: types.NewCurrency64(300e3)},
 		},
 	}
 	cst.cs.applyFileContracts(bn, txn)
@@ -269,6 +269,9 @@ func TestApplyFileContracts(t *testing.T) {
 	}
 	if len(bn.fileContractDiffs) != 3 {
 		t.Error("block node was not updated correctly")
+	}
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
+		t.Error("siafund pool did not update correctly upon creation of a file contract")
 	}
 }
 
@@ -496,9 +499,6 @@ func TestApplyStorageProofs(t *testing.T) {
 	}
 	if sco.Value.Cmp(types.NewCurrency64(290e3)) != 0 {
 		t.Error("storage proof output was created with the wrong value")
-	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
-		t.Error("siafund pool was not correctly updated when applying a storage proof")
 	}
 
 	// Apply a transaction with 2 storage proofs.
