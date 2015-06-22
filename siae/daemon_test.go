@@ -12,9 +12,8 @@ import (
 func TestStartDaemon(t *testing.T) {
 	testDir := build.TempDir("siad", "TestStartDaemon")
 	config.Siad.NoBootstrap = false
-	config.Siad.APIaddr = "localhost:45170"
-	config.Siad.RPCaddr = ":45171"
-	config.Siad.HostAddr = ":45172"
+	config.Siad.APIaddr = "localhost:45370"
+	config.Siad.RPCaddr = ":0"
 	config.Siad.SiaDir = testDir
 	go func() {
 		err := startDaemon()
@@ -27,7 +26,7 @@ func TestStartDaemon(t *testing.T) {
 	// daemon.
 	<-started
 	time.Sleep(250 * time.Millisecond)
-	resp, err := http.Get("http://localhost:45170/daemon/stop")
+	resp, err := http.Get("http://localhost:45370/daemon/stop")
 	if err != nil {
 		t.Fatal(err)
 	}

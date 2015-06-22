@@ -25,8 +25,6 @@ func TestMain(t *testing.T) {
 		"localhost:45150",
 		"-r",
 		"localhost:45151",
-		"-H",
-		"localhost:45152",
 		"-d",
 		testDir,
 	}
