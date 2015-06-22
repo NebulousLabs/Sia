@@ -26,11 +26,11 @@ const (
 
 	maxSettingsLen = 1024
 
-	hostRequestTimeout = 15 * time.Second
+	hostRequestTimeout = 5 * time.Second
 
 	// scanningThreads is the number of threads that will be probing hosts for
 	// their settings and checking for reliability.
-	scanningThreads = 4
+	scanningThreads = 25
 )
 
 var (
