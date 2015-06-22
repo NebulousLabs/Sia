@@ -17,20 +17,26 @@ import (
 )
 
 const (
-	DefaultScanSleep = 4 * time.Hour
-	MaxScanSleep     = 8 * time.Hour
+	DefaultScanSleep = 2*time.Hour + 18*time.Minute
+	MaxScanSleep     = 6 * time.Hour
 	MinScanSleep     = 1 * time.Hour
 
-	MaxActiveHosts              = 200
-	InactiveHostCheckupQuantity = 100
+	MaxActiveHosts              = 500
+	InactiveHostCheckupQuantity = 250
 
 	maxSettingsLen = 1024
+
+	hostRequestTimeout = 15 * time.Second
+
+	// scanningThreads is the number of threads that will be probing hosts for
+	// their settings and checking for reliability.
+	scanningThreads = 4
 )
 
 var (
-	ActiveReliability   = types.NewCurrency64(20)
-	InactiveReliability = types.NewCurrency64(10)
-	UnreachablePenalty  = types.NewCurrency64(1)
+	MaxReliability     = types.NewCurrency64(50) // Given the scanning defaults, about 1 week of survival.
+	DefaultReliability = types.NewCurrency64(20) // Given the scanning defaults, about 3 days of survival.
+	UnreachablePenalty = types.NewCurrency64(1)
 )
 
 // decrementReliability reduces the reliability of a node, moving it out of the
@@ -43,10 +49,10 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	}
 	entry.reliability = entry.reliability.Sub(penalty)
 
-	// If the entry is in the active database and has fallen below
-	// InactiveReliability, remove it from the active database.
+	// If the entry is in the active database, remove it from the active
+	// database.
 	node, exists := hdb.activeHosts[addr]
-	if exists && entry.reliability.Cmp(InactiveReliability) < 0 {
+	if exists {
 		delete(hdb.activeHosts, entry.IPAddress)
 		node.removeNode()
 		hdb.notifySubscribers()
@@ -62,46 +68,47 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 // threadedProbeHost tries to fetch the settings of a host. If successful, the
 // host is put in the set of active hosts. If unsuccessful, the host id deleted
 // from the set of active hosts.
-func (hdb *HostDB) threadedProbeHost(entry *hostEntry) {
-	// Request the most recent set of settings from the host.
-	var settings modules.HostSettings
-	err := func() error {
-		conn, err := net.DialTimeout("tcp", string(entry.IPAddress), 10e9)
+func (hdb *HostDB) threadedProbeHosts() {
+	for hostEntry := range hdb.scanPool {
+		// Request settings from the queue'd host entry.
+		var settings modules.HostSettings
+		err := func() error {
+			conn, err := net.DialTimeout("tcp", string(hostEntry.IPAddress), hostRequestTimeout)
+			if err != nil {
+				return err
+			}
+			defer conn.Close()
+			err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
+			if err != nil {
+				return err
+			}
+			return encoding.ReadObject(conn, &settings, maxSettingsLen)
+		}()
+
+		// Now that network communication is done, lock the hostdb to modify the
+		// host entry.
+		id := hdb.mu.Lock()
+		defer hdb.mu.Unlock(id)
 		if err != nil {
-			return err
+			hdb.decrementReliability(hostEntry.IPAddress, UnreachablePenalty)
+			return
 		}
-		defer conn.Close()
-		err = encoding.WriteObject(conn, [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'})
-		if err != nil {
-			return err
+
+		// Update the host settings, reliability, and weight. The old IPAddress
+		// must be preserved.
+		settings.IPAddress = hostEntry.HostSettings.IPAddress
+		hostEntry.HostSettings = settings
+		hostEntry.reliability = MaxReliability
+		hostEntry.weight = hdb.hostWeight(*hostEntry)
+
+		// If the host is not already in the database and 'MaxActiveHosts' has not
+		// been reached, add the host to the database.
+		_, exists1 := hdb.activeHosts[hostEntry.IPAddress]
+		_, exists2 := hdb.allHosts[hostEntry.IPAddress]
+		if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
+			hdb.insertNode(hostEntry)
+			hdb.notifySubscribers()
 		}
-		return encoding.ReadObject(conn, &settings, maxSettingsLen)
-	}()
-
-	// Now that network communication is done, lock the hostdb to modify the
-	// host entry.
-	id := hdb.mu.Lock()
-	defer hdb.mu.Unlock(id)
-
-	if err != nil {
-		hdb.decrementReliability(entry.IPAddress, UnreachablePenalty)
-		return
-	}
-
-	// Update the host settings, reliability, and weight. The old IPAddress
-	// must be preserved.
-	settings.IPAddress = entry.HostSettings.IPAddress
-	entry.HostSettings = settings
-	entry.reliability = ActiveReliability
-	entry.weight = hdb.hostWeight(*entry)
-
-	// If the host is not already in the database and 'MaxActiveHosts' has not
-	// been reached, add the host to the database.
-	_, exists1 := hdb.activeHosts[entry.IPAddress]
-	_, exists2 := hdb.allHosts[entry.IPAddress]
-	if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
-		hdb.insertNode(entry)
-		hdb.notifySubscribers()
 	}
 }
 
@@ -114,13 +121,14 @@ func (hdb *HostDB) threadedScan() {
 		// inactive hosts.
 		id := hdb.mu.Lock()
 		{
-			// Check all of the active hosts.
+			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
-				go hdb.threadedProbeHost(host.hostEntry)
+				go func() {
+					hdb.scanPool <- host.hostEntry
+				}()
 			}
 
-			// Assemble all of the inactive hosts into a single array and
-			// shuffle it.
+			// Assemble all of the inactive hosts into a single array.
 			var random []*hostEntry
 			for _, entry := range hdb.allHosts {
 				entry2, exists := hdb.activeHosts[entry.IPAddress]
@@ -154,32 +162,35 @@ func (hdb *HostDB) threadedScan() {
 			}
 
 			// Select the first InactiveHostCheckupQuantity hosts from the
-			// shuffled list.
+			// shuffled list and scan them.
 			n := InactiveHostCheckupQuantity
 			if len(random) < InactiveHostCheckupQuantity {
 				n = len(random)
 			}
 			for i := 0; i < n; i++ {
-				go hdb.threadedProbeHost(random[i])
+				go func() {
+					hdb.scanPool <- random[i]
+				}()
 			}
 		}
 		hdb.mu.Unlock(id)
 
-		// Sleep for a random amount of time between 4 and 24 hours. The time
-		// is randomly generated so that hosts who are only on at certain times
-		// of the day or week will still be included. Random times also make it
-		// harder for hosts to game the system.
-		randSleep, err := rand.Int(rand.Reader, big.NewInt(int64(MaxScanSleep)))
+		// Sleep for a random amount of time before doing another round of
+		// scanning. The minimums and maximums keep the scan time reasonable,
+		// while the randomness prevents the scanning from always happening at
+		// the same time of day or week.
+		maxBig := big.NewInt(int64(MaxScanSleep))
+		minBig := big.NewInt(int64(MinScanSleep))
+		randSleep, err := rand.Int(rand.Reader, maxBig.Sub(maxBig, minBig))
 		if err != nil {
 			if build.DEBUG {
 				panic(err)
 			} else {
-				// If there's an error generating the random number, just sleep
-				// for 15 hours because it'll hit all times of the day after
-				// enough iterations.
-				randSleep = big.NewInt(int64(DefaultScanSleep))
+				// If there's an error, sleep for the default amount of time.
+				defaultBig := big.NewInt(int64(DefaultScanSleep))
+				randSleep = defaultBig.Sub(defaultBig, minBig)
 			}
 		}
-		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep)
+		time.Sleep(time.Duration(randSleep.Int64()) + MinScanSleep) // this means the MaxScanSleep is actual Max+Min.
 	}
 }

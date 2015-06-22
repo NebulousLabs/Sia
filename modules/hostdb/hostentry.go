@@ -14,6 +14,7 @@ var (
 	baseWeight = types.NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(120), nil))
 )
 
+// A hostEntry represents a host on the network.
 type hostEntry struct {
 	modules.HostSettings
 	weight      types.Currency
@@ -40,12 +41,17 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	// Add the host to allHosts.
 	entry := &hostEntry{
 		HostSettings: host,
-		reliability:  InactiveReliability,
+		reliability:  DefaultReliability,
 	}
 	_, exists := hdb.allHosts[entry.IPAddress]
 	if !exists {
 		hdb.allHosts[entry.IPAddress] = entry
-		go hdb.threadedProbeHost(entry)
+
+		// Add the host to the scanPool, but in a goroutine so that if the
+		// scanPool is full, the hostdb does not deadlock.
+		go func() {
+			hdb.scanPool <- entry
+		}()
 	}
 }
 
