@@ -39,6 +39,16 @@ var (
 	UnreachablePenalty = types.NewCurrency64(1)
 )
 
+// addHostToScanPool creates a gofunc that adds a host to the scan pool. If the
+// scan pool is currently full, the blocking gofunc will not cause a deadlock.
+// The gofunc is created inside of this function to eliminate the burden of
+// needing to remember to call 'go addHostToScanPool'.
+func (hdb *HostDB) scanHostEntry(entry *hostEntry) {
+	go func() {
+		hdb.scanPool <- entry
+	}()
+}
+
 // decrementReliability reduces the reliability of a node, moving it out of the
 // set of active hosts or deleting it entirely if necessary.
 func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.Currency) {
@@ -70,7 +80,7 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 // from the set of active hosts.
 func (hdb *HostDB) threadedProbeHosts() {
 	for hostEntry := range hdb.scanPool {
-		// Request settings from the queue'd host entry.
+		// Request settings from the queued host entry.
 		var settings modules.HostSettings
 		err := func() error {
 			conn, err := net.DialTimeout("tcp", string(hostEntry.IPAddress), hostRequestTimeout)
@@ -126,9 +136,7 @@ func (hdb *HostDB) threadedScan() {
 		{
 			// Scan all active hosts.
 			for _, host := range hdb.activeHosts {
-				go func() {
-					hdb.scanPool <- host.hostEntry
-				}()
+				hdb.scanHostEntry(host.hostEntry)
 			}
 
 			// Assemble all of the inactive hosts into a single array.
@@ -171,9 +179,7 @@ func (hdb *HostDB) threadedScan() {
 				n = len(random)
 			}
 			for i := 0; i < n; i++ {
-				go func() {
-					hdb.scanPool <- random[i]
-				}()
+				hdb.scanHostEntry(random[i])
 			}
 		}
 		hdb.mu.Unlock(id)

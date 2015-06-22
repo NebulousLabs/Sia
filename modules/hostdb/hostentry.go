@@ -46,12 +46,7 @@ func (hdb *HostDB) insertHost(host modules.HostSettings) {
 	_, exists := hdb.allHosts[entry.IPAddress]
 	if !exists {
 		hdb.allHosts[entry.IPAddress] = entry
-
-		// Add the host to the scanPool, but in a goroutine so that if the
-		// scanPool is full, the hostdb does not deadlock.
-		go func() {
-			hdb.scanPool <- entry
-		}()
+		hdb.scanHostEntry(entry)
 	}
 }
 
