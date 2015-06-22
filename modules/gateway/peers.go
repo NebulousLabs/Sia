@@ -122,7 +122,7 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	}
 
 	// respond with our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
+	if err := encoding.WriteObject(conn, "0.3.3"); err != nil {
 		conn.Close()
 		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
@@ -168,7 +168,7 @@ func (g *Gateway) Connect(addr modules.NetAddress) error {
 		return err
 	}
 	// send our version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
+	if err := encoding.WriteObject(conn, "0.3.3"); err != nil {
 		return err
 	}
 	// read version ack
