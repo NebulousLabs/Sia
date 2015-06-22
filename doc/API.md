@@ -8,9 +8,10 @@ structs. The structs will be encoded to JSON before being sent; they are used
 here to provide type information.
 
 At version 0.4, the API will be locked into forwards compatibility. This means
-that we will not add new required parameters or remove response fields. We
-may, however, add additional fields and optional parameters, and we may
-disable parameters.
+that we will not add new required parameters or remove response fields. We may,
+however, add additional fields and optional parameters, and we may disable
+parameters. It should be noted that significant changes in the API are planned
+between 0.3.3.2 and 0.4.
 
 There may be functional API calls which are not documented. These are not
 guaranteed to be supported beyond the current release, and should not be used
