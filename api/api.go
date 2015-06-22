@@ -19,7 +19,7 @@ const (
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
 		// prevent access from sources other than siac and Sia-UI
-		if req.UserAgent() != "Go 1.1 package http" && !strings.Contains(req.UserAgent(), "Electron") && !strings.Contains(req.UserAgent(), "AtomShell") {
+		if !strings.Contains(req.UserAgent(), "Sia-Miner") && req.UserAgent() != "" && req.UserAgent() != "Go 1.1 package http" && !strings.Contains(req.UserAgent(), "Electron") && !strings.Contains(req.UserAgent(), "AtomShell") {
 			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusInternalServerError)
 			return
 		}
@@ -66,8 +66,8 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
 	handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
 	handleHTTPRequest(mux, "/miner/stop", srv.minerStopHandler)
-	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler) // Deprecated
-	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)   // Deprecated
+	handleHTTPRequest(mux, "/miner/blockforwork", srv.minerBlockforworkHandler)
+	handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)
 	handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
 	handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
 
@@ -82,7 +82,7 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/renter/files/share", srv.renterFilesShareHandler)
 	handleHTTPRequest(mux, "/renter/files/shareascii", srv.renterFilesShareAsciiHandler)
 	handleHTTPRequest(mux, "/renter/files/upload", srv.renterFilesUploadHandler)
-	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler) // TODO: alter
+	handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
 
 	// TransactionPool API Calls
 	handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
