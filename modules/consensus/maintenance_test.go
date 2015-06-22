@@ -111,9 +111,6 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
-		t.Error("siafund pool not updated!")
-	}
 	_, exists = cst.cs.fileContracts[types.FileContractID{}]
 	if exists {
 		t.Error("file contract remains after expiration")
@@ -155,9 +152,6 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	_, exists = cst.cs.siacoinOutputs[spoid]
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
-	}
-	if cst.cs.siafundPool.Cmp(types.NewCurrency64(10e3)) != 0 {
-		t.Error("siafund pool not updated!")
 	}
 	_, exists = cst.cs.fileContracts[types.FileContractID{}]
 	if exists {

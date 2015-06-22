@@ -71,6 +71,15 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 			sfod.Direction = !sfod.Direction
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
+		for i := len(rn.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			dscod := rn.delayedSiacoinOutputDiffs[i]
+			dscod.Direction = !dscod.Direction
+			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
+		}
+		for i := len(rn.siafundPoolDiffs) - 1; i >= 0; i-- {
+			sfpd := rn.siafundPoolDiffs[i]
+			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
+		}
 	}
 	for _, an := range appliedNodes {
 		cc.AppliedBlocks = append(cc.AppliedBlocks, an.block)
@@ -83,13 +92,12 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 		for _, sfod := range an.siafundOutputDiffs {
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
-	}
-	// Handle the siafund pool diff - handling depends on whether there are
-	// reverted nodes.
-	if len(revertedNodes) != 0 {
-		cc.SiafundPoolDiff.Previous = revertedNodes[0].siafundPoolDiff.Adjusted
-	} else {
-		cc.SiafundPoolDiff.Previous = appliedNodes[0].siafundPoolDiff.Previous
+		for _, dscod := range an.delayedSiacoinOutputDiffs {
+			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
+		}
+		for _, sfpd := range an.siafundPoolDiffs {
+			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
+		}
 	}
 	// Add the changes to the change set.
 	s.consensusChanges = append(s.consensusChanges, cc)

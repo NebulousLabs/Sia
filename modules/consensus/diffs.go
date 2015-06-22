@@ -150,6 +150,9 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		for _, dscod := range bn.delayedSiacoinOutputDiffs {
 			s.commitDelayedSiacoinOutputDiff(dscod, dir)
 		}
+		for _, sfpd := range bn.siafundPoolDiffs {
+			s.commitSiafundPoolDiff(sfpd, dir)
+		}
 	} else {
 		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
 			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
@@ -163,8 +166,10 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		for i := len(bn.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
 			s.commitDelayedSiacoinOutputDiff(bn.delayedSiacoinOutputDiffs[i], dir)
 		}
+		for i := len(bn.siafundPoolDiffs) - 1; i >= 0; i-- {
+			s.commitSiafundPoolDiff(bn.siafundPoolDiffs[i], dir)
+		}
 	}
-	s.commitSiafundPoolDiff(bn.siafundPoolDiff, dir)
 
 	// Delete the emptied siacoin output map.
 	if dir == modules.DiffApply {
@@ -229,10 +234,6 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	// invalid, the diffs can be safely reversed from whatever point.
 	bn.diffsGenerated = true
 
-	// The first diff to be applied is to mark what the starting siafundPool balance
-	// is.
-	bn.siafundPoolDiff.Previous = s.siafundPool
-
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
@@ -254,10 +255,6 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
 	s.applyMaintenance(bn)
-
-	// The final thing is to update the siafundPoolDiff to indicate where the
-	// siafund pool ended up.
-	bn.siafundPoolDiff.Adjusted = s.siafundPool
 
 	return nil
 }

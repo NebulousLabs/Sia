@@ -87,6 +87,15 @@ func (cs *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 		}
 		bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
 		cs.commitFileContractDiff(fcd, modules.DiffApply)
+
+		// Get the portion of the contract that goes into the siafund pool and
+		// add it to the siafund pool.
+		sfpd := modules.SiafundPoolDiff{
+			Previous: cs.siafundPool,
+			Adjusted: cs.siafundPool.Add(fc.Tax()),
+		}
+		bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
+		cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)
 	}
 	return
 }
@@ -147,10 +156,6 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 				panic(ErrNonexistentStorageProof)
 			}
 		}
-
-		// Get the portion of the contract that goes into the siafund pool and
-		// add it to the siafund pool.
-		cs.siafundPool = cs.siafundPool.Add(fc.Tax())
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
