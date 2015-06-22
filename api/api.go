@@ -18,6 +18,11 @@ const (
 // the API.
 func handleHTTPRequest(mux *http.ServeMux, url string, handler http.HandlerFunc) {
 	mux.HandleFunc(url, func(w http.ResponseWriter, req *http.Request) {
+		// prevent access from sources other than siac and Sia-UI
+		if req.UserAgent() != "Go 1.1 package http" && !strings.Contains(req.UserAgent(), "AtomShell") {
+			writeError(w, "Browser access disabled due to security vulnerability. Use Sia-UI or siac.", http.StatusInternalServerError)
+			return
+		}
 		handler(w, req)
 	})
 }
