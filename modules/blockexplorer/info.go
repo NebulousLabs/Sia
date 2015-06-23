@@ -38,7 +38,11 @@ func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHe
 		return nil, errors.New("cannot get info on a block higher than the blockchain")
 	}
 
-	return be.blockSummaries[start:finish], nil
+	summaries, err := be.db.dbBlockSummaries(start, finish)
+	if err != nil {
+		return nil, err
+	}
+	return summaries, nil
 }
 
 // Returns many pieces of readily available information

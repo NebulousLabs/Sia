@@ -93,6 +93,11 @@ func (be *BlockExplorer) addBlock(b types.Block) error {
 		Height: be.blockchainHeight,
 		Target: blocktarget,
 	}
+
 	err := be.db.InsertIntoBucket("Blocks", encoding.Marshal(b.ID()), encoding.Marshal(blockStruct))
+	if err != nil {
+		return err
+	}
+	err = be.db.InsertIntoBucket("Heights", encoding.Marshal(be.blockchainHeight), encoding.Marshal(b.ID()))
 	return err
 }

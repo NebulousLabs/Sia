@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/boltdb/bolt"
@@ -116,25 +117,6 @@ func openDB(filename string) (*explorerDB, error) {
 	return &explorerDB{db}, nil
 }
 
-// A higher level function to insert a block into the database
-func (db *explorerDB) insertBlock(b types.Block) error {
-	err := db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("Blocks"))
-		if build.DEBUG {
-			if bucket == nil {
-				panic("blocks bucket was not created correcty")
-			}
-		}
-
-		err := bucket.Put(encoding.Marshal(b.ID()), encoding.Marshal(b))
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	return err
-}
-
 // Returns the block with a given id
 func (db *explorerDB) getBlock(id types.BlockID) (block types.Block, err error) {
 	var b []byte
@@ -162,4 +144,44 @@ func (db *explorerDB) getBlock(id types.BlockID) (block types.Block, err error) 
 	}
 
 	return block, nil
+}
+
+// Returns an array of block summaries. Bounds checking should be done elsewhere
+func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
+	summaries := make([]modules.ExplorerBlockData, int(finish-start))
+	err := db.View(func(tx *bolt.Tx) error {
+		heights := tx.Bucket([]byte("Heights"))
+		blocks := tx.Bucket([]byte("Blocks"))
+
+		// Iterate over each block height, constructing a
+		// summary data structure for each block
+		for i := start; i < finish; i++ {
+			bID := heights.Get(encoding.Marshal(types.BlockHeight(i)))
+			if bID == nil {
+				return errors.New("Block not found in height bucket")
+			}
+
+			blockBytes := blocks.Get(bID)
+			if blockBytes == nil {
+				return errors.New("Block not found in blocks bucket")
+			}
+
+			var blockValues blockData
+			err := encoding.Unmarshal(blockBytes, &blockValues)
+			if err != nil {
+				return err
+			}
+
+			summaries[i-start] = modules.ExplorerBlockData{
+				Timestamp: blockValues.Block.Timestamp,
+				Target:    blockValues.Target,
+				Size:      uint64(len(encoding.Marshal(blockValues.Block))),
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return summaries, nil
 }
