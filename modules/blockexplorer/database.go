@@ -2,6 +2,7 @@ package blockexplorer
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -50,7 +51,16 @@ type explorerDB struct {
 type blockData struct {
 	Block  types.Block
 	Height types.BlockHeight
-	Target types.Target
+}
+
+// Stored along with the height of a block. These are designed to be
+// values that are easily accessable in sequence, so that the entire
+// block does not need to be loaded
+type blockSummary struct {
+	ID        types.BlockID
+	Timestamp types.Timestamp
+	Target    types.Target
+	Size      uint64
 }
 
 // txInfo provides enough information to find the actual transaction
@@ -150,34 +160,30 @@ func (db *explorerDB) getBlock(id types.BlockID) (block types.Block, err error) 
 func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
 	summaries := make([]modules.ExplorerBlockData, int(finish-start))
 	err := db.View(func(tx *bolt.Tx) error {
+		fmt.Printf("Beginning lookup\n")
 		heights := tx.Bucket([]byte("Heights"))
-		blocks := tx.Bucket([]byte("Blocks"))
 
 		// Iterate over each block height, constructing a
 		// summary data structure for each block
 		for i := start; i < finish; i++ {
-			bID := heights.Get(encoding.Marshal(types.BlockHeight(i)))
-			if bID == nil {
+			bSummaryBytes := heights.Get(encoding.Marshal(types.BlockHeight(i)))
+			if bSummaryBytes == nil {
 				return errors.New("Block not found in height bucket")
 			}
 
-			blockBytes := blocks.Get(bID)
-			if blockBytes == nil {
-				return errors.New("Block not found in blocks bucket")
-			}
-
-			var blockValues blockData
-			err := encoding.Unmarshal(blockBytes, &blockValues)
+			var bSummary blockSummary
+			err := encoding.Unmarshal(bSummaryBytes, &bSummary)
 			if err != nil {
 				return err
 			}
 
 			summaries[i-start] = modules.ExplorerBlockData{
-				Timestamp: blockValues.Block.Timestamp,
-				Target:    blockValues.Target,
-				Size:      uint64(len(encoding.Marshal(blockValues.Block))),
+				Timestamp: bSummary.Timestamp,
+				Target:    bSummary.Target,
+				Size:      bSummary.Size,
 			}
 		}
+		fmt.Printf("Lookup finished\n")
 		return nil
 	})
 	if err != nil {
