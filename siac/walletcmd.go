@@ -68,6 +68,13 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
 		Run:   wrap(walletaddresscmd),
 	}
 
+	walletMergeCmd = &cobra.Command{
+		Use:   "merge [walletfile]",
+		Short: "Merge wallet",
+		Long:  "Merge another wallet with the existing wallet. The existing wallet will inherit all keys and addresses.",
+		Run:   wrap(walletmergecmd),
+	}
+
 	walletSendCmd = &cobra.Command{
 		Use:   "send [amount] [dest]",
 		Short: "Send coins to another wallet",
@@ -122,6 +129,18 @@ func walletaddresscmd() {
 		return
 	}
 	fmt.Printf("Created new address: %s\n", addr.Address)
+}
+
+func walletmergecmd(walletfile string) {
+	err := post("/wallet/merge", "walletfile="+abs(walletfile))
+	if err != nil {
+		fmt.Println("Could not merge wallet:", err)
+		return
+	}
+	fmt.Printf(`Added %s to the wallet.
+
+You must restart siad to update your wallet balance.
+`, walletfile)
 }
 
 func walletsendcmd(amount, dest string) {

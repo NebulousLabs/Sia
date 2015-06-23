@@ -62,6 +62,12 @@ func (w *Wallet) save() error {
 func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 	height := w.consensusHeight
 	for _, skey := range savedKeys {
+		// Skip this key if it's already known to the wallet.
+		_, exists := w.keys[skey.UnlockConditions.UnlockHash()]
+		if exists {
+			continue
+		}
+
 		// Create an entry in w.keys for each savedKey.
 		w.keys[skey.UnlockConditions.UnlockHash()] = &key{
 			spendable:        height >= skey.UnlockConditions.Timelock,
@@ -87,6 +93,8 @@ func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 			return err
 		}
 	}
+
+	w.save()
 
 	return nil
 }
@@ -125,5 +133,21 @@ func (w *Wallet) load() error {
 		w.siafundAddresses[sa] = struct{}{}
 	}
 
+	return nil
+}
+
+// MergeWallet merges another wallet with the already-loaded wallet, creating a
+// new wallet that contains all of the addresses from each. This is useful for
+// loading backups.
+func (w *Wallet) MergeWallet(filepath string) error {
+	var savedKeys []savedKey
+	err := encoding.ReadFile(filepath, &savedKeys)
+	if err != nil {
+		return err
+	}
+	err = w.loadKeys(savedKeys)
+	if err != nil {
+		return err
+	}
 	return nil
 }

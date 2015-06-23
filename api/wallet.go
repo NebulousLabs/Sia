@@ -45,6 +45,18 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 	writeJSON(w, struct{ Address types.UnlockHash }{coinAddress})
 }
 
+// walletMergeHandler handles the API call to merge a different wallet into the
+// current wallet.
+func (srv *Server) walletMergeHandler(w http.ResponseWriter, req *http.Request) {
+	// Scan the wallet file.
+	err := srv.wallet.MergeWallet(req.FormValue("walletfile"))
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	// Scan the amount.
