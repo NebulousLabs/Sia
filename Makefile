@@ -44,12 +44,12 @@ release: REBUILD
 xc: dependencies test test-long REBUILD
 	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=0.3.3.2 \
 	     -br=release -pr=beta -include=LICENSE,README.md,doc/API.md              \
-	     -main-dirs-exclude=siag -tasks-=deb,deb-dev,deb-source,go-test          \
+	     -main-dirs-exclude=siae,siag -tasks-=deb,deb-dev,deb-source,go-test     \
 	     -n=Sia
 xc-siag: dependencies test test-long REBUILD
-	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=1.0 \
-	     -br=release -include=LICENSE,README.md,doc/API.md                   \
-	     -main-dirs-exclude=siad,siac -tasks-=deb,deb-dev,deb-source,go-test \
+	goxc -arch="386 amd64 arm" -bc="linux windows darwin" -d=release -pv=1.0.1    \
+	     -br=release -include=LICENSE                                             \
+	     -main-dirs-exclude=siac,siad,siae -tasks-=deb,deb-dev,deb-source,go-test \
 	     -n=Sia_Address_Generator
 
 # clean removes all directories that get automatically created during
@@ -63,10 +63,10 @@ clean:
 # command. 'test' runs short tests that should last no more than a few seconds,
 # 'test-long' runs more thorough tests which should not last more than a few
 # minutes.
-pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus	\
-       ./modules/gateway ./modules/host ./modules/hostdb		\
-       ./modules/miner ./modules/renter ./modules/transactionpool	\
-       ./modules/wallet ./modules/blockexplorer ./persist ./siad	\
+pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
+       ./modules/gateway ./modules/host ./modules/hostdb		     \
+       ./modules/miner ./modules/renter ./modules/transactionpool    \
+       ./modules/wallet ./modules/blockexplorer ./persist ./siad     \
        ./siag ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs)
@@ -76,10 +76,10 @@ test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
-	@for package in $(pkgs); do \
+	@for package in $(pkgs); do                                                                                     \
 		go test -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
-		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html  \
-		&& rm cover/$$package.out ; \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
+		&& rm cover/$$package.out ;                                                                                 \
 	done
 
 # whitepaper builds the whitepaper from whitepaper.tex. pdflatex has to be
