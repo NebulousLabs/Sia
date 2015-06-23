@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -62,7 +64,7 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 
 		err := be.addBlock(block)
 		if err != nil {
-			fmt.Printf("Error when adding block to database: " + err.Error())
+			fmt.Printf("Error when adding block to database: " + err.Error() + "\n")
 		}
 		be.blockchainHeight += 1
 	}
@@ -105,5 +107,91 @@ func (be *BlockExplorer) addBlock(b types.Block) error {
 		return err
 	}
 	err = be.db.InsertIntoBucket("Heights", encoding.Marshal(be.blockchainHeight), encoding.Marshal(bSum))
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Insert the miner payouts as new outputs
+	changes := make([]persist.BoltItem, len(b.MinerPayouts))
+	for i := range b.MinerPayouts {
+		changes[i] = persist.BoltItem{
+			BucketName: "SiacoinOutputs",
+			Key:        encoding.Marshal(b.MinerPayoutID(i)),
+			Value: encoding.Marshal(outputTransactions{
+				OutputTx: crypto.Hash(b.ID()),
+			}),
+		}
+	}
+	err = be.db.BulkInsert(changes)
+	if err != nil {
+		return err
+	}
+
+	// Insert each transaction
+	for i, tx := range b.Transactions {
+		err = be.addTransaction(tx, b.ID(), i)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID, txNum int) error {
+	// Store this for quick lookup
+	txid := tx.ID()
+
+	// A list of things to be added to the database
+	changes := make([]persist.BoltItem, 0)
+
+	// Can put this in addBlock() to reduce the number of
+	// parameters to this function, but conceptually it fits here
+	// better
+	changes = append(changes, persist.BoltItem{
+		BucketName: "Transactions",
+		Key:        encoding.Marshal(txid),
+		Value:      encoding.Marshal(txInfo{bID, txNum}),
+	})
+
+	// Need to modify the outputs that inputs use, which requires
+	// looking them up first
+	inputRequests := make([]persist.BoltItem, len(tx.SiacoinInputs))
+	for i, input := range tx.SiacoinInputs {
+		inputRequests[i] = persist.BoltItem{"SiacoinOutputs", encoding.Marshal(input.ParentID), nil}
+	}
+	inputsBytes, err := be.db.BulkGet(inputRequests)
+	if err != nil {
+		return err
+	}
+
+	inputOutputs := make([]outputTransactions, len(inputsBytes))
+	for i := range inputsBytes {
+		err = encoding.Unmarshal(inputsBytes[i], &inputOutputs[i])
+		if err != nil {
+			return err
+		}
+		inputOutputs[i].InputTx = txid
+		changes = append(changes, persist.BoltItem{
+			BucketName: "SiacoinOutputs",
+			Key:        encoding.Marshal(tx.SiacoinInputs[i].ParentID),
+			Value:      encoding.Marshal(inputOutputs[i]),
+		})
+	}
+
+	// Handle all the transaction outputs
+	for i := range tx.SiacoinOutputs {
+		changes = append(changes, persist.BoltItem{
+			BucketName: "SiacoinOutputs",
+			Key:        encoding.Marshal(tx.SiacoinOutputID(i)),
+			Value: encoding.Marshal(outputTransactions{
+				// The inputTx field is left blank as
+				// the default
+				OutputTx: txid,
+			}),
+		})
+	}
+
+	be.db.BulkInsert(changes)
+
+	return nil
 }

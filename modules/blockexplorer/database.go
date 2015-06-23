@@ -26,7 +26,7 @@ FileContracts
   types.FcID -------------> fcInfo
 
 StorageProofs
-  StorageProofID ---------> FileContrat
+  StorageProofID ---------> FileContract
 SiacoinOutputs
   SiacoinOutputID --------> outputTransactions
 SiafundOutputs
@@ -66,8 +66,8 @@ type blockSummary struct {
 // txInfo provides enough information to find the actual transaction
 // in the block database
 type txInfo struct {
-	blockID types.BlockID
-	txNum   int // Not possible to have >2^32 with block size
+	BlockID types.BlockID
+	TxNum   int // Not possible to have >2^32 with block size
 }
 
 // fcInfo provides enough information to easily find the file
@@ -81,8 +81,8 @@ type fcInfo struct {
 // outputTransactions stores enough information to go from an output id to
 // the places where it is used
 type outputTransactions struct {
-	outputTx crypto.Hash
-	inputTx  crypto.Hash
+	OutputTx crypto.Hash
+	InputTx  crypto.Hash
 }
 
 // Create an enum (a bunch of integers with iota) for the hash type lookup

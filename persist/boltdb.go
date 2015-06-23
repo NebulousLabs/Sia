@@ -2,6 +2,7 @@ package persist
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/boltdb/bolt"
@@ -91,7 +92,7 @@ func (db *BoltDatabase) InsertIntoBucket(bucketName string, key []byte, value []
 
 // insertIntoBuckets is a generic function to insert many items many
 // buckets
-func (db *BoltDatabase) InsertIntoBuckets(items []BoltItem) error {
+func (db *BoltDatabase) BulkInsert(items []BoltItem) error {
 	err := db.Update(func(tx *bolt.Tx) error {
 		for _, item := range items {
 			bucket := tx.Bucket([]byte(item.BucketName))
@@ -107,6 +108,31 @@ func (db *BoltDatabase) InsertIntoBuckets(items []BoltItem) error {
 		return nil
 	})
 	return err
+}
+
+// BulkGet retrieves many items from the database in the same transaction
+func (db *BoltDatabase) BulkGet(items []BoltItem) ([][]byte, error) {
+	values := make([][]byte, len(items))
+	err := db.View(func(tx *bolt.Tx) error {
+		for i, item := range items {
+			bucket := tx.Bucket([]byte(item.BucketName))
+			if bucket == nil {
+				return errors.New("requested bucket does not exist: " + item.BucketName)
+			}
+
+			values[i] = bucket.Get(item.Key)
+			if values[i] == nil {
+				return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
+					item.Key,
+					item.BucketName))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return values, nil
 }
 
 // closeDatabase saves the bolt database to a file, and updates metadata
