@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	port string
+	port  string
+	force bool
 )
 
 // apiGet wraps a GET request with a status code check, such that if the GET does
@@ -156,9 +157,11 @@ func main() {
 		Long:  "Print version information.",
 		Run:   version,
 	})
+	// certain commands accept a "force" flag
+	root.PersistentFlags().BoolVarP(&force, "force", "f", false, "force certain commands")
 
 	root.AddCommand(hostCmd)
-	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostForceAnnounceCmd, hostStatusCmd)
+	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
 
 	root.AddCommand(hostdbCmd)
 	hostCmd.AddCommand(hostdbCmd)
