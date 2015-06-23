@@ -22,47 +22,6 @@ type WalletInfo struct {
 	NumAddresses     int
 }
 
-// Wallet is an interface that keeps track of addresses and balance. Using
-// TransactionBuilder it also streamlines sending coins.
-type Wallet interface {
-	TransactionBuilder
-	// Balance returns the total number of coins accessible to the wallet. If
-	// full == true, the number of coins returned will also include coins that
-	// have been spent in unconfirmed transactions.
-	Balance(full bool) types.Currency
-
-	// CoinAddress return an address into which coins can be paid. The bool
-	// indicates whether the address should be visible to the user.
-	CoinAddress(visible bool) (types.UnlockHash, types.UnlockConditions, error)
-
-	// TimelockedCoinAddress returns an address that can only be spent after
-	// block `unlockHeight`. The bool indicates whether the address should be
-	// visible to the user.
-	TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (types.UnlockHash, types.UnlockConditions, error)
-
-	Info() WalletInfo
-
-	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
-
-	// WalletNotify will push a struct down the channel any time that the
-	// wallet updates.
-	WalletNotify() <-chan struct{}
-
-	// SiafundBalance returns the number of siafunds owned by the wallet, and
-	// the number of siacoins available through siafund claims.
-	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
-
-	// SendSiagSiafunds sends siafunds to another address. The siacoins stored
-	// in the siafunds are sent to an address in the wallet.
-	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
-
-	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
-	WatchSiagSiafundAddress(keyfile string) error
-
-	// Close safely closes the wallet file.
-	Close() error
-}
-
 // TransactionBuilder is an interface in which transactions are registered,
 // detailed, and signed. This gives other modules, and wallet itself, full
 // flexibility in creating dynamic transactions.
@@ -125,4 +84,50 @@ type TransactionBuilder interface {
 	// signature. After being signed, the transaction is deleted from the
 	// wallet and must be reregistered if more changes are to be made.
 	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
+}
+
+// Wallet is an interface that keeps track of addresses and balance. Using
+// TransactionBuilder it also streamlines sending coins.
+type Wallet interface {
+	TransactionBuilder
+
+	// Balance returns the total number of coins accessible to the wallet. If
+	// full == true, the number of coins returned will also include coins that
+	// have been spent in unconfirmed transactions.
+	Balance(full bool) types.Currency
+
+	// Close safely closes the wallet file.
+	Close() error
+
+	// CoinAddress return an address into which coins can be paid. The bool
+	// indicates whether the address should be visible to the user.
+	CoinAddress(visible bool) (types.UnlockHash, types.UnlockConditions, error)
+
+	Info() WalletInfo
+
+	// MergeWallet takes a filepath to another wallet that should be merged
+	// with the current wallet. Repeat addresses will not be merged.
+	MergeWallet(string) error
+
+	// TimelockedCoinAddress returns an address that can only be spent after
+	// block `unlockHeight`. The bool indicates whether the address should be
+	// visible to the user.
+	TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (types.UnlockHash, types.UnlockConditions, error)
+
+	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
+
+	// WalletNotify will push a struct down the channel any time that the
+	// wallet updates.
+	WalletNotify() <-chan struct{}
+
+	// SiafundBalance returns the number of siafunds owned by the wallet, and
+	// the number of siacoins available through siafund claims.
+	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
+
+	// SendSiagSiafunds sends siafunds to another address. The siacoins stored
+	// in the siafunds are sent to an address in the wallet.
+	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
+
+	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
+	WatchSiagSiafundAddress(keyfile string) error
 }

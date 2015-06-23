@@ -167,7 +167,7 @@ func main() {
 	minerCmd.AddCommand(minerStartCmd, minerStopCmd, minerStatusCmd)
 
 	root.AddCommand(walletCmd)
-	walletCmd.AddCommand(walletAddressCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd)
+	walletCmd.AddCommand(walletAddressCmd, walletMergeCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsSendCmd)
 

@@ -100,6 +100,7 @@ func (srv *Server) initAPI(addr string) {
 	// Wallet API Calls
 	if srv.wallet != nil {
 		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
+		handleHTTPRequest(mux, "/wallet/merge", srv.walletMergeHandler)
 		handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
 		handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
 		handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
