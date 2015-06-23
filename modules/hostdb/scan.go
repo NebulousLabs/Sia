@@ -157,7 +157,7 @@ func (hdb *HostDB) threadedScan() {
 			// Randomize the slice by swapping each element with an element
 			// that hasn't been visited yet.
 			for i := 0; i < len(random); i++ {
-				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(random)-i)))
+				N, err := rand.Int(rand.Reader, big.NewInt(int64(len(random)-i-1)))
 				if err != nil {
 					if build.DEBUG {
 						panic(err)
