@@ -157,7 +157,7 @@ func main() {
 		Long:  "Print version information.",
 		Run:   version,
 	})
-	// certain commands accept a "force" flag
+	// certain safety checks can be overrided with the "force" flag
 	root.PersistentFlags().BoolVarP(&force, "force", "f", false, "force certain commands")
 
 	root.AddCommand(hostCmd)
