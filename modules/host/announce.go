@@ -64,11 +64,10 @@ func (h *Host) announce(addr modules.NetAddress) error {
 // arbitrary data, signing the transaction, and submitting it to the
 // transaction pool.
 func (h *Host) Announce() error {
-	// check that our address is reachable
 	lockID := h.mu.RLock()
 	addr := h.myAddr
 	h.mu.RUnlock(lockID)
-	if addr.Host() == "" {
+	if addr.Host() == "::1" {
 		return errors.New("can't announce without knowing external IP")
 	} else if !ping(addr) {
 		return errors.New("host address not reachable; ensure you have forwarded port " + addr.Port())
