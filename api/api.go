@@ -57,7 +57,6 @@ func (srv *Server) initAPI(addr string) {
 	if srv.host != nil {
 		handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
 		handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
-		handleHTTPRequest(mux, "/host/forceannounce", srv.hostForceAnnounceHandler)
 		handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 	}
 

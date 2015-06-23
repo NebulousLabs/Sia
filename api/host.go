@@ -8,7 +8,14 @@ import (
 // hostAnnounceHandler handles the API call to get the host to announce itself
 // to the network.
 func (srv *Server) hostAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.host.Announce()
+	// Announce checks that the host is connectible before proceeding. The
+	// user can override this check with the 'force' flag.
+	var err error
+	if req.FormValue("force") == "true" {
+		err = srv.host.ForceAnnounce()
+	} else {
+		err = srv.host.Announce()
+	}
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -51,17 +58,6 @@ func (srv *Server) hostConfigureHandler(w http.ResponseWriter, req *http.Request
 	}
 
 	srv.host.SetSettings(config)
-	writeSuccess(w)
-}
-
-// hostForceAnnounceHandler handles the API call to get the host to announce
-// itself to the network. This call ignores connectivity checks.
-func (srv *Server) hostForceAnnounceHandler(w http.ResponseWriter, req *http.Request) {
-	err := srv.host.ForceAnnounce()
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	writeSuccess(w)
 }
 
