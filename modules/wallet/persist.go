@@ -34,10 +34,6 @@ func (w *Wallet) saveSiafundTracking(filepath string) error {
 	for sa, _ := range w.siafundAddresses {
 		siafundSlice = append(siafundSlice, sa)
 	}
-	// outputs.dat is intentionally a bit of a misleading name. If I called it
-	// 'siafunds.dat' or something similar, people might think it's okay to
-	// delete their siafund keys, which is NOT okay. Instead of potentially
-	// having this confusion, I chose a less suggestive name.
 	return encoding.WriteFile(filepath, siafundSlice)
 }
 
@@ -53,8 +49,10 @@ func (w *Wallet) save() error {
 		return err
 	}
 
-	// Create a second file for the siafunds. This is another
-	// deprecated-on-arrival file.
+	// outputs.dat is intentionally a bit of a misleading name. If I called it
+	// 'siafunds.dat' or something similar, people might think it's okay to
+	// delete their siafund keys, which is NOT okay. Instead of potentially
+	// having this confusion, I chose a less suggestive name.
 	err = w.saveSiafundTracking(filepath.Join(w.saveDir, "outputs.backup"))
 	if err != nil {
 		return err
