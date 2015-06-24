@@ -62,7 +62,9 @@ func (be *BlockExplorer) ExplorerStatus() modules.ExplorerStatus {
 		TotalCurrency:       totalCurrency(be.blockchainHeight),
 		ActiveContractCount: be.activeContracts,
 		ActiveContractCosts: be.activeContractCost,
+		ActiveContractSize:  be.activeContractSize,
 		TotalContractCount:  be.totalContracts,
 		TotalContractCosts:  be.totalContractCost,
+		TotalContractSize:   be.totalContractSize,
 	}
 }
