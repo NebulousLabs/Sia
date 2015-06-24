@@ -88,8 +88,6 @@ const (
 	hashBlock = iota
 	hashTransaction
 	hashFilecontract
-	hashFileRevision
-	hashFileProof
 	hashCoinOutputID
 	hashFundOutputID
 )
