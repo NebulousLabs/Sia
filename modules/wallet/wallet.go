@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -121,11 +119,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
 		return
-	}
-	homedir := filepath.Join(persist.HomeFolder, modules.WalletDir)
-	err = os.MkdirAll(homedir, 0700)
-	if err != nil {
-		return nil, err
 	}
 
 	// Try to load a previously saved wallet file. If it doesn't exist, assume
