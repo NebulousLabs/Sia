@@ -54,10 +54,6 @@ type BlockExplorer struct {
 	activeContractSize uint64
 	totalContractSize  uint64
 
-	// Stores a few data points for each block:
-	// Timestamp, target and size
-	blockSummaries []modules.ExplorerBlockData
-
 	// Keep a reference to the consensus for queries
 	cs modules.ConsensusSet
 

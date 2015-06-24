@@ -144,7 +144,7 @@ func appendHashType(changes []persist.BoltItem, hash crypto.Hash, hashType int) 
 	})
 }
 
-func (be *BlockExplorer) addBlock(b types.Block) error {
+func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	// Special case for the genesis block, which does not have a valid parent
 	var blocktarget types.Target
 	if b.ID() == be.genesisBlockID {
@@ -219,7 +219,7 @@ func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID,
 	modifications := make([]persist.BoltModification, 0)
 	changes := make([]persist.BoltItem, 0)
 
-	// Can put this in addBlock() to reduce the number of
+	// Can put this in addBlockDB() to reduce the number of
 	// parameters to this function, but conceptually it fits here
 	// better
 	changes = append(changes, persist.BoltItem{
