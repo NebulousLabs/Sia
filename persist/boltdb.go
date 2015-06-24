@@ -15,6 +15,12 @@ type BoltDatabase struct {
 	meta Metadata
 }
 
+type BoltModification struct {
+	BucketName string
+	Key        []byte
+	Map        func([]byte) (BoltItem, error)
+}
+
 type BoltItem struct {
 	BucketName string
 	Key        []byte
@@ -133,6 +139,51 @@ func (db *BoltDatabase) BulkGet(items []BoltItem) ([][]byte, error) {
 		return nil, err
 	}
 	return values, nil
+}
+
+// BulkUpdate is a function to both take readings from a database,
+// modify them, then add the modified elements plus the specified
+// additions to the database
+func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions []BoltItem) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		// A modification gets some data, perfrorms some
+		// function on it (specified by the modifications' map
+		// element), then appends the new element to the list of changes
+		for _, mod := range modifications {
+			bucket := tx.Bucket([]byte(mod.BucketName))
+			if bucket == nil {
+				return errors.New("requested bucket does not exist: " + mod.BucketName)
+			}
+
+			modBytes := bucket.Get(mod.Key)
+			if modBytes == nil {
+				return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
+					mod.Key,
+					mod.BucketName))
+			}
+
+			newItem, err := mod.Map(modBytes)
+			if err != nil {
+				return err
+			}
+			additions = append(additions, newItem)
+		}
+
+		// Analagous to BulkInsert
+		for _, addition := range additions {
+			bucket := tx.Bucket([]byte(addition.BucketName))
+			if bucket == nil {
+				return errors.New("requested bucket does not exist: " + addition.BucketName)
+			}
+
+			err := bucket.Put(addition.Key, addition.Value)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 // closeDatabase saves the bolt database to a file, and updates metadata

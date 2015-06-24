@@ -25,8 +25,6 @@ Addresses
 FileContracts
   types.FcID -------------> fcInfo
 
-StorageProofs
-  StorageProofID ---------> FileContract
 SiacoinOutputs
   SiacoinOutputID --------> outputTransactions
 SiafundOutputs
@@ -73,9 +71,9 @@ type txInfo struct {
 // fcInfo provides enough information to easily find the file
 // contracts in the blockchain
 type fcInfo struct {
-	contract  crypto.Hash
-	revisions crypto.Hash
-	proof     crypto.Hash
+	Contract  crypto.Hash
+	Revisions []crypto.Hash
+	Proof     crypto.Hash
 }
 
 // outputTransactions stores enough information to go from an output id to
