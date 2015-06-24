@@ -36,8 +36,9 @@ Available settings:
 	hostAnnounceCmd = &cobra.Command{
 		Use:   "announce",
 		Short: "Announce yourself as a host",
-		Long:  "Announce yourself as a host on the network.",
-		Run:   wrap(hostannouncecmd)}
+		Long: `Announce yourself as a host on the network.
+The --force flag can be used to override connectivity checks.`,
+		Run: wrap(hostannouncecmd)}
 
 	hostStatusCmd = &cobra.Command{
 		Use:   "status",
@@ -67,7 +68,11 @@ func hostconfigcmd(param, value string) {
 }
 
 func hostannouncecmd() {
-	err := post("/host/announce", "")
+	args := ""
+	if force {
+		args = "force=true"
+	}
+	err := post("/host/announce", args)
 	if err != nil {
 		fmt.Println("Could not announce host:", err)
 		return
