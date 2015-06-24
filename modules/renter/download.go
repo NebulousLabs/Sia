@@ -53,7 +53,7 @@ func (d *Download) Filesize() uint64 {
 
 // Received returns the number of bytes downloaded so far.
 func (d *Download) Received() uint64 {
-	return d.received
+	return atomic.LoadUint64(&d.received)
 }
 
 // Destination returns the file's location on disk.
@@ -70,8 +70,6 @@ func (d *Download) Nickname() string {
 // received field. This allows download progress to be monitored in real-time.
 func (d *Download) Write(b []byte) (int, error) {
 	n, err := d.file.Write(b)
-	// atomically update d.received
-	// TODO: atomic operations may not be necessary
 	atomic.AddUint64(&d.received, uint64(n))
 	return n, err
 }
