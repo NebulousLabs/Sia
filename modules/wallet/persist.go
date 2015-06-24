@@ -102,8 +102,6 @@ func (w *Wallet) loadKeys(savedKeys []savedKey) error {
 		}
 	}
 
-	w.save()
-
 	return nil
 }
 
@@ -162,12 +160,16 @@ func (w *Wallet) load() error {
 		}
 	}
 
-	return nil
+	return w.save()
 }
 
 // MergeWallet merges another wallet with the already-loaded wallet, creating a
 // new wallet that contains all of the addresses from each. This is useful for
 // loading backups.
 func (w *Wallet) MergeWallet(filepath string) error {
-	return w.loadWallet(filepath)
+	err := w.loadWallet(filepath)
+	if err != nil {
+		return err
+	}
+	return w.save()
 }

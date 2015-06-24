@@ -173,7 +173,7 @@ func MarshalAll(v ...interface{}) []byte {
 
 // WriteFile writes v to a file. The file will be created if it does not exist.
 func WriteFile(filename string, v interface{}) error {
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0660)
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
