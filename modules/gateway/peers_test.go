@@ -28,18 +28,38 @@ func TestListen(t *testing.T) {
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
 
-	// "compliant" connect
+	// compliant connect with old version
 	conn, err := net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
 	}
 	addr := modules.NetAddress(conn.LocalAddr().String())
 	// send version
-	if err := encoding.WriteObject(conn, build.Version); err != nil {
+	if err := encoding.WriteObject(conn, "0.1"); err != nil {
 		t.Fatal("couldn't write version")
 	}
 	// read ack
 	var ack string
+	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
+		t.Fatal(err)
+	} else if ack != "reject" {
+		t.Fatal("gateway should have rejected old version")
+	}
+
+	// a simple 'conn.Close' would not obey the muxado disconnect protocol
+	muxado.Client(conn).Close()
+
+	// compliant connect
+	conn, err = net.Dial("tcp", string(g.Address()))
+	if err != nil {
+		t.Fatal("dial failed:", err)
+	}
+	addr = modules.NetAddress(conn.LocalAddr().String())
+	// send version
+	if err := encoding.WriteObject(conn, build.Version); err != nil {
+		t.Fatal("couldn't write version")
+	}
+	// read ack
 	if err := encoding.ReadObject(conn, &ack, maxAddrLength); err != nil {
 		t.Fatal(err)
 	} else if ack == "reject" {
@@ -54,7 +74,6 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock(id)
 	}
 
-	// a simple 'conn.Close' would not obey the muxado disconnect protocol
 	muxado.Client(conn).Close()
 
 	// g should remove the peer
@@ -64,7 +83,7 @@ func TestListen(t *testing.T) {
 		g.mu.RUnlock(id)
 	}
 
-	// "uncompliant" connect
+	// uncompliant connect
 	conn, err = net.Dial("tcp", string(g.Address()))
 	if err != nil {
 		t.Fatal("dial failed:", err)
