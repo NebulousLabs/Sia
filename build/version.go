@@ -6,7 +6,7 @@ import (
 )
 
 // Version is the current version of siad.
-const Version = "0.3.3.2"
+const Version = "0.3.3.3"
 
 // IsVersion returns whether str is a valid version number.
 func IsVersion(str string) bool {
