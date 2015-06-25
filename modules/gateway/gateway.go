@@ -52,8 +52,14 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
-// Close stops the Gateway's listener process.
+// Close saves the state of the Gateway and stops the listener process.
 func (g *Gateway) Close() error {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	err := g.save()
+	if err != nil {
+		return err
+	}
 	return g.listener.Close()
 }
 
