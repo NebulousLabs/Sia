@@ -10,6 +10,7 @@ const (
 
 // Used for the BlockInfo call
 type ExplorerBlockData struct {
+	ID        types.BlockID   // The id hash of the block
 	Timestamp types.Timestamp // The timestamp on the block
 	Target    types.Target    // The target the block was mined for
 	Size      uint64          // The size in bytes of the marshalled block
@@ -43,4 +44,7 @@ type BlockExplorer interface {
 
 	// Sends notifications when the module updates
 	BlockExplorerNotify() <-chan struct{}
+
+	// Returns information pertaining to a given hash
+	GetHashInfo([]byte) (interface{}, error)
 }

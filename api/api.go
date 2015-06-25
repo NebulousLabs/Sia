@@ -112,6 +112,8 @@ func (srv *Server) initAPI(addr string) {
 	if srv.blocke != nil {
 		handleHTTPRequest(mux, "/blockexplorer/status", srv.blockexplorerStatusHandler)
 		handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
+		handleHTTPRequest(mux, "/blockexplorer/gethash", srv.blockexplorerGetHashHandler)
+
 	}
 
 	// create graceful HTTP server

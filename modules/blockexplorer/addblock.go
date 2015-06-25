@@ -1,6 +1,8 @@
 package blockexplorer
 
 import (
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -130,7 +132,7 @@ func appendNewSFOutput(additions []persist.BoltItem, outputID types.SiafundOutpu
 	return append(additions, persist.BoltItem{
 		BucketName: "SiafundOutputs",
 		Key:        encoding.Marshal(outputID),
-		Value:      encoding.Marshal(outputTransactions{
+		Value: encoding.Marshal(outputTransactions{
 			OutputTx: txid,
 		}),
 	})
@@ -188,7 +190,21 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Value:      encoding.Marshal(bSum),
 	})
 
+	if be.blockchainHeight == 300 {
+		fmt.Printf("Adding block %x height %5d\n",b.ID(), be.blockchainHeight)
+	}
 	additions = appendHashType(additions, crypto.Hash(b.ID()), hashBlock)
+
+	// Add the block to the Transactions bucket so that lookups on
+	// the block as a txid result in a special case, not an
+	// error. Necessary because of miner payouts
+	additions = append(additions, persist.BoltItem{
+		BucketName: "Transactions",
+		Key:        encoding.Marshal(b.ID()),
+		Value:      encoding.Marshal(txInfo{b.ID(), -1}),
+	})
+	// TODO add a dummy txid with block id and txNum of -1, so
+	// that txid lookups on a block id are still valid
 
 	// Insert the miner payouts as new outputs
 	for i := range b.MinerPayouts {

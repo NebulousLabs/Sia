@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -90,6 +89,8 @@ const (
 	hashFilecontract
 	hashCoinOutputID
 	hashFundOutputID
+	hashAddress
+	hashUnlockHash
 )
 
 // OpenDB creates and opens the database for the block explorer. Sholud be run on startup
@@ -123,35 +124,6 @@ func openDB(filename string) (*explorerDB, error) {
 	return &explorerDB{db}, nil
 }
 
-// Returns the block with a given id
-func (db *explorerDB) getBlock(id types.BlockID) (block types.Block, err error) {
-	var b []byte
-	err = db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("Blocks"))
-		if build.DEBUG {
-			if bucket == nil {
-				panic("blocks bucket was not created correcty")
-			}
-		}
-
-		b = bucket.Get(encoding.Marshal(id))
-		if b == nil {
-			return errors.New("requested block does not exist in the database")
-		}
-
-		return nil
-	})
-	if err != nil {
-		return block, err
-	}
-	err = encoding.Unmarshal(b, block)
-	if err != nil {
-		return block, err
-	}
-
-	return block, nil
-}
-
 // Returns an array of block summaries. Bounds checking should be done elsewhere
 func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
 	summaries := make([]modules.ExplorerBlockData, int(finish-start))
@@ -174,6 +146,7 @@ func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.Blo
 			}
 
 			summaries[i-start] = modules.ExplorerBlockData{
+				ID:        bSummary.ID,
 				Timestamp: bSummary.Timestamp,
 				Target:    bSummary.Target,
 				Size:      bSummary.Size,

@@ -116,6 +116,29 @@ func (db *BoltDatabase) BulkInsert(items []BoltItem) error {
 	return err
 }
 
+// GetFromBucket is a wrapper around a bolt database lookup. If the
+// element does not exist, no error will be thrown, but the requested
+// element will be nil.
+func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, error) {
+	var bytes []byte
+	fmt.Printf("Requesting %x from bucket %s", key, bucketName)
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("requested bucket does not exist: " + bucketName)
+		}
+
+		// Note that bytes could be nil. This is OK, but needs
+		// to be checked in calling functions
+		bytes = bucket.Get(key)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
 // BulkGet retrieves many items from the database in the same transaction
 func (db *BoltDatabase) BulkGet(items []BoltItem) ([][]byte, error) {
 	values := make([][]byte, len(items))
@@ -171,6 +194,7 @@ func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions [
 
 		// Analagous to BulkInsert
 		for _, addition := range additions {
+			fmt.Printf("Adding %x ----> %x in bucket %s\n", addition.Key, addition.Value, addition.BucketName)
 			bucket := tx.Bucket([]byte(addition.BucketName))
 			if bucket == nil {
 				return errors.New("requested bucket does not exist: " + addition.BucketName)
