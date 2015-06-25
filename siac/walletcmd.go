@@ -181,7 +181,7 @@ func walletsiafundssendcmd(cmd *cobra.Command, args []string) {
 
 	err := post("/wallet/siafunds/send", qs)
 	if err != nil {
-		fmt.Println("Could not track siafunds:", err)
+		fmt.Println("Could not send siafunds:", err)
 		return
 	}
 	fmt.Printf("Sent %s siafunds to %s\n", amount, dest)
