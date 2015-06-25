@@ -107,20 +107,47 @@ on what we do in the next few months. Thank you!
 Version History
 ---------------
 
+June 2015:
+
 v0.3.3.3: Third stable currency patch.
+	- Host announcements can be "forced"
+	- Wallets can be merged
+	- Unresponsive addresses are pruned from the node list
 
 v0.3.3.2: Second stable currency patch.
+	- Siafunds can be loaded and sent
+	- Added block explorer
+	- Patched two critical security vulnerabilities
 
 v0.3.3.1: Hotfixed stable currency release.
+	- Mining API sends headers instead of entire blocks
+	- Slashed default hosting price
 
 v0.3.3: Stable currency release.
+	- Set release target
+	- Added progress bars to uploads
+	- Rigorous testing of consensus code
+
+May 2015:
 
 v0.3.2: Fourth open beta release.
+	- Switched encryption from block cipher to stream cipher
+	- Updates are now signed
+	- Added API calls to support external miners
 
 v0.3.1: Third open beta release.
+	- Blocks are now stored on-disk in a database
+	- Files can be shared via .sia files or ASCII-encoded data
+	- RPCs are now multiplexed over one physical connection
+
+March 2015:
 
 v0.3.0: Second open beta release.
 
+Jan 2015:
+
 v0.2.0: First open beta release.
+
+Dec 2014:
 
 v0.1.0: Closed beta release.
