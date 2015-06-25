@@ -2,6 +2,7 @@ package renter
 
 import (
 	"errors"
+	"sync/atomic"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -39,6 +40,11 @@ type file struct {
 // been uploaded to a host, including information about the host and the health
 // of the file piece.
 type filePiece struct {
+	// Implementation node: 'Transferred' is declared first to ensure that it
+	// is 64-byte aligned. This is necessary to ensure that atomic operations
+	// work correctly on ARM and x86-32.
+	Transferred uint64
+
 	Active     bool                 // True if the host has the file and has been online somewhat recently.
 	Repairing  bool                 // True if the piece is currently being uploaded.
 	Contract   types.FileContract   // The contract being enforced.
@@ -48,8 +54,7 @@ type filePiece struct {
 	StartIndex uint64
 	EndIndex   uint64
 
-	Transferred uint64
-	PieceSize   uint64
+	PieceSize uint64
 
 	PieceIndex    int // Indicates the erasure coding index of this piece.
 	EncryptionKey crypto.TwofishKey
@@ -61,9 +66,13 @@ func (f *file) Available() bool {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
 
+	// The loop uses an index instead of a range because range copies the piece
+	// to fresh data. Atomic operations are being concurrently performed on the
+	// piece, and the copy results in a race condition against the atomic
+	// operations. By removing the copying, the race condition is eliminated.
 	var active int
-	for _, piece := range f.Pieces {
-		if piece.Active {
+	for i := range f.Pieces {
+		if f.Pieces[i].Active {
 			active++
 		}
 		if active >= f.PiecesRequired {
@@ -79,9 +88,14 @@ func (f *file) UploadProgress() float32 {
 	defer f.renter.mu.RUnlock(lockID)
 
 	// full replication means we just use the progress of most-uploaded piece.
+	//
+	// The loop uses an index instead of a range because range copies the piece
+	// to fresh data. Atomic operations are being concurrently performed on the
+	// piece, and the copy results in a race condition against the atomic
+	// operations. By removing the copying, the race condition is eliminated.
 	var max float32
-	for _, piece := range f.Pieces {
-		progress := float32(piece.Transferred) / float32(piece.PieceSize)
+	for i := range f.Pieces {
+		progress := float32(atomic.LoadUint64(&f.Pieces[i].Transferred)) / float32(f.Pieces[i].PieceSize)
 		if progress > max {
 			max = progress
 		}
@@ -114,8 +128,8 @@ func (f *file) Repairing() bool {
 	lockID := f.renter.mu.RLock()
 	defer f.renter.mu.RUnlock(lockID)
 
-	for _, piece := range f.Pieces {
-		if piece.Repairing {
+	for i := range f.Pieces {
+		if f.Pieces[i].Repairing {
 			return true
 		}
 	}
@@ -128,11 +142,11 @@ func (f *file) TimeRemaining() types.BlockHeight {
 	defer f.renter.mu.RUnlock(lockID)
 
 	largest := types.BlockHeight(0)
-	for _, piece := range f.Pieces {
-		if piece.Contract.WindowStart < f.renter.blockHeight {
+	for i := range f.Pieces {
+		if f.Pieces[i].Contract.WindowStart < f.renter.blockHeight {
 			continue
 		}
-		current := piece.Contract.WindowStart - f.renter.blockHeight
+		current := f.Pieces[i].Contract.WindowStart - f.renter.blockHeight
 		if current > largest {
 			largest = current
 		}

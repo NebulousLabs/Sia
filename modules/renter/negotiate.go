@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -68,7 +69,7 @@ type uploadWriter struct {
 // Transferred field. This allows upload progress to be monitored in real-time.
 func (uw *uploadWriter) Write(b []byte) (int, error) {
 	n, err := uw.w.Write(b)
-	uw.piece.Transferred += uint64(n)
+	atomic.AddUint64(&uw.piece.Transferred, uint64(n))
 	return n, err
 }
 
