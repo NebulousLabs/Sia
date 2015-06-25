@@ -2,10 +2,8 @@ package gateway
 
 import (
 	"errors"
-	"io"
 	"log"
 	"net"
-	"net/http"
 	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -54,8 +52,14 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
-// Close stops the Gateway's listener process.
+// Close saves the state of the Gateway and stops the listener process.
 func (g *Gateway) Close() error {
+	id := g.mu.RLock()
+	defer g.mu.RUnlock(id)
+	err := g.save()
+	if err != nil {
+		return err
+	}
 	return g.listener.Close()
 }
 
@@ -115,23 +119,6 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	go g.makeOutboundConnections()
 
 	return
-}
-
-// getExternalIP learns the server's hostname from a centralized service,
-// myexternalip.com.
-func getExternalIP() (string, error) {
-	resp, err := http.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	buf := make([]byte, 64)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	hostname := string(buf[:n-1]) // trim newline
-	return hostname, nil
 }
 
 // enforce that Gateway satisfies the modules.Gateway interface

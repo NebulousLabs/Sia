@@ -82,17 +82,3 @@ func TestNew(t *testing.T) {
 		t.Fatal("expected load error, got nil")
 	}
 }
-
-func TestExternalIP(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	ip, err := getExternalIP()
-	if err != nil {
-		t.Fatal("couldn't determine external IP:", err)
-	}
-	if net.ParseIP(ip) == nil {
-		t.Fatal("getExternalIP returned bad IP:", ip)
-	}
-}

@@ -139,17 +139,6 @@ func applyUpdate(version string) (err error) {
 
 // daemonStopHandler handles the API call to stop the daemon cleanly.
 func (srv *Server) daemonStopHandler(w http.ResponseWriter, req *http.Request) {
-	// safely close each module
-	if srv.cs != nil {
-		srv.cs.Close()
-	}
-	if srv.gateway != nil {
-		srv.gateway.Close()
-	}
-	if srv.wallet != nil {
-		srv.wallet.Close()
-	}
-
 	// can't write after we stop the server, so lie a bit.
 	writeSuccess(w)
 
