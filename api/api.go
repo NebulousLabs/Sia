@@ -133,11 +133,23 @@ func (srv *Server) Serve() error {
 	// It can also be stopped manually by stopHandler.
 	err := srv.apiServer.ListenAndServe()
 	// despite its name, graceful still propogates this benign error
-	if err != nil && strings.HasSuffix(err.Error(), "use of closed network connection") {
-		err = nil
+	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
+		return err
 	}
+
+	// safely close each module
+	if srv.cs != nil {
+		srv.cs.Close()
+	}
+	if srv.gateway != nil {
+		srv.gateway.Close()
+	}
+	if srv.wallet != nil {
+		srv.wallet.Close()
+	}
+
 	fmt.Println("\rCaught stop signal, quitting.")
-	return err
+	return nil
 }
 
 // writeError an error to the API caller.
