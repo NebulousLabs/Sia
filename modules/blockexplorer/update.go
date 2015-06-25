@@ -21,9 +21,12 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 			be.totalContracts += 1
 			be.activeContractCost = be.activeContractCost.Add(diff.FileContract.Payout)
 			be.totalContractCost = be.totalContractCost.Add(diff.FileContract.Payout)
+			be.activeContractSize += diff.FileContract.FileSize
+			be.totalContractSize += diff.FileContract.FileSize
 		} else {
 			be.activeContracts -= 1
 			be.activeContractCost = be.activeContractCost.Sub(diff.FileContract.Payout)
+			be.activeContractSize -= diff.FileContract.FileSize
 		}
 	}
 

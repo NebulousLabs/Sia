@@ -18,8 +18,10 @@ type ExplorerStatus struct {
 	TotalCurrency       types.Currency
 	ActiveContractCount uint64
 	ActiveContractCosts types.Currency
+	ActiveContractSize  uint64
 	TotalContractCount  uint64
 	TotalContractCosts  types.Currency
+	TotalContractSize   uint64
 }
 
 // The BlockExplorer interface provides access to the block explorer

@@ -42,6 +42,12 @@ type BlockExplorer struct {
 	activeContractCost types.Currency
 	totalContractCost  types.Currency
 
+	// activeContractSize and totalCotractSize keep a running
+	// count of the amount of bytes that have been sent over file
+	// contracts
+	activeContractSize uint64
+	totalContractSize  uint64
+
 	// Stores a few data points for each block:
 	// Timestamp, target and size
 	blockSummaries []modules.ExplorerBlockData
