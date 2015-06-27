@@ -281,7 +281,7 @@ func (w *Wallet) AddSiafundOutput(id string, output types.SiafundOutput) (t type
 
 // AddArbitraryData adds arbitrary data to the transaction, returning a copy of
 // the transaction and the index of the new data within the transaction.
-func (w *Wallet) AddArbitraryData(id string, arb string) (t types.Transaction, adIndex uint64, err error) {
+func (w *Wallet) AddArbitraryData(id string, arb []byte) (t types.Transaction, adIndex uint64, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 

@@ -19,11 +19,6 @@ import (
 // Rule: The types of allowed arbitrary data are limited
 //   Purpose: Leave room for more involved soft-forks in the future.
 
-const (
-	PrefixNonSia         = "NonSia"
-	TransactionSizeLimit = 16 * 1024
-)
-
 var (
 	ErrLargeTransaction = errors.New("transaction is too large")
 )
@@ -54,7 +49,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// of hashing can be required of a verifier. Enforcing this rule makes it
 	// more difficult for attackers to exploid this DOS vector, though a miner
 	// with sufficient power could still create unfriendly blocks.
-	if len(encoding.Marshal(t)) > TransactionSizeLimit {
+	if len(encoding.Marshal(t)) > modules.TransactionSizeLimit {
 		return ErrLargeTransaction
 	}
 
@@ -87,9 +82,14 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// arbitrary data. Blocking all other prefixes allows arbitrary data to be
 	// used to orchestrate more complicated soft forks in the future without
 	// putting older nodes at risk of violating the new rules.
-	for _, data := range t.ArbitraryData {
-		if !strings.HasPrefix(data, modules.PrefixHostAnnouncement) &&
-			!strings.HasPrefix(data, PrefixNonSia) {
+	var prefix types.Specifier
+	for _, arb := range t.ArbitraryData {
+		copy(prefix[:], arb)
+		strData := string(arb) // preserved for compatibility with 0.3.3.3
+		if !strings.HasPrefix(strData, modules.PrefixStrHostAnnouncement) &&
+			!strings.HasPrefix(strData, modules.PrefixStrNonSia) &&
+			prefix != modules.PrefixHostAnnouncement &&
+			prefix != modules.PrefixNonSia {
 			return errors.New("arbitrary data contains unrecognized prefix")
 		}
 	}

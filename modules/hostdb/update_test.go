@@ -11,11 +11,11 @@ import (
 // TestFindHostAnnouncements probes the findHostAnnouncements function
 func TestFindHostAnnouncements(t *testing.T) {
 	// Create a block with a host announcement.
-	announcement := modules.PrefixHostAnnouncement + string(encoding.Marshal(modules.HostAnnouncement{}))
+	announcement := append(modules.PrefixHostAnnouncement[:], encoding.Marshal(modules.HostAnnouncement{})...)
 	b := types.Block{
 		Transactions: []types.Transaction{
 			types.Transaction{
-				ArbitraryData: []string{announcement},
+				ArbitraryData: [][]byte{announcement},
 			},
 		},
 	}
@@ -25,14 +25,15 @@ func TestFindHostAnnouncements(t *testing.T) {
 	}
 
 	// Try with an altered prefix
-	b.Transactions[0].ArbitraryData[0] = "bad" + b.Transactions[0].ArbitraryData[0]
+	b.Transactions[0].ArbitraryData[0][0]++
 	announcements = findHostAnnouncements(b)
 	if len(announcements) != 0 {
 		t.Error("host announcement found when there was an invalid prefix")
 	}
+	b.Transactions[0].ArbitraryData[0][0]--
 
 	// Try with an invalid host encoding.
-	b.Transactions[0].ArbitraryData[0] = modules.PrefixHostAnnouncement + "bad"
+	b.Transactions[0].ArbitraryData[0][17]++
 	announcements = findHostAnnouncements(b)
 	if len(announcements) != 0 {
 		t.Error("host announcement found when there was an invalid encoding of a host announcement")
@@ -52,7 +53,7 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = hdbt.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
+	_, _, err = hdbt.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
 	if err != nil {
 		t.Fatal(err)
 	}

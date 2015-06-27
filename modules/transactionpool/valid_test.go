@@ -3,6 +3,7 @@ package transactionpool
 import (
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -17,7 +18,7 @@ func (tpt *tpoolTester) addConflictingSiacoinTransaction() {
 	if err != nil {
 		tpt.t.Error(err)
 	}
-	txn.ArbitraryData = append(txn.ArbitraryData, "NonSia: this stops the transaction from being a duplicate")
+	txn.ArbitraryData = append(txn.ArbitraryData, modules.PrefixNonSia[:]) // Prevent the txn from being a duplicate.
 	err = tpt.tpool.AcceptTransaction(txn)
 	if err != ErrUnrecognizedSiacoinInput {
 		tpt.t.Error(err)

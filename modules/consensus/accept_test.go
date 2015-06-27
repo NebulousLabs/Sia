@@ -242,9 +242,9 @@ func TestLargeBlock(t *testing.T) {
 	}
 
 	// Create a transaction that puts the block over the size limit.
-	bigData := string(make([]byte, types.BlockSizeLimit))
+	bigData := make([]byte, types.BlockSizeLimit)
 	txn := types.Transaction{
-		ArbitraryData: []string{bigData},
+		ArbitraryData: [][]byte{bigData},
 	}
 
 	// Fetch a block and add the transaction, then submit the block.

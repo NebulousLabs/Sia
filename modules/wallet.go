@@ -70,7 +70,7 @@ type TransactionBuilder interface {
 	// AddArbitraryData adds a byte slice to the arbitrary data section of the
 	// transaction, returning the transaction and the index of the new
 	// arbitrary data.
-	AddArbitraryData(id string, arb string) (types.Transaction, uint64, error)
+	AddArbitraryData(id string, arb []byte) (types.Transaction, uint64, error)
 
 	// AddTransactionSignature adds a signature to the transaction, the
 	// signature should already be valid, and shouldn't sign any of the inputs

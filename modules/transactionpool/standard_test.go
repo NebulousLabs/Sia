@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -12,11 +13,11 @@ func TestLargeTransaction(t *testing.T) {
 	tpt := newTpoolTester("TestLargeTransaction", t)
 
 	// Create a transaction that's larger than the size limit.
-	largeArbitraryData := make([]byte, TransactionSizeLimit)
+	largeArbitraryData := make([]byte, modules.TransactionSizeLimit)
 	rand.Read(largeArbitraryData)
-	acceptableData := "NonSia" + string(largeArbitraryData)
+	acceptableData := append(modules.PrefixNonSia[:], largeArbitraryData...)
 	txn := types.Transaction{
-		ArbitraryData: []string{acceptableData},
+		ArbitraryData: [][]byte{acceptableData},
 	}
 
 	// Check IsStandard.

@@ -23,16 +23,19 @@ import (
 // announcement is actually a valid ip address.
 func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings) {
 	for _, t := range b.Transactions {
-		for _, data := range t.ArbitraryData {
-			// the HostAnnouncement must be prefaced by the standard host announcement string
-			if !strings.HasPrefix(data, modules.PrefixHostAnnouncement) {
+		// the HostAnnouncement must be prefaced by the standard host
+		// announcement string
+		var prefix types.Specifier
+		for _, arb := range t.ArbitraryData {
+			copy(prefix[:], arb)
+			if !strings.HasPrefix(string(arb), modules.PrefixStrHostAnnouncement) && // preserved for compatibility with 0.3.3.3
+				prefix != modules.PrefixHostAnnouncement {
 				continue
 			}
 
 			// decode the HostAnnouncement
 			var ha modules.HostAnnouncement
-			encAnnouncement := []byte(strings.TrimPrefix(data, modules.PrefixHostAnnouncement))
-			err := encoding.Unmarshal(encAnnouncement, &ha)
+			err := encoding.Unmarshal(arb[types.SpecifierLen:], &ha)
 			if err != nil {
 				continue
 			}

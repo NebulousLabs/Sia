@@ -1,11 +1,11 @@
 package host
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestAnnouncement has a host announce itself to the blockchain and then
@@ -25,7 +25,7 @@ func TestAnnouncement(t *testing.T) {
 	if len(txns) != 1 {
 		t.Error("Expecting 1 transaction in transaction pool, instead there was", len(txns))
 	}
-	encodedAnnouncement := strings.TrimPrefix(txns[0].ArbitraryData[0], modules.PrefixHostAnnouncement)
+	encodedAnnouncement := txns[0].ArbitraryData[0][types.SpecifierLen:]
 	var ha modules.HostAnnouncement
 	err = encoding.Unmarshal([]byte(encodedAnnouncement), &ha)
 	if err != nil {

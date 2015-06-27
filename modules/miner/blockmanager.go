@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -36,10 +37,10 @@ func (m *Miner) blockForWork() (types.Block, types.Target) {
 	// other parts of the program. This is related to the fact that slices are
 	// pointers, and not immutable objects. Use of the builtin `copy` function
 	// when passing objects like blocks around may fix this problem.
-	randBytes := make([]byte, 16)
+	randBytes := make([]byte, types.SpecifierLen)
 	rand.Read(randBytes)
 	randTxn := types.Transaction{
-		ArbitraryData: []string{"NonSia" + string(randBytes)},
+		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}
 	blockTransactions := append([]types.Transaction{randTxn}, m.transactions...)
 

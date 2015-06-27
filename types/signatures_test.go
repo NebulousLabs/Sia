@@ -34,7 +34,7 @@ func TestSigHash(t *testing.T) {
 		SiafundInputs:         []SiafundInput{SiafundInput{}},
 		SiafundOutputs:        []SiafundOutput{SiafundOutput{}},
 		MinerFees:             []Currency{Currency{}},
-		ArbitraryData:         []string{"one", "two"},
+		ArbitraryData:         [][]byte{[]byte{'o'}, []byte{'t'}},
 		TransactionSignatures: []TransactionSignature{
 			TransactionSignature{
 				CoveredFields: CoveredFields{
@@ -106,7 +106,7 @@ func TestTransactionValidCoveredFields(t *testing.T) {
 		SiafundInputs:         []SiafundInput{SiafundInput{}},
 		SiafundOutputs:        []SiafundOutput{SiafundOutput{}},
 		MinerFees:             []Currency{Currency{}},
-		ArbitraryData:         []string{"one", "two"},
+		ArbitraryData:         [][]byte{[]byte{'o'}, []byte{'t'}},
 		TransactionSignatures: []TransactionSignature{
 			TransactionSignature{
 				CoveredFields: CoveredFields{
