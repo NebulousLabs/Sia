@@ -20,7 +20,7 @@ func (w *Wallet) timelockedCoinAddress(unlockHeight types.BlockHeight, visible b
 		PublicKeys: []types.SiaPublicKey{
 			types.SiaPublicKey{
 				Algorithm: types.SignatureEd25519,
-				Key:       string(encoding.Marshal(pk)),
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}
@@ -69,7 +69,7 @@ func (w *Wallet) coinAddress(visible bool) (coinAddress types.UnlockHash, unlock
 		PublicKeys: []types.SiaPublicKey{
 			types.SiaPublicKey{
 				Algorithm: types.SignatureEd25519,
-				Key:       string(encoding.Marshal(pk)),
+				Key:       encoding.Marshal(pk),
 			},
 		},
 	}

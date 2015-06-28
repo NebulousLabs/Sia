@@ -46,7 +46,7 @@ var (
 )
 
 type (
-	Signature string
+	Signature []byte
 
 	// CoveredFields indicates which fields in a transaction have been covered by
 	// the signature. (Note that the signature does not sign the fields
@@ -79,7 +79,7 @@ type (
 	// the protocol via a soft-fork.
 	SiaPublicKey struct {
 		Algorithm Specifier
-		Key       string
+		Key       []byte
 	}
 
 	// A TransactionSignature is a signature that is included in the transaction.

@@ -109,7 +109,7 @@ func TestLowFeeTransaction(t *testing.T) {
 	emptyData := make([]byte, 15e3-16)
 	randData := make([]byte, 16) // not yet random
 	emptyTxn := types.Transaction{
-		ArbitraryData: []string{"NonSia" + string(append(emptyData, randData...))},
+		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], (append(emptyData, randData...))...)},
 	}
 	transSize := len(encoding.Marshal(emptyTxn))
 
@@ -118,7 +118,7 @@ func TestLowFeeTransaction(t *testing.T) {
 		// Make a unique transaction to accept
 		rand.Read(randData)
 		uniqueTxn := types.Transaction{
-			ArbitraryData: []string{"NonSia" + string(append(emptyData, randData...))},
+			ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], append(emptyData, randData...)...)},
 		}
 
 		// Accept said transaction

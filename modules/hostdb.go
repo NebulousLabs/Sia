@@ -6,7 +6,11 @@ import (
 
 const (
 	// Denotes a host announcement in the Arbitrary Data section.
-	PrefixHostAnnouncement = "HostAnnouncement"
+	PrefixStrHostAnnouncement = "HostAnnouncement" // preserved for compatibility with 0.3.3.3
+)
+
+var (
+	PrefixHostAnnouncement = types.Specifier{'H', 'o', 's', 't', 'A', 'n', 'n', 'o', 'u', 'n', 'c', 'e', 'm', 'e', 'n', 't'}
 )
 
 // HostAnnouncements are stored in the Arbitrary Data section of transactions

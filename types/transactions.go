@@ -9,11 +9,15 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
+const (
+	SpecifierLen = 16
+)
+
 type (
 	Siafund Currency // arbitrary-precision unsigned integer
 
-	// A Specifier is a fixed-length string that serves two purposes. In the
-	// wire protocol, they are used to identify a particular encoding
+	// A Specifier is a fixed-length byte-array that serves two purposes. In
+	// the wire protocol, they are used to identify a particular encoding
 	// algorithm, signature algorithm, etc. This allows nodes to communicate on
 	// their own terms; for example, to reduce bandwidth costs, a node might
 	// only accept compressed messages.
@@ -22,7 +26,7 @@ type (
 	// consensus types have an associated ID, calculated by hashing the data
 	// contained in the type. By prepending the data with Specifier, we can
 	// guarantee that distinct types will never produce the same hash.
-	Specifier [16]byte
+	Specifier [SpecifierLen]byte
 
 	// IDs are used to refer to a type without revealing its contents. They
 	// are constructed by hashing specific fields of the type, along with a
@@ -49,7 +53,7 @@ type (
 		SiafundInputs         []SiafundInput
 		SiafundOutputs        []SiafundOutput
 		MinerFees             []Currency
-		ArbitraryData         []string
+		ArbitraryData         [][]byte
 		TransactionSignatures []TransactionSignature
 	}
 

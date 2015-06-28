@@ -6,10 +6,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	TransactionSizeLimit = 16 * 1024
+)
+
 var (
 	// ErrTransactionPoolDuplicate is returned when a duplicate transaction is
 	// submitted to the transaction pool.
 	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
+	PrefixNonSia                = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
+	PrefixStrNonSia             = "NonSia" // preserved for compatibility with 0.3.3.3
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and

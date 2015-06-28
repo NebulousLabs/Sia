@@ -37,7 +37,7 @@ func (tpt *tpoolTester) testUpdateTransactionRemoval() {
 func (tpt *tpoolTester) testDataTransactions() {
 	// Make a data transaction and put it into the blockchain.
 	txn := types.Transaction{
-		ArbitraryData: []string{"NonSiadata"},
+		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], 'd')},
 	}
 	err := tpt.tpool.AcceptTransaction(txn)
 	if err != nil {

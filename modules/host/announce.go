@@ -39,7 +39,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: addr,
 	})
-	_, _, err = h.wallet.AddArbitraryData(id, modules.PrefixHostAnnouncement+string(announcement))
+	_, _, err = h.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
 	if err != nil {
 		return err
 	}
