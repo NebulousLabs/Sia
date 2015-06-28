@@ -121,7 +121,7 @@ func (db *BoltDatabase) BulkInsert(items []BoltItem) error {
 // element will be nil.
 func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, error) {
 	var bytes []byte
-	fmt.Printf("Requesting %x from bucket %s", key, bucketName)
+	fmt.Printf("Requesting %x from bucket %s\n", key, bucketName)
 	err := db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(bucketName))
 		if bucket == nil {
@@ -179,11 +179,11 @@ func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions [
 			}
 
 			modBytes := bucket.Get(mod.Key)
-			if modBytes == nil {
-				return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
-					mod.Key,
-					mod.BucketName))
-			}
+			// if modBytes == nil {
+			// 	return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
+			// 		mod.Key,
+			// 		mod.BucketName))
+			// }
 
 			newItem, err := mod.Map(modBytes)
 			if err != nil {
@@ -194,7 +194,6 @@ func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions [
 
 		// Analagous to BulkInsert
 		for _, addition := range additions {
-			fmt.Printf("Adding %x ----> %x in bucket %s\n", addition.Key, addition.Value, addition.BucketName)
 			bucket := tx.Bucket([]byte(addition.BucketName))
 			if bucket == nil {
 				return errors.New("requested bucket does not exist: " + addition.BucketName)

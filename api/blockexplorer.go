@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -44,13 +45,14 @@ func (srv *Server) blockexplorerBlockDataHandler(w http.ResponseWriter, req *htt
 // Handles the api call to retrieve data about a specific hash
 func (srv *Server) blockexplorerGetHashHandler(w http.ResponseWriter, req *http.Request) {
 	// Extract the hash from the request
-	var hash []byte
-	_, err := fmt.Sscanf(req.FormValue("hash"), "%x", &hash)
-	fmt.Printf("%x\n", hash)
+	var hash crypto.Hash
+	var data []byte
+	_, err := fmt.Sscanf(req.FormValue("hash"), "%x", &data)
 	if err != nil {
-		writeError(w, "Malformed or no hash provided: " + err.Error(), http.StatusBadRequest)
+		writeError(w, "Malformed or no hash provided: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	copy(hash[:], data[:crypto.HashSize])
 
 	// returnData will be a generic interface. The json encoder
 	// should still work though

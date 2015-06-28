@@ -1,7 +1,7 @@
 package blockexplorer
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -10,21 +10,53 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// func appendModification(modifications []persist.BoltModification, bucketName string, modID crypto.Hash, txid crypto.Hash, t reflect.Type, modFunc func(input t) t ) {
-// 	modIDBytes = encoding.Marshal(modID)
-// 	mapFunc := func(modStructBytes []byte) (presist.BoltItem, error) {
-// 		if modStructBytes == nil {
-// 			return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s", modIDBytes, bucketName))
-// 		}
-// 		var modStruct t
-// 		encoding.Unmarshal(modStructBytes, modStructType)
+func appendAddress(modifications []persist.BoltModification, address types.UnlockHash, txid crypto.Hash) []persist.BoltModification {
+	addr := encoding.Marshal(address)
+	mapFunc := func(addrBytes []byte) (persist.BoltItem, error) {
+		if addrBytes == nil {
+			return persist.BoltItem{
+				BucketName: "Addresses",
+				Key:        addr,
+				Value:      encoding.Marshal([]crypto.Hash{txid}),
+			}, nil
+		}
 
-// 	}
-// }
+		var txids []crypto.Hash
+		err := encoding.Unmarshal(addrBytes, &txids)
+		if err != nil {
+			return *new(persist.BoltItem), err
+		}
+
+		// Don't append if the address is already in there
+		var present bool = false
+		for _, tx := range txids {
+			if tx == txid {
+				present = true
+			}
+		}
+		if !present {
+			txids = append(txids, txid)
+		}
+
+		return persist.BoltItem{
+			BucketName: "Addresses",
+			Key:        addr,
+			Value:      encoding.Marshal(txids),
+		}, nil
+	}
+	return append(modifications, persist.BoltModification{
+		BucketName: "Addresses",
+		Key:        addr,
+		Map:        mapFunc,
+	})
+}
 
 func appendSiacoinInput(modifications []persist.BoltModification, outputID types.SiacoinOutputID, txid crypto.Hash) []persist.BoltModification {
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
+		if outputBytes == nil {
+			return *new(persist.BoltItem), errors.New("item not found in bucket")
+		}
 		var output outputTransactions
 		err := encoding.Unmarshal(outputBytes, &output)
 		if err != nil {
@@ -48,6 +80,9 @@ func appendSiacoinInput(modifications []persist.BoltModification, outputID types
 func appendSiafundInput(modifications []persist.BoltModification, outputID types.SiafundOutputID, txid crypto.Hash) []persist.BoltModification {
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
+		if outputBytes == nil {
+			return *new(persist.BoltItem), errors.New("item not found in bucket")
+		}
 		var output outputTransactions
 		err := encoding.Unmarshal(outputBytes, &output)
 		if err != nil {
@@ -71,6 +106,9 @@ func appendSiafundInput(modifications []persist.BoltModification, outputID types
 func appendFcRevision(modifications []persist.BoltModification, fcid types.FileContractID, txid crypto.Hash) []persist.BoltModification {
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
+		if fcBytes == nil {
+			return *new(persist.BoltItem), errors.New("item not found in bucket")
+		}
 		var fcInfoStruct fcInfo
 		err := encoding.Unmarshal(fcBytes, &fcInfoStruct)
 		if err != nil {
@@ -94,6 +132,9 @@ func appendFcRevision(modifications []persist.BoltModification, fcid types.FileC
 func appendFcProof(modifications []persist.BoltModification, fcid types.FileContractID, txid crypto.Hash) []persist.BoltModification {
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
+		if fcBytes == nil {
+			return *new(persist.BoltItem), errors.New("item not found in bucket")
+		}
 		var fcInfoStruct fcInfo
 		err := encoding.Unmarshal(fcBytes, &fcInfoStruct)
 		if err != nil {
@@ -190,9 +231,6 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Value:      encoding.Marshal(bSum),
 	})
 
-	if be.blockchainHeight == 300 {
-		fmt.Printf("Adding block %x height %5d\n",b.ID(), be.blockchainHeight)
-	}
 	additions = appendHashType(additions, crypto.Hash(b.ID()), hashBlock)
 
 	// Add the block to the Transactions bucket so that lookups on
@@ -208,6 +246,8 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 
 	// Insert the miner payouts as new outputs
 	for i := range b.MinerPayouts {
+		modifications = appendAddress(modifications, b.MinerPayouts[i].UnlockHash, crypto.Hash(b.ID()))
+		additions = appendHashType(additions, crypto.Hash(b.MinerPayouts[i].UnlockHash), hashUnlockHash)
 		additions = appendNewOutput(additions, b.MinerPayoutID(i), crypto.Hash(b.ID()))
 	}
 
@@ -251,6 +291,8 @@ func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID,
 
 	// Handle all the transaction outputs
 	for i := range tx.SiacoinOutputs {
+		modifications = appendAddress(modifications, tx.SiacoinOutputs[i].UnlockHash, txid)
+		changes = appendHashType(changes, crypto.Hash(tx.SiacoinOutputs[i].UnlockHash), hashUnlockHash)
 		changes = appendNewOutput(changes, tx.SiacoinOutputID(i), txid)
 	}
 
@@ -267,10 +309,17 @@ func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID,
 
 		for j := range contract.ValidProofOutputs {
 			changes = appendNewOutput(changes, fcid.StorageProofOutputID(true, j), txid)
+			modifications = appendAddress(modifications, contract.ValidProofOutputs[i].UnlockHash, txid)
+			changes = appendHashType(changes, crypto.Hash(contract.ValidProofOutputs[i].UnlockHash), hashUnlockHash)
 		}
 		for j := range contract.MissedProofOutputs {
 			changes = appendNewOutput(changes, fcid.StorageProofOutputID(false, j), txid)
+			modifications = appendAddress(modifications, contract.MissedProofOutputs[i].UnlockHash, txid)
+			changes = appendHashType(changes, crypto.Hash(contract.MissedProofOutputs[i].UnlockHash), hashUnlockHash)
 		}
+
+		modifications = appendAddress(modifications, contract.UnlockHash, txid)
+		changes = appendHashType(changes, crypto.Hash(contract.UnlockHash), hashUnlockHash)
 
 		changes = appendHashType(changes, crypto.Hash(fcid), hashFilecontract)
 	}
@@ -284,10 +333,17 @@ func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID,
 		// people who may just need it.
 		for i := range revision.NewValidProofOutputs {
 			changes = appendNewOutput(changes, revision.ParentID.StorageProofOutputID(true, i), txid)
+			modifications = appendAddress(modifications, revision.NewValidProofOutputs[i].UnlockHash, txid)
+			changes = appendHashType(changes, crypto.Hash(revision.NewValidProofOutputs[i].UnlockHash), hashUnlockHash)
 		}
 		for i := range revision.NewMissedProofOutputs {
 			changes = appendNewOutput(changes, revision.ParentID.StorageProofOutputID(false, i), txid)
+			modifications = appendAddress(modifications, revision.NewMissedProofOutputs[i].UnlockHash, txid)
+			changes = appendHashType(changes, crypto.Hash(revision.NewMissedProofOutputs[i].UnlockHash), hashUnlockHash)
 		}
+
+		modifications = appendAddress(modifications, revision.NewUnlockHash, txid)
+		changes = appendHashType(changes, crypto.Hash(revision.NewUnlockHash), hashUnlockHash)
 	}
 
 	// Update the list of storage proofs
@@ -303,6 +359,8 @@ func (be *BlockExplorer) addTransaction(tx types.Transaction, bID types.BlockID,
 	// Handle all the siafund outputs
 	for i := range tx.SiafundOutputs {
 		changes = appendNewSFOutput(changes, tx.SiafundOutputID(i), txid)
+		modifications = appendAddress(modifications, tx.SiafundOutputs[i].UnlockHash, txid)
+		changes = appendHashType(changes, crypto.Hash(tx.SiafundOutputs[i].UnlockHash), hashUnlockHash)
 	}
 
 	changes = appendHashType(changes, txid, hashTransaction)

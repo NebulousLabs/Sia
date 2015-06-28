@@ -89,7 +89,6 @@ const (
 	hashFilecontract
 	hashCoinOutputID
 	hashFundOutputID
-	hashAddress
 	hashUnlockHash
 )
 

@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -46,5 +47,5 @@ type BlockExplorer interface {
 	BlockExplorerNotify() <-chan struct{}
 
 	// Returns information pertaining to a given hash
-	GetHashInfo([]byte) (interface{}, error)
+	GetHashInfo(crypto.Hash) (interface{}, error)
 }
