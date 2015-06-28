@@ -46,8 +46,6 @@ var (
 )
 
 type (
-	Signature []byte
-
 	// CoveredFields indicates which fields in a transaction have been covered by
 	// the signature. (Note that the signature does not sign the fields
 	// themselves, but rather their combined hash; see SigHash.) Each slice
@@ -98,7 +96,7 @@ type (
 		PublicKeyIndex uint64
 		Timelock       BlockHeight
 		CoveredFields  CoveredFields
-		Signature      Signature
+		Signature      []byte
 	}
 
 	// UnlockConditions are a set of conditions which must be met to execute
