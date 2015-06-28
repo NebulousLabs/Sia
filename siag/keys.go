@@ -78,7 +78,7 @@ func generateKeys(requiredKeys int, totalKeys int, folder string, keyname string
 	for i := range keys {
 		unlockConditions.PublicKeys = append(unlockConditions.PublicKeys, types.SiaPublicKey{
 			Algorithm: types.SignatureEd25519,
-			Key:       string(pubKeys[i][:]),
+			Key:       pubKeys[i][:],
 		})
 	}
 	for i := range keys {

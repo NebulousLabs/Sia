@@ -14,7 +14,7 @@ func TestUnlockHash(t *testing.T) {
 		PublicKeys: []SiaPublicKey{
 			SiaPublicKey{
 				Algorithm: SignatureEntropy,
-				Key:       "fake key",
+				Key:       []byte{'f', 'a', 'k', 'e'},
 			},
 		},
 		SignaturesRequired: 3,
@@ -176,7 +176,7 @@ func TestTransactionValidSignatures(t *testing.T) {
 	// entropy type, which should never be accepted.
 	uc := UnlockConditions{
 		PublicKeys: []SiaPublicKey{
-			{Algorithm: SignatureEd25519, Key: string(pk[:])},
+			{Algorithm: SignatureEd25519, Key: pk[:]},
 			{},
 			{Algorithm: SignatureEntropy},
 		},
@@ -327,15 +327,15 @@ func TestTransactionValidSignatures(t *testing.T) {
 	txn.TransactionSignatures[0] = tmpTxn0
 
 	// Insert a malformed public key into the transaction.
-	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = "malformed"
+	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = []byte{'b', 'a', 'd'}
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error(err)
 	}
-	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = string(pk[:])
+	txn.SiacoinInputs[0].UnlockConditions.PublicKeys[0].Key = pk[:]
 
 	// Insert a malformed signature into the transaction.
-	txn.TransactionSignatures[0].Signature = "malformed"
+	txn.TransactionSignatures[0].Signature = []byte{'m', 'a', 'l'}
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error(err)
