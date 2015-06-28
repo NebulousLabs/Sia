@@ -237,9 +237,9 @@ func TestTransactionValidSignatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
-	txn.TransactionSignatures[1].Signature = Signature(sig1[:])
-	txn.TransactionSignatures[2].Signature = Signature(sig2[:])
+	txn.TransactionSignatures[0].Signature = sig0[:]
+	txn.TransactionSignatures[1].Signature = sig1[:]
+	txn.TransactionSignatures[2].Signature = sig2[:]
 
 	// Check that the signing was successful.
 	err = txn.validSignatures(10)
@@ -249,13 +249,13 @@ func TestTransactionValidSignatures(t *testing.T) {
 
 	// Corrupt one of the sigantures.
 	sig0[0]++
-	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
+	txn.TransactionSignatures[0].Signature = sig0[:]
 	err = txn.validSignatures(10)
 	if err == nil {
 		t.Error("Corrupted a signature but the txn was still accepted as valid!")
 	}
 	sig0[0]--
-	txn.TransactionSignatures[0].Signature = Signature(sig0[:])
+	txn.TransactionSignatures[0].Signature = sig0[:]
 
 	// Fail the validCoveredFields check.
 	txn.TransactionSignatures[0].CoveredFields.SiacoinInputs = []uint64{33}

@@ -107,7 +107,7 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 		if err != nil {
 			return
 		}
-		parentTxn.TransactionSignatures[sigIndex].Signature = types.Signature(encodedSig[:])
+		parentTxn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 	}
 
 	// Add the exact output to the wallet's knowledgebase before releasing the
@@ -361,7 +361,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 		if err != nil {
 			return
 		}
-		txn.TransactionSignatures[sigIndex].Signature = types.Signature(encodedSig[:])
+		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 	}
 
 	// Delete the open transaction.
