@@ -79,14 +79,14 @@ func TestSimpleBlock(t *testing.T) {
 	}
 }
 
-// testDoSBlockHandling checks that saved bad blocks are correctly ignored.
+// testDoSBlockHandling
 func (cst *consensusSetTester) testDoSBlockHandling() error {
 	// Mine a DoS block and submit it to the state, expect a normal error.
 	dosBlock, err := cst.MineDoSBlock()
 	if err != nil {
 		return err
 	}
-	err = cst.cs.acceptBlock(dosBlock)
+	err = cst.cs.AcceptBlock(dosBlock)
 	// The error is mostly irrelevant, it just needs to have the block flagged
 	// as a DoS block in future attempts.
 	if err != ErrSiacoinInputOutputMismatch {
@@ -94,27 +94,39 @@ func (cst *consensusSetTester) testDoSBlockHandling() error {
 	}
 
 	// Submit the same DoS block to the state again, expect ErrDoSBlock.
-	err = cst.cs.acceptBlock(dosBlock)
+	err = cst.cs.AcceptBlock(dosBlock)
 	if err != ErrDoSBlock {
 		return errors.New("expecting bad block err: " + err.Error())
 	}
 	return nil
 }
 
-// TestDoSBlockHandling creates a new consensus set tester and uses it to call
-// testDoSBlockHandling.
+// TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst, err := createConsensusSetTester("TestDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst.testDoSBlockHandling()
+
+	// Mine a DoS block and submit it to the state, expect a normal error.
+	dosBlock, err := cst.MineDoSBlock()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
+	}
+	err = cst.cs.AcceptBlock(dosBlock)
+	// The error is mostly irrelevant, it just needs to have the block flagged
+	// as a DoS block in future attempts.
+	if err != ErrSiacoinInputOutputMismatch {
+		t.Fatal("expecting invalid signature err: " + err.Error())
+	}
+
+	// Submit the same DoS block to the state again, expect ErrDoSBlock.
+	err = cst.cs.AcceptBlock(dosBlock)
+	if err != ErrDoSBlock {
+		t.Fatal("expecting bad block err: " + err.Error())
 	}
 }
 
@@ -382,4 +394,29 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+// TestInconsistentCheck submits a block on a consensus set that is
+// inconsistent, attempting to trigger a panic.
+func TestInconsistentCheck(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestInconsistentCheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Corrupt the consensus set.
+	cst.cs.siafundPool = cst.cs.siafundPool.Add(types.NewCurrency64(1))
+
+	// Mine and submit a block, triggering the inconsistency check.
+	defer func() {
+		r := recover()
+		if r != errSiacoinMiscount {
+			t.Error("expecting errSiacoinMiscount, got:", r)
+		}
+	}()
+	block, _ := cst.miner.FindBlock()
+	_ = cst.cs.AcceptBlock(block)
 }

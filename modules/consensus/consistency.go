@@ -10,6 +10,10 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	errSiacoinMiscount = errors.New("consensus set has the wrong number of siacoins given the height")
+)
+
 // checkCurrentPath looks at the blocks in the current path and verifies that
 // they are all ordered correctly and in the block map.
 func (cs *State) checkCurrentPath() error {
@@ -80,7 +84,7 @@ func (cs *State) checkSiacoins() error {
 	}
 	totalSiacoins = totalSiacoins.Add(cs.siafundPool)
 	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
-		return fmt.Errorf("checkSiacoins: expected %v siacoins, got %v siacoins", expectedSiacoins, totalSiacoins)
+		return errSiacoinMiscount
 	}
 	return nil
 }
