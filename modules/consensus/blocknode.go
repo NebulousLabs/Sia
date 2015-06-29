@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -43,6 +44,11 @@ type blockNode struct {
 	siafundOutputDiffs        []modules.SiafundOutputDiff
 	delayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
 	siafundPoolDiffs          []modules.SiafundPoolDiff
+
+	// Used only when the DEBUG flag is set, the consensusSet hash indicates
+	// the hash of the consensus set after the block has been applied. It can
+	// then be used for comparison when rewinding.
+	consensusSetHash crypto.Hash
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node

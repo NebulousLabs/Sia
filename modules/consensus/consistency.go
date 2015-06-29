@@ -193,3 +193,53 @@ func (cs *State) consensusSetHash() crypto.Hash {
 
 	return tree.Root()
 }
+
+// checkRewindApply rewinds and reapplies the current block, checking that the
+// consensus set hashes meet the expected values.
+func (cs *State) checkRewindApply() error {
+	// Do nothing if the DEBUG flag is not set.
+	if !build.DEBUG {
+		return nil
+	}
+
+	// Rewind a block, check that the consensus set hash after rewiding is the
+	// same as it was before the current block was added, then reapply the
+	// block and check that the new consensus set has is the same as originally
+	// calculated.
+	currentNode := cs.currentBlockNode()
+	cs.revertToNode(currentNode.parent)
+	if cs.consensusSetHash() != currentNode.parent.consensusSetHash {
+		return errors.New("rewinding a block resulted in unexpected consensus set hash")
+	}
+	cs.applyUntilNode(currentNode)
+	if cs.consensusSetHash() != currentNode.consensusSetHash {
+		return errors.New("reapplying a block resulted in unexpected consensus set hash")
+	}
+	return nil
+}
+
+// checkConsistency runs a series of checks to make sure that the consensus set
+// is consistent with some rules that should always be true.
+func (cs *State) checkConsistency() error {
+	err := cs.checkCurrentPath()
+	if err != nil {
+		return err
+	}
+	err = checkDelayedSiacoinOutputMaps()
+	if err != nil {
+		return err
+	}
+	err = checkSiacoins()
+	if err != nil {
+		return err
+	}
+	err = checkSiafunds()
+	if err != nil {
+		return err
+	}
+	err = checkRewindApply()
+	if err != nil {
+		return err
+	}
+	return nil
+}

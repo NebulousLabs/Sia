@@ -268,5 +268,8 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	// the miner payouts to the list of delayed outputs.
 	s.applyMaintenance(bn)
 
+	if build.DEBUG {
+		bn.consensusSetHash = s.consensusSetHash()
+	}
 	return nil
 }
