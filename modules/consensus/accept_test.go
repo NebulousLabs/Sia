@@ -73,7 +73,7 @@ func TestSimpleBlock(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	err = cst.checkConsistency()
+	err = cst.cs.checkConsistency()
 	if err != nil {
 		t.Error(err)
 	}
@@ -378,7 +378,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	err = cst.checkConsistency()
+	err = cst.cs.checkConsistency()
 	if err != nil {
 		t.Error(err)
 	}
