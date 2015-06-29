@@ -2,11 +2,40 @@ package consensus
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
+
+// checkCurrentPath looks at the blocks in the current path and verifies that
+// they are all ordered correctly and in the block map.
+func (cs *State) checkCurrentPath() error {
+	currentNode := cs.currentBlockNode()
+	for i := cs.height(); i != 0; i-- {
+		// The block should be in the block map.
+		_, exists := cs.blockMap[currentNode.block.ID()]
+		if !exists {
+			return errors.New("current path block not found in block map")
+		}
+		// Current node should match the id in the current path.
+		if currentNode.block.ID() != cs.currentPath[i] {
+			return errors.New("current path points to an incorrect block")
+		}
+		// Height of node needs to be listed correctly.
+		if currentNode.height != i {
+			return errors.New("node height mismatches its location in the blockchain")
+		}
+		// Current node's parent needs the right id.
+		if currentNode.block.ParentID != currentNode.parent.block.ID() {
+			return errors.New("node parent id mismatches actual parent id")
+		}
+
+		currentNode = currentNode.parent
+	}
+	return nil
+}
 
 // checkDelayedSiacoinOutputMaps checks that the delayed siacoin output maps
 // have the right number of maps at the right heights.
@@ -29,6 +58,44 @@ func (cs *State) checkDelayedSiacoinOutputMaps() error {
 	return nil
 }
 
+// checkSiacoins counts the number of siacoins in the database and verifies
+// that it matches the sum of all the coinbases.
+func (cs *State) checkSiacoins() error {
+	expectedSiacoins := types.ZeroCurrency
+	for i := types.BlockHeight(0); i <= cs.height(); i++ {
+		expectedSiacoins = expectedSiacoins.Add(types.CalculateCoinbase(i))
+	}
+	totalSiacoins := types.ZeroCurrency
+	for _, sco := range cs.siacoinOutputs {
+		totalSiacoins = totalSiacoins.Add(sco.Value)
+	}
+	for _, fc := range cs.fileContracts {
+		totalSiacoins = totalSiacoins.Add(fc.Payout)
+	}
+	for _, dsoMap := range cs.delayedSiacoinOutputs {
+		for _, dso := range dsoMap {
+			totalSiacoins = totalSiacoins.Add(dso.Value)
+		}
+	}
+	totalSiacoins = totalSiacoins.Add(cs.siafundPool)
+	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
+		return fmt.Errorf("checkSiacoins: expected %v siacoins, got %v siacoins", expectedSiacoins, totalSiacoins)
+	}
+	return nil
+}
+
+// checkSiafunds counts the siafund outputs and checks that there are 10,000.
+func (cs *State) checkSiafunds() error {
+	totalSiafunds := types.ZeroCurrency
+	for _, sfo := range cs.siafundOutputs {
+		totalSiafunds = totalSiafunds.Add(sfo.Value)
+	}
+	if totalSiafunds.Cmp(types.NewCurrency64(types.SiafundCount)) != 0 {
+		return fmt.Errorf("checkSiafunds: expected %v siafunds, got %v siafunds", types.SiafundCount, totalSiafunds)
+	}
+	return nil
+}
+
 // consensusSetHash returns the Merkle root of the current state of consensus.
 func (cs *State) consensusSetHash() crypto.Hash {
 	// Items of interest:
@@ -36,13 +103,13 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	// 3.	current height
 	// 4.	current target
 	// 5.	current depth
-	// 6.	earliest allowed timestamp of next block
-	// 7.	current path, ordered by height.
+	// 6.	current path + diffs
+	// 7.	earliest allowed timestamp of next block
 	// 8.	unspent siacoin outputs, sorted by id.
 	// 9.	open file contracts, sorted by id.
 	// 10.	unspent siafund outputs, sorted by id.
 	// 11.	delayed siacoin outputs, sorted by height, then sorted by id.
-	// TODO: Add the diff set ?
+	// 12.	siafund pool
 
 	// Create a slice of hashes representing all items of interest.
 	tree := crypto.NewTree()
@@ -52,7 +119,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	tree.PushObject(cs.currentBlockNode().depth)
 	tree.PushObject(cs.currentBlockNode().earliestChildTimestamp())
 
-	// Add all the blocks in the current path.
+	// Add all the blocks in the current path TODO: along with their diffs.
 	for i := 0; i < len(cs.currentPath); i++ {
 		tree.PushObject(cs.currentPath[types.BlockHeight(i)])
 	}
@@ -111,7 +178,6 @@ func (cs *State) consensusSetHash() crypto.Hash {
 			delayedSiacoinOutputs = append(delayedSiacoinOutputs, crypto.Hash(id))
 		}
 		sort.Sort(delayedSiacoinOutputs)
-
 		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {
 			delayedSiacoinOutput, exists := cs.delayedSiacoinOutputs[i][types.SiacoinOutputID(delayedSiacoinOutputID)]
 			if !exists {
@@ -121,6 +187,9 @@ func (cs *State) consensusSetHash() crypto.Hash {
 			tree.PushObject(delayedSiacoinOutputID)
 		}
 	}
+
+	// Add the siafund pool
+	tree.PushObject(cs.siafundPool)
 
 	return tree.Root()
 }

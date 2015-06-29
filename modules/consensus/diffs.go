@@ -112,11 +112,21 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 				panic("applying a block node when it's not a valid successor")
 			}
 		}
+
+		// All siafundPoolDiffs should be increasing the size of the siafund
+		// pool.
+		for _, sfpd := range bn.siafundPoolDiffs {
+			if sfpd.Previous.Cmp(sfpd.Adjusted) < 0 {
+				panic("a siafund pool diff exists that shrinks the siafund pool")
+			}
+		}
 	}
 
 	// Create the filling delayed siacoin output map.
 	if dir == modules.DiffApply {
 		if build.DEBUG {
+			// Sanity check - the output map being created should not already
+			// exist.
 			_, exists := s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
 			if exists {
 				panic("trying to create a map that already exists")
@@ -124,8 +134,10 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		}
 		s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	} else {
-		// Skip creating maps for height's that can't have delayed outputs.
+		// Skip creating maps for heights that can't have delayed outputs.
 		if bn.height > types.MaturityDelay {
+			// Sanity check - the output map being created should not already
+			// exist.
 			if build.DEBUG {
 				_, exists := s.delayedSiacoinOutputs[bn.height]
 				if exists {

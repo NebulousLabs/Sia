@@ -157,7 +157,8 @@ func (cs *State) AcceptBlock(b types.Block) error {
 		return err
 	}
 
-	// Broadcast the new block to all peers. This is an expensive operation, and not necessary during synchronize or
+	// Broadcast the new block to all peers. This is an expensive operation,
+	// and not necessary during synchronize or when loading from disk.
 	go cs.gateway.Broadcast("RelayBlock", b)
 
 	return nil
