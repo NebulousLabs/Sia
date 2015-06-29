@@ -14,7 +14,9 @@ import (
 // are created, applied, reverted, and queried in this file.
 
 var (
-	errBadCommitSiacoinOutputDiff = errors.New("rogue siacoin output in commitSiacoinOutputDiff")
+	errBadCommitSiacoinOutputDiff = errors.New("rogue siacoin output diff in commitSiacoinOutputDiff")
+	errBadCommitFileContractDiff  = errors.New("rogue file contract diff in commitFileContractDiff")
+	errBadCommitSiafundOutputDiff = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
 )
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
@@ -42,7 +44,7 @@ func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules
 	if build.DEBUG {
 		_, exists := s.fileContracts[fcd.ID]
 		if exists == (fcd.Direction == dir) {
-			panic("rogue file contract in commitFileContractDiff")
+			panic(errBadCommitFileContractDiff)
 		}
 	}
 
@@ -60,7 +62,7 @@ func (s *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modu
 	if build.DEBUG {
 		_, exists := s.siafundOutputs[sfod.ID]
 		if exists == (sfod.Direction == dir) {
-			panic("rogue siafund output in commitSiafundOutputDiff")
+			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
