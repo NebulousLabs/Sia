@@ -19,6 +19,9 @@ var (
 	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
 	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
 	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
+	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
+	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field.")
+	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field.")
 )
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
@@ -98,17 +101,36 @@ func (cs *State) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutp
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func (s *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+func (cs *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+	// Sanity check - siafund pool should only ever increase.
+	if build.DEBUG {
+		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
+			panic(errNegativePoolAdjustment)
+		}
+	}
+
 	if dir == modules.DiffApply {
-		s.siafundPool = sfpd.Adjusted
+		// Sanity check - sfpd.Previous should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Previous) != 0 {
+				panic(errApplySiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Adjusted
 	} else {
-		s.siafundPool = sfpd.Previous
+		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
+		if build.DEBUG {
+			if cs.siafundPool.Cmp(sfpd.Adjusted) != 0 {
+				panic(errRevertSiafundPoolDiffMismatch)
+			}
+		}
+		cs.siafundPool = sfpd.Previous
 	}
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
 func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
-	// Sanity check
+	// Sanity checks.
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
 		if !bn.diffsGenerated {

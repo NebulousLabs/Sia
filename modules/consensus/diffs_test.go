@@ -328,3 +328,90 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	}
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 }
+
+// TestCommitSiafundPoolDiff probes the commitSiafundPoolDiff method of the
+// consensus set.
+func TestCommitSiafundPoolDiff(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Apply two siafund pool diffs, and then a diff with 0 change. Then revert
+	// them all.
+	initial := cst.cs.siafundPool
+	adjusted1 := initial.Add(types.NewCurrency64(200))
+	adjusted2 := adjusted1.Add(types.NewCurrency64(500))
+	adjusted3 := adjusted2.Add(types.NewCurrency64(0))
+	sfpd1 := modules.SiafundPoolDiff{
+		Previous: initial,
+		Adjusted: adjusted1,
+	}
+	sfpd2 := modules.SiafundPoolDiff{
+		Previous: adjusted1,
+		Adjusted: adjusted2,
+	}
+	sfpd3 := modules.SiafundPoolDiff{
+		Previous: adjusted2,
+		Adjusted: adjusted3,
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffApply)
+	if cst.cs.siafundPool.Cmp(adjusted1) != 0 {
+		t.Error("siafund pool was not adjusted correctly")
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd2, modules.DiffApply)
+	if cst.cs.siafundPool.Cmp(adjusted2) != 0 {
+		t.Error("second siafund pool adjustment was flawed")
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd3, modules.DiffApply)
+	if cst.cs.siafundPool.Cmp(adjusted3) != 0 {
+		t.Error("second siafund pool adjustment was flawed")
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd3, modules.DiffRevert)
+	if cst.cs.siafundPool.Cmp(adjusted2) != 0 {
+		t.Error("reverting second adjustment was flawed")
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd2, modules.DiffRevert)
+	if cst.cs.siafundPool.Cmp(adjusted1) != 0 {
+		t.Error("reverting second adjustment was flawed")
+	}
+	cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffRevert)
+	if cst.cs.siafundPool.Cmp(initial) != 0 {
+		t.Error("reverting first adjustment was flawed")
+	}
+
+	// Do a chaining set of panics. First apply a negative pool adjustment,
+	// then revert the pool diffs in the wrong order, than apply the pool diffs
+	// in the wrong order.
+	defer func() {
+		r := recover()
+		if r != errApplySiafundPoolDiffMismatch {
+			t.Error("expecting errApplySiafundPoolDiffMismatch, got", r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errRevertSiafundPoolDiffMismatch {
+			t.Error("expecting errRevertSiafundPoolDiffMismatch, got", r)
+		}
+		cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffApply)
+	}()
+	defer func() {
+		r := recover()
+		if r != errNegativePoolAdjustment {
+			t.Error("expecting errNegativePoolAdjustment, got", r)
+		}
+		cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffRevert)
+	}()
+	cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffApply)
+	cst.cs.commitSiafundPoolDiff(sfpd2, modules.DiffApply)
+	negativeAdjustment := adjusted2.Sub(types.NewCurrency64(100))
+	negativeSfpd := modules.SiafundPoolDiff{
+		Previous: adjusted3,
+		Adjusted: negativeAdjustment,
+	}
+	cst.cs.commitSiafundPoolDiff(negativeSfpd, modules.DiffApply)
+}
