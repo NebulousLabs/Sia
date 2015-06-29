@@ -58,7 +58,7 @@ func (bn *blockNode) earliestChildTimestamp() types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	current := bn
-	for i := 0; i < types.MedianTimestampWindow; i++ {
+	for i := uint64(0); i < types.MedianTimestampWindow; i++ {
 		windowTimes[i] = current.block.Timestamp
 
 		// If we are at the genesis block, keep using the genesis block for the

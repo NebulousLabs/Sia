@@ -82,26 +82,22 @@ func (x Currency) Mul(y Currency) (c Currency) {
 	return
 }
 
-// MulFloat returns a new Currency value y = c * x, where x is a float64.
-// Behavior is undefined when x is negative.
-func (x Currency) MulFloat(y float64) (c Currency) {
-	if y < 0 {
+// MulRat returns a new Currency value x = c * y, where y is a big.Rat.
+func (x Currency) MulRat(y *big.Rat) (c Currency) {
+	if y.Sign() < 0 {
 		if build.DEBUG {
 			panic(ErrNegativeCurrency)
 		}
 	} else {
-		cRat := new(big.Rat).Mul(
-			new(big.Rat).SetInt(&x.i),
-			new(big.Rat).SetFloat64(y),
-		)
-		c.i.Div(cRat.Num(), cRat.Denom())
+		tmp := new(big.Rat).Mul(new(big.Rat).SetInt(&x.i), y)
+		c.i.Div(tmp.Num(), tmp.Denom())
 	}
 	return
 }
 
 // RoundDown returns the largest multiple of y <= x.
-func (x Currency) RoundDown(y uint64) (c Currency) {
-	diff := new(big.Int).Mod(&x.i, new(big.Int).SetUint64(y))
+func (x Currency) RoundDown(y Currency) (c Currency) {
+	diff := new(big.Int).Mod(&x.i, &y.i)
 	c.i.Sub(&x.i, diff)
 	return
 }

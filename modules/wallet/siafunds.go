@@ -40,7 +40,7 @@ func (w *Wallet) SiafundBalance() (siafundBalance types.Currency, siacoinClaimBa
 	csPool := w.state.SiafundPool()
 	for _, sfo := range w.siafundOutputs {
 		siafundBalance = siafundBalance.Add(sfo.Value)
-		siacoinsPerSiafund := csPool.Sub(sfo.ClaimStart).Div(types.NewCurrency64(types.SiafundCount))
+		siacoinsPerSiafund := csPool.Sub(sfo.ClaimStart).Div(types.SiafundCount)
 		siacoinClaim := siacoinsPerSiafund.Mul(sfo.Value)
 		siacoinClaimBalance = siacoinClaimBalance.Add(siacoinClaim)
 	}

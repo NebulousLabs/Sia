@@ -122,5 +122,5 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) 
 
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
-	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
+	return fc.Payout.MulRat(SiafundPortion).RoundDown(SiafundCount)
 }

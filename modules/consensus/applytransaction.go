@@ -203,7 +203,7 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 
 		// Calculate the volume of siacoins to put in the claim output.
 		sfo := cs.siafundOutputs[sfi.ParentID]
-		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.NewCurrency64(types.SiafundCount)).Mul(sfo.Value)
+		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{

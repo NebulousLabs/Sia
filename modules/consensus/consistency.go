@@ -95,7 +95,7 @@ func (cs *State) checkSiafunds() error {
 	for _, sfo := range cs.siafundOutputs {
 		totalSiafunds = totalSiafunds.Add(sfo.Value)
 	}
-	if totalSiafunds.Cmp(types.NewCurrency64(types.SiafundCount)) != 0 {
+	if totalSiafunds.Cmp(types.SiafundCount) != 0 {
 		return fmt.Errorf("checkSiafunds: expected %v siafunds, got %v siafunds", types.SiafundCount, totalSiafunds)
 	}
 	return nil
