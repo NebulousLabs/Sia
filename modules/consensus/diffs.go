@@ -14,9 +14,11 @@ import (
 // are created, applied, reverted, and queried in this file.
 
 var (
-	errBadCommitSiacoinOutputDiff = errors.New("rogue siacoin output diff in commitSiacoinOutputDiff")
-	errBadCommitFileContractDiff  = errors.New("rogue file contract diff in commitFileContractDiff")
-	errBadCommitSiafundOutputDiff = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
+	errBadCommitSiacoinOutputDiff        = errors.New("rogue siacoin output diff in commitSiacoinOutputDiff")
+	errBadCommitFileContractDiff         = errors.New("rogue file contract diff in commitFileContractDiff")
+	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
+	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
+	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
 )
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
@@ -38,38 +40,38 @@ func (cs *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir mod
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
-func (s *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
+func (cs *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
-		_, exists := s.fileContracts[fcd.ID]
+		_, exists := cs.fileContracts[fcd.ID]
 		if exists == (fcd.Direction == dir) {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		s.fileContracts[fcd.ID] = fcd.FileContract
+		cs.fileContracts[fcd.ID] = fcd.FileContract
 	} else {
-		delete(s.fileContracts, fcd.ID)
+		delete(cs.fileContracts, fcd.ID)
 	}
 }
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
-func (s *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
+func (cs *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := s.siafundOutputs[sfod.ID]
+		_, exists := cs.siafundOutputs[sfod.ID]
 		if exists == (sfod.Direction == dir) {
 			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
 	if sfod.Direction == dir {
-		s.siafundOutputs[sfod.ID] = sfod.SiafundOutput
+		cs.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 	} else {
-		delete(s.siafundOutputs, sfod.ID)
+		delete(cs.siafundOutputs, sfod.ID)
 	}
 }
 
@@ -78,9 +80,13 @@ func (cs *State) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutp
 	// Sanity check - should not be adding an output twoice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
+		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight]
+		if !exists {
+			panic(errBadMaturityHeight)
+		}
+		_, exists = cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
 		if exists == (dscod.Direction == dir) {
-			panic("rogue delayed siacoin output in commitDelayedSiacoinOutputDiff")
+			panic(errBadCommitDelayedSiacoinOutputDiff)
 		}
 	}
 

@@ -223,6 +223,108 @@ func TestCommitSiafundOutputDiff(t *testing.T) {
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply) // Remove the object again.
 }
 
-// TODO: Repeat the above test for delayed diffs
-// TODO: Repeat the above test for pool diffs
-// NOTE: Try all variations of the 'exists == (scod == dir)' clause throughout the testing.
+// TestCommitDelayedSiacoinOutputDiff probes the commitDelayedSiacoinOutputDiff
+// method of the consensus set.
+func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Commit a delayed siacoin output with maturity height = cs.height()+1
+	maturityHeight := cst.cs.height() + 1
+	initialDscosLen := len(cst.cs.delayedSiacoinOutputs[maturityHeight])
+	id := types.SiacoinOutputID{'1'}
+	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
+	dscod := modules.DelayedSiacoinOutputDiff{
+		Direction:      modules.DiffApply,
+		ID:             id,
+		SiacoinOutput:  dsco,
+		MaturityHeight: maturityHeight,
+	}
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
+	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen+1 {
+		t.Error("delayed output diff set did not increase in size")
+	}
+	if cst.cs.delayedSiacoinOutputs[maturityHeight][id].Value.Cmp(dsco.Value) != 0 {
+		t.Error("wrong delayed siacoin output value after committing a diff")
+	}
+
+	// Rewind the diff.
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffRevert)
+	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen {
+		t.Error("siacoin output diff set did not increase in size")
+	}
+	_, exists := cst.cs.delayedSiacoinOutputs[maturityHeight][id]
+	if exists {
+		t.Error("siacoin output was not reverted")
+	}
+
+	// Restore the diff and then apply the inverse diff.
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
+	dscod.Direction = modules.DiffRevert
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
+	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen {
+		t.Error("siacoin output diff set did not increase in size")
+	}
+	_, exists = cst.cs.delayedSiacoinOutputs[maturityHeight][id]
+	if exists {
+		t.Error("siacoin output was not reverted")
+	}
+
+	// Revert the inverse diff.
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffRevert)
+	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen+1 {
+		t.Error("siacoin output diff set did not increase in size")
+	}
+	if cst.cs.delayedSiacoinOutputs[maturityHeight][id].Value.Cmp(dsco.Value) != 0 {
+		t.Error("wrong siacoin output value after committing a diff")
+	}
+
+	// Trigger an inconsistency check.
+	defer func() {
+		r := recover()
+		if r != errBadCommitDelayedSiacoinOutputDiff {
+			t.Error("expecting errBadCommitDelayedSiacoinOutputDiff, got", r)
+		}
+	}()
+	// Try applying an apply diff that was already applied. (add an object
+	// that already exists)
+	dscod.Direction = modules.DiffApply                             // set the direction to apply
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply) // apply an already existing delayed output.
+}
+
+// TestCommitDelayedSiacoinOutputDiffBadMaturity commits a delayed sicoin
+// output that has a bad maturity height and triggers a panic.
+func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Trigger an inconsistency check.
+	defer func() {
+		r := recover()
+		if r != errBadMaturityHeight {
+			t.Error("expecting errBadMaturityHeight, got", r)
+		}
+	}()
+
+	// Commit a delayed siacoin output with maturity height = cs.height()+1
+	maturityHeight := cst.cs.height() - 1
+	id := types.SiacoinOutputID{'1'}
+	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
+	dscod := modules.DelayedSiacoinOutputDiff{
+		Direction:      modules.DiffApply,
+		ID:             id,
+		SiacoinOutput:  dsco,
+		MaturityHeight: maturityHeight,
+	}
+	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
+}
