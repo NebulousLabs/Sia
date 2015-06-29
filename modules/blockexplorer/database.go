@@ -101,9 +101,8 @@ func openDB(filename string) (*explorerDB, error) {
 
 	var buckets []string = []string{
 		"Blocks", "Transactions", "Addresses",
-		"FileContracts", "StorageProofs", "FileProofs",
-		"SiacoinOutputs", "SiafundOutputs", "Heights",
-		"Hashes",
+		"FileContracts", "SiacoinOutputs", "SiafundOutputs",
+		"Heights", "Hashes",
 	}
 
 	// Create buckets

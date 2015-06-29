@@ -56,7 +56,7 @@ func (srv *Server) blockexplorerGetHashHandler(w http.ResponseWriter, req *http.
 
 	// returnData will be a generic interface. The json encoder
 	// should still work though
-	returnData, err := srv.blocke.GetHashInfo(hash)
+	returnData, err := srv.blocke.GetHashInfo(data)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
