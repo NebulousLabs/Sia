@@ -11,8 +11,6 @@ package hostdb
 // coins burned.
 
 import (
-	"strings"
-
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -28,8 +26,7 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 		var prefix types.Specifier
 		for _, arb := range t.ArbitraryData {
 			copy(prefix[:], arb)
-			if !strings.HasPrefix(string(arb), modules.PrefixStrHostAnnouncement) && // preserved for compatibility with 0.3.3.3
-				prefix != modules.PrefixHostAnnouncement {
+			if prefix != modules.PrefixHostAnnouncement {
 				continue
 			}
 

@@ -85,9 +85,9 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	var prefix types.Specifier
 	for _, arb := range t.ArbitraryData {
 		copy(prefix[:], arb)
-		strData := string(arb) // preserved for compatibility with 0.3.3.3
-		if !strings.HasPrefix(strData, modules.PrefixStrHostAnnouncement) &&
-			!strings.HasPrefix(strData, modules.PrefixStrNonSia) &&
+		strData := string(arb)                                               // COMPATv0.3.3.3
+		if !strings.HasPrefix(strData, modules.PrefixStrHostAnnouncement) && // COMPATv0.3.3.3
+			!strings.HasPrefix(strData, modules.PrefixStrNonSia) && // COMPATv0.3.3.3
 			prefix != modules.PrefixHostAnnouncement &&
 			prefix != modules.PrefixNonSia {
 			return errors.New("arbitrary data contains unrecognized prefix")

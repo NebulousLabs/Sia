@@ -15,7 +15,7 @@ var (
 	// submitted to the transaction pool.
 	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
 	PrefixNonSia                = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
-	PrefixStrNonSia             = "NonSia" // preserved for compatibility with 0.3.3.3
+	PrefixStrNonSia             = "NonSia" // COMPATv0.3.3.3
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and

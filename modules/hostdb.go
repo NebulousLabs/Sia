@@ -6,7 +6,7 @@ import (
 
 const (
 	// Denotes a host announcement in the Arbitrary Data section.
-	PrefixStrHostAnnouncement = "HostAnnouncement" // preserved for compatibility with 0.3.3.3
+	PrefixStrHostAnnouncement = "HostAnnouncement" // COMPATv0.3.3.3
 )
 
 var (

@@ -217,3 +217,12 @@ each function should be tested individually.
 Encoding objects is an important part of Sia. Any objects that get declared in
 polished code need to have a test which checks that they can be marshalled and
 unmarshalled without error.
+
+Compatibility
+-------------
+
+Upgrades must preserve compatibility with previous versions. While Sia is still
+in beta, compatibility must be preserved until 90% no longer need the
+compatibilty adjustments.
+
+Compatibility code should be marked with a COMPAT tag. Example: // COMPATv0.3.3.3
