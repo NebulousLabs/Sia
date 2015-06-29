@@ -127,8 +127,6 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 		g.log.Printf("INFO: could not write version ack to %v: %v", addr, err)
 		return
 	}
-	// TODO: connecting peer may disconnect at this point if they reject our
-	// version. This could be handled more gracefully.
 
 	// If we are already fully connected, kick out an old inbound peer to make
 	// room for the new one. Among other things, this ensures that bootstrap

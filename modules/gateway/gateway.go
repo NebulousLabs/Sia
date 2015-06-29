@@ -13,7 +13,6 @@ import (
 const (
 	// maxStrikes is the number of "strikes" that can be incurred by a peer
 	// before it will be removed.
-	// TODO: need a way to whitelist peers (e.g. hosts)
 	maxStrikes = 5
 )
 
@@ -35,14 +34,14 @@ type Gateway struct {
 	// peers are the nodes we are currently connected to.
 	peers map[modules.NetAddress]*peer
 
-	// nodes is a list of all known nodes (i.e. potential peers) on the
+	// nodes is the set of all known nodes (i.e. potential peers) on the
 	// network.
-	// TODO: map to a timestamp?
 	nodes map[modules.NetAddress]struct{}
 
 	persistDir string
-	log        *log.Logger
-	mu         *sync.RWMutex
+
+	log *log.Logger
+	mu  *sync.RWMutex
 }
 
 // Address returns the NetAddress of the Gateway.
