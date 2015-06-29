@@ -23,7 +23,6 @@ const (
 )
 
 type peer struct {
-	strikes uint32
 	addr    modules.NetAddress
 	sess    muxado.Session
 	inbound bool

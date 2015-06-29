@@ -3,7 +3,6 @@ package gateway
 import (
 	"errors"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -53,8 +52,6 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	err = fn(conn)
 	if err != nil {
 		g.log.Printf("WARN: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
-		// give peer a strike
-		atomic.AddUint32(&peer.strikes, 1)
 	}
 	return err
 }

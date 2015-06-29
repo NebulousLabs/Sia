@@ -10,12 +10,6 @@ import (
 	"github.com/NebulousLabs/Sia/sync"
 )
 
-const (
-	// maxStrikes is the number of "strikes" that can be incurred by a peer
-	// before it will be removed.
-	maxStrikes = 5
-)
-
 var (
 	errNoPeers     = errors.New("no peers")
 	errUnreachable = errors.New("peer did not respond to ping")
