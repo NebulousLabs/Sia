@@ -157,6 +157,14 @@ func (cs *State) AcceptBlock(b types.Block) error {
 		return err
 	}
 
+	// Sanity check - consensus set should pass all consistency checks.
+	if build.DEBUG {
+		err = cs.checkConsistency()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	// Broadcast the new block to all peers. This is an expensive operation,
 	// and not necessary during synchronize or when loading from disk.
 	go cs.gateway.Broadcast("RelayBlock", b)

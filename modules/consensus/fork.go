@@ -134,7 +134,7 @@ func (cs *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes
 	// fast-forward to newNode
 	appliedNodes, err = cs.applyUntilNode(newNode)
 	if err == nil {
-		return revertedNodes, appliedNodes, err
+		return revertedNodes, appliedNodes, nil
 	}
 
 	// restore old path

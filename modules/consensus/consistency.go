@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -225,19 +226,19 @@ func (cs *State) checkConsistency() error {
 	if err != nil {
 		return err
 	}
-	err = checkDelayedSiacoinOutputMaps()
+	err = cs.checkDelayedSiacoinOutputMaps()
 	if err != nil {
 		return err
 	}
-	err = checkSiacoins()
+	err = cs.checkSiacoins()
 	if err != nil {
 		return err
 	}
-	err = checkSiafunds()
+	err = cs.checkSiafunds()
 	if err != nil {
 		return err
 	}
-	err = checkRewindApply()
+	err = cs.checkRewindApply()
 	if err != nil {
 		return err
 	}

@@ -163,6 +163,10 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
+	// Get the genesis consensus set hash.
+	if build.DEBUG {
+		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
+	}
 
 	// Send out genesis block update.
 	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
