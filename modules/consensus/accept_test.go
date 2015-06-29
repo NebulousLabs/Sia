@@ -386,14 +386,6 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	if testing.Short() {
-		t.SkipNow()
-	}
-	err = cst.cs.checkConsistency()
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // TestInconsistentCheck submits a block on a consensus set that is

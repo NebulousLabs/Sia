@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -11,21 +13,25 @@ import (
 // changes are recorded as diffs for easy rewinding and reapplying. The diffs
 // are created, applied, reverted, and queried in this file.
 
+var (
+	errBadCommitSiacoinOutputDiff = errors.New("rogue siacoin output in commitSiacoinOutputDiff")
+)
+
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (s *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+func (cs *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := s.siacoinOutputs[scod.ID]
+		_, exists := cs.siacoinOutputs[scod.ID]
 		if exists == (scod.Direction == dir) {
-			panic("rogue siacoin output in commitSiacoinOutputDiff")
+			panic(errBadCommitSiacoinOutputDiff)
 		}
 	}
 
 	if scod.Direction == dir {
-		s.siacoinOutputs[scod.ID] = scod.SiacoinOutput
+		cs.siacoinOutputs[scod.ID] = scod.SiacoinOutput
 	} else {
-		delete(s.siacoinOutputs, scod.ID)
+		delete(cs.siacoinOutputs, scod.ID)
 	}
 }
 
@@ -252,7 +258,10 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	for _, txn := range bn.block.Transactions {
 		err := s.validTransaction(txn)
 		if err != nil {
-			s.applyMaturedSiacoinOutputs(bn) // Awkward: need to apply the matured outputs otherwise the diff structure malforms.
+			// Awkward: need to apply the matured outputs otherwise the diff
+			// structure malforms due to the way the delayedOutput maps are
+			// created and destroyed.
+			s.applyMaturedSiacoinOutputs(bn)
 			s.commitDiffSet(bn, modules.DiffRevert)
 			s.dosBlocks[bn.block.ID()] = struct{}{}
 			s.deleteNode(bn)
