@@ -24,6 +24,26 @@ func TestAddPeer(t *testing.T) {
 	}
 }
 
+func TestRandomInboundPeer(t *testing.T) {
+	g := newTestingGateway("TestRandomInboundPeer", t)
+	defer g.Close()
+	id := g.mu.Lock()
+	defer g.mu.Unlock(id)
+	_, err := g.randomInboundPeer()
+	if err != errNoPeers {
+		t.Fatal("expected errNoPeers, got", err)
+	}
+
+	g.addPeer(&peer{addr: "foo", sess: muxado.Client(nil), inbound: true})
+	if len(g.peers) != 1 {
+		t.Fatal("gateway did not add peer")
+	}
+	addr, err := g.randomInboundPeer()
+	if err != nil || addr != "foo" {
+		t.Fatal("gateway did not select random peer")
+	}
+}
+
 func TestListen(t *testing.T) {
 	g := newTestingGateway("TestListen", t)
 	defer g.Close()
