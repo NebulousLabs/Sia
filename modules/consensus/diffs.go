@@ -128,8 +128,9 @@ func (cs *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules
 	}
 }
 
-// commitDiffSet applies or reverts the diffs in a blockNode.
-func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
+// commitDiffSetSanity performs a series of sanity checks before commiting a
+// diff set.
+func (cs *State) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
 	// Sanity checks.
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
@@ -140,12 +141,12 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
 		if dir == modules.DiffApply {
-			if bn.parent.block.ID() != s.currentBlockID() {
+			if bn.parent.block.ID() != cs.currentBlockID() {
 				panic("applying a block node when it's not a valid successor")
 			}
 		} else {
-			if bn.block.ID() != s.currentBlockID() {
-				panic("applying a block node when it's not a valid successor")
+			if bn.block.ID() != cs.currentBlockID() {
+				panic("reverting a block node when it's not a valid successor")
 			}
 		}
 
@@ -157,99 +158,118 @@ func (s *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 			}
 		}
 	}
+}
 
-	// Create the filling delayed siacoin output map.
+// createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
+// will be used when applying delayed siacoin outputs in the diff set.
+func (cs *State) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
 			// exist.
-			_, exists := s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
 			if exists {
 				panic("trying to create a map that already exists")
 			}
 		}
-		s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+		cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	} else {
 		// Skip creating maps for heights that can't have delayed outputs.
 		if bn.height > types.MaturityDelay {
 			// Sanity check - the output map being created should not already
 			// exist.
 			if build.DEBUG {
-				_, exists := s.delayedSiacoinOutputs[bn.height]
+				_, exists := cs.delayedSiacoinOutputs[bn.height]
 				if exists {
 					panic("trying to create a map that already exists")
 				}
 			}
-			s.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+			cs.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 		}
 	}
+}
 
-	// Apply each of the diffs.
+// commitNodeDiffs commits all of the diffs in a block node.
+func (cs *State) commitNodeDiffs(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		for _, scod := range bn.siacoinOutputDiffs {
-			s.commitSiacoinOutputDiff(scod, dir)
+			cs.commitSiacoinOutputDiff(scod, dir)
 		}
 		for _, fcd := range bn.fileContractDiffs {
-			s.commitFileContractDiff(fcd, dir)
+			cs.commitFileContractDiff(fcd, dir)
 		}
 		for _, sfod := range bn.siafundOutputDiffs {
-			s.commitSiafundOutputDiff(sfod, dir)
+			cs.commitSiafundOutputDiff(sfod, dir)
 		}
 		for _, dscod := range bn.delayedSiacoinOutputDiffs {
-			s.commitDelayedSiacoinOutputDiff(dscod, dir)
+			cs.commitDelayedSiacoinOutputDiff(dscod, dir)
 		}
 		for _, sfpd := range bn.siafundPoolDiffs {
-			s.commitSiafundPoolDiff(sfpd, dir)
+			cs.commitSiafundPoolDiff(sfpd, dir)
 		}
 	} else {
 		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
-			s.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
+			cs.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
 		}
 		for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
-			s.commitFileContractDiff(bn.fileContractDiffs[i], dir)
+			cs.commitFileContractDiff(bn.fileContractDiffs[i], dir)
 		}
 		for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
-			s.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
+			cs.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
 		}
 		for i := len(bn.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			s.commitDelayedSiacoinOutputDiff(bn.delayedSiacoinOutputDiffs[i], dir)
+			cs.commitDelayedSiacoinOutputDiff(bn.delayedSiacoinOutputDiffs[i], dir)
 		}
 		for i := len(bn.siafundPoolDiffs) - 1; i >= 0; i-- {
-			s.commitSiafundPoolDiff(bn.siafundPoolDiffs[i], dir)
+			cs.commitSiafundPoolDiff(bn.siafundPoolDiffs[i], dir)
 		}
 	}
+}
 
-	// Delete the emptied siacoin output map.
+// deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
+// are no longer in use.
+func (cs *State) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if bn.height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if len(s.delayedSiacoinOutputs[bn.height]) != 0 {
+				if len(cs.delayedSiacoinOutputs[bn.height]) != 0 {
 					panic("trying to delete a set of delayed outputs that is not empty.")
 				}
 			}
-			delete(s.delayedSiacoinOutputs, bn.height)
+			delete(cs.delayedSiacoinOutputs, bn.height)
 		}
 	} else {
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
-			if len(s.delayedSiacoinOutputs[bn.height+types.MaturityDelay]) != 0 {
+			if len(cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]) != 0 {
 				panic("trying to delete a set of delayed outputs that is not empty.")
 			}
 		}
-		delete(s.delayedSiacoinOutputs, bn.height+types.MaturityDelay)
-
+		delete(cs.delayedSiacoinOutputs, bn.height+types.MaturityDelay)
 	}
+}
 
+// updateCurrentPath updates the current path after applying a diff set.
+func (cs *State) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		s.currentPath = append(s.currentPath, bn.block.ID())
-		s.db.AddBlock(bn.block)
+		cs.currentPath = append(cs.currentPath, bn.block.ID())
+		cs.db.AddBlock(bn.block)
 	} else {
-		s.currentPath = s.currentPath[:len(s.currentPath)-1]
-		s.db.RemoveBlock()
+		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
+		cs.db.RemoveBlock()
 	}
+}
+
+// commitDiffSet applies or reverts the diffs in a blockNode.
+func (cs *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
+	cs.commitDiffSetSanity(bn, dir)
+	cs.createUpcomingDelayedOutputMaps(bn, dir)
+	cs.commitNodeDiffs(bn, dir)
+	cs.deleteObsoleteDelayedOutputMaps(bn, dir)
+	cs.updateCurrentPath(bn, dir)
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
