@@ -9,21 +9,21 @@ import (
 
 // deleteNode recursively deletes its children from the set of known blocks.
 // The node being deleted should not be a part of the current path.
-func (cs *State) deleteNode(node *blockNode) {
+func (cs *State) deleteNode(bn *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
-		if types.BlockHeight(len(cs.currentPath)) > node.height &&
-			cs.currentPath[node.height] == node.block.ID() {
-			panic("cannot call 'deleteNode' on a node in the current path.")
+		if types.BlockHeight(len(cs.currentPath)) > bn.height &&
+			cs.currentPath[bn.height] == bn.block.ID() {
+			panic("cannot call 'deleteNode' on a block node in the current path.")
 		}
 	}
 
 	// Recusively call 'deleteNode' on of the input node's children, then
-	// delete the input node.
-	for i := range node.children {
-		cs.deleteNode(node.children[i])
+	// delete the node.
+	for i := range bn.children {
+		cs.deleteNode(bn.children[i])
 	}
-	delete(cs.blockMap, node.block.ID())
+	delete(cs.blockMap, bn.block.ID())
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in

@@ -276,7 +276,7 @@ func (cs *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (s *State) generateAndApplyDiff(bn *blockNode) error {
+func (cs *State) generateAndApplyDiff(bn *blockNode) error {
 	// Sanity check
 	if build.DEBUG {
 		// Generate should only be called if the diffs have not yet been
@@ -286,15 +286,15 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 		}
 
 		// Current node must be the input node's parent.
-		if bn.parent.block.ID() != s.currentBlockID() {
+		if bn.parent.block.ID() != cs.currentBlockID() {
 			panic(errInvalidSuccessor)
 		}
 	}
 
 	// Update the state to point to the new block.
-	s.currentPath = append(s.currentPath, bn.block.ID())
-	s.db.AddBlock(bn.block)
-	s.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	cs.currentPath = append(cs.currentPath, bn.block.ID())
+	cs.db.AddBlock(bn.block)
+	cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
@@ -305,29 +305,29 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
 	for _, txn := range bn.block.Transactions {
-		err := s.validTransaction(txn)
+		err := cs.validTransaction(txn)
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
 			// created and destroyed.
-			s.applyMaturedSiacoinOutputs(bn)
-			s.commitDiffSet(bn, modules.DiffRevert)
-			s.dosBlocks[bn.block.ID()] = struct{}{}
-			s.deleteNode(bn)
+			cs.applyMaturedSiacoinOutputs(bn)
+			cs.commitDiffSet(bn, modules.DiffRevert)
+			cs.dosBlocks[bn.block.ID()] = struct{}{}
+			cs.deleteNode(bn)
 			return err
 		}
 
-		s.applyTransaction(bn, txn)
+		cs.applyTransaction(bn, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	s.applyMaintenance(bn)
+	cs.applyMaintenance(bn)
 
 	if build.DEBUG {
-		bn.consensusSetHash = s.consensusSetHash()
+		bn.consensusSetHash = cs.consensusSetHash()
 	}
 	return nil
 }
