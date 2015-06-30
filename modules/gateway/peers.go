@@ -20,6 +20,8 @@ const (
 	wellConnectedThreshold = 8
 	// the gateway will not accept inbound connections above this threshold
 	fullyConnectedThreshold = 128
+	// the gateway will ask for more addresses below this threshold
+	minNodeListLen = 100
 )
 
 type peer struct {
@@ -51,8 +53,23 @@ func (g *Gateway) addPeer(p *peer) {
 	go g.listenPeer(p)
 }
 
+// randomPeer returns a random peer from the gateway's peer list.
+func (g *Gateway) randomPeer() (modules.NetAddress, error) {
+	if len(g.peers) > 0 {
+		r := rand.Intn(len(g.peers))
+		for addr := range g.peers {
+			if r == 0 {
+				return addr, nil
+			}
+			r--
+		}
+	}
+
+	return "", errNoPeers
+}
+
 // randomInboundPeer returns a random peer that initiated its connection.
-func (g *Gateway) randomInboundPeer() modules.NetAddress {
+func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
 		r := rand.Intn(len(g.peers))
 		for addr, peer := range g.peers {
@@ -61,13 +78,13 @@ func (g *Gateway) randomInboundPeer() modules.NetAddress {
 				continue
 			}
 			if r == 0 {
-				return addr
+				return addr, nil
 			}
 			r--
 		}
 	}
 
-	return ""
+	return "", errNoPeers
 }
 
 // listen handles incoming connection requests. If the connection is accepted,
@@ -134,10 +151,12 @@ func (g *Gateway) acceptConn(conn net.Conn) {
 	// you should be able to connect to less full peers.
 	id := g.mu.Lock()
 	if len(g.peers) >= fullyConnectedThreshold {
-		oldPeer := g.randomInboundPeer()
-		g.peers[oldPeer].sess.Close()
-		delete(g.peers, oldPeer)
-		g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
+		oldPeer, err := g.randomInboundPeer()
+		if err == nil {
+			g.peers[oldPeer].sess.Close()
+			delete(g.peers, oldPeer)
+			g.log.Printf("INFO: disconnected from %v to make room for %v", oldPeer, addr)
+		}
 	}
 	// add the peer
 	g.addPeer(&peer{addr: addr, sess: muxado.Server(conn), inbound: true})
@@ -243,6 +262,14 @@ func (g *Gateway) makeOutboundConnections() {
 				g.removeNode(addr)
 				g.mu.Unlock(id)
 			}
+		}
+		// request more nodes if necessary
+		id := g.mu.RLock()
+		numNodes := len(g.nodes)
+		addr, err := g.randomPeer()
+		g.mu.RUnlock(id)
+		if build.Release != "testing" && err == nil && numNodes < minNodeListLen {
+			g.RPC(addr, "ShareNodes", g.requestNodes)
 		}
 		time.Sleep(5 * time.Second)
 	}
