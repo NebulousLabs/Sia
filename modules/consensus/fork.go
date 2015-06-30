@@ -1,10 +1,16 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
@@ -14,16 +20,30 @@ func (cs *State) deleteNode(bn *blockNode) {
 	if build.DEBUG {
 		if types.BlockHeight(len(cs.currentPath)) > bn.height &&
 			cs.currentPath[bn.height] == bn.block.ID() {
-			panic("cannot call 'deleteNode' on a block node in the current path.")
+			panic(errDeleteCurrentPath)
 		}
 	}
 
-	// Recusively call 'deleteNode' on of the input node's children, then
-	// delete the node.
+	// Recusively call 'deleteNode' on of the input node's children.
 	for i := range bn.children {
 		cs.deleteNode(bn.children[i])
 	}
+
+	// Remove the node from the block map, and from its parents list of
+	// children.
 	delete(cs.blockMap, bn.block.ID())
+	for i := range bn.parent.children {
+		if bn.parent.children[i] == bn {
+			// If 'i' is not the last element, remove it from the array by
+			// copying the remaining array over it.
+			if i < len(bn.parent.children)-1 {
+				copy(bn.parent.children[i:], bn.parent.children[i+1:])
+			}
+			// Trim the last element.
+			bn.parent.children = bn.parent.children[:len(bn.parent.children)-1]
+			break
+		}
+	}
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
