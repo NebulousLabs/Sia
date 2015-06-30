@@ -333,7 +333,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 // consensus set.
 func TestCommitSiafundPoolDiff(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
 	if err != nil {
@@ -414,4 +414,111 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 		Adjusted: negativeAdjustment,
 	}
 	cst.cs.commitSiafundPoolDiff(negativeSfpd, modules.DiffApply)
+}
+
+// TestCommitDiffSetSanity triggers all of the panics in the
+// commitDiffSetSanity method of the consensus set.
+func TestCommitDiffSetSanity(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	defer func() {
+		r := recover()
+		if r != errDiffsNotGenerated {
+			t.Error("expected errDiffsNotGenerated, got", r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errWrongAppliedDiffSet {
+			t.Error("expected errWrongAppliedDiffSet, got", r)
+		}
+
+		// Trigger a panic about diffs not being generated.
+		bn.diffsGenerated = false
+		cst.cs.commitDiffSetSanity(bn, modules.DiffRevert)
+	}()
+	defer func() {
+		r := recover()
+		if r != errWrongRevertDiffSet {
+			t.Error("expected errWrongRevertDiffSet, got", r)
+		}
+
+		// trigger a panic about applying the wrong block.
+		bn.block.ParentID[0]++
+		cst.cs.commitDiffSetSanity(bn, modules.DiffApply)
+	}()
+
+	// Trigger a panic about incorrectly reverting a diff set.
+	bn.block.MinerPayouts = append(bn.block.MinerPayouts, types.SiacoinOutput{}) // change the block id by adding a miner payout
+	cst.cs.commitDiffSetSanity(bn, modules.DiffRevert)
+}
+
+// TestCreateUpcomingDelayedOutputMaps probes the createUpcomingDelayedMaps
+// method of the consensus set.
+func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Check that a map gets created upon revert.
+	_, exists := cst.cs.delayedSiacoinOutputs[bn.height]
+	if exists {
+		t.Fatal("unexpected delayed output map at bn.height")
+	}
+	cst.cs.commitDiffSet(bn, modules.DiffRevert) // revert the current block node
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height]
+	if !exists {
+		t.Error("delayed output map was not created when reverting diffs")
+	}
+
+	// Check that a map gets created on apply.
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	if exists {
+		t.Fatal("delayed output map exists when it shouldn't")
+	}
+	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	if !exists {
+		t.Error("delayed output map was not created")
+	}
+
+	// Check that a map is not created on revert when the height is
+	// sufficiently low.
+	cst.cs.commitDiffSet(bn.parent, modules.DiffRevert)
+	cst.cs.commitDiffSet(bn.parent.parent, modules.DiffRevert)
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.parent.parent.height]
+	if exists {
+		t.Error("delayed output map was created when bringing the height too low")
+	}
+
+	defer func() {
+		r := recover()
+		if r != errCreatingExistingUpcomingMap {
+			t.Error("expected errCreatingExistingUpcomingMap, got", r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errCreatingExistingUpcomingMap {
+			t.Error("expected errCreatingExistingUpcomingMap, got", r)
+		}
+
+		// Trigger a panic by creating a map that's already there during a revert.
+		cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffRevert)
+	}()
+
+	// Trigger a panic by creating a map that's already there during an apply.
+	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
 }

@@ -19,9 +19,13 @@ var (
 	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
 	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
 	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
+	errCreatingExistingUpcomingMap       = errors.New("creating an existing upcoming map")
+	errDiffsNotGenerated                 = errors.New("applying diff set before generating errors")
 	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
-	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field.")
-	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field.")
+	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field")
+	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field")
+	errWrongAppliedDiffSet               = errors.New("applying a diff set that isn't the current block")
+	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
 )
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
@@ -135,26 +139,18 @@ func (cs *State) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
 		if !bn.diffsGenerated {
-			panic("misuse of applyDiffSet - diffs have not been generated!")
+			panic(errDiffsNotGenerated)
 		}
 
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
 		if dir == modules.DiffApply {
 			if bn.parent.block.ID() != cs.currentBlockID() {
-				panic("applying a block node when it's not a valid successor")
+				panic(errWrongAppliedDiffSet)
 			}
 		} else {
 			if bn.block.ID() != cs.currentBlockID() {
-				panic("reverting a block node when it's not a valid successor")
-			}
-		}
-
-		// All siafundPoolDiffs should be increasing the size of the siafund
-		// pool.
-		for _, sfpd := range bn.siafundPoolDiffs {
-			if sfpd.Previous.Cmp(sfpd.Adjusted) < 0 {
-				panic("a siafund pool diff exists that shrinks the siafund pool")
+				panic(errWrongRevertDiffSet)
 			}
 		}
 	}
@@ -169,7 +165,7 @@ func (cs *State) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.Diff
 			// exist.
 			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
 			if exists {
-				panic("trying to create a map that already exists")
+				panic(errCreatingExistingUpcomingMap)
 			}
 		}
 		cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
@@ -181,7 +177,7 @@ func (cs *State) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.Diff
 			if build.DEBUG {
 				_, exists := cs.delayedSiacoinOutputs[bn.height]
 				if exists {
-					panic("trying to create a map that already exists")
+					panic(errCreatingExistingUpcomingMap)
 				}
 			}
 			cs.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
