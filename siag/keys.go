@@ -167,7 +167,7 @@ func verifyKeys(uc types.UnlockConditions, folder string, keyname string) error 
 			if err != nil {
 				return err
 			}
-			txn.TransactionSignatures[j].Signature = types.Signature(sig[:])
+			txn.TransactionSignatures[j].Signature = sig[:]
 			i++
 			j++
 		}

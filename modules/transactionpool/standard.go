@@ -84,13 +84,18 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// putting older nodes at risk of violating the new rules.
 	var prefix types.Specifier
 	for _, arb := range t.ArbitraryData {
+
+		// Check for a whilelisted prefix.
 		copy(prefix[:], arb)
-		strData := string(arb) // preserved for compatibility with 0.3.3.3
-		if !strings.HasPrefix(strData, modules.PrefixStrHostAnnouncement) &&
-			!strings.HasPrefix(strData, modules.PrefixStrNonSia) &&
-			prefix != modules.PrefixHostAnnouncement &&
-			prefix != modules.PrefixNonSia {
-			return errors.New("arbitrary data contains unrecognized prefix")
+		if prefix == modules.PrefixHostAnnouncement ||
+			prefix == modules.PrefixNonSia {
+			continue
+		}
+
+		// COMPATv0.3.3.3 - deprecated whitelisted prefixes.
+		strData := string(arb)
+		if strings.HasPrefix(strData, modules.PrefixStrNonSia) {
+			continue
 		}
 	}
 

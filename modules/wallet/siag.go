@@ -161,7 +161,7 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 			if err != nil {
 				return types.Transaction{}, err
 			}
-			txn.TransactionSignatures[sigIndex].Signature = types.Signature(encodedSig[:])
+			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 
 			txn, _, err = w.AddTransactionSignature(id, txn.TransactionSignatures[sigIndex])
 			if err != nil {
