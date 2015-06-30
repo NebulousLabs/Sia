@@ -133,11 +133,9 @@ func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions [
 			}
 
 			modBytes := bucket.Get(mod.Key)
-			// if modBytes == nil {
-			// 	return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
-			// 		mod.Key,
-			// 		mod.BucketName))
-			// }
+			// The check to see if modBytes is nil needs
+			// to be done inside the map function, as some
+			// expect nil input
 
 			newItem, err := mod.Map(modBytes)
 			if err != nil {

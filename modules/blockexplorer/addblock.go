@@ -10,6 +10,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// appendAddress appends a modification object to conditionally
+// appends an address to the stored address in a database
 func appendAddress(modifications []persist.BoltModification, address types.UnlockHash, txid crypto.Hash) []persist.BoltModification {
 	addr := encoding.Marshal(address)
 	mapFunc := func(addrBytes []byte) (persist.BoltItem, error) {
@@ -51,6 +53,8 @@ func appendAddress(modifications []persist.BoltModification, address types.Unloc
 	})
 }
 
+// appendSiacoinInput appends a modificatoin object to look up a
+// siacoin output and set the input field
 func appendSiacoinInput(modifications []persist.BoltModification, outputID types.SiacoinOutputID, txid crypto.Hash) []persist.BoltModification {
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
@@ -77,6 +81,8 @@ func appendSiacoinInput(modifications []persist.BoltModification, outputID types
 	})
 }
 
+// append SiafundInput does the same thing as appendSiacoinInput, but
+// with siafunds instead
 func appendSiafundInput(modifications []persist.BoltModification, outputID types.SiafundOutputID, txid crypto.Hash) []persist.BoltModification {
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
@@ -103,6 +109,8 @@ func appendSiafundInput(modifications []persist.BoltModification, outputID types
 	})
 }
 
+// appendFcRevision appends a file contract revision to the list of
+// revisions in a file contract
 func appendFcRevision(modifications []persist.BoltModification, fcid types.FileContractID, txid crypto.Hash) []persist.BoltModification {
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
@@ -129,6 +137,8 @@ func appendFcRevision(modifications []persist.BoltModification, fcid types.FileC
 	})
 }
 
+// appendFcProof looks up a file contract and appends the file proof
+// to the filecontract object in the database
 func appendFcProof(modifications []persist.BoltModification, fcid types.FileContractID, txid crypto.Hash) []persist.BoltModification {
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
@@ -155,7 +165,8 @@ func appendFcProof(modifications []persist.BoltModification, fcid types.FileCont
 	})
 }
 
-// returns a new additions list with the a bolt item for inserting the output id appended to the end
+// appendNewOutput returns a new additions list with the a bolt item
+// for inserting the output id appended to the end
 func appendNewOutput(additions []persist.BoltItem, outputID types.SiacoinOutputID, txid crypto.Hash) []persist.BoltItem {
 	additions = appendHashType(additions, crypto.Hash(outputID), hashCoinOutputID)
 	return append(additions, persist.BoltItem{
@@ -167,7 +178,8 @@ func appendNewOutput(additions []persist.BoltItem, outputID types.SiacoinOutputI
 	})
 }
 
-// Same as appendNewOutput, but for SiaFunds instead of siacoins
+// appendNewSFOutput is the same as appendNewOutput, but for Siafunds
+// instead of siacoins
 func appendNewSFOutput(additions []persist.BoltItem, outputID types.SiafundOutputID, txid crypto.Hash) []persist.BoltItem {
 	additions = appendHashType(additions, crypto.Hash(outputID), hashFundOutputID)
 	return append(additions, persist.BoltItem{
@@ -187,8 +199,11 @@ func appendHashType(changes []persist.BoltItem, hash crypto.Hash, hashType int) 
 	})
 }
 
+// Parses and adds
 func (be *BlockExplorer) addBlockDB(b types.Block) error {
-	// Special case for the genesis block, which does not have a valid parent
+	// Special case for the genesis block, which does not have a
+	// valid parent, and for testing, as tests will not always use
+	// blocks in consensus
 	var blocktarget types.Target
 	if b.ID() == be.genesisBlockID {
 		blocktarget = types.RootDepth
@@ -196,9 +211,13 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		var exists bool
 		blocktarget, exists = be.cs.ChildTarget(b.ParentID)
 		if build.DEBUG {
+			if build.Release == "testing" {
+				blocktarget = types.RootDepth
+			}
 			if !exists {
 				panic("Applied block not in consensus")
 			}
+
 		}
 	}
 

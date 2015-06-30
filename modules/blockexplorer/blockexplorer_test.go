@@ -73,7 +73,7 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	be, err := New(cs)
+	be, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -114,7 +114,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create renter:", err)
 	}
-	be, err := blockexplorer.New(cs)
+	be, err := blockexplorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		t.Fatal("Failed to create explorer:", err)
 	}
