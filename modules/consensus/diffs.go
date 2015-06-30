@@ -14,15 +14,18 @@ import (
 // are created, applied, reverted, and queried in this file.
 
 var (
+	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field")
 	errBadCommitSiacoinOutputDiff        = errors.New("rogue siacoin output diff in commitSiacoinOutputDiff")
 	errBadCommitFileContractDiff         = errors.New("rogue file contract diff in commitFileContractDiff")
 	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
 	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
 	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
 	errCreatingExistingUpcomingMap       = errors.New("creating an existing upcoming map")
+	errDeletingNonEmptyDelayedMap        = errors.New("deleting a delayed siacoin output map that is not empty")
 	errDiffsNotGenerated                 = errors.New("applying diff set before generating errors")
+	errInvalidSuccessor                  = errors.New("generating diffs for a block that's an invalid successsor to the current block")
 	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
-	errApplySiafundPoolDiffMismatch      = errors.New("committing a siafund pool diff with an invalid 'previous' field")
+	errRegenerateDiffs                   = errors.New("cannot call generateAndApplyDiffs on a node for which diffs were already generated")
 	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field")
 	errWrongAppliedDiffSet               = errors.New("applying a diff set that isn't the current block")
 	errWrongRevertDiffSet                = errors.New("reverting a diff set that isn't the current block")
@@ -231,7 +234,7 @@ func (cs *State) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.Diff
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
 				if len(cs.delayedSiacoinOutputs[bn.height]) != 0 {
-					panic("trying to delete a set of delayed outputs that is not empty.")
+					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
 			delete(cs.delayedSiacoinOutputs, bn.height)
@@ -240,7 +243,7 @@ func (cs *State) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.Diff
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
 			if len(cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]) != 0 {
-				panic("trying to delete a set of delayed outputs that is not empty.")
+				panic(errDeletingNonEmptyDelayedMap)
 			}
 		}
 		delete(cs.delayedSiacoinOutputs, bn.height+types.MaturityDelay)
@@ -279,12 +282,12 @@ func (s *State) generateAndApplyDiff(bn *blockNode) error {
 		// Generate should only be called if the diffs have not yet been
 		// generated.
 		if bn.diffsGenerated {
-			panic("misuse of generateAndApplyDiff")
+			panic(errRegenerateDiffs)
 		}
 
 		// Current node must be the input node's parent.
 		if bn.parent.block.ID() != s.currentBlockID() {
-			panic("applying a block node when it's not a valid successor")
+			panic(errInvalidSuccessor)
 		}
 	}
 

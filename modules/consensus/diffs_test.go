@@ -303,7 +303,7 @@ func TestCommitDelayedSiacoinOutputDiffBadMaturity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiffBadMaturity")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	cst, err := createConsensusSetTester("TestCommitSiafundPoolDiff")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestCommitDiffSetSanity(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	cst, err := createConsensusSetTester("TestCommitDiffSetSanity")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	cst, err := createConsensusSetTester("TestCreateUpcomingDelayedOutputMaps")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,7 +528,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	cst, err := createConsensusSetTester("TestCommitNodeDiffs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -610,4 +610,115 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
+}
+
+// TestDeleteObsoleteDelayedOutputMaps probes the
+// deleteObsoleteDelayedOutputMaps method of the consensus set.
+func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestDeleteObsoleteDelayedOutputMaps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+
+	// Check that maps are deleted at bn.height when applying changes.
+	_, exists := cst.cs.delayedSiacoinOutputs[bn.height]
+	if !exists {
+		t.Fatal("expected a delayed output map at bn.height")
+	}
+	// Prepare for and then apply the obsolete maps.
+	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+	cst.cs.commitNodeDiffs(bn, modules.DiffApply)
+	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffApply)
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height]
+	if exists {
+		t.Error("delayed output map was not deleted on apply")
+	}
+
+	// Check that maps are deleted at bn.height+types.MaturityDelay when
+	// reverting changes.
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	if !exists {
+		t.Fatal("expected a delayed output map at bn.height+maturity delay")
+	}
+	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffRevert)
+	cst.cs.commitNodeDiffs(bn, modules.DiffRevert)
+	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffRevert)
+	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	if exists {
+		t.Error("delayed siacoin output map was not deleted upon revert")
+	}
+}
+
+// TestDeleteObsoleteDelayedOutputMapsSanity probes the sanity checks of the
+// deleteObsoleteDelayedOutputMaps method of the consensus set.
+func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestDeleteObsoleteDelayedOutputMapsSanity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+
+	defer func() {
+		r := recover()
+		if r != errDeletingNonEmptyDelayedMap {
+			t.Error("expected errDeletingNonEmptyDelayedMap, got", r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errDeletingNonEmptyDelayedMap {
+			t.Error("expected errDeletingNonEmptyDelayedMap, got", r)
+		}
+
+		// Trigger a panic by deleting a map with outputs in it during revert.
+		cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+		cst.cs.commitNodeDiffs(bn, modules.DiffApply)
+		cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffRevert)
+	}()
+
+	// Trigger a panic by deleting a map with outputs in it during apply.
+	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffApply)
+}
+
+// TestGenerateAndApplyDiffSanity triggers the sanity checks in the
+// generateAndApplyDiff method of the consensus set.
+func TestGenerateAndApplyDiffSanity(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestGenerateAndApplyDiffSanity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+
+	defer func() {
+		r := recover()
+		if r != errRegenerateDiffs {
+			t.Error("expected errRegenerateDiffs, got", r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errInvalidSuccessor {
+			t.Error("expected errInvalidSuccessor, got", r)
+		}
+
+		// Trigger errRegenerteDiffs
+		_ = cst.cs.generateAndApplyDiff(bn)
+	}()
+
+	// Trigger errInvalidSuccessor
+	bn.parent.diffsGenerated = false
+	_ = cst.cs.generateAndApplyDiff(bn.parent)
 }
