@@ -91,8 +91,9 @@ func (cs *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
 		sfpd := modules.SiafundPoolDiff{
-			Previous: cs.siafundPool,
-			Adjusted: cs.siafundPool.Add(fc.Tax()),
+			Direction: modules.DiffApply,
+			Previous:  cs.siafundPool,
+			Adjusted:  cs.siafundPool.Add(fc.Tax()),
 		}
 		bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
 		cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)

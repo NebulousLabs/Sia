@@ -347,16 +347,19 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 	adjusted2 := adjusted1.Add(types.NewCurrency64(500))
 	adjusted3 := adjusted2.Add(types.NewCurrency64(0))
 	sfpd1 := modules.SiafundPoolDiff{
-		Previous: initial,
-		Adjusted: adjusted1,
+		Direction: modules.DiffApply,
+		Previous:  initial,
+		Adjusted:  adjusted1,
 	}
 	sfpd2 := modules.SiafundPoolDiff{
-		Previous: adjusted1,
-		Adjusted: adjusted2,
+		Direction: modules.DiffApply,
+		Previous:  adjusted1,
+		Adjusted:  adjusted2,
 	}
 	sfpd3 := modules.SiafundPoolDiff{
-		Previous: adjusted2,
-		Adjusted: adjusted3,
+		Direction: modules.DiffApply,
+		Previous:  adjusted2,
+		Adjusted:  adjusted3,
 	}
 	cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffApply)
 	if cst.cs.siafundPool.Cmp(adjusted1) != 0 {
@@ -572,8 +575,9 @@ func TestCommitNodeDiffs(t *testing.T) {
 		MaturityHeight: cst.cs.height() + types.MaturityDelay,
 	}
 	sfpd := modules.SiafundPoolDiff{
-		Previous: cst.cs.siafundPool,
-		Adjusted: cst.cs.siafundPool.Add(types.NewCurrency64(1)),
+		Direction: modules.DiffApply,
+		Previous:  cst.cs.siafundPool,
+		Adjusted:  cst.cs.siafundPool.Add(types.NewCurrency64(1)),
 	}
 	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod0)
 	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod1)

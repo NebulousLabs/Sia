@@ -26,13 +26,6 @@ func (s *State) height() types.BlockHeight {
 	return types.BlockHeight(len(s.currentPath) - 1)
 }
 
-// output returns the unspent SiacoinOutput associated with the given ID. If
-// the output is not in the UTXO set, 'exists' will be false.
-func (s *State) output(id types.SiacoinOutputID) (sco types.SiacoinOutput, exists bool) {
-	sco, exists = s.siacoinOutputs[id]
-	return
-}
-
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *State) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
@@ -92,13 +85,6 @@ func (s *State) InCurrentPath(bid types.BlockID) bool {
 		return false
 	}
 	return s.currentPath[node.height] == bid
-}
-
-// SiafundPool returns the size of the siafund pool.
-func (cs *State) SiafundPool() types.Currency {
-	lockID := cs.mu.RLock()
-	defer cs.mu.RUnlock(lockID)
-	return cs.siafundPool
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

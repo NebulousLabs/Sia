@@ -45,6 +45,7 @@ type Wallet struct {
 	state            modules.ConsensusSet
 	tpool            modules.TransactionPool
 	unconfirmedDiffs []modules.SiacoinOutputDiff
+	siafundPool      types.Currency
 
 	// Location of the wallet directory, for saving and loading keys.
 	saveDir string

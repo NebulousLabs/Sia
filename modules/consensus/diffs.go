@@ -25,6 +25,7 @@ var (
 	errDiffsNotGenerated                 = errors.New("applying diff set before generating errors")
 	errInvalidSuccessor                  = errors.New("generating diffs for a block that's an invalid successsor to the current block")
 	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
+	errNonApplySiafundPoolDiff           = errors.New("commiting a siafund pool diff that doesn't have the 'apply' direction")
 	errRegenerateDiffs                   = errors.New("cannot call generateAndApplyDiffs on a node for which diffs were already generated")
 	errRevertSiafundPoolDiffMismatch     = errors.New("committing a siafund pool diff with an invalid 'adjusted' field")
 	errWrongAppliedDiffSet               = errors.New("applying a diff set that isn't the current block")
@@ -113,6 +114,9 @@ func (cs *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules
 	if build.DEBUG {
 		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
 			panic(errNegativePoolAdjustment)
+		}
+		if sfpd.Direction != modules.DiffApply {
+			panic(errNonApplySiafundPoolDiff)
 		}
 	}
 
