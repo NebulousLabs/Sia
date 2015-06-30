@@ -464,7 +464,7 @@ func TestCommitDiffSetSanity(t *testing.T) {
 // method of the consensus set.
 func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
 	if err != nil {
@@ -521,4 +521,93 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 
 	// Trigger a panic by creating a map that's already there during an apply.
 	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+}
+
+// TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
+func TestCommitNodeDiffs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestCommitDelayedSiacoinOutputDiff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+	cst.cs.commitDiffSet(bn, modules.DiffRevert) // pull the block node out of the consensus set.
+
+	// For diffs that can be destroyed in the same block they are created,
+	// create diffs that do just that. This has in the past caused issues upon
+	// rewinding.
+	scoid := types.SiacoinOutputID{'1'}
+	scod0 := modules.SiacoinOutputDiff{
+		Direction: modules.DiffApply,
+		ID:        scoid,
+	}
+	scod1 := modules.SiacoinOutputDiff{
+		Direction: modules.DiffRevert,
+		ID:        scoid,
+	}
+	fcid := types.FileContractID{'2'}
+	fcd0 := modules.FileContractDiff{
+		Direction: modules.DiffApply,
+		ID:        fcid,
+	}
+	fcd1 := modules.FileContractDiff{
+		Direction: modules.DiffRevert,
+		ID:        fcid,
+	}
+	sfoid := types.SiafundOutputID{'3'}
+	sfod0 := modules.SiafundOutputDiff{
+		Direction: modules.DiffApply,
+		ID:        sfoid,
+	}
+	sfod1 := modules.SiafundOutputDiff{
+		Direction: modules.DiffRevert,
+		ID:        sfoid,
+	}
+	dscoid := types.SiacoinOutputID{'4'}
+	dscod := modules.DelayedSiacoinOutputDiff{
+		Direction:      modules.DiffApply,
+		ID:             dscoid,
+		MaturityHeight: cst.cs.height() + types.MaturityDelay,
+	}
+	sfpd := modules.SiafundPoolDiff{
+		Previous: cst.cs.siafundPool,
+		Adjusted: cst.cs.siafundPool.Add(types.NewCurrency64(1)),
+	}
+	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod0)
+	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod1)
+	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd0)
+	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd1)
+	bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod0)
+	bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod1)
+	bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+	bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
+	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+	cst.cs.commitNodeDiffs(bn, modules.DiffApply)
+	_, exists := cst.cs.siacoinOutputs[scoid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	_, exists = cst.cs.fileContracts[fcid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	_, exists = cst.cs.siafundOutputs[sfoid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	cst.cs.commitNodeDiffs(bn, modules.DiffRevert)
+	_, exists = cst.cs.siacoinOutputs[scoid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	_, exists = cst.cs.fileContracts[fcid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
+	_, exists = cst.cs.siafundOutputs[sfoid]
+	if exists {
+		t.Error("intradependent outputs not treated correctly")
+	}
 }
