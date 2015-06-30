@@ -2,7 +2,6 @@ package persist
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/boltdb/bolt"
@@ -77,7 +76,8 @@ func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 	return nil
 }
 
-// A generic function to insert a value into a specific bucket in the database
+// InsertIntoBucket is a generic function to insert a value into a
+// specific bucket in the database
 func (db *BoltDatabase) InsertIntoBucket(bucketName string, key []byte, value []byte) error {
 	err := db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(bucketName))
@@ -96,32 +96,11 @@ func (db *BoltDatabase) InsertIntoBucket(bucketName string, key []byte, value []
 	return err
 }
 
-// insertIntoBuckets is a generic function to insert many items many
-// buckets
-func (db *BoltDatabase) BulkInsert(items []BoltItem) error {
-	err := db.Update(func(tx *bolt.Tx) error {
-		for _, item := range items {
-			bucket := tx.Bucket([]byte(item.BucketName))
-			if bucket == nil {
-				return errors.New("requested bucket does not exist: " + item.BucketName)
-			}
-
-			err := bucket.Put(item.Key, item.Value)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return err
-}
-
 // GetFromBucket is a wrapper around a bolt database lookup. If the
 // element does not exist, no error will be thrown, but the requested
 // element will be nil.
 func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, error) {
 	var bytes []byte
-	fmt.Printf("Requesting %x from bucket %s\n", key, bucketName)
 	err := db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(bucketName))
 		if bucket == nil {
@@ -137,31 +116,6 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 		return nil, err
 	}
 	return bytes, nil
-}
-
-// BulkGet retrieves many items from the database in the same transaction
-func (db *BoltDatabase) BulkGet(items []BoltItem) ([][]byte, error) {
-	values := make([][]byte, len(items))
-	err := db.View(func(tx *bolt.Tx) error {
-		for i, item := range items {
-			bucket := tx.Bucket([]byte(item.BucketName))
-			if bucket == nil {
-				return errors.New("requested bucket does not exist: " + item.BucketName)
-			}
-
-			values[i] = bucket.Get(item.Key)
-			if values[i] == nil {
-				return errors.New(fmt.Sprintf("requested item %x does not exist in bucket %s",
-					item.Key,
-					item.BucketName))
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return values, nil
 }
 
 // BulkUpdate is a function to both take readings from a database,

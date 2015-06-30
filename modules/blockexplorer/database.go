@@ -2,7 +2,6 @@ package blockexplorer
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -15,7 +14,7 @@ import (
 /*
 Database Structure:
 
-Blocks:
+Blocks
   types.BlockID ----------> types.Block
 Transactions
   Txid -------------------> txInfo
@@ -126,7 +125,6 @@ func openDB(filename string) (*explorerDB, error) {
 func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
 	summaries := make([]modules.ExplorerBlockData, int(finish-start))
 	err := db.View(func(tx *bolt.Tx) error {
-		fmt.Printf("Beginning lookup\n")
 		heights := tx.Bucket([]byte("Heights"))
 
 		// Iterate over each block height, constructing a
@@ -150,7 +148,6 @@ func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.Blo
 				Size:      bSummary.Size,
 			}
 		}
-		fmt.Printf("Lookup finished\n")
 		return nil
 	})
 	if err != nil {

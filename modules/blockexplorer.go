@@ -46,7 +46,11 @@ type (
 		// Sends notifications when the module updates
 		BlockExplorerNotify() <-chan struct{}
 
-		// Returns information pertaining to a given hash
+		// Returns information pertaining to a given hash. The
+		// type of the returned value depends on what the hash
+		// was, so an interface is returned instead (i.e. an
+		// address will return a list of transactions while a
+		// block ID will return a block
 		GetHashInfo([]byte) (interface{}, error)
 	}
 )

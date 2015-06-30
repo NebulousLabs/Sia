@@ -192,6 +192,8 @@ func (db *explorerDB) getFileContract(id types.FileContractID) (fcResponse, erro
 	return fr, nil
 }
 
+// getSiacoinOutput retrieves data about a siacoin output from the
+// database and puts it into a response structure
 func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (outputResponse, error) {
 	var or outputResponse
 	otBytes, err := db.GetFromBucket("SiacoinOutputs", encoding.Marshal(id))
@@ -212,6 +214,8 @@ func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (outputResponse
 	return or, nil
 }
 
+// getSiafundOutput retrieves data about a siafund output and puts it
+// into a response structure
 func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (outputResponse, error) {
 	var or outputResponse
 	otBytes, err := db.GetFromBucket("SiafundOutputs", encoding.Marshal(id))
@@ -232,6 +236,9 @@ func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (outputResponse
 	return or, nil
 }
 
+// getAddressTransactions gets the list of all blocks and transactions
+// the address was involved with, which could be many, and puts the
+// result in a response structure
 func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (addrResponse, error) {
 	var ar addrResponse
 	txBytes, err := db.GetFromBucket("Addresses", encoding.Marshal(address))
