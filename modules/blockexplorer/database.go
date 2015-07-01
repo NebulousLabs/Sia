@@ -35,8 +35,8 @@ Hashes
 
 */
 
-var meta persist.Metadata = persist.Metadata{
-	Version: ".1",
+var meta = persist.Metadata{
+	Version: "0.1",
 	Header:  "Sia Block Explorer Database",
 }
 
@@ -47,16 +47,6 @@ type explorerDB struct {
 type blockData struct {
 	Block  types.Block
 	Height types.BlockHeight
-}
-
-// Stored along with the height of a block. These are designed to be
-// values that are easily accessable in sequence, so that the entire
-// block does not need to be loaded
-type blockSummary struct {
-	ID        types.BlockID
-	Timestamp types.Timestamp
-	Target    types.Target
-	Size      uint64
 }
 
 // txInfo provides enough information to find the actual transaction
@@ -130,22 +120,14 @@ func (db *explorerDB) dbBlockSummaries(start types.BlockHeight, finish types.Blo
 		// Iterate over each block height, constructing a
 		// summary data structure for each block
 		for i := start; i < finish; i++ {
-			bSummaryBytes := heights.Get(encoding.Marshal(types.BlockHeight(i)))
+			bSummaryBytes := heights.Get(encoding.Marshal(i))
 			if bSummaryBytes == nil {
 				return errors.New("Block not found in height bucket")
 			}
 
-			var bSummary blockSummary
-			err := encoding.Unmarshal(bSummaryBytes, &bSummary)
+			err := encoding.Unmarshal(bSummaryBytes, &summaries[i-start])
 			if err != nil {
 				return err
-			}
-
-			summaries[i-start] = modules.ExplorerBlockData{
-				ID:        bSummary.ID,
-				Timestamp: bSummary.Timestamp,
-				Target:    bSummary.Target,
-				Size:      bSummary.Size,
 			}
 		}
 		return nil

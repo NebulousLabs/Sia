@@ -70,33 +70,33 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if typeBytes == nil {
-		return nil, errors.New("requested hash not found in database")
-	}
 
 	var hashType int
 	err = encoding.Unmarshal(typeBytes, &hashType)
+	if err != nil {
+		return nil, err
+	}
 
 	switch hashType {
 	case hashBlock:
 		var id types.BlockID
-		copy(id[:], hash[:crypto.HashSize])
+		copy(id[:], hash[:])
 		return be.db.getBlock(types.BlockID(id))
 	case hashTransaction:
 		var id crypto.Hash
-		copy(id[:], hash[:crypto.HashSize])
+		copy(id[:], hash[:])
 		return be.db.getTransaction(id)
 	case hashFilecontract:
 		var id types.FileContractID
-		copy(id[:], hash[:crypto.HashSize])
+		copy(id[:], hash[:])
 		return be.db.getFileContract(id)
 	case hashCoinOutputID:
 		var id types.SiacoinOutputID
-		copy(id[:], hash[:crypto.HashSize])
+		copy(id[:], hash[:])
 		return be.db.getSiacoinOutput(id)
 	case hashFundOutputID:
 		var id types.SiafundOutputID
-		copy(id[:], hash[:crypto.HashSize])
+		copy(id[:], hash[:])
 		return be.db.getSiafundOutput(id)
 	case hashUnlockHash:
 		var id types.UnlockHash
@@ -119,21 +119,23 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 }
 
 // Returns the block with a given id
-func (db *explorerDB) getBlock(id types.BlockID) (block blockResponse, err error) {
+func (db *explorerDB) getBlock(id types.BlockID) (blockResponse, error) {
+	var br blockResponse
+
 	b, err := db.GetFromBucket("Blocks", encoding.Marshal(id))
 	if err != nil {
-		return block, err
+		return br, err
 	}
 
 	var bd blockData
 	err = encoding.Unmarshal(b, &bd)
 	if err != nil {
-		return block, err
+		return br, err
 	}
-	block.Block = bd.Block
-	block.Height = bd.Height
-	block.ResponseType = responseBlock
-	return block, nil
+	br.Block = bd.Block
+	br.Height = bd.Height
+	br.ResponseType = responseBlock
+	return br, nil
 }
 
 // Returns the transaction with the given id

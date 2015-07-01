@@ -6,6 +6,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -26,7 +27,7 @@ func appendAddress(modifications []persist.BoltModification, address types.Unloc
 		var txids []crypto.Hash
 		err := encoding.Unmarshal(addrBytes, &txids)
 		if err != nil {
-			return *new(persist.BoltItem), err
+			return persist.BoltItem{}, err
 		}
 
 		// Don't append if the address is already in there
@@ -59,12 +60,12 @@ func appendSiacoinInput(modifications []persist.BoltModification, outputID types
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
 		if outputBytes == nil {
-			return *new(persist.BoltItem), errors.New("item not found in bucket")
+			return persist.BoltItem{}, errors.New("item not found in bucket")
 		}
 		var output outputTransactions
 		err := encoding.Unmarshal(outputBytes, &output)
 		if err != nil {
-			return *new(persist.BoltItem), err
+			return persist.BoltItem{}, err
 		}
 
 		output.InputTx = txid
@@ -87,12 +88,12 @@ func appendSiafundInput(modifications []persist.BoltModification, outputID types
 	oID := encoding.Marshal(outputID)
 	mapFunc := func(outputBytes []byte) (persist.BoltItem, error) {
 		if outputBytes == nil {
-			return *new(persist.BoltItem), errors.New("item not found in bucket")
+			return persist.BoltItem{}, errors.New("item not found in bucket")
 		}
 		var output outputTransactions
 		err := encoding.Unmarshal(outputBytes, &output)
 		if err != nil {
-			return *new(persist.BoltItem), err
+			return persist.BoltItem{}, err
 		}
 
 		output.InputTx = txid
@@ -115,12 +116,12 @@ func appendFcRevision(modifications []persist.BoltModification, fcid types.FileC
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
 		if fcBytes == nil {
-			return *new(persist.BoltItem), errors.New("item not found in bucket")
+			return persist.BoltItem{}, errors.New("item not found in bucket")
 		}
 		var fcInfoStruct fcInfo
 		err := encoding.Unmarshal(fcBytes, &fcInfoStruct)
 		if err != nil {
-			return *new(persist.BoltItem), err
+			return persist.BoltItem{}, err
 		}
 
 		fcInfoStruct.Revisions = append(fcInfoStruct.Revisions, txid)
@@ -143,12 +144,12 @@ func appendFcProof(modifications []persist.BoltModification, fcid types.FileCont
 	fcidBytes := encoding.Marshal(fcid)
 	mapFunc := func(fcBytes []byte) (persist.BoltItem, error) {
 		if fcBytes == nil {
-			return *new(persist.BoltItem), errors.New("item not found in bucket")
+			return persist.BoltItem{}, errors.New("item not found in bucket")
 		}
 		var fcInfoStruct fcInfo
 		err := encoding.Unmarshal(fcBytes, &fcInfoStruct)
 		if err != nil {
-			return *new(persist.BoltItem), err
+			return persist.BoltItem{}, err
 		}
 
 		fcInfoStruct.Proof = txid
@@ -222,8 +223,8 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	}
 
 	// Create an additions slice for this block
-	modifications := make([]persist.BoltModification, 0)
-	additions := make([]persist.BoltItem, 0)
+	var modifications []persist.BoltModification
+	var additions []persist.BoltItem
 
 	// Construct the struct that will be inside the database
 	blockStruct := blockData{
@@ -237,7 +238,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Value:      encoding.Marshal(blockStruct),
 	})
 
-	bSum := blockSummary{
+	bSum := modules.ExplorerBlockData{
 		ID:        b.ID(),
 		Timestamp: b.Timestamp,
 		Target:    blocktarget,

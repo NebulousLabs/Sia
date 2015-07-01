@@ -109,7 +109,12 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 
 		// Note that bytes could be nil. This is OK, but needs
 		// to be checked in calling functions
-		bytes = bucket.Get(key)
+		value := bucket.Get(key)
+		if value == nil {
+			return errors.New("requested item not found in database")
+		}
+		bytes = make([]byte, len(value))
+		copy(bytes, value)
 		return nil
 	})
 	if err != nil {
