@@ -6,6 +6,7 @@ import (
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -15,44 +16,6 @@ const (
 	responseFileContract = "FileContract"
 	responseOutput       = "Output"
 	responseAddress      = "Address"
-)
-
-type (
-	// Many explicit wrappers for return values
-	// All must have the ResponseType field as a string
-	blockResponse struct {
-		Block        types.Block
-		Height       types.BlockHeight
-		ResponseType string
-	}
-
-	// Wrapper for a transaction, with a little extra info
-	transactionResponse struct {
-		Tx           types.Transaction
-		ParentID     types.BlockID
-		TxNum        int
-		ResponseType string
-	}
-
-	// Wrapper for fcInfo struct, defined in database.go
-	fcResponse struct {
-		Contract     crypto.Hash
-		Revisions    []crypto.Hash
-		Proof        crypto.Hash
-		ResponseType string
-	}
-
-	// Wrapper for the address type response
-	addrResponse struct {
-		Txns         []crypto.Hash
-		ResponseType string
-	}
-
-	outputResponse struct {
-		OutputTx     crypto.Hash
-		InputTx      crypto.Hash
-		ResponseType string
-	}
 )
 
 // GetHashInfo returns sufficient data about the hash that was
@@ -99,15 +62,15 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 		copy(id[:], hash[:])
 		return be.db.getSiafundOutput(id)
 	case hashUnlockHash:
-		var id types.UnlockHash
-		copy(id[:], hash[:crypto.HashSize])
-
 		// Check that the address is valid before doing a lookup
 		if len(hash) != crypto.HashSize+types.UnlockHashChecksumSize {
 			return nil, errors.New("address does not have a valid checksum")
 		}
-		givenChecksum := hash[crypto.HashSize : crypto.HashSize+types.UnlockHashChecksumSize]
+		var id types.UnlockHash
+		copy(id[:], hash[:crypto.HashSize])
 		uhChecksum := crypto.HashObject(id)
+
+		givenChecksum := hash[crypto.HashSize : crypto.HashSize+types.UnlockHashChecksumSize]
 		if bytes.Compare(givenChecksum, uhChecksum[:types.UnlockHashChecksumSize]) != 0 {
 			return nil, errors.New("address does not have a valid checksum")
 		}
@@ -119,8 +82,8 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 }
 
 // Returns the block with a given id
-func (db *explorerDB) getBlock(id types.BlockID) (blockResponse, error) {
-	var br blockResponse
+func (db *explorerDB) getBlock(id types.BlockID) (modules.BlockResponse, error) {
+	var br modules.BlockResponse
 
 	b, err := db.GetFromBucket("Blocks", encoding.Marshal(id))
 	if err != nil {
@@ -139,8 +102,8 @@ func (db *explorerDB) getBlock(id types.BlockID) (blockResponse, error) {
 }
 
 // Returns the transaction with the given id
-func (db *explorerDB) getTransaction(id crypto.Hash) (transactionResponse, error) {
-	var tr transactionResponse
+func (db *explorerDB) getTransaction(id crypto.Hash) (modules.TransactionResponse, error) {
+	var tr modules.TransactionResponse
 
 	// Look up the transaction's location
 	tBytes, err := db.GetFromBucket("Transactions", encoding.Marshal(id))
@@ -173,8 +136,8 @@ func (db *explorerDB) getTransaction(id crypto.Hash) (transactionResponse, error
 }
 
 // Returns the list of transactions a file contract with a given id has taken part in
-func (db *explorerDB) getFileContract(id types.FileContractID) (fcResponse, error) {
-	var fr fcResponse
+func (db *explorerDB) getFileContract(id types.FileContractID) (modules.FcResponse, error) {
+	var fr modules.FcResponse
 	fcBytes, err := db.GetFromBucket("FileContracts", encoding.Marshal(id))
 	if err != nil {
 		return fr, err
@@ -196,8 +159,8 @@ func (db *explorerDB) getFileContract(id types.FileContractID) (fcResponse, erro
 
 // getSiacoinOutput retrieves data about a siacoin output from the
 // database and puts it into a response structure
-func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (outputResponse, error) {
-	var or outputResponse
+func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (modules.OutputResponse, error) {
+	var or modules.OutputResponse
 	otBytes, err := db.GetFromBucket("SiacoinOutputs", encoding.Marshal(id))
 	if err != nil {
 		return or, err
@@ -218,8 +181,8 @@ func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (outputResponse
 
 // getSiafundOutput retrieves data about a siafund output and puts it
 // into a response structure
-func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (outputResponse, error) {
-	var or outputResponse
+func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (modules.OutputResponse, error) {
+	var or modules.OutputResponse
 	otBytes, err := db.GetFromBucket("SiafundOutputs", encoding.Marshal(id))
 	if err != nil {
 		return or, err
@@ -241,8 +204,8 @@ func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (outputResponse
 // getAddressTransactions gets the list of all blocks and transactions
 // the address was involved with, which could be many, and puts the
 // result in a response structure
-func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (addrResponse, error) {
-	var ar addrResponse
+func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (modules.AddrResponse, error) {
+	var ar modules.AddrResponse
 	txBytes, err := db.GetFromBucket("Addresses", encoding.Marshal(address))
 	if err != nil {
 		return ar, err

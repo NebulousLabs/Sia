@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -28,6 +29,45 @@ type (
 		TotalContractCount  uint64
 		TotalContractCosts  types.Currency
 		TotalContractSize   uint64
+	}
+
+	// The following are used when returning information about a
+	// hash (using the GetHashInfo function)
+	//
+	// The responseType field is used to differentiate the structs
+	// blindly, and must be set
+	BlockResponse struct {
+		Block        types.Block
+		Height       types.BlockHeight
+		ResponseType string
+	}
+
+	// Wrapper for a transaction, with a little extra info
+	TransactionResponse struct {
+		Tx           types.Transaction
+		ParentID     types.BlockID
+		TxNum        int
+		ResponseType string
+	}
+
+	// Wrapper for fcInfo struct, defined in database.go
+	FcResponse struct {
+		Contract     crypto.Hash
+		Revisions    []crypto.Hash
+		Proof        crypto.Hash
+		ResponseType string
+	}
+
+	// Wrapper for the address type response
+	AddrResponse struct {
+		Txns         []crypto.Hash
+		ResponseType string
+	}
+
+	OutputResponse struct {
+		OutputTx     crypto.Hash
+		InputTx      crypto.Hash
+		ResponseType string
 	}
 
 	// The BlockExplorer interface provides access to the block explorer
