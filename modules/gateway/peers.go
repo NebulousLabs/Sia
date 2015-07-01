@@ -2,12 +2,12 @@ package gateway
 
 import (
 	"errors"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 
@@ -56,9 +56,9 @@ func (g *Gateway) addPeer(p *peer) {
 // randomPeer returns a random peer from the gateway's peer list.
 func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
-		r := rand.Intn(len(g.peers))
+		r, _ := crypto.RandIntn(len(g.peers))
 		for addr := range g.peers {
-			if r == 0 {
+			if r <= 0 {
 				return addr, nil
 			}
 			r--
@@ -71,13 +71,13 @@ func (g *Gateway) randomPeer() (modules.NetAddress, error) {
 // randomInboundPeer returns a random peer that initiated its connection.
 func (g *Gateway) randomInboundPeer() (modules.NetAddress, error) {
 	if len(g.peers) > 0 {
-		r := rand.Intn(len(g.peers))
+		r, _ := crypto.RandIntn(len(g.peers))
 		for addr, peer := range g.peers {
 			// only select inbound peers
 			if !peer.inbound {
 				continue
 			}
-			if r == 0 {
+			if r <= 0 {
 				return addr, nil
 			}
 			r--
