@@ -11,6 +11,7 @@ import (
 
 var (
 	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
+	errExternalRevert    = errors.New("cannot revert to node outside of current path")
 )
 
 // deleteNode recursively deletes its children from the set of known blocks.
@@ -64,18 +65,19 @@ func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 
 // revertToNode will revert blocks from the State's current path until 'bn' is
 // the current block. Blocks are returned in the order that they were reverted.
-func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
+// 'bn' is not reverted.
+func (cs *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {
-		if s.currentPath[bn.height] != bn.block.ID() {
-			panic("can't revert to node not in current path")
+		if types.BlockHeight(len(cs.currentPath)) <= bn.height || cs.currentPath[bn.height] != bn.block.ID() {
+			panic(errExternalRevert)
 		}
 	}
 
 	// Rewind blocks until we reach 'bn'.
-	for s.currentBlockID() != bn.block.ID() {
-		node := s.currentBlockNode()
-		s.commitDiffSet(node, modules.DiffRevert)
+	for cs.currentBlockID() != bn.block.ID() {
+		node := cs.currentBlockNode()
+		cs.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
@@ -84,10 +86,8 @@ func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 // applyUntilNode will successively apply the blocks between the state's
 // currentPath and 'bn'.
 func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
-	// Backtrack to the common parent of 'bn' and currentPath.
+	// Backtrack to the common parent of 'bn' and currentPath and then apply the new nodes.
 	newPath := s.backtrackToCurrentPath(bn)
-
-	// Apply new nodes.
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
@@ -100,17 +100,7 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 			}
 		}
 		appliedNodes = append(appliedNodes, node)
-
-		// Sanity check - check that the delayed siacoin outputs map structure
-		// matches the expected strucutre.
-		if build.DEBUG {
-			err = s.checkDelayedSiacoinOutputMaps()
-			if err != nil {
-				panic(err)
-			}
-		}
 	}
-
 	return
 }
 

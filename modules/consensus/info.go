@@ -12,8 +12,8 @@ type StateInfo struct {
 }
 
 // currentBlockID returns the ID of the current block.
-func (s *State) currentBlockID() types.BlockID {
-	return s.currentPath[s.height()]
+func (cs *State) currentBlockID() types.BlockID {
+	return cs.currentPath[cs.height()]
 }
 
 // currentBlockNode returns the blockNode of the current block.

@@ -129,3 +129,37 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 		t.Error("backtracked from the wrong node")
 	}
 }
+
+// TestRevertToNode probes the revertToNode method of the consensus set.
+func TestRevertToNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Revert to a grandparent and verify the returned array is correct.
+	revertedNodes := cst.cs.revertToNode(bn.parent.parent)
+	if len(revertedNodes) != 2 {
+		t.Error("wrong number of nodes reverted")
+	}
+	if revertedNodes[0] != bn {
+		t.Error("wrong composition of reverted nodes")
+	}
+	if revertedNodes[1] != bn.parent {
+		t.Error("wrong composition of reverted nodes")
+	}
+
+	// Trigger a panic by trying to revert to a node outside of the current
+	// path.
+	defer func() {
+		r := recover()
+		if r != errExternalRevert {
+			t.Error(r)
+		}
+	}()
+	cst.cs.revertToNode(bn)
+}
