@@ -404,10 +404,18 @@ func TestCommitSiafundPoolDiff(t *testing.T) {
 	}()
 	defer func() {
 		r := recover()
+		if r != errNonApplySiafundPoolDiff {
+			t.Error(r)
+		}
+		cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffRevert)
+	}()
+	defer func() {
+		r := recover()
 		if r != errNegativePoolAdjustment {
 			t.Error("expecting errNegativePoolAdjustment, got", r)
 		}
-		cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffRevert)
+		sfpd2.Direction = modules.DiffRevert
+		cst.cs.commitSiafundPoolDiff(sfpd2, modules.DiffApply)
 	}()
 	cst.cs.commitSiafundPoolDiff(sfpd1, modules.DiffApply)
 	cst.cs.commitSiafundPoolDiff(sfpd2, modules.DiffApply)

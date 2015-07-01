@@ -88,7 +88,7 @@ func TestDeleteNode(t *testing.T) {
 // consensus set.
 func TestBacktrackToCurrentPath(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
 	if err != nil {
@@ -128,14 +128,4 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if nodes[1].block.ID() != bn.block.ID() {
 		t.Error("backtracked from the wrong node")
 	}
-
-	// Trigger a panic by giving the diverted node a nil parent.
-	defer func() {
-		r := recover()
-		if r != errBacktrackNil {
-			t.Error("expecting errBacktrackNil, got", r)
-		}
-	}()
-	bn.parent = nil
-	_ = cst.cs.backtrackToCurrentPath(bn)
 }

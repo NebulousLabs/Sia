@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	errBacktrackNil      = errors.New("backtrack hit a nil node")
 	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
 )
 
@@ -59,18 +58,6 @@ func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 		}
 		bn = bn.parent
 		path = append([]*blockNode{bn}, path...) // prepend
-
-		// Sanity check - all block nodes should have a parent except the
-		// genesis block. The loop should break upon reaching the genesis
-		// block, and not continue to the genesis block's parent. The consensus
-		// set will never accept a bock that doesn't share the same root
-		// genesis hash.
-		if bn == nil {
-			if build.DEBUG {
-				panic(errBacktrackNil)
-			}
-			break
-		}
 	}
 	return path
 }
@@ -90,15 +77,6 @@ func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 		node := s.currentBlockNode()
 		s.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
-
-		// Sanity check - check that the delayed siacoin outputs map structure
-		// matches the expected strucutre.
-		if build.DEBUG {
-			err := s.checkDelayedSiacoinOutputMaps()
-			if err != nil {
-				panic(err)
-			}
-		}
 	}
 	return
 }
