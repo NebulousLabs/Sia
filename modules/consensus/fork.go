@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	errBacktrackNil      = errors.New("backtrack hit a nil node")
 	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
 )
 
@@ -49,23 +50,24 @@ func (cs *State) deleteNode(bn *blockNode) {
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
 // the State's current path (the "common parent"). It returns the (inclusive)
 // set of nodes between the common parent and 'bn', starting from the former.
-func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
+func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for {
-		// stop when we reach the common parent
-		if bn.height <= s.height() && s.currentPath[bn.height] == bn.block.ID() {
+		// Stop when we reach the common parent.
+		if bn.height <= cs.height() && cs.currentPath[bn.height] == bn.block.ID() {
 			break
 		}
-
 		bn = bn.parent
-		path = append([]*blockNode{bn}, path...) // prepend, not append
+		path = append([]*blockNode{bn}, path...) // prepend
 
 		// Sanity check - all block nodes should have a parent except the
-		// genesis block, and this loop should break before reaching the
-		// genesis block.
+		// genesis block. The loop should break upon reaching the genesis
+		// block, and not continue to the genesis block's parent. The consensus
+		// set will never accept a bock that doesn't share the same root
+		// genesis hash.
 		if bn == nil {
 			if build.DEBUG {
-				panic("backtrack hit a nil node?")
+				panic(errBacktrackNil)
 			}
 			break
 		}

@@ -83,3 +83,59 @@ func TestDeleteNode(t *testing.T) {
 	}()
 	cst.cs.deleteNode(bn)
 }
+
+// TestBacktrackToCurrentPath probes the backtrackToCurrentPath method of the
+// consensus set.
+func TestBacktrackToCurrentPath(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Backtrack from the current node to the blockchain.
+	nodes := cst.cs.backtrackToCurrentPath(bn)
+	if len(nodes) != 1 {
+		t.Fatal("backtracking to the current node gave incorrect result")
+	}
+	if nodes[0].block.ID() != bn.block.ID() {
+		t.Error("backtrack returned the wrong node")
+	}
+
+	// Backtrack from a node that has diverted from the current blockchain.
+	child0, _ := cst.miner.FindBlock()
+	child1, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(child0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.csUpdateWait()
+	err = cst.cs.AcceptBlock(child1)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+	bn = cst.cs.blockMap[child1.ID()]
+	nodes = cst.cs.backtrackToCurrentPath(bn)
+	if len(nodes) != 2 {
+		t.Error("backtracking grabbed wrong number of nodes")
+	}
+	if nodes[0].block.ID() != bn.parent.block.ID() {
+		t.Error("grabbed the wrong block as the common block")
+	}
+	if nodes[1].block.ID() != bn.block.ID() {
+		t.Error("backtracked from the wrong node")
+	}
+
+	// Trigger a panic by giving the diverted node a nil parent.
+	defer func() {
+		r := recover()
+		if r != errBacktrackNil {
+			t.Error("expecting errBacktrackNil, got", r)
+		}
+	}()
+	bn.parent = nil
+	_ = cst.cs.backtrackToCurrentPath(bn)
+}
