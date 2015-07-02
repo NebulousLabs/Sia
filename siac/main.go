@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	port  string
+	addr  string
 	force bool
 )
 
@@ -24,7 +25,11 @@ var (
 // not return 200, the error will be read and returned. The response body is
 // not closed.
 func apiGet(call string) (*http.Response, error) {
-	resp, err := http.Get("http://localhost:" + port + call)
+	if host, port, _ := net.SplitHostPort(addr); host == "" {
+		addr = net.JoinHostPort("localhost", port)
+	}
+
+	resp, err := http.Get("http://" + addr + call)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
@@ -68,11 +73,15 @@ func get(call string) error {
 // does not return 200, the error will be read and returned. The response body
 // is not closed.
 func apiPost(call, vals string) (*http.Response, error) {
+	if host, port, _ := net.SplitHostPort(addr); host == "" {
+		addr = net.JoinHostPort("localhost", port)
+	}
+
 	data, err := url.ParseQuery(vals)
 	if err != nil {
 		return nil, errors.New("bad query string")
 	}
-	resp, err := http.PostForm("http://localhost:"+port+call, data)
+	resp, err := http.PostForm("http://"+addr+call, data)
 	if err != nil {
 		return nil, errors.New("no response from daemon")
 	}
@@ -157,8 +166,6 @@ func main() {
 		Long:  "Print version information.",
 		Run:   version,
 	})
-	// certain safety checks can be overrided with the "force" flag
-	root.PersistentFlags().BoolVarP(&force, "force", "f", false, "force certain commands")
 
 	root.AddCommand(hostCmd)
 	hostCmd.AddCommand(hostConfigCmd, hostAnnounceCmd, hostStatusCmd)
@@ -190,7 +197,8 @@ func main() {
 	root.AddCommand(stopCmd)
 
 	// parse flags
-	root.PersistentFlags().StringVarP(&port, "port", "p", "9980", "which port to communicate with (i.e. the port siad is listening on)")
+	root.PersistentFlags().StringVarP(&addr, "addr", "a", "localhost:9980", "which host/port to communicate with (i.e. the host/port siad is listening on)")
+	root.PersistentFlags().BoolVarP(&force, "force", "f", false, "force certain commands")
 
 	// run
 	root.Execute()
