@@ -17,6 +17,7 @@ var (
 	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
 	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
 	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrSiafundInputOutputMismatch = errors.New("siafund inputs do not equal siafund outputs for transaction")
 	ErrUnfinishedFileContract     = errors.New("file contract window has not yet openend")
 	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
 	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
@@ -152,19 +153,19 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 
 // validSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func (s *State) validSiafunds(t types.Transaction) (err error) {
+func (cs *State) validSiafunds(t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
 	for _, sfi := range t.SiafundInputs {
-		sfo, exists := s.siafundOutputs[sfi.ParentID]
+		sfo, exists := cs.siafundOutputs[sfi.ParentID]
 		if !exists {
 			return ErrMissingSiafundOutput
 		}
 
 		// Check the unlock conditions match the unlock hash.
 		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
-			return errors.New("unlock conditions don't match required unlock hash")
+			return ErrWrongUnlockConditions
 		}
 
 		siafundInputSum = siafundInputSum.Add(sfo.Value)
@@ -173,49 +174,49 @@ func (s *State) validSiafunds(t types.Transaction) (err error) {
 		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
 	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
-		return errors.New("siafund inputs do not equal siafund outpus within transaction")
+		return ErrSiafundInputOutputMismatch
 	}
 	return
 }
 
 // ValidStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (s *State) ValidStorageProofs(t types.Transaction) (err error) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-	return s.validStorageProofs(t)
+func (cs *State) ValidStorageProofs(t types.Transaction) (err error) {
+	id := cs.mu.RLock()
+	defer cs.mu.RUnlock(id)
+	return cs.validStorageProofs(t)
 }
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func (s *State) validTransaction(t types.Transaction) error {
+func (cs *State) validTransaction(t types.Transaction) error {
 	// Skip transaction verification if the State is accepting trusted blocks.
-	if s.verificationRigor != fullVerification {
+	if cs.verificationRigor != fullVerification {
 		return nil
 	}
 
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
-	err := t.StandaloneValid(s.height())
+	err := t.StandaloneValid(cs.height())
 	if err != nil {
 		return err
 	}
 
 	// Check that each portion of the transaction is legal given the current
 	// consensus set.
-	err = s.validSiacoins(t)
+	err = cs.validSiacoins(t)
 	if err != nil {
 		return err
 	}
-	err = s.validStorageProofs(t)
+	err = cs.validStorageProofs(t)
 	if err != nil {
 		return err
 	}
-	err = s.validFileContractRevisions(t)
+	err = cs.validFileContractRevisions(t)
 	if err != nil {
 		return err
 	}
-	err = s.validSiafunds(t)
+	err = cs.validSiafunds(t)
 	if err != nil {
 		return err
 	}

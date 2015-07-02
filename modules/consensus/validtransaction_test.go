@@ -15,7 +15,7 @@ func TestValidSiacoins(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestStorageProofSegment")
+	cst, err := createConsensusSetTester("TestValidSiacoins")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,9 +195,9 @@ func TestValidStorageProofs(t *testing.T) {
 // of the consensus set.
 func TestValidFileContractRevisions(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidStorageProofs")
+	cst, err := createConsensusSetTester("TestValidFileContractRevisions")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,6 +322,53 @@ func TestValidFileContractRevisions(t *testing.T) {
 	txn.FileContractRevisions[0].NewMissedProofOutputs = nil
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+}
+
+// TestValidSiafunds probes the validSiafunds mthod of the consensus set.
+func TestValidSiafunds(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidSiafunds")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction pointing to a nonexistent siafund output.
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{{}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrMissingSiafundOutput {
+		t.Error(err)
+	}
+
+	// Create a transaction with invalid unlock conditions.
+	var sfoid types.SiafundOutputID
+	for mapSfoid, _ := range cst.cs.siafundOutputs {
+		sfoid = mapSfoid
+		break
+	}
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID: sfoid,
+		}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+
+	// Create a transaction with more outputs than inputs.
+	txn = types.Transaction{
+		SiafundOutputs: []types.SiafundOutput{{
+			Value: types.NewCurrency64(1),
+		}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrSiafundInputOutputMismatch {
 		t.Error(err)
 	}
 }
