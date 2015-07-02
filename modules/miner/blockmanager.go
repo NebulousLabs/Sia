@@ -1,7 +1,6 @@
 package miner
 
 import (
-	"crypto/rand"
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -37,8 +36,7 @@ func (m *Miner) blockForWork() (types.Block, types.Target) {
 	// other parts of the program. This is related to the fact that slices are
 	// pointers, and not immutable objects. Use of the builtin `copy` function
 	// when passing objects like blocks around may fix this problem.
-	randBytes := make([]byte, types.SpecifierLen)
-	rand.Read(randBytes)
+	randBytes, _ := crypto.RandBytes(types.SpecifierLen)
 	randTxn := types.Transaction{
 		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 	}

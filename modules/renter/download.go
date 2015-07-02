@@ -1,7 +1,6 @@
 package renter
 
 import (
-	"crypto/rand"
 	"errors"
 	"io"
 	"net"
@@ -182,9 +181,8 @@ func (r *Renter) Download(nickname, destination string) error {
 
 		// This iteration failed, no hosts returned the piece. Try again
 		// after waiting a random amount of time.
-		randSource := make([]byte, 1)
-		rand.Read(randSource)
-		time.Sleep(time.Second * time.Duration(i*i) * time.Duration(randSource[0]))
+		r, _ := crypto.RandIntn(i * i * 256)
+		time.Sleep(time.Second * time.Duration(r))
 	}
 
 	// File could not be downloaded; delete the copy on disk.
