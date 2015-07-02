@@ -10,6 +10,7 @@ import (
 
 var (
 	errMissingFileContract = errors.New("storage proof submitted for non existing file contract")
+	errOutputAlreadyMature = errors.New("delayed siacoin output is already in the matured outputs set")
 	errPayoutsAlreadyPaid  = errors.New("payouts are already in the consensus set")
 	errStorageProofTiming  = errors.New("missed proof triggered for file contract that is not expiring")
 )
@@ -62,7 +63,7 @@ func (cs *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 		if build.DEBUG {
 			_, exists := cs.siacoinOutputs[dscoid]
 			if exists {
-				panic("trying to add a delayed output when the output is already there")
+				panic(errOutputAlreadyMature)
 			}
 		}
 

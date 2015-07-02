@@ -443,3 +443,43 @@ func TestValidTransaction(t *testing.T) {
 		t.Error("transaction is valid")
 	}
 }
+
+// TestTryTransactions probes the TryTransactions method of the consensus set.
+func TestTryTransactions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialHash := cst.cs.consensusSetHash()
+
+	// Try a valid transaction.
+	var txns []types.Transaction
+	_, err = cst.wallet.SendCoins(types.NewCurrency64(1), types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txns = cst.tpool.TransactionSet()
+	err = cst.cs.TryTransactions(txns)
+	if err != nil {
+		t.Error(err)
+	}
+	if cst.cs.consensusSetHash() != initialHash {
+		t.Error("TryTransactions did not resotre order")
+	}
+
+	// Try a valid transaction followed by an invalid transaction.
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	txns = append(txns, txn)
+	err = cst.cs.TryTransactions(txns)
+	if err == nil {
+		t.Error("bad transaction survived filter")
+	}
+	if cst.cs.consensusSetHash() != initialHash {
+		t.Error("TryTransactions did not restore order")
+	}
+}
