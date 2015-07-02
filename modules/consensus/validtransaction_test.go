@@ -10,6 +10,53 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestValidSiacoins probes the validSiacoins method of the consensus set.
+func TestValidSiacoins(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestStorageProofSegment")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction pointing to a nonexistent siacoin output.
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrMissingSiacoinOutput {
+		t.Error(err)
+	}
+
+	// Create a transaction with invalid unlock conditions.
+	var scoid types.SiacoinOutputID
+	for mapScoid, _ := range cst.cs.siacoinOutputs {
+		scoid = mapScoid
+		break
+	}
+	txn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID: scoid,
+		}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+
+	// Create a txn with more outputs than inputs.
+	txn = types.Transaction{
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value: types.NewCurrency64(1),
+		}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrSiacoinInputOutputMismatch {
+		t.Error(err)
+	}
+}
+
 // TestStorageProofSegment probes the storageProofSegment method of the
 // consensus set.
 func TestStorageProofSegment(t *testing.T) {
@@ -49,6 +96,21 @@ func TestStorageProofSegment(t *testing.T) {
 	zip.Close()
 	if b.Len() < len(outputs) {
 		t.Error("supposedly high entropy random segments have been compressed!")
+	}
+
+	// Submit a file contract that is unrecognized.
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
+
+	// Try to get the segment of an unfinished file contract.
+	cst.cs.fileContracts[types.FileContractID{}] = types.FileContract{
+		WindowStart: 100000,
+	}
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnfinishedFileContract {
+		t.Error(err)
 	}
 }
 
@@ -118,6 +180,13 @@ func TestValidStorageProofs(t *testing.T) {
 	}
 	err = cst.cs.validStorageProofs(txn)
 	if err != ErrInvalidStorageProof {
+		t.Error(err)
+	}
+
+	// Try to validate a proof for a file contract that doesn't exist.
+	txn.StorageProofs[0].ParentID = types.FileContractID{}
+	err = cst.cs.validStorageProofs(txn)
+	if err != ErrUnrecognizedFileContractID {
 		t.Error(err)
 	}
 }
@@ -199,6 +268,60 @@ func TestValidFileContractRevisions(t *testing.T) {
 	}
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrLowRevisionNumber {
+		t.Error(err)
+	}
+
+	// Submit a file contract revision pointing to an invalid parent.
+	txn.FileContractRevisions[0].ParentID[0]--
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].ParentID[0]++
+
+	// Submit a file contract revision for a file contract whose window has
+	// already opened.
+	fc = cst.cs.fileContracts[fcid]
+	fc.WindowStart = 0
+	cst.cs.fileContracts[fcid] = fc
+	txn.FileContractRevisions[0].NewRevisionNumber = 3
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrLateRevision {
+		t.Error(err)
+	}
+
+	// Submit a file contract revision with incorrect unlock conditions.
+	fc.WindowStart = 100
+	cst.cs.fileContracts[fcid] = fc
+	txn.FileContractRevisions[0].UnlockConditions.Timelock++
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].UnlockConditions.Timelock--
+
+	// Submit file contract revisions for file contracts with altered payouts.
+	txn.FileContractRevisions[0].NewValidProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	txn.FileContractRevisions[0].NewMissedProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].NewValidProofOutputs = nil
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].NewValidProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	txn.FileContractRevisions[0].NewMissedProofOutputs = nil
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
 		t.Error(err)
 	}
 }

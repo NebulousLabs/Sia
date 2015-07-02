@@ -10,15 +10,16 @@ import (
 )
 
 var (
-	ErrInvalidStorageProof                = errors.New("provided storage proof is invalid")
-	ErrLowRevisionNumber                  = errors.New("transaction has a file contract with an outdated revision number")
-	ErrMissingSiacoinOutput               = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingFileContract                = errors.New("transaction terminates a nonexisting file contract")
-	ErrMissingSiafundOutput               = errors.New("transaction spends a nonexisting siafund output")
-	ErrSiacoinInputOutputMismatch         = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
-	ErrUnfinishedFileContract             = errors.New("file contract window has not yet openend")
-	ErrUnrecognizedFileContractID         = errors.New("cannot fetch storage proof segment for unknown file contract")
-	ErrWrongSiacoinOutputUnlockConditions = errors.New("transaction contains a siacoin output with incorrect unlock conditions")
+	ErrAlteredRevisionPayouts     = errors.New("file contract revision has altered payout volume")
+	ErrInvalidStorageProof        = errors.New("provided storage proof is invalid")
+	ErrLateRevision               = errors.New("file contract revision submitted after deadline")
+	ErrLowRevisionNumber          = errors.New("transaction has a file contract with an outdated revision number")
+	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
+	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrUnfinishedFileContract     = errors.New("file contract window has not yet openend")
+	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
+	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
@@ -34,7 +35,7 @@ func (cs *State) validSiacoins(t types.Transaction) (err error) {
 
 		// Check that the unlock conditions match the required unlock hash.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return ErrWrongSiacoinOutputUnlockConditions
+			return ErrWrongUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
@@ -80,17 +81,12 @@ func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, e
 // of the consensus set.
 func (cs *State) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
-		fc, exists := cs.fileContracts[sp.ParentID]
-		if !exists {
-			return errors.New("unrecognized file contract ID in storage proof")
-		}
-
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
+		fc, _ := cs.fileContracts[sp.ParentID] // previous function verifies the file contract exists
 		if err != nil {
 			return err
 		}
-
 		verified := crypto.VerifySegment(
 			sp.Segment,
 			sp.HashSet,
@@ -113,14 +109,14 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 		// Check that the revision revises an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
 		if !exists {
-			return ErrMissingFileContract
+			return ErrUnrecognizedFileContractID
 		}
 
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
 		if cs.height() > fc.WindowStart {
-			return errors.New("contract revision submitted too late")
+			return ErrLateRevision
 		}
 
 		// Check that the revision number of the revision is greater than the
@@ -131,20 +127,23 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 
 		// Check that the unlock conditions match the unlock hash.
 		if fcr.UnlockConditions.UnlockHash() != fc.UnlockHash {
-			return errors.New("unlock conditions don't match unlock hash")
+			return ErrWrongUnlockConditions
 		}
 
 		// Check that the payout of the revision matches the payout of the
-		// original.
-		//
-		// txn.StandaloneValid checks for the validity of the
-		// ValidProofOutputs.
-		var payout types.Currency
-		for _, output := range fcr.NewMissedProofOutputs {
-			payout = payout.Add(output.Value)
+		// original, and that the payouts match eachother.
+		var validPayout, missedPayout types.Currency
+		for _, output := range fcr.NewValidProofOutputs {
+			validPayout = validPayout.Add(output.Value)
 		}
-		if payout.Cmp(fc.Payout) != 0 {
-			return errors.New("contract revision has incorrect payouts")
+		for _, output := range fcr.NewMissedProofOutputs {
+			missedPayout = missedPayout.Add(output.Value)
+		}
+		if validPayout.Cmp(fc.Payout) != 0 {
+			return ErrAlteredRevisionPayouts
+		}
+		if missedPayout.Cmp(fc.Payout) != 0 {
+			return ErrAlteredRevisionPayouts
 		}
 	}
 
