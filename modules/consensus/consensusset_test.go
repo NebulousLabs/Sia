@@ -103,31 +103,6 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	return cst, nil
 }
 
-// MineDoSBlock will create a dos block and perform nonce grinding.
-func (cst *consensusSetTester) MineDoSBlock() (types.Block, error) {
-	// Create a transaction that is funded but the funds are never spent. This
-	// transaction is invalid in a way that triggers the DoS block detection.
-	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
-	if err != nil {
-		return types.Block{}, err
-	}
-	_, err = cst.wallet.FundTransaction(id, types.NewCurrency64(50))
-	if err != nil {
-		return types.Block{}, err
-	}
-	cst.tpUpdateWait()
-	txn, err := cst.wallet.SignTransaction(id, true) // true indicates that the whole transaction should be signed.
-	if err != nil {
-		return types.Block{}, err
-	}
-
-	// Get a block, insert the transaction, and submit the block.
-	block, _, target := cst.miner.BlockForWork()
-	block.Transactions = append(block.Transactions, txn)
-	solvedBlock, _ := cst.miner.SolveBlock(block, target)
-	return solvedBlock, nil
-}
-
 // TestNilInputs tries to create new consensus set modules using nil inputs.
 func TestNilInputs(t *testing.T) {
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")

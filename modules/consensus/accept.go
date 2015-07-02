@@ -131,11 +131,18 @@ func (cs *State) acceptBlock(b types.Block) error {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
 
-	// Sanity check - if applied nodes is len 0, revertedNodes should also be
-	// len 0.
+	// Sanity checks.
 	if build.DEBUG {
+		// If appliedNodes is 0, revertedNodes will also be 0.
 		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
 			panic("appliedNodes and revertedNodes are mismatched!")
+		}
+
+		// After applying a block, the consensus set should be in a consistent
+		// state.
+		err = cs.checkConsistency()
+		if err != nil {
+			panic(err)
 		}
 	}
 
@@ -155,14 +162,6 @@ func (cs *State) AcceptBlock(b types.Block) error {
 	err := cs.acceptBlock(b)
 	if err != nil {
 		return err
-	}
-
-	// Sanity check - consensus set should pass all consistency checks.
-	if build.DEBUG {
-		err = cs.checkConsistency()
-		if err != nil {
-			panic(err)
-		}
 	}
 
 	// Broadcast the new block to all peers. This is an expensive operation,

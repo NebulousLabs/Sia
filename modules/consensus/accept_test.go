@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"crypto/rand"
 	"errors"
 	"testing"
 	"time"
@@ -8,98 +9,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
-
-// testSimpleBlock mines a simple block (no transactions except those
-// automatically added by the miner) and adds it to the consnesus set.
-func (cst *consensusSetTester) testSimpleBlock() error {
-	// Get the starting hash of the consenesus set.
-	initialCSSum := cst.cs.consensusSetHash()
-
-	// Mine and submit a block
-	block, _ := cst.miner.FindBlock()
-	err := cst.cs.AcceptBlock(block)
-	if err != nil {
-		return err
-	}
-	cst.csUpdateWait()
-
-	// Get the ending hash of the consensus set.
-	resultingCSSum := cst.cs.consensusSetHash()
-	if initialCSSum == resultingCSSum {
-		return errors.New("state hash is unchanged after mining a block")
-	}
-
-	// Check that the current path has updated as expected.
-	newNode := cst.cs.currentBlockNode()
-	if cst.cs.CurrentBlock().ID() != block.ID() {
-		return errors.New("the state's current block is not reporting as the recently mined block.")
-	}
-	// Check that the current path has updated correctly.
-	if block.ID() != cst.cs.currentPath[newNode.height] {
-		return errors.New("the state's current path didn't update correctly after accepting a new block")
-	}
-
-	// Revert the block that was just added to the consensus set and check for
-	// parity with the original state of consensus.
-	_, _, err = cst.cs.forkBlockchain(newNode.parent)
-	if err != nil {
-		return err
-	}
-	if cst.cs.consensusSetHash() != initialCSSum {
-		return errors.New("adding and reverting a block changed the consensus set")
-	}
-	// Re-add the block and check for parity with the first time it was added.
-	// This test is useful because a different codepath is followed if the
-	// diffs have already been generated.
-	_, _, err = cst.cs.forkBlockchain(newNode)
-	if cst.cs.consensusSetHash() != resultingCSSum {
-		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
-	}
-
-	return nil
-}
-
-// TestSimpleBlock is a passthrough function.
-func TestSimpleBlock(t *testing.T) {
-	cst, err := createConsensusSetTester("TestSimpleBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.testSimpleBlock()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if testing.Short() {
-		t.SkipNow()
-	}
-	err = cst.cs.checkConsistency()
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-// testDoSBlockHandling
-func (cst *consensusSetTester) testDoSBlockHandling() error {
-	// Mine a DoS block and submit it to the state, expect a normal error.
-	dosBlock, err := cst.MineDoSBlock()
-	if err != nil {
-		return err
-	}
-	err = cst.cs.AcceptBlock(dosBlock)
-	// The error is mostly irrelevant, it just needs to have the block flagged
-	// as a DoS block in future attempts.
-	if err != ErrSiacoinInputOutputMismatch {
-		return errors.New("expecting invalid signature err: " + err.Error())
-	}
-
-	// Submit the same DoS block to the state again, expect ErrDoSBlock.
-	err = cst.cs.AcceptBlock(dosBlock)
-	if err != ErrDoSBlock {
-		return errors.New("expecting bad block err: " + err.Error())
-	}
-	return nil
-}
 
 // TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
@@ -112,13 +21,27 @@ func TestDoSBlockHandling(t *testing.T) {
 	}
 
 	// Mine a DoS block and submit it to the state, expect a normal error.
-	dosBlock, err := cst.MineDoSBlock()
+	// Create a transaction that is funded but the funds are never spent. This
+	// transaction is invalid in a way that triggers the DoS block detection.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = cst.wallet.FundTransaction(id, types.NewCurrency64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	txn, err := cst.wallet.SignTransaction(id, true) // true indicates that the whole transaction should be signed.
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get a block, insert the transaction, and submit the block.
+	block, _, target := cst.miner.BlockForWork()
+	block.Transactions = append(block.Transactions, txn)
+	dosBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.AcceptBlock(dosBlock)
-	// The error is mostly irrelevant, it just needs to have the block flagged
-	// as a DoS block in future attempts.
 	if err != ErrSiacoinInputOutputMismatch {
 		t.Fatal("expecting invalid signature err: " + err.Error())
 	}
@@ -411,4 +334,145 @@ func TestInconsistentCheck(t *testing.T) {
 	}()
 	block, _ := cst.miner.FindBlock()
 	_ = cst.cs.AcceptBlock(block)
+}
+
+// testSimpleBlock mines a simple block (no transactions except those
+// automatically added by the miner) and adds it to the consnesus set.
+func (cst *consensusSetTester) testSimpleBlock() error {
+	// Get the starting hash of the consenesus set.
+	initialCSSum := cst.cs.consensusSetHash()
+
+	// Mine and submit a block
+	block, _ := cst.miner.FindBlock()
+	err := cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Get the ending hash of the consensus set.
+	resultingCSSum := cst.cs.consensusSetHash()
+	if initialCSSum == resultingCSSum {
+		return errors.New("state hash is unchanged after mining a block")
+	}
+
+	// Check that the current path has updated as expected.
+	newNode := cst.cs.currentBlockNode()
+	if cst.cs.CurrentBlock().ID() != block.ID() {
+		return errors.New("the state's current block is not reporting as the recently mined block.")
+	}
+	// Check that the current path has updated correctly.
+	if block.ID() != cst.cs.currentPath[newNode.height] {
+		return errors.New("the state's current path didn't update correctly after accepting a new block")
+	}
+
+	// Revert the block that was just added to the consensus set and check for
+	// parity with the original state of consensus.
+	_, _, err = cst.cs.forkBlockchain(newNode.parent)
+	if err != nil {
+		return err
+	}
+	if cst.cs.consensusSetHash() != initialCSSum {
+		return errors.New("adding and reverting a block changed the consensus set")
+	}
+	// Re-add the block and check for parity with the first time it was added.
+	// This test is useful because a different codepath is followed if the
+	// diffs have already been generated.
+	_, _, err = cst.cs.forkBlockchain(newNode)
+	if cst.cs.consensusSetHash() != resultingCSSum {
+		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
+	}
+	return nil
+}
+
+// TestSimpleBlock creates a consensus set tester and uses it to call
+// testSimpleBlock.
+func TestSimpleBlock(t *testing.T) {
+	cst, err := createConsensusSetTester("TestSimpleBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testSimpleBlock()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// testSpendSiacoinsBlock mines a block with a transaction spending siacoins
+// and adds it to the consensus set.
+func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
+	// Create a random destination address for the output in the transaction.
+	var destAddr types.UnlockHash
+	_, err := rand.Read(destAddr[:])
+	if err != nil {
+		return err
+	}
+
+	// Create a block containing a transaction with a valid siacoin output.
+	txnValue := types.NewCurrency64(1200)
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, txnValue)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, outputIndex, err := cst.wallet.AddSiacoinOutput(id, types.SiacoinOutput{Value: txnValue, UnlockHash: destAddr})
+	if err != nil {
+		return err
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	outputID := txn.SiacoinOutputID(int(outputIndex))
+
+	// Mine and apply the block to the consensus set.
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Find the destAddr among the outputs.
+	var found bool
+	for id, output := range cst.cs.siacoinOutputs {
+		if id == outputID {
+			if found {
+				return errors.New("output found twice")
+			}
+			if output.Value.Cmp(txnValue) != 0 {
+				return errors.New("output has wrong value")
+			}
+			found = true
+		}
+	}
+	if !found {
+		return errors.New("could not find created siacoin output")
+	}
+	return nil
+}
+
+// TestSpendSiacoinsBlock creates a consensus set and uses it to call
+// testSpendSiacoinsBlock.
+func TestSpendSiacoinsBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testSpendSiacoinsBlock()
+	if err != nil {
+		t.Error(err)
+	}
 }
