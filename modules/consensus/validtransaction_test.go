@@ -372,3 +372,74 @@ func TestValidSiafunds(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestValidTransaction probes the validTransaction method of the consensus
+// set.
+func TestValidTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction that is not standalone valid.
+	txn := types.Transaction{
+		FileContracts: []types.FileContract{{
+			WindowStart: 0,
+		}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Try when the verificationRigor is turned down.
+	cst.cs.verificationRigor = partialVerification
+	err = cst.cs.validTransaction(txn)
+	if err != nil {
+		t.Error(err)
+	}
+	cst.cs.verificationRigor = fullVerification
+
+	// Create a transaction with invalid siacoins.
+	txn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid storage proofs.
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid file contract revisions.
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			NewWindowStart: 5000,
+			NewWindowEnd:   5005,
+			ParentID:       types.FileContractID{},
+		}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid siafunds.
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+}

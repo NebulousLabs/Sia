@@ -228,21 +228,19 @@ func (cs *State) validTransaction(t types.Transaction) error {
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked.
-func (s *State) TryTransactions(txns []types.Transaction) error {
+func (cs *State) TryTransactions(txns []types.Transaction) error {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
 	var diffHolder *blockNode
-	defer s.commitDiffSet(diffHolder, modules.DiffRevert)
-
+	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
-		err := s.validTransaction(txn)
+		err := cs.validTransaction(txn)
 		if err != nil {
 			return err
 		}
-		s.applyTransaction(diffHolder, txn)
+		cs.applyTransaction(diffHolder, txn)
 	}
-
 	return nil
 }
