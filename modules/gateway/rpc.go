@@ -3,7 +3,6 @@ package gateway
 import (
 	"errors"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/encoding"
@@ -32,8 +31,6 @@ func handlerName(name string) (id rpcID) {
 // RPC calls an RPC on the given address. RPC cannot be called on an address
 // that the Gateway is not connected to.
 func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) error {
-	// TODO: change to debug log
-	//g.log.Printf("INFO: calling RPC \"%v\" on %v", name, addr)
 	id := g.mu.RLock()
 	peer, ok := g.peers[addr]
 	g.mu.RUnlock(id)
@@ -55,8 +52,6 @@ func (g *Gateway) RPC(addr modules.NetAddress, name string, fn modules.RPCFunc) 
 	err = fn(conn)
 	if err != nil {
 		g.log.Printf("WARN: calling RPC \"%v\" on peer %v returned error: %v", name, addr, err)
-		// give peer a strike
-		atomic.AddUint32(&peer.strikes, 1)
 	}
 	return err
 }
@@ -108,13 +103,10 @@ func (g *Gateway) threadedHandleConn(conn modules.PeerConn) {
 	fn, ok := g.handlers[id]
 	g.mu.RUnlock(lockid)
 	if !ok {
-		// TODO: write this error to conn?
 		g.log.Printf("WARN: incoming conn %v requested unknown RPC \"%v\"", conn.RemoteAddr(), id)
 		return
 	}
 
-	// TODO: change to debug log
-	//g.log.Printf("INFO: handling RPC \"%v\" from %v", id, conn.RemoteAddr())
 	if err := fn(conn); err != nil {
 		g.log.Printf("WARN: incoming RPC \"%v\" failed: %v", id, err)
 	}

@@ -43,8 +43,7 @@ func (key TwofishKey) EncryptBytes(plaintext []byte) (Ciphertext, error) {
 	aead, _ := cipher.NewGCM(key.NewCipher())
 
 	// Create the nonce.
-	nonce := make([]byte, aead.NonceSize())
-	_, err := rand.Read(nonce)
+	nonce, err := RandBytes(aead.NonceSize())
 	if err != nil {
 		return nil, err
 	}

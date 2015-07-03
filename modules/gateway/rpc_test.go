@@ -91,7 +91,7 @@ func TestRPC(t *testing.T) {
 		t.Fatal("Foo gave wrong response:", foo)
 	}
 
-	// force a strike
+	// don't read or write anything
 	err = g1.RPC(g2.Address(), "Foo", func(modules.PeerConn) error {
 		return errNoPeers // any non-nil error will do
 	})

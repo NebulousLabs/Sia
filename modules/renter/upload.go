@@ -1,12 +1,12 @@
 package renter
 
 import (
-	"crypto/rand"
 	"errors"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -76,9 +76,8 @@ func (r *Renter) threadedUploadPiece(host modules.HostSettings, up modules.FileU
 		// sleeping for a randomized amount of time to increase our chances
 		// of success. This will help spread things out if there are
 		// problems with network congestion or other randomized issues.
-		randSource := make([]byte, 1)
-		rand.Read(randSource)
-		time.Sleep(100 * time.Millisecond * time.Duration(randSource[0]))
+		r, _ := crypto.RandIntn(256)
+		time.Sleep(100 * time.Millisecond * time.Duration(r))
 	}
 
 	// All attempts failed.

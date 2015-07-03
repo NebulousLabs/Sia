@@ -2,9 +2,9 @@ package gateway
 
 import (
 	"errors"
-	"math/rand"
 	"net"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
@@ -39,9 +39,9 @@ func (g *Gateway) removeNode(addr modules.NetAddress) error {
 
 func (g *Gateway) randomNode() (modules.NetAddress, error) {
 	if len(g.nodes) > 0 {
-		r := rand.Intn(len(g.nodes))
+		r, _ := crypto.RandIntn(len(g.nodes))
 		for node := range g.nodes {
-			if r == 0 {
+			if r <= 0 {
 				return node, nil
 			}
 			r--
