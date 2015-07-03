@@ -82,7 +82,10 @@ func (cs *State) checkSiacoins() error {
 			totalSiacoins = totalSiacoins.Add(dso.Value)
 		}
 	}
-	totalSiacoins = totalSiacoins.Add(cs.siafundPool)
+	for _, sfo := range cs.siafundOutputs {
+		sfoSiacoins := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
+		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
+	}
 	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
 		return errSiacoinMiscount
 	}
