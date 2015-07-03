@@ -92,19 +92,6 @@ type (
 	ProofStatus bool
 )
 
-// FileContractTerminationPayoutID returns the ID of a file contract
-// termination payout, given the index of the payout in the termination. The
-// ID is calculated by hashing the concatenation of the
-// FileContractTerminationPayout Specifier, the ID of the file contract being
-// terminated, and the payout index.
-func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		SpecifierFileContractTerminationPayout,
-		fcid,
-		i,
-	))
-}
-
 // StorageProofOutputID returns the ID of an output created by a file
 // contract, given the status of the storage proof. The ID is calculating by
 // hashing the concatenation of the StorageProofOutput Specifier, the ID of

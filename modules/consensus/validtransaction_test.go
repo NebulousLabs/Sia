@@ -353,7 +353,8 @@ func TestValidSiafunds(t *testing.T) {
 	}
 	txn = types.Transaction{
 		SiafundInputs: []types.SiafundInput{{
-			ParentID: sfoid,
+			ParentID:         sfoid,
+			UnlockConditions: types.UnlockConditions{Timelock: 12345}, // avoid collisions with existing outputs
 		}},
 	}
 	err = cst.cs.validSiafunds(txn)

@@ -67,8 +67,12 @@ func init() {
 				UnlockHash: UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223},
 			},
 			{
-				Value:      NewCurrency64(8000),
+				Value:      NewCurrency64(7000),
 				UnlockHash: UnlockHash{209, 246, 228, 60, 248, 78, 242, 110, 9, 8, 227, 248, 225, 216, 163, 52, 142, 93, 47, 176, 103, 41, 137, 80, 212, 8, 132, 58, 241, 189, 2, 17},
+			},
+			{
+				Value:      NewCurrency64(1000),
+				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
 
@@ -99,8 +103,12 @@ func init() {
 				UnlockHash: UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223},
 			},
 			{
-				Value:      NewCurrency64(8000),
+				Value:      NewCurrency64(7000),
 				UnlockHash: UnlockHash{209, 246, 228, 60, 248, 78, 242, 110, 9, 8, 227, 248, 225, 216, 163, 52, 142, 93, 47, 176, 103, 41, 137, 80, 212, 8, 132, 58, 241, 189, 2, 17},
+			},
+			{
+				Value:      NewCurrency64(1000),
+				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
 

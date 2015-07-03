@@ -140,10 +140,10 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 		for _, output := range fcr.NewMissedProofOutputs {
 			missedPayout = missedPayout.Add(output.Value)
 		}
-		if validPayout.Cmp(fc.Payout) != 0 {
+		if validPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
 			return ErrAlteredRevisionPayouts
 		}
-		if missedPayout.Cmp(fc.Payout) != 0 {
+		if missedPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
 			return ErrAlteredRevisionPayouts
 		}
 	}

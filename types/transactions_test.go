@@ -17,7 +17,6 @@ func TestIDs(t *testing.T) {
 	tid := txn.ID()
 	scoid := txn.SiacoinOutputID(0)
 	fcid := txn.FileContractID(0)
-	fctpid := fcid.FileContractTerminationPayoutID(0)
 	spidT := fcid.StorageProofOutputID(ProofValid, 0)
 	spidF := fcid.StorageProofOutputID(ProofMissed, 0)
 	sfoid := txn.SiafundOutputID(0)
@@ -29,7 +28,6 @@ func TestIDs(t *testing.T) {
 		crypto.Hash(tid),
 		crypto.Hash(scoid),
 		crypto.Hash(fcid),
-		crypto.Hash(fctpid),
 		crypto.Hash(spidT),
 		crypto.Hash(spidF),
 		crypto.Hash(sfoid),

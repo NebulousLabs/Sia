@@ -75,7 +75,7 @@ func (cs *State) checkSiacoins() error {
 		totalSiacoins = totalSiacoins.Add(sco.Value)
 	}
 	for _, fc := range cs.fileContracts {
-		totalSiacoins = totalSiacoins.Add(fc.Payout)
+		totalSiacoins = totalSiacoins.Add(fc.Payout.Sub(fc.Tax()))
 	}
 	for _, dsoMap := range cs.delayedSiacoinOutputs {
 		for _, dso := range dsoMap {
@@ -136,10 +136,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	}
 	sort.Sort(openSiacoinOutputs)
 	for _, id := range openSiacoinOutputs {
-		sco, exists := cs.siacoinOutputs[types.SiacoinOutputID(id)]
-		if !exists {
-			panic("trying to push nonexistent siacoin output")
-		}
+		sco, _ := cs.siacoinOutputs[types.SiacoinOutputID(id)]
 		tree.PushObject(id)
 		tree.PushObject(sco)
 	}
@@ -152,10 +149,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	sort.Sort(openFileContracts)
 	for _, id := range openFileContracts {
 		// Sanity Check - file contract should exist.
-		fc, exists := cs.fileContracts[types.FileContractID(id)]
-		if !exists {
-			panic("trying to push a nonexistent file contract")
-		}
+		fc, _ := cs.fileContracts[types.FileContractID(id)]
 		tree.PushObject(id)
 		tree.PushObject(fc)
 	}
@@ -167,10 +161,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 	}
 	sort.Sort(openSiafundOutputs)
 	for _, id := range openSiafundOutputs {
-		sco, exists := cs.siafundOutputs[types.SiafundOutputID(id)]
-		if !exists {
-			panic("trying to push nonexistent siafund output")
-		}
+		sco, _ := cs.siafundOutputs[types.SiafundOutputID(id)]
 		tree.PushObject(id)
 		tree.PushObject(sco)
 	}
@@ -184,10 +175,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 		}
 		sort.Sort(delayedSiacoinOutputs)
 		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {
-			delayedSiacoinOutput, exists := cs.delayedSiacoinOutputs[i][types.SiacoinOutputID(delayedSiacoinOutputID)]
-			if !exists {
-				panic("trying to push nonexistent delayed siacoin output")
-			}
+			delayedSiacoinOutput, _ := cs.delayedSiacoinOutputs[i][types.SiacoinOutputID(delayedSiacoinOutputID)]
 			tree.PushObject(delayedSiacoinOutput)
 			tree.PushObject(delayedSiacoinOutputID)
 		}

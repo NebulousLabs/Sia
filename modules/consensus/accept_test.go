@@ -1,11 +1,13 @@
 package consensus
 
 import (
+	"bytes"
 	"crypto/rand"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -461,17 +463,366 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 	return nil
 }
 
-// TestSpendSiacoinsBlock creates a consensus set and uses it to call
+// TestSpendSiacoinsBlock creates a consensus set tester and uses it to call
 // testSpendSiacoinsBlock.
 func TestSpendSiacoinsBlock(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = cst.testSpendSiacoinsBlock()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// testFileContractsBlocks creates a series of blocks that create, revise,
+// prove, and fail to prove file contracts.
+func (cst *consensusSetTester) testFileContractsBlocks() error {
+	var validProofDest, missedProofDest, revisionDest types.UnlockHash
+	_, err := rand.Read(validProofDest[:])
+	if err != nil {
+		return err
+	}
+	_, err = rand.Read(missedProofDest[:])
+	if err != nil {
+		return err
+	}
+	_, err = rand.Read(revisionDest[:])
+	if err != nil {
+		return err
+	}
+
+	// Create a file (as a bytes.Buffer) that will be used for file contracts
+	// and storage proofs.
+	filesize := uint64(4e3)
+	fileBytes := make([]byte, filesize)
+	_, err = rand.Read(fileBytes)
+	if err != nil {
+		return err
+	}
+	file := bytes.NewReader(fileBytes)
+	merkleRoot, err := crypto.ReaderMerkleRoot(file)
+	if err != nil {
+		return err
+	}
+	file.Seek(0, 0)
+
+	// Create a file contract that will be successfully proven and an alternate
+	// file contract which will be missed.
+	payout := types.NewCurrency64(400e6)
+	validFC := types.FileContract{
+		FileSize:       filesize,
+		FileMerkleRoot: merkleRoot,
+		WindowStart:    cst.cs.height() + 2,
+		WindowEnd:      cst.cs.height() + 4,
+		Payout:         payout,
+		ValidProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: validProofDest,
+		}},
+		MissedProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: missedProofDest,
+		}},
+		UnlockHash: types.UnlockConditions{}.UnlockHash(),
+	}
+	outputSize := payout.Sub(validFC.Tax())
+	validFC.ValidProofOutputs[0].Value = outputSize
+	validFC.MissedProofOutputs[0].Value = outputSize
+	missedFC := types.FileContract{
+		FileSize:       uint64(filesize),
+		FileMerkleRoot: merkleRoot,
+		WindowStart:    cst.cs.height() + 2,
+		WindowEnd:      cst.cs.height() + 4,
+		Payout:         payout,
+		ValidProofOutputs: []types.SiacoinOutput{{
+			Value:      outputSize,
+			UnlockHash: validProofDest,
+		}},
+		MissedProofOutputs: []types.SiacoinOutput{{
+			Value:      outputSize,
+			UnlockHash: missedProofDest,
+		}},
+		UnlockHash: types.UnlockConditions{}.UnlockHash(),
+	}
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, payout.Mul(types.NewCurrency64(2)))
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, validFCIndex, err := cst.wallet.AddFileContract(id, validFC)
+	if err != nil {
+		return err
+	}
+	_, missedFCIndex, err := cst.wallet.AddFileContract(id, missedFC)
+	if err != nil {
+		return err
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	validFCID := txn.FileContractID(int(validFCIndex))
+	missedFCID := txn.FileContractID(int(missedFCIndex))
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the siafund pool was increased.
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(31200e3)) != 0 {
+		return errors.New("siafund pool was not increased correctly")
+	}
+
+	// Submit a file contract revision to the missed-proof file contract.
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:          missedFCID,
+			NewRevisionNumber: 1,
+
+			NewFileSize:          10e3, // By changing the filesize without changing the hash, a proof should become impossible.
+			NewFileMerkleRoot:    missedFC.FileMerkleRoot,
+			NewWindowStart:       missedFC.WindowStart + 1,
+			NewWindowEnd:         missedFC.WindowEnd,
+			NewValidProofOutputs: missedFC.ValidProofOutputs,
+			NewMissedProofOutputs: []types.SiacoinOutput{{
+				Value:      outputSize,
+				UnlockHash: revisionDest,
+			}},
+		}},
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the revision was successful.
+	if cst.cs.fileContracts[missedFCID].RevisionNumber != 1 {
+		return errors.New("revision did not update revision number")
+	}
+	if cst.cs.fileContracts[missedFCID].FileSize != 10e3 {
+		return errors.New("revision did not update file contract size")
+	}
+
+	// Create a storage proof for the validFC and submit it in a block.
+	spSegmentIndex, err := cst.cs.StorageProofSegment(validFCID)
+	if err != nil {
+		return err
+	}
+	segment, hashSet, err := crypto.BuildReaderProof(file, spSegmentIndex)
+	if err != nil {
+		return err
+	}
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{
+			ParentID: validFCID,
+			Segment:  segment,
+			HashSet:  hashSet,
+		}},
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the valid contract was removed but the missed contract was
+	// not.
+	_, exists := cst.cs.fileContracts[validFCID]
+	if exists {
+		return errors.New("valid file contract still exists in the consensus set")
+	}
+	_, exists = cst.cs.fileContracts[missedFCID]
+	if !exists {
+		return errors.New("missed file contract was consumed by storage proof")
+	}
+
+	// Check that the file contract output made it into the set of delayed
+	// outputs.
+	validProofID := validFCID.StorageProofOutputID(types.ProofValid, 0)
+	_, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][validProofID]
+	if !exists {
+		return errors.New("file contract payout is not in the delayed outputs set")
+	}
+
+	// Mine a block to close the window on the missed file contract.
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	_, exists = cst.cs.fileContracts[validFCID]
+	if exists {
+		return errors.New("valid file contract still exists in the consensus set")
+	}
+	_, exists = cst.cs.fileContracts[missedFCID]
+	if exists {
+		return errors.New("missed file contract was not consumed when the window was closed.")
+	}
+
+	// Mine enough blocks to get all of the outputs into the set of siacoin
+	// outputs.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		block, _ = cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+	}
+
+	// Check that all of the outputs have ended up at the right destination.
+	if cst.cs.siacoinOutputs[validFCID.StorageProofOutputID(types.ProofValid, 0)].UnlockHash != validProofDest {
+		return errors.New("file contract output did not end up at the right place.")
+	}
+	if cst.cs.siacoinOutputs[missedFCID.StorageProofOutputID(types.ProofMissed, 0)].UnlockHash != revisionDest {
+		return errors.New("missed file proof output did not end up at the revised destination")
+	}
+
+	return nil
+}
+
+// TestFileContractsBlocks creates a consensus set tester and uses it to call
+// testFileContractsBlocks.
+func TestFileContractsBlocks(t *testing.T) {
+	if testing.Short() {
+		// t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestFileContractsBlocks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testFileContractsBlocks()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// testSpendSiafundsBlock mines a block with a transaction spending siafunds
+// and adds it to the consensus set.
+func (cst *consensusSetTester) testSpendSiafundsBlock() error {
+	// Create a destination for the siafunds.
+	var destAddr types.UnlockHash
+	_, err := rand.Read(destAddr[:])
+	if err != nil {
+		return err
+	}
+
+	// Find the siafund output that is 'anyone can spend' (output exists only
+	// in the testing setup).
+	var srcID types.SiafundOutputID
+	var srcValue types.Currency
+	anyoneSpends := types.UnlockConditions{}.UnlockHash()
+	for id, sfo := range cst.cs.siafundOutputs {
+		if sfo.UnlockHash == anyoneSpends {
+			srcID = id
+			srcValue = sfo.Value
+			break
+		}
+	}
+
+	// Create a transaction that spends siafunds.
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         srcID,
+			UnlockConditions: types.UnlockConditions{},
+		}},
+		SiafundOutputs: []types.SiafundOutput{
+			{
+				Value:      srcValue.Sub(types.NewCurrency64(1)),
+				UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			},
+			{
+				Value:      types.NewCurrency64(1),
+				UnlockHash: destAddr,
+			},
+		},
+	}
+	sfoid0 := txn.SiafundOutputID(0)
+	sfoid1 := txn.SiafundOutputID(1)
+	cst.tpool.AcceptTransaction(txn)
+	cst.tpUpdateWait()
+
+	// Mine a block containing the txn.
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the input got consumed, and that the outputs got created.
+	_, exists := cst.cs.siafundOutputs[srcID]
+	if exists {
+		return errors.New("siafund output was not properly consumed")
+	}
+	sfo, exists := cst.cs.siafundOutputs[sfoid0]
+	if !exists {
+		return errors.New("siafund output was not properly created")
+	}
+	if sfo.Value.Cmp(srcValue.Sub(types.NewCurrency64(1))) != 0 {
+		return errors.New("created siafund has wrong value")
+	}
+	if sfo.UnlockHash != anyoneSpends {
+		return errors.New("siafund output sent to wrong unlock hash")
+	}
+	sfo, exists = cst.cs.siafundOutputs[sfoid1]
+	if !exists {
+		return errors.New("second siafund output was not properly created")
+	}
+	if sfo.Value.Cmp(types.NewCurrency64(1)) != 0 {
+		return errors.New("second siafund output has wrong value")
+	}
+	if sfo.UnlockHash != destAddr {
+		return errors.New("second siafund output sent to wrong addr")
+	}
+
+	// TODO: This test doesn't add any coins to the siafund pool, which is
+	// imperative if the test is going to cover all possibilities.
+
+	return nil
+}
+
+// TestSpendSiafundsBlock creates a consensus set tester and uses it to call
+// testSpendSiafundsBlock.
+func TestSpendSiafundsBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestSpendSiafundsBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testSpendSiafundsBlock()
 	if err != nil {
 		t.Error(err)
 	}
