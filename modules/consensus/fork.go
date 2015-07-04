@@ -69,7 +69,7 @@ func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 func (cs *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {
-		if types.BlockHeight(len(cs.currentPath)) <= bn.height || cs.currentPath[bn.height] != bn.block.ID() {
+		if cs.height() < bn.height || cs.currentPath[bn.height] != bn.block.ID() {
 			panic(errExternalRevert)
 		}
 	}

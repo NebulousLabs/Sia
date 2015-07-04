@@ -89,8 +89,8 @@ func (x Currency) MulRat(y *big.Rat) (c Currency) {
 			panic(ErrNegativeCurrency)
 		}
 	} else {
-		tmp := new(big.Rat).Mul(new(big.Rat).SetInt(&x.i), y)
-		c.i.Div(tmp.Num(), tmp.Denom())
+		c.i.Mul(&x.i, y.Num())
+		c.i.Div(&c.i, y.Denom())
 	}
 	return
 }
