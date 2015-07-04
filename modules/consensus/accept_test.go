@@ -814,9 +814,109 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 		return errors.New("second siafund output sent to wrong addr")
 	}
 
-	// TODO: This test doesn't add any coins to the siafund pool, which is
-	// imperative if the test is going to cover all possibilities. Note that
-	// the siafund pool may not be zero when this function starts.
+	// Put a file contract into the blockchain that will add values to siafund
+	// outputs.
+	oldSiafundPool := cst.cs.siafundPool
+	payout := types.NewCurrency64(400e6)
+	fc := types.FileContract{
+		WindowStart: cst.cs.height() + 2,
+		WindowEnd:   cst.cs.height() + 4,
+		Payout:      payout,
+	}
+	outputSize := payout.Sub(fc.Tax())
+	fc.ValidProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
+	fc.MissedProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, payout)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddFileContract(id, fc)
+	if err != nil {
+		return err
+	}
+	txn, err = cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15600e3).Add(oldSiafundPool)) != 0 {
+		return errors.New("siafund pool did not update correctly")
+	}
+
+	// Create a transaction that spends siafunds.
+	var claimDest types.UnlockHash
+	_, err = rand.Read(claimDest[:])
+	if err != nil {
+		return err
+	}
+	var srcClaimStart types.Currency
+	for id, sfo := range cst.cs.siafundOutputs {
+		if sfo.UnlockHash == anyoneSpends {
+			srcID = id
+			srcValue = sfo.Value
+			srcClaimStart = sfo.ClaimStart
+			break
+		}
+	}
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         srcID,
+			UnlockConditions: types.UnlockConditions{},
+			ClaimUnlockHash:  claimDest,
+		}},
+		SiafundOutputs: []types.SiafundOutput{
+			{
+				Value:      srcValue.Sub(types.NewCurrency64(1)),
+				UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			},
+			{
+				Value:      types.NewCurrency64(1),
+				UnlockHash: destAddr,
+			},
+		},
+	}
+	sfoid1 = txn.SiafundOutputID(1)
+	cst.tpool.AcceptTransaction(txn)
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Find the siafund output and check that it has the expected number of
+	// siafunds.
+	found := false
+	expectedBalance := cst.cs.siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
+	for _, output := range cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay] {
+		if output.UnlockHash == claimDest {
+			found = true
+			if output.Value.Cmp(expectedBalance) != 0 {
+				return errors.New("siafund output has the wrong balance")
+			}
+		}
+	}
+	if !found {
+		return errors.New("could not find siafund claim output")
+	}
 
 	return nil
 }
@@ -835,6 +935,46 @@ func TestSpendSiafundsBlock(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+// TODO:
+//
+// testIntradependentBlock creates a block that has interdependent
+// transactions.
+
+// TODO:
+//
+// testPaymentChannel walks through creating a payment channel on the
+// blockchain.
+
+// TODO:
+//
+// try to make a block with a buried bad transaction.
+
+// TODO:
+//
+// try to make a fork with a buried bad block.
+
+// complexBlockSet puts a set of blocks with many types of transactions into
+// the consensus set.
+func (cst *consensusSetTester) complexBlockSet() error {
+	err := cst.testSimpleBlock()
+	if err != nil {
+		return err
+	}
+	err = cst.testSpendSiacoinsBlock()
+	if err != nil {
+		return err
+	}
+	err = cst.testFileContractsBlocks()
+	if err != nil {
+		return err
+	}
+	err = cst.testSpendSiafundsBlock()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // TestComplexForking adds every type of test block into two parallel chains of
@@ -858,19 +998,7 @@ func TestComplexForking(t *testing.T) {
 	}
 
 	// Give each type of major block to cst1.
-	err = cst1.testSimpleBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst1.testSpendSiacoinsBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst1.testFileContractsBlocks()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst1.testSpendSiafundsBlock()
+	err = cst1.complexBlockSet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,19 +1035,7 @@ func TestComplexForking(t *testing.T) {
 		}
 		cst2.csUpdateWait()
 	}
-	err = cst2.testSimpleBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst2.testSpendSiacoinsBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst2.testFileContractsBlocks()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst2.testSpendSiafundsBlock()
+	err = cst2.complexBlockSet()
 	if err != nil {
 		t.Fatal(err)
 	}
