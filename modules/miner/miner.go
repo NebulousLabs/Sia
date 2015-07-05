@@ -16,9 +16,15 @@ const (
 
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
 	// that are remembered.
-	headerForWorkMemory = 50
+	headerForWorkMemory = 1000
+
+	// headersPerBlockMemory is the number of headers created by changing the
+	// random transaction of a block before updating the block to contain any
+	// new transactions
+	headersPerBlockMemory = 100
 )
 
+// TODO: docstring
 type Miner struct {
 	// Module dependencies.
 	cs     modules.ConsensusSet
@@ -33,14 +39,15 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	// A list of blocks that have been through SubmitBlock.
+	// A list of blocks that have been submitted through SubmitBlock.
 	blocksFound []types.BlockID
 
 	// BlockManager variables. The BlockManager passes out and receives unique
 	// block headers on each call, these variables help to map the received
 	// block header to the original block. The headers are passed instead of
 	// the block because a full block is 2mb and is a lot to send over http.
-	blockMem    map[types.BlockHeader]types.Block
+	blockMem    map[types.BlockHeader]*types.Block
+	randTxnMem  map[types.BlockHeader]types.Transaction
 	headerMem   []types.BlockHeader
 	memProgress int
 
@@ -108,8 +115,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		earliestTimestamp: earliestTimestamp,
 		address:           addr,
 
-		blockMem:  make(map[types.BlockHeader]types.Block),
-		headerMem: make([]types.BlockHeader, headerForWorkMemory),
+		blockMem:   make(map[types.BlockHeader]*types.Block),
+		randTxnMem: make(map[types.BlockHeader]types.Transaction),
+		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),

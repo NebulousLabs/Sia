@@ -69,21 +69,50 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
-	// Grab a block for work.
-	block, target := m.blockForWork()
+	block := new(types.Block)
 
-	// Save a mapping between the block and its header, replacing the block
-	// that was stored 'headerForWorkMemory' requests ago.
+	if m.memProgress%headersPerBlockMemory == 0 {
+		// Grab a new block
+		*block, _ = m.blockForWork()
+	} else {
+		// Set block to previous block and create a randTxn
+		blockOld := m.blockMem[m.headerMem[m.memProgress-1]]
+
+		randBytes, _ := crypto.RandBytes(types.SpecifierLen)
+		randTxn := types.Transaction{
+			ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
+		}
+
+		// Overwrite the old bolck's random transaction
+		blockTransactions := append([]types.Transaction{randTxn}, blockOld.Transactions[1:]...)
+
+		// Assemble the block
+		*block = types.Block{
+			ParentID:     blockOld.ParentID,
+			Timestamp:    blockOld.Timestamp,
+			MinerPayouts: blockOld.MinerPayouts,
+			Transactions: blockTransactions,
+		}
+	}
+
+	header := block.Header()
+	randTxn := block.Transactions[0]
+
+	// Save a mapping between the block and its header as well as the
+	// random transaction and its header, replacing the block that was
+	// stored 'headerForWorkMemory' requests ago.
 	delete(m.blockMem, m.headerMem[m.memProgress])
-	m.blockMem[block.Header()] = block
-	m.headerMem[m.memProgress] = block.Header()
+	delete(m.randTxnMem, m.headerMem[m.memProgress])
+	m.blockMem[header] = block
+	m.randTxnMem[header] = randTxn
+	m.headerMem[m.memProgress] = header
 	m.memProgress++
 	if m.memProgress == headerForWorkMemory {
 		m.memProgress = 0
 	}
 
 	// Return the header and target.
-	return block.Header(), target
+	return header, m.target
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
@@ -117,13 +146,28 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
 	lockID := m.mu.Lock()
-	b, exists := m.blockMem[lookupBH]
-	m.mu.Unlock(lockID)
-	if !exists {
+	b, bExists := m.blockMem[lookupBH]
+	randTxn, txnExists := m.randTxnMem[lookupBH]
+
+	if !bExists || !txnExists {
+		m.mu.Unlock(lockID)
 		err := errors.New("block header returned late - block was cleared from memory")
 		m.log.Println("ERROR:", err)
 		return err
 	}
-	b.Nonce = bh.Nonce
-	return m.SubmitBlock(b)
+	// Reset block memory
+	m.memProgress = 0
+	m.mu.Unlock(lockID)
+
+	// Write the correct randTxn to a new block
+	blockTransactions := append([]types.Transaction{randTxn}, b.Transactions[1:]...)
+	block := types.Block{
+		ParentID:     b.ParentID,
+		Timestamp:    b.Timestamp,
+		MinerPayouts: b.MinerPayouts,
+		Transactions: blockTransactions,
+	}
+
+	block.Nonce = bh.Nonce
+	return m.SubmitBlock(block)
 }
