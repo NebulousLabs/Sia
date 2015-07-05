@@ -8,8 +8,25 @@ import (
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+
 	"github.com/boltdb/bolt"
 )
+
+var (
+	ErrNilEntry = errors.New("entry does not exist")
+)
+
+func getObject(b *bolt.Bucket, key, obj interface{}) error {
+	objBytes := b.Get(encoding.Marshal(key))
+	if objBytes == nil {
+		return ErrNilEntry
+	}
+	return encoding.Unmarshal(objBytes, obj)
+}
+
+func putObject(b *bolt.Bucket, key, val interface{}) error {
+	return b.Put(encoding.Marshal(key), encoding.Marshal(val))
+}
 
 // addHashType adds an entry in the Hashes bucket for identifing that hash
 func addHashType(tx *bolt.Tx, hash crypto.Hash, hashType int) error {
@@ -18,7 +35,7 @@ func addHashType(tx *bolt.Tx, hash crypto.Hash, hashType int) error {
 		return errors.New("bucket Hashes does not exist")
 	}
 
-	return b.Put(encoding.Marshal(hash), encoding.Marshal(hashType))
+	return putObject(b, hash, hashType)
 }
 
 // addAddress either creates a new list of transactions for the given
@@ -34,24 +51,14 @@ func addAddress(tx *bolt.Tx, addr types.UnlockHash, txid crypto.Hash) error {
 		return errors.New("Addresses bucket does not exist")
 	}
 
-	txBytes := b.Get(encoding.Marshal(addr))
-	if txBytes == nil {
-		err := b.Put(encoding.Marshal(addr), encoding.Marshal([]crypto.Hash{txid}))
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
 	var txns []crypto.Hash
-	err = encoding.Unmarshal(txBytes, &txns)
-	if err != nil {
+	err = getObject(b, addr, &txns)
+	if err != ErrNilEntry {
 		return err
 	}
-
 	txns = append(txns, txid)
 
-	return b.Put(encoding.Marshal(addr), encoding.Marshal(txns))
+	return putObject(b, addr, txns)
 }
 
 // addSiacoinInput changes an existing outputTransactions struct to
@@ -62,43 +69,33 @@ func addSiacoinInput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Ha
 		return errors.New("bucket SiacoinOutputs does not exist")
 	}
 
-	outputBytes := b.Get(encoding.Marshal(outputID))
-	if outputBytes == nil {
-		return errors.New("output for id does not exist")
-	}
-
 	var ot outputTransactions
-	err := encoding.Unmarshal(outputBytes, &ot)
+	err := getObject(b, outputID, &ot)
 	if err != nil {
 		return err
 	}
 
 	ot.InputTx = txid
 
-	return b.Put(encoding.Marshal(outputID), encoding.Marshal(ot))
+	return putObject(b, outputID, ot)
 }
 
 // addSiafundInpt does the same thing as addSiacoinInput except with siafunds
 func addSiafundInput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
 	b := tx.Bucket([]byte("SiafundOutputs"))
 	if b == nil {
-		return errors.New("bucket SaifundOutputs does not exist")
-	}
-
-	outputBytes := b.Get(encoding.Marshal(outputID))
-	if outputBytes == nil {
-		return errors.New("output for id does not exist")
+		return errors.New("bucket SiafundOutputs does not exist")
 	}
 
 	var ot outputTransactions
-	err := encoding.Unmarshal(outputBytes, &ot)
+	err := getObject(b, outputID, &ot)
 	if err != nil {
 		return err
 	}
 
 	ot.InputTx = txid
 
-	return b.Put(encoding.Marshal(outputID), encoding.Marshal(ot))
+	return putObject(b, outputID, ot)
 }
 
 // addFcRevision changes an existing fcInfo struct to contain the txid
@@ -109,20 +106,15 @@ func addFcRevision(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) err
 		return errors.New("bucket FileContracts does not exist")
 	}
 
-	fiBytes := b.Get(encoding.Marshal(fcid))
-	if fiBytes == nil {
-		return errors.New("filecontract does not exist in database")
-	}
-
 	var fi fcInfo
-	err := encoding.Unmarshal(fiBytes, &fi)
+	err := getObject(b, fcid, &fi)
 	if err != nil {
 		return err
 	}
 
 	fi.Revisions = append(fi.Revisions, txid)
 
-	return b.Put(encoding.Marshal(fcid), encoding.Marshal(fi))
+	return putObject(b, fcid, fi)
 }
 
 // addFcProof changes an existing fcInfo struct in the database to
@@ -133,20 +125,15 @@ func addFcProof(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error 
 		return errors.New("bucket FileContracts does not exist")
 	}
 
-	fiBytes := b.Get(encoding.Marshal(fcid))
-	if fiBytes == nil {
-		return errors.New("filecontract does not exist in database")
-	}
-
 	var fi fcInfo
-	err := encoding.Unmarshal(fiBytes, &fi)
+	err := getObject(b, fcid, &fi)
 	if err != nil {
 		return err
 	}
 
 	fi.Proof = txid
 
-	return b.Put(encoding.Marshal(fcid), encoding.Marshal(fi))
+	return putObject(b, fcid, fi)
 }
 
 func addNewHash(tx *bolt.Tx, bucketName string, t int, hash crypto.Hash, value interface{}) error {
@@ -159,7 +146,7 @@ func addNewHash(tx *bolt.Tx, bucketName string, t int, hash crypto.Hash, value i
 	if b == nil {
 		return errors.New("bucket does not exist: " + bucketName)
 	}
-	return b.Put(encoding.Marshal(hash), encoding.Marshal(value))
+	return putObject(b, hash, value)
 }
 
 // addNewOutput creats a new outputTransactions struct and adds it to the database
@@ -182,7 +169,7 @@ func addHeight(tx *bolt.Tx, height types.BlockHeight, bs modules.ExplorerBlockDa
 		return errors.New("bucket Blocks does not exist")
 	}
 
-	return b.Put(encoding.Marshal(height), encoding.Marshal(bs))
+	return putObject(b, height, bs)
 }
 
 // addBlockDB parses a block and adds it to the database
