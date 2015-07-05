@@ -16,122 +16,130 @@ var (
 	ErrNilEntry = errors.New("entry does not exist")
 )
 
-func getObject(tx *bolt.Tx, bucket string, key, obj interface{}) error {
+// A boltTx is a bolt transaction. It implements monadic error handling, such that
+// any operation that occurs after an error becomes a no-op.
+type boltTx struct {
+	*bolt.Tx
+	err error
+}
+
+func newBoltTx(db *explorerDB) (*boltTx, error) {
+	tx, err := db.Begin(true)
+	if err != nil {
+		return nil, err
+	}
+	return &boltTx{tx, nil}, nil
+}
+
+func (tx *boltTx) commit() error {
+	if tx.err != nil {
+		return tx.err
+	}
+	return tx.Commit()
+}
+
+func (tx *boltTx) getObject(bucket string, key, obj interface{}) {
+	// if an error has already be encountered, do nothing
+	if tx.err != nil {
+		return
+	}
+
 	b := tx.Bucket([]byte(bucket))
 	if b == nil {
-		return errors.New("bucket does not exist: " + bucket)
+		tx.err = errors.New("bucket does not exist: " + bucket)
+		return
 	}
 	objBytes := b.Get(encoding.Marshal(key))
 	if objBytes == nil {
-		return ErrNilEntry
+		tx.err = ErrNilEntry
+		return
 	}
-	return encoding.Unmarshal(objBytes, obj)
+	tx.err = encoding.Unmarshal(objBytes, obj)
+	return
 }
 
-func putObject(tx *bolt.Tx, bucket string, key, val interface{}) error {
+func (tx *boltTx) putObject(bucket string, key, val interface{}) {
+	// if an error has already be encountered, do nothing
+	if tx.err != nil {
+		return
+	}
+
 	b := tx.Bucket([]byte(bucket))
 	if b == nil {
-		return errors.New("bucket does not exist: " + bucket)
+		tx.err = errors.New("bucket does not exist: " + bucket)
+		return
 	}
-	return b.Put(encoding.Marshal(key), encoding.Marshal(val))
-}
-
-// addHashType adds an entry in the Hashes bucket for identifing that hash
-func addHashType(tx *bolt.Tx, hash crypto.Hash, hashType int) error {
-	return putObject(tx, "Hashes", hash, hashType)
+	tx.err = b.Put(encoding.Marshal(key), encoding.Marshal(val))
+	return
 }
 
 // addAddress either creates a new list of transactions for the given
 // address, or adds the txid to the list if such a list already exists
-func addAddress(tx *bolt.Tx, addr types.UnlockHash, txid crypto.Hash) error {
-	err := putObject(tx, "Hashes", crypto.Hash(addr), hashUnlockHash)
-	if err != nil {
-		return err
-	}
+func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
+	tx.putObject("Hashes", crypto.Hash(addr), hashUnlockHash)
 
 	var txns []crypto.Hash
-	err = getObject(tx, "Addresses", addr, &txns)
-	if err != ErrNilEntry {
-		return err
+	tx.getObject("Addresses", addr, &txns)
+	if tx.err == ErrNilEntry {
+		// NOTE: this is a special case where a nil entry is not an error, so
+		// we must explicitly reset tx.err.
+		tx.err = nil
 	}
 	txns = append(txns, txid)
 
-	return putObject(tx, "Addresses", addr, txns)
+	tx.putObject("Addresses", addr, txns)
 }
 
 // addSiacoinInput changes an existing outputTransactions struct to
 // point to the place where that output was used
-func addSiacoinInput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash) error {
+func (tx *boltTx) addSiacoinInput(outputID types.SiacoinOutputID, txid crypto.Hash) {
 	var ot outputTransactions
-	err := getObject(tx, "SiacoinOutputs", outputID, &ot)
-	if err != nil {
-		return err
-	}
-
+	tx.getObject("SiacoinOutputs", outputID, &ot)
 	ot.InputTx = txid
-
-	return putObject(tx, "SiacoinOutputs", outputID, ot)
+	tx.putObject("SiacoinOutputs", outputID, ot)
 }
 
 // addSiafundInpt does the same thing as addSiacoinInput except with siafunds
-func addSiafundInput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
+func (tx *boltTx) addSiafundInput(outputID types.SiafundOutputID, txid crypto.Hash) {
 	var ot outputTransactions
-	err := getObject(tx, "SiafundOutputs", outputID, &ot)
-	if err != nil {
-		return err
-	}
-
+	tx.getObject("SiafundOutputs", outputID, &ot)
 	ot.InputTx = txid
-
-	return putObject(tx, "SiafundOutputs", outputID, ot)
+	tx.putObject("SiafundOutputs", outputID, ot)
 }
 
 // addFcRevision changes an existing fcInfo struct to contain the txid
 // of the contract revision
-func addFcRevision(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error {
+func (tx *boltTx) addFcRevision(fcid types.FileContractID, txid crypto.Hash) {
 	var fi fcInfo
-	err := getObject(tx, "FileContracts", fcid, &fi)
-	if err != nil {
-		return err
-	}
-
+	tx.getObject("FileContracts", fcid, &fi)
 	fi.Revisions = append(fi.Revisions, txid)
-
-	return putObject(tx, "FileContracts", fcid, fi)
+	tx.putObject("FileContracts", fcid, fi)
 }
 
 // addFcProof changes an existing fcInfo struct in the database to
 // contain the txid of its storage proof
-func addFcProof(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error {
+func (tx *boltTx) addFcProof(fcid types.FileContractID, txid crypto.Hash) {
 	var fi fcInfo
-	err := getObject(tx, "FileContracts", fcid, &fi)
-	if err != nil {
-		return err
-	}
-
+	tx.getObject("FileContracts", fcid, &fi)
 	fi.Proof = txid
-
-	return putObject(tx, "FileContracts", fcid, fi)
+	tx.putObject("FileContracts", fcid, fi)
 }
 
-func addNewHash(tx *bolt.Tx, bucketName string, t int, hash crypto.Hash, value interface{}) error {
-	err := putObject(tx, "Hashes", hash, t)
-	if err != nil {
-		return err
-	}
-	return putObject(tx, bucketName, hash, value)
+func (tx *boltTx) addNewHash(bucketName string, t int, hash crypto.Hash, value interface{}) {
+	tx.putObject("Hashes", hash, t)
+	tx.putObject(bucketName, hash, value)
 }
 
 // addNewOutput creats a new outputTransactions struct and adds it to the database
-func addNewOutput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash) error {
+func (tx *boltTx) addNewOutput(outputID types.SiacoinOutputID, txid crypto.Hash) {
 	otx := outputTransactions{txid, crypto.Hash{}}
-	return addNewHash(tx, "SiacoinOutputs", hashCoinOutputID, crypto.Hash(outputID), otx)
+	tx.addNewHash("SiacoinOutputs", hashCoinOutputID, crypto.Hash(outputID), otx)
 }
 
 // addNewSFOutput does the same thing as addNewOutput does, except for siafunds
-func addNewSFOutput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
+func (tx *boltTx) addNewSFOutput(outputID types.SiafundOutputID, txid crypto.Hash) {
 	otx := outputTransactions{txid, crypto.Hash{}}
-	return addNewHash(tx, "SiafundOutputs", hashFundOutputID, crypto.Hash(outputID), otx)
+	tx.addNewHash("SiafundOutputs", hashFundOutputID, crypto.Hash(outputID), otx)
 }
 
 // addBlockDB parses a block and adds it to the database
@@ -156,7 +164,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		}
 	}
 
-	tx, err := be.db.Begin(true)
+	tx, err := newBoltTx(be.db)
 	if err != nil {
 		return err
 	}
@@ -168,10 +176,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Height: be.blockchainHeight,
 	}
 
-	err = addNewHash(tx, "Blocks", hashBlock, crypto.Hash(b.ID()), blockStruct)
-	if err != nil {
-		return err
-	}
+	tx.addNewHash("Blocks", hashBlock, crypto.Hash(b.ID()), blockStruct)
 
 	bSum := modules.ExplorerBlockData{
 		ID:        b.ID(),
@@ -180,167 +185,95 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Size:      uint64(len(encoding.Marshal(b))),
 	}
 
-	err = putObject(tx, "Heights", be.blockchainHeight, bSum)
-	if err != nil {
-		return err
-	}
-	err = putObject(tx, "Hashes", crypto.Hash(b.ID()), hashBlock)
-	if err != nil {
-		return err
-	}
+	tx.putObject("Heights", be.blockchainHeight, bSum)
+	tx.putObject("Hashes", crypto.Hash(b.ID()), hashBlock)
 
 	// Insert the miner payouts as new outputs
 	for i, payout := range b.MinerPayouts {
-		err = addAddress(tx, payout.UnlockHash, crypto.Hash(b.ID()))
-		if err != nil {
-			return err
-		}
-		err = addNewOutput(tx, b.MinerPayoutID(i), crypto.Hash(b.ID()))
-		if err != nil {
-			return err
-		}
+		tx.addAddress(payout.UnlockHash, crypto.Hash(b.ID()))
+		tx.addNewOutput(b.MinerPayoutID(i), crypto.Hash(b.ID()))
 	}
 
 	// Insert each transaction
 	for i, txn := range b.Transactions {
-		err = addNewHash(tx, "Transactions", hashTransaction, txn.ID(), txInfo{b.ID(), i})
-		if err != nil {
-			return err
-		}
-		err = be.addTransaction(tx, txn)
-		if err != nil {
-			return err
-		}
+		tx.addNewHash("Transactions", hashTransaction, txn.ID(), txInfo{b.ID(), i})
+		be.addTransaction(tx, txn)
 	}
 
-	return tx.Commit()
+	return tx.commit()
 }
 
 // addTransaction is called from addBlockDB, and delegates the adding
 // of information to the database to the functions defined above
-func (be *BlockExplorer) addTransaction(btx *bolt.Tx, tx types.Transaction) error {
+func (be *BlockExplorer) addTransaction(btx *boltTx, tx types.Transaction) {
 	// Store this for quick lookup
 	txid := tx.ID()
 
 	// Append each input to the list of modifications
 	for _, input := range tx.SiacoinInputs {
-		err := addSiacoinInput(btx, input.ParentID, txid)
-		if err != nil {
-			return err
-		}
+		btx.addSiacoinInput(input.ParentID, txid)
 	}
 
 	// Handle all the transaction outputs
 	for i, output := range tx.SiacoinOutputs {
-		err := addAddress(btx, output.UnlockHash, txid)
-		if err != nil {
-			return err
-		}
-		err = addNewOutput(btx, tx.SiacoinOutputID(i), txid)
-		if err != nil {
-			return err
-		}
+		btx.addAddress(output.UnlockHash, txid)
+		btx.addNewOutput(tx.SiacoinOutputID(i), txid)
 	}
 
 	// Handle each file contract individually
 	for i, contract := range tx.FileContracts {
 		fcid := tx.FileContractID(i)
-		err := addNewHash(btx, "FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
+		btx.addNewHash("FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
 			Contract: txid,
 		})
-		if err != nil {
-			return err
-		}
 
 		for j, output := range contract.ValidProofOutputs {
-			err = addAddress(btx, output.UnlockHash, txid)
-			if err != nil {
-				return err
-			}
-			err = addNewOutput(btx, fcid.StorageProofOutputID(true, j), txid)
-			if err != nil {
-				return err
-			}
+			btx.addAddress(output.UnlockHash, txid)
+			btx.addNewOutput(fcid.StorageProofOutputID(true, j), txid)
 		}
 		for j, output := range contract.MissedProofOutputs {
-			err = addAddress(btx, output.UnlockHash, txid)
-			if err != nil {
-				return err
-			}
-			err = addNewOutput(btx, fcid.StorageProofOutputID(false, j), txid)
-			if err != nil {
-				return err
-			}
+			btx.addAddress(output.UnlockHash, txid)
+			btx.addNewOutput(fcid.StorageProofOutputID(false, j), txid)
 		}
 
-		err = addAddress(btx, contract.UnlockHash, txid)
-		if err != nil {
-			return err
-		}
+		btx.addAddress(contract.UnlockHash, txid)
 	}
 
 	// Update the list of revisions
 	for _, revision := range tx.FileContractRevisions {
-		err := addFcRevision(btx, revision.ParentID, txid)
-		if err != nil {
-			return err
-		}
+		btx.addFcRevision(revision.ParentID, txid)
 
 		// Note the old outputs will still be there in the
 		// database. This is to provide information to the
 		// people who may just need it.
 		for i, output := range revision.NewValidProofOutputs {
-			err = addAddress(btx, output.UnlockHash, txid)
-			if err != nil {
-				return err
-			}
-			err = addNewOutput(btx, revision.ParentID.StorageProofOutputID(true, i), txid)
-			if err != nil {
-				return err
-			}
+			btx.addAddress(output.UnlockHash, txid)
+			btx.addNewOutput(revision.ParentID.StorageProofOutputID(true, i), txid)
 		}
 		for i, output := range revision.NewMissedProofOutputs {
-			err = addAddress(btx, output.UnlockHash, txid)
-			if err != nil {
-				return err
-			}
-			err = addNewOutput(btx, revision.ParentID.StorageProofOutputID(false, i), txid)
-			if err != nil {
-				return err
-			}
+			btx.addAddress(output.UnlockHash, txid)
+			btx.addNewOutput(revision.ParentID.StorageProofOutputID(false, i), txid)
 		}
 
-		addAddress(btx, revision.NewUnlockHash, txid)
+		btx.addAddress(revision.NewUnlockHash, txid)
 	}
 
 	// Update the list of storage proofs
 	for _, proof := range tx.StorageProofs {
-		err := addFcProof(btx, proof.ParentID, txid)
-		if err != nil {
-			return err
-		}
+		btx.addFcProof(proof.ParentID, txid)
 	}
 
 	// Append all the siafund inputs to the modification list
 	for _, input := range tx.SiafundInputs {
-		err := addSiafundInput(btx, input.ParentID, txid)
-		if err != nil {
-			return err
-		}
+		btx.addSiafundInput(input.ParentID, txid)
 	}
 
 	// Handle all the siafund outputs
 	for i, output := range tx.SiafundOutputs {
-		err := addAddress(btx, output.UnlockHash, txid)
-		if err != nil {
-			return err
-		}
-		err = addNewSFOutput(btx, tx.SiafundOutputID(i), txid)
-		if err != nil {
-			return err
-		}
+		btx.addAddress(output.UnlockHash, txid)
+		btx.addNewSFOutput(tx.SiafundOutputID(i), txid)
 
 	}
 
-	return putObject(btx, "Hashes", txid, hashTransaction)
+	btx.putObject("Hashes", txid, hashTransaction)
 }
