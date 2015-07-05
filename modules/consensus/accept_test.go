@@ -939,21 +939,8 @@ func TestSpendSiafundsBlock(t *testing.T) {
 
 // TODO:
 //
-// testIntradependentBlock creates a block that has interdependent
-// transactions.
-
-// TODO:
-//
 // testPaymentChannel walks through creating a payment channel on the
 // blockchain.
-
-// TODO:
-//
-// try to make a block with a buried bad transaction.
-
-// TODO:
-//
-// try to make a fork with a buried bad block.
 
 // complexBlockSet puts a set of blocks with many types of transactions into
 // the consensus set.
@@ -992,7 +979,7 @@ func TestComplexForking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst3, err := createConsensusSetTester("TestComplexForking - 2")
+	cst3, err := createConsensusSetTester("TestComplexForking - 3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1090,3 +1077,61 @@ func TestComplexForking(t *testing.T) {
 		t.Error("cst1 and cst3 do not share the same consensus set hash")
 	}
 }
+
+// TestBuriedBadFork creates a block with an invalid transaction that's not on
+// the longest fork. The consensus set will not validate that block. Then valid
+// blocks are added on top of it to make it the longest fork. When it becomes
+// the longest fork, all the blocks should be fully validated and thrown out
+// because a parent is invalid.
+func TestBuriedBadFork(t *testing.T) {
+	if !testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBuriedBadFork")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Create a bad block that builds on a parent, so that it is part of not
+	// the longest fork.
+	badBlock := types.Block{
+		ParentID:     bn.parent.block.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height)}},
+		Transactions: []types.Transaction{{
+			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
+		}},
+	}
+	badBlock, _ = cst.miner.SolveBlock(badBlock, bn.parent.childTarget)
+	err = cst.cs.AcceptBlock(badBlock)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+
+	// Build another bock on top of the bad block that is fully valid, this
+	// will cause a fork and full validation of the bad block, both the bad
+	// block and this block should be thrown away.
+	block := types.Block{
+		ParentID:     badBlock.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height + 1)}},
+	}
+	block, _ = cst.miner.SolveBlock(block, bn.parent.childTarget) // okay because the target will not change
+	err = cst.cs.AcceptBlock(block)
+	if err == nil {
+		t.Fatal(err)
+	}
+	_, exists := cst.cs.blockMap[badBlock.ID()]
+	if exists {
+		t.Error("bad block not cleared from memory")
+	}
+	_, exists = cst.cs.blockMap[block.ID()]
+	if exists {
+		t.Error("block not cleared from memory")
+	}
+}
+
+// TODO:
+//
+// try to make a block with a buried bad transaction.
