@@ -149,75 +149,29 @@ func addFcProof(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error 
 	return b.Put(encoding.Marshal(fcid), encoding.Marshal(fi))
 }
 
-// addNewOutput creats a new outputTransactions struct and adds it to the database
-func addNewOutput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash) error {
-	err := addHashType(tx, crypto.Hash(outputID), hashCoinOutputID)
+func addNewHash(tx *bolt.Tx, bucketName string, t int, hash crypto.Hash, value interface{}) error {
+	err := addHashType(tx, hash, t)
 	if err != nil {
 		return err
 	}
 
-	b := tx.Bucket([]byte("SiacoinOutputs"))
+	b := tx.Bucket([]byte(bucketName))
 	if b == nil {
-		return errors.New("bucket SiacoinOutputs does not exist")
+		return errors.New("bucket does not exist: " + bucketName)
 	}
+	return b.Put(encoding.Marshal(hash), encoding.Marshal(value))
+}
 
-	return b.Put(encoding.Marshal(outputID), encoding.Marshal(outputTransactions{
-		OutputTx: txid,
-	}))
+// addNewOutput creats a new outputTransactions struct and adds it to the database
+func addNewOutput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash) error {
+	otx := outputTransactions{txid, crypto.Hash{}}
+	return addNewHash(tx, "SiacoinOutputs", hashCoinOutputID, crypto.Hash(outputID), otx)
 }
 
 // addNewSFOutput does the same thing as addNewOutput does, except for siafunds
 func addNewSFOutput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
-	b := tx.Bucket([]byte("SiafundOutputs"))
-	if b == nil {
-		return errors.New("bucket SaifundOutputs does not exist")
-	}
-
-	return b.Put(encoding.Marshal(outputID), encoding.Marshal(outputTransactions{
-		OutputTx: txid,
-	}))
-}
-
-// addBlock creates a new blockData struct containing a block and adds
-// it to the database
-func addBlock(tx *bolt.Tx, id types.BlockID, bd blockData) error {
-	b := tx.Bucket([]byte("Blocks"))
-	if b == nil {
-		return errors.New("bucket Blocks does not exist")
-	}
-
-	return b.Put(encoding.Marshal(id), encoding.Marshal(bd))
-}
-
-// addTxid creates a new txInfo struct and adds it to the database
-func addTxid(tx *bolt.Tx, txid crypto.Hash, ti txInfo) error {
-	err := addHashType(tx, txid, hashTransaction)
-	if err != nil {
-		return err
-	}
-
-	b := tx.Bucket([]byte("Transactions"))
-	if b == nil {
-		return errors.New("bucket Transactions does not exist")
-	}
-
-	return b.Put(encoding.Marshal(txid), encoding.Marshal(ti))
-}
-
-// addFcid creates a new fcInfo struct about a file contract and adds
-// it to the database
-func addFcid(tx *bolt.Tx, fcid types.FileContractID, fi fcInfo) error {
-	err := addHashType(tx, crypto.Hash(fcid), hashFilecontract)
-	if err != nil {
-		return err
-	}
-
-	b := tx.Bucket([]byte("FileContracts"))
-	if b == nil {
-		return errors.New("bucket FileContracts does not exist")
-	}
-
-	return b.Put(encoding.Marshal(fcid), encoding.Marshal(fi))
+	otx := outputTransactions{txid, crypto.Hash{}}
+	return addNewHash(tx, "SiafundOutputs", hashFundOutputID, crypto.Hash(outputID), otx)
 }
 
 // addHeight adds a block summary (modules.ExplorerBlockData) to the
@@ -265,7 +219,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Height: be.blockchainHeight,
 	}
 
-	err = addBlock(tx, b.ID(), blockStruct)
+	err = addNewHash(tx, "Blocks", hashBlock, crypto.Hash(b.ID()), blockStruct)
 	if err != nil {
 		return err
 	}
@@ -300,7 +254,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 
 	// Insert each transaction
 	for i, txn := range b.Transactions {
-		err = addTxid(tx, txn.ID(), txInfo{b.ID(), i})
+		err = addNewHash(tx, "Transactions", hashTransaction, txn.ID(), txInfo{b.ID(), i})
 		if err != nil {
 			return err
 		}
@@ -342,7 +296,7 @@ func (be *BlockExplorer) addTransaction(btx *bolt.Tx, tx types.Transaction) erro
 	// Handle each file contract individually
 	for i, contract := range tx.FileContracts {
 		fcid := tx.FileContractID(i)
-		err := addFcid(btx, fcid, fcInfo{
+		err := addNewHash(btx, "FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
 			Contract: txid,
 		})
 		if err != nil {
