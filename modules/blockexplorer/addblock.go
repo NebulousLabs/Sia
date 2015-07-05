@@ -16,7 +16,11 @@ var (
 	ErrNilEntry = errors.New("entry does not exist")
 )
 
-func getObject(b *bolt.Bucket, key, obj interface{}) error {
+func getObject(tx *bolt.Tx, bucket string, key, obj interface{}) error {
+	b := tx.Bucket([]byte(bucket))
+	if b == nil {
+		return errors.New("bucket does not exist: " + bucket)
+	}
 	objBytes := b.Get(encoding.Marshal(key))
 	if objBytes == nil {
 		return ErrNilEntry
@@ -24,129 +28,98 @@ func getObject(b *bolt.Bucket, key, obj interface{}) error {
 	return encoding.Unmarshal(objBytes, obj)
 }
 
-func putObject(b *bolt.Bucket, key, val interface{}) error {
+func putObject(tx *bolt.Tx, bucket string, key, val interface{}) error {
+	b := tx.Bucket([]byte(bucket))
+	if b == nil {
+		return errors.New("bucket does not exist: " + bucket)
+	}
 	return b.Put(encoding.Marshal(key), encoding.Marshal(val))
 }
 
 // addHashType adds an entry in the Hashes bucket for identifing that hash
 func addHashType(tx *bolt.Tx, hash crypto.Hash, hashType int) error {
-	b := tx.Bucket([]byte("Hashes"))
-	if b == nil {
-		return errors.New("bucket Hashes does not exist")
-	}
-
-	return putObject(b, hash, hashType)
+	return putObject(tx, "Hashes", hash, hashType)
 }
 
 // addAddress either creates a new list of transactions for the given
 // address, or adds the txid to the list if such a list already exists
 func addAddress(tx *bolt.Tx, addr types.UnlockHash, txid crypto.Hash) error {
-	err := addHashType(tx, crypto.Hash(addr), hashUnlockHash)
+	err := putObject(tx, "Hashes", crypto.Hash(addr), hashUnlockHash)
 	if err != nil {
 		return err
 	}
 
-	b := tx.Bucket([]byte("Addresses"))
-	if b == nil {
-		return errors.New("Addresses bucket does not exist")
-	}
-
 	var txns []crypto.Hash
-	err = getObject(b, addr, &txns)
+	err = getObject(tx, "Addresses", addr, &txns)
 	if err != ErrNilEntry {
 		return err
 	}
 	txns = append(txns, txid)
 
-	return putObject(b, addr, txns)
+	return putObject(tx, "Addresses", addr, txns)
 }
 
 // addSiacoinInput changes an existing outputTransactions struct to
 // point to the place where that output was used
 func addSiacoinInput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash) error {
-	b := tx.Bucket([]byte("SiacoinOutputs"))
-	if b == nil {
-		return errors.New("bucket SiacoinOutputs does not exist")
-	}
-
 	var ot outputTransactions
-	err := getObject(b, outputID, &ot)
+	err := getObject(tx, "SiacoinOutputs", outputID, &ot)
 	if err != nil {
 		return err
 	}
 
 	ot.InputTx = txid
 
-	return putObject(b, outputID, ot)
+	return putObject(tx, "SiacoinOutputs", outputID, ot)
 }
 
 // addSiafundInpt does the same thing as addSiacoinInput except with siafunds
 func addSiafundInput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
-	b := tx.Bucket([]byte("SiafundOutputs"))
-	if b == nil {
-		return errors.New("bucket SiafundOutputs does not exist")
-	}
-
 	var ot outputTransactions
-	err := getObject(b, outputID, &ot)
+	err := getObject(tx, "SiafundOutputs", outputID, &ot)
 	if err != nil {
 		return err
 	}
 
 	ot.InputTx = txid
 
-	return putObject(b, outputID, ot)
+	return putObject(tx, "SiafundOutputs", outputID, ot)
 }
 
 // addFcRevision changes an existing fcInfo struct to contain the txid
 // of the contract revision
 func addFcRevision(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error {
-	b := tx.Bucket([]byte("FileContracts"))
-	if b == nil {
-		return errors.New("bucket FileContracts does not exist")
-	}
-
 	var fi fcInfo
-	err := getObject(b, fcid, &fi)
+	err := getObject(tx, "FileContracts", fcid, &fi)
 	if err != nil {
 		return err
 	}
 
 	fi.Revisions = append(fi.Revisions, txid)
 
-	return putObject(b, fcid, fi)
+	return putObject(tx, "FileContracts", fcid, fi)
 }
 
 // addFcProof changes an existing fcInfo struct in the database to
 // contain the txid of its storage proof
 func addFcProof(tx *bolt.Tx, fcid types.FileContractID, txid crypto.Hash) error {
-	b := tx.Bucket([]byte("FileContracts"))
-	if b == nil {
-		return errors.New("bucket FileContracts does not exist")
-	}
-
 	var fi fcInfo
-	err := getObject(b, fcid, &fi)
+	err := getObject(tx, "FileContracts", fcid, &fi)
 	if err != nil {
 		return err
 	}
 
 	fi.Proof = txid
 
-	return putObject(b, fcid, fi)
+	return putObject(tx, "FileContracts", fcid, fi)
 }
 
 func addNewHash(tx *bolt.Tx, bucketName string, t int, hash crypto.Hash, value interface{}) error {
-	err := addHashType(tx, hash, t)
+	err := putObject(tx, "Hashes", hash, t)
 	if err != nil {
 		return err
 	}
-
-	b := tx.Bucket([]byte(bucketName))
-	if b == nil {
-		return errors.New("bucket does not exist: " + bucketName)
-	}
-	return putObject(b, hash, value)
+	return putObject(tx, bucketName, hash, value)
 }
 
 // addNewOutput creats a new outputTransactions struct and adds it to the database
@@ -159,17 +132,6 @@ func addNewOutput(tx *bolt.Tx, outputID types.SiacoinOutputID, txid crypto.Hash)
 func addNewSFOutput(tx *bolt.Tx, outputID types.SiafundOutputID, txid crypto.Hash) error {
 	otx := outputTransactions{txid, crypto.Hash{}}
 	return addNewHash(tx, "SiafundOutputs", hashFundOutputID, crypto.Hash(outputID), otx)
-}
-
-// addHeight adds a block summary (modules.ExplorerBlockData) to the
-// database with a height as the key
-func addHeight(tx *bolt.Tx, height types.BlockHeight, bs modules.ExplorerBlockData) error {
-	b := tx.Bucket([]byte("Heights"))
-	if b == nil {
-		return errors.New("bucket Blocks does not exist")
-	}
-
-	return putObject(b, height, bs)
 }
 
 // addBlockDB parses a block and adds it to the database
@@ -218,11 +180,11 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Size:      uint64(len(encoding.Marshal(b))),
 	}
 
-	err = addHeight(tx, be.blockchainHeight, bSum)
+	err = putObject(tx, "Heights", be.blockchainHeight, bSum)
 	if err != nil {
 		return err
 	}
-	err = addHashType(tx, crypto.Hash(b.ID()), hashBlock)
+	err = putObject(tx, "Hashes", crypto.Hash(b.ID()), hashBlock)
 	if err != nil {
 		return err
 	}
@@ -380,5 +342,5 @@ func (be *BlockExplorer) addTransaction(btx *bolt.Tx, tx types.Transaction) erro
 
 	}
 
-	return addHashType(btx, txid, hashTransaction)
+	return putObject(btx, "Hashes", txid, hashTransaction)
 }
