@@ -1132,6 +1132,63 @@ func TestBuriedBadFork(t *testing.T) {
 	}
 }
 
-// TODO:
-//
-// try to make a block with a buried bad transaction.
+// TestBuriedBadTransaction tries submitting a block with a bad transaction
+// that is buried under good transactions.
+func TestBuriedBadTransaction(t *testing.T) {
+	if !testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBuriedBadTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Create a good transaction using the wallet.
+	txnValue := types.NewCurrency64(1200)
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cst.wallet.FundTransaction(id, txnValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddSiacoinOutput(id, types.SiacoinOutput{Value: txnValue})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+
+	// Create a bad transaction
+	badTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	txns := append(cst.tpool.TransactionSet(), badTxn)
+
+	// Create a block with a buried bad transaction.
+	block := types.Block{
+		ParentID:     bn.block.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height + 1)}},
+		Transactions: txns,
+	}
+	block, _ = cst.miner.SolveBlock(block, bn.childTarget)
+	err = cst.cs.AcceptBlock(block)
+	if err == nil {
+		t.Error("buried transaction didn't cause an error")
+	}
+	_, exists := cst.cs.blockMap[block.ID()]
+	if exists {
+		t.Error("bad block made it into the block map")
+	}
+}
