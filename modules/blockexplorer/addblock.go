@@ -78,9 +78,10 @@ func (tx *boltTx) putObject(bucket string, key, val interface{}) {
 func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
 	tx.putObject("Hashes", crypto.Hash(addr), hashUnlockHash)
 
+	oldErr := tx.err
 	var txns []crypto.Hash
 	tx.getObject("Addresses", addr, &txns)
-	if tx.err == ErrNilEntry {
+	if oldErr == nil && tx.err == ErrNilEntry {
 		// NOTE: this is a special case where a nil entry is not an error, so
 		// we must explicitly reset tx.err.
 		tx.err = nil
