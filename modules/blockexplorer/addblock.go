@@ -198,7 +198,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	// Insert each transaction
 	for i, txn := range b.Transactions {
 		tx.addNewHash("Transactions", hashTransaction, txn.ID(), txInfo{b.ID(), i})
-		be.addTransaction(tx, txn)
+		tx.addTransaction(txn)
 	}
 
 	return tx.commit()
@@ -206,75 +206,75 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 
 // addTransaction is called from addBlockDB, and delegates the adding
 // of information to the database to the functions defined above
-func (be *BlockExplorer) addTransaction(btx *boltTx, tx types.Transaction) {
+func (tx *boltTx) addTransaction(txn types.Transaction) {
 	// Store this for quick lookup
-	txid := tx.ID()
+	txid := txn.ID()
 
 	// Append each input to the list of modifications
-	for _, input := range tx.SiacoinInputs {
-		btx.addSiacoinInput(input.ParentID, txid)
+	for _, input := range txn.SiacoinInputs {
+		tx.addSiacoinInput(input.ParentID, txid)
 	}
 
 	// Handle all the transaction outputs
-	for i, output := range tx.SiacoinOutputs {
-		btx.addAddress(output.UnlockHash, txid)
-		btx.addNewOutput(tx.SiacoinOutputID(i), txid)
+	for i, output := range txn.SiacoinOutputs {
+		tx.addAddress(output.UnlockHash, txid)
+		tx.addNewOutput(txn.SiacoinOutputID(i), txid)
 	}
 
 	// Handle each file contract individually
-	for i, contract := range tx.FileContracts {
-		fcid := tx.FileContractID(i)
-		btx.addNewHash("FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
+	for i, contract := range txn.FileContracts {
+		fcid := txn.FileContractID(i)
+		tx.addNewHash("FileContracts", hashFilecontract, crypto.Hash(fcid), fcInfo{
 			Contract: txid,
 		})
 
 		for j, output := range contract.ValidProofOutputs {
-			btx.addAddress(output.UnlockHash, txid)
-			btx.addNewOutput(fcid.StorageProofOutputID(true, j), txid)
+			tx.addAddress(output.UnlockHash, txid)
+			tx.addNewOutput(fcid.StorageProofOutputID(true, j), txid)
 		}
 		for j, output := range contract.MissedProofOutputs {
-			btx.addAddress(output.UnlockHash, txid)
-			btx.addNewOutput(fcid.StorageProofOutputID(false, j), txid)
+			tx.addAddress(output.UnlockHash, txid)
+			tx.addNewOutput(fcid.StorageProofOutputID(false, j), txid)
 		}
 
-		btx.addAddress(contract.UnlockHash, txid)
+		tx.addAddress(contract.UnlockHash, txid)
 	}
 
 	// Update the list of revisions
-	for _, revision := range tx.FileContractRevisions {
-		btx.addFcRevision(revision.ParentID, txid)
+	for _, revision := range txn.FileContractRevisions {
+		tx.addFcRevision(revision.ParentID, txid)
 
 		// Note the old outputs will still be there in the
 		// database. This is to provide information to the
 		// people who may just need it.
 		for i, output := range revision.NewValidProofOutputs {
-			btx.addAddress(output.UnlockHash, txid)
-			btx.addNewOutput(revision.ParentID.StorageProofOutputID(true, i), txid)
+			tx.addAddress(output.UnlockHash, txid)
+			tx.addNewOutput(revision.ParentID.StorageProofOutputID(true, i), txid)
 		}
 		for i, output := range revision.NewMissedProofOutputs {
-			btx.addAddress(output.UnlockHash, txid)
-			btx.addNewOutput(revision.ParentID.StorageProofOutputID(false, i), txid)
+			tx.addAddress(output.UnlockHash, txid)
+			tx.addNewOutput(revision.ParentID.StorageProofOutputID(false, i), txid)
 		}
 
-		btx.addAddress(revision.NewUnlockHash, txid)
+		tx.addAddress(revision.NewUnlockHash, txid)
 	}
 
 	// Update the list of storage proofs
-	for _, proof := range tx.StorageProofs {
-		btx.addFcProof(proof.ParentID, txid)
+	for _, proof := range txn.StorageProofs {
+		tx.addFcProof(proof.ParentID, txid)
 	}
 
 	// Append all the siafund inputs to the modification list
-	for _, input := range tx.SiafundInputs {
-		btx.addSiafundInput(input.ParentID, txid)
+	for _, input := range txn.SiafundInputs {
+		tx.addSiafundInput(input.ParentID, txid)
 	}
 
 	// Handle all the siafund outputs
-	for i, output := range tx.SiafundOutputs {
-		btx.addAddress(output.UnlockHash, txid)
-		btx.addNewSFOutput(tx.SiafundOutputID(i), txid)
+	for i, output := range txn.SiafundOutputs {
+		tx.addAddress(output.UnlockHash, txid)
+		tx.addNewSFOutput(txn.SiafundOutputID(i), txid)
 
 	}
 
-	btx.putObject("Hashes", txid, hashTransaction)
+	tx.putObject("Hashes", txid, hashTransaction)
 }
