@@ -25,6 +25,6 @@ func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 }
 
 func TestConsensusUpdates(t *testing.T) {
-	ht := createExplorerTester("TestExplorerConsensusUpdate", t)
-	ht.testConsensusUpdates(t)
+	et := createExplorerTester("TestExplorerConsensusUpdate", t)
+	et.testConsensusUpdates(t)
 }

@@ -122,8 +122,11 @@ func (e *Encoder) encode(val reflect.Value) error {
 	case reflect.Array:
 		// special case for byte arrays
 		if val.Type().Elem().Kind() == reflect.Uint8 {
-			// convert array to slice so we can use Bytes()
-			// can't just use Slice() because array may be unaddressable
+			// if the array is addressable, we can optimize a bit here
+			if val.CanAddr() {
+				return e.write(val.Slice(0, val.Len()).Bytes())
+			}
+			// otherwise we have to copy into a newly allocated slice
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
 			return e.write(slice.Bytes())

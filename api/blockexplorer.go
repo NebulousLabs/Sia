@@ -40,3 +40,23 @@ func (srv *Server) blockexplorerBlockDataHandler(w http.ResponseWriter, req *htt
 
 	writeJSON(w, blockSummaries)
 }
+
+// Handles the api call to retrieve data about a specific hash
+func (srv *Server) blockexplorerGetHashHandler(w http.ResponseWriter, req *http.Request) {
+	// Extract the hash from the request
+	var data []byte
+	_, err := fmt.Sscanf(req.FormValue("hash"), "%x", &data)
+	if err != nil {
+		writeError(w, "Malformed or no hash provided: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// returnData will be a generic interface. The json encoder
+	// should still work though
+	returnData, err := srv.blocke.GetHashInfo(data)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, returnData)
+}
