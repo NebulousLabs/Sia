@@ -1339,8 +1339,157 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		}
 	}
 
-	// TODO: Create a channel and the open the channel, but close the channel
-	// using the timelocked signature.
+	// Create a channel and the open the channel, but close the channel using
+	// the timelocked signature.
+	{
+		// Funding entity creates but does not sign a transaction that funds the
+		// channel address. Because the wallet is not very flexible, the channel
+		// txn needs to be fully custom. To get a custom txn, manually create an
+		// address and then use the wallet to fund that address.
+		channelSize := types.NewCurrency64(10e3)
+		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		if err != nil {
+			return err
+		}
+		channelFundingUC := types.UnlockConditions{
+			PublicKeys: []types.SiaPublicKey{{
+				Algorithm: types.SignatureEd25519,
+				Key:       channelFundingPK[:],
+			}},
+			SignaturesRequired: 1,
+		}
+		channelFundingAddr := channelFundingUC.UnlockHash()
+		fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+		if err != nil {
+			return err
+		}
+		_, err = cst.wallet.FundTransaction(fundID, channelSize)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
+		if err != nil {
+			return err
+		}
+		fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+		if err != nil {
+			return err
+		}
+		err = cst.tpool.AcceptTransaction(fundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+		channelTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: channelAddress,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+
+		// Funding entity creates and signs a transaction that spends the full
+		// channel output.
+		channelOutputID := channelTxn.SiacoinOutputID(0)
+		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		refundTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         channelOutputID,
+				UnlockConditions: uc,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: refundAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash := refundTxn.SigHash(0)
+		cryptoSig1, err := crypto.SignHash(sigHash, sk1)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
+
+		// Receiving entity signs the transaction that spends the full channel
+		// output, but with a timelock.
+		refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
+			ParentID:       crypto.Hash(channelOutputID),
+			PublicKeyIndex: 1,
+			Timelock:       cst.cs.height() + 2,
+			CoveredFields:  types.CoveredFields{WholeTransaction: true},
+		})
+		sigHash = refundTxn.SigHash(1)
+		cryptoSig2, err := crypto.SignHash(sigHash, sk2)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[1].Signature = cryptoSig2[:]
+
+		// Funding entity will now sign and broadcast the funding transaction.
+		sigHash = channelTxn.SigHash(0)
+		cryptoSig0, err := crypto.SignHash(sigHash, channelFundingSK)
+		if err != nil {
+			return err
+		}
+		channelTxn.TransactionSignatures[0].Signature = cryptoSig0[:]
+		err = cst.tpool.AcceptTransaction(channelTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		// Put the txn in a block.
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+
+		// Receiving entity never signs another transaction, so the funding
+		// entity waits until the timelock is complete, and then submits the
+		// refundTxn.
+		for i := 0; i < 3; i++ {
+			block, _ := cst.miner.FindBlock()
+			err = cst.cs.AcceptBlock(block)
+			if err != nil {
+				return err
+			}
+			cst.csUpdateWait()
+		}
+		err = cst.tpool.AcceptTransaction(refundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		block, _ = cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+		refundOutputID := refundTxn.SiacoinOutputID(0)
+		_, exists := cst.cs.siacoinOutputs[refundOutputID]
+		if !exists {
+			return errors.New("timelocked refund transaction did not get spent correctly")
+		}
+	}
 
 	return nil
 }
@@ -1349,7 +1498,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 // testPaymentChannelBlocks.
 func TestPaymentChannelBlocks(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestPaymentChannelBlocks")
 	if err != nil {
@@ -1611,6 +1760,3 @@ func TestBuriedBadTransaction(t *testing.T) {
 		t.Error("bad block made it into the block map")
 	}
 }
-
-// TODO: Try performining a file contract revision where the revision is
-// missing a signature.
