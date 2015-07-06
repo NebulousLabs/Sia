@@ -82,7 +82,27 @@ func (x Currency) Mul(y Currency) (c Currency) {
 	return
 }
 
-// MulRat returns a new Currency value x = c * y, where y is a big.Rat.
+// COMPATv0.4.0 - until the first 10e3 blocks have been archived, MulFloat is
+// needed while verifying the first set of blocks.
+//
+// MulFloat returns a new Currency value y = c * x, where x is a float64.
+// Behavior is undefined when x is negative.
+func (x Currency) MulFloat(y float64) (c Currency) {
+	if y < 0 {
+		if build.DEBUG {
+			panic(ErrNegativeCurrency)
+		}
+	} else {
+		cRat := new(big.Rat).Mul(
+			new(big.Rat).SetInt(&x.i),
+			new(big.Rat).SetFloat64(y),
+		)
+		c.i.Div(cRat.Num(), cRat.Denom())
+	}
+	return
+}
+
+// MulRat returns a new Currency value c = x * y, where y is a big.Rat.
 func (x Currency) MulRat(y *big.Rat) (c Currency) {
 	if y.Sign() < 0 {
 		if build.DEBUG {
@@ -93,6 +113,13 @@ func (x Currency) MulRat(y *big.Rat) (c Currency) {
 		c.i.Div(&c.i, y.Denom())
 	}
 	return
+}
+
+// MulTax returns a new Currency value c = x * 0.039, where 0.039 is a big.Rat.
+func (x Currency) MulTax() (c Currency) {
+	c.i.Mul(&x.i, big.NewInt(39))
+	c.i.Div(&c.i, big.NewInt(1000))
+	return c
 }
 
 // RoundDown returns the largest multiple of y <= x.

@@ -4,6 +4,7 @@ package types
 // contracts.
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -109,5 +110,13 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) 
 
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
-	return fc.Payout.MulRat(SiafundPortion).RoundDown(SiafundCount)
+	// COMPATv0.4.0 - until the first 10000 blocks have been archived, they
+	// will need to be handled in a special way.
+	CurrentHeightLock.Lock()
+	height := CurrentHeight
+	CurrentHeightLock.Unlock()
+	if (height < 12e3 && build.Release == "standard") || height < 10 {
+		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
+	}
+	return fc.Payout.MulTax().RoundDown(SiafundCount)
 }

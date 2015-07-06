@@ -325,20 +325,20 @@ func TestInconsistentCheck(t *testing.T) {
 	}
 
 	// Corrupt the consensus set.
-	var scod types.SiacoinOutputID
-	var sco types.SiacoinOutput
-	for id, output := range cst.cs.siacoinOutputs {
-		scod = id
-		sco = output
+	var sfod types.SiafundOutputID
+	var sfo types.SiafundOutput
+	for id, output := range cst.cs.siafundOutputs {
+		sfod = id
+		sfo = output
 		break
 	}
-	sco.Value = sco.Value.Add(types.NewCurrency64(1))
-	cst.cs.siacoinOutputs[scod] = sco
+	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
+	cst.cs.siafundOutputs[sfod] = sfo
 
 	// Mine and submit a block, triggering the inconsistency check.
 	defer func() {
 		r := recover()
-		if r != errSiacoinMiscount {
+		if r != errSiafundMiscount {
 			t.Error("expecting errSiacoinMiscount, got:", r)
 		}
 	}()
@@ -723,11 +723,24 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 // testFileContractsBlocks.
 func TestFileContractsBlocks(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
 	cst, err := createConsensusSetTester("TestFileContractsBlocks")
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
 	}
 	err = cst.testFileContractsBlocks()
 	if err != nil {
@@ -930,6 +943,19 @@ func TestSpendSiafundsBlock(t *testing.T) {
 	cst, err := createConsensusSetTester("TestSpendSiafundsBlock")
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
 	}
 	err = cst.testSpendSiafundsBlock()
 	if err != nil {
@@ -1521,6 +1547,19 @@ func (cst *consensusSetTester) complexBlockSet() error {
 	if err != nil {
 		return err
 	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+	}
 	err = cst.testFileContractsBlocks()
 	if err != nil {
 		return err
@@ -1758,5 +1797,87 @@ func TestBuriedBadTransaction(t *testing.T) {
 	_, exists := cst.cs.blockMap[block.ID()]
 	if exists {
 		t.Error("bad block made it into the block map")
+	}
+}
+
+// COMPATv0.4.0
+//
+// This test checks that the hardfork scheduled for block 12,000 rolls through
+// smoothly.
+func TestTaxHardfork(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestTaxHardfork")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file contract with a payout that is put into the blockchain
+	// before the hardfork block but expires after the hardfork block.
+	payout := types.NewCurrency64(400e6)
+	fc := types.FileContract{
+		WindowStart:        cst.cs.height() + 10,
+		WindowEnd:          cst.cs.height() + 12,
+		Payout:             payout,
+		ValidProofOutputs:  []types.SiacoinOutput{{}},
+		MissedProofOutputs: []types.SiacoinOutput{{}},
+	}
+	outputSize := payout.Sub(fc.Tax())
+	fc.ValidProofOutputs[0].Value = outputSize
+	fc.MissedProofOutputs[0].Value = outputSize
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cst.wallet.FundTransaction(id, payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddFileContract(id, fc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.csUpdateWait()
+
+	// Check that the siafund pool was increased.
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
+		t.Fatal("siafund pool was not increased correctly")
+	}
+
+	// Mine blocks until the file contract expires and see if any problems
+	// occur.
+	for i := 0; i < 12; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
+	}
+
+	// Run a siacoins check to make sure that order has been restored - note
+	// that the siacoin check will fail in the middle, and thus is commented
+	// out until after the hardfork.
+	err = cst.cs.checkSiacoins()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

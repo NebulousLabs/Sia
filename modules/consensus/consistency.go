@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -12,6 +11,7 @@ import (
 
 var (
 	errSiacoinMiscount = errors.New("consensus set has the wrong number of siacoins given the height")
+	errSiafundMiscount = errors.New("consensus set has the wrong number of siafunds")
 )
 
 // checkCurrentPath looks at the blocks in the current path and verifies that
@@ -99,7 +99,7 @@ func (cs *State) checkSiafunds() error {
 		totalSiafunds = totalSiafunds.Add(sfo.Value)
 	}
 	if totalSiafunds.Cmp(types.SiafundCount) != 0 {
-		return fmt.Errorf("checkSiafunds: expected %v siafunds, got %v siafunds", types.SiafundCount, totalSiafunds)
+		return errSiafundMiscount
 	}
 	return nil
 }
@@ -225,10 +225,19 @@ func (cs *State) checkConsistency() error {
 	if err != nil {
 		return err
 	}
-	err = cs.checkSiacoins()
-	if err != nil {
-		return err
-	}
+
+	// COMPATv0.4.0
+	//
+	// checkSiacoins is broken for file contracts that are created before the
+	// hardfork barrier but terminate after the hardfork barrier. This break
+	// will not be a problem after the hardfork checkpoint is created.
+	/*
+		err = cs.checkSiacoins()
+		if err != nil {
+			return err
+		}
+	*/
+
 	err = cs.checkSiafunds()
 	if err != nil {
 		return err

@@ -83,6 +83,20 @@ func (cs *State) validHeader(b types.Block) error {
 // does not extend the longest fork.
 func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
+	// COMPATv0.4.0
+	//
+	// When validating/accepting a block, the types height needs to be set to
+	// the height of the block that's being analyzed. After analysis is
+	// finished, the height needs to be set to the height of the current block.
+	types.CurrentHeightLock.Lock()
+	types.CurrentHeight = parentNode.height
+	types.CurrentHeightLock.Unlock()
+	defer func() {
+		types.CurrentHeightLock.Lock()
+		types.CurrentHeight = cs.height()
+		types.CurrentHeightLock.Unlock()
+	}()
+
 	newNode := parentNode.newChild(b)
 	cs.blockMap[b.ID()] = newNode
 	if newNode.heavierThan(cs.currentBlockNode()) {
