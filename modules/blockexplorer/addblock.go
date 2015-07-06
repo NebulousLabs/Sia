@@ -151,6 +151,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	var blocktarget types.Target
 	if b.ID() == be.genesisBlockID {
 		blocktarget = types.RootDepth
+		be.blockchainHeight = 0
 	} else {
 		var exists bool
 		blocktarget, exists = be.cs.ChildTarget(b.ParentID)

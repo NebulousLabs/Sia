@@ -34,7 +34,7 @@ func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHe
 	if start > finish {
 		return nil, errors.New("the start block must be higher than the end block")
 	}
-	if finish > be.blockchainHeight {
+	if finish > be.blockchainHeight+1 {
 		return nil, errors.New("cannot get info on a block higher than the blockchain")
 	}
 

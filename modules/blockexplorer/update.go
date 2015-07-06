@@ -35,12 +35,12 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 
 	// Handle incoming blocks
 	for _, block := range cc.AppliedBlocks {
+		be.blockchainHeight += 1
 		// add the block to the database.
 		err := be.addBlockDB(block)
 		if err != nil {
 			fmt.Printf("Error when adding block to database: " + err.Error() + "\n")
 		}
-		be.blockchainHeight += 1
 	}
 	be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
