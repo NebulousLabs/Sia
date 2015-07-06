@@ -1016,25 +1016,64 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	channelAddress := uc.UnlockHash()
 
 	// Funding entity creates but does not sign a transaction that funds the
-	// channel address.
+	// channel address. Because the wallet is not very flexible, the channel
+	// txn needs to be fully custom. To get a custom txn, manually create an
+	// address and then use the wallet to fund that address.
 	channelSize := types.NewCurrency64(10e3)
-	channelID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return err
 	}
-	_, err = cst.wallet.FundTransaction(channelID, channelSize) // The transaction returned will need to be spent/manipulated if the receiving entity is uncooperative.
+	channelFundingUC := types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{{
+			Algorithm: types.SignatureEd25519,
+			Key:       channelFundingPK[:],
+		}},
+		SignaturesRequired: 1,
+	}
+	channelFundingAddr := channelFundingUC.UnlockHash()
+	fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(fundID, channelSize)
 	if err != nil {
 		return err
 	}
 	cst.tpUpdateWait()
-	channelTxn, scoIndex, err := cst.wallet.AddSiacoinOutput(channelID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelAddress})
+	_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
 	if err != nil {
 		return err
+	}
+	fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(fundTxn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+	channelTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         fundOutputID,
+			UnlockConditions: channelFundingUC,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      channelSize,
+			UnlockHash: channelAddress,
+		}},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(fundOutputID),
+			PublicKeyIndex: 0,
+			CoveredFields:  types.CoveredFields{WholeTransaction: true},
+		}},
 	}
 
 	// Funding entity creates and signs a transaction that spends the full
 	// channel output.
-	channelOutputID := channelTxn.SiacoinOutputID(int(scoIndex))
+	channelOutputID := channelTxn.SiacoinOutputID(0)
 	refundAddr, _, err := cst.wallet.CoinAddress(false)
 	if err != nil {
 		return err
@@ -1077,10 +1116,12 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	refundTxn.TransactionSignatures[1].Signature = cryptoSig2[:]
 
 	// Funding entity will now sign and broadcast the funding transaction.
-	channelTxn, err = cst.wallet.SignTransaction(channelID, true)
+	sigHash = channelTxn.SigHash(0)
+	cryptoSig0, err := crypto.SignHash(sigHash, channelFundingSK)
 	if err != nil {
 		return err
 	}
+	channelTxn.TransactionSignatures[0].Signature = cryptoSig0[:]
 	err = cst.tpool.AcceptTransaction(channelTxn)
 	if err != nil {
 		return err
@@ -1154,9 +1195,149 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		return err
 	}
 	cst.csUpdateWait()
+	closeRefundID := closeTxn.SiacoinOutputID(0)
+	closePaymentID := closeTxn.SiacoinOutputID(1)
+	_, exists := cst.cs.siacoinOutputs[closeRefundID]
+	if !exists {
+		return errors.New("close txn refund output doesn't exist")
+	}
+	_, exists = cst.cs.siacoinOutputs[closePaymentID]
+	if !exists {
+		return errors.New("close txn payment output doesn't exist")
+	}
 
-	// TODO: Create a channel and then undo the spend - assume the receiving
-	// party never responds with a signature.
+	// Create a payment channel where the receiving entity never responds to
+	// the initial transaction.
+	{
+		// Funding entity creates but does not sign a transaction that funds the
+		// channel address. Because the wallet is not very flexible, the channel
+		// txn needs to be fully custom. To get a custom txn, manually create an
+		// address and then use the wallet to fund that address.
+		channelSize := types.NewCurrency64(10e3)
+		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		if err != nil {
+			return err
+		}
+		channelFundingUC := types.UnlockConditions{
+			PublicKeys: []types.SiaPublicKey{{
+				Algorithm: types.SignatureEd25519,
+				Key:       channelFundingPK[:],
+			}},
+			SignaturesRequired: 1,
+		}
+		channelFundingAddr := channelFundingUC.UnlockHash()
+		fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+		if err != nil {
+			return err
+		}
+		_, err = cst.wallet.FundTransaction(fundID, channelSize)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
+		if err != nil {
+			return err
+		}
+		fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+		if err != nil {
+			return err
+		}
+		err = cst.tpool.AcceptTransaction(fundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+		channelTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: channelAddress,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+
+		// Funding entity creates and signs a transaction that spends the full
+		// channel output.
+		channelOutputID := channelTxn.SiacoinOutputID(0)
+		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		refundTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         channelOutputID,
+				UnlockConditions: uc,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: refundAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash := refundTxn.SigHash(0)
+		cryptoSig1, err := crypto.SignHash(sigHash, sk1)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
+
+		// Recieving entity never communitcates, funding entity must reclaim
+		// the 'channelSize' coins that were intended to go to the channel.
+		reclaimAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		reclaimTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: reclaimAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash = reclaimTxn.SigHash(0)
+		cryptoSig, err := crypto.SignHash(sigHash, channelFundingSK)
+		if err != nil {
+			return err
+		}
+		reclaimTxn.TransactionSignatures[0].Signature = cryptoSig[:]
+		err = cst.tpool.AcceptTransaction(reclaimTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+		reclaimOutputID := reclaimTxn.SiacoinOutputID(0)
+		_, exists := cst.cs.siacoinOutputs[reclaimOutputID]
+		if !exists {
+			return errors.New("failed to reclaim an output that belongs to the funding entity")
+		}
+	}
 
 	// TODO: Create a channel and the open the channel, but close the channel
 	// using the timelocked signature.
