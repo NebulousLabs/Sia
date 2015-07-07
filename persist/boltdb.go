@@ -26,6 +26,10 @@ type BoltItem struct {
 	Value      []byte
 }
 
+var (
+	ErrNilEntry = errors.New("entry does not exist")
+)
+
 // checkDbMetadata confirms that the metadata in the database is
 // correct. If there is no metadata, correct metadata is inserted
 func (db *BoltDatabase) checkMetadata(meta Metadata) error {
@@ -111,7 +115,7 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 		// to be checked in calling functions
 		value := bucket.Get(key)
 		if value == nil {
-			return errors.New("requested item not found in database")
+			return ErrNilEntry
 		}
 		bytes = make([]byte, len(value))
 		copy(bytes, value)

@@ -7,6 +7,7 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/boltdb/bolt"
@@ -172,7 +173,17 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	}
 	defer tx.Rollback()
 
-	// Construct the struct that will be inside the database
+	// Check if the block is already there before adding it
+	blkBytes, err := be.db.GetFromBucket("Blocks", encoding.Marshal(b.ID()))
+	if err != nil && err != persist.ErrNilEntry {
+		return err
+	}
+	if blkBytes != nil {
+		// Block with same ID is already in database, adding just wastes time
+		return tx.commit()
+	}
+
+	// Construct the struct that will be inside the heights map
 	blockStruct := blockData{
 		Block:  b,
 		Height: be.blockchainHeight,
