@@ -34,7 +34,9 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 	}
 
 	// This should not error at least...
+	lockID := et.explorer.mu.Lock()
 	err := et.explorer.addBlockDB(b1)
+	et.explorer.mu.Unlock(lockID)
 	if err != nil {
 		et.t.Fatal("Error inserting basic block: " + err.Error())
 	}
@@ -55,13 +57,17 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 		}},
 	}
 
+	lockID = et.explorer.mu.Lock()
 	err = et.explorer.addBlockDB(b2)
+	et.explorer.mu.Unlock(lockID)
 	if err != nil {
 		et.t.Fatal("Error inserting block 2: " + err.Error())
 	}
 
 	// Now query the database to see if it has been linked properly
+	lockID = et.explorer.mu.RLock()
 	bytes, err := et.explorer.db.GetFromBucket("Blocks", encoding.Marshal(b1.ID()))
+	et.explorer.mu.RUnlock(lockID)
 	var b types.Block
 	err = encoding.Unmarshal(bytes, &b)
 	if err != nil {
@@ -72,7 +78,9 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 	}
 
 	// Query to see if the input is added to the output field
+	lockID = et.explorer.mu.RLock()
 	bytes, err = et.explorer.db.GetFromBucket("Outputs", encoding.Marshal(b1))
+	et.explorer.mu.RUnlock(lockID)
 	var ot outputTransactions
 	err = encoding.Unmarshal(bytes, &ot)
 	if err != nil {
