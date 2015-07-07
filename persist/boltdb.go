@@ -127,6 +127,22 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 	return bytes, nil
 }
 
+// Exists checks for the existance of an item in the specified bucket
+func (db *BoltDatabase) Exists(bucketName string, key []byte) (bool, error) {
+	var exists bool
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("requested bucket does not exist: " + bucketName)
+		}
+
+		v := bucket.Get(key)
+		exists = v != nil
+		return nil
+	})
+	return exists, err
+}
+
 // BulkUpdate is a function to both take readings from a database,
 // modify them, then add the modified elements plus the specified
 // additions to the database

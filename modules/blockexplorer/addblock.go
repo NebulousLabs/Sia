@@ -13,10 +13,6 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-var (
-	ErrNilEntry = errors.New("entry does not exist")
-)
-
 // A boltTx is a bolt transaction. It implements monadic error handling, such that
 // any operation that occurs after an error becomes a no-op.
 type boltTx struct {
@@ -52,7 +48,7 @@ func (tx *boltTx) getObject(bucket string, key, obj interface{}) {
 	}
 	objBytes := b.Get(encoding.Marshal(key))
 	if objBytes == nil {
-		tx.err = ErrNilEntry
+		tx.err = persist.ErrNilEntry
 		return
 	}
 	tx.err = encoding.Unmarshal(objBytes, obj)
@@ -82,7 +78,7 @@ func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
 	oldErr := tx.err
 	var txns []crypto.Hash
 	tx.getObject("Addresses", addr, &txns)
-	if oldErr == nil && tx.err == ErrNilEntry {
+	if oldErr == nil && tx.err == persist.ErrNilEntry {
 		// NOTE: this is a special case where a nil entry is not an error, so
 		// we must explicitly reset tx.err.
 		tx.err = nil
@@ -167,21 +163,20 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		}
 	}
 
+	// Check if the block exists
+	exists, err := be.db.Exists("Blocks", encoding.Marshal(b.ID()))
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+
 	tx, err := newBoltTx(be.db)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-
-	// Check if the block is already there before adding it
-	blkBytes, err := be.db.GetFromBucket("Blocks", encoding.Marshal(b.ID()))
-	if err != nil && err != persist.ErrNilEntry {
-		return err
-	}
-	if blkBytes != nil {
-		// Block with same ID is already in database, adding just wastes time
-		return tx.commit()
-	}
 
 	// Construct the struct that will be inside the heights map
 	blockStruct := blockData{
