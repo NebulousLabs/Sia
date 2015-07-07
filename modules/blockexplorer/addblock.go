@@ -155,8 +155,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		if build.DEBUG {
 			if build.Release == "testing" {
 				blocktarget = types.RootDepth
-			}
-			if !exists {
+			} else if !exists {
 				panic("Applied block not in consensus")
 			}
 

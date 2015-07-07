@@ -79,8 +79,14 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 
 	// Query to see if the input is added to the output field
 	lockID = et.explorer.mu.RLock()
-	bytes, err = et.explorer.db.GetFromBucket("Outputs", encoding.Marshal(b1))
+	bytes, err = et.explorer.db.GetFromBucket("SiacoinOutputs", encoding.Marshal(b1.MinerPayoutID(0)))
 	et.explorer.mu.RUnlock(lockID)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if bytes == nil {
+		et.t.Fatal("Output is nil")
+	}
 	var ot outputTransactions
 	err = encoding.Unmarshal(bytes, &ot)
 	if err != nil {
@@ -93,5 +99,5 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 
 func TestAddBlock(t *testing.T) {
 	et := createExplorerTester("TestExplorerAddBlock", t)
-	et.testConsensusUpdates(t)
+	et.testAddBlock(t)
 }
