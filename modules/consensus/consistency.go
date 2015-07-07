@@ -75,7 +75,11 @@ func (cs *State) checkSiacoins() error {
 		totalSiacoins = totalSiacoins.Add(sco.Value)
 	}
 	for _, fc := range cs.fileContracts {
-		totalSiacoins = totalSiacoins.Add(fc.Payout.Sub(fc.Tax()))
+		var payout types.Currency
+		for _, output := range fc.ValidProofOutputs {
+			payout = payout.Add(output.Value)
+		}
+		totalSiacoins = totalSiacoins.Add(payout)
 	}
 	for _, dsoMap := range cs.delayedSiacoinOutputs {
 		for _, dso := range dsoMap {
@@ -225,19 +229,10 @@ func (cs *State) checkConsistency() error {
 	if err != nil {
 		return err
 	}
-
-	// COMPATv0.4.0
-	//
-	// checkSiacoins is broken for file contracts that are created before the
-	// hardfork barrier but terminate after the hardfork barrier. This break
-	// will not be a problem after the hardfork checkpoint is created.
-	/*
-		err = cs.checkSiacoins()
-		if err != nil {
-			return err
-		}
-	*/
-
+	err = cs.checkSiacoins()
+	if err != nil {
+		return err
+	}
 	err = cs.checkSiafunds()
 	if err != nil {
 		return err
