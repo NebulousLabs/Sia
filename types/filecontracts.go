@@ -4,6 +4,7 @@ package types
 // contracts.
 
 import (
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -92,19 +93,6 @@ type (
 	ProofStatus bool
 )
 
-// FileContractTerminationPayoutID returns the ID of a file contract
-// termination payout, given the index of the payout in the termination. The
-// ID is calculated by hashing the concatenation of the
-// FileContractTerminationPayout Specifier, the ID of the file contract being
-// terminated, and the payout index.
-func (fcid FileContractID) FileContractTerminationPayoutID(i int) SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashAll(
-		SpecifierFileContractTerminationPayout,
-		fcid,
-		i,
-	))
-}
-
 // StorageProofOutputID returns the ID of an output created by a file
 // contract, given the status of the storage proof. The ID is calculating by
 // hashing the concatenation of the StorageProofOutput Specifier, the ID of
@@ -122,5 +110,13 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) 
 
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
-	return fc.Payout.MulFloat(SiafundPortion).RoundDown(SiafundCount)
+	// COMPATv0.4.0 - until the first 10000 blocks have been archived, they
+	// will need to be handled in a special way.
+	CurrentHeightLock.Lock()
+	height := CurrentHeight
+	CurrentHeightLock.Unlock()
+	if (height < 12e3 && build.Release == "standard") || height < 10 {
+		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
+	}
+	return fc.Payout.MulTax().RoundDown(SiafundCount)
 }

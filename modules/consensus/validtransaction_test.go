@@ -10,6 +10,53 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// TestValidSiacoins probes the validSiacoins method of the consensus set.
+func TestValidSiacoins(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidSiacoins")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction pointing to a nonexistent siacoin output.
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrMissingSiacoinOutput {
+		t.Error(err)
+	}
+
+	// Create a transaction with invalid unlock conditions.
+	var scoid types.SiacoinOutputID
+	for mapScoid, _ := range cst.cs.siacoinOutputs {
+		scoid = mapScoid
+		break
+	}
+	txn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID: scoid,
+		}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+
+	// Create a txn with more outputs than inputs.
+	txn = types.Transaction{
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value: types.NewCurrency64(1),
+		}},
+	}
+	err = cst.cs.validSiacoins(txn)
+	if err != ErrSiacoinInputOutputMismatch {
+		t.Error(err)
+	}
+}
+
 // TestStorageProofSegment probes the storageProofSegment method of the
 // consensus set.
 func TestStorageProofSegment(t *testing.T) {
@@ -49,6 +96,21 @@ func TestStorageProofSegment(t *testing.T) {
 	zip.Close()
 	if b.Len() < len(outputs) {
 		t.Error("supposedly high entropy random segments have been compressed!")
+	}
+
+	// Submit a file contract that is unrecognized.
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
+
+	// Try to get the segment of an unfinished file contract.
+	cst.cs.fileContracts[types.FileContractID{}] = types.FileContract{
+		WindowStart: 100000,
+	}
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnfinishedFileContract {
+		t.Error(err)
 	}
 }
 
@@ -120,15 +182,22 @@ func TestValidStorageProofs(t *testing.T) {
 	if err != ErrInvalidStorageProof {
 		t.Error(err)
 	}
+
+	// Try to validate a proof for a file contract that doesn't exist.
+	txn.StorageProofs[0].ParentID = types.FileContractID{}
+	err = cst.cs.validStorageProofs(txn)
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
 }
 
 // TestValidFileContractRevisions probes the validFileContractRevisions method
 // of the consensus set.
 func TestValidFileContractRevisions(t *testing.T) {
 	if testing.Short() {
-		// t.SkipNow()
+		t.SkipNow()
 	}
-	cst, err := createConsensusSetTester("TestValidStorageProofs")
+	cst, err := createConsensusSetTester("TestValidFileContractRevisions")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,5 +269,218 @@ func TestValidFileContractRevisions(t *testing.T) {
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrLowRevisionNumber {
 		t.Error(err)
+	}
+
+	// Submit a file contract revision pointing to an invalid parent.
+	txn.FileContractRevisions[0].ParentID[0]--
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].ParentID[0]++
+
+	// Submit a file contract revision for a file contract whose window has
+	// already opened.
+	fc = cst.cs.fileContracts[fcid]
+	fc.WindowStart = 0
+	cst.cs.fileContracts[fcid] = fc
+	txn.FileContractRevisions[0].NewRevisionNumber = 3
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrLateRevision {
+		t.Error(err)
+	}
+
+	// Submit a file contract revision with incorrect unlock conditions.
+	fc.WindowStart = 100
+	cst.cs.fileContracts[fcid] = fc
+	txn.FileContractRevisions[0].UnlockConditions.Timelock++
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].UnlockConditions.Timelock--
+
+	// Submit file contract revisions for file contracts with altered payouts.
+	txn.FileContractRevisions[0].NewValidProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	txn.FileContractRevisions[0].NewMissedProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].NewValidProofOutputs = nil
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+	txn.FileContractRevisions[0].NewValidProofOutputs = []types.SiacoinOutput{{
+		Value: types.NewCurrency64(1),
+	}}
+	txn.FileContractRevisions[0].NewMissedProofOutputs = nil
+	err = cst.cs.validFileContractRevisions(txn)
+	if err != ErrAlteredRevisionPayouts {
+		t.Error(err)
+	}
+}
+
+// TestValidSiafunds probes the validSiafunds mthod of the consensus set.
+func TestValidSiafunds(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidSiafunds")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction pointing to a nonexistent siafund output.
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{{}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrMissingSiafundOutput {
+		t.Error(err)
+	}
+
+	// Create a transaction with invalid unlock conditions.
+	var sfoid types.SiafundOutputID
+	for mapSfoid, _ := range cst.cs.siafundOutputs {
+		sfoid = mapSfoid
+		break
+	}
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         sfoid,
+			UnlockConditions: types.UnlockConditions{Timelock: 12345}, // avoid collisions with existing outputs
+		}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrWrongUnlockConditions {
+		t.Error(err)
+	}
+
+	// Create a transaction with more outputs than inputs.
+	txn = types.Transaction{
+		SiafundOutputs: []types.SiafundOutput{{
+			Value: types.NewCurrency64(1),
+		}},
+	}
+	err = cst.cs.validSiafunds(txn)
+	if err != ErrSiafundInputOutputMismatch {
+		t.Error(err)
+	}
+}
+
+// TestValidTransaction probes the validTransaction method of the consensus
+// set.
+func TestValidTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a transaction that is not standalone valid.
+	txn := types.Transaction{
+		FileContracts: []types.FileContract{{
+			WindowStart: 0,
+		}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Try when the verificationRigor is turned down.
+	cst.cs.verificationRigor = partialVerification
+	err = cst.cs.validTransaction(txn)
+	if err != nil {
+		t.Error(err)
+	}
+	cst.cs.verificationRigor = fullVerification
+
+	// Create a transaction with invalid siacoins.
+	txn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid storage proofs.
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid file contract revisions.
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			NewWindowStart: 5000,
+			NewWindowEnd:   5005,
+			ParentID:       types.FileContractID{},
+		}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+
+	// Create a transaction with invalid siafunds.
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{}},
+	}
+	err = cst.cs.validTransaction(txn)
+	if err == nil {
+		t.Error("transaction is valid")
+	}
+}
+
+// TestTryTransactions probes the TryTransactions method of the consensus set.
+func TestTryTransactions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestValidTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialHash := cst.cs.consensusSetHash()
+
+	// Try a valid transaction.
+	var txns []types.Transaction
+	_, err = cst.wallet.SendCoins(types.NewCurrency64(1), types.UnlockHash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txns = cst.tpool.TransactionSet()
+	err = cst.cs.TryTransactions(txns)
+	if err != nil {
+		t.Error(err)
+	}
+	if cst.cs.consensusSetHash() != initialHash {
+		t.Error("TryTransactions did not resotre order")
+	}
+
+	// Try a valid transaction followed by an invalid transaction.
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	txns = append(txns, txn)
+	err = cst.cs.TryTransactions(txns)
+	if err == nil {
+		t.Error("bad transaction survived filter")
+	}
+	if cst.cs.consensusSetHash() != initialHash {
+		t.Error("TryTransactions did not restore order")
 	}
 }

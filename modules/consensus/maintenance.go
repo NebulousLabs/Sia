@@ -1,9 +1,18 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
+)
+
+var (
+	errMissingFileContract = errors.New("storage proof submitted for non existing file contract")
+	errOutputAlreadyMature = errors.New("delayed siacoin output is already in the matured outputs set")
+	errPayoutsAlreadyPaid  = errors.New("payouts are already in the consensus set")
+	errStorageProofTiming  = errors.New("missed proof triggered for file contract that is not expiring")
 )
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
@@ -16,12 +25,12 @@ func (cs *State) applyMinerPayouts(bn *blockNode) {
 			// Check the delayed outputs set.
 			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][mpid]
 			if exists {
-				panic("miner subsidy already in delayed outputs")
+				panic(errPayoutsAlreadyPaid)
 			}
 			// Check the full outputs set.
 			_, exists = cs.siacoinOutputs[mpid]
 			if exists {
-				panic("miner subsidy already in siacoin outputs")
+				panic(errPayoutsAlreadyPaid)
 			}
 		}
 
@@ -54,7 +63,7 @@ func (cs *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 		if build.DEBUG {
 			_, exists := cs.siacoinOutputs[dscoid]
 			if exists {
-				panic("trying to add a delayed output when the output is already there")
+				panic(errOutputAlreadyMature)
 			}
 		}
 
@@ -96,33 +105,33 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 	if build.DEBUG {
 		// Check that the file contract in question exists.
 		if !exists {
-			panic("misuse of applyMissedProof")
+			panic(errMissingFileContract)
 		}
 
 		// Check that the file contract in question expires at bn.height.
 		if fc.WindowEnd != bn.height {
-			panic("applyMissedStorageProof being called at the wrong height")
+			panic(errStorageProofTiming)
 		}
 	}
 
 	// Add all of the outputs in the missed proof outputs to the consensus set.
 	for i, mpo := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
-		spid := fcid.StorageProofOutputID(types.ProofMissed, i)
+		spoid := fcid.StorageProofOutputID(types.ProofMissed, i)
 		if build.DEBUG {
-			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spid]
+			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 			if exists {
-				panic("missed proof output already exists in the delayed outputs set")
+				panic(errPayoutsAlreadyPaid)
 			}
-			_, exists = cs.siacoinOutputs[spid]
+			_, exists = cs.siacoinOutputs[spoid]
 			if exists {
-				panic("missed proof output already exists in the siacoin outputs set")
+				panic(errPayoutsAlreadyPaid)
 			}
 		}
 
 		dscod := modules.DelayedSiacoinOutputDiff{
 			Direction:      modules.DiffApply,
-			ID:             spid,
+			ID:             spoid,
 			SiacoinOutput:  mpo,
 			MaturityHeight: bn.height + types.MaturityDelay,
 		}

@@ -1,82 +1,84 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	errDeleteCurrentPath = errors.New("cannot call 'deleteNode' on a block node in the current path")
+	errExternalRevert    = errors.New("cannot revert to node outside of current path")
+)
+
 // deleteNode recursively deletes its children from the set of known blocks.
 // The node being deleted should not be a part of the current path.
-func (cs *State) deleteNode(node *blockNode) {
+func (cs *State) deleteNode(bn *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
-		if types.BlockHeight(len(cs.currentPath)) > node.height &&
-			cs.currentPath[node.height] == node.block.ID() {
-			panic("cannot call 'deleteNode' on a node in the current path.")
+		if types.BlockHeight(len(cs.currentPath)) > bn.height &&
+			cs.currentPath[bn.height] == bn.block.ID() {
+			panic(errDeleteCurrentPath)
 		}
 	}
 
-	// Recusively call 'deleteNode' on of the input node's children, then
-	// delete the input node.
-	for i := range node.children {
-		cs.deleteNode(node.children[i])
+	// Recusively call 'deleteNode' on of the input node's children.
+	for i := range bn.children {
+		cs.deleteNode(bn.children[i])
 	}
-	delete(cs.blockMap, node.block.ID())
+
+	// Remove the node from the block map, and from its parents list of
+	// children.
+	delete(cs.blockMap, bn.block.ID())
+	for i := range bn.parent.children {
+		if bn.parent.children[i] == bn {
+			// If 'i' is not the last element, remove it from the array by
+			// copying the remaining array over it.
+			if i < len(bn.parent.children)-1 {
+				copy(bn.parent.children[i:], bn.parent.children[i+1:])
+			}
+			// Trim the last element.
+			bn.parent.children = bn.parent.children[:len(bn.parent.children)-1]
+			break
+		}
+	}
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
 // the State's current path (the "common parent"). It returns the (inclusive)
 // set of nodes between the common parent and 'bn', starting from the former.
-func (s *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
+func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for {
-		// stop when we reach the common parent
-		if bn.height <= s.height() && s.currentPath[bn.height] == bn.block.ID() {
+		// Stop when we reach the common parent.
+		if bn.height <= cs.height() && cs.currentPath[bn.height] == bn.block.ID() {
 			break
 		}
-
 		bn = bn.parent
-		path = append([]*blockNode{bn}, path...) // prepend, not append
-
-		// Sanity check - all block nodes should have a parent except the
-		// genesis block, and this loop should break before reaching the
-		// genesis block.
-		if bn == nil {
-			if build.DEBUG {
-				panic("backtrack hit a nil node?")
-			}
-			break
-		}
+		path = append([]*blockNode{bn}, path...) // prepend
 	}
 	return path
 }
 
 // revertToNode will revert blocks from the State's current path until 'bn' is
 // the current block. Blocks are returned in the order that they were reverted.
-func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
+// 'bn' is not reverted.
+func (cs *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {
-		if s.currentPath[bn.height] != bn.block.ID() {
-			panic("can't revert to node not in current path")
+		if cs.height() < bn.height || cs.currentPath[bn.height] != bn.block.ID() {
+			panic(errExternalRevert)
 		}
 	}
 
 	// Rewind blocks until we reach 'bn'.
-	for s.currentBlockID() != bn.block.ID() {
-		node := s.currentBlockNode()
-		s.commitDiffSet(node, modules.DiffRevert)
+	for cs.currentBlockID() != bn.block.ID() {
+		node := cs.currentBlockNode()
+		cs.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
-
-		// Sanity check - check that the delayed siacoin outputs map structure
-		// matches the expected strucutre.
-		if build.DEBUG {
-			err := s.checkDelayedSiacoinOutputMaps()
-			if err != nil {
-				panic(err)
-			}
-		}
 	}
 	return
 }
@@ -84,10 +86,8 @@ func (s *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 // applyUntilNode will successively apply the blocks between the state's
 // currentPath and 'bn'.
 func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
-	// Backtrack to the common parent of 'bn' and currentPath.
+	// Backtrack to the common parent of 'bn' and currentPath and then apply the new nodes.
 	newPath := s.backtrackToCurrentPath(bn)
-
-	// Apply new nodes.
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
@@ -100,17 +100,7 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 			}
 		}
 		appliedNodes = append(appliedNodes, node)
-
-		// Sanity check - check that the delayed siacoin outputs map structure
-		// matches the expected strucutre.
-		if build.DEBUG {
-			err = s.checkDelayedSiacoinOutputMaps()
-			if err != nil {
-				panic(err)
-			}
-		}
 	}
-
 	return
 }
 
@@ -134,7 +124,7 @@ func (cs *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes
 	// fast-forward to newNode
 	appliedNodes, err = cs.applyUntilNode(newNode)
 	if err == nil {
-		return revertedNodes, appliedNodes, err
+		return revertedNodes, appliedNodes, nil
 	}
 
 	// restore old path

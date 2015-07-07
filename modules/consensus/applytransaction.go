@@ -91,8 +91,9 @@ func (cs *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 		// Get the portion of the contract that goes into the siafund pool and
 		// add it to the siafund pool.
 		sfpd := modules.SiafundPoolDiff{
-			Previous: cs.siafundPool,
-			Adjusted: cs.siafundPool.Add(fc.Tax()),
+			Direction: modules.DiffApply,
+			Previous:  cs.siafundPool,
+			Adjusted:  cs.siafundPool.Add(fc.Tax()),
 		}
 		bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
 		cs.commitSiafundPoolDiff(sfpd, modules.DiffApply)
@@ -203,7 +204,7 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 
 		// Calculate the volume of siacoins to put in the claim output.
 		sfo := cs.siafundOutputs[sfi.ParentID]
-		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.NewCurrency64(types.SiafundCount)).Mul(sfo.Value)
+		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
 		sco := types.SiacoinOutput{

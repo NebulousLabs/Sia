@@ -655,7 +655,7 @@ func TestApplySiafundInputs(t *testing.T) {
 	if exists {
 		t.Error("Failed to conusme a siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 1 {
+	if len(cst.cs.siafundOutputs) != 2 {
 		t.Error("siafund outputs not correctly updated", len(cst.cs.siafundOutputs))
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
@@ -738,7 +738,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 3 {
+	if len(cst.cs.siafundOutputs) != 4 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 1 {
@@ -772,7 +772,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 5 {
+	if len(cst.cs.siafundOutputs) != 6 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(bn.siafundOutputDiffs) != 3 {

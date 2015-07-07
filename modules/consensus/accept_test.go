@@ -1,120 +1,57 @@
 package consensus
 
 import (
+	"bytes"
+	"crypto/rand"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// testSimpleBlock mines a simple block (no transactions except those
-// automatically added by the miner) and adds it to the consnesus set.
-func (cst *consensusSetTester) testSimpleBlock() error {
-	// Get the starting hash of the consenesus set.
-	initialCSSum := cst.cs.consensusSetHash()
-
-	// Mine and submit a block
-	block, _ := cst.miner.FindBlock()
-	err := cst.cs.AcceptBlock(block)
-	if err != nil {
-		return err
-	}
-	cst.csUpdateWait()
-
-	// Get the ending hash of the consensus set.
-	resultingCSSum := cst.cs.consensusSetHash()
-	if initialCSSum == resultingCSSum {
-		return errors.New("state hash is unchanged after mining a block")
-	}
-
-	// Check that the current path has updated as expected.
-	newNode := cst.cs.currentBlockNode()
-	if cst.cs.CurrentBlock().ID() != block.ID() {
-		return errors.New("the state's current block is not reporting as the recently mined block.")
-	}
-	// Check that the current path has updated correctly.
-	if block.ID() != cst.cs.currentPath[newNode.height] {
-		return errors.New("the state's current path didn't update correctly after accepting a new block")
-	}
-
-	// Revert the block that was just added to the consensus set and check for
-	// parity with the original state of consensus.
-	_, _, err = cst.cs.forkBlockchain(newNode.parent)
-	if err != nil {
-		return err
-	}
-	if cst.cs.consensusSetHash() != initialCSSum {
-		return errors.New("adding and reverting a block changed the consensus set")
-	}
-	// Re-add the block and check for parity with the first time it was added.
-	// This test is useful because a different codepath is followed if the
-	// diffs have already been generated.
-	_, _, err = cst.cs.forkBlockchain(newNode)
-	if cst.cs.consensusSetHash() != resultingCSSum {
-		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
-	}
-
-	return nil
-}
-
-// TestSimpleBlock is a passthrough function.
-func TestSimpleBlock(t *testing.T) {
-	cst, err := createConsensusSetTester("TestSimpleBlock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = cst.testSimpleBlock()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if testing.Short() {
-		t.SkipNow()
-	}
-	err = cst.checkConsistency()
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-// testDoSBlockHandling checks that saved bad blocks are correctly ignored.
-func (cst *consensusSetTester) testDoSBlockHandling() error {
-	// Mine a DoS block and submit it to the state, expect a normal error.
-	dosBlock, err := cst.MineDoSBlock()
-	if err != nil {
-		return err
-	}
-	err = cst.cs.acceptBlock(dosBlock)
-	// The error is mostly irrelevant, it just needs to have the block flagged
-	// as a DoS block in future attempts.
-	if err != ErrSiacoinInputOutputMismatch {
-		return errors.New("expecting invalid signature err: " + err.Error())
-	}
-
-	// Submit the same DoS block to the state again, expect ErrDoSBlock.
-	err = cst.cs.acceptBlock(dosBlock)
-	if err != ErrDoSBlock {
-		return errors.New("expecting bad block err: " + err.Error())
-	}
-	return nil
-}
-
-// TestDoSBlockHandling creates a new consensus set tester and uses it to call
-// testDoSBlockHandling.
+// TestDoSBlockHandling checks that saved bad blocks are correctly ignored.
 func TestDoSBlockHandling(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst, err := createConsensusSetTester("TestDoSBlockHandling")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cst.testDoSBlockHandling()
+
+	// Mine a DoS block and submit it to the state, expect a normal error.
+	// Create a transaction that is funded but the funds are never spent. This
+	// transaction is invalid in a way that triggers the DoS block detection.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
+	}
+	_, err = cst.wallet.FundTransaction(id, types.NewCurrency64(50))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	txn, err := cst.wallet.SignTransaction(id, true) // true indicates that the whole transaction should be signed.
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get a block, insert the transaction, and submit the block.
+	block, _, target := cst.miner.BlockForWork()
+	block.Transactions = append(block.Transactions, txn)
+	dosBlock, _ := cst.miner.SolveBlock(block, target)
+	err = cst.cs.AcceptBlock(dosBlock)
+	if err != ErrSiacoinInputOutputMismatch {
+		t.Fatal("expecting invalid signature err: " + err.Error())
+	}
+
+	// Submit the same DoS block to the state again, expect ErrDoSBlock.
+	err = cst.cs.AcceptBlock(dosBlock)
+	if err != ErrDoSBlock {
+		t.Fatal("expecting bad block err: " + err.Error())
 	}
 }
 
@@ -374,12 +311,1573 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
 
+// TestInconsistentCheck submits a block on a consensus set that is
+// inconsistent, attempting to trigger a panic.
+func TestInconsistentCheck(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	err = cst.checkConsistency()
+	cst, err := createConsensusSetTester("TestInconsistentCheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Corrupt the consensus set.
+	var sfod types.SiafundOutputID
+	var sfo types.SiafundOutput
+	for id, output := range cst.cs.siafundOutputs {
+		sfod = id
+		sfo = output
+		break
+	}
+	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
+	cst.cs.siafundOutputs[sfod] = sfo
+
+	// Mine and submit a block, triggering the inconsistency check.
+	defer func() {
+		r := recover()
+		if r != errSiafundMiscount {
+			t.Error("expecting errSiacoinMiscount, got:", r)
+		}
+	}()
+	block, _ := cst.miner.FindBlock()
+	_ = cst.cs.AcceptBlock(block)
+}
+
+// testSimpleBlock mines a simple block (no transactions except those
+// automatically added by the miner) and adds it to the consnesus set.
+func (cst *consensusSetTester) testSimpleBlock() error {
+	// Get the starting hash of the consenesus set.
+	initialCSSum := cst.cs.consensusSetHash()
+
+	// Mine and submit a block
+	block, _ := cst.miner.FindBlock()
+	err := cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Get the ending hash of the consensus set.
+	resultingCSSum := cst.cs.consensusSetHash()
+	if initialCSSum == resultingCSSum {
+		return errors.New("state hash is unchanged after mining a block")
+	}
+
+	// Check that the current path has updated as expected.
+	newNode := cst.cs.currentBlockNode()
+	if cst.cs.CurrentBlock().ID() != block.ID() {
+		return errors.New("the state's current block is not reporting as the recently mined block.")
+	}
+	// Check that the current path has updated correctly.
+	if block.ID() != cst.cs.currentPath[newNode.height] {
+		return errors.New("the state's current path didn't update correctly after accepting a new block")
+	}
+
+	// Revert the block that was just added to the consensus set and check for
+	// parity with the original state of consensus.
+	_, _, err = cst.cs.forkBlockchain(newNode.parent)
+	if err != nil {
+		return err
+	}
+	if cst.cs.consensusSetHash() != initialCSSum {
+		return errors.New("adding and reverting a block changed the consensus set")
+	}
+	// Re-add the block and check for parity with the first time it was added.
+	// This test is useful because a different codepath is followed if the
+	// diffs have already been generated.
+	_, _, err = cst.cs.forkBlockchain(newNode)
+	if cst.cs.consensusSetHash() != resultingCSSum {
+		return errors.New("adding, reverting, and reading a block was inconsistent with just adding the block")
+	}
+	return nil
+}
+
+// TestSimpleBlock creates a consensus set tester and uses it to call
+// testSimpleBlock.
+func TestSimpleBlock(t *testing.T) {
+	cst, err := createConsensusSetTester("TestSimpleBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testSimpleBlock()
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// testSpendSiacoinsBlock mines a block with a transaction spending siacoins
+// and adds it to the consensus set.
+func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
+	// Create a random destination address for the output in the transaction.
+	var destAddr types.UnlockHash
+	_, err := rand.Read(destAddr[:])
+	if err != nil {
+		return err
+	}
+
+	// Create a block containing a transaction with a valid siacoin output.
+	txnValue := types.NewCurrency64(1200)
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, txnValue)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, outputIndex, err := cst.wallet.AddSiacoinOutput(id, types.SiacoinOutput{Value: txnValue, UnlockHash: destAddr})
+	if err != nil {
+		return err
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	outputID := txn.SiacoinOutputID(int(outputIndex))
+
+	// Mine and apply the block to the consensus set.
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Find the destAddr among the outputs.
+	var found bool
+	for id, output := range cst.cs.siacoinOutputs {
+		if id == outputID {
+			if found {
+				return errors.New("output found twice")
+			}
+			if output.Value.Cmp(txnValue) != 0 {
+				return errors.New("output has wrong value")
+			}
+			found = true
+		}
+	}
+	if !found {
+		return errors.New("could not find created siacoin output")
+	}
+	return nil
+}
+
+// TestSpendSiacoinsBlock creates a consensus set tester and uses it to call
+// testSpendSiacoinsBlock.
+func TestSpendSiacoinsBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestSpendSiacoinsBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testSpendSiacoinsBlock()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// testFileContractsBlocks creates a series of blocks that create, revise,
+// prove, and fail to prove file contracts.
+func (cst *consensusSetTester) testFileContractsBlocks() error {
+	var validProofDest, missedProofDest, revisionDest types.UnlockHash
+	_, err := rand.Read(validProofDest[:])
+	if err != nil {
+		return err
+	}
+	_, err = rand.Read(missedProofDest[:])
+	if err != nil {
+		return err
+	}
+	_, err = rand.Read(revisionDest[:])
+	if err != nil {
+		return err
+	}
+
+	// Create a file (as a bytes.Buffer) that will be used for file contracts
+	// and storage proofs.
+	filesize := uint64(4e3)
+	fileBytes := make([]byte, filesize)
+	_, err = rand.Read(fileBytes)
+	if err != nil {
+		return err
+	}
+	file := bytes.NewReader(fileBytes)
+	merkleRoot, err := crypto.ReaderMerkleRoot(file)
+	if err != nil {
+		return err
+	}
+	file.Seek(0, 0)
+
+	// Create a file contract that will be successfully proven and an alternate
+	// file contract which will be missed.
+	payout := types.NewCurrency64(400e6)
+	validFC := types.FileContract{
+		FileSize:       filesize,
+		FileMerkleRoot: merkleRoot,
+		WindowStart:    cst.cs.height() + 2,
+		WindowEnd:      cst.cs.height() + 4,
+		Payout:         payout,
+		ValidProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: validProofDest,
+		}},
+		MissedProofOutputs: []types.SiacoinOutput{{
+			UnlockHash: missedProofDest,
+		}},
+		UnlockHash: types.UnlockConditions{}.UnlockHash(),
+	}
+	outputSize := payout.Sub(validFC.Tax())
+	validFC.ValidProofOutputs[0].Value = outputSize
+	validFC.MissedProofOutputs[0].Value = outputSize
+	missedFC := types.FileContract{
+		FileSize:       uint64(filesize),
+		FileMerkleRoot: merkleRoot,
+		WindowStart:    cst.cs.height() + 2,
+		WindowEnd:      cst.cs.height() + 4,
+		Payout:         payout,
+		ValidProofOutputs: []types.SiacoinOutput{{
+			Value:      outputSize,
+			UnlockHash: validProofDest,
+		}},
+		MissedProofOutputs: []types.SiacoinOutput{{
+			Value:      outputSize,
+			UnlockHash: missedProofDest,
+		}},
+		UnlockHash: types.UnlockConditions{}.UnlockHash(),
+	}
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, payout.Mul(types.NewCurrency64(2)))
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, validFCIndex, err := cst.wallet.AddFileContract(id, validFC)
+	if err != nil {
+		return err
+	}
+	_, missedFCIndex, err := cst.wallet.AddFileContract(id, missedFC)
+	if err != nil {
+		return err
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	validFCID := txn.FileContractID(int(validFCIndex))
+	missedFCID := txn.FileContractID(int(missedFCIndex))
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the siafund pool was increased.
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(31200e3)) != 0 {
+		return errors.New("siafund pool was not increased correctly")
+	}
+
+	// Submit a file contract revision to the missed-proof file contract.
+	txn = types.Transaction{
+		FileContractRevisions: []types.FileContractRevision{{
+			ParentID:          missedFCID,
+			NewRevisionNumber: 1,
+
+			NewFileSize:          10e3, // By changing the filesize without changing the hash, a proof should become impossible.
+			NewFileMerkleRoot:    missedFC.FileMerkleRoot,
+			NewWindowStart:       missedFC.WindowStart + 1,
+			NewWindowEnd:         missedFC.WindowEnd,
+			NewValidProofOutputs: missedFC.ValidProofOutputs,
+			NewMissedProofOutputs: []types.SiacoinOutput{{
+				Value:      outputSize,
+				UnlockHash: revisionDest,
+			}},
+		}},
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the revision was successful.
+	if cst.cs.fileContracts[missedFCID].RevisionNumber != 1 {
+		return errors.New("revision did not update revision number")
+	}
+	if cst.cs.fileContracts[missedFCID].FileSize != 10e3 {
+		return errors.New("revision did not update file contract size")
+	}
+
+	// Create a storage proof for the validFC and submit it in a block.
+	spSegmentIndex, err := cst.cs.StorageProofSegment(validFCID)
+	if err != nil {
+		return err
+	}
+	segment, hashSet, err := crypto.BuildReaderProof(file, spSegmentIndex)
+	if err != nil {
+		return err
+	}
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{
+			ParentID: validFCID,
+			Segment:  segment,
+			HashSet:  hashSet,
+		}},
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the valid contract was removed but the missed contract was
+	// not.
+	_, exists := cst.cs.fileContracts[validFCID]
+	if exists {
+		return errors.New("valid file contract still exists in the consensus set")
+	}
+	_, exists = cst.cs.fileContracts[missedFCID]
+	if !exists {
+		return errors.New("missed file contract was consumed by storage proof")
+	}
+
+	// Check that the file contract output made it into the set of delayed
+	// outputs.
+	validProofID := validFCID.StorageProofOutputID(types.ProofValid, 0)
+	_, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][validProofID]
+	if !exists {
+		return errors.New("file contract payout is not in the delayed outputs set")
+	}
+
+	// Mine a block to close the window on the missed file contract.
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	_, exists = cst.cs.fileContracts[validFCID]
+	if exists {
+		return errors.New("valid file contract still exists in the consensus set")
+	}
+	_, exists = cst.cs.fileContracts[missedFCID]
+	if exists {
+		return errors.New("missed file contract was not consumed when the window was closed.")
+	}
+
+	// Mine enough blocks to get all of the outputs into the set of siacoin
+	// outputs.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		block, _ = cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+	}
+
+	// Check that all of the outputs have ended up at the right destination.
+	if cst.cs.siacoinOutputs[validFCID.StorageProofOutputID(types.ProofValid, 0)].UnlockHash != validProofDest {
+		return errors.New("file contract output did not end up at the right place.")
+	}
+	if cst.cs.siacoinOutputs[missedFCID.StorageProofOutputID(types.ProofMissed, 0)].UnlockHash != revisionDest {
+		return errors.New("missed file proof output did not end up at the revised destination")
+	}
+
+	return nil
+}
+
+// TestFileContractsBlocks creates a consensus set tester and uses it to call
+// testFileContractsBlocks.
+func TestFileContractsBlocks(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestFileContractsBlocks")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
+	}
+	err = cst.testFileContractsBlocks()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// testSpendSiafundsBlock mines a block with a transaction spending siafunds
+// and adds it to the consensus set.
+func (cst *consensusSetTester) testSpendSiafundsBlock() error {
+	// Create a destination for the siafunds.
+	var destAddr types.UnlockHash
+	_, err := rand.Read(destAddr[:])
+	if err != nil {
+		return err
+	}
+
+	// Find the siafund output that is 'anyone can spend' (output exists only
+	// in the testing setup).
+	var srcID types.SiafundOutputID
+	var srcValue types.Currency
+	anyoneSpends := types.UnlockConditions{}.UnlockHash()
+	for id, sfo := range cst.cs.siafundOutputs {
+		if sfo.UnlockHash == anyoneSpends {
+			srcID = id
+			srcValue = sfo.Value
+			break
+		}
+	}
+
+	// Create a transaction that spends siafunds.
+	txn := types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         srcID,
+			UnlockConditions: types.UnlockConditions{},
+		}},
+		SiafundOutputs: []types.SiafundOutput{
+			{
+				Value:      srcValue.Sub(types.NewCurrency64(1)),
+				UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			},
+			{
+				Value:      types.NewCurrency64(1),
+				UnlockHash: destAddr,
+			},
+		},
+	}
+	sfoid0 := txn.SiafundOutputID(0)
+	sfoid1 := txn.SiafundOutputID(1)
+	cst.tpool.AcceptTransaction(txn)
+	cst.tpUpdateWait()
+
+	// Mine a block containing the txn.
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Check that the input got consumed, and that the outputs got created.
+	_, exists := cst.cs.siafundOutputs[srcID]
+	if exists {
+		return errors.New("siafund output was not properly consumed")
+	}
+	sfo, exists := cst.cs.siafundOutputs[sfoid0]
+	if !exists {
+		return errors.New("siafund output was not properly created")
+	}
+	if sfo.Value.Cmp(srcValue.Sub(types.NewCurrency64(1))) != 0 {
+		return errors.New("created siafund has wrong value")
+	}
+	if sfo.UnlockHash != anyoneSpends {
+		return errors.New("siafund output sent to wrong unlock hash")
+	}
+	sfo, exists = cst.cs.siafundOutputs[sfoid1]
+	if !exists {
+		return errors.New("second siafund output was not properly created")
+	}
+	if sfo.Value.Cmp(types.NewCurrency64(1)) != 0 {
+		return errors.New("second siafund output has wrong value")
+	}
+	if sfo.UnlockHash != destAddr {
+		return errors.New("second siafund output sent to wrong addr")
+	}
+
+	// Put a file contract into the blockchain that will add values to siafund
+	// outputs.
+	oldSiafundPool := cst.cs.siafundPool
+	payout := types.NewCurrency64(400e6)
+	fc := types.FileContract{
+		WindowStart: cst.cs.height() + 2,
+		WindowEnd:   cst.cs.height() + 4,
+		Payout:      payout,
+	}
+	outputSize := payout.Sub(fc.Tax())
+	fc.ValidProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
+	fc.MissedProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(id, payout)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddFileContract(id, fc)
+	if err != nil {
+		return err
+	}
+	txn, err = cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15600e3).Add(oldSiafundPool)) != 0 {
+		return errors.New("siafund pool did not update correctly")
+	}
+
+	// Create a transaction that spends siafunds.
+	var claimDest types.UnlockHash
+	_, err = rand.Read(claimDest[:])
+	if err != nil {
+		return err
+	}
+	var srcClaimStart types.Currency
+	for id, sfo := range cst.cs.siafundOutputs {
+		if sfo.UnlockHash == anyoneSpends {
+			srcID = id
+			srcValue = sfo.Value
+			srcClaimStart = sfo.ClaimStart
+			break
+		}
+	}
+	txn = types.Transaction{
+		SiafundInputs: []types.SiafundInput{{
+			ParentID:         srcID,
+			UnlockConditions: types.UnlockConditions{},
+			ClaimUnlockHash:  claimDest,
+		}},
+		SiafundOutputs: []types.SiafundOutput{
+			{
+				Value:      srcValue.Sub(types.NewCurrency64(1)),
+				UnlockHash: types.UnlockConditions{}.UnlockHash(),
+			},
+			{
+				Value:      types.NewCurrency64(1),
+				UnlockHash: destAddr,
+			},
+		},
+	}
+	sfoid1 = txn.SiafundOutputID(1)
+	cst.tpool.AcceptTransaction(txn)
+	cst.tpUpdateWait()
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Find the siafund output and check that it has the expected number of
+	// siafunds.
+	found := false
+	expectedBalance := cst.cs.siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
+	for _, output := range cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay] {
+		if output.UnlockHash == claimDest {
+			found = true
+			if output.Value.Cmp(expectedBalance) != 0 {
+				return errors.New("siafund output has the wrong balance")
+			}
+		}
+	}
+	if !found {
+		return errors.New("could not find siafund claim output")
+	}
+
+	return nil
+}
+
+// TestSpendSiafundsBlock creates a consensus set tester and uses it to call
+// testSpendSiafundsBlock.
+func TestSpendSiafundsBlock(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestSpendSiafundsBlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
+	}
+	err = cst.testSpendSiafundsBlock()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// testPaymentChannelBlocks submits blocks to set up, use, and close a payment
+// channel.
+func (cst *consensusSetTester) testPaymentChannelBlocks() error {
+	// The current method of doing payment channels is gimped because public
+	// keys do not have timelocks. We will be hardforking to include timelocks
+	// in public keys in 0.4.0, but in the meantime we need an alternate
+	// method.
+
+	// Gimped payment channels: 2-of-2 multisig where one key is controlled by
+	// the funding entity, and one key is controlled by the receiving entity. An
+	// address is created containing both keys, and then the funding entity
+	// creates, but does not sign, a transaction sending coins to the channel
+	// address. A second transaction is created that sends all the coins in the
+	// funding output back to the funding entity. The receiving entity signs the
+	// transaction with a timelocked signature. The funding entity will get the
+	// refund after T blocks as long as the output is not double spent. The
+	// funding entity then signs the first transaction and opens the channel.
+	//
+	// Creating the channel:
+	//	1. Create a 2-of-2 unlock conditions, one key held by each entity.
+	//	2. Funding entity creates, but does not sign, a transaction sending
+	//		money to the payment channel address. (txn A)
+	//	3. Funding entity creates and signs a transaction spending the output
+	//		created in txn A that sends all the money back as a refund. (txn B)
+	//	4. Receiving entity signs txn B with a timelocked signature, so that the
+	//		funding entity cannot get the refund for several days. The funding entity
+	//		is given a fully signed and eventually-spendable txn B.
+	//	5. The funding entity signs and broadcasts txn A.
+	//
+	// Using the channel:
+	//	Each the receiving entity and the funding entity keeps a record of how
+	//	much has been sent down the unclosed channel, and watches the
+	//	blockchain for a channel closing transaction. To send more money down
+	//	the channel, the funding entity creates and signs a transaction sending
+	//	X+y coins to the receiving entity from the channel address. The
+	//	transaction is sent to the receiving entity, who will keep it and
+	//	potentially sign and broadcast it later. The funding entity will only
+	//	send money down the channel if 'work' or some other sort of event has
+	//	completed that indicates the receiving entity should get more money.
+	//
+	// Closing the channel:
+	//	The receiving entity will sign the transaction that pays them the most
+	//	money and then broadcast that transaction. This will spend the output
+	//	and close the channel, invalidating txn B and preventing any future
+	//	transactions from being made over the channel. The channel must be
+	//	closed before the timelock expires on the second signature in txn B,
+	//	otherwise the funding entity will be able to get a full refund.
+	//
+	//	The funding entity should be waiting until either the receiving entity
+	//	closes the channel or the timelock expires. If the receiving entity
+	//	closes the channel, all is good. If not, then the funding entity can
+	//	close the channel and get a full refund.
+
+	// Create a 2-of-2 unlock conditions, 1 key for each the sender and the
+	// receiver in the payment channel.
+	sk1, pk1, err := crypto.GenerateSignatureKeys() // Funding entity.
+	if err != nil {
+		return err
+	}
+	sk2, pk2, err := crypto.GenerateSignatureKeys() // Receiving entity.
+	if err != nil {
+		return err
+	}
+	uc := types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{
+			{
+				Algorithm: types.SignatureEd25519,
+				Key:       pk1[:],
+			},
+			{
+				Algorithm: types.SignatureEd25519,
+				Key:       pk2[:],
+			},
+		},
+		SignaturesRequired: 2,
+	}
+	channelAddress := uc.UnlockHash()
+
+	// Funding entity creates but does not sign a transaction that funds the
+	// channel address. Because the wallet is not very flexible, the channel
+	// txn needs to be fully custom. To get a custom txn, manually create an
+	// address and then use the wallet to fund that address.
+	channelSize := types.NewCurrency64(10e3)
+	channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+	if err != nil {
+		return err
+	}
+	channelFundingUC := types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{{
+			Algorithm: types.SignatureEd25519,
+			Key:       channelFundingPK[:],
+		}},
+		SignaturesRequired: 1,
+	}
+	channelFundingAddr := channelFundingUC.UnlockHash()
+	fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		return err
+	}
+	_, err = cst.wallet.FundTransaction(fundID, channelSize)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
+	if err != nil {
+		return err
+	}
+	fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+	if err != nil {
+		return err
+	}
+	err = cst.tpool.AcceptTransaction(fundTxn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+	channelTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         fundOutputID,
+			UnlockConditions: channelFundingUC,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      channelSize,
+			UnlockHash: channelAddress,
+		}},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(fundOutputID),
+			PublicKeyIndex: 0,
+			CoveredFields:  types.CoveredFields{WholeTransaction: true},
+		}},
+	}
+
+	// Funding entity creates and signs a transaction that spends the full
+	// channel output.
+	channelOutputID := channelTxn.SiacoinOutputID(0)
+	refundAddr, _, err := cst.wallet.CoinAddress(false)
+	if err != nil {
+		return err
+	}
+	refundTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         channelOutputID,
+			UnlockConditions: uc,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      channelSize,
+			UnlockHash: refundAddr,
+		}},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID:       crypto.Hash(channelOutputID),
+			PublicKeyIndex: 0,
+			CoveredFields:  types.CoveredFields{WholeTransaction: true},
+		}},
+	}
+	sigHash := refundTxn.SigHash(0)
+	cryptoSig1, err := crypto.SignHash(sigHash, sk1)
+	if err != nil {
+		return err
+	}
+	refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
+
+	// Receiving entity signs the transaction that spends the full channel
+	// output, but with a timelock.
+	refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
+		ParentID:       crypto.Hash(channelOutputID),
+		PublicKeyIndex: 1,
+		Timelock:       cst.cs.height() + 2,
+		CoveredFields:  types.CoveredFields{WholeTransaction: true},
+	})
+	sigHash = refundTxn.SigHash(1)
+	cryptoSig2, err := crypto.SignHash(sigHash, sk2)
+	if err != nil {
+		return err
+	}
+	refundTxn.TransactionSignatures[1].Signature = cryptoSig2[:]
+
+	// Funding entity will now sign and broadcast the funding transaction.
+	sigHash = channelTxn.SigHash(0)
+	cryptoSig0, err := crypto.SignHash(sigHash, channelFundingSK)
+	if err != nil {
+		return err
+	}
+	channelTxn.TransactionSignatures[0].Signature = cryptoSig0[:]
+	err = cst.tpool.AcceptTransaction(channelTxn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+	// Put the txn in a block.
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+
+	// Try to submit the refund transaction before the timelock has expired.
+	err = cst.tpool.AcceptTransaction(refundTxn)
+	if err != types.ErrPrematureSignature {
+		return err
+	}
+
+	// Create a transaction that has partially used the channel, and submit it
+	// to the blockchain to close the channel.
+	closeTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         channelOutputID,
+			UnlockConditions: uc,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{
+			{
+				Value:      channelSize.Sub(types.NewCurrency64(5)),
+				UnlockHash: refundAddr,
+			},
+			{
+				Value: types.NewCurrency64(5),
+			},
+		},
+		TransactionSignatures: []types.TransactionSignature{
+			{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			},
+			{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 1,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			},
+		},
+	}
+	sigHash = closeTxn.SigHash(0)
+	cryptoSig3, err := crypto.SignHash(sigHash, sk1)
+	if err != nil {
+		return err
+	}
+	closeTxn.TransactionSignatures[0].Signature = cryptoSig3[:]
+	sigHash = closeTxn.SigHash(1)
+	cryptoSig4, err := crypto.SignHash(sigHash, sk2)
+	if err != nil {
+		return err
+	}
+	closeTxn.TransactionSignatures[1].Signature = cryptoSig4[:]
+	err = cst.tpool.AcceptTransaction(closeTxn)
+	if err != nil {
+		return err
+	}
+	cst.tpUpdateWait()
+
+	// Mine the block with the transaction.
+	block, _ = cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		return err
+	}
+	cst.csUpdateWait()
+	closeRefundID := closeTxn.SiacoinOutputID(0)
+	closePaymentID := closeTxn.SiacoinOutputID(1)
+	_, exists := cst.cs.siacoinOutputs[closeRefundID]
+	if !exists {
+		return errors.New("close txn refund output doesn't exist")
+	}
+	_, exists = cst.cs.siacoinOutputs[closePaymentID]
+	if !exists {
+		return errors.New("close txn payment output doesn't exist")
+	}
+
+	// Create a payment channel where the receiving entity never responds to
+	// the initial transaction.
+	{
+		// Funding entity creates but does not sign a transaction that funds the
+		// channel address. Because the wallet is not very flexible, the channel
+		// txn needs to be fully custom. To get a custom txn, manually create an
+		// address and then use the wallet to fund that address.
+		channelSize := types.NewCurrency64(10e3)
+		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		if err != nil {
+			return err
+		}
+		channelFundingUC := types.UnlockConditions{
+			PublicKeys: []types.SiaPublicKey{{
+				Algorithm: types.SignatureEd25519,
+				Key:       channelFundingPK[:],
+			}},
+			SignaturesRequired: 1,
+		}
+		channelFundingAddr := channelFundingUC.UnlockHash()
+		fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+		if err != nil {
+			return err
+		}
+		_, err = cst.wallet.FundTransaction(fundID, channelSize)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
+		if err != nil {
+			return err
+		}
+		fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+		if err != nil {
+			return err
+		}
+		err = cst.tpool.AcceptTransaction(fundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+		channelTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: channelAddress,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+
+		// Funding entity creates and signs a transaction that spends the full
+		// channel output.
+		channelOutputID := channelTxn.SiacoinOutputID(0)
+		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		refundTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         channelOutputID,
+				UnlockConditions: uc,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: refundAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash := refundTxn.SigHash(0)
+		cryptoSig1, err := crypto.SignHash(sigHash, sk1)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
+
+		// Recieving entity never communitcates, funding entity must reclaim
+		// the 'channelSize' coins that were intended to go to the channel.
+		reclaimAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		reclaimTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: reclaimAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash = reclaimTxn.SigHash(0)
+		cryptoSig, err := crypto.SignHash(sigHash, channelFundingSK)
+		if err != nil {
+			return err
+		}
+		reclaimTxn.TransactionSignatures[0].Signature = cryptoSig[:]
+		err = cst.tpool.AcceptTransaction(reclaimTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+		reclaimOutputID := reclaimTxn.SiacoinOutputID(0)
+		_, exists := cst.cs.siacoinOutputs[reclaimOutputID]
+		if !exists {
+			return errors.New("failed to reclaim an output that belongs to the funding entity")
+		}
+	}
+
+	// Create a channel and the open the channel, but close the channel using
+	// the timelocked signature.
+	{
+		// Funding entity creates but does not sign a transaction that funds the
+		// channel address. Because the wallet is not very flexible, the channel
+		// txn needs to be fully custom. To get a custom txn, manually create an
+		// address and then use the wallet to fund that address.
+		channelSize := types.NewCurrency64(10e3)
+		channelFundingSK, channelFundingPK, err := crypto.GenerateSignatureKeys()
+		if err != nil {
+			return err
+		}
+		channelFundingUC := types.UnlockConditions{
+			PublicKeys: []types.SiaPublicKey{{
+				Algorithm: types.SignatureEd25519,
+				Key:       channelFundingPK[:],
+			}},
+			SignaturesRequired: 1,
+		}
+		channelFundingAddr := channelFundingUC.UnlockHash()
+		fundID, err := cst.wallet.RegisterTransaction(types.Transaction{})
+		if err != nil {
+			return err
+		}
+		_, err = cst.wallet.FundTransaction(fundID, channelSize)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		_, scoFundIndex, err := cst.wallet.AddSiacoinOutput(fundID, types.SiacoinOutput{Value: channelSize, UnlockHash: channelFundingAddr})
+		if err != nil {
+			return err
+		}
+		fundTxn, err := cst.wallet.SignTransaction(fundID, true)
+		if err != nil {
+			return err
+		}
+		err = cst.tpool.AcceptTransaction(fundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		fundOutputID := fundTxn.SiacoinOutputID(int(scoFundIndex))
+		channelTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         fundOutputID,
+				UnlockConditions: channelFundingUC,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: channelAddress,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(fundOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+
+		// Funding entity creates and signs a transaction that spends the full
+		// channel output.
+		channelOutputID := channelTxn.SiacoinOutputID(0)
+		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		if err != nil {
+			return err
+		}
+		refundTxn := types.Transaction{
+			SiacoinInputs: []types.SiacoinInput{{
+				ParentID:         channelOutputID,
+				UnlockConditions: uc,
+			}},
+			SiacoinOutputs: []types.SiacoinOutput{{
+				Value:      channelSize,
+				UnlockHash: refundAddr,
+			}},
+			TransactionSignatures: []types.TransactionSignature{{
+				ParentID:       crypto.Hash(channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			}},
+		}
+		sigHash := refundTxn.SigHash(0)
+		cryptoSig1, err := crypto.SignHash(sigHash, sk1)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[0].Signature = cryptoSig1[:]
+
+		// Receiving entity signs the transaction that spends the full channel
+		// output, but with a timelock.
+		refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
+			ParentID:       crypto.Hash(channelOutputID),
+			PublicKeyIndex: 1,
+			Timelock:       cst.cs.height() + 2,
+			CoveredFields:  types.CoveredFields{WholeTransaction: true},
+		})
+		sigHash = refundTxn.SigHash(1)
+		cryptoSig2, err := crypto.SignHash(sigHash, sk2)
+		if err != nil {
+			return err
+		}
+		refundTxn.TransactionSignatures[1].Signature = cryptoSig2[:]
+
+		// Funding entity will now sign and broadcast the funding transaction.
+		sigHash = channelTxn.SigHash(0)
+		cryptoSig0, err := crypto.SignHash(sigHash, channelFundingSK)
+		if err != nil {
+			return err
+		}
+		channelTxn.TransactionSignatures[0].Signature = cryptoSig0[:]
+		err = cst.tpool.AcceptTransaction(channelTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		// Put the txn in a block.
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+
+		// Receiving entity never signs another transaction, so the funding
+		// entity waits until the timelock is complete, and then submits the
+		// refundTxn.
+		for i := 0; i < 3; i++ {
+			block, _ := cst.miner.FindBlock()
+			err = cst.cs.AcceptBlock(block)
+			if err != nil {
+				return err
+			}
+			cst.csUpdateWait()
+		}
+		err = cst.tpool.AcceptTransaction(refundTxn)
+		if err != nil {
+			return err
+		}
+		cst.tpUpdateWait()
+		block, _ = cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+		refundOutputID := refundTxn.SiacoinOutputID(0)
+		_, exists := cst.cs.siacoinOutputs[refundOutputID]
+		if !exists {
+			return errors.New("timelocked refund transaction did not get spent correctly")
+		}
+	}
+
+	return nil
+}
+
+// TestPaymentChannelBlocks creates a consensus set tester and uses it to call
+// testPaymentChannelBlocks.
+func TestPaymentChannelBlocks(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestPaymentChannelBlocks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.testPaymentChannelBlocks()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// complexBlockSet puts a set of blocks with many types of transactions into
+// the consensus set.
+func (cst *consensusSetTester) complexBlockSet() error {
+	err := cst.testSimpleBlock()
+	if err != nil {
+		return err
+	}
+	err = cst.testSpendSiacoinsBlock()
+	if err != nil {
+		return err
+	}
+
+	// COMPATv0.4.0
+	//
+	// Mine enough blocks to get above the file contract hardfork threshold
+	// (10).
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			return err
+		}
+		cst.csUpdateWait()
+	}
+	err = cst.testFileContractsBlocks()
+	if err != nil {
+		return err
+	}
+	err = cst.testSpendSiafundsBlock()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// TestComplexForking adds every type of test block into two parallel chains of
+// consensus, and then forks to a new chain, forcing the whole structure to be
+// reverted.
+func TestComplexForking(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst1, err := createConsensusSetTester("TestComplexForking - 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst2, err := createConsensusSetTester("TestComplexForking - 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst3, err := createConsensusSetTester("TestComplexForking - 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Give each type of major block to cst1.
+	err = cst1.complexBlockSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Give all the blocks in cst1 to cst3 - as a holding place.
+	var cst1Blocks []types.Block
+	bn := cst1.cs.currentBlockNode()
+	for bn != cst1.cs.blockRoot {
+		cst1Blocks = append([]types.Block{bn.block}, cst1Blocks...) // prepend
+		bn = bn.parent
+	}
+	for _, block := range cst1Blocks {
+		// Some blocks will return errors.
+		err = cst3.cs.AcceptBlock(block)
+		if err == nil {
+			cst3.csUpdateWait()
+		}
+	}
+	if cst3.cs.currentBlockID() != cst1.cs.currentBlockID() {
+		t.Error("cst1 and cst3 do not share the same path")
+	}
+	if cst3.cs.consensusSetHash() != cst1.cs.consensusSetHash() {
+		t.Error("cst1 and cst3 do not share a consensus set hash")
+	}
+
+	// Mine 3 blocks on cst2, then all the block types, to give it a heavier
+	// weight, then give all of its blocks to cst1. This will cause a complex
+	// fork to happen.
+	for i := 0; i < 3; i++ {
+		block, _ := cst2.miner.FindBlock()
+		err = cst2.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst2.csUpdateWait()
+	}
+	err = cst2.complexBlockSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cst2Blocks []types.Block
+	bn = cst2.cs.currentBlockNode()
+	for bn != cst2.cs.blockRoot {
+		cst2Blocks = append([]types.Block{bn.block}, cst2Blocks...) // prepend
+		bn = bn.parent
+	}
+	for _, block := range cst2Blocks {
+		// Some blocks will return errors.
+		err = cst1.cs.AcceptBlock(block)
+		if err == nil {
+			cst1.csUpdateWait()
+		}
+	}
+	if cst1.cs.currentBlockID() != cst2.cs.currentBlockID() {
+		t.Error("cst1 and cst2 do not share the same path")
+	}
+	if cst1.cs.consensusSetHash() != cst2.cs.consensusSetHash() {
+		t.Error("cst1 and cst2 do not share the same consensus set hash")
+	}
+
+	// Mine 6 blocks on cst3 and then give those blocks to cst1, which will
+	// cause cst1 to switch back to its old chain. cst1 will then have created,
+	// reverted, and reapplied all the significant types of blocks.
+	for i := 0; i < 6; i++ {
+		block, _ := cst3.miner.FindBlock()
+		err = cst3.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst3.csUpdateWait()
+	}
+	var cst3Blocks []types.Block
+	bn = cst3.cs.currentBlockNode()
+	for bn != cst3.cs.blockRoot {
+		cst3Blocks = append([]types.Block{bn.block}, cst3Blocks...) // prepend
+		bn = bn.parent
+	}
+	for _, block := range cst3Blocks {
+		// Some blocks will return errors.
+		err = cst1.cs.AcceptBlock(block)
+		if err == nil {
+			cst1.csUpdateWait()
+		}
+	}
+	if cst1.cs.currentBlockID() != cst3.cs.currentBlockID() {
+		t.Error("cst1 and cst3 do not share the same path")
+	}
+	if cst1.cs.consensusSetHash() != cst3.cs.consensusSetHash() {
+		t.Error("cst1 and cst3 do not share the same consensus set hash")
+	}
+}
+
+// TestBuriedBadFork creates a block with an invalid transaction that's not on
+// the longest fork. The consensus set will not validate that block. Then valid
+// blocks are added on top of it to make it the longest fork. When it becomes
+// the longest fork, all the blocks should be fully validated and thrown out
+// because a parent is invalid.
+func TestBuriedBadFork(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBuriedBadFork")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Create a bad block that builds on a parent, so that it is part of not
+	// the longest fork.
+	badBlock := types.Block{
+		ParentID:     bn.parent.block.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height)}},
+		Transactions: []types.Transaction{{
+			SiacoinInputs: []types.SiacoinInput{{}}, // Will trigger an error on full verification but not partial verification.
+		}},
+	}
+	badBlock, _ = cst.miner.SolveBlock(badBlock, bn.parent.childTarget)
+	err = cst.cs.AcceptBlock(badBlock)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+
+	// Build another bock on top of the bad block that is fully valid, this
+	// will cause a fork and full validation of the bad block, both the bad
+	// block and this block should be thrown away.
+	block := types.Block{
+		ParentID:     badBlock.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height + 1)}},
+	}
+	block, _ = cst.miner.SolveBlock(block, bn.parent.childTarget) // okay because the target will not change
+	err = cst.cs.AcceptBlock(block)
+	if err == nil {
+		t.Fatal(err)
+	}
+	_, exists := cst.cs.blockMap[badBlock.ID()]
+	if exists {
+		t.Error("bad block not cleared from memory")
+	}
+	_, exists = cst.cs.blockMap[block.ID()]
+	if exists {
+		t.Error("block not cleared from memory")
+	}
+}
+
+// TestBuriedBadTransaction tries submitting a block with a bad transaction
+// that is buried under good transactions.
+func TestBuriedBadTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBuriedBadTransaction")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Create a good transaction using the wallet.
+	txnValue := types.NewCurrency64(1200)
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cst.wallet.FundTransaction(id, txnValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddSiacoinOutput(id, types.SiacoinOutput{Value: txnValue})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+
+	// Create a bad transaction
+	badTxn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{}},
+	}
+	txns := append(cst.tpool.TransactionSet(), badTxn)
+
+	// Create a block with a buried bad transaction.
+	block := types.Block{
+		ParentID:     bn.block.ID(),
+		Timestamp:    types.CurrentTimestamp(),
+		MinerPayouts: []types.SiacoinOutput{{Value: types.CalculateCoinbase(bn.height + 1)}},
+		Transactions: txns,
+	}
+	block, _ = cst.miner.SolveBlock(block, bn.childTarget)
+	err = cst.cs.AcceptBlock(block)
+	if err == nil {
+		t.Error("buried transaction didn't cause an error")
+	}
+	_, exists := cst.cs.blockMap[block.ID()]
+	if exists {
+		t.Error("bad block made it into the block map")
+	}
+}
+
+// COMPATv0.4.0
+//
+// This test checks that the hardfork scheduled for block 12,000 rolls through
+// smoothly.
+func TestTaxHardfork(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestTaxHardfork")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file contract with a payout that is put into the blockchain
+	// before the hardfork block but expires after the hardfork block.
+	payout := types.NewCurrency64(400e6)
+	fc := types.FileContract{
+		WindowStart:        cst.cs.height() + 10,
+		WindowEnd:          cst.cs.height() + 12,
+		Payout:             payout,
+		ValidProofOutputs:  []types.SiacoinOutput{{}},
+		MissedProofOutputs: []types.SiacoinOutput{{}},
+	}
+	outputSize := payout.Sub(fc.Tax())
+	fc.ValidProofOutputs[0].Value = outputSize
+	fc.MissedProofOutputs[0].Value = outputSize
+
+	// Create and fund a transaction with a file contract.
+	id, err := cst.wallet.RegisterTransaction(types.Transaction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cst.wallet.FundTransaction(id, payout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	_, _, err = cst.wallet.AddFileContract(id, fc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn, err := cst.wallet.SignTransaction(id, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cst.tpool.AcceptTransaction(txn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.tpUpdateWait()
+	block, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.csUpdateWait()
+
+	// Check that the siafund pool was increased.
+	if cst.cs.siafundPool.Cmp(types.NewCurrency64(15590e3)) != 0 {
+		t.Fatal("siafund pool was not increased correctly")
+	}
+
+	// Mine blocks until the file contract expires and see if any problems
+	// occur.
+	for i := 0; i < 12; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
+	}
+
+	// Run a siacoins check to make sure that order has been restored - note
+	// that the siacoin check will fail in the middle, and thus is commented
+	// out until after the hardfork.
+	err = cst.cs.checkSiacoins()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

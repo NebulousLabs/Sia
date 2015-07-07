@@ -73,6 +73,49 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if len(bn2.delayedSiacoinOutputDiffs) != 2 {
 		t.Error("block node should have 2 delayed outputs")
 	}
+
+	// Trigger a panic where the miner payouts have already been applied.
+	defer func() {
+		r := recover()
+		if r != errPayoutsAlreadyPaid {
+			t.Error(r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errPayoutsAlreadyPaid {
+			t.Error(r)
+		}
+		delete(cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay], mpid0)
+		cst.cs.siacoinOutputs[mpid0] = types.SiacoinOutput{}
+		cst.cs.applyMinerPayouts(bn)
+	}()
+	cst.cs.applyMinerPayouts(bn)
+}
+
+// TestApplyMaturedSiacoinOutputs probes the applyMaturedSiacoinOutputs method
+// of the consensus set.
+func TestApplyMaturedSiacoinOutputs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestApplyMissedStorageProof")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Trigger the sanity check concerning already-matured outputs.
+	defer func() {
+		r := recover()
+		if r != errOutputAlreadyMature {
+			t.Error(r)
+		}
+	}()
+	cst.cs.siacoinOutputs[types.SiacoinOutputID{}] = types.SiacoinOutput{}
+	cst.cs.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	cst.cs.delayedSiacoinOutputs[bn.height][types.SiacoinOutputID{}] = types.SiacoinOutput{}
+	cst.cs.applyMaturedSiacoinOutputs(bn)
 }
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the
@@ -115,6 +158,49 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if exists {
 		t.Error("file contract remains after expiration")
 	}
+
+	// Trigger the debug panics.
+	// not exist.
+	defer func() {
+		r := recover()
+		if r != errMissingFileContract {
+			t.Error(r)
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r != errStorageProofTiming {
+			t.Error(r)
+		}
+		// Trigger errMissingFileContract
+		cst.cs.applyMissedStorageProof(bn, types.FileContractID(spoid))
+	}()
+	defer func() {
+		r := recover()
+		if r != errPayoutsAlreadyPaid {
+			t.Error(r)
+		}
+
+		// Trigger errStorageProofTiming
+		expiringFC.WindowEnd = 0
+		cst.cs.fileContracts[types.FileContractID{}] = expiringFC
+		cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+	}()
+	defer func() {
+		r := recover()
+		if r != errPayoutsAlreadyPaid {
+			t.Error(r)
+		}
+
+		// Trigger errPayoutsAlreadyPaid from siacoin outputs.
+		delete(cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay], spoid)
+		cst.cs.siacoinOutputs[spoid] = types.SiacoinOutput{}
+		cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+	}()
+	// Trigger errPayoutsAlreadyPaid from delayed outputs.
+	cst.cs.fileContracts[types.FileContractID{}] = expiringFC
+	cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid] = types.SiacoinOutput{}
+	cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
 }
 
 // TestApplyFileContractMaintenance probes the applyFileContractMaintenance

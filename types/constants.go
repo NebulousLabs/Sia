@@ -8,31 +8,43 @@ package types
 
 import (
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
 
+// COMPATv0.4.0 - until the first 10e3 blocks have been archived, CurrentHeight
+// is needed to keep code consistent while verifying earlier blocks.
+//
+// CurrentHeight is a global variable to help with an upcoming hardfork. When
+// the height is less than 12,000, one set of code will be run. When the height
+// is greater than 12,000, a different set of code will be run. After the
+// hardfork has passed and everyone has upgraded, a checkpoint will be created
+// and blocks below 12,000 will never be viewed again.
+var CurrentHeight BlockHeight = 0
+var CurrentHeightLock sync.Mutex
+
 var (
-	BlockSizeLimit   uint64
+	BlockSizeLimit   = uint64(2e6)
+	RootDepth        = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
 	BlockFrequency   BlockHeight
 	MaturityDelay    BlockHeight
 	GenesisTimestamp Timestamp
 	RootTarget       Target
-	RootDepth        Target
 
+	MedianTimestampWindow  = uint64(11)
 	TargetWindow           BlockHeight
-	MedianTimestampWindow  int
 	MaxAdjustmentUp        *big.Rat
 	MaxAdjustmentDown      *big.Rat
 	FutureThreshold        Timestamp
 	ExtremeFutureThreshold Timestamp
 
-	SiafundCount     uint64
-	SiafundPortion   float64
-	InitialCoinbase  uint64
+	SiafundCount     = NewCurrency64(10000)
+	SiafundPortion   = big.NewRat(39, 1000)
+	SiacoinPrecision = NewCurrency(new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+	InitialCoinbase  = uint64(300e3)
 	MinimumCoinbase  uint64
-	SiacoinPrecision Currency
 
 	GenesisSiafundAllocation []SiafundOutput
 
@@ -42,20 +54,6 @@ var (
 // init checks which build constant is in place and initializes the variables
 // accordingly.
 func init() {
-	// Constants that are consistent regardless of the build settings.
-	BlockSizeLimit = 2e6 // 1 MB
-	RootDepth = Target{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}
-
-	MedianTimestampWindow = 11 // 11 Blocks.
-
-	SiafundCount = 10e3             // 10,000 total siafunds.
-	SiafundPortion = 0.039          // 3.9% fee on all file contract payouts.
-	InitialCoinbase = 300e3         // 300,000 Siacoins per block
-	SiacoinPrecision = NewCurrency( // Siacoin is divisible by 10^24
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil),
-	)
-
-	// Constants that depend on build settings.
 	if build.Release == "dev" {
 		// 'dev' settings are for small developer testnets, usually on the same
 		// computer. Settings are slow enough that a small team of developers
@@ -81,8 +79,12 @@ func init() {
 				UnlockHash: UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223},
 			},
 			{
-				Value:      NewCurrency64(8000),
+				Value:      NewCurrency64(7000),
 				UnlockHash: UnlockHash{209, 246, 228, 60, 248, 78, 242, 110, 9, 8, 227, 248, 225, 216, 163, 52, 142, 93, 47, 176, 103, 41, 137, 80, 212, 8, 132, 58, 241, 189, 2, 17},
+			},
+			{
+				Value:      NewCurrency64(1000),
+				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
 
@@ -113,8 +115,12 @@ func init() {
 				UnlockHash: UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223},
 			},
 			{
-				Value:      NewCurrency64(8000),
+				Value:      NewCurrency64(7000),
 				UnlockHash: UnlockHash{209, 246, 228, 60, 248, 78, 242, 110, 9, 8, 227, 248, 225, 216, 163, 52, 142, 93, 47, 176, 103, 41, 137, 80, 212, 8, 132, 58, 241, 189, 2, 17},
+			},
+			{
+				Value:      NewCurrency64(1000),
+				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
 

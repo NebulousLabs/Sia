@@ -111,9 +111,10 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 		fileContracts:  make(map[types.FileContractID]types.FileContract),
 		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		referenceSiacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		referenceFileContracts:  make(map[types.FileContractID]types.FileContract),
-		referenceSiafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
+		referenceSiacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		referenceFileContracts:         make(map[types.FileContractID]types.FileContract),
+		referenceFileContractRevisions: make(map[crypto.Hash]types.FileContract),
+		referenceSiafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}

@@ -83,6 +83,20 @@ func (cs *State) validHeader(b types.Block) error {
 // does not extend the longest fork.
 func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
+	// COMPATv0.4.0
+	//
+	// When validating/accepting a block, the types height needs to be set to
+	// the height of the block that's being analyzed. After analysis is
+	// finished, the height needs to be set to the height of the current block.
+	types.CurrentHeightLock.Lock()
+	types.CurrentHeight = parentNode.height
+	types.CurrentHeightLock.Unlock()
+	defer func() {
+		types.CurrentHeightLock.Lock()
+		types.CurrentHeight = cs.height()
+		types.CurrentHeightLock.Unlock()
+	}()
+
 	newNode := parentNode.newChild(b)
 	cs.blockMap[b.ID()] = newNode
 	if newNode.heavierThan(cs.currentBlockNode()) {
@@ -131,11 +145,18 @@ func (cs *State) acceptBlock(b types.Block) error {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
 
-	// Sanity check - if applied nodes is len 0, revertedNodes should also be
-	// len 0.
+	// Sanity checks.
 	if build.DEBUG {
+		// If appliedNodes is 0, revertedNodes will also be 0.
 		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
 			panic("appliedNodes and revertedNodes are mismatched!")
+		}
+
+		// After applying a block, the consensus set should be in a consistent
+		// state.
+		err = cs.checkConsistency()
+		if err != nil {
+			panic(err)
 		}
 	}
 
@@ -157,7 +178,8 @@ func (cs *State) AcceptBlock(b types.Block) error {
 		return err
 	}
 
-	// Broadcast the new block to all peers. This is an expensive operation, and not necessary during synchronize or
+	// Broadcast the new block to all peers. This is an expensive operation,
+	// and not necessary during synchronize or when loading from disk.
 	go cs.gateway.Broadcast("RelayBlock", b)
 
 	return nil

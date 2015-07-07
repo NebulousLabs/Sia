@@ -78,6 +78,7 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 		}
 		for i := len(rn.siafundPoolDiffs) - 1; i >= 0; i-- {
 			sfpd := rn.siafundPoolDiffs[i]
+			sfpd.Direction = modules.DiffRevert
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
