@@ -20,7 +20,7 @@ var (
 func (cs *State) applyMinerPayouts(bn *blockNode) {
 	for i, payout := range bn.block.MinerPayouts {
 		// Sanity check - input should not exist in the consensus set.
-		mpid := bn.block.MinerPayoutID(i)
+		mpid := bn.block.MinerPayoutID(uint64(i))
 		if build.DEBUG {
 			// Check the delayed outputs set.
 			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][mpid]
@@ -117,7 +117,7 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 	// Add all of the outputs in the missed proof outputs to the consensus set.
 	for i, mpo := range fc.MissedProofOutputs {
 		// Sanity check - output should not already exist.
-		spoid := fcid.StorageProofOutputID(types.ProofMissed, i)
+		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
 		if build.DEBUG {
 			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
 			if exists {

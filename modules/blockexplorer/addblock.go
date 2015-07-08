@@ -198,7 +198,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	// Insert the miner payouts as new outputs
 	for i, payout := range b.MinerPayouts {
 		tx.addAddress(payout.UnlockHash, crypto.Hash(b.ID()))
-		tx.addNewOutput(b.MinerPayoutID(i), crypto.Hash(b.ID()))
+		tx.addNewOutput(b.MinerPayoutID(uint64(i)), crypto.Hash(b.ID()))
 	}
 
 	// Insert each transaction
@@ -236,11 +236,11 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 
 		for j, output := range contract.ValidProofOutputs {
 			tx.addAddress(output.UnlockHash, txid)
-			tx.addNewOutput(fcid.StorageProofOutputID(true, j), txid)
+			tx.addNewOutput(fcid.StorageProofOutputID(true, uint64(j)), txid)
 		}
 		for j, output := range contract.MissedProofOutputs {
 			tx.addAddress(output.UnlockHash, txid)
-			tx.addNewOutput(fcid.StorageProofOutputID(false, j), txid)
+			tx.addNewOutput(fcid.StorageProofOutputID(false, uint64(j)), txid)
 		}
 
 		tx.addAddress(contract.UnlockHash, txid)
@@ -255,11 +255,11 @@ func (tx *boltTx) addTransaction(txn types.Transaction) {
 		// people who may just need it.
 		for i, output := range revision.NewValidProofOutputs {
 			tx.addAddress(output.UnlockHash, txid)
-			tx.addNewOutput(revision.ParentID.StorageProofOutputID(true, i), txid)
+			tx.addNewOutput(revision.ParentID.StorageProofOutputID(true, uint64(i)), txid)
 		}
 		for i, output := range revision.NewMissedProofOutputs {
 			tx.addAddress(output.UnlockHash, txid)
-			tx.addNewOutput(revision.ParentID.StorageProofOutputID(false, i), txid)
+			tx.addNewOutput(revision.ParentID.StorageProofOutputID(false, uint64(i)), txid)
 		}
 
 		tx.addAddress(revision.NewUnlockHash, txid)

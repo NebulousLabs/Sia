@@ -99,7 +99,7 @@ type (
 // the file contract that the proof is for, a boolean indicating whether the
 // proof was valid (true) or missed (false), and the index of the output
 // within the file contract.
-func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) SiacoinOutputID {
+func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i uint64) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierStorageProofOutput,
 		fcid,
