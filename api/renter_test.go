@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestUploadAndDownload creates a network with a host and then uploads a file
@@ -35,7 +34,7 @@ func TestUploadAndDownload(t *testing.T) {
 	// TODO: There should be some way to just spinblock until the download
 	// completes. Except there's no exported function in the renter that will
 	// indicate if a download has completed or not.
-	time.Sleep(types.RenterZeroConfDelay + time.Second*10)
+	time.Sleep(time.Second * 10)
 
 	files := st.server.renter.FileList()
 	if len(files) != 1 || !files[0].Available() {

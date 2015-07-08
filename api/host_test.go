@@ -3,8 +3,6 @@ package api
 import (
 	"testing"
 	"time"
-
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // announceHost puts a host announcement for the host into the blockchain.
@@ -66,7 +64,7 @@ func TestStorageProofs(t *testing.T) {
 	// Have the renter submit an upload to the host.
 	uploadName := "api.go"
 	st.callAPI("/renter/files/upload?pieces=1&nickname=api.go&source=" + uploadName)
-	time.Sleep(types.RenterZeroConfDelay + time.Second*10)
+	time.Sleep(time.Second * 10)
 
 	// Mine 25 blocks - the file will expire. (special constants)
 	for i := 0; i < 25; i++ {
