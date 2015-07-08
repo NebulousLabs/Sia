@@ -7,13 +7,10 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/boltdb/bolt"
-)
-
-var (
-	ErrNilEntry = errors.New("entry does not exist")
 )
 
 // A boltTx is a bolt transaction. It implements monadic error handling, such that
@@ -51,7 +48,7 @@ func (tx *boltTx) getObject(bucket string, key, obj interface{}) {
 	}
 	objBytes := b.Get(encoding.Marshal(key))
 	if objBytes == nil {
-		tx.err = ErrNilEntry
+		tx.err = persist.ErrNilEntry
 		return
 	}
 	tx.err = encoding.Unmarshal(objBytes, obj)
@@ -81,7 +78,7 @@ func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
 	oldErr := tx.err
 	var txns []crypto.Hash
 	tx.getObject("Addresses", addr, &txns)
-	if oldErr == nil && tx.err == ErrNilEntry {
+	if oldErr == nil && tx.err == persist.ErrNilEntry {
 		// NOTE: this is a special case where a nil entry is not an error, so
 		// we must explicitly reset tx.err.
 		tx.err = nil
@@ -158,12 +155,20 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		if build.DEBUG {
 			if build.Release == "testing" {
 				blocktarget = types.RootDepth
-			}
-			if !exists {
+			} else if !exists {
 				panic("Applied block not in consensus")
 			}
 
 		}
+	}
+
+	// Check if the block exists
+	exists, err := be.db.Exists("Blocks", encoding.Marshal(b.ID()))
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
 	}
 
 	tx, err := newBoltTx(be.db)
@@ -172,7 +177,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	}
 	defer tx.Rollback()
 
-	// Construct the struct that will be inside the database
+	// Construct the struct that will be inside the heights map
 	blockStruct := blockData{
 		Block:  b,
 		Height: be.blockchainHeight,

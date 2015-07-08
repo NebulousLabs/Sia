@@ -26,6 +26,10 @@ type BoltItem struct {
 	Value      []byte
 }
 
+var (
+	ErrNilEntry = errors.New("entry does not exist")
+)
+
 // checkDbMetadata confirms that the metadata in the database is
 // correct. If there is no metadata, correct metadata is inserted
 func (db *BoltDatabase) checkMetadata(meta Metadata) error {
@@ -111,7 +115,7 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 		// to be checked in calling functions
 		value := bucket.Get(key)
 		if value == nil {
-			return errors.New("requested item not found in database")
+			return ErrNilEntry
 		}
 		bytes = make([]byte, len(value))
 		copy(bytes, value)
@@ -121,6 +125,22 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 		return nil, err
 	}
 	return bytes, nil
+}
+
+// Exists checks for the existance of an item in the specified bucket
+func (db *BoltDatabase) Exists(bucketName string, key []byte) (bool, error) {
+	var exists bool
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return errors.New("requested bucket does not exist: " + bucketName)
+		}
+
+		v := bucket.Get(key)
+		exists = v != nil
+		return nil
+	})
+	return exists, err
 }
 
 // BulkUpdate is a function to both take readings from a database,

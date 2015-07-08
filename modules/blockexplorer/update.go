@@ -12,7 +12,6 @@ import (
 // well as the current block height
 func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := be.mu.Lock()
-	defer be.mu.Unlock(lockID)
 
 	// Modify the number of file contracts and how much they costed
 	for _, diff := range cc.FileContractDiffs {
@@ -45,5 +44,6 @@ func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
+	be.mu.Unlock(lockID)
 	be.updateSubscribers()
 }
