@@ -86,3 +86,24 @@ func TestStorageProof(t *testing.T) {
 		t.Error("Verified a bad proof")
 	}
 }
+
+// TestPaddedStorageProof builds a storage proof that has padding in the last
+// segment, and then requests a proof on the padded segment.
+func TestPaddedStorageProof(t *testing.T) {
+	// generate proof data
+	data := make([]byte, (2*SegmentSize)+10)
+	rand.Read(data)
+	rootHash, err := ReaderMerkleRoot(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create and verify a proof for the last index.
+	baseSegment, hashSet, err := BuildReaderProof(bytes.NewReader(data), 2)
+	if err != nil {
+		t.Error(err)
+	}
+	if !VerifySegment(baseSegment, hashSet, 3, 2, rootHash) {
+		t.Error("padded segment proof failed")
+	}
+}

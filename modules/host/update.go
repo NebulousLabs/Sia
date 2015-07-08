@@ -53,8 +53,8 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 		fmt.Println(err)
 		return
 	}
-
-	sp := types.StorageProof{obligation.ID, base, hashSet}
+	sp := types.StorageProof{obligation.ID, [crypto.SegmentSize]byte{}, hashSet}
+	copy(sp.Segment[:], base)
 
 	// Create and send the transaction.
 	id, err := h.wallet.RegisterTransaction(types.Transaction{})
