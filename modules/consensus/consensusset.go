@@ -40,9 +40,10 @@ var (
 // sources, the computationally expensive steps can be skipped.
 type verificationRigor byte
 
-// The State is the object responsible for tracking the current status of the
-// blockchain. Broadly speaking, it is responsible for maintaining consensus.
-// It accepts blocks and constructs a blockchain, forking when necessary.
+// The ConsensusSet is the object responsible for tracking the current status
+// of the blockchain. Broadly speaking, it is responsible for maintaining
+// consensus.  It accepts blocks and constructs a blockchain, forking when
+// necessary.
 type State struct {
 	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
