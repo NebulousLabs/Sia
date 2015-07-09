@@ -210,7 +210,7 @@ func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
 func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 	// Skip transaction verification if the ConsensusSet is accepting trusted
 	// blocks.
-	if cs.verificationRigor != fullVerification {
+	if cs.verificationRigor != fullVerification && (build.Release == "testing" || !build.DEBUG) {
 		return nil
 	}
 

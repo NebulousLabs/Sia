@@ -17,6 +17,11 @@ var (
 // checkCurrentPath looks at the blocks in the current path and verifies that
 // they are all ordered correctly and in the block map.
 func (cs *ConsensusSet) checkCurrentPath() error {
+	// Check is too slow to be done on a full node.
+	if build.Release == "standard" {
+		return nil
+	}
+
 	currentNode := cs.currentBlockNode()
 	for i := cs.height(); i != 0; i-- {
 		// The block should be in the block map.
@@ -66,10 +71,17 @@ func (cs *ConsensusSet) checkDelayedSiacoinOutputMaps() error {
 // checkSiacoins counts the number of siacoins in the database and verifies
 // that it matches the sum of all the coinbases.
 func (cs *ConsensusSet) checkSiacoins() error {
-	expectedSiacoins := types.ZeroCurrency
-	for i := types.BlockHeight(0); i <= cs.height(); i++ {
-		expectedSiacoins = expectedSiacoins.Add(types.CalculateCoinbase(i))
+	// Calculate the number of expected coins in constant time.
+	deflationBlocks := types.InitialCoinbase - types.MinimumCoinbase
+	expectedSiacoins := types.CalculateCoinbase(0).Add(types.CalculateCoinbase(cs.height())).Div(types.NewCurrency64(2))
+	if cs.height() < types.BlockHeight(deflationBlocks) {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(uint64(cs.height()) + 1))
+	} else {
+		expectedSiacoins = expectedSiacoins.Mul(types.NewCurrency64(deflationBlocks + 1))
+		trailingSiacoins := types.NewCurrency64(uint64(cs.height()) - deflationBlocks).Mul(types.CalculateCoinbase(cs.height()))
+		expectedSiacoins = expectedSiacoins.Add(trailingSiacoins)
 	}
+
 	totalSiacoins := types.ZeroCurrency
 	for _, sco := range cs.siacoinOutputs {
 		totalSiacoins = totalSiacoins.Add(sco.Value)
@@ -110,6 +122,11 @@ func (cs *ConsensusSet) checkSiafunds() error {
 
 // consensusSetHash returns the Merkle root of the current state of consensus.
 func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
+	// Check is too slow to be done on a full node.
+	if build.Release == "standard" {
+		return crypto.Hash{}
+	}
+
 	// Items of interest:
 	// 1.	genesis block
 	// 3.	current height
