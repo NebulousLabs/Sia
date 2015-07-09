@@ -16,7 +16,7 @@ var (
 
 // checkCurrentPath looks at the blocks in the current path and verifies that
 // they are all ordered correctly and in the block map.
-func (cs *State) checkCurrentPath() error {
+func (cs *ConsensusSet) checkCurrentPath() error {
 	currentNode := cs.currentBlockNode()
 	for i := cs.height(); i != 0; i-- {
 		// The block should be in the block map.
@@ -44,7 +44,7 @@ func (cs *State) checkCurrentPath() error {
 
 // checkDelayedSiacoinOutputMaps checks that the delayed siacoin output maps
 // have the right number of maps at the right heights.
-func (cs *State) checkDelayedSiacoinOutputMaps() error {
+func (cs *ConsensusSet) checkDelayedSiacoinOutputMaps() error {
 	expected := 0
 	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
 		if !(i > types.MaturityDelay) {
@@ -65,7 +65,7 @@ func (cs *State) checkDelayedSiacoinOutputMaps() error {
 
 // checkSiacoins counts the number of siacoins in the database and verifies
 // that it matches the sum of all the coinbases.
-func (cs *State) checkSiacoins() error {
+func (cs *ConsensusSet) checkSiacoins() error {
 	expectedSiacoins := types.ZeroCurrency
 	for i := types.BlockHeight(0); i <= cs.height(); i++ {
 		expectedSiacoins = expectedSiacoins.Add(types.CalculateCoinbase(i))
@@ -97,7 +97,7 @@ func (cs *State) checkSiacoins() error {
 }
 
 // checkSiafunds counts the siafund outputs and checks that there are 10,000.
-func (cs *State) checkSiafunds() error {
+func (cs *ConsensusSet) checkSiafunds() error {
 	totalSiafunds := types.ZeroCurrency
 	for _, sfo := range cs.siafundOutputs {
 		totalSiafunds = totalSiafunds.Add(sfo.Value)
@@ -109,7 +109,7 @@ func (cs *State) checkSiafunds() error {
 }
 
 // consensusSetHash returns the Merkle root of the current state of consensus.
-func (cs *State) consensusSetHash() crypto.Hash {
+func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// Items of interest:
 	// 1.	genesis block
 	// 3.	current height
@@ -196,7 +196,7 @@ func (cs *State) consensusSetHash() crypto.Hash {
 
 // checkRewindApply rewinds and reapplies the current block, checking that the
 // consensus set hashes meet the expected values.
-func (cs *State) checkRewindApply() error {
+func (cs *ConsensusSet) checkRewindApply() error {
 	// Do nothing if the DEBUG flag is not set.
 	if !build.DEBUG {
 		return nil
@@ -220,7 +220,7 @@ func (cs *State) checkRewindApply() error {
 
 // checkConsistency runs a series of checks to make sure that the consensus set
 // is consistent with some rules that should always be true.
-func (cs *State) checkConsistency() error {
+func (cs *ConsensusSet) checkConsistency() error {
 	err := cs.checkCurrentPath()
 	if err != nil {
 		return err

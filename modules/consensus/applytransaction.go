@@ -21,7 +21,7 @@ var (
 
 // applySiacoinInputs takes all of the siacoin inputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (cs *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 	// Remove all siacoin inputs from the unspent siacoin outputs list.
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
@@ -44,7 +44,7 @@ func (cs *State) applySiacoinInputs(bn *blockNode, t types.Transaction) {
 
 // applySiacoinOutputs takes all of the siacoin outputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (cs *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
 	// Add all siacoin outputs to the unspent siacoin outputs list.
 	for i, sco := range t.SiacoinOutputs {
 		// Sanity check - the output should not exist within the state.
@@ -69,7 +69,7 @@ func (cs *State) applySiacoinOutputs(bn *blockNode, t types.Transaction) {
 // applyFileContracts iterates through all of the file contracts in a
 // transaction and applies them to the state, updating the diffs in the block
 // node.
-func (cs *State) applyFileContracts(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applyFileContracts(bn *blockNode, t types.Transaction) {
 	for i, fc := range t.FileContracts {
 		// Sanity check - the file contract should not exists within the state.
 		fcid := t.FileContractID(i)
@@ -104,7 +104,7 @@ func (cs *State) applyFileContracts(bn *blockNode, t types.Transaction) {
 // applyFileContractRevisions iterates through all of the file contract
 // revisions in a transaction and applies them to the state, updating the diffs
 // in the block node.
-func (cs *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applyFileContractRevisions(bn *blockNode, t types.Transaction) {
 	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - termination should affect an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
@@ -148,7 +148,7 @@ func (cs *State) applyFileContractRevisions(bn *blockNode, t types.Transaction) 
 // applyStorageProofs iterates through all of the storage proofs in a
 // transaction and applies them to the state, updating the diffs in the block
 // node.
-func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applyStorageProofs(bn *blockNode, t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		// Sanity check - the file contract of the storage proof should exist.
 		fc, exists := cs.fileContracts[sp.ParentID]
@@ -192,7 +192,7 @@ func (cs *State) applyStorageProofs(bn *blockNode, t types.Transaction) {
 
 // applySiafundInputs takes all of the siafund inputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applySiafundInputs(bn *blockNode, t types.Transaction) {
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if build.DEBUG {
@@ -235,7 +235,7 @@ func (cs *State) applySiafundInputs(bn *blockNode, t types.Transaction) {
 
 // applySiafundOutputs takes all of the siafund outputs in a transaction and
 // applies them to the state, updating the diffs in the block node.
-func (cs *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
+func (cs *ConsensusSet) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 	for i, sfo := range t.SiafundOutputs {
 		// Sanity check - the output should not exist within the blockchain.
 		sfoid := t.SiafundOutputID(i)
@@ -260,10 +260,10 @@ func (cs *State) applySiafundOutputs(bn *blockNode, t types.Transaction) {
 	}
 }
 
-// applyTransaction applies the contents of a transaction to the State. This
-// produces a set of diffs, which are stored in the blockNode containing the
-// transaction. No verification is done by this function.
-func (cs *State) applyTransaction(bn *blockNode, t types.Transaction) {
+// applyTransaction applies the contents of a transaction to the ConsensusSet.
+// This produces a set of diffs, which are stored in the blockNode containing
+// the transaction. No verification is done by this function.
+func (cs *ConsensusSet) applyTransaction(bn *blockNode, t types.Transaction) {
 	// Apply each component of the transaction. Miner fees are handled
 	// elsewhere.
 	cs.applySiacoinInputs(bn, t)

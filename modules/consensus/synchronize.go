@@ -18,7 +18,7 @@ const (
 )
 
 // threadedResynchronize will call synchronize on up to 8 random peers.
-func (s *State) threadedResynchronize() {
+func (s *ConsensusSet) threadedResynchronize() {
 	for {
 		peers := s.gateway.Peers()
 		for _, peer := range peers {
@@ -36,7 +36,7 @@ func (s *State) threadedResynchronize() {
 }
 
 // receiveBlocks is the calling end of the SendBlocks RPC.
-func (s *State) receiveBlocks(conn modules.PeerConn) error {
+func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
 	lockID := s.mu.RLock()
 	history := s.blockHistory()
@@ -81,7 +81,7 @@ func (s *State) receiveBlocks(conn modules.PeerConn) error {
 // BlockIDs and then doubling in step size until the genesis block is reached.
 // The genesis block is always included. This array of BlockIDs is used to
 // establish a shared commonality between peers during synchronization.
-func (s *State) blockHistory() (blockIDs [32]types.BlockID) {
+func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 	knownBlocks := make([]types.BlockID, 0, 32)
 	step := types.BlockHeight(1)
 	for height := s.height(); ; height -= step {
@@ -110,7 +110,7 @@ func (s *State) blockHistory() (blockIDs [32]types.BlockID) {
 // known ID is used as the starting point, and up to 'MaxCatchUpBlocks' from
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
-func (s *State) sendBlocks(conn modules.PeerConn) error {
+func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
@@ -191,6 +191,6 @@ func (s *State) sendBlocks(conn modules.PeerConn) error {
 //
 // TODO: Synchronize is a blocking call that involved network traffic. This
 // seems to break convention, but I'm not certain. It does seem weird though.
-func (s *State) Synchronize(peer modules.NetAddress) error {
+func (s *ConsensusSet) Synchronize(peer modules.NetAddress) error {
 	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
 }

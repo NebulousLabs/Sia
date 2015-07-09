@@ -22,7 +22,7 @@ type consensusSetTester struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	cs *State
+	cs *ConsensusSet
 
 	persistDir string
 

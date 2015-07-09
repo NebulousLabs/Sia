@@ -26,7 +26,7 @@ var (
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (cs *State) validSiacoins(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validSiacoins(t types.Transaction) (err error) {
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
@@ -50,7 +50,7 @@ func (cs *State) validSiacoins(t types.Transaction) (err error) {
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	// Get the file contract associated with the input id.
 	fc, exists := cs.fileContracts[fcid]
 	if !exists {
@@ -81,7 +81,7 @@ func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, e
 
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (cs *State) validStorageProofs(t types.Transaction) error {
+func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
@@ -123,7 +123,7 @@ func (cs *State) validStorageProofs(t types.Transaction) error {
 
 // validFileContractRevision checks that each file contract revision is valid
 // in the context of the current consensus set.
-func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validFileContractRevisions(t types.Transaction) (err error) {
 	for _, fcr := range t.FileContractRevisions {
 		// Check that the revision revises an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
@@ -171,7 +171,7 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 
 // validSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func (cs *State) validSiafunds(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validSiafunds(t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
@@ -199,7 +199,7 @@ func (cs *State) validSiafunds(t types.Transaction) (err error) {
 
 // ValidStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (cs *State) ValidStorageProofs(t types.Transaction) (err error) {
+func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
 	id := cs.mu.RLock()
 	defer cs.mu.RUnlock(id)
 	return cs.validStorageProofs(t)
@@ -207,8 +207,9 @@ func (cs *State) ValidStorageProofs(t types.Transaction) (err error) {
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func (cs *State) validTransaction(t types.Transaction) error {
-	// Skip transaction verification if the State is accepting trusted blocks.
+func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
+	// Skip transaction verification if the ConsensusSet is accepting trusted
+	// blocks.
 	if cs.verificationRigor != fullVerification {
 		return nil
 	}
@@ -246,7 +247,7 @@ func (cs *State) validTransaction(t types.Transaction) error {
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked.
-func (cs *State) TryTransactions(txns []types.Transaction) error {
+func (cs *ConsensusSet) TryTransactions(txns []types.Transaction) error {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the

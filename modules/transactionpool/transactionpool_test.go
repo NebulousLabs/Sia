@@ -19,7 +19,7 @@ import (
 // transaction pool or consensus set, updateWait() should be called or
 // desynchronization could be introduced.
 type tpoolTester struct {
-	cs      *consensus.State
+	cs      *consensus.ConsensusSet
 	gateway modules.Gateway
 	tpool   *TransactionPool
 	miner   modules.Miner
