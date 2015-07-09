@@ -14,8 +14,10 @@ var (
 	// ErrTransactionPoolDuplicate is returned when a duplicate transaction is
 	// submitted to the transaction pool.
 	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
-	PrefixNonSia                = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
-	PrefixStrNonSia             = "NonSia" // COMPATv0.3.3.3
+	ErrInvalidArbPrefix         = errors.New("transaction contains non-standard arbitrary data")
+
+	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
+	PrefixStrNonSia = "NonSia" // COMPATv0.3.3.3
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and
