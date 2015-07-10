@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"errors"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -11,6 +13,81 @@ import (
 type changeEntry struct {
 	revertedBlocks []types.BlockID
 	appliedBlocks  []types.BlockID
+}
+
+// computeConsensusChange computes the consensus change from the change entry
+// at index 'i' in the change log. If i is out of bounds, an error is returned.
+func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChange, err error) {
+	if i < 0 || i >= len(cs.changeLog) {
+		err = errors.New("bounds error when querying changelog")
+		return
+	}
+
+	for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
+		revertedNode, exists := cs.blockMap[revertedBlockID]
+		// Sanity check - node should exist.
+		if build.DEBUG {
+			if !exists {
+				panic("grabbed a node that does not exist during a consensus change")
+			}
+		}
+
+		// Because the direction is 'revert', the order of the diffs needs to
+		// be flipped and the direction of the diffs also needs to be flipped.
+		cc.RevertedBlocks = append(cc.RevertedBlocks, revertedNode.block)
+		for i := len(revertedNode.siacoinOutputDiffs) - 1; i >= 0; i-- {
+			scod := revertedNode.siacoinOutputDiffs[i]
+			scod.Direction = !scod.Direction
+			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
+		}
+		for i := len(revertedNode.fileContractDiffs) - 1; i >= 0; i-- {
+			fcd := revertedNode.fileContractDiffs[i]
+			fcd.Direction = !fcd.Direction
+			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
+		}
+		for i := len(revertedNode.siafundOutputDiffs) - 1; i >= 0; i-- {
+			sfod := revertedNode.siafundOutputDiffs[i]
+			sfod.Direction = !sfod.Direction
+			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
+		}
+		for i := len(revertedNode.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			dscod := revertedNode.delayedSiacoinOutputDiffs[i]
+			dscod.Direction = !dscod.Direction
+			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
+		}
+		for i := len(revertedNode.siafundPoolDiffs) - 1; i >= 0; i-- {
+			sfpd := revertedNode.siafundPoolDiffs[i]
+			sfpd.Direction = modules.DiffRevert
+			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
+		}
+	}
+	for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
+		appliedNode, exists := cs.blockMap[appliedBlockID]
+		// Sanity check - node should exist.
+		if build.DEBUG {
+			if !exists {
+				panic("grabbed a node that does not exist during a consensus change")
+			}
+		}
+
+		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.block)
+		for _, scod := range appliedNode.siacoinOutputDiffs {
+			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
+		}
+		for _, fcd := range appliedNode.fileContractDiffs {
+			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
+		}
+		for _, sfod := range appliedNode.siafundOutputDiffs {
+			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
+		}
+		for _, dscod := range appliedNode.delayedSiacoinOutputDiffs {
+			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
+		}
+		for _, sfpd := range appliedNode.siafundPoolDiffs {
+			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
+		}
+	}
+	return
 }
 
 // threadedSendUpdates sends updates to a specific subscriber as they become
@@ -34,73 +111,10 @@ func (cs *ConsensusSet) threadedSendUpdates(update chan struct{}, subscriber mod
 		cs.mu.RUnlock(id)
 		for i < updateCount {
 			// Build the consensus change that occured at the current index.
-			var cc modules.ConsensusChange
 			id := cs.mu.RLock()
-			{
-				for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
-					revertedNode, exists := cs.blockMap[revertedBlockID]
-					// Sanity check - node should exist.
-					if build.DEBUG {
-						if !exists {
-							panic("grabbed a node that does not exist during a consensus change")
-						}
-					}
-
-					// Because the direction is 'revert', the order of the diffs needs to
-					// be flipped and the direction of the diffs also needs to be flipped.
-					cc.RevertedBlocks = append(cc.RevertedBlocks, revertedNode.block)
-					for i := len(revertedNode.siacoinOutputDiffs) - 1; i >= 0; i-- {
-						scod := revertedNode.siacoinOutputDiffs[i]
-						scod.Direction = !scod.Direction
-						cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
-					}
-					for i := len(revertedNode.fileContractDiffs) - 1; i >= 0; i-- {
-						fcd := revertedNode.fileContractDiffs[i]
-						fcd.Direction = !fcd.Direction
-						cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
-					}
-					for i := len(revertedNode.siafundOutputDiffs) - 1; i >= 0; i-- {
-						sfod := revertedNode.siafundOutputDiffs[i]
-						sfod.Direction = !sfod.Direction
-						cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
-					}
-					for i := len(revertedNode.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-						dscod := revertedNode.delayedSiacoinOutputDiffs[i]
-						dscod.Direction = !dscod.Direction
-						cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
-					}
-					for i := len(revertedNode.siafundPoolDiffs) - 1; i >= 0; i-- {
-						sfpd := revertedNode.siafundPoolDiffs[i]
-						sfpd.Direction = modules.DiffRevert
-						cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
-					}
-				}
-				for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
-					appliedNode, exists := cs.blockMap[appliedBlockID]
-					// Sanity check - node should exist.
-					if build.DEBUG {
-						if !exists {
-							panic("grabbed a node that does not exist during a consensus change")
-						}
-					}
-
-					cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.block)
-					for _, scod := range appliedNode.siacoinOutputDiffs {
-						cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
-					}
-					for _, fcd := range appliedNode.fileContractDiffs {
-						cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
-					}
-					for _, sfod := range appliedNode.siafundOutputDiffs {
-						cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
-					}
-					for _, dscod := range appliedNode.delayedSiacoinOutputDiffs {
-						cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
-					}
-					for _, sfpd := range appliedNode.siafundPoolDiffs {
-						cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
-					}
-				}
+			cc, err := cs.computeConsensusChange(i)
+			if build.DEBUG && err != nil {
+				panic("error returned when querying consensus change log")
 			}
 			cs.mu.RUnlock(id)
 
@@ -142,6 +156,14 @@ func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNod
 		default:
 		}
 	}
+}
+
+// ConsensusChange returns the consensus change that occured at index 'i',
+// returning an error if the input is out of bounds.
+func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) {
+	id := cs.mu.RLock()
+	defer cs.mu.RUnlock(id)
+	return cs.computeConsensusChange(i)
 }
 
 // ConsensusSetNotify returns a channel that will be sent an empty struct every

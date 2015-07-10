@@ -136,6 +136,11 @@ type ConsensusSet interface {
 	// run any required closing routines.
 	Close() error
 
+	// ConsensusChange returns the consensus change that occured at the input
+	// index. An error is returned if there is not a change at the provided
+	// index.
+	ConsensusChange(int) (ConsensusChange, error)
+
 	// ConsensusSetSubscribe will subscribe another module to the consensus
 	// set. Every time that there is a change to the consensus set, an update
 	// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.
