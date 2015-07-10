@@ -81,7 +81,8 @@ type TransactionPool struct {
 	// up. To prevent deadlocks in the transaction pool, subscribers are
 	// updated in a separate thread which does not guarantee that a subscriber
 	// is always fully synchronized to the transaction pool.
-	consensusChanges        []modules.ConsensusChange
+	consensusChangeIndex    int   // Increments any time a consensus update is made.
+	consensusChanges        []int // The index of the consensus change from the consensus set. -1 means there was no change from the consensus set.
 	unconfirmedTransactions [][]types.Transaction
 	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
 	subscribers             []chan struct{}
