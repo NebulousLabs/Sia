@@ -9,3 +9,5 @@ install:
   - make
 
 script: make test-long && make cover
+
+sudo: false
