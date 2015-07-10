@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -129,7 +130,13 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	// transactions have propgated to the host's transaction pool. Instead,
 	// built into the protocol should be a step where any dependent
 	// transactions are automatically provided.
-	time.Sleep(types.RenterZeroConfDelay)
+	if build.Release == "standard" {
+		time.Sleep(time.Minute)
+	} else if build.Release == "testing" {
+		time.Sleep(time.Second * 15)
+	} else {
+		time.Sleep(time.Second)
+	}
 
 	// Perform the negotiations with the host through a network call.
 	conn, err := net.DialTimeout("tcp", string(host.IPAddress), 10e9)

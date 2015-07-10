@@ -9,7 +9,6 @@ package types
 import (
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
@@ -47,8 +46,6 @@ var (
 	MinimumCoinbase  uint64
 
 	GenesisSiafundAllocation []SiafundOutput
-
-	RenterZeroConfDelay time.Duration // TODO: This shouldn't exist here.
 )
 
 // init checks which build constant is in place and initializes the variables
@@ -87,8 +84,6 @@ func init() {
 				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
-
-		RenterZeroConfDelay = 15 * time.Second // TODO: This doesn't belong here.
 	} else if build.Release == "testing" {
 		// 'testing' settings are for automatic testing, and create much faster
 		// environments than a humand can interact with.
@@ -123,8 +118,6 @@ func init() {
 				UnlockHash: UnlockConditions{}.UnlockHash(),
 			},
 		}
-
-		RenterZeroConfDelay = 2 * time.Second // TODO: This doesn't belong here.
 	} else if build.Release == "standard" {
 		// 'standard' settings are for the full network. They are slow enough
 		// that the network is secure in a real-world byzantine environment.
@@ -187,8 +180,6 @@ func init() {
 		// increasingly potent dropoff for about 5 years, until inflation more
 		// or less permanently settles around 2%.
 		MinimumCoinbase = 30e3
-
-		RenterZeroConfDelay = 60 * time.Second // TODO: This doesn't belong here.
 
 		GenesisSiafundAllocation = []SiafundOutput{
 			{

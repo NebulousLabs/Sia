@@ -125,11 +125,26 @@ func TestValidStorageProofs(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// COMPATv0.4.0
+	//
+	// Mine 10 blocks so that the post-hardfork rules are in effect.
+	for i := 0; i < 10; i++ {
+		block, _ := cst.miner.FindBlock()
+		err = cst.cs.AcceptBlock(block)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.csUpdateWait()
+	}
+
 	// Create a file contract for which a storage proof can be created.
 	var fcid types.FileContractID
 	fcid[0] = 12
 	simFile := make([]byte, 64*1024)
-	rand.Read(simFile)
+	_, err = rand.Read(simFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 	buffer := bytes.NewReader(simFile)
 	root, err := crypto.ReaderMerkleRoot(buffer)
 	if err != nil {
@@ -154,14 +169,12 @@ func TestValidStorageProofs(t *testing.T) {
 		t.Fatal(err)
 	}
 	txn := types.Transaction{
-		StorageProofs: []types.StorageProof{
-			{
-				ParentID: fcid,
-				Segment:  base,
-				HashSet:  proofSet,
-			},
-		},
+		StorageProofs: []types.StorageProof{{
+			ParentID: fcid,
+			HashSet:  proofSet,
+		}},
 	}
+	copy(txn.StorageProofs[0].Segment[:], base)
 	err = cst.cs.validStorageProofs(txn)
 	if err != nil {
 		t.Error(err)
@@ -170,14 +183,12 @@ func TestValidStorageProofs(t *testing.T) {
 	// Corrupt the proof set.
 	proofSet[0][0]++
 	txn = types.Transaction{
-		StorageProofs: []types.StorageProof{
-			{
-				ParentID: fcid,
-				Segment:  base,
-				HashSet:  proofSet,
-			},
-		},
+		StorageProofs: []types.StorageProof{{
+			ParentID: fcid,
+			HashSet:  proofSet,
+		}},
 	}
+	copy(txn.StorageProofs[0].Segment[:], base)
 	err = cst.cs.validStorageProofs(txn)
 	if err != ErrInvalidStorageProof {
 		t.Error(err)
@@ -188,6 +199,117 @@ func TestValidStorageProofs(t *testing.T) {
 	err = cst.cs.validStorageProofs(txn)
 	if err != ErrUnrecognizedFileContractID {
 		t.Error(err)
+	}
+
+	// Try a proof set where there is padding on the last segment in the file.
+	file := make([]byte, 100)
+	_, err = rand.Read(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buffer = bytes.NewReader(file)
+	root, err = crypto.ReaderMerkleRoot(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc = types.FileContract{
+		FileSize:       100,
+		FileMerkleRoot: root,
+		WindowStart:    2,
+		WindowEnd:      1200,
+	}
+	buffer.Seek(0, 0)
+
+	// Find a proofIndex that has the value '1'.
+	for {
+		fcid[0]++
+		cst.cs.fileContracts[fcid] = fc
+		proofIndex, err = cst.cs.storageProofSegment(fcid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if proofIndex == 1 {
+			break
+		}
+	}
+	base, proofSet, err = crypto.BuildReaderProof(buffer, proofIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn = types.Transaction{
+		StorageProofs: []types.StorageProof{{
+			ParentID: fcid,
+			HashSet:  proofSet,
+		}},
+	}
+	copy(txn.StorageProofs[0].Segment[:], base)
+	err = cst.cs.validStorageProofs(txn)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// COMPATv0.4.0
+//
+// TestPreForkValidStorageProofs checks that storage proofs which are invalid
+// before the hardfork (but valid afterwards) are still rejected before the
+// hardfork).
+func TestPreForkValidStorageProofs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestPreForkValidStorageProofs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try a proof set where there is padding on the last segment in the file.
+	file := make([]byte, 100)
+	_, err = rand.Read(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buffer := bytes.NewReader(file)
+	root, err := crypto.ReaderMerkleRoot(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := types.FileContract{
+		FileSize:       100,
+		FileMerkleRoot: root,
+		WindowStart:    2,
+		WindowEnd:      1200,
+	}
+	buffer.Seek(0, 0)
+
+	// Find a proofIndex that has the value '1'.
+	var fcid types.FileContractID
+	var proofIndex uint64
+	for {
+		fcid[0]++
+		cst.cs.fileContracts[fcid] = fc
+		proofIndex, err = cst.cs.storageProofSegment(fcid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if proofIndex == 1 {
+			break
+		}
+	}
+	base, proofSet, err := crypto.BuildReaderProof(buffer, proofIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn := types.Transaction{
+		StorageProofs: []types.StorageProof{{
+			ParentID: fcid,
+			HashSet:  proofSet,
+		}},
+	}
+	copy(txn.StorageProofs[0].Segment[:], base)
+	err = cst.cs.validStorageProofs(txn)
+	if err != ErrInvalidStorageProof {
+		t.Fatal(err)
 	}
 }
 

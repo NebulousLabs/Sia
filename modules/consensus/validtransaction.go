@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -84,14 +85,31 @@ func (cs *State) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
-		fc, _ := cs.fileContracts[sp.ParentID] // previous function verifies the file contract exists
 		if err != nil {
 			return err
 		}
+
+		fc, _ := cs.fileContracts[sp.ParentID] // previous function verifies the file contract exists
+		leaves := crypto.CalculateLeaves(fc.FileSize)
+		segmentLen := uint64(crypto.SegmentSize)
+		if segmentIndex == leaves-1 {
+			segmentLen = fc.FileSize % crypto.SegmentSize
+		}
+
+		// COMPATv0.4.0
+		//
+		// Fixing the padding situation resulted in a hardfork. The below code
+		// will stop the hardfork from triggering before block 15,000.
+		types.CurrentHeightLock.Lock()
+		if (build.Release == "standard" && types.CurrentHeight < 15e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+			segmentLen = uint64(crypto.SegmentSize)
+		}
+		types.CurrentHeightLock.Unlock()
+
 		verified := crypto.VerifySegment(
-			sp.Segment,
+			sp.Segment[:segmentLen],
 			sp.HashSet,
-			crypto.CalculateLeaves(fc.FileSize),
+			leaves,
 			segmentIndex,
 			fc.FileMerkleRoot,
 		)

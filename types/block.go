@@ -124,7 +124,7 @@ func (b Block) MerkleRoot() crypto.Hash {
 // MinerPayoutID returns the ID of the miner payout at the given index, which
 // is calculated by hashing the concatenation of the BlockID and the payout
 // index.
-func (b Block) MinerPayoutID(i int) SiacoinOutputID {
+func (b Block) MinerPayoutID(i uint64) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		b.ID(),
 		i,

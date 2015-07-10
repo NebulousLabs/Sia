@@ -99,7 +99,7 @@ type (
 // the file contract that the proof is for, a boolean indicating whether the
 // proof was valid (true) or missed (false), and the index of the output
 // within the file contract.
-func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) SiacoinOutputID {
+func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i uint64) SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashAll(
 		SpecifierStorageProofOutput,
 		fcid,
@@ -110,12 +110,12 @@ func (fcid FileContractID) StorageProofOutputID(proofStatus ProofStatus, i int) 
 
 // Tax returns the amount of Currency that will be taxed from fc.
 func (fc FileContract) Tax() Currency {
-	// COMPATv0.4.0 - until the first 10000 blocks have been archived, they
+	// COMPATv0.4.0 - until the first 15,000 blocks have been archived, they
 	// will need to be handled in a special way.
 	CurrentHeightLock.Lock()
 	height := CurrentHeight
 	CurrentHeightLock.Unlock()
-	if (height < 12e3 && build.Release == "standard") || height < 10 {
+	if (height < 15e3 && build.Release == "standard") || (height < 10 && build.Release == "testing") {
 		return fc.Payout.MulFloat(0.039).RoundDown(SiafundCount)
 	}
 	return fc.Payout.MulTax().RoundDown(SiafundCount)

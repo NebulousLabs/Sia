@@ -646,10 +646,10 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	txn = types.Transaction{
 		StorageProofs: []types.StorageProof{{
 			ParentID: validFCID,
-			Segment:  segment,
 			HashSet:  hashSet,
 		}},
 	}
+	copy(txn.StorageProofs[0].Segment[:], segment)
 	err = cst.tpool.AcceptTransaction(txn)
 	if err != nil {
 		return err
