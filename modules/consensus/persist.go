@@ -9,8 +9,8 @@ import (
 )
 
 // load pulls all the blocks that have been saved to disk into memory, using
-// them to fill out the State.
-func (cs *State) load(saveDir string) error {
+// them to fill out the ConsensusSet.
+func (cs *ConsensusSet) load(saveDir string) error {
 	db, err := persist.OpenDB(filepath.Join(saveDir, "chain.db"))
 	if err != nil {
 		return err

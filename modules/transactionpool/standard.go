@@ -97,6 +97,8 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 		if strings.HasPrefix(strData, modules.PrefixStrNonSia) {
 			continue
 		}
+
+		return modules.ErrInvalidArbPrefix
 	}
 
 	return

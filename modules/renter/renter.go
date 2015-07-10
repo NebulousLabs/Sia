@@ -19,7 +19,7 @@ var (
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	cs          *consensus.State
+	cs          *consensus.ConsensusSet
 	hostDB      modules.HostDB
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
@@ -34,7 +34,7 @@ type Renter struct {
 }
 
 // New returns an empty renter.
-func New(cs *consensus.State, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
+func New(cs *consensus.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
 	}

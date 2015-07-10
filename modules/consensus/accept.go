@@ -23,7 +23,7 @@ var (
 )
 
 // validHeader does some early, low computation verification on the block.
-func (cs *State) validHeader(b types.Block) error {
+func (cs *ConsensusSet) validHeader(b types.Block) error {
 	// Grab the parent of the block and verify the ID of the child meets the
 	// target. This is done as early as possible to enforce that any
 	// block-related DoS must use blocks that have sufficient work.
@@ -81,7 +81,7 @@ func (cs *State) validHeader(b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
 	// COMPATv0.4.0
 	//
@@ -114,7 +114,7 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 // blocks from a trust source, such as blocks that were previously verified and
 // saved to disk. The value of 'cs.verificationRigor' should be set before
 // 'acceptBlock' is called.
-func (cs *State) acceptBlock(b types.Block) error {
+func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
@@ -167,7 +167,7 @@ func (cs *State) acceptBlock(b types.Block) error {
 // on a fork that is heavier than the current fork. If the block is accepted,
 // it will be relayed to connected peers. This function should only be called
 // for new, untrusted blocks.
-func (cs *State) AcceptBlock(b types.Block) error {
+func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 
@@ -186,7 +186,7 @@ func (cs *State) AcceptBlock(b types.Block) error {
 }
 
 // RelayBlock is an RPC that accepts a block from a peer.
-func (cs *State) RelayBlock(conn modules.PeerConn) error {
+func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)

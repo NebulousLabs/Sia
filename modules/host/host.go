@@ -30,7 +30,7 @@ type contractObligation struct {
 // A Host contains all the fields necessary for storing files for clients and
 // performing the storage proofs on the received files.
 type Host struct {
-	cs          *consensus.State
+	cs          *consensus.ConsensusSet
 	hostdb      modules.HostDB
 	tpool       modules.TransactionPool
 	wallet      modules.Wallet
@@ -56,7 +56,7 @@ type Host struct {
 }
 
 // New returns an initialized Host.
-func New(cs *consensus.State, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
+func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.TransactionPool, wallet modules.Wallet, addr string, saveDir string) (*Host, error) {
 	if cs == nil {
 		return nil, errors.New("host cannot use a nil state")
 	}

@@ -33,7 +33,7 @@ var (
 )
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
-func (cs *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -51,7 +51,7 @@ func (cs *State) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir mod
 }
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
-func (cs *State) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
@@ -69,7 +69,7 @@ func (cs *State) commitFileContractDiff(fcd modules.FileContractDiff, dir module
 }
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
-func (cs *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -87,7 +87,7 @@ func (cs *State) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir mod
 }
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func (cs *State) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twoice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -109,7 +109,7 @@ func (cs *State) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutp
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
-func (cs *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules.DiffDirection) {
 	// Sanity check - siafund pool should only ever increase.
 	if build.DEBUG {
 		if sfpd.Adjusted.Cmp(sfpd.Previous) < 0 {
@@ -141,7 +141,7 @@ func (cs *State) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir modules
 
 // commitDiffSetSanity performs a series of sanity checks before commiting a
 // diff set.
-func (cs *State) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
 	// Sanity checks.
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
@@ -165,7 +165,7 @@ func (cs *State) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func (cs *State) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
@@ -193,7 +193,7 @@ func (cs *State) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.Diff
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func (cs *State) commitNodeDiffs(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitNodeDiffs(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		for _, scod := range bn.siacoinOutputDiffs {
 			cs.commitSiacoinOutputDiff(scod, dir)
@@ -231,7 +231,7 @@ func (cs *State) commitNodeDiffs(bn *blockNode, dir modules.DiffDirection) {
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
-func (cs *State) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if bn.height > types.MaturityDelay {
@@ -255,7 +255,7 @@ func (cs *State) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.Diff
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func (cs *State) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
 		cs.currentPath = append(cs.currentPath, bn.block.ID())
@@ -267,7 +267,7 @@ func (cs *State) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (cs *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 	cs.commitDiffSetSanity(bn, dir)
 	cs.createUpcomingDelayedOutputMaps(bn, dir)
 	cs.commitNodeDiffs(bn, dir)
@@ -280,7 +280,7 @@ func (cs *State) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (cs *State) generateAndApplyDiff(bn *blockNode) error {
+func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	// Sanity check
 	if build.DEBUG {
 		// Generate should only be called if the diffs have not yet been

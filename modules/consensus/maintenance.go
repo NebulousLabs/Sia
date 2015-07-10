@@ -17,7 +17,7 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func (cs *State) applyMinerPayouts(bn *blockNode) {
+func (cs *ConsensusSet) applyMinerPayouts(bn *blockNode) {
 	for i, payout := range bn.block.MinerPayouts {
 		// Sanity check - input should not exist in the consensus set.
 		mpid := bn.block.MinerPayoutID(uint64(i))
@@ -50,7 +50,7 @@ func (cs *State) applyMinerPayouts(bn *blockNode) {
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *State) applyMaturedSiacoinOutputs(bn *blockNode) {
+func (cs *ConsensusSet) applyMaturedSiacoinOutputs(bn *blockNode) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
 	if !(bn.height > types.MaturityDelay) {
@@ -67,7 +67,8 @@ func (cs *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 			}
 		}
 
-		// Add the output to the State and record the diff in the blockNode.
+		// Add the output to the ConsensusSet and record the diff in the
+		// blockNode.
 		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffApply,
 			ID:            dscoid,
@@ -99,7 +100,7 @@ func (cs *State) applyMaturedSiacoinOutputs(bn *blockNode) {
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractID) {
+func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileContractID) {
 	// Sanity checks.
 	fc, exists := cs.fileContracts[fcid]
 	if build.DEBUG {
@@ -139,7 +140,8 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	}
 
-	// Remove the contract from the State and record the diff in the blockNode.
+	// Remove the contract from the ConsensusSet and record the diff in the
+	// blockNode.
 	delete(cs.fileContracts, fcid)
 	bn.fileContractDiffs = append(bn.fileContractDiffs, modules.FileContractDiff{
 		Direction:    modules.DiffRevert,
@@ -153,7 +155,7 @@ func (cs *State) applyMissedStorageProof(bn *blockNode, fcid types.FileContractI
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func (cs *State) applyFileContractMaintenance(bn *blockNode) {
+func (cs *ConsensusSet) applyFileContractMaintenance(bn *blockNode) {
 	// Because you can't modify a map safely while iterating through it, a
 	// slice of contracts to be handled is created, then acted upon after
 	// iterating through the map.
@@ -181,7 +183,7 @@ func (cs *State) applyFileContractMaintenance(bn *blockNode) {
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func (cs *State) applyMaintenance(bn *blockNode) {
+func (cs *ConsensusSet) applyMaintenance(bn *blockNode) {
 	cs.applyMinerPayouts(bn)
 	cs.applyMaturedSiacoinOutputs(bn)
 	cs.applyFileContractMaintenance(bn)

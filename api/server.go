@@ -32,7 +32,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.State, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, be modules.BlockExplorer) (*Server, error) {
+func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, be modules.BlockExplorer) (*Server, error) {
 	srv := &Server{
 		cs:      s,
 		gateway: g,

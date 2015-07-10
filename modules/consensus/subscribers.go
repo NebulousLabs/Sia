@@ -18,7 +18,7 @@ import (
 // consensus set while it makes a blocking call to the subscriber. If the
 // subscriber deadlocks or has problems, the thread will stall indefinitely,
 // but the rest of consensus will not be disrupted.
-func (s *State) threadedSendUpdates(update chan struct{}, subscriber modules.ConsensusSetSubscriber) {
+func (s *ConsensusSet) threadedSendUpdates(update chan struct{}, subscriber modules.ConsensusSetSubscriber) {
 	i := 0
 	for {
 		id := s.mu.RLock()
@@ -42,7 +42,7 @@ func (s *State) threadedSendUpdates(update chan struct{}, subscriber modules.Con
 
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
-func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
+func (s *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
 	// Sanity check - len(appliedNodes) should never be 0.
 	if build.DEBUG {
 		if len(appliedNodes) == 0 {
@@ -115,7 +115,7 @@ func (s *State) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*bl
 
 // ConsensusSetNotify returns a channel that will be sent an empty struct every
 // time the consensus set changes.
-func (s *State) ConsensusSetNotify() <-chan struct{} {
+func (s *ConsensusSet) ConsensusSetNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	c <- struct{}{} // Notify subscriber about the genesis block.
 	id := s.mu.Lock()
@@ -126,7 +126,7 @@ func (s *State) ConsensusSetNotify() <-chan struct{} {
 
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
 // ReceiveConsensusSetUpdate every time there is a change in the consensus set.
-func (s *State) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
+func (s *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	c <- struct{}{} // Notify subscriber about the genesis block.
 	id := s.mu.Lock()

@@ -1,7 +1,7 @@
 Developer Environment
 =====================
 
-Sia is mostly written in go. To build and test Sia, you are going to need a
+Sia is written in golang. To build and test Sia, you are going to need a
 working go environment, including having both $GOROOT/bin and $GOPATH/bin in
 your $PATH. For most Linux distributions, go will be in the package manager.
 Then it should be sufficient to run `make dependencies && make`. For more
@@ -69,27 +69,30 @@ over other potential choices.
 Naming
 ------
 
-Names are used to give readers and reviewers a sense of what is happening in the
-code. When naming variables, you should assume that the person reading your
-code is unfamiliar with the codebase. Short names (like 's' instead of 'state')
-should only be used when the context is immediately obvious. For example
-'s := new(consensus.State)' is immediately obvious context for 's', and so 's'
-is appropriate for the rest of the function.
+Names are used to give readers and reviewers a sense of what is happening in
+the code. When naming variables, you should assume that the person reading your
+code is unfamiliar with the codebase. Short names (like 'cs' instead of
+'consensusSet') should only be used when the context is immediately obvious.
+For example 'cs := new(ConsensusSet)' is immediately obvious context for 'cs',
+and so 'cs' is appropriate for the rest of the function.
 
 Data structures should never have shortened names. 'FileContract.mr' is
 confusing to anyone who has not used the data structure extensively. The code
-should be accessible to people who are unfamiliar with the codebase.
+should be accessible to people who are unfamiliar with the codebase. One
+exception is for the variable called 'mu', which is short for 'mutex'. 'mu' is
+an acceptable variable name within a data structure.
 
 When calling functions with obscure parameters, named variables should be used
 to indicate what the parameters do. For example, 'm := NewMiner(1)' is
 confusing. Instead, use 'threads := 1; m := NewMiner(threads)'. The name gives
 readers a sense of what the parameter within 'NewMiner' does even when they are
-not familiar with the 'NewMiner' function.
+not familiar with the 'NewMiner' function. Where possible, functions with
+obscure, untyped inputs should be avoided.
 
 The most important thing to remember when choosing names is to cater to people
 who are unfamiliar with the code. A reader should never have to ask 'What is
-`s`?' on their first pass through the code, even though to most of it is
-painfully obvious that `s` refers to a consensus.State.
+`cs`?' on their first pass through the code, even though to experienced
+developers it is obvious that `cs` refers to a consensus.ConsensusSet.
 
 Control Flow
 ------------
@@ -133,13 +136,6 @@ means that developers can safely assume the usage of non exported functions
 will not cause deadlock within the program. This convention is strictly
 enforced.
 
-One exception to this rule is for functions with the prefix 'threaded' (example
-'threadedMine'). The 'threaded' prefix indicates that the function should be
-called in a separate goroutine and that the function will manage its own
-mutexes. Deadlock is not a risk for callers in this case, because they know to
-call the function in a separate goroutine. This also makes it easier for code
-reviews to catch mistakes.
-
 Functions prefixed 'threaded' (example 'threadedMine') are meant to be called
 in their own goroutine ('go threadedMine()') and will manage their own mutexes.
 These functions typically loop forever, either listening on a channel or
@@ -151,7 +147,7 @@ Error Handling
 All errors need to be checked as soon as they are received, even if they are
 known to not cause problems. The statement that checks the error needs to be
 `if err != nil`, and if there is a good reason to use an alternative statement
-(such ass `err == nil`), it must be documented. The body of the if statement
+(such as `err == nil`), it must be documented. The body of the if statement
 should be at most 4 lines, but usually only one. Anything requiring more lines
 needs to be its own function.
 
@@ -190,6 +186,11 @@ will have higher performance because the code should never fail anyway.
 If the code is continually checking items that should be universally true,
 mistakes are easier to catch during testing, and side effects are less likely
 to go unnoticed.
+
+Sanity checks and panics are purely to check for developer mistakes. A user
+should not be able to trigger a panic, and no set of network communications or
+real-world conditions should be able to trigger a panic. In an ideal world, no
+panic would ever be thrown by production code.
 
 Testing
 -------

@@ -40,10 +40,11 @@ var (
 // sources, the computationally expensive steps can be skipped.
 type verificationRigor byte
 
-// The State is the object responsible for tracking the current status of the
-// blockchain. Broadly speaking, it is responsible for maintaining consensus.
-// It accepts blocks and constructs a blockchain, forking when necessary.
-type State struct {
+// The ConsensusSet is the object responsible for tracking the current status
+// of the blockchain. Broadly speaking, it is responsible for maintaining
+// consensus.  It accepts blocks and constructs a blockchain, forking when
+// necessary.
+type ConsensusSet struct {
 	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
 	// up loading blocks from memory.
@@ -103,16 +104,16 @@ type State struct {
 	mu *sync.RWMutex
 }
 
-// New returns a new State, containing at least the genesis block. If there is
-// an existing block database present in saveDir, it will be loaded. Otherwise,
-// a new database will be created.
-func New(gateway modules.Gateway, saveDir string) (*State, error) {
+// New returns a new ConsensusSet, containing at least the genesis block. If
+// there is an existing block database present in saveDir, it will be loaded.
+// Otherwise, a new database will be created.
+func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	if gateway == nil {
 		return nil, ErrNilGateway
 	}
 
-	// Create the State object.
-	cs := &State{
+	// Create the ConsensusSet object.
+	cs := &ConsensusSet{
 		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
 
@@ -200,6 +201,6 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 }
 
 // Close safely closes the block database.
-func (cs *State) Close() error {
+func (cs *ConsensusSet) Close() error {
 	return cs.db.Close()
 }

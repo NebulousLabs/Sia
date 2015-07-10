@@ -16,7 +16,7 @@ var (
 
 // deleteNode recursively deletes its children from the set of known blocks.
 // The node being deleted should not be a part of the current path.
-func (cs *State) deleteNode(bn *blockNode) {
+func (cs *ConsensusSet) deleteNode(bn *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
 		if types.BlockHeight(len(cs.currentPath)) > bn.height &&
@@ -48,9 +48,10 @@ func (cs *State) deleteNode(bn *blockNode) {
 }
 
 // backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
-// the State's current path (the "common parent"). It returns the (inclusive)
-// set of nodes between the common parent and 'bn', starting from the former.
-func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
+// the ConsensusSet's current path (the "common parent"). It returns the
+// (inclusive) set of nodes between the common parent and 'bn', starting from
+// the former.
+func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for {
 		// Stop when we reach the common parent.
@@ -63,10 +64,10 @@ func (cs *State) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	return path
 }
 
-// revertToNode will revert blocks from the State's current path until 'bn' is
-// the current block. Blocks are returned in the order that they were reverted.
-// 'bn' is not reverted.
-func (cs *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
+// revertToNode will revert blocks from the ConsensusSet's current path until
+// 'bn' is the current block. Blocks are returned in the order that they were
+// reverted.  'bn' is not reverted.
+func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the currentPath.
 	if build.DEBUG {
 		if cs.height() < bn.height || cs.currentPath[bn.height] != bn.block.ID() {
@@ -83,9 +84,9 @@ func (cs *State) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	return
 }
 
-// applyUntilNode will successively apply the blocks between the state's
-// currentPath and 'bn'.
-func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
+// applyUntilNode will successively apply the blocks between the consensus
+// set's currentPath and 'bn'.
+func (s *ConsensusSet) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
 	// Backtrack to the common parent of 'bn' and currentPath and then apply the new nodes.
 	newPath := s.backtrackToCurrentPath(bn)
 	for _, node := range newPath[1:] {
@@ -106,9 +107,9 @@ func (s *State) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err er
 
 // forkBlockchain will move the consensus set onto the 'newNode' fork. An error
 // will be returned if any of the blocks applied in the transition are found to
-// be invalid. forkBlockchain is atomic; the State is only updated if the
-// function returns nil.
-func (cs *State) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
+// be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
+// the function returns nil.
+func (cs *ConsensusSet) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash

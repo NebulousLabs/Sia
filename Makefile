@@ -37,7 +37,9 @@ install: fmt REBUILD
 
 # release builds and installs release binaries.
 release: REBUILD
-	go install -a -race ./...
+	go install -a -race -tags='debug' ./...
+release-std: REBUILD
+	go install -a ./...
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
