@@ -103,7 +103,7 @@ func startDaemon() error {
 
 	// Print a 'startup complete' message.
 	startupTime := time.Now().UnixNano() - loadStart
-	fmt.Println("siad has finished loading after", float64(startupTime) / 1e9, "seconds")
+	fmt.Println("siad has finished loading after", float64(startupTime)/1e9, "seconds")
 
 	// Start serving api requests.
 	err = srv.Serve()

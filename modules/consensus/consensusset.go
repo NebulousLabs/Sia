@@ -93,9 +93,9 @@ type ConsensusSet struct {
 	fileContractExpirations map[types.BlockHeight]map[types.FileContractID]struct{}
 
 	// Modules subscribed to the consensus set will receive an ordered list of
-	// changes that occur to the consensus set.
-	consensusChanges []modules.ConsensusChange
-	subscriptions    []chan struct{}
+	// changes that occur to the consensus set, computed using the changeLog.
+	changeLog     []changeEntry
+	subscriptions []chan struct{}
 
 	// block database, used for saving/loading the current path
 	db persist.DB
