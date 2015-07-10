@@ -143,12 +143,11 @@ func (e *Encoder) encode(val reflect.Value) error {
 				return err
 			}
 		}
-	default:
-		// Marshalling should never fail. If it panics, you're doing something wrong,
-		// like trying to encode a map or an unexported struct field.
-		panic("could not marshal type " + val.Type().String())
 	}
-	return nil
+
+	// Marshalling should never fail. If it panics, you're doing something wrong,
+	// like trying to encode a map or an unexported struct field.
+	panic("could not marshal type " + val.Type().String())
 }
 
 // NewEncoder returns a new encoder that writes to w.
