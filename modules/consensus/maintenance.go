@@ -140,14 +140,15 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	}
 
-	// Remove the contract from the ConsensusSet and record the diff in the
-	// blockNode.
-	delete(cs.fileContracts, fcid)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, modules.FileContractDiff{
+	// Remove the file contract from the consensus set and record the diff in
+	// the blockNode.
+	fcd := modules.FileContractDiff{
 		Direction:    modules.DiffRevert,
 		ID:           fcid,
 		FileContract: fc,
-	})
+	}
+	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+	cs.commitFileContractDiff(fcd, modules.DiffApply)
 
 	return
 }
@@ -160,22 +161,20 @@ func (cs *ConsensusSet) applyFileContractMaintenance(bn *blockNode) {
 	// slice of contracts to be handled is created, then acted upon after
 	// iterating through the map.
 	var expiredFileContracts []types.FileContractID
-	for id, fc := range cs.fileContracts {
-		if fc.WindowEnd == bn.height {
-			expiredFileContracts = append(expiredFileContracts, id)
-		}
-
-		// Sanity check - there should be no file contracts in the consensus
-		// set at a lower height than the block node height.
-		if build.DEBUG {
-			if fc.WindowEnd < bn.height {
-				panic("an expiring file contract was missed somehow")
-			}
-		}
+	for id, _ := range cs.fileContractExpirations[bn.height] {
+		expiredFileContracts = append(expiredFileContracts, id)
 	}
 	for _, id := range expiredFileContracts {
 		cs.applyMissedStorageProof(bn, id)
 	}
+
+	// Sanity check - map with expiring file contracts should now be empty.
+	if build.DEBUG {
+		if len(cs.fileContractExpirations[bn.height]) != 0 {
+			panic("an expiring file contract was missed")
+		}
+	}
+	delete(cs.fileContractExpirations, bn.height)
 
 	return
 }
