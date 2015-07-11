@@ -1,38 +1,6 @@
 // Package encoding converts arbitrary objects into byte slices, and vis
 // versa. It also contains helper functions for reading and writing length-
-// prefixed data. The encoding rules are as follows:
-//
-// Objects are encoded as binary data, without type information. The receiver
-// uses context to determine the type to decode into.
-//
-// Integers are little-endian, and are always encoded as 8 bytes, i.e. their
-// int64 or uint64 equivalent.
-//
-// Booleans are encoded as one byte, either zero (false) or one (true). No
-// other values may be used.
-//
-// Nil pointers are equivalent to "false," i.e. a single zero byte. Valid
-// pointers are represented by a "true" byte (0x01) followed by the encoding
-// of the dereferenced value.
-//
-// Variable-length types, such as strings and slices, are represented by an 8-byte
-// length-prefix followed by the encoded value.
-//
-// Slices and structs are simply the concatenation of their encoded elements.
-// Byte slices are not subject to the 8-byte integer rule; they are encoded as
-// their literal representation, one byte per byte.
-//
-// The ordering of struct fields is determined by their type definition. For
-// example:
-//
-//   type foo struct { S string; I int }
-//
-//   Marshal(foo{"bar", 3}) == append(Marshal("bar"), Marshal(3)...)
-//
-// Finally, if a type implements the SiaMarshaler interface, its MarshalSia
-// method will be used to encode the type. The resulting byte slice will be
-// length-prefixed like any other variable-length type. During decoding, the
-// type is decoded as a byte slice, and then passed to UnmarshalSia.
+// prefixed data. See doc/Encoding.md for the full encoding specification.
 package encoding
 
 import (
