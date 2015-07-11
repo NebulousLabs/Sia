@@ -105,12 +105,14 @@ func (e *Encoder) encode(val reflect.Value) error {
 				return err
 			}
 		}
+		return nil
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
 			if err := e.encode(val.Field(i)); err != nil {
 				return err
 			}
 		}
+		return nil
 	}
 
 	// Marshalling should never fail. If it panics, you're doing something wrong,
