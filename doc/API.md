@@ -1,6 +1,48 @@
 Siad API
 ========
 
+The siad API is currently under construction. The deprecated way of doing
+things is documented at the end of the (incomplete) new documentation.
+
+Consensus
+---------
+
+Queries:
+
+* /consensus [GET]
+* /consensus/synchronize [GET]
+
+#### /consensus [GET]
+
+Function: Returns information about the consensus set, such as the current
+block height.
+
+Parameters: none
+
+Response:
+```
+struct {
+	height       int
+	currentBlock string
+	target       string
+}
+```
+
+#### /consensus/synchronize [GET]
+
+Function: Sends a command to the consensus package to try synchronizing to the
+network.
+
+Parameters: none
+
+Response:
+```
+UNDECIDED
+```
+
+Siad API (Deprecated)
+=====================
+
 All API calls return JSON objects. If there is an error, the error is returned
 in plaintext with an appropriate HTTP error code. The standard response is {
 "Success": true }. In this document, the API responses are defined as Go

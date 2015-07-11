@@ -3,36 +3,41 @@ package api
 import (
 	"testing"
 
-	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestBlockBootstrap checks that consensus.Synchronize probably synchronizes
-// the consensus set of a bootstrapping peer.
-func TestBlockBootstrap(t *testing.T) {
-	t.Skip("transaction pool is too slow - deadlock detector triggers a false positive")
+// TestConsensusGet probes the GET call to /consensus.
+func TestConsensusGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	// Create a server and give it some blocks.
-	st := newServerTester("TestBlockBootstrap1", t)
-	for i := 0; i < 2*consensus.MaxCatchUpBlocks+1; i++ {
-		b, _ := st.miner.FindBlock()
-		err := st.cs.AcceptBlock(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		st.csUpdateWait()
+	st := newServerTester("TestConsensusGET", t)
+	var css ConsensusSetStatus
+	st.getAPI("/consensus", &css) // TODO: err =
+	if css.Height != 4 {
+		t.Error("wrong height returned in consensus GET call")
+	}
+	if css.CurrentBlock != st.server.currentBlock.ID() {
+		t.Error("wrong block returned in consensus GET call")
+	}
+	expectedTarget := types.Target{64}
+	if css.Target != expectedTarget {
+		t.Error("wrong target returned in consensus GET call")
+	}
+}
+
+// TestConsensusSynchronizeGET probes the GET call to /consensus/synchronize.
+func TestConsensusSynchronizeGET(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
 	}
 
-	// Add a peer and spin until the peer is caught up. addPeer() already does
-	// this check, but it's left here to be explict anyway.
-	st2 := st.addPeer("TestBlockBootstrap2")
-	lockID := st.server.mu.RLock()
-	lockID = st2.server.mu.RLock()
-	defer st.server.mu.RUnlock(lockID)
-	defer st2.server.mu.RUnlock(lockID)
-	if st.server.blockchainHeight != st2.server.blockchainHeight {
-		t.Fatal("heights do not match after synchronize")
-	}
+	st := newServerTester("TestConsensusSynchronizeGET", t)
+	st.callAPI("/consensus/synchronize") // TODO: err = 
+
+	// TODO: Need some way to tell that a peer was out of sync, and then
+	// in-sync. The problem is that currently, if there are peers they should
+	// synchronize automatically. /consensus/synchronize is much closer to a
+	// debugging api call than an actual api call.
 }

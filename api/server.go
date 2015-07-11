@@ -23,7 +23,7 @@ type Server struct {
 	exp     modules.Explorer
 
 	// Consensus set variables.
-	blockchainHeight types.BlockHeight
+	blockchainHeight int
 	currentBlock     types.Block
 
 	apiServer *graceful.Server
@@ -43,6 +43,8 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 		tpool:   tp,
 		wallet:  w,
 		exp:     exp,
+
+		blockchainHeight: -1,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
