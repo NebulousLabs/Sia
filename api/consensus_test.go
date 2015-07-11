@@ -34,7 +34,7 @@ func TestConsensusSynchronizeGET(t *testing.T) {
 	}
 
 	st := newServerTester("TestConsensusSynchronizeGET", t)
-	st.callAPI("/consensus/synchronize") // TODO: err = 
+	st.callAPI("/consensus/synchronize") // TODO: err =
 
 	// TODO: Need some way to tell that a peer was out of sync, and then
 	// in-sync. The problem is that currently, if there are peers they should

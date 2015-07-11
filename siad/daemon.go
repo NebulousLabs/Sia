@@ -101,6 +101,14 @@ func startDaemon() error {
 		pprof.StopCPUProfile()
 	}
 
+	// Save the memory profile.
+	memFile, err := os.Create(filepath.Join(config.Siad.ProfileDir, "mem-profile.prof"))
+	if err != nil {
+		fmt.Println("Memory profiling failed:", err)
+		return err
+	}
+	pprof.WriteHeapProfile(memFile)
+
 	// Print a 'startup complete' message.
 	startupTime := time.Now().UnixNano() - loadStart
 	fmt.Println("siad has finished loading after", float64(startupTime)/1e9, "seconds")
@@ -123,11 +131,10 @@ func startDaemonCmd(*cobra.Command, []string) {
 			return
 		}
 
-		// Create a goroutime to log the number of gothreads in use every 30
-		// seconds.
+		// Create a logger to infrequently log performance statistics.
 		go func() {
 			// Create a logger for the goroutine.
-			logFile, err := os.OpenFile(filepath.Join(config.Siad.ProfileDir, "goroutineCount.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+			logFile, err := os.OpenFile(filepath.Join(config.Siad.ProfileDir, "profiling.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 			if err != nil {
 				fmt.Println("Goroutine logging failed:", err)
 				return
@@ -137,23 +144,10 @@ func startDaemonCmd(*cobra.Command, []string) {
 
 			// Inifinite loop to print out the goroutine count.
 			for {
-				log.Println(runtime.NumGoroutine())
-				time.Sleep(time.Second * 30)
-			}
-		}()
-
-		// Create a goroutine to update the memory profile.
-		go func() {
-			memFile, err := os.Create(filepath.Join(config.Siad.ProfileDir, "memprofile.prof"))
-			if err != nil {
-				fmt.Println("Memory profiling failed:", err)
-				return
-			}
-
-			// Infinite loop to update the memory profile.
-			for {
-				pprof.WriteHeapProfile(memFile)
-				time.Sleep(time.Minute)
+				var m runtime.MemStats
+				runtime.ReadMemStats(&m)
+				log.Printf("\n\tGoroutines: %v\n\tAlloc: %v\n\tTotalAlloc: %v\n\tHeapAlloc: %v\n\tHeapSys: %v", runtime.NumGoroutine(), m.Alloc, m.TotalAlloc, m.HeapAlloc, m.HeapSys)
+				time.Sleep(time.Minute * 5)
 			}
 		}()
 	}
