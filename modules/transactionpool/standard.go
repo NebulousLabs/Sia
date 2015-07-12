@@ -12,12 +12,27 @@ import (
 // standard.go adds extra rules to transactions which help preserve network
 // health and provides flexibility for future soft forks and tweaks to the
 // network.
+//
 // Rule: Transaction size is limited
-//   Purpose: Minimizes DOS vectors but maximizes future flexibility
-// Rule: Foreign signature algorithms are ignored
-//   Purpose: Prevent violating future rules where new signature algorithms
+//		There is a DoS vector where large transactions can both contain many
+//		signatures, and have each signature's CoveredFields object cover a
+//		unique but large portion of the transaciton. A 1mb transaction could
+//		force a verifier to hash very large volumes of data, which takes a long
+//		time on nonspecialized hardware.
+//
+// Rule: Foreign signature algorithms are rejected.
+//		There are plans to add newer, faster signature algorithms to Sia as the
+//		project matures and the need for increased verification speed grows.
+//		Foreign signatures are allowed into the blockchain, where they are
+//		accepted as valid. Hoewver, if there has been a soft-fork, the foreign
+//		signatures might actually be invalid. This rule protects legacy miners
+//		from including potentially invalid transactions in their blocks.
+//
 // Rule: The types of allowed arbitrary data are limited
-//   Purpose: Leave room for more involved soft-forks in the future.
+//		The arbitrary data field can be used to orchestrate soft-forks to Sia
+//		that add features. Legacy miners are at risk of creating invalid blocks
+//		if they include arbitrary data which has meanings that the legacy miner
+//		doesn't understand.
 
 var (
 	ErrLargeTransaction = errors.New("transaction is too large")
@@ -41,7 +56,7 @@ func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) erro
 
 // IsStandardTransaction enforces extra rules such as a transaction size limit.
 // These rules can be altered without disrupting consensus.
-func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error) {
+func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	// Check that the size of the transaction does not exceed the standard
 	// established in Standard.md. Larger transactions are a DOS vector,
 	// because someone can fill a large transaction with a bunch of signatures
@@ -59,21 +74,21 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// may make certain unrecognized signatures invalid, and this node cannot
 	// tell which sigantures are the invalid ones.
 	for _, sci := range t.SiacoinInputs {
-		err = tp.checkUnlockConditions(sci.UnlockConditions)
+		err := tp.checkUnlockConditions(sci.UnlockConditions)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	for _, fcr := range t.FileContractRevisions {
-		err = tp.checkUnlockConditions(fcr.UnlockConditions)
+		err := tp.checkUnlockConditions(fcr.UnlockConditions)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	for _, sfi := range t.SiafundInputs {
-		err = tp.checkUnlockConditions(sfi.UnlockConditions)
+		err := tp.checkUnlockConditions(sfi.UnlockConditions)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -84,7 +99,6 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 	// putting older nodes at risk of violating the new rules.
 	var prefix types.Specifier
 	for _, arb := range t.ArbitraryData {
-
 		// Check for a whilelisted prefix.
 		copy(prefix[:], arb)
 		if prefix == modules.PrefixHostAnnouncement ||
@@ -100,6 +114,5 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) (err error
 
 		return modules.ErrInvalidArbPrefix
 	}
-
-	return
+	return nil
 }
