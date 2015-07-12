@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"bytes"
@@ -157,68 +157,3 @@ func (db *explorerDB) getFileContract(id types.FileContractID) (modules.FcRespon
 	return fr, nil
 }
 
-// getSiacoinOutput retrieves data about a siacoin output from the
-// database and puts it into a response structure
-func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (modules.OutputResponse, error) {
-	var or modules.OutputResponse
-	otBytes, err := db.GetFromBucket("SiacoinOutputs", encoding.Marshal(id))
-	if err != nil {
-		return or, err
-	}
-
-	var ot outputTransactions
-	err = encoding.Unmarshal(otBytes, &ot)
-	if err != nil {
-		return or, err
-	}
-
-	or.OutputTx = ot.OutputTx
-	or.InputTx = ot.InputTx
-	or.ResponseType = responseOutput
-
-	return or, nil
-}
-
-// getSiafundOutput retrieves data about a siafund output and puts it
-// into a response structure
-func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (modules.OutputResponse, error) {
-	var or modules.OutputResponse
-	otBytes, err := db.GetFromBucket("SiafundOutputs", encoding.Marshal(id))
-	if err != nil {
-		return or, err
-	}
-
-	var ot outputTransactions
-	err = encoding.Unmarshal(otBytes, &ot)
-	if err != nil {
-		return or, err
-	}
-
-	or.OutputTx = ot.OutputTx
-	or.InputTx = ot.InputTx
-	or.ResponseType = responseOutput
-
-	return or, nil
-}
-
-// getAddressTransactions gets the list of all blocks and transactions
-// the address was involved with, which could be many, and puts the
-// result in a response structure
-func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (modules.AddrResponse, error) {
-	var ar modules.AddrResponse
-	txBytes, err := db.GetFromBucket("Addresses", encoding.Marshal(address))
-	if err != nil {
-		return ar, err
-	}
-
-	var atxids []crypto.Hash
-	err = encoding.Unmarshal(txBytes, &atxids)
-	if err != nil {
-		return ar, err
-	}
-
-	ar.Txns = atxids
-	ar.ResponseType = responseAddress
-
-	return ar, nil
-}

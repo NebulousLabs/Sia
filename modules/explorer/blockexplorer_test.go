@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"path/filepath"
