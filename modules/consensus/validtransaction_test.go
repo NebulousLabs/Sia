@@ -585,12 +585,15 @@ func TestTryTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	txns = cst.tpool.TransactionSet()
-	err = cst.cs.TryTransactions(txns)
+	cc, err := cst.cs.TryTransactions(txns)
 	if err != nil {
 		t.Error(err)
 	}
 	if cst.cs.consensusSetHash() != initialHash {
 		t.Error("TryTransactions did not resotre order")
+	}
+	if len(cc.SiacoinOutputDiffs) == 0 {
+		t.Error("consensus change is missing diffs after verifying a transction clump")
 	}
 
 	// Try a valid transaction followed by an invalid transaction.
@@ -598,11 +601,14 @@ func TestTryTransactions(t *testing.T) {
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
 	txns = append(txns, txn)
-	err = cst.cs.TryTransactions(txns)
+	cc, err = cst.cs.TryTransactions(txns)
 	if err == nil {
 		t.Error("bad transaction survived filter")
 	}
 	if cst.cs.consensusSetHash() != initialHash {
 		t.Error("TryTransactions did not restore order")
+	}
+	if len(cc.SiacoinOutputDiffs) != 0 {
+		t.Error("consensus change was not empty despite an error being returned")
 	}
 }
