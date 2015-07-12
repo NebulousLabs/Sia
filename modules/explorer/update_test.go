@@ -10,7 +10,7 @@ import (
 // value agrees with consensus
 func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 	// Clear the notification about the genesis block
-	<-et.beUpdateChan
+	<-et.eUpdateChan
 
 	// 20 here is arbitrary
 	for i := types.BlockHeight(0); i < 20; i++ {

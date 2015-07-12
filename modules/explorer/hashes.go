@@ -20,16 +20,16 @@ const (
 
 // GetHashInfo returns sufficient data about the hash that was
 // provided to do more extensive lookups
-func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
+func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 	if len(hash) < crypto.HashSize {
 		return nil, errors.New("requested hash not long enough")
 	}
 
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
+	lockID := e.mu.RLock()
+	defer e.mu.RUnlock(lockID)
 
 	// Perform a lookup to tell which type of hash it is
-	typeBytes, err := be.db.GetFromBucket("Hashes", hash[:crypto.HashSize])
+	typeBytes, err := e.db.GetFromBucket("Hashes", hash[:crypto.HashSize])
 	if err != nil {
 		return nil, err
 	}
@@ -44,23 +44,23 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 	case hashBlock:
 		var id types.BlockID
 		copy(id[:], hash[:])
-		return be.db.getBlock(types.BlockID(id))
+		return e.db.getBlock(types.BlockID(id))
 	case hashTransaction:
 		var id crypto.Hash
 		copy(id[:], hash[:])
-		return be.db.getTransaction(id)
+		return e.db.getTransaction(id)
 	case hashFilecontract:
 		var id types.FileContractID
 		copy(id[:], hash[:])
-		return be.db.getFileContract(id)
+		return e.db.getFileContract(id)
 	case hashCoinOutputID:
 		var id types.SiacoinOutputID
 		copy(id[:], hash[:])
-		return be.db.getSiacoinOutput(id)
+		return e.db.getSiacoinOutput(id)
 	case hashFundOutputID:
 		var id types.SiafundOutputID
 		copy(id[:], hash[:])
-		return be.db.getSiafundOutput(id)
+		return e.db.getSiafundOutput(id)
 	case hashUnlockHash:
 		// Check that the address is valid before doing a lookup
 		if len(hash) != crypto.HashSize+types.UnlockHashChecksumSize {
@@ -75,7 +75,7 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 			return nil, errors.New("address does not have a valid checksum")
 		}
 
-		return be.db.getAddressTransactions(id)
+		return e.db.getAddressTransactions(id)
 	default:
 		return nil, errors.New("bad hash type")
 	}
@@ -157,3 +157,68 @@ func (db *explorerDB) getFileContract(id types.FileContractID) (modules.FcRespon
 	return fr, nil
 }
 
+// getSiacoinOutput retrieves data about a siacoin output from the
+// database and puts it into a response structure
+func (db *explorerDB) getSiacoinOutput(id types.SiacoinOutputID) (modules.OutputResponse, error) {
+	var or modules.OutputResponse
+	otBytes, err := db.GetFromBucket("SiacoinOutputs", encoding.Marshal(id))
+	if err != nil {
+		return or, err
+	}
+
+	var ot outputTransactions
+	err = encoding.Unmarshal(otBytes, &ot)
+	if err != nil {
+		return or, err
+	}
+
+	or.OutputTx = ot.OutputTx
+	or.InputTx = ot.InputTx
+	or.ResponseType = responseOutput
+
+	return or, nil
+}
+
+// getSiafundOutput retrieves data about a siafund output and puts it
+// into a response structure
+func (db *explorerDB) getSiafundOutput(id types.SiafundOutputID) (modules.OutputResponse, error) {
+	var or modules.OutputResponse
+	otBytes, err := db.GetFromBucket("SiafundOutputs", encoding.Marshal(id))
+	if err != nil {
+		return or, err
+	}
+
+	var ot outputTransactions
+	err = encoding.Unmarshal(otBytes, &ot)
+	if err != nil {
+		return or, err
+	}
+
+	or.OutputTx = ot.OutputTx
+	or.InputTx = ot.InputTx
+	or.ResponseType = responseOutput
+
+	return or, nil
+}
+
+// getAddressTransactions gets the list of all blocks and transactions
+// the address was involved with, which could be many, and puts the
+// result in a response structure
+func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (modules.AddrResponse, error) {
+	var ar modules.AddrResponse
+	txBytes, err := db.GetFromBucket("Addresses", encoding.Marshal(address))
+	if err != nil {
+		return ar, err
+	}
+
+	var atxids []crypto.Hash
+	err = encoding.Unmarshal(txBytes, &atxids)
+	if err != nil {
+		return ar, err
+	}
+
+	ar.Txns = atxids
+	ar.ResponseType = responseAddress
+
+	return ar, nil
+}

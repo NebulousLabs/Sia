@@ -10,40 +10,40 @@ import (
 // Handles updates recieved from the consensus subscription. Keeps
 // track of transaction volume, block timestamps and block sizes, as
 // well as the current block height
-func (be *BlockExplorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
-	lockID := be.mu.Lock()
+func (e *Explorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+	lockID := e.mu.Lock()
 
 	// Modify the number of file contracts and how much they costed
 	for _, diff := range cc.FileContractDiffs {
 		if diff.Direction == modules.DiffApply {
-			be.activeContracts += 1
-			be.totalContracts += 1
-			be.activeContractCost = be.activeContractCost.Add(diff.FileContract.Payout)
-			be.totalContractCost = be.totalContractCost.Add(diff.FileContract.Payout)
-			be.activeContractSize += diff.FileContract.FileSize
-			be.totalContractSize += diff.FileContract.FileSize
+			e.activeContracts += 1
+			e.totalContracts += 1
+			e.activeContractCost = e.activeContractCost.Add(diff.FileContract.Payout)
+			e.totalContractCost = e.totalContractCost.Add(diff.FileContract.Payout)
+			e.activeContractSize += diff.FileContract.FileSize
+			e.totalContractSize += diff.FileContract.FileSize
 		} else {
-			be.activeContracts -= 1
-			be.activeContractCost = be.activeContractCost.Sub(diff.FileContract.Payout)
-			be.activeContractSize -= diff.FileContract.FileSize
+			e.activeContracts -= 1
+			e.activeContractCost = e.activeContractCost.Sub(diff.FileContract.Payout)
+			e.activeContractSize -= diff.FileContract.FileSize
 		}
 	}
 
 	// Reverting the blockheight and block data structs from reverted blocks
-	be.blockchainHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	e.blockchainHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 
 	// Handle incoming blocks
 	for _, block := range cc.AppliedBlocks {
-		be.blockchainHeight += 1
+		e.blockchainHeight += 1
 		// add the block to the database.
-		err := be.addBlockDB(block)
+		err := e.addBlockDB(block)
 		if err != nil {
 			fmt.Printf("Error when adding block to database: " + err.Error() + "\n")
 		}
 	}
-	be.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
+	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
-	be.mu.Unlock(lockID)
-	be.updateSubscribers()
+	e.mu.Unlock(lockID)
+	e.updateSubscribers()
 }

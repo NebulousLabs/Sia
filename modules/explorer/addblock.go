@@ -141,17 +141,17 @@ func (tx *boltTx) addNewSFOutput(outputID types.SiafundOutputID, txid crypto.Has
 }
 
 // addBlockDB parses a block and adds it to the database
-func (be *BlockExplorer) addBlockDB(b types.Block) error {
+func (e *Explorer) addBlockDB(b types.Block) error {
 	// Special case for the genesis block, which does not have a
 	// valid parent, and for testing, as tests will not always use
 	// blocks in consensus
 	var blocktarget types.Target
-	if b.ID() == be.genesisBlockID {
+	if b.ID() == e.genesisBlockID {
 		blocktarget = types.RootDepth
-		be.blockchainHeight = 0
+		e.blockchainHeight = 0
 	} else {
 		var exists bool
-		blocktarget, exists = be.cs.ChildTarget(b.ParentID)
+		blocktarget, exists = e.cs.ChildTarget(b.ParentID)
 		if build.DEBUG {
 			if build.Release == "testing" {
 				blocktarget = types.RootDepth
@@ -163,7 +163,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	}
 
 	// Check if the block exists
-	exists, err := be.db.Exists("Blocks", encoding.Marshal(b.ID()))
+	exists, err := e.db.Exists("Blocks", encoding.Marshal(b.ID()))
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		return nil
 	}
 
-	tx, err := newBoltTx(be.db)
+	tx, err := newBoltTx(e.db)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 	// Construct the struct that will be inside the heights map
 	blockStruct := blockData{
 		Block:  b,
-		Height: be.blockchainHeight,
+		Height: e.blockchainHeight,
 	}
 
 	tx.addNewHash("Blocks", hashBlock, crypto.Hash(b.ID()), blockStruct)
@@ -192,7 +192,7 @@ func (be *BlockExplorer) addBlockDB(b types.Block) error {
 		Size:      uint64(len(encoding.Marshal(b))),
 	}
 
-	tx.putObject("Heights", be.blockchainHeight, bSum)
+	tx.putObject("Heights", e.blockchainHeight, bSum)
 	tx.putObject("Hashes", crypto.Hash(b.ID()), hashBlock)
 
 	// Insert the miner payouts as new outputs

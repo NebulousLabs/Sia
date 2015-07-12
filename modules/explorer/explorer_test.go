@@ -22,10 +22,10 @@ type explorerTester struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	explorer *BlockExplorer
+	explorer *Explorer
 
 	csUpdateChan     <-chan struct{}
-	beUpdateChan     <-chan struct{}
+	eUpdateChan      <-chan struct{}
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
@@ -37,7 +37,7 @@ type explorerTester struct {
 // modules.
 func (et *explorerTester) csUpdateWait() {
 	<-et.csUpdateChan
-	<-et.beUpdateChan
+	<-et.eUpdateChan
 	et.tpUpdateWait()
 }
 
@@ -73,7 +73,7 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	be, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
+	e, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,10 +85,10 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 		tpool:   tp,
 		wallet:  w,
 
-		explorer: be,
+		explorer: e,
 
 		csUpdateChan:     cs.ConsensusSetNotify(),
-		beUpdateChan:     be.BlockExplorerNotify(),
+		eUpdateChan:      e.ExplorerNotify(),
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),

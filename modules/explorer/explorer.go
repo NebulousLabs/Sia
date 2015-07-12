@@ -9,12 +9,12 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// The blockexplorer module provides a glimpse into what the blockchain
+// The explorer module provides a glimpse into what the Sia network
 // currently looks like.
 
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
-type BlockExplorer struct {
+type Explorer struct {
 	// db is the currently opened database. the explorerDB passes
 	// through to a persist.BoltDatabase, which passes through to
 	// a bolt.db
@@ -66,7 +66,7 @@ type BlockExplorer struct {
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err error) {
+func New(cs modules.ConsensusSet, persistDir string) (e *Explorer, err error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		err = errors.New("Blockchain explorer cannot use a nil ConsensusSet")
@@ -86,7 +86,7 @@ func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err err
 	}
 
 	// Initilize the module state
-	be = &BlockExplorer{
+	e = &Explorer{
 		db:                 db,
 		currentBlock:       cs.GenesisBlock(),
 		genesisBlockID:     cs.GenesisBlock().ID(),
@@ -98,11 +98,11 @@ func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err err
 		mu:                 sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	cs.ConsensusSetSubscribe(be)
+	cs.ConsensusSetSubscribe(e)
 
 	return
 }
 
-func (be *BlockExplorer) Close() error {
-	return be.db.CloseDatabase()
+func (e *Explorer) Close() error {
+	return e.db.CloseDatabase()
 }
