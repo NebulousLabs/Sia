@@ -88,6 +88,20 @@ func startDaemon() error {
 		started <- struct{}{}
 	}()
 
+	// Stop the cpu profiler now that the initial blockchain loading is
+	// complete.
+	if config.Siad.Profile {
+		pprof.StopCPUProfile()
+
+		// Save the memory profile.
+		memFile, err := os.Create(filepath.Join(config.Siad.ProfileDir, "mem-profile.prof"))
+		if err != nil {
+			fmt.Println("Memory profiling failed:", err)
+			return err
+		}
+		pprof.WriteHeapProfile(memFile)
+	}
+
 	// Print a 'startup complete' message.
 	//
 	// TODO: This message can be removed once the api starts up in under 1/2
