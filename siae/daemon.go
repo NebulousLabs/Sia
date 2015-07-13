@@ -7,8 +7,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/blockexplorer"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 
 	"github.com/spf13/cobra"
@@ -28,7 +28,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	explorer, err := blockexplorer.New(state, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
+	explorer, err := explorer.New(state, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 	if err != nil {
 		return err
 	}

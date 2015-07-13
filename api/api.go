@@ -109,10 +109,10 @@ func (srv *Server) initAPI(addr string) {
 	}
 
 	// BlockExplorer API Calls
-	if srv.blocke != nil {
-		handleHTTPRequest(mux, "/blockexplorer/status", srv.blockexplorerStatusHandler)
-		handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
-		handleHTTPRequest(mux, "/blockexplorer/gethash", srv.blockexplorerGetHashHandler)
+	if srv.exp != nil {
+		handleHTTPRequest(mux, "/explorer/status", srv.explorerStatusHandler)
+		handleHTTPRequest(mux, "/explorer/blockdata", srv.explorerBlockDataHandler)
+		handleHTTPRequest(mux, "/explorer/gethash", srv.explorerGetHashHandler)
 
 	}
 
