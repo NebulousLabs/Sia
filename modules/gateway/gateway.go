@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -49,8 +50,11 @@ func (g *Gateway) Address() modules.NetAddress {
 func (g *Gateway) Close() error {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
-	err := g.save()
-	if err != nil {
+	if err := g.save(); err != nil {
+		return err
+	}
+	portInt, _ := strconv.Atoi(g.myAddr.Port())
+	if err := modules.IGD.Clear(uint16(portInt)); err != nil {
 		return err
 	}
 	return g.listener.Close()
@@ -93,10 +97,23 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 	if err != nil {
 		return
 	}
+	host, err := modules.IGD.ExternalIP()
+	if err != nil {
+		g.log.Println("WARN: failed to discover external IP, using ::1 instead")
+		host = "::1"
+	}
 	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
-	g.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
+	g.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
 
 	g.log.Println("INFO: our address is", g.myAddr)
+
+	// Forward port, if possible
+	portInt, _ := strconv.Atoi(port)
+	if portErr := modules.IGD.Forward(uint16(portInt), "Sia RPC"); portErr == nil {
+		g.log.Println("INFO: successfully forwarded port", port)
+	} else if portErr != modules.ErrNoUPnP {
+		g.log.Println("WARN: automatic port forwarding failed")
+	}
 
 	// Spawn the primary listener.
 	go g.listen()

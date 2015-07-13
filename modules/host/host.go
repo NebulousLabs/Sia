@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -105,8 +106,19 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	if err != nil {
 		return nil, err
 	}
+	host, err := modules.IGD.ExternalIP()
+	if err != nil {
+		// log error? should be fatal
+		host = "::1"
+	}
 	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
-	h.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
+	h.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
+
+	// Forward port, if possible
+	portInt, _ := strconv.Atoi(port)
+	if portErr := modules.IGD.Forward(uint16(portInt), "Sia Host"); portErr != nil {
+		// log error? should be fatal if err != modules.ErrNoUPnP
+	}
 
 	err = os.MkdirAll(saveDir, 0700)
 	if err != nil {
