@@ -53,6 +53,6 @@ func (e *Explorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
-	e.mu.Unlock(lockID)
 	e.updateSubscribers()
+	e.mu.Unlock(lockID)
 }

@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -19,7 +20,7 @@ func genHashNum(x byte) crypto.Hash {
 
 // Add a couple blocks to the database, then perform lookups to see if
 // they were added and crossed referenced correctly
-func (et *explorerTester) testAddBlock(t *testing.T) {
+func (et *explorerTester) testAddBlock(t *testing.T) error {
 	// This block will *NOT* be valid, but should contain
 	// addresses that can cross reference each other.
 	b1 := types.Block{
@@ -38,7 +39,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 	err := et.explorer.addBlockDB(b1)
 	et.explorer.mu.Unlock(lockID)
 	if err != nil {
-		et.t.Fatal("Error inserting basic block: " + err.Error())
+		return errors.New("Error inserting basic block: " + err.Error())
 	}
 
 	// Again, not a valid block at all.
@@ -61,7 +62,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 	err = et.explorer.addBlockDB(b2)
 	et.explorer.mu.Unlock(lockID)
 	if err != nil {
-		et.t.Fatal("Error inserting block 2: " + err.Error())
+		return errors.New("Error inserting block 2: " + err.Error())
 	}
 
 	// Now query the database to see if it has been linked properly
@@ -71,10 +72,10 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 	var b types.Block
 	err = encoding.Unmarshal(bytes, &b)
 	if err != nil {
-		et.t.Fatal("Could not decode loaded block")
+		return errors.New("Could not decode loaded block")
 	}
 	if b.ID() != b1.ID() {
-		et.t.Fatal("Block 1 not stored properly")
+		return errors.New("Block 1 not stored properly")
 	}
 
 	// Query to see if the input is added to the output field
@@ -85,19 +86,26 @@ func (et *explorerTester) testAddBlock(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	if bytes == nil {
-		et.t.Fatal("Output is nil")
+		return errors.New("Output is nil")
 	}
 	var ot outputTransactions
 	err = encoding.Unmarshal(bytes, &ot)
 	if err != nil {
-		et.t.Fatal("Could not decode loaded block")
+		return errors.New("Could not decode loaded block")
 	}
 	if ot.InputTx == *new(crypto.Hash) {
-		et.t.Fatal("Input not added as output")
+		return errors.New("Input not added as output")
 	}
+	return nil
 }
 
 func TestAddBlock(t *testing.T) {
-	et := createExplorerTester("TestExplorerAddBlock", t)
-	et.testAddBlock(t)
+	et, err := createExplorerTester("TestExplorerAddBlock", t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = et.testAddBlock(t)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

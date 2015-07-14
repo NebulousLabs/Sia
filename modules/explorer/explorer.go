@@ -73,6 +73,9 @@ type Explorer struct {
 	// notify other modules when changes occur
 	subscriptions []chan struct{}
 
+	// updates is the number of updates that have been sent out to subscribers
+	updates uint64
+
 	mu *sync.RWMutex
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Explorer tester struct is the helper object for explorer
@@ -49,7 +50,7 @@ func (et *explorerTester) tpUpdateWait() {
 	<-et.walletUpdateChan
 }
 
-func createExplorerTester(name string, t *testing.T) *explorerTester {
+func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules
@@ -97,5 +98,15 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	}
 
 	et.csUpdateWait()
-	return et
+
+	// Mine until the wallet has money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		b, _ := et.miner.FindBlock()
+		err = et.cs.AcceptBlock(b)
+		if err != nil {
+			return nil, err
+		}
+		et.csUpdateWait()
+	}
+	return et, nil
 }
