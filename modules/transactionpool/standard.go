@@ -34,8 +34,13 @@ import (
 //		if they include arbitrary data which has meanings that the legacy miner
 //		doesn't understand.
 
+const (
+	TransactionSetLimit = 500e3
+)
+
 var (
 	ErrLargeTransaction = errors.New("transaction is too large")
+	ErrLargeTransactionSet = errors.New("transaction set is too large")
 )
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
@@ -113,6 +118,24 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 		}
 
 		return modules.ErrInvalidArbPrefix
+	}
+	return nil
+}
+
+func (tp *TransactionPool) IsStandardTransacitonSet(ts []types.Transaction) error {
+	for i := range ts {
+		err := tp.IsStandardTransaction(ts[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	totalSize := 0
+	for i := range ts {
+		totalSize += len(encoding.Marshal(ts[i]))
+		if totalSize > TransactionSetLimit {
+			return ErrLargeTransactionSet
+		}
 	}
 	return nil
 }
