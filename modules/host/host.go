@@ -195,3 +195,18 @@ func (h *Host) Info() modules.HostInfo {
 
 	return info
 }
+
+// Close saves the state of the Gateway and stops its listener process.
+func (h *Host) Close() error {
+	id := h.mu.RLock()
+	defer h.mu.RUnlock(id)
+	// save the latest host state
+	if err := h.save(); err != nil {
+		return err
+	}
+	// clear the port mapping (no effect if UPnP not supported)
+	portInt, _ := strconv.Atoi(h.myAddr.Port())
+	modules.IGD.Clear(uint16(portInt))
+	// shut down the listener
+	return h.listener.Close()
+}

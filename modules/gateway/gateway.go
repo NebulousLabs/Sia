@@ -46,17 +46,18 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
-// Close saves the state of the Gateway and stops the listener process.
+// Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
 	id := g.mu.RLock()
 	defer g.mu.RUnlock(id)
+	// save the latest gateway state
 	if err := g.save(); err != nil {
 		return err
 	}
+	// clear the port mapping (no effect if UPnP not supported)
 	portInt, _ := strconv.Atoi(g.myAddr.Port())
-	if err := modules.IGD.Clear(uint16(portInt)); err != nil {
-		return err
-	}
+	modules.IGD.Clear(uint16(portInt))
+	// shut down the listener
 	return g.listener.Close()
 }
 
