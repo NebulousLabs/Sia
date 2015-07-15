@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -35,6 +36,14 @@ func (e *Explorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	// Handle incoming blocks
 	for _, block := range cc.AppliedBlocks {
 		e.blockchainHeight += 1
+
+		// Add the current time to seenTimes
+		if time.Unix(int64(block.Timestamp), 0).Before(e.startTime) {
+			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Unix(int64(block.Timestamp), 0)
+		} else {
+			e.seenTimes[e.blockchainHeight%types.BlockHeight(len(e.seenTimes))] = time.Now()
+		}
+
 		// add the block to the database.
 		err := e.addBlockDB(block)
 		if err != nil {

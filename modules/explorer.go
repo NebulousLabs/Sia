@@ -22,6 +22,7 @@ type (
 		Height              types.BlockHeight
 		Block               types.Block
 		Target              types.Target
+		MatureTime          types.Timestamp
 		TotalCurrency       types.Currency
 		ActiveContractCount uint64
 		ActiveContractCosts types.Currency
