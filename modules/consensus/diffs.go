@@ -19,10 +19,12 @@ var (
 	errBadCommitFileContractDiff         = errors.New("rogue file contract diff in commitFileContractDiff")
 	errBadCommitSiafundOutputDiff        = errors.New("rogue siafund output diff in commitSiafundOutputDiff")
 	errBadCommitDelayedSiacoinOutputDiff = errors.New("rogue delayed siacoin output diff in commitSiacoinOutputDiff")
+	errBadExpirationPointer              = errors.New("deleting a file contract that has a file pointer to a nonexistant map")
 	errBadMaturityHeight                 = errors.New("delayed siacoin output diff was submitted with illegal maturity height")
 	errCreatingExistingUpcomingMap       = errors.New("creating an existing upcoming map")
 	errDeletingNonEmptyDelayedMap        = errors.New("deleting a delayed siacoin output map that is not empty")
 	errDiffsNotGenerated                 = errors.New("applying diff set before generating errors")
+	errExistingFileContractExpiration    = errors.New("creating a pointer to a file contract expiration that already exists")
 	errInvalidSuccessor                  = errors.New("generating diffs for a block that's an invalid successsor to the current block")
 	errNegativePoolAdjustment            = errors.New("committing a siafund pool diff with a negative adjustment")
 	errNonApplySiafundPoolDiff           = errors.New("commiting a siafund pool diff that doesn't have the 'apply' direction")
@@ -63,8 +65,36 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 
 	if fcd.Direction == dir {
 		cs.fileContracts[fcd.ID] = fcd.FileContract
+
+		// Put a file contract into the file contract expirations map.
+		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+		if !exists {
+			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
+		}
+
+		// Sanity check - file contract expiration pointer should not already
+		// exist.
+		if build.DEBUG {
+			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			if exists {
+				panic(errExistingFileContractExpiration)
+			}
+		}
+		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
 	} else {
 		delete(cs.fileContracts, fcd.ID)
+
+		if build.DEBUG {
+			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+			if !exists {
+				panic(errBadExpirationPointer)
+			}
+			_, exists = cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			if !exists {
+				panic(errBadExpirationPointer)
+			}
+		}
+		delete(cs.fileContractExpirations[fcd.FileContract.WindowEnd], fcd.ID)
 	}
 }
 

@@ -136,6 +136,12 @@ type ConsensusSet interface {
 	// run any required closing routines.
 	Close() error
 
+	// ConsensusChange returns the ith consensus change that was broadcast to
+	// subscribers by the consensus set. An error is returned if i consensus
+	// changes have not been broadcast. The primary purpose of this funciton is
+	// to rescan the blockchain.
+	ConsensusChange(i int) (ConsensusChange, error)
+
 	// ConsensusSetSubscribe will subscribe another module to the consensus
 	// set. Every time that there is a change to the consensus set, an update
 	// will be sent to the module via the 'ReceiveConsensusSetUpdate' function.

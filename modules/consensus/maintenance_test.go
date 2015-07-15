@@ -140,6 +140,8 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	cst.cs.fileContractExpirations[bn.height] = make(map[types.FileContractID]struct{})
+	cst.cs.fileContractExpirations[bn.height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
 	_, exists := cst.cs.fileContracts[types.FileContractID{}]
 	if exists {
@@ -225,6 +227,8 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	cst.cs.fileContractExpirations[bn.height] = make(map[types.FileContractID]struct{})
+	cst.cs.fileContractExpirations[bn.height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyFileContractMaintenance(bn)
 	_, exists := cst.cs.fileContracts[types.FileContractID{}]
 	if exists {

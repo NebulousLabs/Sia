@@ -29,6 +29,9 @@ type Config struct {
 		HostAddr string
 
 		SiaDir string
+
+		Profile    bool
+		ProfileDir string
 	}
 }
 
@@ -37,7 +40,6 @@ type Config struct {
 func init() {
 	// Initialize the started channel, only used for testing.
 	started = make(chan struct{}, 1)
-
 }
 
 // versionCmd is a cobra command that prints the version of siad.
@@ -67,6 +69,8 @@ func main() {
 	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
+	root.PersistentFlags().BoolVarP(&config.Siad.Profile, "profile", "p", false, "enable profiling")
+	root.PersistentFlags().StringVarP(&config.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
 
 	// Parse cmdline flags, overwriting both the default values and the config
 	// file values.

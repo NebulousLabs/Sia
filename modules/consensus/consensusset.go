@@ -84,10 +84,18 @@ type ConsensusSet struct {
 	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
+	// fileContractExpirations is not actually a part of the consensus set, but
+	// it is needed to get decent order notation on the file contract lookups.
+	// It is a map of heights to maps of file contract ids. The other table is
+	// needed because of file contract revisions - you need to have random
+	// access lookups to file contracts for when revisions are submitted to the
+	// blockchain.
+	fileContractExpirations map[types.BlockHeight]map[types.FileContractID]struct{}
+
 	// Modules subscribed to the consensus set will receive an ordered list of
-	// changes that occur to the consensus set.
-	consensusChanges []modules.ConsensusChange
-	subscriptions    []chan struct{}
+	// changes that occur to the consensus set, computed using the changeLog.
+	changeLog     []changeEntry
+	subscriptions []chan struct{}
 
 	// block database, used for saving/loading the current path
 	db persist.DB
@@ -123,6 +131,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
+
+		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
 
 		gateway: gateway,
 
