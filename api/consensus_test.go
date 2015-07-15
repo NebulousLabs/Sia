@@ -29,12 +29,13 @@ func TestConsensusGET(t *testing.T) {
 
 // TestConsensusSynchronizeGET probes the GET call to /consensus/synchronize.
 func TestConsensusSynchronizeGET(t *testing.T) {
+	t.Skip("no known way to add peers without automatically performing a synchronize")
 	if testing.Short() {
 		t.SkipNow()
 	}
 
 	st := newServerTester("TestConsensusSynchronizeGET", t)
-	st.callAPI("/consensus/synchronize") // TODO: err =
+	st.callAPI("/consensus/synchronize")
 
 	// TODO: Need some way to tell that a peer was out of sync, and then
 	// in-sync. The problem is that currently, if there are peers they should
