@@ -35,8 +35,9 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
 	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
-	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler)
+	handleHTTPRequest(mux, "/consensus", srv.consensusHandler)                        // GET
+	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler) // GET
+	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)           // DEPRECATED.
 
 	// Daemon API Calls
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
