@@ -147,6 +147,9 @@ func (srv *Server) Serve() error {
 	if srv.gateway != nil {
 		srv.gateway.Close()
 	}
+	if srv.host != nil {
+		srv.host.Close()
+	}
 	if srv.wallet != nil {
 		srv.wallet.Close()
 	}

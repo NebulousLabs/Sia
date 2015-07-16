@@ -45,14 +45,17 @@ func (g *Gateway) Address() modules.NetAddress {
 	return g.myAddr
 }
 
-// Close saves the state of the Gateway and stops the listener process.
+// Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
 	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
-	err := g.save()
-	if err != nil {
+	// save the latest gateway state
+	if err := g.save(); err != nil {
 		return err
 	}
+	g.mu.RUnlock(id)
+	// clear the port mapping (no effect if UPnP not supported)
+	g.clearPort(g.myAddr.Port())
+	// shut down the listener
 	return g.listener.Close()
 }
 
@@ -80,13 +83,11 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		log:        logger,
 	}
 
-	// Register RPCs.
-	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("RelayNode", g.relayNode)
-	g.RegisterConnectCall("ShareNodes", g.requestNodes)
-	g.RegisterConnectCall("RelayNode", g.sendAddress)
-
-	g.log.Println("INFO: gateway created, started logging")
+	// Load the old peer list. If it doesn't exist, no problem, but if it does,
+	// we want to know about any errors preventing us from loading it.
+	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
+		return nil, loadErr
+	}
 
 	// Create listener and set address.
 	g.listener, err = net.Listen("tcp", addr)
@@ -94,22 +95,27 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		return
 	}
 	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
-	g.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
+	g.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
 
-	g.log.Println("INFO: our address is", g.myAddr)
+	// Register RPCs.
+	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("RelayNode", g.relayNode)
+	g.RegisterConnectCall("ShareNodes", g.requestNodes)
 
-	// Spawn the primary listener.
-	go g.listen()
+	g.log.Println("INFO: gateway created, started logging")
 
-	// Load the old peer list. If it doesn't exist, no problem, but if it does,
-	// we want to know about any errors preventing us from loading it.
-	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
-		return nil, loadErr
-	}
+	// Learn our external IP.
+	go g.learnHostname()
+
+	// Automatically forward the RPC port, if possible.
+	go g.forwardPort(port)
 
 	// Spawn the connector loop. This will continually attempt to add nodes as
 	// peers to ensure we stay well-connected.
 	go g.makeOutboundConnections()
+
+	// Spawn the primary listener.
+	go g.listen()
 
 	return
 }
