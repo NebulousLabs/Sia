@@ -6,6 +6,7 @@ import (
 
 // updateSubscribers will inform subscribers of any updates to the block explorer
 func (e *Explorer) updateSubscribers() {
+	e.updates++
 	for _, subscriber := range e.subscriptions {
 		select {
 		case subscriber <- struct{}{}:
@@ -19,7 +20,9 @@ func (e *Explorer) updateSubscribers() {
 func (e *Explorer) ExplorerNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	lockID := e.mu.Lock()
-	c <- struct{}{}
+	for i := uint64(0); i < e.updates; i++ {
+		c <- struct{}{}
+	}
 	e.subscriptions = append(e.subscriptions, c)
 	e.mu.Unlock(lockID)
 	return c

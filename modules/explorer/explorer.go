@@ -3,6 +3,7 @@ package explorer
 import (
 	"errors"
 	"os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -32,6 +33,17 @@ type Explorer struct {
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
 
+	// Used to  store the time blocks were seen.  Sholud only keep
+	// track of the most recent 144 blocks. Its size should always
+	// be types.MaturityDelay. SeenTimes  keeps track of that many
+	//  times,  and should  be  indexed  with (blockchainheight  %
+	// len(seenTimes))
+	seenTimes []time.Time
+
+	// stores the time that the blockexplorer started so that new
+	// seen blocks can be compared against it.
+	startTime time.Time
+
 	// currencySent keeps track of how much currency has been
 	// i.e. sending siacoin to somebody else
 	currencySent types.Currency
@@ -60,6 +72,9 @@ type Explorer struct {
 	// Subscriptions currently contain no data, but serve to
 	// notify other modules when changes occur
 	subscriptions []chan struct{}
+
+	// updates is the number of updates that have been sent out to subscribers
+	updates uint64
 
 	mu *sync.RWMutex
 }
@@ -91,6 +106,8 @@ func New(cs modules.ConsensusSet, persistDir string) (e *Explorer, err error) {
 		currentBlock:       cs.GenesisBlock(),
 		genesisBlockID:     cs.GenesisBlock().ID(),
 		blockchainHeight:   0,
+		seenTimes:          make([]time.Time, types.MaturityDelay+1),
+		startTime:          time.Now(),
 		currencySent:       types.NewCurrency64(0),
 		activeContractCost: types.NewCurrency64(0),
 		totalContractCost:  types.NewCurrency64(0),

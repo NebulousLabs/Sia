@@ -65,10 +65,14 @@ func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
 		}
 	}
 
+	// Find the seen time of the block 144 ago in the list
+	matureBlockTime := e.seenTimes[(e.blockchainHeight-144)%types.BlockHeight(len(e.seenTimes))]
+
 	return modules.ExplorerStatus{
 		Height:              e.blockchainHeight,
 		Block:               e.currentBlock,
 		Target:              currentTarget,
+		MatureTime:          types.Timestamp(matureBlockTime.Unix()),
 		TotalCurrency:       totalCurrency(e.blockchainHeight),
 		ActiveContractCount: e.activeContracts,
 		ActiveContractCosts: e.activeContractCost,
