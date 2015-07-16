@@ -10,49 +10,37 @@ import (
 )
 
 const (
-	TransactionPoolSizeLimit  = 10 * 1024 * 1024
-	TransactionPoolSizeForFee = 5 * 1024 * 1024
+	TransactionPoolSizeLimit  = 10e6
+	TransactionPoolSizeForFee = 2e6
 )
 
 var (
-	ErrLargeTransactionPool = errors.New("transaction size limit reached within pool")
-	ErrLowMinerFees         = errors.New("transaction miner fees too low to be accepted")
-	TransactionMinFee       = types.NewCurrency64(3).Mul(types.SiacoinPrecision)
+	ErrObjectConflict = errors.New("transaction set conflicts with an existing transaction set")
+	ErrFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
+	ErrLowMinerFees         = errors.New("transaction set needs more miner fees to be accepted")
+	TransactionMinFee       = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
 
-// accept.go is responsible for applying a transaction to the transaction pool.
-// Validation is handled by valid.go. The componenets of the transcation are
-// added to the unconfirmed consensus set piecemeal, and then the transaction
-// itself is appended to the linked list of transactions, such that any
-// dependecies will appear earlier in the list.
-
-// checkMinerFees checks that all MinerFees are valid within the context of the
-// transactionpool given parameters to prevention DoS
-func (tp *TransactionPool) checkMinerFees(t types.Transaction) error {
-	// TODO: This has unacceptable order notation.
-	transactionPoolSize := len(encoding.Marshal(tp.transactionList))
-	if transactionPoolSize > TransactionPoolSizeLimit {
-		return ErrLargeTransactionPool
+// checkMinerFees checks that the total amount of transaction fees in the set
+// is sufficient to store it in the unconfirmed transactions database.
+func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
+	if tp.databaseSize > TransactionPoolSizeLimit {
+		return ErrFullTransactionPool
 	}
-	if transactionPoolSize > TransactionPoolSizeForFee {
+
+	if tp.databaseSize > TransactionPoolSizeForFee {
 		var feeSum types.Currency
-		for _, fee := range t.MinerFees {
-			feeSum = feeSum.Add(fee)
+		for i := range ts {
+			for _, fee := range ts[i].MinerFees {
+				feeSum = feeSum.Add(fee)
+			}
 		}
-		if feeSum.Cmp(TransactionMinFee) < 0 {
+		feeRequired := TransactionMinFee.Mul(types.NewCurrency64(uint64(len(ts))))
+		if feeSum.Cmp(feeRequired) < 0 {
 			return ErrLowMinerFees
 		}
 	}
 	return
-}
-
-// addTransactionToPool puts a transaction into the transaction pool, changing
-// the unconfirmed set and the transaction linked list to reflect the new
-// transaction.
-func (tp *TransactionPool) addTransactionToPool(t types.Transaction) {
-	// Add the transaction to the list of transactions.
-	tp.transactions[crypto.HashObject(t)] = struct{}{}
-	tp.transactionList = append(tp.transactionList, t)
 }
 
 // AcceptTransaction adds a transaction to the unconfirmed set of
@@ -62,38 +50,81 @@ func (tp *TransactionPool) AcceptTransactions(ts []types.Transaction) (err error
 	id := tp.mu.Lock()
 	defer tp.mu.Unlock(id)
 
-	// Check that the transaction set is not currently in the unconfirmed set.
+	// Check that the transaction set is not already known.
 	setHash := TransactionSetID(crypto.HashObject(ts))
 	_, exists := tp.transactionSets[setHash]
 	if exists {
 		return modules.ErrTransactionPoolDuplicate
 	}
 
-	// Check that the transaction follows 'Standard.md' guidelines.
-	err = tp.IsStandardTransaction(t)
+	// Check that the transaction set has enough fees to justify adding it to
+	// the database.
+	err = tp.checkMinerFees(ts)
+	if err != nil {
+		return
+	}
+
+	// All checks after this are expensive.
+	//
+	// TODO: The transactions are encoded multiple times, when only once is
+	// needed (IsStandard + size counting).
+	//
+	// TODO: There is no DoS prevention mechanism in place to prevent repeated
+	// expensive verifications of invalid transactions that are created on the
+	// fly.
+
+	// Check that all transactions follow 'Standard.md' guidelines.
+	err = tp.IsStandardTransactionSet(ts)
 	if err != nil {
 		return err
 	}
 
-	// Check that the transaction has enough fees to justify it being in the
-	// mempool.
-	err = tp.checkMinerFees(t)
+	// Check that all transactions are valid, and that there is no conflict
+	// with existing transacitons.
+	cc, err := tp.consensusSet.TryTransactions(ts)
 	if err != nil {
-		return
+		return err
+	}
+	for _, diff := range cc.SiacoinOutputDiffs {
+		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		if exists {
+			return ErrObjectConflict
+		}
+	}
+	for _, diff := range cc.FileContractDiffs {
+		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		if exists {
+			return ErrObjectConflict
+		}
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		if exists {
+			return ErrObjectConflict
+		}
 	}
 
-	// Check that the transaction is legal given the unconfirmed consensus set
-	// and the settings of the transaction pool.
-	err = tp.validUnconfirmedTransaction(t)
-	if err != nil {
-		return
+	// Add the transaction to the pool.
+	tp.transactionSets[setHash] = ts
+	var oids []ObjectID
+	for _, diff := range cc.SiacoinOutputDiffs {
+		tp.knownObjects = crypto.Hash(diff.ID)
+		oids = append(oids, crypto.Hash(diff.ID))
 	}
+	for _, diff := range cc.FileContractDiffs {
+		tp.knownObjects = crypto.Hash(diff.ID)
+		oids = append(oids, crypto.Hash(diff.ID))
+	}
+	for _, diff := range cc.SiafundOutputDiffs {
+		tp.knownObjects = crypto.Hash(diff.ID)
+		oids = append(oids, crypto.Hash(diff.ID))
+	}
+	tp.transactionSetDiffs[setHash] = oids
+	tp.databaseSize += len(encoding.Marshal(ts))
 
-	// Add the transaction to the pool, notify all subscribers, and broadcast
-	// the transaction.
-	tp.addTransactionToPool(t)
+	// Notify subscribers and broadcast the transaction set.
 	tp.updateSubscribers(modules.ConsensusChange{}, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
-	go tp.gateway.Broadcast("RelayTransaction", t)
+	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	return
 }
 

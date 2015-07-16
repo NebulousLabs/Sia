@@ -18,21 +18,23 @@ type TransactionPool struct {
 	// synchronized to the state.
 	consensusSet       modules.ConsensusSet
 	gateway            modules.Gateway
-	consensusSetHeight types.BlockHeight
 
 	// unconfirmedIDs is a set of hashes representing the ID of an object in
 	// the unconfirmed set of transactions. Each unconfirmed ID points to the
 	// transaciton set containing that object. Transaction sets are sets of
 	// transactions that get id'd by their hash. transacitonSetDiffs contain
 	// the set of IDs that each transaction set is associated with.
-	unconfirmedIDs      map[ObjectID]TransactionSetID
+	knownObjects        map[ObjectID]TransactionSetID
 	transactionSets     map[TransactionSetID][]types.Transaction
 	transactionSetDiffs map[TransactionSetID][]ObjectID
+	databaseSize int
 	// TODO: Write a consistency check comparing transactionSets,
 	// transactionSetDiffs.
 	//
 	// TODO: Write a consistency check making sure that all unconfirmedIDs
 	// point to the right place, and that all UnconfirmedIDs are accounted for.
+	//
+	// TODO: Need some sort of first-come-first-serve memory.
 
 	// The entire history of the transaction pool is kept. Each element
 	// represents an atomic change to the transaction pool. When a new
