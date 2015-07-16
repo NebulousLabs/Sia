@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/pprof"
 	"time"
 
 	"github.com/NebulousLabs/Sia/api"
@@ -19,6 +16,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/profile"
 
 	"github.com/spf13/cobra"
 )
@@ -29,18 +27,11 @@ func startDaemon() error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Print a startup message.
-	fmt.Println("siad is loading")
+	//
+	// TODO: This message can be removed once the api starts up in under 1/2
+	// second.
+	fmt.Println("siad is loading, may take a minute or two")
 	loadStart := time.Now().UnixNano()
-
-	// Establish cpu profiling. The current implementation only profiles
-	// loading the blockchain into memory.
-	if config.Siad.Profile {
-		cpuProfileFile, err := os.Create(filepath.Join(config.Siad.ProfileDir, "startup-cpu-profile.prof"))
-		if err != nil {
-			return err
-		}
-		pprof.StartCPUProfile(cpuProfileFile)
-	}
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
@@ -91,17 +82,16 @@ func startDaemon() error {
 	// that daemon startup has completed. A gofunc is used with the hope that
 	// srv.Serve() will start running before the value is sent down the
 	// channel.
+	//
+	// TODO: There are better ways to approach this.
 	go func() {
 		started <- struct{}{}
 	}()
 
-	// Stop the cpu profiler now that the initial blockchain loading is
-	// complete.
-	if config.Siad.Profile {
-		pprof.StopCPUProfile()
-	}
-
 	// Print a 'startup complete' message.
+	//
+	// TODO: This message can be removed once the api starts up in under 1/2
+	// second.
 	startupTime := time.Now().UnixNano() - loadStart
 	fmt.Println("siad has finished loading after", float64(startupTime)/1e9, "seconds")
 
@@ -117,45 +107,7 @@ func startDaemon() error {
 func startDaemonCmd(*cobra.Command, []string) {
 	// Create the profiling directory if profiling is enabled.
 	if config.Siad.Profile {
-		err := os.MkdirAll(config.Siad.ProfileDir, 0700)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		// Create a goroutime to log the number of gothreads in use every 30
-		// seconds.
-		go func() {
-			// Create a logger for the goroutine.
-			logFile, err := os.OpenFile(filepath.Join(config.Siad.ProfileDir, "goroutineCount.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
-			if err != nil {
-				fmt.Println("Goroutine logging failed:", err)
-				return
-			}
-			log := log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-			log.Println("Goroutine logger started. The number of goroutines in use will be printed every 30 seoncds.")
-
-			// Inifinite loop to print out the goroutine count.
-			for {
-				log.Println(runtime.NumGoroutine())
-				time.Sleep(time.Second * 30)
-			}
-		}()
-
-		// Create a goroutine to update the memory profile.
-		go func() {
-			memFile, err := os.Create(filepath.Join(config.Siad.ProfileDir, "memprofile.prof"))
-			if err != nil {
-				fmt.Println("Memory profiling failed:", err)
-				return
-			}
-
-			// Infinite loop to update the memory profile.
-			for {
-				pprof.WriteHeapProfile(memFile)
-				time.Sleep(time.Minute)
-			}
-		}()
+		go profile.StartContinuousProfile(config.Siad.ProfileDir)
 	}
 
 	// Start siad. startDaemon will only return when it is shutting down.

@@ -22,6 +22,7 @@ type (
 		Height              types.BlockHeight
 		Block               types.Block
 		Target              types.Target
+		MatureTime          types.Timestamp
 		TotalCurrency       types.Currency
 		ActiveContractCount uint64
 		ActiveContractCosts types.Currency
@@ -71,7 +72,7 @@ type (
 	}
 
 	// The BlockExplorer interface provides access to the block explorer
-	BlockExplorer interface {
+	Explorer interface {
 		// Returns a slice of data points about blocks. Called
 		// primarly by the blockdata api call
 		BlockInfo(types.BlockHeight, types.BlockHeight) ([]ExplorerBlockData, error)
@@ -84,7 +85,7 @@ type (
 		Close() error
 
 		// Sends notifications when the module updates
-		BlockExplorerNotify() <-chan struct{}
+		ExplorerNotify() <-chan struct{}
 
 		// Returns information pertaining to a given hash. The
 		// type of the returned value depends on what the hash

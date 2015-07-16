@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"errors"
@@ -26,19 +26,19 @@ func totalCurrency(height types.BlockHeight) types.Currency {
 
 // Returns a partial slice of our stored data on the blockchain. Data
 // obtained from consensus updates
-func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
+func (e *Explorer) BlockInfo(start types.BlockHeight, finish types.BlockHeight) ([]modules.ExplorerBlockData, error) {
+	lockID := e.mu.RLock()
+	defer e.mu.RUnlock(lockID)
 
 	// Error checking on the given range
 	if start > finish {
 		return nil, errors.New("the start block must be higher than the end block")
 	}
-	if finish > be.blockchainHeight+1 {
+	if finish > e.blockchainHeight+1 {
 		return nil, errors.New("cannot get info on a block higher than the blockchain")
 	}
 
-	summaries, err := be.db.dbBlockSummaries(start, finish)
+	summaries, err := e.db.dbBlockSummaries(start, finish)
 	if err != nil {
 		return nil, err
 	}
@@ -46,18 +46,18 @@ func (be *BlockExplorer) BlockInfo(start types.BlockHeight, finish types.BlockHe
 }
 
 // Returns many pieces of readily available information
-func (be *BlockExplorer) ExplorerStatus() modules.ExplorerStatus {
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
+func (e *Explorer) ExplorerStatus() modules.ExplorerStatus {
+	lockID := e.mu.RLock()
+	defer e.mu.RUnlock(lockID)
 
 	// No reason that consensus should broadcast a block that it
 	// doesn't have information on
 	var currentTarget types.Target
-	if be.currentBlock.ID() == be.genesisBlockID {
+	if e.currentBlock.ID() == e.genesisBlockID {
 		currentTarget = types.RootDepth
 	} else {
 		var exists bool
-		currentTarget, exists = be.cs.ChildTarget(be.currentBlock.ParentID)
+		currentTarget, exists = e.cs.ChildTarget(e.currentBlock.ParentID)
 		if build.DEBUG {
 			if !exists {
 				panic("The state of the current block cannot be found")
@@ -65,16 +65,20 @@ func (be *BlockExplorer) ExplorerStatus() modules.ExplorerStatus {
 		}
 	}
 
+	// Find the seen time of the block 144 ago in the list
+	matureBlockTime := e.seenTimes[(e.blockchainHeight-144)%types.BlockHeight(len(e.seenTimes))]
+
 	return modules.ExplorerStatus{
-		Height:              be.blockchainHeight,
-		Block:               be.currentBlock,
+		Height:              e.blockchainHeight,
+		Block:               e.currentBlock,
 		Target:              currentTarget,
-		TotalCurrency:       totalCurrency(be.blockchainHeight),
-		ActiveContractCount: be.activeContracts,
-		ActiveContractCosts: be.activeContractCost,
-		ActiveContractSize:  be.activeContractSize,
-		TotalContractCount:  be.totalContracts,
-		TotalContractCosts:  be.totalContractCost,
-		TotalContractSize:   be.totalContractSize,
+		MatureTime:          types.Timestamp(matureBlockTime.Unix()),
+		TotalCurrency:       totalCurrency(e.blockchainHeight),
+		ActiveContractCount: e.activeContracts,
+		ActiveContractCosts: e.activeContractCost,
+		ActiveContractSize:  e.activeContractSize,
+		TotalContractCount:  e.totalContracts,
+		TotalContractCosts:  e.totalContractCost,
+		TotalContractSize:   e.totalContractSize,
 	}
 }

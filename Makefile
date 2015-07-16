@@ -68,7 +68,7 @@ clean:
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/gateway ./modules/host ./modules/hostdb		     \
        ./modules/miner ./modules/renter ./modules/transactionpool    \
-       ./modules/wallet ./modules/blockexplorer ./persist ./siad     \
+       ./modules/wallet ./modules/explorer ./persist ./siad     \
        ./siag ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs)
@@ -76,6 +76,8 @@ test-v: clean fmt REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs)
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
+bench: clean fmt REBUILD
+	go test -tags='testing' -timeout=600s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \

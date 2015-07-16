@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"errors"
@@ -37,7 +37,7 @@ Hashes
 
 var meta = persist.Metadata{
 	Version: "0.1",
-	Header:  "Sia Block Explorer Database",
+	Header:  "Sia Explorer Database",
 }
 
 type explorerDB struct {

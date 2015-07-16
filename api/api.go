@@ -35,8 +35,9 @@ func (srv *Server) initAPI(addr string) {
 	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
 	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)
-	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler)
+	handleHTTPRequest(mux, "/consensus", srv.consensusHandler)                        // GET
+	handleHTTPRequest(mux, "/consensus/synchronize", srv.consensusSynchronizeHandler) // GET
+	handleHTTPRequest(mux, "/consensus/status", srv.consensusStatusHandler)           // DEPRECATED.
 
 	// Daemon API Calls
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
@@ -109,10 +110,10 @@ func (srv *Server) initAPI(addr string) {
 	}
 
 	// BlockExplorer API Calls
-	if srv.blocke != nil {
-		handleHTTPRequest(mux, "/blockexplorer/status", srv.blockexplorerStatusHandler)
-		handleHTTPRequest(mux, "/blockexplorer/blockdata", srv.blockexplorerBlockDataHandler)
-		handleHTTPRequest(mux, "/blockexplorer/gethash", srv.blockexplorerGetHashHandler)
+	if srv.exp != nil {
+		handleHTTPRequest(mux, "/explorer/status", srv.explorerStatusHandler)
+		handleHTTPRequest(mux, "/explorer/blockdata", srv.explorerBlockDataHandler)
+		handleHTTPRequest(mux, "/explorer/gethash", srv.explorerGetHashHandler)
 
 	}
 

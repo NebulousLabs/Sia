@@ -10,8 +10,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/blockexplorer"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
@@ -40,7 +40,7 @@ type serverTester struct {
 	miner   modules.Miner
 	renter  modules.Renter
 	tpool   modules.TransactionPool
-	blocke  modules.BlockExplorer
+	exp     modules.Explorer
 	wallet  modules.Wallet
 
 	server *Server
@@ -114,11 +114,11 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create renter:", err)
 	}
-	be, err := blockexplorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
+	exp, err := explorer.New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		t.Fatal("Failed to create explorer:", err)
 	}
-	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, be)
+	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, exp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		miner:   m,
 		renter:  r,
 		tpool:   tp,
-		blocke:  be,
+		exp:     exp,
 		wallet:  w,
 
 		server: srv,

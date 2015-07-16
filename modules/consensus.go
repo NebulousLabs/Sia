@@ -138,7 +138,7 @@ type ConsensusSet interface {
 
 	// ConsensusChange returns the ith consensus change that was broadcast to
 	// subscribers by the consensus set. An error is returned if i consensus
-	// changes have not been broadcast. The primary purpose of this funciton is
+	// changes have not been broadcast. The primary purpose of this function is
 	// to rescan the blockchain.
 	ConsensusChange(i int) (ConsensusChange, error)
 

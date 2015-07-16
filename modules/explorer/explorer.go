@@ -1,20 +1,21 @@
-package blockexplorer
+package explorer
 
 import (
 	"errors"
 	"os"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// The blockexplorer module provides a glimpse into what the blockchain
+// The explorer module provides a glimpse into what the Sia network
 // currently looks like.
 
 // Basic structure to store the blockchain. Metadata may also be
 // stored here in the future
-type BlockExplorer struct {
+type Explorer struct {
 	// db is the currently opened database. the explorerDB passes
 	// through to a persist.BoltDatabase, which passes through to
 	// a bolt.db
@@ -31,6 +32,17 @@ type BlockExplorer struct {
 
 	// Used for caching the current blockchain height
 	blockchainHeight types.BlockHeight
+
+	// Used to  store the time blocks were seen.  Sholud only keep
+	// track of the most recent 144 blocks. Its size should always
+	// be types.MaturityDelay. SeenTimes  keeps track of that many
+	//  times,  and should  be  indexed  with (blockchainheight  %
+	// len(seenTimes))
+	seenTimes []time.Time
+
+	// stores the time that the blockexplorer started so that new
+	// seen blocks can be compared against it.
+	startTime time.Time
 
 	// currencySent keeps track of how much currency has been
 	// i.e. sending siacoin to somebody else
@@ -61,12 +73,15 @@ type BlockExplorer struct {
 	// notify other modules when changes occur
 	subscriptions []chan struct{}
 
+	// updates is the number of updates that have been sent out to subscribers
+	updates uint64
+
 	mu *sync.RWMutex
 }
 
 // New creates the internal data structures, and subscribes to
 // consensus for changes to the blockchain
-func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err error) {
+func New(cs modules.ConsensusSet, persistDir string) (e *Explorer, err error) {
 	// Check that input modules are non-nil
 	if cs == nil {
 		err = errors.New("Blockchain explorer cannot use a nil ConsensusSet")
@@ -86,11 +101,13 @@ func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err err
 	}
 
 	// Initilize the module state
-	be = &BlockExplorer{
+	e = &Explorer{
 		db:                 db,
 		currentBlock:       cs.GenesisBlock(),
 		genesisBlockID:     cs.GenesisBlock().ID(),
 		blockchainHeight:   0,
+		seenTimes:          make([]time.Time, types.MaturityDelay+1),
+		startTime:          time.Now(),
 		currencySent:       types.NewCurrency64(0),
 		activeContractCost: types.NewCurrency64(0),
 		totalContractCost:  types.NewCurrency64(0),
@@ -98,11 +115,11 @@ func New(cs modules.ConsensusSet, persistDir string) (be *BlockExplorer, err err
 		mu:                 sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	cs.ConsensusSetSubscribe(be)
+	cs.ConsensusSetSubscribe(e)
 
 	return
 }
 
-func (be *BlockExplorer) Close() error {
-	return be.db.CloseDatabase()
+func (e *Explorer) Close() error {
+	return e.db.CloseDatabase()
 }

@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"bytes"
@@ -20,16 +20,16 @@ const (
 
 // GetHashInfo returns sufficient data about the hash that was
 // provided to do more extensive lookups
-func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
+func (e *Explorer) GetHashInfo(hash []byte) (interface{}, error) {
 	if len(hash) < crypto.HashSize {
 		return nil, errors.New("requested hash not long enough")
 	}
 
-	lockID := be.mu.RLock()
-	defer be.mu.RUnlock(lockID)
+	lockID := e.mu.RLock()
+	defer e.mu.RUnlock(lockID)
 
 	// Perform a lookup to tell which type of hash it is
-	typeBytes, err := be.db.GetFromBucket("Hashes", hash[:crypto.HashSize])
+	typeBytes, err := e.db.GetFromBucket("Hashes", hash[:crypto.HashSize])
 	if err != nil {
 		return nil, err
 	}
@@ -44,23 +44,23 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 	case hashBlock:
 		var id types.BlockID
 		copy(id[:], hash[:])
-		return be.db.getBlock(types.BlockID(id))
+		return e.db.getBlock(types.BlockID(id))
 	case hashTransaction:
 		var id crypto.Hash
 		copy(id[:], hash[:])
-		return be.db.getTransaction(id)
+		return e.db.getTransaction(id)
 	case hashFilecontract:
 		var id types.FileContractID
 		copy(id[:], hash[:])
-		return be.db.getFileContract(id)
+		return e.db.getFileContract(id)
 	case hashCoinOutputID:
 		var id types.SiacoinOutputID
 		copy(id[:], hash[:])
-		return be.db.getSiacoinOutput(id)
+		return e.db.getSiacoinOutput(id)
 	case hashFundOutputID:
 		var id types.SiafundOutputID
 		copy(id[:], hash[:])
-		return be.db.getSiafundOutput(id)
+		return e.db.getSiafundOutput(id)
 	case hashUnlockHash:
 		// Check that the address is valid before doing a lookup
 		if len(hash) != crypto.HashSize+types.UnlockHashChecksumSize {
@@ -75,7 +75,7 @@ func (be *BlockExplorer) GetHashInfo(hash []byte) (interface{}, error) {
 			return nil, errors.New("address does not have a valid checksum")
 		}
 
-		return be.db.getAddressTransactions(id)
+		return e.db.getAddressTransactions(id)
 	default:
 		return nil, errors.New("bad hash type")
 	}

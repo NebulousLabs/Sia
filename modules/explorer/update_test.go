@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"testing"
@@ -9,9 +9,6 @@ import (
 // Mine a bunch of blocks, checking each time that the stored
 // value agrees with consensus
 func (et *explorerTester) testConsensusUpdates(t *testing.T) {
-	// Clear the notification about the genesis block
-	<-et.beUpdateChan
-
 	// 20 here is arbitrary
 	for i := types.BlockHeight(0); i < 20; i++ {
 		b, _ := et.miner.FindBlock()
@@ -28,6 +25,9 @@ func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 }
 
 func TestConsensusUpdates(t *testing.T) {
-	et := createExplorerTester("TestExplorerConsensusUpdate", t)
+	et, err := createExplorerTester("TestExplorerConsensusUpdate", t)
+	if err != nil {
+		t.Fatal(err)
+	}
 	et.testConsensusUpdates(t)
 }
