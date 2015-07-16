@@ -166,6 +166,10 @@ func TestRelayNodes(t *testing.T) {
 	g3.myAddr = dummyNode
 	g3.mu.Unlock(id)
 
+	// normally the Gateway will only register this RPC if has discovered its
+	// IP through external means.
+	g3.RegisterConnectCall("RelayNode", g3.sendAddress)
+
 	// connect g2 to g1
 	err := g2.Connect(g1.Address())
 	if err != nil {
