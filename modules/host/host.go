@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
@@ -71,6 +70,12 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		return nil, errors.New("host cannot use a nil wallet")
 	}
 
+	// Create host directory if it does not exist.
+	err := os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+
 	coinAddr, _, err := wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err != nil {
 		return nil, err
@@ -101,33 +106,25 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	}
 	h.spaceRemaining = h.TotalStorage
 
+	// Load the old host data.
+	err = h.load()
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
 	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	host, err := modules.IGD.ExternalIP()
-	if err != nil {
-		// log error? should be fatal
-		host = "::1"
-	}
 	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
-	h.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
+	h.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
 
-	// Forward port, if possible
-	portInt, _ := strconv.Atoi(port)
-	if portErr := modules.IGD.Forward(uint16(portInt), "Sia Host"); portErr != nil {
-		// log error? should be fatal if err != modules.ErrNoUPnP
-	}
+	// Learn our external IP.
+	go h.learnHostname()
 
-	err = os.MkdirAll(saveDir, 0700)
-	if err != nil {
-		return nil, err
-	}
-	err = h.load()
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
+	// Forward the hosting port, if possible.
+	go h.forwardPort(port)
 
 	// spawn listener
 	go h.listen()
@@ -199,14 +196,13 @@ func (h *Host) Info() modules.HostInfo {
 // Close saves the state of the Gateway and stops its listener process.
 func (h *Host) Close() error {
 	id := h.mu.RLock()
-	defer h.mu.RUnlock(id)
 	// save the latest host state
 	if err := h.save(); err != nil {
 		return err
 	}
+	h.mu.RUnlock(id)
 	// clear the port mapping (no effect if UPnP not supported)
-	portInt, _ := strconv.Atoi(h.myAddr.Port())
-	modules.IGD.Clear(uint16(portInt))
+	h.clearPort(h.myAddr.Port())
 	// shut down the listener
 	return h.listener.Close()
 }

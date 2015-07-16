@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -49,14 +48,13 @@ func (g *Gateway) Address() modules.NetAddress {
 // Close saves the state of the Gateway and stops its listener process.
 func (g *Gateway) Close() error {
 	id := g.mu.RLock()
-	defer g.mu.RUnlock(id)
 	// save the latest gateway state
 	if err := g.save(); err != nil {
 		return err
 	}
+	g.mu.RUnlock(id)
 	// clear the port mapping (no effect if UPnP not supported)
-	portInt, _ := strconv.Atoi(g.myAddr.Port())
-	modules.IGD.Clear(uint16(portInt))
+	g.clearPort(g.myAddr.Port())
 	// shut down the listener
 	return g.listener.Close()
 }
@@ -85,49 +83,39 @@ func New(addr string, persistDir string) (g *Gateway, err error) {
 		log:        logger,
 	}
 
-	// Register RPCs.
-	g.RegisterRPC("ShareNodes", g.shareNodes)
-	g.RegisterRPC("RelayNode", g.relayNode)
-	g.RegisterConnectCall("ShareNodes", g.requestNodes)
-	g.RegisterConnectCall("RelayNode", g.sendAddress)
-
-	g.log.Println("INFO: gateway created, started logging")
-
-	// Create listener and set address.
-	g.listener, err = net.Listen("tcp", addr)
-	if err != nil {
-		return
-	}
-	host, err := modules.IGD.ExternalIP()
-	if err != nil {
-		g.log.Println("WARN: failed to discover external IP, using ::1 instead")
-		host = "::1"
-	}
-	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
-	g.myAddr = modules.NetAddress(net.JoinHostPort(host, port))
-
-	g.log.Println("INFO: our address is", g.myAddr)
-
-	// Forward port, if possible
-	portInt, _ := strconv.Atoi(port)
-	if portErr := modules.IGD.Forward(uint16(portInt), "Sia RPC"); portErr == nil {
-		g.log.Println("INFO: successfully forwarded port", port)
-	} else if portErr != modules.ErrNoUPnP {
-		g.log.Println("WARN: automatic port forwarding failed")
-	}
-
-	// Spawn the primary listener.
-	go g.listen()
-
 	// Load the old peer list. If it doesn't exist, no problem, but if it does,
 	// we want to know about any errors preventing us from loading it.
 	if loadErr := g.load(); loadErr != nil && !os.IsNotExist(loadErr) {
 		return nil, loadErr
 	}
 
+	// Create listener and set address.
+	g.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+	_, port, _ := net.SplitHostPort(g.listener.Addr().String())
+	g.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
+
+	// Register RPCs.
+	g.RegisterRPC("ShareNodes", g.shareNodes)
+	g.RegisterRPC("RelayNode", g.relayNode)
+	g.RegisterConnectCall("ShareNodes", g.requestNodes)
+
+	g.log.Println("INFO: gateway created, started logging")
+
+	// Learn our external IP.
+	go g.learnHostname()
+
+	// Automatically forward the RPC port, if possible.
+	go g.forwardPort(port)
+
 	// Spawn the connector loop. This will continually attempt to add nodes as
 	// peers to ensure we stay well-connected.
 	go g.makeOutboundConnections()
+
+	// Spawn the primary listener.
+	go g.listen()
 
 	return
 }
