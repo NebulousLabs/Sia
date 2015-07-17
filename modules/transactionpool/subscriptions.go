@@ -46,12 +46,16 @@ func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	id := tp.mu.Lock()
 	tp.subscribers = append(tp.subscribers, subscriber)
+	println("newcomer")
 	for i := 0; i <= tp.consensusChangeIndex; i++ {
 		cc, err := tp.consensusSet.ConsensusChange(i)
+		println(i)
+		println(tp.consensusChangeIndex)
 		if err != nil && build.DEBUG {
 			panic(err)
 		}
 		subscriber.ReceiveConsensusSetUpdate(cc)
+		println("sent an update successfully")
 	}
 	tp.mu.Unlock(id)
 }

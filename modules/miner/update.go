@@ -7,6 +7,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// ReceiveConsensusSetUpdate will update the miner's most recent block. This is
+// a part of the ConsensusSetSubscriber interface.
 func (m *Miner) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
@@ -34,6 +36,9 @@ func (m *Miner) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	m.earliestTimestamp = timestamp
 }
 
+// ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed
+// set of transactions with the input transactions. This is a part of the
+// TransactionPoolSubscriber interface.
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)

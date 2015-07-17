@@ -51,6 +51,7 @@ func (tp *TransactionPool) ReceiveConsensusSetUpdate(cc modules.ConsensusChange)
 	}
 
 	// Inform subscribers that an update has executed.
+	println("incrementational")
 	tp.consensusChangeIndex++
 	tp.updateSubscribersConsensus(cc)
 	tp.updateSubscribersTransactions()

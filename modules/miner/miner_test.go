@@ -38,9 +38,13 @@ func (mt *minerTester) csUpdateWait() {
 // tpUpdateWait blocks until a transaction pool update has propagated to all
 // modules.
 func (mt *minerTester) tpUpdateWait() {
+	println("aep")
 	<-mt.tpoolUpdateChan
+	println("tep")
 	<-mt.minerUpdateChan
+	println("mep")
 	<-mt.walletUpdateChan
+	println("wep")
 }
 
 // createMinerTester creates a minerTester that's ready for use.

@@ -67,6 +67,9 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
+		// TODO: Docstring
+		consensusChangeIndex: -1,
+
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 

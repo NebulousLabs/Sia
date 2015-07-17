@@ -8,10 +8,7 @@ import (
 // update.
 func (w *Wallet) notifySubscribers() {
 	for _, subscriber := range w.subscribers {
-		select {
-		case subscriber <- struct{}{}:
-		default:
-		}
+		subscriber <- struct{}{}
 	}
 }
 
