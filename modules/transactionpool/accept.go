@@ -80,13 +80,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	return nil
 }
 
-// AcceptTransaction adds a transaction to the unconfirmed set of
-// transactions. If the transaction is accepted, it will be relayed to
-// connected peers.
-func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
-	id := tp.mu.Lock()
-	defer tp.mu.Unlock(id)
-
+func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
@@ -135,9 +129,23 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}
 	tp.transactionSetDiffs[setID] = oids
 	tp.databaseSize += len(encoding.Marshal(ts))
+	return nil
+}
+
+// AcceptTransaction adds a transaction to the unconfirmed set of
+// transactions. If the transaction is accepted, it will be relayed to
+// connected peers.
+func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
+	id := tp.mu.Lock()
+	defer tp.mu.Unlock(id)
+
+	err := tp.acceptTransactionSet(ts)
+	if err != nil {
+		return err
+	}
 
 	// Notify subscribers and broadcast the transaction set.
-	tp.updateSubscribers(modules.ConsensusChange{}, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
+	tp.updateSubscribersTransactions()
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
 	return nil
 }

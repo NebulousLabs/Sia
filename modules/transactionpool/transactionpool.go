@@ -36,18 +36,10 @@ type TransactionPool struct {
 	//
 	// TODO: Need some sort of first-come-first-serve memory.
 
-	// The entire history of the transaction pool is kept. Each element
-	// represents an atomic change to the transaction pool. When a new
-	// subscriber joins the transaction pool, they can be sent the entire
-	// history and catch up properly, and they can take a long time to catch
-	// up. To prevent deadlocks in the transaction pool, subscribers are
-	// updated in a separate thread which does not guarantee that a subscriber
-	// is always fully synchronized to the transaction pool.
-	consensusChangeIndex    int   // Increments any time a consensus update is made.
-	consensusChanges        []int // The index of the consensus change from the consensus set. -1 means there was no change from the consensus set.
-	unconfirmedTransactions [][]types.Transaction
-	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
-	subscribers             []chan struct{}
+	// TODO: docstring
+	consensusChangeIndex int
+	subscribers          []modules.TransactionPoolSubscriber
+	notifySubscribers    []chan struct{}
 
 	mu *sync.RWMutex
 }
@@ -69,7 +61,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 		consensusSet: cs,
 		gateway:      g,
 
-		unconfirmedIDs:      make(map[ObjectID]TransactionSetID),
+		knownObjects:        make(map[ObjectID]TransactionSetID),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID][]ObjectID),
 
@@ -77,7 +69,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 	}
 
 	// Register RPCs
-	g.RegisterRPC("RelayTransaction", tp.RelayTransaction)
+	g.RegisterRPC("RelayTransactionSet", tp.RelayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)
