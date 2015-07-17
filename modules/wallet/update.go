@@ -54,7 +54,6 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 func (w *Wallet) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	// TODO: Current wallet model is completely incompatible with the
 	// transaction pool update model.
-	println("consensus update to wallet")
 }
 
 // ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
@@ -106,5 +105,4 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, un
 		}
 
 	*/
-	println("tpool update to wallet")
 }

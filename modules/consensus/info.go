@@ -36,9 +36,6 @@ func (s *ConsensusSet) CurrentBlock() types.Block {
 // ChildTarget does not need a lock, as the values being read are not changed
 // once they have been created.
 func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exists bool) {
-	lockID := s.mu.RLock()
-	defer s.mu.RUnlock(lockID)
-
 	bn, exists := s.blockMap[bid]
 	if !exists {
 		return
@@ -50,8 +47,6 @@ func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exis
 // EarliestChildTimestamp returns the earliest timestamp that the next block can
 // have in order for it to be considered valid.
 func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
 	bn, exists := s.blockMap[bid]
 	if !exists {
 		return

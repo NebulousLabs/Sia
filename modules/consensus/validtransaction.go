@@ -254,6 +254,7 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
 	diffHolder := new(blockNode)
+	diffHolder.height = cs.height()
 	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)
