@@ -16,12 +16,12 @@ const (
 
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
 	// that are remembered.
-	headerForWorkMemory = 1000
+	headerForWorkMemory = 20
 
 	// headersPerBlockMemory is the number of headers created by changing the
 	// random transaction of a block before updating the block to contain any
 	// new transactions
-	headersPerBlockMemory = 100
+	headersPerBlockMemory = 5
 )
 
 // TODO: docstring
@@ -75,8 +75,7 @@ type Miner struct {
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
-	// Create the miner and its dependencies.
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) { // Create the miner and its dependencies.
 	if cs == nil {
 		return nil, errors.New("miner cannot use a nil state")
 	}

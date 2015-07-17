@@ -69,34 +69,37 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
-	block := new(types.Block)
+	var header types.BlockHeader
+	var randTxn types.Transaction
+	var block *types.Block
 
 	if m.memProgress%headersPerBlockMemory == 0 {
 		// Grab a new block
+		block = new(types.Block)
 		*block, _ = m.blockForWork()
+		header = block.Header()
+		randTxn = block.Transactions[0]
 	} else {
 		// Set block to previous block and create a randTxn
-		blockOld := m.blockMem[m.headerMem[m.memProgress-1]]
+		block = m.blockMem[m.headerMem[m.memProgress-1]]
 
 		randBytes, _ := crypto.RandBytes(types.SpecifierLen)
-		randTxn := types.Transaction{
+		randTxn = types.Transaction{
 			ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
 		}
 
-		// Overwrite the old bolck's random transaction
-		blockTransactions := append([]types.Transaction{randTxn}, blockOld.Transactions[1:]...)
+		// Overwrite the old block's random transaction
+		blockTransactions := append([]types.Transaction{randTxn}, block.Transactions[1:]...)
 
 		// Assemble the block
-		*block = types.Block{
-			ParentID:     blockOld.ParentID,
-			Timestamp:    blockOld.Timestamp,
-			MinerPayouts: blockOld.MinerPayouts,
+		newBlock := types.Block{
+			ParentID:     block.ParentID,
+			Timestamp:    block.Timestamp,
+			MinerPayouts: block.MinerPayouts,
 			Transactions: blockTransactions,
 		}
+		header = newBlock.Header()
 	}
-
-	header := block.Header()
-	randTxn := block.Transactions[0]
 
 	// Save a mapping between the block and its header as well as the
 	// random transaction and its header, replacing the block that was
