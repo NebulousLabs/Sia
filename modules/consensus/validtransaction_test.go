@@ -134,7 +134,6 @@ func TestValidStorageProofs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst.csUpdateWait()
 	}
 
 	// Create a file contract for which a storage proof can be created.

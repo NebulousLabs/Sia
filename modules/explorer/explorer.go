@@ -69,10 +69,6 @@ type Explorer struct {
 	// Keep a reference to the consensus for queries
 	cs modules.ConsensusSet
 
-	// Subscriptions currently contain no data, but serve to
-	// notify other modules when changes occur
-	subscriptions []chan struct{}
-
 	// updates is the number of updates that have been sent out to subscribers
 	updates uint64
 

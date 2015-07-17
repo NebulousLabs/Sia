@@ -116,10 +116,6 @@ type Wallet interface {
 
 	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
 
-	// WalletNotify will push a struct down the channel any time that the
-	// wallet updates.
-	WalletNotify() <-chan struct{}
-
 	// SiafundBalance returns the number of siafunds owned by the wallet, and
 	// the number of siacoins available through siafund claims.
 	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)

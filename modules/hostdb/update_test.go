@@ -65,7 +65,6 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdbt.tpUpdateWait()
 
 	// Check that, prior to mining, the hostdb has no hosts.
 	if len(hdbt.hostdb.allHosts) != 0 {
@@ -78,7 +77,6 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdbt.csUpdateWait()
 
 	// Check that there is now a host in the hostdb.
 	if len(hdbt.hostdb.allHosts) != 1 {

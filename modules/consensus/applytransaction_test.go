@@ -25,7 +25,6 @@ func TestApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.csUpdateWait()
 
 	// Create a block node to use with application.
 	bn := new(blockNode)

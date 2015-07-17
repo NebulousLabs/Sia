@@ -65,7 +65,6 @@ func (hdb *HostDB) decrementReliability(addr modules.NetAddress, penalty types.C
 	if exists {
 		delete(hdb.activeHosts, entry.IPAddress)
 		node.removeNode()
-		hdb.notifySubscribers()
 	}
 
 	// If the reliability has fallen to 0, remove the host from the
@@ -118,7 +117,6 @@ func (hdb *HostDB) threadedProbeHosts() {
 			_, exists2 := hdb.allHosts[hostEntry.IPAddress]
 			if !exists1 && exists2 && len(hdb.activeHosts) < MaxActiveHosts {
 				hdb.insertNode(hostEntry)
-				hdb.notifySubscribers()
 			}
 		}
 		hdb.mu.Unlock(id)

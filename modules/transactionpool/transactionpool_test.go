@@ -25,11 +25,6 @@ type tpoolTester struct {
 	miner   modules.Miner
 	wallet  modules.Wallet
 
-	csUpdateChan     <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
 }
 
@@ -62,23 +57,6 @@ func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
 	return txn
 }
 
-// csUpdateWait listens on all channels until a consensus set update has
-// reached all modules.
-func (tpt *tpoolTester) csUpdateWait() {
-	<-tpt.csUpdateChan
-	tpt.tpUpdateWait()
-}
-
-// tpUpdateWait listens on all channels until a transaction pool update has
-// reached all modules.
-func (tpt *tpoolTester) tpUpdateWait() {
-	<-tpt.tpoolUpdateChan
-	<-tpt.minerUpdateChan
-	<-tpt.walletUpdateChan
-}
-
-// An exact clone of wallet's SendCoins(). The difference is the use of
-// tpUpdateWait() for testing purposes.
 func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
 	output := types.SiacoinOutput{
 		Value:      amount,
@@ -92,7 +70,6 @@ func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) 
 	if err != nil {
 		return
 	}
-	tpt.tpUpdateWait()
 	_, _, err = tpt.wallet.AddSiacoinOutput(id, output)
 	if err != nil {
 		return
@@ -105,7 +82,6 @@ func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) 
 	if err != nil {
 		return
 	}
-	tpt.tpUpdateWait()
 	return
 }
 
@@ -152,14 +128,8 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		miner:   m,
 		wallet:  w,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	tpt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -168,7 +138,6 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tpt.csUpdateWait()
 	}
 
 	return tpt

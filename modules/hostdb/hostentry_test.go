@@ -67,7 +67,6 @@ func TestInsertHost(t *testing.T) {
 	if len(hdbt.hostdb.allHosts) != 2 {
 		t.Error("host was not inserted")
 	}
-	<-hdbt.hostdbUpdateChan
 	if len(hdbt.hostdb.activeHosts) != 1 {
 		t.Error("expecting an active host")
 	}

@@ -12,7 +12,6 @@ import (
 func (m *Miner) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
-	defer m.notifySubscribers()
 
 	m.height -= types.BlockHeight(len(cc.RevertedBlocks))
 	m.height += types.BlockHeight(len(cc.AppliedBlocks))
@@ -42,7 +41,6 @@ func (m *Miner) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []types.Transaction, _ modules.ConsensusChange) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
-	defer m.notifySubscribers()
 
 	m.transactions = nil
 	remainingSize := int(types.BlockSizeLimit - 5e3)

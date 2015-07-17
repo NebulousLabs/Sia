@@ -13,7 +13,6 @@ func (st *serverTester) announceHost() error {
 	if err != nil {
 		return err
 	}
-	st.csUpdateWait()
 	return nil
 }
 
@@ -73,7 +72,6 @@ func TestStorageProofs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		st.csUpdateWait()
 		t.Error("found", i)
 	}
 
@@ -85,7 +83,6 @@ func TestStorageProofs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		st.csUpdateWait()
 		time.Sleep(time.Millisecond * 50)
 		t.Error("2 - found", i)
 	}

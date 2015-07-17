@@ -12,5 +12,4 @@ func (r *Renter) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	defer r.mu.Unlock(lockID)
 	r.blockHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	r.blockHeight += types.BlockHeight(len(cc.AppliedBlocks))
-	r.updateSubscribers()
 }

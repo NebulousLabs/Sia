@@ -25,29 +25,7 @@ type explorerTester struct {
 
 	explorer *Explorer
 
-	csUpdateChan     <-chan struct{}
-	eUpdateChan      <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWait blocks until a consensus update has propagated to all
-// modules.
-func (et *explorerTester) csUpdateWait() {
-	<-et.csUpdateChan
-	<-et.eUpdateChan
-	et.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until a transaction pool update has propagated to all
-// modules.
-func (et *explorerTester) tpUpdateWait() {
-	<-et.tpoolUpdateChan
-	<-et.minerUpdateChan
-	<-et.walletUpdateChan
 }
 
 func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
@@ -88,16 +66,8 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 
 		explorer: e,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		eUpdateChan:      e.ExplorerNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-
-	et.csUpdateWait()
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -106,7 +76,6 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 		if err != nil {
 			return nil, err
 		}
-		et.csUpdateWait()
 	}
 	return et, nil
 }

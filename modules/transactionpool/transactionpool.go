@@ -40,7 +40,6 @@ type (
 		// TODO: docstring
 		consensusChangeIndex int
 		subscribers          []modules.TransactionPoolSubscriber
-		notifySubscribers    []chan struct{}
 
 		mu *sync.RWMutex
 	}

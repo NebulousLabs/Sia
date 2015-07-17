@@ -17,7 +17,6 @@ func (st *serverTester) addPeer(name string) *serverTester {
 	if err != nil {
 		st.t.Fatal(err)
 	}
-	st.csUpdateWait()
 
 	// Create a new peer and bootstrap it to st.
 	newPeer := newServerTester(name, st.t)

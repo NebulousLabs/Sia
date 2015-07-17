@@ -100,6 +100,4 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	}
 	h.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	h.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
-
-	go h.threadedUpdateSubscribers()
 }
