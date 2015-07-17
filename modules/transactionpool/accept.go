@@ -114,20 +114,16 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	// Add the transaction set to the pool.
 	setID := TransactionSetID(crypto.HashObject(ts))
 	tp.transactionSets[setID] = ts
-	var oids []ObjectID
 	for _, diff := range cc.SiacoinOutputDiffs {
 		tp.knownObjects[ObjectID(diff.ID)] = setID
-		oids = append(oids, ObjectID(diff.ID))
 	}
 	for _, diff := range cc.FileContractDiffs {
 		tp.knownObjects[ObjectID(diff.ID)] = setID
-		oids = append(oids, ObjectID(diff.ID))
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
 		tp.knownObjects[ObjectID(diff.ID)] = setID
-		oids = append(oids, ObjectID(diff.ID))
 	}
-	tp.transactionSetDiffs[setID] = oids
+	tp.transactionSetDiffs[setID] = cc
 	tp.databaseSize += len(encoding.Marshal(ts))
 	return nil
 }
@@ -164,4 +160,14 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 		err = nil
 	}
 	return err
+}
+
+// DEPRECATED
+func (tp *TransactionPool) AcceptTransaction(t types.Transaction) error {
+	return tp.AcceptTransactionSet([]types.Transaction{t})
+}
+
+// DEPRECATED
+func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
+	return tp.RelayTransactionSet(conn)
 }

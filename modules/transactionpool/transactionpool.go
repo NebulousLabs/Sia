@@ -9,40 +9,42 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-type ObjectID crypto.Hash
-type TransactionSetID crypto.Hash
+type (
+	ObjectID         crypto.Hash
+	TransactionSetID crypto.Hash
 
-type TransactionPool struct {
-	// Depedencies of the transaction pool. The state height is needed
-	// separately from the state because the transaction pool may not be
-	// synchronized to the state.
-	consensusSet modules.ConsensusSet
-	gateway      modules.Gateway
+	TransactionPool struct {
+		// Depedencies of the transaction pool. The state height is needed
+		// separately from the state because the transaction pool may not be
+		// synchronized to the state.
+		consensusSet modules.ConsensusSet
+		gateway      modules.Gateway
 
-	// unconfirmedIDs is a set of hashes representing the ID of an object in
-	// the unconfirmed set of transactions. Each unconfirmed ID points to the
-	// transaciton set containing that object. Transaction sets are sets of
-	// transactions that get id'd by their hash. transacitonSetDiffs contain
-	// the set of IDs that each transaction set is associated with.
-	knownObjects        map[ObjectID]TransactionSetID
-	transactionSets     map[TransactionSetID][]types.Transaction
-	transactionSetDiffs map[TransactionSetID][]ObjectID
-	databaseSize        int
-	// TODO: Write a consistency check comparing transactionSets,
-	// transactionSetDiffs.
-	//
-	// TODO: Write a consistency check making sure that all unconfirmedIDs
-	// point to the right place, and that all UnconfirmedIDs are accounted for.
-	//
-	// TODO: Need some sort of first-come-first-serve memory.
+		// unconfirmedIDs is a set of hashes representing the ID of an object in
+		// the unconfirmed set of transactions. Each unconfirmed ID points to the
+		// transaciton set containing that object. Transaction sets are sets of
+		// transactions that get id'd by their hash. transacitonSetDiffs contain
+		// the set of IDs that each transaction set is associated with.
+		knownObjects        map[ObjectID]TransactionSetID
+		transactionSets     map[TransactionSetID][]types.Transaction
+		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
+		databaseSize        int
+		// TODO: Write a consistency check comparing transactionSets,
+		// transactionSetDiffs.
+		//
+		// TODO: Write a consistency check making sure that all unconfirmedIDs
+		// point to the right place, and that all UnconfirmedIDs are accounted for.
+		//
+		// TODO: Need some sort of first-come-first-serve memory.
 
-	// TODO: docstring
-	consensusChangeIndex int
-	subscribers          []modules.TransactionPoolSubscriber
-	notifySubscribers    []chan struct{}
+		// TODO: docstring
+		consensusChangeIndex int
+		subscribers          []modules.TransactionPoolSubscriber
+		notifySubscribers    []chan struct{}
 
-	mu *sync.RWMutex
-}
+		mu *sync.RWMutex
+	}
+)
 
 // New creates a transaction pool that is ready to receive transactions.
 func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err error) {
@@ -63,7 +65,7 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 
 		knownObjects:        make(map[ObjectID]TransactionSetID),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
-		transactionSetDiffs: make(map[TransactionSetID][]ObjectID),
+		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
@@ -75,4 +77,12 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 	cs.ConsensusSetSubscribe(tp)
 
 	return
+}
+
+func (tp *TransactionPool) TransactionSet() []types.Transaction {
+	var txns []types.Transaction
+	for _, tSet := range tp.transactionSets {
+		txns = append(txns, tSet...)
+	}
+	return txns
 }

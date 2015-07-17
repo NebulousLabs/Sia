@@ -29,8 +29,9 @@ type TransactionPoolSubscriber interface {
 	ConsensusSetSubscriber
 
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
-	// consensus set and/or unconfirmed set.
-	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction)
+	// consensus set and/or unconfirmed set, and includes the consensus change
+	// that would result if all of the transactions made it into a block.
+	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
 }
 
 type TransactionPool interface {

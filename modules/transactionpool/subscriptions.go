@@ -14,11 +14,15 @@ func (tp *TransactionPool) sendNotification() {
 
 func (tp *TransactionPool) updateSubscribersTransactions() {
 	var txns []types.Transaction
+	var cc modules.ConsensusChange
 	for _, tSet := range tp.transactionSets {
 		txns = append(txns, tSet...)
 	}
+	for _, tSetDiff := range tp.transactionSetDiffs {
+		cc = cc.Append(tSetDiff)
+	}
 	for _, subscriber := range tp.subscribers {
-		subscriber.ReceiveUpdatedUnconfirmedTransactions(txns)
+		subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
 	}
 	tp.sendNotification()
 }
@@ -30,9 +34,6 @@ func (tp *TransactionPool) updateSubscribersConsensus(cc modules.ConsensusChange
 	tp.sendNotification()
 }
 
-// TransactionPoolNotify adds a subscriber to the list who will be notified any
-// time that there is a change to the transaction pool (new transaction or
-// block), but that subscriber will not be told any details about the change.
 func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	id := tp.mu.Lock()
@@ -42,9 +43,6 @@ func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
 	return c
 }
 
-// TransactionPoolSubscribe adds a subscriber to the transaction pool that will
-// be given a full list of changes via ReceiveTransactionPoolUpdate any time
-// that there is a change.
 func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.TransactionPoolSubscriber) {
 	id := tp.mu.Lock()
 	tp.subscribers = append(tp.subscribers, subscriber)
