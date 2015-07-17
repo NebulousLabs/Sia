@@ -243,12 +243,12 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 	return nil
 }
 
-// TryTransactions applies the input transactions to the consensus set to
+// TryTransactionSet applies the input transactions to the consensus set to
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
-func (cs *ConsensusSet) TryTransactions(txns []types.Transaction) (modules.ConsensusChange, error) {
+func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the

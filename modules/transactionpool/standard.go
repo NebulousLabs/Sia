@@ -39,7 +39,7 @@ const (
 )
 
 var (
-	ErrLargeTransaction = errors.New("transaction is too large")
+	ErrLargeTransaction    = errors.New("transaction is too large")
 	ErrLargeTransactionSet = errors.New("transaction set is too large")
 )
 
@@ -122,7 +122,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	return nil
 }
 
-func (tp *TransactionPool) IsStandardTransacitonSet(ts []types.Transaction) error {
+func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) error {
 	for i := range ts {
 		err := tp.IsStandardTransaction(ts[i])
 		if err != nil {

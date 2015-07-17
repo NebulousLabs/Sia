@@ -16,8 +16,8 @@ type TransactionPool struct {
 	// Depedencies of the transaction pool. The state height is needed
 	// separately from the state because the transaction pool may not be
 	// synchronized to the state.
-	consensusSet       modules.ConsensusSet
-	gateway            modules.Gateway
+	consensusSet modules.ConsensusSet
+	gateway      modules.Gateway
 
 	// unconfirmedIDs is a set of hashes representing the ID of an object in
 	// the unconfirmed set of transactions. Each unconfirmed ID points to the
@@ -27,7 +27,7 @@ type TransactionPool struct {
 	knownObjects        map[ObjectID]TransactionSetID
 	transactionSets     map[TransactionSetID][]types.Transaction
 	transactionSetDiffs map[TransactionSetID][]ObjectID
-	databaseSize int
+	databaseSize        int
 	// TODO: Write a consistency check comparing transactionSets,
 	// transactionSetDiffs.
 	//

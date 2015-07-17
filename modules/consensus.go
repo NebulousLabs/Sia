@@ -169,6 +169,12 @@ type ConsensusSet interface {
 	// use, this call should never be necessary.
 	Synchronize(NetAddress) error
 
+	// TryTransactionSet checks whether the transaction set would be valid if
+	// it were added in the next block. A consensus change is returned
+	// detailing the diffs that would result from the application of the
+	// transaction.
+	TryTransactionSet([]types.Transaction) (ConsensusChange, error)
+
 	// ValidStorageProofs checks that all the storage proofs in a transaction
 	// are valid in the context of the current consensus set. An error is
 	// returned if not.

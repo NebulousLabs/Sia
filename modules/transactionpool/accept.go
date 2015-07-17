@@ -10,15 +10,16 @@ import (
 )
 
 const (
-	TransactionPoolSizeLimit  = 10e6
-	TransactionPoolSizeForFee = 2e6
+	TransactionPoolSizeLimit  = 5e6
+	TransactionPoolSizeForFee = 1e6
 )
 
 var (
-	ErrObjectConflict = errors.New("transaction set conflicts with an existing transaction set")
+	ErrObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
 	ErrFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
-	ErrLowMinerFees         = errors.New("transaction set needs more miner fees to be accepted")
-	TransactionMinFee       = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
+	ErrLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
+
+	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
 
 // checkMinerFees checks that the total amount of transaction fees in the set
@@ -40,28 +41,26 @@ func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
 			return ErrLowMinerFees
 		}
 	}
-	return
+	return nil
 }
 
-// AcceptTransaction adds a transaction to the unconfirmed set of
-// transactions. If the transaction is accepted, it will be relayed to
-// connected peers.
-func (tp *TransactionPool) AcceptTransactions(ts []types.Transaction) (err error) {
-	id := tp.mu.Lock()
-	defer tp.mu.Unlock(id)
-
+// checkTransactionSetComposition checks if the transaction set is valid given
+// the state of the pool. It does not check that each individual transaction
+// would be legal in the next block, but does check things like miner fees and
+// IsStandard.
+func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction) error {
 	// Check that the transaction set is not already known.
-	setHash := TransactionSetID(crypto.HashObject(ts))
-	_, exists := tp.transactionSets[setHash]
+	setID := TransactionSetID(crypto.HashObject(ts))
+	_, exists := tp.transactionSets[setID]
 	if exists {
 		return modules.ErrTransactionPoolDuplicate
 	}
 
 	// Check that the transaction set has enough fees to justify adding it to
 	// the database.
-	err = tp.checkMinerFees(ts)
+	err := tp.checkMinerFees(ts)
 	if err != nil {
-		return
+		return err
 	}
 
 	// All checks after this are expensive.
@@ -78,70 +77,82 @@ func (tp *TransactionPool) AcceptTransactions(ts []types.Transaction) (err error
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// AcceptTransaction adds a transaction to the unconfirmed set of
+// transactions. If the transaction is accepted, it will be relayed to
+// connected peers.
+func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
+	id := tp.mu.Lock()
+	defer tp.mu.Unlock(id)
+
+	err := tp.checkTransactionSetComposition(ts)
+	if err != nil {
+		return err
+	}
 
 	// Check that all transactions are valid, and that there is no conflict
-	// with existing transacitons.
-	cc, err := tp.consensusSet.TryTransactions(ts)
+	// with existing transactions.
+	cc, err := tp.consensusSet.TryTransactionSet(ts)
 	if err != nil {
 		return err
 	}
 	for _, diff := range cc.SiacoinOutputDiffs {
-		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
 			return ErrObjectConflict
 		}
 	}
 	for _, diff := range cc.FileContractDiffs {
-		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
 			return ErrObjectConflict
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		_, exists := tp.knownObjects[crypto.Hash(diff.ID)]
+		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
 			return ErrObjectConflict
 		}
 	}
 
-	// Add the transaction to the pool.
-	tp.transactionSets[setHash] = ts
+	// Add the transaction set to the pool.
+	setID := TransactionSetID(crypto.HashObject(ts))
+	tp.transactionSets[setID] = ts
 	var oids []ObjectID
 	for _, diff := range cc.SiacoinOutputDiffs {
-		tp.knownObjects = crypto.Hash(diff.ID)
-		oids = append(oids, crypto.Hash(diff.ID))
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+		oids = append(oids, ObjectID(diff.ID))
 	}
 	for _, diff := range cc.FileContractDiffs {
-		tp.knownObjects = crypto.Hash(diff.ID)
-		oids = append(oids, crypto.Hash(diff.ID))
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+		oids = append(oids, ObjectID(diff.ID))
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		tp.knownObjects = crypto.Hash(diff.ID)
-		oids = append(oids, crypto.Hash(diff.ID))
+		tp.knownObjects[ObjectID(diff.ID)] = setID
+		oids = append(oids, ObjectID(diff.ID))
 	}
-	tp.transactionSetDiffs[setHash] = oids
+	tp.transactionSetDiffs[setID] = oids
 	tp.databaseSize += len(encoding.Marshal(ts))
 
 	// Notify subscribers and broadcast the transaction set.
 	tp.updateSubscribers(modules.ConsensusChange{}, tp.transactionList, tp.unconfirmedSiacoinOutputDiffs())
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
-	return
+	return nil
 }
 
 // RelayTransaction is an RPC that accepts a transaction from a peer. If the
 // accept is successful, the transaction will be relayed to the Gateway's
 // other peers.
-func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
-	var t types.Transaction
-	err := encoding.ReadObject(conn, &t, types.BlockSizeLimit)
+func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
+	var ts []types.Transaction
+	err := encoding.ReadObject(conn, &ts, types.BlockSizeLimit)
 	if err != nil {
 		return err
 	}
-	err = tp.AcceptTransaction(t)
-	// ErrTransactionPoolDuplicate is benign
-	// TODO: Is relay called automatically? Will it broadcast a dup? If it
-	// broadcasts a dup, this is a severe DoS problem.
-	if err == modules.ErrTransactionPoolDuplicate {
+	err = tp.AcceptTransactionSet(ts)
+	if err == modules.ErrTransactionPoolDuplicate { // benign error
 		err = nil
 	}
 	return err

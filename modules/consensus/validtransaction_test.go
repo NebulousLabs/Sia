@@ -611,4 +611,7 @@ func TestTryTransactions(t *testing.T) {
 	if len(cc.SiacoinOutputDiffs) != 0 {
 		t.Error("consensus change was not empty despite an error being returned")
 	}
+
+	// TODO: Try invalid transactions on the corner cases. (transaction is
+	// about to expire, etc.)
 }
