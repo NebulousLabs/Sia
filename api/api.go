@@ -130,31 +130,6 @@ func (srv *Server) unrecognizedCallHandler(w http.ResponseWriter, req *http.Requ
 	fmt.Fprintf(w, "404 - Refer to API.md")
 }
 
-// Serve listens for and handles API calls. It a blocking function.
-func (srv *Server) Serve() error {
-	// graceful will run until it catches a signal.
-	// It can also be stopped manually by stopHandler.
-	err := srv.apiServer.ListenAndServe()
-	// despite its name, graceful still propogates this benign error
-	if err != nil && !strings.HasSuffix(err.Error(), "use of closed network connection") {
-		return err
-	}
-
-	// safely close each module
-	if srv.cs != nil {
-		srv.cs.Close()
-	}
-	if srv.gateway != nil {
-		srv.gateway.Close()
-	}
-	if srv.wallet != nil {
-		srv.wallet.Close()
-	}
-
-	fmt.Println("\rCaught stop signal, quitting.")
-	return nil
-}
-
 // writeError an error to the API caller.
 func writeError(w http.ResponseWriter, msg string, err int) {
 	http.Error(w, msg, err)
