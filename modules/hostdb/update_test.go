@@ -49,19 +49,19 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: hdbt.gateway.Address(),
 	})
-	id, err := hdbt.wallet.RegisterTransaction(types.Transaction{})
+	id, err := hdbt.wallet.RegisterTransaction(types.Transaction{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = hdbt.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
+	_, err = hdbt.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn, err := hdbt.wallet.SignTransaction(id, true)
+	txnSet, err := hdbt.wallet.SignTransaction(id, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = hdbt.tpool.AcceptTransactionSet(txn)
+	err = hdbt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
