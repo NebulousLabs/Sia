@@ -52,8 +52,27 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 }
 
 func (w *Wallet) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
-	// TODO: Current wallet model is completely incompatible with the
-	// transaction pool update model.
+	// TODO: Restruture whole wallet.
+
+	// Adjust the confirmed set of diffs.
+	for _, scod := range cc.SiacoinOutputDiffs {
+		w.applyDiff(scod, modules.DiffApply)
+	}
+
+	// Update the wallet age and consensus height. Though they update together,
+	// the wallet age can be altered/reset, but the consensus height cannot.
+	w.age -= len(cc.RevertedBlocks)
+	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
+	w.age += len(cc.AppliedBlocks)
+	w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
+
+	// Update the siafund addresses.
+	for _, diff := range cc.SiafundOutputDiffs {
+		_, exists := w.siafundAddresses[diff.SiafundOutput.UnlockHash]
+		if exists {
+			w.applySiafundDiff(diff, modules.DiffApply)
+		}
+	}
 }
 
 // ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
@@ -71,30 +90,10 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, un
 			w.applyDiff(diff, modules.DiffRevert)
 		}
 
-		// Adjust the confirmed set of diffs.
-		for _, scod := range cc.SiacoinOutputDiffs {
-			w.applyDiff(scod, modules.DiffApply)
-		}
-
 		// Add all of the unconfirmed diffs to the wallet.
 		w.unconfirmedDiffs = unconfirmedSiacoinDiffs
 		for _, diff := range w.unconfirmedDiffs {
 			w.applyDiff(diff, modules.DiffApply)
-		}
-
-		// Update the wallet age and consensus height. Though they update together,
-		// the wallet age can be altered/reset, but the consensus height cannot.
-		w.age -= len(cc.RevertedBlocks)
-		w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-		w.age += len(cc.AppliedBlocks)
-		w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
-
-		// Update the siafund addresses.
-		for _, diff := range cc.SiafundOutputDiffs {
-			_, exists := w.siafundAddresses[diff.SiafundOutput.UnlockHash]
-			if exists {
-				w.applySiafundDiff(diff, modules.DiffApply)
-			}
 		}
 		if len(cc.SiafundPoolDiffs) > 0 {
 			if cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Direction == modules.DiffApply {

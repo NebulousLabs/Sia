@@ -83,7 +83,7 @@ type TransactionBuilder interface {
 	// the wholeTransaction flag will be set in CoveredFields for each
 	// signature. After being signed, the transaction is deleted from the
 	// wallet and must be reregistered if more changes are to be made.
-	SignTransaction(id string, wholeTransaction bool) (types.Transaction, error)
+	SignTransaction(id string, wholeTransaction bool) ([]types.Transaction, error)
 }
 
 // Wallet is an interface that keeps track of addresses and balance. Using
@@ -114,7 +114,7 @@ type Wallet interface {
 	// visible to the user.
 	TimelockedCoinAddress(unlockHeight types.BlockHeight, visible bool) (types.UnlockHash, types.UnlockConditions, error)
 
-	SendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error)
+	SendCoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
 	// SiafundBalance returns the number of siafunds owned by the wallet, and
 	// the number of siacoins available through siafund claims.
@@ -122,7 +122,7 @@ type Wallet interface {
 
 	// SendSiagSiafunds sends siafunds to another address. The siacoins stored
 	// in the siafunds are sent to an address in the wallet.
-	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) (types.Transaction, error)
+	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) ([]types.Transaction, error)
 
 	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
 	WatchSiagSiafundAddress(keyfile string) error

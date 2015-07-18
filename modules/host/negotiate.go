@@ -263,7 +263,7 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	if err != nil {
 		return
 	}
-	err = h.tpool.AcceptTransaction(fullTxn)
+	err = h.tpool.AcceptTransactionSet(fullTxn)
 	if err != nil {
 		return
 	}

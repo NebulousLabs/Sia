@@ -38,7 +38,11 @@ type TransactionPool interface {
 	// AcceptTransaction takes a transaction, analyzes it, and either rejects
 	// it or adds it to the transaction pool. Accepted transactions will be
 	// relayed to connected peers.
+	//
+	// DEPRECATED
 	AcceptTransaction(types.Transaction) error
+
+	AcceptTransactionSet([]types.Transaction) error
 
 	// RelayTransaction is an RPC that accepts a block from a peer.
 	RelayTransaction(PeerConn) error

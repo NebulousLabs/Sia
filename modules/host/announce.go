@@ -43,13 +43,13 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	if err != nil {
 		return err
 	}
-	t, err = h.wallet.SignTransaction(id, true)
+	txns, err := h.wallet.SignTransaction(id, true)
 	if err != nil {
 		return err
 	}
 
 	// Add the transaction to the transaction pool.
-	err = h.tpool.AcceptTransaction(t)
+	err = h.tpool.AcceptTransactionSet(txns)
 	if err == modules.ErrTransactionPoolDuplicate {
 		return errors.New("you have already announced yourself")
 	}

@@ -151,7 +151,7 @@ func (w *Wallet) Close() error {
 
 // SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
+func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
 	// Add a transaction fee of 10 siacoins.
 	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 
@@ -160,7 +160,7 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t type
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	id, err := w.RegisterTransaction(t)
+	id, err := w.RegisterTransaction(types.Transaction{})
 	if err != nil {
 		return
 	}
@@ -176,11 +176,11 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t type
 	if err != nil {
 		return
 	}
-	t, err = w.SignTransaction(id, true)
+	txns, err = w.SignTransaction(id, true)
 	if err != nil {
 		return
 	}
-	err = w.tpool.AcceptTransaction(t)
+	err = w.tpool.AcceptTransactionSet(txns)
 	if err != nil {
 		return
 	}

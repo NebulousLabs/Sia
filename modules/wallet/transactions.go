@@ -17,6 +17,7 @@ var (
 // in the transaction) that the wallet has added personally, so that the inputs
 // can be signed when SignTransaction() is called.
 type openTransaction struct {
+	parents     []types.Transaction // TODO: make this cleaner, probably requires rewriting the whole wallet.
 	transaction *types.Transaction
 	inputs      []int
 }
@@ -26,8 +27,8 @@ type openTransaction struct {
 // then be used to modify and sign the transaction. An empty transaction is
 // legal input.
 func (w *Wallet) RegisterTransaction(t types.Transaction) (id string, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
 
 	id = strconv.Itoa(w.transactionCounter)
 	w.transactionCounter++
@@ -42,8 +43,8 @@ func (w *Wallet) RegisterTransaction(t types.Transaction) (id string, err error)
 // of outputs that add up to at least the desired amount, and then creates a
 // single output of the exact amount and a second refund output.
 func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Transaction, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
 
 	// Create a parent transaction and supply it with enough inputs to cover
 	// 'amount'.
@@ -121,12 +122,6 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 		age:       w.age,
 	}
 
-	// Send the transaction to the transaction pool.
-	err = w.tpool.AcceptTransaction(parentTxn)
-	if err != nil {
-		return
-	}
-
 	// Get the transaction that was originally meant to be funded.
 	openTxn, exists := w.transactions[id]
 	if !exists {
@@ -140,6 +135,7 @@ func (w *Wallet) FundTransaction(id string, amount types.Currency) (t types.Tran
 		ParentID:         parentTxn.SiacoinOutputID(0),
 		UnlockConditions: parentSpendConds,
 	}
+	openTxn.parents = append(openTxn.parents, parentTxn)
 	openTxn.inputs = append(openTxn.inputs, len(txn.SiacoinInputs))
 	txn.SiacoinInputs = append(txn.SiacoinInputs, newInput)
 	t = *txn
@@ -279,6 +275,27 @@ func (w *Wallet) AddSiafundOutput(id string, output types.SiafundOutput) (t type
 	return
 }
 
+// AddTransactionSignature adds a signature to the transaction, presumably
+// signing one of the inputs that 'SignTransaction' will not sign
+// automatically. This can be useful for dealing with multiparty signatures, or
+// for staged negotiations which involve sending the transaction first and the
+// signature later.
+func (w *Wallet) AddTransactionSignature(id string, sig types.TransactionSignature) (t types.Transaction, sigIndex uint64, err error) {
+	counter := w.mu.Lock()
+	defer w.mu.Unlock(counter)
+
+	openTxn, exists := w.transactions[id]
+	if !exists {
+		err = ErrInvalidID
+		return
+	}
+
+	openTxn.transaction.TransactionSignatures = append(openTxn.transaction.TransactionSignatures, sig)
+	t = *openTxn.transaction
+	sigIndex = uint64(len(t.TransactionSignatures) - 1)
+	return
+}
+
 // AddArbitraryData adds arbitrary data to the transaction, returning a copy of
 // the transaction and the index of the new data within the transaction.
 func (w *Wallet) AddArbitraryData(id string, arb []byte) (t types.Transaction, adIndex uint64, err error) {
@@ -299,7 +316,7 @@ func (w *Wallet) AddArbitraryData(id string, arb []byte) (t types.Transaction, a
 
 // SignTransaction signs the transaction, then deletes the transaction from the
 // wallet's internal memory, then returns the transaction.
-func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Transaction, err error) {
+func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txns []types.Transaction, err error) {
 	counter := w.mu.Lock()
 	defer w.mu.Unlock(counter)
 
@@ -309,7 +326,7 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 		err = ErrInvalidID
 		return
 	}
-	txn = *openTxn.transaction
+	txn := *openTxn.transaction
 
 	// Get the coveredfields struct.
 	var coveredFields types.CoveredFields
@@ -364,29 +381,10 @@ func (w *Wallet) SignTransaction(id string, wholeTransaction bool) (txn types.Tr
 		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 	}
 
+	txns = append(openTxn.parents, txn)
+
 	// Delete the open transaction.
 	delete(w.transactions, id)
 
-	return
-}
-
-// AddTransactionSignature adds a signature to the transaction, presumably
-// signing one of the inputs that 'SignTransaction' will not sign
-// automatically. This can be useful for dealing with multiparty signatures, or
-// for staged negotiations which involve sending the transaction first and the
-// signature later.
-func (w *Wallet) AddTransactionSignature(id string, sig types.TransactionSignature) (t types.Transaction, sigIndex uint64, err error) {
-	counter := w.mu.Lock()
-	defer w.mu.Unlock(counter)
-
-	openTxn, exists := w.transactions[id]
-	if !exists {
-		err = ErrInvalidID
-		return
-	}
-
-	openTxn.transaction.TransactionSignatures = append(openTxn.transaction.TransactionSignatures, sig)
-	t = *openTxn.transaction
-	sigIndex = uint64(len(t.TransactionSignatures) - 1)
 	return
 }

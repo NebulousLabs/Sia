@@ -72,7 +72,7 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 		fmt.Println(err)
 		return
 	}
-	err = h.tpool.AcceptTransaction(t)
+	err = h.tpool.AcceptTransactionSet(t)
 	if err != nil {
 		fmt.Println(err)
 		return
