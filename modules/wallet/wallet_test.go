@@ -23,41 +23,10 @@ type walletTester struct {
 	persistDir string
 }
 
-// sendCoins sends the desired amount of coins to the desired address, calling
-// wait at all of the appropriate places to assist synchronization.
-func (wt *walletTester) sendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error) {
-	output := types.SiacoinOutput{
-		Value:      amount,
-		UnlockHash: dest,
-	}
-	id, err := wt.wallet.RegisterTransaction(types.Transaction{})
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	_, err = wt.wallet.FundTransaction(id, amount)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	_, _, err = wt.wallet.AddSiacoinOutput(id, output)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	txn, err := wt.wallet.SignTransaction(id, true)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	err = wt.tpool.AcceptTransaction(txn)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	return txn, nil
-}
-
 // createWalletTester takes a testing.T and creates a WalletTester.
 func createWalletTester(name string) (*walletTester, error) {
-	testdir := build.TempDir("wallet", name)
-
 	// Create the modules
+	testdir := build.TempDir(modules.WalletDir, name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
@@ -97,6 +66,5 @@ func createWalletTester(name string) (*walletTester, error) {
 			return nil, err
 		}
 	}
-
 	return wt, nil
 }

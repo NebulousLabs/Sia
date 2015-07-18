@@ -61,7 +61,7 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = hdbt.tpool.AcceptTransaction(txn)
+	err = hdbt.tpool.AcceptTransactionSet(txn)
 	if err != nil {
 		t.Fatal(err)
 	}

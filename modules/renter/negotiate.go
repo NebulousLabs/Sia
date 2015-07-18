@@ -23,7 +23,7 @@ const (
 // them to build a transaction containing a file contract that satisfies the
 // terms, including providing an input balance. The transaction does not get
 // signed.
-func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, id string, err error) {
+func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, id int, err error) {
 	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
 	sizeCurrency := types.NewCurrency64(terms.FileSize)
 	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
@@ -43,19 +43,22 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 	}
 
 	// Create the transaction.
-	id, err = r.wallet.RegisterTransaction(txn)
+	id, err = r.wallet.RegisterTransaction(txn, nil)
 	if err != nil {
 		return
 	}
-	_, err = r.wallet.FundTransaction(id, clientCost)
+	err = r.wallet.FundTransaction(id, clientCost)
 	if err != nil {
 		return
 	}
-	txn, _, err = r.wallet.AddFileContract(id, contract)
+	_, err = r.wallet.AddFileContract(id, contract)
 	if err != nil {
 		return
 	}
-
+	txn, _, err = r.wallet.ViewTransaction(id)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -198,7 +201,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		return err
 	}
 	for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
-		_, _, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
+		_, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
 		if err != nil {
 			return err
 		}
