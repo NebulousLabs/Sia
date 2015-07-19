@@ -1717,7 +1717,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 	badTxn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
-	txns := append(cst.tpool.TransactionSet(), badTxn)
+	txns := append(cst.tpool.TransactionList(), badTxn)
 
 	// Create a block with a buried bad transaction.
 	block := types.Block{

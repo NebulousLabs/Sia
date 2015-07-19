@@ -10,8 +10,19 @@ import (
 )
 
 const (
-	TransactionPoolSizeLimit  = 5e6
-	TransactionPoolSizeForFee = 1e6
+	// The TransactionPoolSizeLimit is first checked, and then a transaction
+	// set is added. The current transaction pool does not do any priority
+	// ordering, so the size limit is such that the transaction pool will never
+	// exceed the size of a block.
+	//
+	// TODO: Add a priority structure that will allow the transaction pool to
+	// fill up beyond the size of a single block, without being subject to
+	// manipulation.
+	//
+	// The first ~1/4 of the transaction pool can be filled for free. This is
+	// mostly to preserve compatibility with clients that do not add fees.
+	TransactionPoolSizeLimit  = 2e6 - 5e3 - modules.TransactionSetSizeLimit
+	TransactionPoolSizeForFee = 500e3
 )
 
 var (
@@ -22,14 +33,20 @@ var (
 	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
 
-// checkMinerFees checks that the total amount of transaction fees in the set
-// is sufficient to store it in the unconfirmed transactions database.
+// checkMinerFees checks that the total amount of transaction fees in the
+// transaction set is sufficient to earn a spot in the transaction pool.
 func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
+	// Transactions cannot be added after the TransactionPoolSizeLimit has been
+	// hit.
 	if tp.databaseSize > TransactionPoolSizeLimit {
 		return ErrFullTransactionPool
 	}
 
+	// The first TransactionPoolSizeForFee transactions do not need fees.
 	if tp.databaseSize > TransactionPoolSizeForFee {
+		// Currently required fees are set on a per-transaction basis. 2 coins
+		// are required per transaction if the free-fee limit has been reached,
+		// adding a larger fee is not useful.
 		var feeSum types.Currency
 		for i := range ts {
 			for _, fee := range ts[i].MinerFees {
@@ -65,9 +82,6 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 
 	// All checks after this are expensive.
 	//
-	// TODO: The transactions are encoded multiple times, when only once is
-	// needed (IsStandard + size counting).
-	//
 	// TODO: There is no DoS prevention mechanism in place to prevent repeated
 	// expensive verifications of invalid transactions that are created on the
 	// fly.
@@ -80,7 +94,11 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	return nil
 }
 
+// acceptTransactionSet verifies that a transaction set is allowed to be in the
+// transaction pool, and then adds it to the transaction pool.
 func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
+	// Check the composition of the transaction set, including fees and
+	// IsStandard rules.
 	err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
@@ -115,13 +133,13 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	setID := TransactionSetID(crypto.HashObject(ts))
 	tp.transactionSets[setID] = ts
 	for _, diff := range cc.SiacoinOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
 	}
 	for _, diff := range cc.FileContractDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		tp.knownObjects[ObjectID(diff.ID)] = setID
+		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
 	}
 	tp.transactionSetDiffs[setID] = cc
 	tp.databaseSize += len(encoding.Marshal(ts))
@@ -141,13 +159,13 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	}
 
 	// Notify subscribers and broadcast the transaction set.
-	tp.updateSubscribersTransactions()
 	go tp.gateway.Broadcast("RelayTransactionSet", ts)
+	tp.updateSubscribersTransactions()
 	return nil
 }
 
-// RelayTransaction is an RPC that accepts a transaction from a peer. If the
-// accept is successful, the transaction will be relayed to the Gateway's
+// RelayTransaction is an RPC that accepts a transaction set from a peer. If
+// the accept is successful, the transaction will be relayed to the gateway's
 // other peers.
 func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 	var ts []types.Transaction
@@ -155,6 +173,7 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 	if err != nil {
 		return err
 	}
+	// TODO: Ask Luke some stuff about DoS with regards to this function.
 	err = tp.AcceptTransactionSet(ts)
 	if err == modules.ErrTransactionPoolDuplicate { // benign error
 		err = nil

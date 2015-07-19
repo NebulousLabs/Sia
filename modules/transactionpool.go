@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	TransactionSizeLimit = 16 * 1024
+	TransactionSizeLimit    = 16e3
+	TransactionSetSizeLimit = 100e3
 )
 
 var (
@@ -58,10 +59,13 @@ type TransactionPool interface {
 	// that make this condition necessary.
 	PurgeTransactionPool()
 
-	// TransactionSet returns the set of unconfirmed transactions.
-	TransactionSet() []types.Transaction
+	// TransactionList returns a list of all transactions in the transaction
+	// pool. The transactions are provided in an order that can acceptably be
+	// put into a block.
+	TransactionList() []types.Transaction
 
-	// TransactionPoolSubscribe will subscribe the input object to the changes
-	// in the transaction pool.
+	// TransactionPoolSubscribe adds a subscriber to the transaction pool.
+	// Subscribers will receive all consensus set changes as well as
+	// transaction pool changes, and should not subscribe to both.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
 }

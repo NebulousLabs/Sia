@@ -10,22 +10,33 @@ import (
 )
 
 type (
+	// ObjectIDs are the IDs of objects such as siacoin outputs and file
+	// contracts, and are used to see if there are conflicts or overlaps within
+	// the transaction pool. A TransactionSetID is the hash of a transaction
+	// set.
 	ObjectID         crypto.Hash
 	TransactionSetID crypto.Hash
 
+	// The TransactionPool tracks incoming transactions, accepting them or
+	// rejecting them based on internal criteria such as fees and unconfirmed
+	// double spends.
 	TransactionPool struct {
-		// Depedencies of the transaction pool. The state height is needed
-		// separately from the state because the transaction pool may not be
-		// synchronized to the state.
+		// Depedencies of the transaction pool.
 		consensusSet modules.ConsensusSet
 		gateway      modules.Gateway
 
-		// unconfirmedIDs is a set of hashes representing the ID of an object in
-		// the unconfirmed set of transactions. Each unconfirmed ID points to the
-		// transaciton set containing that object. Transaction sets are sets of
-		// transactions that get id'd by their hash. transacitonSetDiffs contain
-		// the set of IDs that each transaction set is associated with.
-		knownObjects        map[ObjectID]TransactionSetID
+		// To prevent double spends in the unconfirmed transaction set, the
+		// transaction pool keeps a list of all objects that have either been
+		// created or consumed by the current unconfirmed transaction pool. All
+		// transactions with overlaps are rejected. This model is
+		// over-aggressive - one transaction set may create an object that
+		// another transaction set spends. This is done to minimize the
+		// computation and memory load on the transaction pool. Dependent
+		// transactions should be lumped into a single transaction set.
+		//
+		// transactionSetDiffs map form a transaction set id to the set of
+		// diffs that resulted from the transaction set.
+		knownObjects        map[ObjectID]struct{}
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
 		databaseSize        int
@@ -34,10 +45,11 @@ type (
 		//
 		// TODO: Write a consistency check making sure that all unconfirmedIDs
 		// point to the right place, and that all UnconfirmedIDs are accounted for.
-		//
-		// TODO: Need some sort of first-come-first-serve memory.
 
-		// TODO: docstring
+		// The consensus change index tracks how many consensus changes have
+		// been sent to the transaction pool. When a new subscriber joins the
+		// transaction pool, all prior consensus changes are sent to the new
+		// subscriber.
 		consensusChangeIndex int
 		subscribers          []modules.TransactionPoolSubscriber
 
@@ -62,14 +74,16 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 		consensusSet: cs,
 		gateway:      g,
 
-		knownObjects:        make(map[ObjectID]TransactionSetID),
+		knownObjects:        make(map[ObjectID]struct{}),
 		transactionSets:     make(map[TransactionSetID][]types.Transaction),
 		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
-		// TODO: Docstring
+		// The consensus change index is intialized to '-1', which indicates
+		// that no consensus changes have been sent yet. The first consensus
+		// change will then have an index of '0'.
 		consensusChangeIndex: -1,
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		mu: sync.New(modules.SafeMutexDelay, 5),
 	}
 
 	// Register RPCs
@@ -77,11 +91,13 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)
-
 	return
 }
 
-func (tp *TransactionPool) TransactionSet() []types.Transaction {
+// TransactionList returns a list of all transactions in the transaction pool.
+// The transactions are provided in an order that can acceptably be put into a
+// block.
+func (tp *TransactionPool) TransactionList() []types.Transaction {
 	var txns []types.Transaction
 	for _, tSet := range tp.transactionSets {
 		txns = append(txns, tSet...)

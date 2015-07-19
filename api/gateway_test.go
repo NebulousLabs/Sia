@@ -89,8 +89,8 @@ func TestTransactionRelay(t *testing.T) {
 	st2 := st.addPeer("TestTransactionRelay2")
 
 	// Make sure both servers have empty transaction pools.
-	tset := st.server.tpool.TransactionSet()
-	tset2 := st2.server.tpool.TransactionSet()
+	tset := st.server.tpool.TransactionList()
+	tset2 := st2.server.tpool.TransactionList()
 	if len(tset) != 0 || len(tset2) != 0 {
 		t.Fatal("transaction set is not empty after creating new server tester")
 	}
@@ -104,8 +104,8 @@ func TestTransactionRelay(t *testing.T) {
 	// will take an unknown amount of time.
 	st.callAPI("/wallet/send?amount=15&destination=" + st2.coinAddress())
 	for len(tset) == 0 || len(tset2) == 0 {
-		tset = st.server.tpool.TransactionSet()
-		tset2 = st2.server.tpool.TransactionSet()
+		tset = st.server.tpool.TransactionList()
+		tset2 = st2.server.tpool.TransactionList()
 		time.Sleep(time.Millisecond)
 	}
 

@@ -583,7 +583,7 @@ func TestTryTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txns = cst.tpool.TransactionSet()
+	txns = cst.tpool.TransactionList()
 	cc, err := cst.cs.TryTransactionSet(txns)
 	if err != nil {
 		t.Error(err)

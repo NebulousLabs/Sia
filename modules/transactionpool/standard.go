@@ -33,10 +33,11 @@ import (
 //		that add features. Legacy miners are at risk of creating invalid blocks
 //		if they include arbitrary data which has meanings that the legacy miner
 //		doesn't understand.
-
-const (
-	TransactionSetLimit = 500e3
-)
+//
+// Rule: The transaction set size is limited.
+//		A group of dependent transactions
+//		cannot exceed 100kb to limit how quickly the transaction pool can be filled
+//		with new transactions.
 
 var (
 	ErrLargeTransaction    = errors.New("transaction is too large")
@@ -45,9 +46,9 @@ var (
 
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
 // public keys are recognized. Unrecognized public keys are automatically
-// accpeted as valid by the state, but rejected by the transaction pool. This
-// allows new types of keys to be added via a softfork without alienating all
-// of the older nodes.
+// accpeted as valid by the consnensus set, but rejected by the transaction
+// pool. This allows new types of keys to be added via a softfork without
+// alienating all of the older nodes.
 func (tp *TransactionPool) checkUnlockConditions(uc types.UnlockConditions) error {
 	for _, pk := range uc.PublicKeys {
 		if pk.Algorithm != types.SignatureEntropy &&
@@ -122,7 +123,11 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	return nil
 }
 
+// IsStandardTransactionSet checks that all transacitons of a set follow the
+// IsStandard guidelines, and that the set as a whole follows the guidelines as
+// well.
 func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) error {
+	// Check that each transaction is acceptable.
 	for i := range ts {
 		err := tp.IsStandardTransaction(ts[i])
 		if err != nil {
@@ -130,10 +135,11 @@ func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) erro
 		}
 	}
 
+	// Check that the set is a reasonable size.
 	totalSize := 0
 	for i := range ts {
 		totalSize += len(encoding.Marshal(ts[i]))
-		if totalSize > TransactionSetLimit {
+		if totalSize > modules.TransactionSetSizeLimit {
 			return ErrLargeTransactionSet
 		}
 	}
