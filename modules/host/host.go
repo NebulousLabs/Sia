@@ -68,6 +68,12 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		return nil, errors.New("host cannot use a nil wallet")
 	}
 
+	// Create host directory if it does not exist.
+	err := os.MkdirAll(saveDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+
 	coinAddr, _, err := wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
 	if err != nil {
 		return nil, err
@@ -98,22 +104,25 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 	}
 	h.spaceRemaining = h.TotalStorage
 
+	// Load the old host data.
+	err = h.load()
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
 	// Create listener and set address.
 	h.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 	_, port, _ := net.SplitHostPort(h.listener.Addr().String())
-	h.myAddr = modules.NetAddress(net.JoinHostPort(modules.ExternalIP, port))
+	h.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
 
-	err = os.MkdirAll(saveDir, 0700)
-	if err != nil {
-		return nil, err
-	}
-	err = h.load()
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
+	// Learn our external IP.
+	go h.learnHostname()
+
+	// Forward the hosting port, if possible.
+	go h.forwardPort(port)
 
 	// spawn listener
 	go h.listen()
@@ -180,4 +189,18 @@ func (h *Host) Info() modules.HostInfo {
 	info.Competition = estimatedCost
 
 	return info
+}
+
+// Close saves the state of the Gateway and stops its listener process.
+func (h *Host) Close() error {
+	id := h.mu.RLock()
+	// save the latest host state
+	if err := h.save(); err != nil {
+		return err
+	}
+	h.mu.RUnlock(id)
+	// clear the port mapping (no effect if UPnP not supported)
+	h.clearPort(h.myAddr.Port())
+	// shut down the listener
+	return h.listener.Close()
 }

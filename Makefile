@@ -15,6 +15,7 @@ dependencies:
 	go get -u github.com/kardianos/osext
 	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir
+	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful

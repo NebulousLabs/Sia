@@ -1,12 +1,7 @@
 package modules
 
 import (
-	"io"
 	"net"
-	"net/http"
-	"time"
-
-	"github.com/NebulousLabs/Sia/build"
 )
 
 const (
@@ -25,7 +20,6 @@ var (
 // an RPC. For now it is identical to a net.Conn.
 type PeerConn interface {
 	net.Conn
-	// AddStrike() ?
 }
 
 // RPCFunc is the type signature of functions that handle RPCs. It is used for
@@ -86,26 +80,3 @@ type Gateway interface {
 	// Close safely stops the Gateway's listener process.
 	Close() error
 }
-
-// ExternalIP is the external IP of the computer running this code. It is
-// defined here to facilitate reuse, instead of requiring each module to make
-// an HTTP call. During testing, the loopback address is returned.
-var ExternalIP = func() string {
-	if build.Release == "testing" {
-		return "::1"
-	}
-
-	// timeout after 3 seconds
-	client := http.Client{Timeout: time.Duration(3 * time.Second)}
-	resp, err := client.Get("http://myexternalip.com/raw")
-	if err != nil {
-		return "::1"
-	}
-	defer resp.Body.Close()
-	buf := make([]byte, 64)
-	n, err := resp.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		return "::1"
-	}
-	return string(buf[:n-1]) // trim newline
-}()
