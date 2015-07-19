@@ -1,74 +1,49 @@
 package miner
 
 import (
-	"path/filepath"
+	"errors"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/modules/transactionpool"
-	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// createBlockManagerTester creates a Miner ready to be tested
-func createBlockManagerTester(name string) (*Miner, error) {
-	testdir := build.TempDir(modules.MinerDir, name)
-
-	// Create the modules
-	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		return nil, err
-	}
-	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
-	if err != nil {
-		return nil, err
-	}
-	tp, err := transactionpool.New(cs, g)
-	if err != nil {
-		return nil, err
-	}
-	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
-	if err != nil {
-		return nil, err
-	}
-	m, err := New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
 // reconstructBlock reconstructs a block given the miner and the header
-func reconstructBlock(m *Miner, header types.BlockHeader) types.Block {
-	block := m.blockMem[header]
+func reconstructBlock(m *Miner, header types.BlockHeader) (b types.Block, err error) {
+	block, exists := m.blockMem[header]
+	if !exists {
+		err = errors.New("Header is either invalid or too old")
+		return
+	}
 	randTxn := m.randTxnMem[header]
 
 	blockTransactions := append([]types.Transaction{randTxn}, block.Transactions[1:]...)
-	return types.Block{
+
+	b = types.Block{
 		ParentID:     block.ParentID,
 		Timestamp:    block.Timestamp,
 		MinerPayouts: block.MinerPayouts,
 		Transactions: blockTransactions,
 	}
+	return
 }
 
 // mineHeader takes a header, and nonce grinds it. It returns
 // the header with a nonce that solves the corresponding block
-func mineHeader(m *Miner, header types.BlockHeader) types.BlockHeader {
-	b := reconstructBlock(m, header)
+func mineHeader(m *Miner, header types.BlockHeader) (bh types.BlockHeader, err error) {
+	b, err := reconstructBlock(m, header)
+	if err != nil {
+		return
+	}
 	b, _ = m.SolveBlock(b, m.target)
-	return b.Header()
+	bh = b.Header()
+	return
 }
 
 // TestBlockManager creates a miner, then polls the Miner for block
 // headers to mine. It ensures that the blockmanager properly hands
 // out headers, then reconstructs the blocks
 func TestBlockManager(t *testing.T) {
-	m, err := createBlockManagerTester("TestMiner")
+	mt, err := createMinerTester("TestBlockManager")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,16 +51,16 @@ func TestBlockManager(t *testing.T) {
 	headers := make([]types.BlockHeader, 2*headerForWorkMemory)
 
 	for i := 0; i < headerForWorkMemory; i++ {
-		headers[i], _ = m.HeaderForWork()
+		headers[i], _ = mt.miner.HeaderForWork()
 	}
 
 	// Make sure Miner still has headerForWorkMemory headers stored
 	for i := 0; i < headerForWorkMemory; i++ {
-		_, exists := m.blockMem[headers[i]]
+		_, exists := mt.miner.blockMem[headers[i]]
 		if !exists {
 			t.Error("Miner did not remember enough headers")
 		}
-		_, exists = m.randTxnMem[headers[i]]
+		_, exists = mt.miner.randTxnMem[headers[i]]
 		if !exists {
 			t.Error("Miner did not remember enough headers")
 		}
@@ -94,7 +69,7 @@ func TestBlockManager(t *testing.T) {
 	// Make sure Miner isn't storing a block for each header
 	numUniqueBlocks := 0
 	stored := make(map[*types.Block]bool)
-	for _, value := range m.blockMem {
+	for _, value := range mt.miner.blockMem {
 		if !stored[value] {
 			stored[value] = true
 			numUniqueBlocks++
@@ -106,24 +81,32 @@ func TestBlockManager(t *testing.T) {
 
 	// Start getting headers beyond headerForWorkMemory
 	for i := headerForWorkMemory; i < 2*headerForWorkMemory; i++ {
-		headers[i], _ = m.HeaderForWork()
+		headers[i], _ = mt.miner.HeaderForWork()
 
 		// Make sure the oldest headers are being erased
-		_, exists := m.blockMem[headers[i-headerForWorkMemory]]
+		_, exists := mt.miner.blockMem[headers[i-headerForWorkMemory]]
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}
-		_, exists = m.randTxnMem[headers[i-headerForWorkMemory]]
+		_, exists = mt.miner.randTxnMem[headers[i-headerForWorkMemory]]
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}
 	}
 
-	// Try submitting the oldest header
-	err = m.SubmitHeader(mineHeader(m, headers[2*headerForWorkMemory-1]))
+	// Try submitting a header that's just barely too old
+	err = mt.miner.SubmitHeader(headers[headerForWorkMemory-1])
+	if err == nil {
+		t.Error("Miner accepted a header that should have been too old")
+	}
+
+	// Try submitting the oldest header that should still work
+	minedHeader, err := mineHeader(mt.miner, headers[headerForWorkMemory])
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// TODO: Try submitting 10 other random headers
+	err = mt.miner.SubmitHeader(minedHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
