@@ -6,15 +6,18 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// TestConsensusGet probes the GET call to /consensus.
-func TestConsensusGET(t *testing.T) {
+// TestIntegrationConsensusGet probes the GET call to /consensus.
+func TestIntegrationConsensusGET(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 
 	st := newServerTester("TestConsensusGET", t)
 	var css ConsensusSetStatus
-	st.getAPI("/consensus", &css) // TODO: err =
+	err := st.getAPI("/consensus", &css)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if css.Height != 4 {
 		t.Error("wrong height returned in consensus GET call")
 	}
@@ -27,15 +30,19 @@ func TestConsensusGET(t *testing.T) {
 	}
 }
 
-// TestConsensusSynchronizeGET probes the GET call to /consensus/synchronize.
-func TestConsensusSynchronizeGET(t *testing.T) {
+// TestIntegrationConsensusSynchronizeGET probes the GET call to
+// /consensus/synchronize.
+func TestIntegrationConsensusSynchronizeGET(t *testing.T) {
 	t.Skip("no known way to add peers without automatically performing a synchronize")
 	if testing.Short() {
 		t.SkipNow()
 	}
 
 	st := newServerTester("TestConsensusSynchronizeGET", t)
-	st.callAPI("/consensus/synchronize") // TODO: err =
+	err := st.callAPI("/consensus/synchronize")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// TODO: Need some way to tell that a peer was out of sync, and then
 	// in-sync. The problem is that currently, if there are peers they should
