@@ -67,15 +67,15 @@ func TestCurrencyMul(t *testing.T) {
 	}
 }
 
-// TestCurrencyMulFloat probes the MulFloat function of the currency type.
-func TestCurrencyMulFloat(t *testing.T) {
+// TestCurrencyMulRat probes the MulRat function of the currency type.
+func TestCurrencyMulRat(t *testing.T) {
 	c5 := NewCurrency64(5)
 	c7 := NewCurrency64(7)
 	c10 := NewCurrency64(10)
-	if c5.MulFloat(2).Cmp(c10) != 0 {
+	if c5.MulRat(big.NewRat(2, 1)).Cmp(c10) != 0 {
 		t.Error("Multiplying 5 by 2 should return 10")
 	}
-	if c5.MulFloat(1.5).Cmp(c7) != 0 {
+	if c5.MulRat(big.NewRat(3, 2)).Cmp(c7) != 0 {
 		t.Error("Multiplying 5 by 1.5 should return 7")
 	}
 }
@@ -85,7 +85,7 @@ func TestCurrencyRoundDown(t *testing.T) {
 	// 10,000 is chosen because that's how many siafunds there usually are.
 	c40000 := NewCurrency64(40000)
 	c45000 := NewCurrency64(45000)
-	if c45000.RoundDown(10000).Cmp(c40000) != 0 {
+	if c45000.RoundDown(NewCurrency64(10000)).Cmp(c40000) != 0 {
 		t.Error("rounding down 45000 to the nearest 10000 didn't work")
 	}
 }
@@ -215,9 +215,9 @@ func TestCurrencyEncoding(t *testing.T) {
 	}
 }
 
-// TestNegativeCurrencyMulFloat checks that negative numbers are rejected when
-// calling MulFloat on the currency type.
-func TestNegativeCurrencyMulFloat(t *testing.T) {
+// TestNegativeCurrencyMulRat checks that negative numbers are rejected when
+// calling MulRat on the currency type.
+func TestNegativeCurrencyMulRat(t *testing.T) {
 	// In debug mode, attempting to get a negative currency results in a panic.
 	defer func() {
 		r := recover()
@@ -227,7 +227,7 @@ func TestNegativeCurrencyMulFloat(t *testing.T) {
 	}()
 
 	c := NewCurrency64(12)
-	_ = c.MulFloat(-1)
+	_ = c.MulRat(big.NewRat(-1, 1))
 }
 
 // TestNegativeCurrencySub checks that negative numbers are prevented when

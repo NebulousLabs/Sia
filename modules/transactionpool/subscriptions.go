@@ -73,14 +73,21 @@ func (tp *TransactionPool) threadedSendUpdates(update chan struct{}, subscriber 
 	for {
 		// Determine how many total updates there are to send.
 		id := tp.mu.RLock()
-		updateCount := len(tp.consensusChanges)
+		updateCount := len(tp.unconfirmedTransactions)
 		tp.mu.RUnlock(id)
 
 		// Send each of the updates in order, starting from the first update
 		// that has not yet been sent to the subscriber.
 		for i < updateCount {
+			var cc modules.ConsensusChange
 			id := tp.mu.RLock()
-			cc := tp.consensusChanges[i]
+			if tp.consensusChanges[i] != -1 {
+				var err error
+				cc, err = tp.consensusSet.ConsensusChange(tp.consensusChanges[i])
+				if err != nil && build.DEBUG {
+					panic("error when requesting consensus change from consensus set")
+				}
+			}
 			unconfirmedTransactions := tp.unconfirmedTransactions[i]
 			unconfirmedDiffs := tp.unconfirmedSiacoinDiffs[i]
 			tp.mu.RUnlock(id)
@@ -104,7 +111,14 @@ func (tp *TransactionPool) updateSubscribers(cc modules.ConsensusChange, unconfi
 	copy(safeTxns, unconfirmedTransactions)
 	copy(safeDiffs, diffs)
 
-	tp.consensusChanges = append(tp.consensusChanges, cc)
+	// If the consensus change variable is empty, add a -1, otherwise add the
+	// prevConsensusIndex value.
+	if len(cc.AppliedBlocks) == 0 {
+		tp.consensusChanges = append(tp.consensusChanges, -1)
+	} else {
+		tp.consensusChanges = append(tp.consensusChanges, tp.consensusChangeIndex)
+		tp.consensusChangeIndex++
+	}
 	tp.unconfirmedTransactions = append(tp.unconfirmedTransactions, safeTxns)
 	tp.unconfirmedSiacoinDiffs = append(tp.unconfirmedSiacoinDiffs, safeDiffs)
 
@@ -125,7 +139,7 @@ func (tp *TransactionPool) updateSubscribers(cc modules.ConsensusChange, unconfi
 func (tp *TransactionPool) TransactionPoolNotify() <-chan struct{} {
 	c := make(chan struct{}, modules.NotifyBuffer)
 	id := tp.mu.Lock()
-	if len(tp.consensusChanges) != 0 {
+	if len(tp.unconfirmedTransactions) != 0 {
 		c <- struct{}{}
 	}
 	tp.subscribers = append(tp.subscribers, c)

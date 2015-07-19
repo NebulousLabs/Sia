@@ -3,21 +3,12 @@ Consensus Rules
 
 This document is meant to provide a good high level overview of the Sia
 cryptosystem, but does not fully explain all of the small details. The most
-accurate explanation of the consensus rules is the consensus package.
+accurate explanation of the consensus rules is the consensus package (and all
+dependencies).
 
 This document will be more understandable if you have a general understanding
 of proof of work blockchains, and does not try to build up from first
 principles.
-
-If you wish to know more about the protocol and the consensus rules, you should
-read the documentation in the following order:
-
-- Consensus.md
-- consensus/types -- refer to [godoc](https://godoc.org/github.com/NebulousLabs/Sia/types)
-- consensus/state.go
-
-From there, you can start reading through the logic of the consensus package,
-starting at the function AcceptBlock in consensus/blocks.go.
 
 Cryptographic Algorithms
 ------------------------
@@ -81,19 +72,19 @@ Currency
 The Sia cryptosystem has two types of currency. The first is the Siacoin.
 Siacoins are generated every block and distributed to the miners. These miners
 can then use the siacoins to fund file contracts, or can send the siacoins to
-other parties. The siacoin is represented by a 128 bit unsigned integer.
+other parties. The siacoin is represented by an infinite precision unsigned
+integer.
 
 The second currency in the Sia cryptosystem is the Siafund, which is a special
 asset limited to 10,000 indivisible units. Each time a file contract payout is
 made, 3.9% of the payout is put into the siafund pool. The number of siacoins
 in the siafund pool must always be divisible by 10,000; the number of coins
 taken from the payout is rounded down to the nearest 10,000. The siafund is
-also represented by a 128 bit unsigned integer, even though only 16 bits of
-resolution are required.
+also represented by an infinite precision unsigned integer.
 
 Siafund owners can collect the siacoins in the siafund pool. For every 10,000
 siacoins added to the siafund pool, a siafund owner can withdraw 1 siacoin.
-Approx. 8750 siafunds are owned by Nebulous Inc. The remaining siafunds are
+Approx. 8790 siafunds are owned by Nebulous Inc. The remaining siafunds are
 owned by early backers of the Sia project.
 
 There are future plans to enable sidechain compatibility with Sia. This would
@@ -114,13 +105,16 @@ hashed. The following rules are used for hashing:
  - Arrays and structs are encoded as their individual elements concatenated
    together. The ordering of the struct is determined by the struct definition.
    There is only one way to encode each struct.
- - The Currency type is encoded as a 16 byte unsigned integer.
+ - The Currency type (an infinite precision integer) is encoded in big endian
+   using as many bytes as necessary to represent the underlying number. As it
+   is a variable length type, it is prefixed by 8 bytes containing the lenght.
 
 Block Size
 ----------
 
-The maximum block size is 1024 * 1024 bytes. There is no limit on transaction
-size, though it must fit inside of the block.
+The maximum block size is 2e6 bytes. There is no limit on transaction size,
+though it must fit inside of the block. Most miners enforce a size limit of
+16e3 bytes per transaction.
 
 Block Timestamps
 ----------------
@@ -145,11 +139,12 @@ output), and the hashes of the transactions (one leaf per transaction).
 Block Target
 ------------
 
-For a block to be valid, the id of the block must be below a certain target.  A
-new target is set every block by by comparing the timestamp of the current
-block with the timestamp of the block added 1000 blocks prior. The expected
-difference in time is 10,000 minutes. If less time has passed, the target is
-lowered. If more time has passed, the target is increased.
+For a block to be valid, the id of the block must be below a certain target.
+The target is adjusted once every 500 blocks, and it is adjusted by looking at
+the timestamps of the previous 1000 blocks. The expected amount of time passed
+between the most recent block and the 1000th previous block is 10e3 minutes. If
+more time has passed, the target is lowered. If less time has passed, the
+target is increased. Each adjustment can adjust the target by up to 2.5x.
 
 The target is changed in proportion to the difference in time (If the time was
 half of what was expected, the new target is 1/2 the old target). There is a
@@ -163,22 +158,13 @@ should be done using infinite precision, and the result should be truncated.
 If there are not 1000 blocks, the genesis timestamp is used for comparison.
 The expected time is (10 minutes * block height).
 
-The difficulty clamp means that the target can shift by at most 7.5x in 2016
-blocks, which can be compared to the 4x clamp of Bitcoin. The amount of work
-required to quadruple the difficulty in Sia is 3000x the starting difficulty,
-which can be compared to 2000x for Bitcoin. The amount of work required to 16x
-the difficulty in Sia is 15,000x the original difficulty, which can be compared
-to 10,000x for Bitcoin.
-
 Block Subsidy
 -------------
 
-The coinbase for a block is (300,000 - height) * 2^80, with a minimum of 30,000
-\* 2^80. Any miner fees get added to the coinbase to create the block subsidy.
-The block subsidy is then given to multiple outputs, called the miner payouts.
-The total value of the miner payouts must equal the block subsidy. Having
-multiple outputs allows the block reward to be sent to multiple people,
-enabling systems like p2pool.
+The coinbase for a block is (300,000 - height) * 10^24, with a minimum of
+30,000 \* 10^24. Any miner fees get added to the coinbase to create the block
+subsidy. The block subsidy is then given to multiple outputs, called the miner
+payouts. The total value of the miner payouts must equal the block subsidy.
 
 The ids of the outputs created by the miner payouts is determined by taking the
 block id and concatenating the index of the payout that the output corresponds
@@ -196,19 +182,19 @@ Transactions
 A Transaction is composed of the following:
 
 - Siacoin Inputs
-- Miner Fees
 - Siacoin Outputs
 - File Contracts
-- File Contract Terminations
+- File Contract Revisions
 - Storage Proofs
 - Siafund Inputs
 - Siafund Outputs
+- Miner Fees
 - Arbitrary Data
-- Signatures
+- Transaction Signatures
 
 The sum of all the siacoin inputs must equal the sum of all the miner fees,
-siacoin outputs, and contract payouts. There can be no leftovers. The sum of
-all siafund inputs must equal the sum of all siafund outputs.
+siacoin outputs, and file contract payouts. There can be no leftovers. The sum
+of all siafund inputs must equal the sum of all siafund outputs.
 
 Several objects have unlock hashes. An unlock hash is the Merkle root of the
 'unlock conditions' object. The unlock conditions contain a timelock, a number
@@ -244,11 +230,6 @@ set. The 'value' field of the output indicates how many siacoins must be used
 in the outputs of the transaction. Valid outputs are miner fees, siacoin
 outputs, and contract payouts.
 
-Miner Fees
-----------
-
-A miner fee is a volume of siacoins that get added to the block subsidy.
-
 Siacoin Outputs
 ---------------
 
@@ -267,33 +248,37 @@ The Merkle root is formed by breaking the file into 64 byte segments and
 hashing each segment to form the leaves of the Merkle tree. The final segment
 is not padded out.
 
-The storage proof must be submitted between the 'start' and 'end' fields of the
-contract. There is a 'payout', which indicates how many siacoins are given out
-when the storage proof is provided. 3.9% of this payout (rounded down to the
-nearest 10,000) is put aside for the owners of siafunds. If the storage proof
-is provided and is valid, the remaining payout is put in an output spendable by
-the 'valid proof spend hash', and if a valid storage proof is not provided to
-the blockchain by 'end', the remaining payout is put in an output spendable by
-the 'missed proof spend hash'.
+The storage proof must be submitted between the 'WindowStart' and 'WindowEnd'
+fields of the contract. There is a 'Payout', which indicates how many siacoins
+are given out when the storage proof is provided. 3.9% of this payout (rounded
+down to the nearest 10,000) is put aside for the owners of siafunds. If the
+storage proof is provided and is valid, the remaining payout is put in an
+output spendable by the 'valid proof spend hash', and if a valid storage proof
+is not provided to the blockchain by 'end', the remaining payout is put in an
+output spendable by the 'missed proof spend hash'.
 
 All contracts must have a non-zero payout, 'start' must be before 'end', and
 'start' must be greater than the current height of the blockchain. A storage
 proof is acceptible if it is submitted in the block of height 'end'.
 
-File contracts are created with a 'Termination Hash', which is the Merkle root
-of an unlock conditions object. A 'file contract termination' can be submitted
-which fulfills the unlock conditions object, resulting in the contract payout
-being distributed according to the fields of the termination object, as opposed
-to being distributed according to whether a valid storage proof was submitted
-or not. This provides flexibility to edit an resubmit file contracts.
+File contracts are created with a 'Revision Hash', which is the Merkle root of
+an unlock conditions object. A 'file contract revision' can be submitted which
+fulfills the unlock conditions object, resulting in the file contract being
+replaced by a new file contract, as specified in the revision.
 
-File Contract Terminations
---------------------------
+File Contract Revisions
+-----------------------
 
-A file contract termination voids a file contract, recovering the payout and
-distributing it to a set of siacoin outputs that are specified in the
-termination. The sum of the termination payouts must equal the value of the
-original contract payout.
+A file contract revision modifies a contract. File contracts have a revision
+number, and any revision submitted to the blockchain must have a higher
+revision number in order to be valid. Any field can be changed except for the
+payout - siacoins cannot be added to or removed from the file contract during a
+revision, though the destination upon a successful or unsuccessful storage
+proof can be changed.
+
+The greatest application for file contract revisions is file-diff channels - a
+file contract can be edited many tiems off-blockchain as a user uploads new or
+different content to the host. This improves the overall scalability of Sia.
 
 Storage Proofs
 --------------
@@ -314,7 +299,7 @@ leaves. To determine which leaf, take the hash of the contract id concatenated
 to the trigger block id, then take the numerical value of the result modulus
 the number of segments:
 
-	Hash(contract id + trigger block id) % num segments
+	Hash(file contract id + trigger block id) % num segments
 
 The proof is formed by providing the 64 byte segment, and then the missing
 hashes required to fill out the remaining tree. The total size of the proof
@@ -367,6 +352,11 @@ the siacoin pool between the creation and the spending of the output. This
 growth is measured by storing a 'claim start', which indicates the size of the
 siafund pool at the moment the siafund output was created.
 
+Miner Fees
+----------
+
+A miner fee is a volume of siacoins that get added to the block subsidy.
+
 Arbitrary Data
 --------------
 
@@ -407,40 +397,3 @@ Entirely nonmalleable transactions can be achieved by setting the 'whole
 transaction' flag and then providing the last signature, including every other
 signature in your signature. Because no frivolous signatures are allowed, the
 transaction cannot be changed without your signature being invalidated.
-
-Consensus Set
--------------
-
-The blockchain is used to achieve consensus around 3 objects. The first is
-unspent financial outputs. The second is unfulfilled storage contracts. The
-third is siafund ownership and claims. All transaction components have some
-effect on this set of information.
-
-Genesis Set
------------
-
-The genesis block will have a unix timestamp set to 1427760000, which
-corresponds to March 31st, 2015 at midnight.  All other fields will be empty.
-The required target for the next block shall be [0, 0, 0, 1, 0...], where each
-value is a byte.
-
-The genesis block does not need to meet a particular target.
-
-The genesis state needs to have an output to the zero address from the genesis
-block, and a siafund output to the Nebulous Genesis Address for 10,000
-siafunds (both the spend hash and the claim destination), having the zero id.
-
-Terms
------
-
-Bad Block - a block that appears valid to an SPV node. Namely, all signatures
-are valid, all headers are valid, but contained within the block is some form
-of invalid transaction that is only detectable as a full node.
-
-DoS Block - a block that is invalid, but requries using heavy computational
-resources to determine invalidity.
-
-Stale Block - a block that appears on a fork which is not the longest fork. The
-block is stale because it is unlikely to every be on the longest fork.
-
-Orphan Block - a block whose parent is unknown.

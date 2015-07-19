@@ -15,6 +15,7 @@ dependencies:
 	go get -u github.com/kardianos/osext
 	go get -u github.com/laher/goxc
 	go get -u github.com/mitchellh/go-homedir
+	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
@@ -37,7 +38,9 @@ install: fmt REBUILD
 
 # release builds and installs release binaries.
 release: REBUILD
-	go install -a -race ./...
+	go install -a -race -tags='debug' ./...
+release-std: REBUILD
+	go install -a ./...
 
 # xc builds and packages release binaries for all systems by using goxc.
 # Cross Compile - makes binaries for windows, linux, and mac, 32 and 64 bit.
@@ -66,7 +69,7 @@ clean:
 pkgs = ./api ./compatibility ./crypto ./encoding ./modules/consensus \
        ./modules/gateway ./modules/host ./modules/hostdb		     \
        ./modules/miner ./modules/renter ./modules/transactionpool    \
-       ./modules/wallet ./modules/blockexplorer ./persist ./siad     \
+       ./modules/wallet ./modules/explorer ./persist ./siad     \
        ./siag ./siae ./types
 test: clean fmt REBUILD
 	go test -short -tags='debug testing' -timeout=3s $(pkgs)

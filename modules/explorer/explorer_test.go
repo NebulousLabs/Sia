@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"path/filepath"
@@ -11,21 +11,22 @@ import (
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // Explorer tester struct is the helper object for explorer
 // testing. It holds the helper modules for its testing
 type explorerTester struct {
-	cs      *consensus.State
+	cs      *consensus.ConsensusSet
 	gateway modules.Gateway
 	miner   modules.Miner
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
-	explorer *BlockExplorer
+	explorer *Explorer
 
 	csUpdateChan     <-chan struct{}
-	beUpdateChan     <-chan struct{}
+	eUpdateChan      <-chan struct{}
 	tpoolUpdateChan  <-chan struct{}
 	minerUpdateChan  <-chan struct{}
 	walletUpdateChan <-chan struct{}
@@ -37,7 +38,7 @@ type explorerTester struct {
 // modules.
 func (et *explorerTester) csUpdateWait() {
 	<-et.csUpdateChan
-	<-et.beUpdateChan
+	<-et.eUpdateChan
 	et.tpUpdateWait()
 }
 
@@ -49,7 +50,7 @@ func (et *explorerTester) tpUpdateWait() {
 	<-et.walletUpdateChan
 }
 
-func createExplorerTester(name string, t *testing.T) *explorerTester {
+func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 	testdir := build.TempDir(modules.HostDir, name)
 
 	// Create the modules
@@ -73,7 +74,7 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	be, err := New(cs)
+	e, err := New(cs, filepath.Join(testdir, modules.ExplorerDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,10 +86,10 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 		tpool:   tp,
 		wallet:  w,
 
-		explorer: be,
+		explorer: e,
 
 		csUpdateChan:     cs.ConsensusSetNotify(),
-		beUpdateChan:     be.BlockExplorerNotify(),
+		eUpdateChan:      e.ExplorerNotify(),
 		tpoolUpdateChan:  tp.TransactionPoolNotify(),
 		minerUpdateChan:  m.MinerNotify(),
 		walletUpdateChan: w.WalletNotify(),
@@ -97,5 +98,15 @@ func createExplorerTester(name string, t *testing.T) *explorerTester {
 	}
 
 	et.csUpdateWait()
-	return et
+
+	// Mine until the wallet has money.
+	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
+		b, _ := et.miner.FindBlock()
+		err = et.cs.AcceptBlock(b)
+		if err != nil {
+			return nil, err
+		}
+		et.csUpdateWait()
+	}
+	return et, nil
 }

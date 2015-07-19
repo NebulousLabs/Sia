@@ -63,31 +63,25 @@ func (t Transaction) correctFileContracts(currentHeight BlockHeight) error {
 // to the revision rules.
 func (t Transaction) correctFileContractRevisions(currentHeight BlockHeight) error {
 	for _, fcr := range t.FileContractRevisions {
-		// To ensure consistency with the file contract rules, a temporary txn
-		// is created containing only the file contract that would result from
-		// this revision.
-		var payout Currency
+		// Check that start and expiration are reasonable values.
+		if fcr.NewWindowStart <= currentHeight {
+			return ErrFileContractWindowStartViolation
+		}
+		if fcr.NewWindowEnd <= fcr.NewWindowStart {
+			return ErrFileContractWindowEndViolation
+		}
+
+		// Check that the valid outputs and missed outputs sum to the same
+		// value.
+		var validProofOutputSum, missedProofOutputSum Currency
+		for _, output := range fcr.NewValidProofOutputs {
+			validProofOutputSum = validProofOutputSum.Add(output.Value)
+		}
 		for _, output := range fcr.NewMissedProofOutputs {
-			payout = payout.Add(output.Value)
+			missedProofOutputSum = missedProofOutputSum.Add(output.Value)
 		}
-		tmp := Transaction{
-			FileContracts: []FileContract{
-				FileContract{
-					FileSize:           fcr.NewFileSize,
-					FileMerkleRoot:     fcr.NewFileMerkleRoot,
-					WindowStart:        fcr.NewWindowStart,
-					WindowEnd:          fcr.NewWindowEnd,
-					Payout:             payout,
-					ValidProofOutputs:  fcr.NewValidProofOutputs,
-					MissedProofOutputs: fcr.NewMissedProofOutputs,
-					UnlockHash:         fcr.NewUnlockHash,
-					RevisionNumber:     fcr.NewRevisionNumber,
-				},
-			},
-		}
-		err := tmp.correctFileContracts(currentHeight)
-		if err != nil {
-			return err
+		if validProofOutputSum.Cmp(missedProofOutputSum) != 0 {
+			return ErrFileContractOutputSumViolation
 		}
 	}
 	return nil

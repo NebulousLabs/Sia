@@ -90,6 +90,13 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []ty
 			w.applySiafundDiff(diff, modules.DiffApply)
 		}
 	}
+	if len(cc.SiafundPoolDiffs) > 0 {
+		if cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Direction == modules.DiffApply {
+			w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Adjusted
+		} else {
+			w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Previous
+		}
+	}
 
 	w.notifySubscribers()
 }

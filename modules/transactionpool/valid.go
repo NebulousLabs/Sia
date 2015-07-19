@@ -94,13 +94,20 @@ func (tp *TransactionPool) validUnconfirmedFileContractRevisions(t types.Transac
 			return errors.New("unlock conditions do not meet required unlock hash")
 		}
 
-		// Check that the payouts in the revision add up to the payout of the
-		// contract.
-		var payout types.Currency
-		for _, output := range fcr.NewMissedProofOutputs {
-			payout = payout.Add(output.Value)
+		// Check that the payouts in the revision add up to the payouts of the
+		// original.
+		expectedPayoutSum := fc.Payout.Sub(fc.Tax())
+		var validPayouts, missedPayouts types.Currency
+		for _, output := range fcr.NewValidProofOutputs {
+			validPayouts = validPayouts.Add(output.Value)
 		}
-		if payout.Cmp(fc.Payout) != 0 {
+		for _, output := range fcr.NewMissedProofOutputs {
+			missedPayouts = missedPayouts.Add(output.Value)
+		}
+		if expectedPayoutSum.Cmp(validPayouts) != 0 {
+			return errors.New("contract revision has incorrect payouts")
+		}
+		if expectedPayoutSum.Cmp(missedPayouts) != 0 {
 			return errors.New("contract revision has incorrect payouts")
 		}
 	}

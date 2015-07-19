@@ -1,4 +1,4 @@
-package blockexplorer
+package explorer
 
 import (
 	"testing"
@@ -25,6 +25,9 @@ func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 }
 
 func TestConsensusUpdates(t *testing.T) {
-	ht := createExplorerTester("TestExplorerConsensusUpdate", t)
-	ht.testConsensusUpdates(t)
+	et, err := createExplorerTester("TestExplorerConsensusUpdate", t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	et.testConsensusUpdates(t)
 }

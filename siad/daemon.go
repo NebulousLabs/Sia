@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
@@ -15,6 +16,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/profile"
 
 	"github.com/spf13/cobra"
 )
@@ -23,6 +25,13 @@ import (
 func startDaemon() error {
 	// Establish multithreading.
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	// Print a startup message.
+	//
+	// TODO: This message can be removed once the api starts up in under 1/2
+	// second.
+	fmt.Println("siad is loading, may take a minute or two")
+	loadStart := time.Now().UnixNano()
 
 	// Create all of the modules.
 	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
@@ -73,9 +82,18 @@ func startDaemon() error {
 	// that daemon startup has completed. A gofunc is used with the hope that
 	// srv.Serve() will start running before the value is sent down the
 	// channel.
+	//
+	// TODO: There are better ways to approach this.
 	go func() {
 		started <- struct{}{}
 	}()
+
+	// Print a 'startup complete' message.
+	//
+	// TODO: This message can be removed once the api starts up in under 1/2
+	// second.
+	startupTime := time.Now().UnixNano() - loadStart
+	fmt.Println("siad has finished loading after", float64(startupTime)/1e9, "seconds")
 
 	// Start serving api requests.
 	err = srv.Serve()
@@ -87,6 +105,12 @@ func startDaemon() error {
 
 // startDaemonCmd is a passthrough function for startDaemon.
 func startDaemonCmd(*cobra.Command, []string) {
+	// Create the profiling directory if profiling is enabled.
+	if config.Siad.Profile {
+		go profile.StartContinuousProfile(config.Siad.ProfileDir)
+	}
+
+	// Start siad. startDaemon will only return when it is shutting down.
 	err := startDaemon()
 	if err != nil {
 		fmt.Println(err)

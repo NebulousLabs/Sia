@@ -13,10 +13,10 @@ type SiaConstants struct {
 	BlockSizeLimit        uint64
 	BlockFrequency        types.BlockHeight
 	TargetWindow          types.BlockHeight
-	MedianTimestampWindow int
+	MedianTimestampWindow uint64
 	FutureThreshold       types.Timestamp
-	SiafundCount          uint64
-	SiafundPortion        float64
+	SiafundCount          types.Currency
+	SiafundPortion        *big.Rat
 
 	InitialCoinbase uint64
 	MinimumCoinbase uint64

@@ -7,8 +7,8 @@ import (
 
 	"github.com/NebulousLabs/Sia/api"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/blockexplorer"
 	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/explorer"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 
 	"github.com/spf13/cobra"
@@ -20,15 +20,15 @@ func startDaemon() error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Create all of the modules.
-	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, "gateway"))
+	gateway, err := gateway.New(config.Siad.RPCaddr, filepath.Join(config.Siad.SiaDir, modules.GatewayDir))
 	if err != nil {
 		return err
 	}
-	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, "consensus"))
+	state, err := consensus.New(gateway, filepath.Join(config.Siad.SiaDir, modules.ConsensusDir))
 	if err != nil {
 		return err
 	}
-	explorer, err := blockexplorer.New(state)
+	explorer, err := explorer.New(state, filepath.Join(config.Siad.SiaDir, modules.ExplorerDir))
 	if err != nil {
 		return err
 	}

@@ -71,13 +71,13 @@ func ReaderMerkleRoot(r io.Reader) (h Hash, err error) {
 }
 
 // BuildReaderProof will build a storage proof when given a reader.
-func BuildReaderProof(r io.Reader, proofIndex uint64) (base [SegmentSize]byte, hashSet []Hash, err error) {
+func BuildReaderProof(r io.Reader, proofIndex uint64) (base []byte, hashSet []Hash, err error) {
 	_, proofSet, _, err := merkletree.BuildReaderProof(r, NewHash(), SegmentSize, proofIndex)
 	if err != nil {
 		return
 	}
 	// convert proofSet to base and hashSet
-	copy(base[:], proofSet[0])
+	base = proofSet[0]
 	hashSet = make([]Hash, len(proofSet)-1)
 	for i, proof := range proofSet[1:] {
 		copy(hashSet[i][:], proof)
@@ -87,10 +87,10 @@ func BuildReaderProof(r io.Reader, proofIndex uint64) (base [SegmentSize]byte, h
 
 // VerifySegment will verify that a segment, given the proof, is a part of a
 // merkle root.
-func VerifySegment(base [SegmentSize]byte, hashSet []Hash, numSegments, proofIndex uint64, root Hash) bool {
+func VerifySegment(base []byte, hashSet []Hash, numSegments, proofIndex uint64, root Hash) bool {
 	// convert base and hashSet to proofSet
 	proofSet := make([][]byte, len(hashSet)+1)
-	proofSet[0] = base[:]
+	proofSet[0] = base
 	for i := range hashSet {
 		proofSet[i+1] = hashSet[i][:]
 	}

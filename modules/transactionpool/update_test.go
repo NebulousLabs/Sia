@@ -263,14 +263,8 @@ func (tpt *tpoolTester) testRewinding() {
 			types.SiacoinOutput{Value: types.CalculateCoinbase(tpt.cs.Height() + 1)},
 		},
 	}
-	for {
-		var found bool
-		forkCommit, found = tpt.miner.SolveBlock(forkCommit, target)
-		if found {
-			tpt.cs.AcceptBlock(forkCommit)
-			break
-		}
-	}
+	forkCommit, _ = tpt.miner.SolveBlock(forkCommit, target)
+	tpt.cs.AcceptBlock(forkCommit)
 	tpt.csUpdateWait()
 
 	// Check that the transaction which was once confirmed but no longer is

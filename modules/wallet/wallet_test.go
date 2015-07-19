@@ -15,7 +15,7 @@ import (
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
 // functions for facilitating wallet integration testing.
 type walletTester struct {
-	cs     *consensus.State
+	cs     *consensus.ConsensusSet
 	tpool  modules.TransactionPool
 	miner  modules.Miner
 	wallet *Wallet

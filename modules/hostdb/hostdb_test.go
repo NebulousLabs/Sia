@@ -25,7 +25,7 @@ import (
 // is submitted to the transaction pool (such as a new transaction),
 // tpoolUpdateWait should be called.
 type hdbTester struct {
-	cs      *consensus.State
+	cs      *consensus.ConsensusSet
 	gateway modules.Gateway
 	host    modules.Host
 	miner   modules.Miner

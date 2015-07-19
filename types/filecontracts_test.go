@@ -6,13 +6,6 @@ import (
 
 // TestFileContractTax probes the Tax function.
 func TestTax(t *testing.T) {
-	if SiafundPortion != 0.039 {
-		t.Error("SiafundPortion does not match expected value, Tax testing may be off")
-	}
-	if SiafundCount != 10000 {
-		t.Error("SiafundCount does not match expected value, Tax testing may be off")
-	}
-
 	fc := FileContract{
 		Payout: NewCurrency64(435000),
 	}

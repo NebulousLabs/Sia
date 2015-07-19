@@ -4,26 +4,29 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
-	ErrInvalidStorageProof                = errors.New("provided storage proof is invalid")
-	ErrLowRevisionNumber                  = errors.New("transaction has a file contract with an outdated revision number")
-	ErrMissingSiacoinOutput               = errors.New("transaction spends a nonexisting siacoin output")
-	ErrMissingFileContract                = errors.New("transaction terminates a nonexisting file contract")
-	ErrMissingSiafundOutput               = errors.New("transaction spends a nonexisting siafund output")
-	ErrSiacoinInputOutputMismatch         = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
-	ErrUnfinishedFileContract             = errors.New("file contract window has not yet openend")
-	ErrUnrecognizedFileContractID         = errors.New("cannot fetch storage proof segment for unknown file contract")
-	ErrWrongSiacoinOutputUnlockConditions = errors.New("transaction contains a siacoin output with incorrect unlock conditions")
+	ErrAlteredRevisionPayouts     = errors.New("file contract revision has altered payout volume")
+	ErrInvalidStorageProof        = errors.New("provided storage proof is invalid")
+	ErrLateRevision               = errors.New("file contract revision submitted after deadline")
+	ErrLowRevisionNumber          = errors.New("transaction has a file contract with an outdated revision number")
+	ErrMissingSiacoinOutput       = errors.New("transaction spends a nonexisting siacoin output")
+	ErrMissingSiafundOutput       = errors.New("transaction spends a nonexisting siafund output")
+	ErrSiacoinInputOutputMismatch = errors.New("siacoin inputs do not equal siacoin outputs for transaction")
+	ErrSiafundInputOutputMismatch = errors.New("siafund inputs do not equal siafund outputs for transaction")
+	ErrUnfinishedFileContract     = errors.New("file contract window has not yet openend")
+	ErrUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
+	ErrWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 )
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
-func (cs *State) validSiacoins(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validSiacoins(t types.Transaction) (err error) {
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
@@ -34,7 +37,7 @@ func (cs *State) validSiacoins(t types.Transaction) (err error) {
 
 		// Check that the unlock conditions match the required unlock hash.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {
-			return ErrWrongSiacoinOutputUnlockConditions
+			return ErrWrongUnlockConditions
 		}
 
 		inputSum = inputSum.Add(sco.Value)
@@ -47,7 +50,7 @@ func (cs *State) validSiacoins(t types.Transaction) (err error) {
 
 // storageProofSegment returns the index of the segment that needs to be proven
 // exists in a file contract.
-func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
+func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	// Get the file contract associated with the input id.
 	fc, exists := cs.fileContracts[fcid]
 	if !exists {
@@ -78,23 +81,35 @@ func (cs *State) storageProofSegment(fcid types.FileContractID) (index uint64, e
 
 // validStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (cs *State) validStorageProofs(t types.Transaction) error {
+func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 	for _, sp := range t.StorageProofs {
-		fc, exists := cs.fileContracts[sp.ParentID]
-		if !exists {
-			return errors.New("unrecognized file contract ID in storage proof")
-		}
-
 		// Check that the storage proof itself is valid.
 		segmentIndex, err := cs.storageProofSegment(sp.ParentID)
 		if err != nil {
 			return err
 		}
 
+		fc, _ := cs.fileContracts[sp.ParentID] // previous function verifies the file contract exists
+		leaves := crypto.CalculateLeaves(fc.FileSize)
+		segmentLen := uint64(crypto.SegmentSize)
+		if segmentIndex == leaves-1 {
+			segmentLen = fc.FileSize % crypto.SegmentSize
+		}
+
+		// COMPATv0.4.0
+		//
+		// Fixing the padding situation resulted in a hardfork. The below code
+		// will stop the hardfork from triggering before block 15,000.
+		types.CurrentHeightLock.Lock()
+		if (build.Release == "standard" && types.CurrentHeight < 15e3) || (build.Release == "testing" && types.CurrentHeight < 10) {
+			segmentLen = uint64(crypto.SegmentSize)
+		}
+		types.CurrentHeightLock.Unlock()
+
 		verified := crypto.VerifySegment(
-			sp.Segment,
+			sp.Segment[:segmentLen],
 			sp.HashSet,
-			crypto.CalculateLeaves(fc.FileSize),
+			leaves,
 			segmentIndex,
 			fc.FileMerkleRoot,
 		)
@@ -108,19 +123,19 @@ func (cs *State) validStorageProofs(t types.Transaction) error {
 
 // validFileContractRevision checks that each file contract revision is valid
 // in the context of the current consensus set.
-func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validFileContractRevisions(t types.Transaction) (err error) {
 	for _, fcr := range t.FileContractRevisions {
 		// Check that the revision revises an existing contract.
 		fc, exists := cs.fileContracts[fcr.ParentID]
 		if !exists {
-			return ErrMissingFileContract
+			return ErrUnrecognizedFileContractID
 		}
 
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has
 		// opened.  This reduces complexity for unconfirmed transactions.
 		if cs.height() > fc.WindowStart {
-			return errors.New("contract revision submitted too late")
+			return ErrLateRevision
 		}
 
 		// Check that the revision number of the revision is greater than the
@@ -131,20 +146,23 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 
 		// Check that the unlock conditions match the unlock hash.
 		if fcr.UnlockConditions.UnlockHash() != fc.UnlockHash {
-			return errors.New("unlock conditions don't match unlock hash")
+			return ErrWrongUnlockConditions
 		}
 
 		// Check that the payout of the revision matches the payout of the
-		// original.
-		//
-		// txn.StandaloneValid checks for the validity of the
-		// ValidProofOutputs.
-		var payout types.Currency
-		for _, output := range fcr.NewMissedProofOutputs {
-			payout = payout.Add(output.Value)
+		// original, and that the payouts match eachother.
+		var validPayout, missedPayout types.Currency
+		for _, output := range fcr.NewValidProofOutputs {
+			validPayout = validPayout.Add(output.Value)
 		}
-		if payout.Cmp(fc.Payout) != 0 {
-			return errors.New("contract revision has incorrect payouts")
+		for _, output := range fcr.NewMissedProofOutputs {
+			missedPayout = missedPayout.Add(output.Value)
+		}
+		if validPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
+			return ErrAlteredRevisionPayouts
+		}
+		if missedPayout.Cmp(fc.Payout.Sub(fc.Tax())) != 0 {
+			return ErrAlteredRevisionPayouts
 		}
 	}
 
@@ -153,19 +171,19 @@ func (cs *State) validFileContractRevisions(t types.Transaction) (err error) {
 
 // validSiafunds checks that the siafund portions of the transaction are valid
 // in the context of the consensus set.
-func (s *State) validSiafunds(t types.Transaction) (err error) {
+func (cs *ConsensusSet) validSiafunds(t types.Transaction) (err error) {
 	// Compare the number of input siafunds to the output siafunds.
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
 	for _, sfi := range t.SiafundInputs {
-		sfo, exists := s.siafundOutputs[sfi.ParentID]
+		sfo, exists := cs.siafundOutputs[sfi.ParentID]
 		if !exists {
 			return ErrMissingSiafundOutput
 		}
 
 		// Check the unlock conditions match the unlock hash.
 		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
-			return errors.New("unlock conditions don't match required unlock hash")
+			return ErrWrongUnlockConditions
 		}
 
 		siafundInputSum = siafundInputSum.Add(sfo.Value)
@@ -174,49 +192,50 @@ func (s *State) validSiafunds(t types.Transaction) (err error) {
 		siafundOutputSum = siafundOutputSum.Add(sfo.Value)
 	}
 	if siafundOutputSum.Cmp(siafundInputSum) != 0 {
-		return errors.New("siafund inputs do not equal siafund outpus within transaction")
+		return ErrSiafundInputOutputMismatch
 	}
 	return
 }
 
 // ValidStorageProofs checks that the storage proofs are valid in the context
 // of the consensus set.
-func (s *State) ValidStorageProofs(t types.Transaction) (err error) {
-	id := s.mu.RLock()
-	defer s.mu.RUnlock(id)
-	return s.validStorageProofs(t)
+func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
+	id := cs.mu.RLock()
+	defer cs.mu.RUnlock(id)
+	return cs.validStorageProofs(t)
 }
 
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
-func (s *State) validTransaction(t types.Transaction) error {
-	// Skip transaction verification if the State is accepting trusted blocks.
-	if s.verificationRigor != fullVerification {
+func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
+	// Skip transaction verification if the ConsensusSet is accepting trusted
+	// blocks.
+	if cs.verificationRigor != fullVerification && (build.Release == "testing" || !build.DEBUG) {
 		return nil
 	}
 
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
-	err := t.StandaloneValid(s.height())
+	err := t.StandaloneValid(cs.height())
 	if err != nil {
 		return err
 	}
 
 	// Check that each portion of the transaction is legal given the current
 	// consensus set.
-	err = s.validSiacoins(t)
+	err = cs.validSiacoins(t)
 	if err != nil {
 		return err
 	}
-	err = s.validStorageProofs(t)
+	err = cs.validStorageProofs(t)
 	if err != nil {
 		return err
 	}
-	err = s.validFileContractRevisions(t)
+	err = cs.validFileContractRevisions(t)
 	if err != nil {
 		return err
 	}
-	err = s.validSiafunds(t)
+	err = cs.validSiafunds(t)
 	if err != nil {
 		return err
 	}
@@ -228,21 +247,19 @@ func (s *State) validTransaction(t types.Transaction) error {
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
 // is not checked.
-func (s *State) TryTransactions(txns []types.Transaction) error {
+func (cs *ConsensusSet) TryTransactions(txns []types.Transaction) error {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
-	var diffHolder *blockNode
-	defer s.commitDiffSet(diffHolder, modules.DiffRevert)
-
+	diffHolder := new(blockNode)
+	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
-		err := s.validTransaction(txn)
+		err := cs.validTransaction(txn)
 		if err != nil {
 			return err
 		}
-		s.applyTransaction(diffHolder, txn)
+		cs.applyTransaction(diffHolder, txn)
 	}
-
 	return nil
 }

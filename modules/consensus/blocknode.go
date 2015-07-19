@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -35,14 +36,19 @@ type blockNode struct {
 	// prevents duplicate work from being performed.
 	//
 	// Note that diffsGenerated == true iff the node has ever been in the
-	// State's currentPath; this is because diffs must be generated to apply
-	// the node.
+	// ConsensusSet's currentPath; this is because diffs must be generated to
+	// apply the node.
 	diffsGenerated            bool
 	siacoinOutputDiffs        []modules.SiacoinOutputDiff
 	fileContractDiffs         []modules.FileContractDiff
 	siafundOutputDiffs        []modules.SiafundOutputDiff
 	delayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
 	siafundPoolDiffs          []modules.SiafundPoolDiff
+
+	// Used only when the DEBUG flag is set, the consensusSet hash indicates
+	// the hash of the consensus set after the block has been applied. It can
+	// then be used for comparison when rewinding.
+	consensusSetHash crypto.Hash
 }
 
 // earliestChildTimestamp returns the earliest timestamp that a child node
@@ -52,7 +58,7 @@ func (bn *blockNode) earliestChildTimestamp() types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	current := bn
-	for i := 0; i < types.MedianTimestampWindow; i++ {
+	for i := uint64(0); i < types.MedianTimestampWindow; i++ {
 		windowTimes[i] = current.block.Timestamp
 
 		// If we are at the genesis block, keep using the genesis block for the

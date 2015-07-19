@@ -23,7 +23,7 @@ var (
 )
 
 // validHeader does some early, low computation verification on the block.
-func (cs *State) validHeader(b types.Block) error {
+func (cs *ConsensusSet) validHeader(b types.Block) error {
 	// Grab the parent of the block and verify the ID of the child meets the
 	// target. This is done as early as possible to enforce that any
 	// block-related DoS must use blocks that have sufficient work.
@@ -81,8 +81,22 @@ func (cs *State) validHeader(b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
 	parentNode := cs.blockMap[b.ParentID]
+	// COMPATv0.4.0
+	//
+	// When validating/accepting a block, the types height needs to be set to
+	// the height of the block that's being analyzed. After analysis is
+	// finished, the height needs to be set to the height of the current block.
+	types.CurrentHeightLock.Lock()
+	types.CurrentHeight = parentNode.height
+	types.CurrentHeightLock.Unlock()
+	defer func() {
+		types.CurrentHeightLock.Lock()
+		types.CurrentHeight = cs.height()
+		types.CurrentHeightLock.Unlock()
+	}()
+
 	newNode := parentNode.newChild(b)
 	cs.blockMap[b.ID()] = newNode
 	if newNode.heavierThan(cs.currentBlockNode()) {
@@ -100,7 +114,7 @@ func (cs *State) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*b
 // blocks from a trust source, such as blocks that were previously verified and
 // saved to disk. The value of 'cs.verificationRigor' should be set before
 // 'acceptBlock' is called.
-func (cs *State) acceptBlock(b types.Block) error {
+func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
@@ -131,11 +145,18 @@ func (cs *State) acceptBlock(b types.Block) error {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
 
-	// Sanity check - if applied nodes is len 0, revertedNodes should also be
-	// len 0.
+	// Sanity checks.
 	if build.DEBUG {
+		// If appliedNodes is 0, revertedNodes will also be 0.
 		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
 			panic("appliedNodes and revertedNodes are mismatched!")
+		}
+
+		// After applying a block, the consensus set should be in a consistent
+		// state.
+		err = cs.checkConsistency()
+		if err != nil {
+			panic(err)
 		}
 	}
 
@@ -146,7 +167,7 @@ func (cs *State) acceptBlock(b types.Block) error {
 // on a fork that is heavier than the current fork. If the block is accepted,
 // it will be relayed to connected peers. This function should only be called
 // for new, untrusted blocks.
-func (cs *State) AcceptBlock(b types.Block) error {
+func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 
@@ -157,14 +178,15 @@ func (cs *State) AcceptBlock(b types.Block) error {
 		return err
 	}
 
-	// Broadcast the new block to all peers. This is an expensive operation, and not necessary during synchronize or
+	// Broadcast the new block to all peers. This is an expensive operation,
+	// and not necessary during synchronize or when loading from disk.
 	go cs.gateway.Broadcast("RelayBlock", b)
 
 	return nil
 }
 
 // RelayBlock is an RPC that accepts a block from a peer.
-func (cs *State) RelayBlock(conn modules.PeerConn) error {
+func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
 	// Decode the block from the connection.
 	var b types.Block
 	err := encoding.ReadObject(conn, &b, types.BlockSizeLimit)

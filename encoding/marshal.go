@@ -1,38 +1,6 @@
 // Package encoding converts arbitrary objects into byte slices, and vis
 // versa. It also contains helper functions for reading and writing length-
-// prefixed data. The encoding rules are as follows:
-//
-// Objects are encoded as binary data, without type information. The receiver
-// uses context to determine the type to decode into.
-//
-// Integers are little-endian, and are always encoded as 8 bytes, i.e. their
-// int64 or uint64 equivalent.
-//
-// Booleans are encoded as one byte, either zero (false) or one (true). No
-// other values may be used.
-//
-// Nil pointers are equivalent to "false," i.e. a single zero byte. Valid
-// pointers are represented by a "true" byte (0x01) followed by the encoding
-// of the dereferenced value.
-//
-// Variable-length types, such as strings and slices, are represented by an 8-byte
-// length-prefix followed by the encoded value.
-//
-// Slices and structs are simply the concatenation of their encoded elements.
-// Byte slices are not subject to the 8-byte integer rule; they are encoded as
-// their literal representation, one byte per byte.
-//
-// The ordering of struct fields is determined by their type definition. For
-// example:
-//
-//   type foo struct { S string; I int }
-//
-//   Marshal(foo{"bar", 3}) == append(Marshal("bar"), Marshal(3)...)
-//
-// Finally, if a type implements the SiaMarshaler interface, its MarshalSia
-// method will be used to encode the type. The resulting byte slice will be
-// length-prefixed like any other variable-length type. During decoding, the
-// type is decoded as a byte slice, and then passed to UnmarshalSia.
+// prefixed data. See doc/Encoding.md for the full encoding specification.
 package encoding
 
 import (
@@ -122,8 +90,11 @@ func (e *Encoder) encode(val reflect.Value) error {
 	case reflect.Array:
 		// special case for byte arrays
 		if val.Type().Elem().Kind() == reflect.Uint8 {
-			// convert array to slice so we can use Bytes()
-			// can't just use Slice() because array may be unaddressable
+			// if the array is addressable, we can optimize a bit here
+			if val.CanAddr() {
+				return e.write(val.Slice(0, val.Len()).Bytes())
+			}
+			// otherwise we have to copy into a newly allocated slice
 			slice := reflect.MakeSlice(reflect.SliceOf(val.Type().Elem()), val.Len(), val.Len())
 			reflect.Copy(slice, val)
 			return e.write(slice.Bytes())
@@ -134,18 +105,19 @@ func (e *Encoder) encode(val reflect.Value) error {
 				return err
 			}
 		}
+		return nil
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
 			if err := e.encode(val.Field(i)); err != nil {
 				return err
 			}
 		}
-	default:
-		// Marshalling should never fail. If it panics, you're doing something wrong,
-		// like trying to encode a map or an unexported struct field.
-		panic("could not marshal type " + val.Type().String())
+		return nil
 	}
-	return nil
+
+	// Marshalling should never fail. If it panics, you're doing something wrong,
+	// like trying to encode a map or an unexported struct field.
+	panic("could not marshal type " + val.Type().String())
 }
 
 // NewEncoder returns a new encoder that writes to w.

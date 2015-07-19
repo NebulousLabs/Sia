@@ -40,10 +40,11 @@ var (
 // sources, the computationally expensive steps can be skipped.
 type verificationRigor byte
 
-// The State is the object responsible for tracking the current status of the
-// blockchain. Broadly speaking, it is responsible for maintaining consensus.
-// It accepts blocks and constructs a blockchain, forking when necessary.
-type State struct {
+// The ConsensusSet is the object responsible for tracking the current status
+// of the blockchain. Broadly speaking, it is responsible for maintaining
+// consensus.  It accepts blocks and constructs a blockchain, forking when
+// necessary.
+type ConsensusSet struct {
 	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
 	// up loading blocks from memory.
@@ -83,10 +84,18 @@ type State struct {
 	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
+	// fileContractExpirations is not actually a part of the consensus set, but
+	// it is needed to get decent order notation on the file contract lookups.
+	// It is a map of heights to maps of file contract ids. The other table is
+	// needed because of file contract revisions - you need to have random
+	// access lookups to file contracts for when revisions are submitted to the
+	// blockchain.
+	fileContractExpirations map[types.BlockHeight]map[types.FileContractID]struct{}
+
 	// Modules subscribed to the consensus set will receive an ordered list of
-	// changes that occur to the consensus set.
-	consensusChanges []modules.ConsensusChange
-	subscriptions    []chan struct{}
+	// changes that occur to the consensus set, computed using the changeLog.
+	changeLog     []changeEntry
+	subscriptions []chan struct{}
 
 	// block database, used for saving/loading the current path
 	db persist.DB
@@ -103,16 +112,16 @@ type State struct {
 	mu *sync.RWMutex
 }
 
-// New returns a new State, containing at least the genesis block. If there is
-// an existing block database present in saveDir, it will be loaded. Otherwise,
-// a new database will be created.
-func New(gateway modules.Gateway, saveDir string) (*State, error) {
+// New returns a new ConsensusSet, containing at least the genesis block. If
+// there is an existing block database present in saveDir, it will be loaded.
+// Otherwise, a new database will be created.
+func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	if gateway == nil {
 		return nil, ErrNilGateway
 	}
 
-	// Create the State object.
-	cs := &State{
+	// Create the ConsensusSet object.
+	cs := &ConsensusSet{
 		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
 
@@ -122,6 +131,8 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
+
+		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
 
 		gateway: gateway,
 
@@ -163,6 +174,10 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
+	// Get the genesis consensus set hash.
+	if build.DEBUG {
+		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
+	}
 
 	// Send out genesis block update.
 	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
@@ -196,6 +211,6 @@ func New(gateway modules.Gateway, saveDir string) (*State, error) {
 }
 
 // Close safely closes the block database.
-func (cs *State) Close() error {
+func (cs *ConsensusSet) Close() error {
 	return cs.db.Close()
 }

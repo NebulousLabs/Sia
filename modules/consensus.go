@@ -111,8 +111,9 @@ type DelayedSiacoinOutputDiff struct {
 // siafundPool to 'Adjusted'. When reverting the diff, set siafundPool to
 // 'Previous'.
 type SiafundPoolDiff struct {
-	Previous types.Currency
-	Adjusted types.Currency
+	Direction DiffDirection
+	Previous  types.Currency
+	Adjusted  types.Currency
 }
 
 // A ConsensusSet accepts blocks and builds an understanding of network
@@ -134,6 +135,12 @@ type ConsensusSet interface {
 	// Close will shut down the consensus set, giving the module enough time to
 	// run any required closing routines.
 	Close() error
+
+	// ConsensusChange returns the ith consensus change that was broadcast to
+	// subscribers by the consensus set. An error is returned if i consensus
+	// changes have not been broadcast. The primary purpose of this function is
+	// to rescan the blockchain.
+	ConsensusChange(i int) (ConsensusChange, error)
 
 	// ConsensusSetSubscribe will subscribe another module to the consensus
 	// set. Every time that there is a change to the consensus set, an update
@@ -157,12 +164,6 @@ type ConsensusSet interface {
 	// InCurrentPath returns true if the block id presented is found in the
 	// current path, false otherwise.
 	InCurrentPath(types.BlockID) bool
-
-	// SiafundPool is a deprecaated-on-arrival function that returns the
-	// current size of the siafund pool. The siafund pool management is
-	// undergoing some significant changes but there was not enough time to
-	// implement them fully before the release of the siafund tool.
-	SiafundPool() types.Currency
 
 	// Synchronize will try to synchronize to a specific peer. During general
 	// use, this call should never be necessary.

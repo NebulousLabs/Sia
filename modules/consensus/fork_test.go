@@ -1,224 +1,165 @@
 package consensus
 
-/*
 import (
-	"math/big"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
-	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
-// mineInvalidSignatureBlock will mine a block that is valid on the longest
-// fork except for having an illegal signature, and then will mine `i` more
-// blocks after that which are valid.
-func (ct *ConsensusTester) MineInvalidSignatureBlockSet(depth int) (blocks []types.Block) {
-	siacoinInput, value := ct.FindSpendableSiacoinInput()
-	txn := ct.AddSiacoinInputToTransaction(types.Transaction{}, siacoinInput)
-	txn.MinerFees = append(txn.MinerFees, value)
-
-	// Invalidate the signature.
-	byteSig := []byte(txn.TransactionSignatures[0].Signature)
-	byteSig[0]++
-	txn.TransactionSignatures[0].Signature = types.Signature(byteSig)
-
-	// Mine a block with this transcation.
-	block := ct.MineCurrentBlock([]types.Transaction{txn})
-	blocks = append(blocks, block)
-
-	// Mine several more blocks.
-	recentID := block.ID()
-	for i := 0; i < depth; i++ {
-		intTarget := ct.CurrentTarget().Int()
-		safeIntTarget := intTarget.Div(intTarget, big.NewInt(2))
-		block = MineTestingBlock(recentID, types.CurrentTimestamp(), ct.Payouts(ct.Height()+2+types.BlockHeight(i), nil), nil, types.IntToTarget(safeIntTarget))
-		blocks = append(blocks, block)
-		recentID = block.ID()
-	}
-
-	return
-}
-
-// TestComplexForking creates multiple states and sets up multiple forking
-// scenarios between them to check consistency during forking.
-func TestComplexForking(t *testing.T) {
+// TestDeleteNode probes the deleteNode method of the consensus set.
+func TestDeleteNode(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
-	// Create gateway. For this test, we can use the same gateway in all
-	// States without causing problems.
-	g, err := gateway.New(":0", build.TempDir("consensus", "TestComplexForking", "gateway"))
+	cst, err := createConsensusSetTester("TestDeleteNode")
 	if err != nil {
 		t.Fatal(err)
 	}
+	bn := cst.cs.currentBlockNode()
 
-	// Can't use NewTestingEnvironment; all states need to have the same set of
-	// initial blocks.
-	s1, err := New(g, build.TempDir("consensus", "TestComplexForking1"))
+	// Set up the following structure:
+	//		parent -> child0 + child1
+	//		child0 -> grandchild
+	//		child1 -> nil
+	//		grandchild -> nil
+	//
+	// When child0 is removed from the list, the following structure should
+	// remain:
+	//		parent -> child1Good
+	//		child1Good -> nil
+	child0, _ := cst.miner.FindBlock()
+	child1, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(child0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s2, err := New(g, build.TempDir("consensus", "TestComplexForking2"))
+	cst.csUpdateWait()
+	grandchild, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(grandchild)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s3, err := New(g, build.TempDir("consensus", "TestComplexForking3"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	a1 := NewConsensusTester(t, s1)
-	a2 := NewConsensusTester(t, s2)
-	a3 := NewConsensusTester(t, s3)
-
-	// Verify that the three states have the same initial hash.
-	if s1.StateHash() != s2.StateHash() {
-		t.Fatal("starting states have different hashes - can't run test")
-	}
-	if s1.StateHash() != s3.StateHash() {
-		t.Fatal("starting states have different hashes - can't run test")
-	}
-
-	// Get state1 and state2 on different forks, s3 will follow s1 at this
-	// point.
-	block1 := MineTestingBlock(s1.CurrentBlock().ID(), types.GenesisTimestamp, a1.Payouts(s1.Height()+1, nil), nil, s1.CurrentTarget())
-	err = s1.AcceptBlock(block1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	block2 := MineTestingBlock(s2.CurrentBlock().ID(), types.GenesisTimestamp+1, a2.Payouts(s2.Height()+1, nil), nil, s2.CurrentTarget())
-	err = s2.AcceptBlock(block2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.StateHash() == s2.StateHash() {
-		t.Fatal("failed to get states on different forks")
-	}
-	err = s3.AcceptBlock(block1)
-	if err != nil {
+	cst.csUpdateWait()
+	err = cst.cs.AcceptBlock(child1)
+	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
 
-	// Mine several blocks on each state.
-	for i := 0; i < 2; i++ {
-		// state 1 mining.
-		block1 = a1.MineCurrentBlock(nil)
-		err = s1.AcceptBlock(block1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = s3.AcceptBlock(block1)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// state 2 mining.
-		block2 = a2.MineCurrentBlock(nil)
-		err = s2.AcceptBlock(block2)
-		if err != nil {
-			t.Fatal(err)
-		}
+	// Check the structure is as intended.
+	if len(bn.children) != 2 {
+		t.Fatal("wrong number of children on parent block")
+	}
+	if len(bn.children[0].children) != 1 {
+		t.Fatal("bad block doesn't have the right number of children")
+	}
+	if len(bn.children[1].children) != 0 {
+		t.Fatal("good block has children")
 	}
 
-	// Consistency checks, sprinkled throughout the forking process to help
-	// catch any latent problems.
-	a1.ConsistencyChecks()
-	a2.ConsistencyChecks()
-	a3.ConsistencyChecks()
+	// Rewind so that 'bn' is the current block again.
+	cst.cs.commitDiffSet(bn.children[0].children[0], modules.DiffRevert)
+	cst.cs.commitDiffSet(bn.children[0], modules.DiffRevert)
 
-	// Put state2 ahead of state1 and then give all of the state2 blocks to
-	// state1, causing state1 to fork. State3 is left alone.
-	for i := 0; i < 2; i++ {
-		block2 = a2.MineCurrentBlock(nil)
-		err = s2.AcceptBlock(block2)
-		if err != nil {
-			t.Fatal(err)
+	// Call 'deleteNode' on child0
+	child0Node := bn.children[0]
+	cst.cs.deleteNode(bn.children[0])
+	if len(bn.children) != 1 {
+		t.Error("children not correctly deleted")
+	}
+	if len(child0Node.children) != 0 {
+		t.Error("grandchild not deleted correctly")
+	}
+	if bn.children[0] == child0Node {
+		t.Error("wrong child was deleted")
+	}
+
+	// Trigger a panic by calling 'deleteNode' on a block node in the current
+	// path.
+	defer func() {
+		r := recover()
+		if r != errDeleteCurrentPath {
+			t.Error("expecting errDeleteCurrentPath, got", r)
 		}
-	}
-	for i := types.BlockHeight(1); i <= s2.Height(); i++ {
-		b, exists := s2.BlockAtHeight(i)
-		if !exists {
-			t.Fatal("error when moving blocks from s2 to s1")
-		}
-		err = s1.AcceptBlock(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// State1 hash should match state2 hash.
-	if s1.StateHash() != s2.StateHash() {
-		t.Fatal("hashes don't match after trying to force a rewinding fork")
-	}
-
-	// Consistency checks, sprinkled throughout the forking process to help
-	// catch any latent problems.
-	a1.ConsistencyChecks()
-	a2.ConsistencyChecks()
-	a3.ConsistencyChecks()
-
-	// Put state3 ahead of state 1&2 on state1's original block path. Then feed
-	// all of state 3's blocks to state1, which will cause state1 to fork to
-	// state3. State1 will be applying diffs for many of the blocks instead of
-	// generating them, which means a different codepath will be followed from
-	// the previous fork.
-	s3InitialHeight := s3.Height()
-	for i := 0; i < 4; i++ {
-		block3 := a3.MineCurrentBlock(nil)
-		err = s3.AcceptBlock(block3)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	for i := s3InitialHeight + 1; i <= s3.Height(); i++ {
-		b, exists := s3.BlockAtHeight(i)
-		if !exists {
-			t.Fatal("error when moving blocks from s3 to s1")
-		}
-		err = s1.AcceptBlock(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Consistency checks, sprinkled throughout the forking process to help
-	// catch any latent problems.
-	a1.ConsistencyChecks()
-	a2.ConsistencyChecks()
-	a3.ConsistencyChecks()
-
-	// State1 hash should match state3 hash.
-	if s1.StateHash() != s3.StateHash() {
-		t.Fatal("hashes don't match after trying to force an applying fork")
-	}
-
-	// Mine a bunch of blocks on state2 where the first block has an invalid
-	// signature. Feed them all to state1. The result should be that state1
-	// attempts to fork, finds the invalid singature, and then reverts to its
-	// original position with state3.
-	invalidBlocks := a2.MineInvalidSignatureBlockSet(2)
-	for _, block := range invalidBlocks[:len(invalidBlocks)-1] {
-		err = s1.AcceptBlock(block)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = s1.AcceptBlock(invalidBlocks[len(invalidBlocks)-1])
-	if err != crypto.ErrInvalidSignature {
-		t.Fatal("expecting invalid signature:", err)
-	}
-
-	// State1 hash should match state3 hash.
-	if s1.StateHash() != s3.StateHash() {
-		t.Fatal("hashes don't match after trying to force an invalid fork")
-	}
-
-	// Consistency checks, sprinkled throughout the forking process to help
-	// catch any latent problems.
-	a1.ConsistencyChecks()
-	a2.ConsistencyChecks()
-	a3.ConsistencyChecks()
+	}()
+	cst.cs.deleteNode(bn)
 }
-*/
+
+// TestBacktrackToCurrentPath probes the backtrackToCurrentPath method of the
+// consensus set.
+func TestBacktrackToCurrentPath(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Backtrack from the current node to the blockchain.
+	nodes := cst.cs.backtrackToCurrentPath(bn)
+	if len(nodes) != 1 {
+		t.Fatal("backtracking to the current node gave incorrect result")
+	}
+	if nodes[0].block.ID() != bn.block.ID() {
+		t.Error("backtrack returned the wrong node")
+	}
+
+	// Backtrack from a node that has diverted from the current blockchain.
+	child0, _ := cst.miner.FindBlock()
+	child1, _ := cst.miner.FindBlock()
+	err = cst.cs.AcceptBlock(child0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cst.csUpdateWait()
+	err = cst.cs.AcceptBlock(child1)
+	if err != modules.ErrNonExtendingBlock {
+		t.Fatal(err)
+	}
+	bn = cst.cs.blockMap[child1.ID()]
+	nodes = cst.cs.backtrackToCurrentPath(bn)
+	if len(nodes) != 2 {
+		t.Error("backtracking grabbed wrong number of nodes")
+	}
+	if nodes[0].block.ID() != bn.parent.block.ID() {
+		t.Error("grabbed the wrong block as the common block")
+	}
+	if nodes[1].block.ID() != bn.block.ID() {
+		t.Error("backtracked from the wrong node")
+	}
+}
+
+// TestRevertToNode probes the revertToNode method of the consensus set.
+func TestRevertToNode(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	cst, err := createConsensusSetTester("TestBacktrackToCurrentPath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bn := cst.cs.currentBlockNode()
+
+	// Revert to a grandparent and verify the returned array is correct.
+	revertedNodes := cst.cs.revertToNode(bn.parent.parent)
+	if len(revertedNodes) != 2 {
+		t.Error("wrong number of nodes reverted")
+	}
+	if revertedNodes[0] != bn {
+		t.Error("wrong composition of reverted nodes")
+	}
+	if revertedNodes[1] != bn.parent {
+		t.Error("wrong composition of reverted nodes")
+	}
+
+	// Trigger a panic by trying to revert to a node outside of the current
+	// path.
+	defer func() {
+		r := recover()
+		if r != errExternalRevert {
+			t.Error(r)
+		}
+	}()
+	cst.cs.revertToNode(bn)
+}

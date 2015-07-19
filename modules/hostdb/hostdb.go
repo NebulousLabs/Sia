@@ -34,7 +34,7 @@ var (
 // host based on their hosting parameters, and then can select hosts at random
 // for uploading files.
 type HostDB struct {
-	consensusSet *consensus.State
+	consensusSet *consensus.ConsensusSet
 	gateway      modules.Gateway
 
 	// The hostTree is the root node of the tree that organizes hosts by
@@ -63,7 +63,7 @@ type HostDB struct {
 
 // New returns a host database that will still crawling the hosts it finds on
 // the blockchain.
-func New(cs *consensus.State, g modules.Gateway) (hdb *HostDB, err error) {
+func New(cs *consensus.ConsensusSet, g modules.Gateway) (hdb *HostDB, err error) {
 	// Check for nil dependencies.
 	if cs == nil {
 		err = ErrNilConsensusSet
