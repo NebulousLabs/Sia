@@ -67,7 +67,10 @@ func (srv *Server) consensusSynchronizeHandlerGET(w http.ResponseWriter, req *ht
 	if err != nil {
 		writeError(w, "System error", http.StatusInternalServerError)
 	}
-	go srv.cs.Synchronize(peers[randPeer])
+	err = srv.cs.Synchronize(peers[randPeer])
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+	}
 	writeSuccess(w)
 }
 
