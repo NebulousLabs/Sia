@@ -19,6 +19,8 @@ var (
 
 	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
 	PrefixStrNonSia = "NonSia" // COMPATv0.3.3.3
+
+	TransactionPoolDir = "transactionpool"
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and
