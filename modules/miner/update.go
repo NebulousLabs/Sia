@@ -7,9 +7,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// ReceiveConsensusSetUpdate will update the miner's most recent block. This is
-// a part of the ConsensusSetSubscriber interface.
-func (m *Miner) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange will update the miner's most recent block. This is a
+// part of the ConsensusSetSubscriber interface.
+func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
@@ -44,16 +44,11 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(unconfirmedTransactions []
 
 	m.transactions = nil
 	remainingSize := int(types.BlockSizeLimit - 5e3)
-	for {
-		if len(unconfirmedTransactions) == 0 {
-			break
-		}
-		remainingSize -= len(encoding.Marshal(unconfirmedTransactions[0]))
+	for i := range unconfirmedTransactions {
+		remainingSize -= len(encoding.Marshal(unconfirmedTransactions[i]))
 		if remainingSize < 0 {
 			break
 		}
-
-		m.transactions = append(m.transactions, unconfirmedTransactions[0])
-		unconfirmedTransactions = unconfirmedTransactions[1:]
+		m.transactions = unconfirmedTransactions[0 : i+1]
 	}
 }

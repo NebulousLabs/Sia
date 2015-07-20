@@ -13,9 +13,9 @@ func (tp *TransactionPool) purge() {
 	tp.databaseSize = 0
 }
 
-// ReceiveConsensusSetUpdate gets called to inform the transaction pool of
-// changes to the consensus set.
-func (tp *TransactionPool) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange gets called to inform the transaction pool of changes
+// to the consensus set.
+func (tp *TransactionPool) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := tp.mu.Lock()
 	defer tp.mu.Unlock(lockID)
 

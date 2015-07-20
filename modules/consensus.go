@@ -27,12 +27,9 @@ type (
 	// A ConsensusSetSubscriber is an object that receives updates to the consensus
 	// set every time there is a change in consensus.
 	ConsensusSetSubscriber interface {
-		// ReceiveConsensusSetUpdate sends a consensus update to a module through a
-		// function call. Updates will always be sent in the correct order.
-		// Usually, the function receiving the updates will also process the
-		// changes. If the function blocks indefinitely, the state will still
-		// function.
-		ReceiveConsensusSetUpdate(ConsensusChange)
+		// ProcessConsensusChange sends a consensus update to a module through
+		// a function call. Updates will always be sent in the correct order.
+		ProcessConsensusChange(ConsensusChange)
 	}
 
 	// A ConsensusChange enumerates a set of changes that occured to the consensus set.

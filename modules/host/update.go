@@ -81,9 +81,9 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 	}
 }
 
-// RecieveConsensusSetUpdate will be called by the consensus set every time
-// there is a new block or a fork of some kind.
-func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange will be called by the consensus set every time there
+// is a change to the blockchain.
+func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 

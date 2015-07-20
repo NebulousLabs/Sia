@@ -109,7 +109,7 @@ func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNod
 		panic(err)
 	}
 	for _, subscriber := range cs.subscribers {
-		subscriber.ReceiveConsensusSetUpdate(cc)
+		subscriber.ProcessConsensusChange(cc)
 	}
 }
 
@@ -124,7 +124,7 @@ func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) 
 }
 
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
-// ReceiveConsensusSetUpdate every time there is a change in the consensus set.
+// ProcessConsensusChange every time there is a change in the consensus set.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	id := cs.mu.Lock()
 	cs.subscribers = append(cs.subscribers, subscriber)
@@ -133,7 +133,7 @@ func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSub
 		if err != nil && build.DEBUG {
 			panic(err)
 		}
-		subscriber.ReceiveConsensusSetUpdate(cc)
+		subscriber.ProcessConsensusChange(cc)
 	}
 	cs.mu.Unlock(id)
 }

@@ -51,7 +51,7 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 	}
 }
 
-func (w *Wallet) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// TODO: Restruture whole wallet.
 
 	// Adjust the confirmed set of diffs.

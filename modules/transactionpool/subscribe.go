@@ -25,7 +25,7 @@ func (tp *TransactionPool) updateSubscribersTransactions() {
 // updateSubscribersConsensus sends a new consensus change to all subscribers.
 func (tp *TransactionPool) updateSubscribersConsensus(cc modules.ConsensusChange) {
 	for _, subscriber := range tp.subscribers {
-		subscriber.ReceiveConsensusSetUpdate(cc)
+		subscriber.ProcessConsensusChange(cc)
 	}
 }
 
@@ -40,7 +40,7 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 		if err != nil && build.DEBUG {
 			panic(err)
 		}
-		subscriber.ReceiveConsensusSetUpdate(cc)
+		subscriber.ProcessConsensusChange(cc)
 	}
 	tp.mu.Unlock(id)
 }
