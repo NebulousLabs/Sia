@@ -177,11 +177,11 @@ func TestDisconnect(t *testing.T) {
 		t.Fatal("couldn't start listener:", err)
 	}
 	go func() {
-		conn, err := l.Accept()
+		_, err := l.Accept()
 		if err != nil {
 			t.Fatal("accept failed:", err)
 		}
-		conn.Close()
+		// conn.Close()
 	}()
 	// skip standard connection protocol
 	conn, err := net.Dial("tcp", l.Addr().String())
