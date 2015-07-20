@@ -28,8 +28,7 @@ func ping(addr modules.NetAddress) bool {
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
 	// create the transaction that will hold the announcement
-	var t types.Transaction
-	id, err := h.wallet.RegisterTransaction(t)
+	id, err := h.wallet.RegisterTransaction(types.Transaction{}, nil)
 	if err != nil {
 		return err
 	}
@@ -39,17 +38,17 @@ func (h *Host) announce(addr modules.NetAddress) error {
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: addr,
 	})
-	_, _, err = h.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
+	_, err = h.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
 	if err != nil {
 		return err
 	}
-	t, err = h.wallet.SignTransaction(id, true)
+	txnSet, err := h.wallet.SignTransaction(id, true)
 	if err != nil {
 		return err
 	}
 
 	// Add the transaction to the transaction pool.
-	err = h.tpool.AcceptTransaction(t)
+	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err == modules.ErrTransactionPoolDuplicate {
 		return errors.New("you have already announced yourself")
 	}

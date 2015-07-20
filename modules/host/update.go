@@ -32,6 +32,8 @@ func (h *Host) threadedDeleteObligation(obligation contractObligation) {
 
 // threadedCreateStorageProof creates a storage proof for a file contract
 // obligation and submits it to the blockchain.
+//
+// TODO: The printlns here should be logging messages.
 func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightForProof types.BlockHeight) {
 	defer h.threadedDeleteObligation(obligation)
 
@@ -57,31 +59,31 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 	copy(sp.Segment[:], base)
 
 	// Create and send the transaction.
-	id, err := h.wallet.RegisterTransaction(types.Transaction{})
+	id, err := h.wallet.RegisterTransaction(types.Transaction{}, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	_, _, err = h.wallet.AddStorageProof(id, sp)
+	_, err = h.wallet.AddStorageProof(id, sp)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	t, err := h.wallet.SignTransaction(id, true)
+	txnSet, err := h.wallet.SignTransaction(id, true)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = h.tpool.AcceptTransaction(t)
+	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 }
 
-// RecieveConsensusSetUpdate will be called by the consensus set every time
-// there is a new block or a fork of some kind.
-func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange will be called by the consensus set every time there
+// is a change to the blockchain.
+func (h *Host) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := h.mu.Lock()
 	defer h.mu.Unlock(lockID)
 
@@ -100,6 +102,4 @@ func (h *Host) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	}
 	h.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
 	h.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
-
-	go h.threadedUpdateSubscribers()
 }

@@ -33,13 +33,11 @@ func TestDeleteNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.csUpdateWait()
 	grandchild, _ := cst.miner.FindBlock()
 	err = cst.cs.AcceptBlock(grandchild)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.csUpdateWait()
 	err = cst.cs.AcceptBlock(child1)
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
@@ -112,7 +110,6 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst.csUpdateWait()
 	err = cst.cs.AcceptBlock(child1)
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)

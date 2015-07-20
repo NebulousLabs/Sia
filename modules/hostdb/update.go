@@ -47,9 +47,9 @@ func findHostAnnouncements(b types.Block) (announcements []modules.HostSettings)
 	return
 }
 
-// ReceiveConsensusSetUpdate accepts an update from the consensus set which
+// ProcessConsensusChange accepts an update from the consensus set which
 // contains new blocks.
-func (hdb *HostDB) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+func (hdb *HostDB) ProcessConsensusChange(cc modules.ConsensusChange) {
 	id := hdb.mu.Lock()
 	defer hdb.mu.Unlock(id)
 
@@ -62,6 +62,5 @@ func (hdb *HostDB) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 
 	hdb.consensusHeight -= len(cc.RevertedBlocks)
 	hdb.consensusHeight += len(cc.AppliedBlocks)
-	hdb.notifySubscribers()
 	return
 }

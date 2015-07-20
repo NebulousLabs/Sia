@@ -9,86 +9,53 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// transactionpool.go contains the major objects used when working with the
-// transactionpool. The transaction pool needs access to the consensus set and
-// to a gateway (to broadcast valid transactions). Transactions are kept in a
-// list where new transactions are appended to the end to preserve any
-// dependency requirements. Updating the transaction pool happens by removing
-// all unconfirmed transactions, adding the changes to the consensus set, and
-// then re-adding all of the unconfirmed transactions. Some of the unconfirmed
-// transactions may now be invalid, but this will be caught upon re-insertion.
-//
-// The transaction pool maintains an unconfirmed set and a reference set. The
-// unconfirmed set contains all of the elements of the confirmed set except for
-// those which have been consumed by unconfirmed transactions, and additionally
-// contains any elements that have been added by unconfirmed transactions. The
-// reference set contains elements which have been consumed by unconfirmed
-// transactions because they might be necessary when constructing diffs.
-// Information would otherwise be lost as things get removed from the
-// unconfirmed set. The reference set should always be empty when there are no
-// unconfirmed transactions.
-//
-// All changes to the transaction pool are logged by the update set. This is so
-// the changes can be sent to subscribers, even subscribers that join late or
-// deadlock for some period of time. This could eventually cause performance
-// issues, and will be addressed after that becomes a problem.
-//
-// The transaction pool does not currently prioritize transactions with higher
-// fees, and also has no minimum fee. This is a good place to CONTRIBUTE.
+type (
+	// ObjectIDs are the IDs of objects such as siacoin outputs and file
+	// contracts, and are used to see if there are conflicts or overlaps within
+	// the transaction pool. A TransactionSetID is the hash of a transaction
+	// set.
+	ObjectID         crypto.Hash
+	TransactionSetID crypto.Hash
 
-// The transaction pool keeps an unconfirmed set of transactions along with the
-// contracts and outputs that have been created by unconfirmed transactions.
-// Incoming transactions are allowed to use objects in the unconfirmed
-// consensus set. Doing so will consume them, preventing other transactions
-// from using them.
-type TransactionPool struct {
-	// Depedencies of the transaction pool. The state height is needed
-	// separately from the state because the transaction pool may not be
-	// synchronized to the state.
-	consensusSet       modules.ConsensusSet
-	gateway            modules.Gateway
-	consensusSetHeight types.BlockHeight
+	// The TransactionPool tracks incoming transactions, accepting them or
+	// rejecting them based on internal criteria such as fees and unconfirmed
+	// double spends.
+	TransactionPool struct {
+		// Depedencies of the transaction pool.
+		consensusSet modules.ConsensusSet
+		gateway      modules.Gateway
 
-	// A linked list of transactions, with a map pointing to each. Incoming
-	// transactions are inserted at the tail if they do not conflict with
-	// existing transactions. Transactions pulled from reverted blocks are
-	// inserted at the head because there may be dependencies. Inserting in
-	// this order ensures that dependencies always appear earlier in the linked
-	// list, so a call to TransactionSet() will never dump out-of-order
-	// transactions.
-	transactions    map[crypto.Hash]struct{}
-	transactionList []types.Transaction
+		// To prevent double spends in the unconfirmed transaction set, the
+		// transaction pool keeps a list of all objects that have either been
+		// created or consumed by the current unconfirmed transaction pool. All
+		// transactions with overlaps are rejected. This model is
+		// over-aggressive - one transaction set may create an object that
+		// another transaction set spends. This is done to minimize the
+		// computation and memory load on the transaction pool. Dependent
+		// transactions should be lumped into a single transaction set.
+		//
+		// transactionSetDiffs map form a transaction set id to the set of
+		// diffs that resulted from the transaction set.
+		knownObjects        map[ObjectID]struct{}
+		transactionSets     map[TransactionSetID][]types.Transaction
+		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
+		transactionListSize int
+		// TODO: Write a consistency check comparing transactionSets,
+		// transactionSetDiffs.
+		//
+		// TODO: Write a consistency check making sure that all unconfirmedIDs
+		// point to the right place, and that all UnconfirmedIDs are accounted for.
 
-	// The unconfirmed set of contracts and outputs. The unconfirmed set
-	// includes the confirmed set, except for elements that have been spent by
-	// the unconfirmed set.
-	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	fileContracts  map[types.FileContractID]types.FileContract
-	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
+		// The consensus change index tracks how many consensus changes have
+		// been sent to the transaction pool. When a new subscriber joins the
+		// transaction pool, all prior consensus changes are sent to the new
+		// subscriber.
+		consensusChangeIndex int
+		subscribers          []modules.TransactionPoolSubscriber
 
-	// The reference set contains any objects that are not in the unconfirmed
-	// set, but may still need to be referenced when creating diffs or
-	// reverting unconfirmed transactions (due to conflicts).
-	referenceSiacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
-	referenceFileContracts         map[types.FileContractID]types.FileContract
-	referenceFileContractRevisions map[crypto.Hash]types.FileContract
-	referenceSiafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
-
-	// The entire history of the transaction pool is kept. Each element
-	// represents an atomic change to the transaction pool. When a new
-	// subscriber joins the transaction pool, they can be sent the entire
-	// history and catch up properly, and they can take a long time to catch
-	// up. To prevent deadlocks in the transaction pool, subscribers are
-	// updated in a separate thread which does not guarantee that a subscriber
-	// is always fully synchronized to the transaction pool.
-	consensusChangeIndex    int   // Increments any time a consensus update is made.
-	consensusChanges        []int // The index of the consensus change from the consensus set. -1 means there was no change from the consensus set.
-	unconfirmedTransactions [][]types.Transaction
-	unconfirmedSiacoinDiffs [][]modules.SiacoinOutputDiff
-	subscribers             []chan struct{}
-
-	mu *sync.RWMutex
-}
+		mu *sync.RWMutex
+	}
+)
 
 // New creates a transaction pool that is ready to receive transactions.
 func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err error) {
@@ -107,24 +74,33 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 		consensusSet: cs,
 		gateway:      g,
 
-		transactions:   make(map[crypto.Hash]struct{}),
-		siacoinOutputs: make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		fileContracts:  make(map[types.FileContractID]types.FileContract),
-		siafundOutputs: make(map[types.SiafundOutputID]types.SiafundOutput),
+		knownObjects:        make(map[ObjectID]struct{}),
+		transactionSets:     make(map[TransactionSetID][]types.Transaction),
+		transactionSetDiffs: make(map[TransactionSetID]modules.ConsensusChange),
 
-		referenceSiacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		referenceFileContracts:         make(map[types.FileContractID]types.FileContract),
-		referenceFileContractRevisions: make(map[crypto.Hash]types.FileContract),
-		referenceSiafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
+		// The consensus change index is intialized to '-1', which indicates
+		// that no consensus changes have been sent yet. The first consensus
+		// change will then have an index of '0'.
+		consensusChangeIndex: -1,
 
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		mu: sync.New(modules.SafeMutexDelay, 5),
 	}
 
 	// Register RPCs
-	g.RegisterRPC("RelayTransaction", tp.RelayTransaction)
+	g.RegisterRPC("RelayTransactionSet", tp.RelayTransactionSet)
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)
-
 	return
+}
+
+// TransactionList returns a list of all transactions in the transaction pool.
+// The transactions are provided in an order that can acceptably be put into a
+// block.
+func (tp *TransactionPool) TransactionList() []types.Transaction {
+	var txns []types.Transaction
+	for _, tSet := range tp.transactionSets {
+		txns = append(txns, tSet...)
+	}
+	return txns
 }

@@ -25,88 +25,7 @@ type tpoolTester struct {
 	miner   modules.Miner
 	wallet  modules.Wallet
 
-	csUpdateChan     <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// emptyUnlockTransaction creates a transaction with empty UnlockConditions,
-// meaning it's trivial to spend the output.
-func (tpt *tpoolTester) emptyUnlockTransaction() types.Transaction {
-	// Send money to an anyone-can-spend address.
-	emptyHash := types.UnlockConditions{}.UnlockHash()
-	txn, err := tpt.sendCoins(types.NewCurrency64(1), emptyHash)
-	if err != nil {
-		tpt.t.Fatal(err)
-	}
-	outputID := txn.SiacoinOutputID(0)
-
-	// Create a transaction spending the coins.
-	txn = types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{
-			types.SiacoinInput{
-				ParentID: outputID,
-			},
-		},
-		SiacoinOutputs: []types.SiacoinOutput{
-			types.SiacoinOutput{
-				Value:      types.NewCurrency64(1),
-				UnlockHash: emptyHash,
-			},
-		},
-	}
-
-	return txn
-}
-
-// csUpdateWait listens on all channels until a consensus set update has
-// reached all modules.
-func (tpt *tpoolTester) csUpdateWait() {
-	<-tpt.csUpdateChan
-	tpt.tpUpdateWait()
-}
-
-// tpUpdateWait listens on all channels until a transaction pool update has
-// reached all modules.
-func (tpt *tpoolTester) tpUpdateWait() {
-	<-tpt.tpoolUpdateChan
-	<-tpt.minerUpdateChan
-	<-tpt.walletUpdateChan
-}
-
-// An exact clone of wallet's SendCoins(). The difference is the use of
-// tpUpdateWait() for testing purposes.
-func (tpt *tpoolTester) sendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
-	output := types.SiacoinOutput{
-		Value:      amount,
-		UnlockHash: dest,
-	}
-	id, err := tpt.wallet.RegisterTransaction(t)
-	if err != nil {
-		return
-	}
-	_, err = tpt.wallet.FundTransaction(id, amount)
-	if err != nil {
-		return
-	}
-	tpt.tpUpdateWait()
-	_, _, err = tpt.wallet.AddSiacoinOutput(id, output)
-	if err != nil {
-		return
-	}
-	t, err = tpt.wallet.SignTransaction(id, true)
-	if err != nil {
-		return
-	}
-	err = tpt.tpool.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
-	tpt.tpUpdateWait()
-	return
 }
 
 // newTpoolTester returns a ready-to-use tpool tester, with all modules
@@ -152,14 +71,8 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		miner:   m,
 		wallet:  w,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	tpt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -168,7 +81,6 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tpt.csUpdateWait()
 	}
 
 	return tpt

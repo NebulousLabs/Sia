@@ -135,20 +135,24 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 
 // addCollateral takes a transaction and its contract terms and adds the host
 // collateral to the transaction.
-func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms) (fundedTxn types.Transaction, txnID string, err error) {
+func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms) (fundedTxn types.Transaction, txnID int, err error) {
 	// Determine the amount of colletaral the host needs to provide.
 	sizeCurrency := types.NewCurrency64(terms.FileSize)
 	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	collateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 
-	txnID, err = h.wallet.RegisterTransaction(txn)
+	txnID, err = h.wallet.RegisterTransaction(txn, nil)
 	if err != nil {
 		return
 	}
 	if collateral.Cmp(types.NewCurrency64(0)) == 0 {
 		return txn, txnID, nil
 	}
-	fundedTxn, err = h.wallet.FundTransaction(txnID, collateral)
+	err = h.wallet.FundTransaction(txnID, collateral)
+	if err != nil {
+		return
+	}
+	fundedTxn, _, err = h.wallet.ViewTransaction(txnID)
 	if err != nil {
 		return
 	}
@@ -254,16 +258,16 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	// Add the signatures from the renter signed transaction, and then sign the
 	// transaction, then submit the transaction.
 	for _, sig := range signedTxn.TransactionSignatures {
-		_, _, err = h.wallet.AddTransactionSignature(txnID, sig)
+		_, err = h.wallet.AddTransactionSignature(txnID, sig)
 		if err != nil {
 			return
 		}
 	}
-	fullTxn, err := h.wallet.SignTransaction(txnID, true)
+	txnSet, err := h.wallet.SignTransaction(txnID, true)
 	if err != nil {
 		return
 	}
-	err = h.tpool.AcceptTransaction(fullTxn)
+	err = h.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		return
 	}

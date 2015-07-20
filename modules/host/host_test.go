@@ -26,28 +26,7 @@ type hostTester struct {
 
 	host *Host
 
-	csUpdateChan     <-chan struct{}
-	hostUpdateChan   <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWait blocks until a consensus update has propagated to all modules.
-func (ht *hostTester) csUpdateWait() {
-	<-ht.csUpdateChan
-	<-ht.hostUpdateChan
-	ht.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until a transaction pool update has propagated to all
-// modules.
-func (ht *hostTester) tpUpdateWait() {
-	<-ht.tpoolUpdateChan
-	<-ht.minerUpdateChan
-	<-ht.walletUpdateChan
 }
 
 // CreateHostTester initializes a HostTester.
@@ -94,15 +73,8 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 
 		host: h,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		hostUpdateChan:   h.HostNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	ht.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -111,7 +83,6 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ht.csUpdateWait()
 	}
 	return ht
 }

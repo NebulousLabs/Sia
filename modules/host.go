@@ -47,10 +47,6 @@ type Host interface {
 	// connectivity.
 	ForceAnnounce() error
 
-	// HostNotify will push a struct down the channel every time that an update
-	// is received.
-	HostNotify() <-chan struct{}
-
 	// SetConfig sets the hosting parameters of the host.
 	SetSettings(HostSettings)
 

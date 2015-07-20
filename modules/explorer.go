@@ -84,9 +84,6 @@ type (
 		// Function to safely shut down the block explorer. Closes the database
 		Close() error
 
-		// Sends notifications when the module updates
-		ExplorerNotify() <-chan struct{}
-
 		// Returns information pertaining to a given hash. The
 		// type of the returned value depends on what the hash
 		// was, so an interface is returned instead (i.e. an

@@ -45,32 +45,7 @@ type serverTester struct {
 
 	server *Server
 
-	csUpdateChan     <-chan struct{}
-	hostUpdateChan   <-chan struct{}
-	hostdbUpdateChan <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	renterUpdateChan <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWait blocks until an update from the consensus set has propagated to
-// all modules.
-func (st *serverTester) csUpdateWait() {
-	<-st.csUpdateChan
-	<-st.hostUpdateChan
-	<-st.renterUpdateChan
-	st.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until and update from the transaction pool has
-// propagated too all modules.
-func (st *serverTester) tpUpdateWait() {
-	<-st.tpoolUpdateChan
-	<-st.minerUpdateChan
-	<-st.walletUpdateChan
 }
 
 // newServerTester creates a server tester object that is ready for testing,
@@ -137,17 +112,8 @@ func newServerTester(name string, t *testing.T) *serverTester {
 
 		server: srv,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		hostUpdateChan:   h.HostNotify(),
-		hostdbUpdateChan: hdb.HostDBNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		renterUpdateChan: r.RenterNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	st.csUpdateWait()
 
 	// TODO: A more reasonable way of listening for server errors.
 	go func() {
@@ -164,7 +130,6 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		st.csUpdateWait()
 	}
 
 	return st

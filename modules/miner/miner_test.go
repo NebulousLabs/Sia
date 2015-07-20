@@ -21,26 +21,6 @@ type minerTester struct {
 	wallet  modules.Wallet
 
 	miner *Miner
-
-	csUpdateChan     <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-}
-
-// csUpdateWait blocks until an update to the consensus set has propagated to
-// all modules.
-func (mt *minerTester) csUpdateWait() {
-	<-mt.csUpdateChan
-	mt.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until a transaction pool update has propagated to all
-// modules.
-func (mt *minerTester) tpUpdateWait() {
-	<-mt.tpoolUpdateChan
-	<-mt.minerUpdateChan
-	<-mt.walletUpdateChan
 }
 
 // createMinerTester creates a minerTester that's ready for use.
@@ -77,13 +57,7 @@ func createMinerTester(name string) (*minerTester, error) {
 		wallet:  w,
 
 		miner: m,
-
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		walletUpdateChan: w.WalletNotify(),
 	}
-	mt.csUpdateWait()
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -92,7 +66,6 @@ func createMinerTester(name string) (*minerTester, error) {
 		if err != nil {
 			return nil, err
 		}
-		mt.csUpdateWait()
 	}
 
 	return mt, nil
@@ -124,6 +97,5 @@ func TestMiner(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		mt.csUpdateWait()
 	}
 }

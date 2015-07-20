@@ -29,7 +29,6 @@ func TestSynchronize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst2.csUpdateWait()
 	}
 
 	// connect gateways, triggering a Synchronize
@@ -67,7 +66,6 @@ func TestSynchronize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst2.csUpdateWait()
 	}
 	// reconnect
 	err = cst1.gateway.Connect(cst2.gateway.Address())
@@ -113,7 +111,6 @@ func TestResynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst2.csUpdateWait()
 
 	// connect and disconnect, so that cst1 and cst2 are synchronized
 	err = cst1.gateway.Connect(cst2.gateway.Address())
@@ -135,7 +132,6 @@ func TestResynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cst2.csUpdateWait()
 	lockID := cst2.cs.mu.Lock()
 	id := cst2.cs.currentBlockID()
 	cst2.cs.currentPath = cst2.cs.currentPath[:len(cst2.cs.currentPath)-1]
@@ -183,7 +179,6 @@ func TestBlockHistory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst.csUpdateWait()
 	}
 
 	history := cst.cs.blockHistory()

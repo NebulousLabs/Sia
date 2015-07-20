@@ -94,8 +94,8 @@ type ConsensusSet struct {
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
-	changeLog     []changeEntry
-	subscriptions []chan struct{}
+	changeLog   []changeEntry
+	subscribers []modules.ConsensusSetSubscriber
 
 	// block database, used for saving/loading the current path
 	db persist.DB
@@ -174,7 +174,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
-	// Get the genesis consensus set hash.
 	if build.DEBUG {
 		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
 	}
