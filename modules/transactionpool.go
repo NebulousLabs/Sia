@@ -37,14 +37,10 @@ type TransactionPoolSubscriber interface {
 	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
 }
 
+// A TransactionPool manages unconfirmed transactions.
 type TransactionPool interface {
-	// AcceptTransaction takes a transaction, analyzes it, and either rejects
-	// it or adds it to the transaction pool. Accepted transactions will be
-	// relayed to connected peers.
-	//
-	// DEPRECATED
-	AcceptTransaction(types.Transaction) error
-
+	// AcceptTransactionSet accepts a set of potentially interdependent
+	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
 	// RelayTransactionSet is an RPC that accepts a transaction set from a

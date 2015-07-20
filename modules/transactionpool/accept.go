@@ -180,8 +180,3 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 	}
 	return err
 }
-
-// DEPRECATED
-func (tp *TransactionPool) AcceptTransaction(t types.Transaction) error {
-	return tp.AcceptTransactionSet([]types.Transaction{t})
-}

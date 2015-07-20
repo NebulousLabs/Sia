@@ -114,7 +114,7 @@ func (srv *Server) debugMutextestHandler(w http.ResponseWriter, req *http.Reques
 		mds.Renter = true
 	}()
 	go func() {
-		srv.tpool.AcceptTransaction(types.Transaction{})
+		srv.tpool.AcceptTransactionSet(nil)
 		mds.TransactionPool = true
 	}()
 	go func() {
