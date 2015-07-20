@@ -128,7 +128,7 @@ func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) 
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
 	id := cs.mu.Lock()
 	cs.subscribers = append(cs.subscribers, subscriber)
-	for i := 0; i < len(cs.changeLog); i++ {
+	for i := range cs.changeLog {
 		cc, err := cs.computeConsensusChange(i)
 		if err != nil && build.DEBUG {
 			panic(err)

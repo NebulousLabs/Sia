@@ -39,7 +39,7 @@ type (
 		knownObjects        map[ObjectID]struct{}
 		transactionSets     map[TransactionSetID][]types.Transaction
 		transactionSetDiffs map[TransactionSetID]modules.ConsensusChange
-		databaseSize        int
+		transactionListSize int
 		// TODO: Write a consistency check comparing transactionSets,
 		// transactionSetDiffs.
 		//

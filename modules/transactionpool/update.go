@@ -10,7 +10,7 @@ func (tp *TransactionPool) purge() {
 	tp.knownObjects = make(map[ObjectID]struct{})
 	tp.transactionSets = make(map[TransactionSetID][]types.Transaction)
 	tp.transactionSetDiffs = make(map[TransactionSetID]modules.ConsensusChange)
-	tp.databaseSize = 0
+	tp.transactionListSize = 0
 }
 
 // ProcessConsensusChange gets called to inform the transaction pool of changes

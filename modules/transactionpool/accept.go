@@ -38,12 +38,12 @@ var (
 func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
 	// Transactions cannot be added after the TransactionPoolSizeLimit has been
 	// hit.
-	if tp.databaseSize > TransactionPoolSizeLimit {
+	if tp.transactionListSize > TransactionPoolSizeLimit {
 		return ErrFullTransactionPool
 	}
 
 	// The first TransactionPoolSizeForFee transactions do not need fees.
-	if tp.databaseSize > TransactionPoolSizeForFee {
+	if tp.transactionListSize > TransactionPoolSizeForFee {
 		// Currently required fees are set on a per-transaction basis. 2 coins
 		// are required per transaction if the free-fee limit has been reached,
 		// adding a larger fee is not useful.
@@ -74,7 +74,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	}
 
 	// Check that the transaction set has enough fees to justify adding it to
-	// the database.
+	// the transaction list.
 	err := tp.checkMinerFees(ts)
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 		tp.knownObjects[ObjectID(diff.ID)] = struct{}{}
 	}
 	tp.transactionSetDiffs[setID] = cc
-	tp.databaseSize += len(encoding.Marshal(ts))
+	tp.transactionListSize += len(encoding.Marshal(ts))
 	return nil
 }
 
@@ -184,9 +184,4 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 // DEPRECATED
 func (tp *TransactionPool) AcceptTransaction(t types.Transaction) error {
 	return tp.AcceptTransactionSet([]types.Transaction{t})
-}
-
-// DEPRECATED
-func (tp *TransactionPool) RelayTransaction(conn modules.PeerConn) error {
-	return tp.RelayTransactionSet(conn)
 }
