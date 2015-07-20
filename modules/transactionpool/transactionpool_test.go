@@ -23,9 +23,9 @@ type tpoolTester struct {
 	wallet  modules.Wallet
 }
 
-// newTpoolTester returns a ready-to-use tpool tester, with all modules
+// createTpoolTester returns a ready-to-use tpool tester, with all modules
 // initialized.
-func newTpoolTester(name string) (*tpoolTester, error) {
+func createTpoolTester(name string) (*tpoolTester, error) {
 	// Initialize the modules.
 	testdir := build.TempDir(modules.TransactionPoolDir, name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
