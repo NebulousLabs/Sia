@@ -49,7 +49,7 @@ func (h *Host) announce(addr modules.NetAddress) error {
 
 	// Add the transaction to the transaction pool.
 	err = h.tpool.AcceptTransactionSet(txnSet)
-	if err == modules.ErrTransactionPoolDuplicate {
+	if err == modules.ErrDuplicateTransactionSet {
 		return errors.New("you have already announced yourself")
 	}
 	if err != nil {

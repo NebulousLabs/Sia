@@ -70,7 +70,7 @@ func (tp *TransactionPool) checkTransactionSetComposition(ts []types.Transaction
 	setID := TransactionSetID(crypto.HashObject(ts))
 	_, exists := tp.transactionSets[setID]
 	if exists {
-		return modules.ErrTransactionPoolDuplicate
+		return modules.ErrDuplicateTransactionSet
 	}
 
 	// Check that the transaction set has enough fees to justify adding it to
@@ -175,7 +175,7 @@ func (tp *TransactionPool) RelayTransactionSet(conn modules.PeerConn) error {
 	}
 	// TODO: Ask Luke some stuff about DoS with regards to this function.
 	err = tp.AcceptTransactionSet(ts)
-	if err == modules.ErrTransactionPoolDuplicate { // benign error
+	if err == modules.ErrDuplicateTransactionSet { // benign error
 		err = nil
 	}
 	return err
