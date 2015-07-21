@@ -54,6 +54,64 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 	}
 }
 
+// TestIntegrationConflictingTransactionSets tries to add two transaction sets
+// to the transaction pool that are each legal individually, but double spend
+// an output.
+func TestIntegrationConflictingTransactionSets(t *testing.T) {
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester("TestIntegrationConflictingTransactionSets")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fund a partial transaction.
+	fund := types.NewCurrency64(30e6)
+	id, err := tpt.wallet.RegisterTransaction(types.Transaction{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tpt.wallet.FundTransaction(id, fund)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wholeTransaction is set to false so that we can use the same signature
+	// to create a double spend.
+	txnSet, err := tpt.wallet.SignTransaction(id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnSetDoubleSpend := make([]types.Transaction, len(txnSet))
+	copy(txnSetDoubleSpend, txnSet)
+
+	// There are now two sets of transactions that are signed and ready to
+	// spend the same output. Have one spend the money in a miner fee, and the
+	// other create a siacoin output.
+	txnIndex := len(txnSet) - 1
+	txnSet[txnIndex].MinerFees = append(txnSet[txnIndex].MinerFees, fund)
+	txnSetDoubleSpend[txnIndex].SiacoinOutputs = append(txnSetDoubleSpend[txnIndex].SiacoinOutputs, types.SiacoinOutput{Value: fund})
+
+	// Add the first and then the second txn set.
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Error(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSetDoubleSpend)
+	if err != errObjectConflict {
+		t.Error(err)
+	}
+
+	// Purge and try the sets in the reverse order.
+	tpt.tpool.PurgeTransactionPool()
+	err = tpt.tpool.AcceptTransactionSet(txnSetDoubleSpend)
+	if err != nil {
+		t.Error(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != errObjectConflict {
+		t.Error(err)
+	}
+}
+
 // TestIntegrationCheckMinerFees probes the checkMinerFees method of the
 // transaction pool.
 func TestIntegrationCheckMinerFees(t *testing.T) {
@@ -80,7 +138,7 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 
 	// Add another transaction, this one should fail for having too few fees.
 	err = tpt.tpool.AcceptTransactionSet([]types.Transaction{{}})
-	if err != ErrLowMinerFees {
+	if err != errLowMinerFees {
 		t.Error(err)
 	}
 

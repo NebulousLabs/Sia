@@ -26,9 +26,9 @@ const (
 )
 
 var (
-	ErrObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
-	ErrFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
-	ErrLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
+	errObjectConflict      = errors.New("transaction set conflicts with an existing transaction set")
+	errFullTransactionPool = errors.New("transaction pool cannot accept more transactions")
+	errLowMinerFees        = errors.New("transaction set needs more miner fees to be accepted")
 
 	TransactionMinFee = types.NewCurrency64(2).Mul(types.SiacoinPrecision)
 )
@@ -39,7 +39,7 @@ func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
 	// Transactions cannot be added after the TransactionPoolSizeLimit has been
 	// hit.
 	if tp.transactionListSize > TransactionPoolSizeLimit {
-		return ErrFullTransactionPool
+		return errFullTransactionPool
 	}
 
 	// The first TransactionPoolSizeForFee transactions do not need fees.
@@ -55,7 +55,7 @@ func (tp *TransactionPool) checkMinerFees(ts []types.Transaction) error {
 		}
 		feeRequired := TransactionMinFee.Mul(types.NewCurrency64(uint64(len(ts))))
 		if feeSum.Cmp(feeRequired) < 0 {
-			return ErrLowMinerFees
+			return errLowMinerFees
 		}
 	}
 	return nil
@@ -113,19 +113,19 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction) error {
 	for _, diff := range cc.SiacoinOutputDiffs {
 		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
-			return ErrObjectConflict
+			return errObjectConflict
 		}
 	}
 	for _, diff := range cc.FileContractDiffs {
 		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
-			return ErrObjectConflict
+			return errObjectConflict
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
 		_, exists := tp.knownObjects[ObjectID(diff.ID)]
 		if exists {
-			return ErrObjectConflict
+			return errObjectConflict
 		}
 	}
 
