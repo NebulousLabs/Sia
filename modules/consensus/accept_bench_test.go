@@ -13,9 +13,7 @@ import (
 
 // benchmarkEmptyBlocks is a benchmark that mines many blocks, and
 // measures how long it takes to add them to the consensusset
-func benchmarkEmptyBlocks(bt *testing.B) error {
-	bt.StopTimer()
-
+func benchmarkEmptyBlocks(b *testing.B) error {
 	// Create an alternate testing consensus set, which does not
 	// have any subscribers
 	testdir := build.TempDir(modules.ConsensusDir, "BenchmarkEmptyBlocksB")
@@ -41,22 +39,22 @@ func benchmarkEmptyBlocks(bt *testing.B) error {
 		}
 	}
 
-	for j := 0; j < bt.N; j++ {
-		b, _ := cst.miner.FindBlock()
+	b.ResetTimer()
+	for j := 0; j < b.N; j++ {
+		b.StopTimer()
+		block, _ := cst.miner.FindBlock()
 
-		err = cst.cs.AcceptBlock(b)
+		err = cst.cs.AcceptBlock(block)
 		if err != nil {
 			errstr := fmt.Sprintf("Error accepting %d from mined: %s", j, err.Error())
 			return errors.New(errstr)
 		}
-		bt.StartTimer()
-		err = cs.AcceptBlock(b)
+		b.StartTimer()
+		err = cs.AcceptBlock(block)
 		if err != nil {
 			errstr := fmt.Sprintf("Error accepting %d for timing: %s", j, err.Error())
 			return errors.New(errstr)
 		}
-		bt.StopTimer()
-		cst.csUpdateWait()
 	}
 
 	return nil

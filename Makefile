@@ -78,7 +78,7 @@ test-v: clean fmt REBUILD
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
 bench: clean fmt REBUILD
-	go test -tags='testing' -timeout=600s -run=XXX -bench=. $(pkgs)
+	go test -tags='testing' -timeout=120s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
