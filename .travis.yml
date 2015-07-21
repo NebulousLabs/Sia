@@ -8,6 +8,6 @@ install:
   - test -z "$(go fmt ./...)"
   - make
 
-script: make test-long && make cover
+script: make test-long && make cover && make bench
 
 sudo: false
