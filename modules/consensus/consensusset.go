@@ -197,6 +197,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
+	cs.updatePath = true
+
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)

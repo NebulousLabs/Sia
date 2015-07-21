@@ -19,8 +19,8 @@ var (
 func (cs *ConsensusSet) deleteNode(bn *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
-		if types.BlockHeight(len(cs.currentPath)) > bn.height &&
-			cs.currentPath[bn.height] == bn.block.ID() {
+		if types.BlockHeight(cs.db.pathHeight()) > bn.height &&
+			cs.db.path(bn.height) == bn.block.ID() {
 			panic(errDeleteCurrentPath)
 		}
 	}
@@ -55,7 +55,7 @@ func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for {
 		// Stop when we reach the common parent.
-		if bn.height <= cs.height() && cs.currentPath[bn.height] == bn.block.ID() {
+		if bn.height <= cs.height() && cs.db.path(bn.height) == bn.block.ID() {
 			break
 		}
 		bn = bn.parent
@@ -68,9 +68,9 @@ func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 // 'bn' is the current block. Blocks are returned in the order that they were
 // reverted.  'bn' is not reverted.
 func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
-	// Sanity check - make sure that bn is in the currentPath.
+	// Sanity check - make sure that bn is in the current path.
 	if build.DEBUG {
-		if cs.height() < bn.height || cs.currentPath[bn.height] != bn.block.ID() {
+		if cs.height() < bn.height || cs.db.path(bn.height) != bn.block.ID() {
 			panic(errExternalRevert)
 		}
 	}
@@ -85,9 +85,9 @@ func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode)
 }
 
 // applyUntilNode will successively apply the blocks between the consensus
-// set's currentPath and 'bn'.
+// set's current path and 'bn'.
 func (s *ConsensusSet) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
-	// Backtrack to the common parent of 'bn' and currentPath and then apply the new nodes.
+	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
 	newPath := s.backtrackToCurrentPath(bn)
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs

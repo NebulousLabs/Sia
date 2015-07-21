@@ -332,6 +332,10 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 
 	// Update the state to point to the new block.
 	cs.currentPath = append(cs.currentPath, bn.block.ID())
+	err := cs.db.addPath(bn.block)
+	if err != nil {
+		return err
+	}
 	cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
@@ -367,9 +371,5 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	if build.DEBUG {
 		bn.consensusSetHash = cs.consensusSetHash()
 	}
-	err := cs.db.addBlockMap(*bn)
-	if err != nil {
-		return err
-	}
-	return cs.db.pushPath(bn.block)
+	return cs.db.addBlockMap(*bn)
 }
