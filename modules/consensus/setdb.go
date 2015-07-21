@@ -13,8 +13,8 @@ import (
 )
 
 var meta = persist.Metadata{
-	Version: "0.1",
-	Header:  "Consensus Set Backing Database",
+	Version: "0.4.0",
+	Header:  "Consensus Set Database",
 }
 
 var (
@@ -51,6 +51,12 @@ type processedBlock struct {
 	ConsensusSetHash crypto.Hash
 }
 
+// bnToPb and pbToBn convert between blockNodes and
+// processedBlocks. As block nodes will be replaced with
+// processedBlocks, this code should be considered deprecated
+
+// bnToPb converts a blockNode to a processed block
+// DEPRECATED
 func bnToPb(bn blockNode) processedBlock {
 	pb := processedBlock{
 		Block:  bn.block,
@@ -76,9 +82,8 @@ func bnToPb(bn blockNode) processedBlock {
 }
 
 // pbToBn exists to move a processed block to a block node. It
-// requires the consensus block Map. Its current placement in this
-// file is a bit awkward, so it should be moved some point in the near
-// future
+// requires the consensus block Map.
+// DEPRECATED
 func (cs *ConsensusSet) pbToBn(pb *processedBlock) blockNode {
 	parent, exists := cs.blockMap[pb.Parent]
 	if !exists {
@@ -105,6 +110,7 @@ func (cs *ConsensusSet) pbToBn(pb *processedBlock) blockNode {
 	return bn
 }
 
+// openDB loads the set database and populates it with the necessary buckets
 func openDB(filename string) (*setDB, error) {
 	db, err := persist.OpenDatabase(meta, filename)
 	if err != nil {
@@ -112,7 +118,8 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
-		"Path", "BlockMap",
+		"Path",
+		"BlockMap",
 	}
 
 	// Create buckets
@@ -128,15 +135,18 @@ func openDB(filename string) (*setDB, error) {
 	return &setDB{db}, nil
 }
 
-// addItem and getItem are part of consensus due to stricter error conditions.
-//
 // addItem should only be called from this file, and adds a new item
 // to the database
+//
+// addItem and getItem are part of consensus due to stricter error
+// conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
+		// Sanity check: make sure the buckets exists and that
+		// you are not inserting something that already exists
 		if build.DEBUG {
 			if b == nil {
 				panic(errNilBucket)
@@ -150,16 +160,19 @@ func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	})
 }
 
+// getItem is a generic function to insert an item into the set database
 func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error) {
 	k := encoding.Marshal(key)
 	err = db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
+		// Sanity check to make sure the bucket exists.
 		if build.DEBUG {
 			if b == nil {
 				panic(errNilBucket)
 			}
 		}
 		item = b.Get(k)
+		// Sanity check to make sure the item requested exists
 		if build.DEBUG {
 			if item == nil {
 				panic(errNilItem)
@@ -170,9 +183,9 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 	return
 }
 
-// AddBlock inserts a block into the database at the "end" of the chain, i.e.
+// pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
-func (db *setDB) addPath(block types.Block) error {
+func (db *setDB) pushPath(block types.Block) error {
 	value := encoding.Marshal(block.ID())
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
@@ -181,9 +194,9 @@ func (db *setDB) addPath(block types.Block) error {
 	})
 }
 
-// RemoveBlock removes a block from the "end" of the chain, i.e. the block
+// popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
-func (db *setDB) rmPath() error {
+func (db *setDB) popPath() error {
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
@@ -192,7 +205,7 @@ func (db *setDB) rmPath() error {
 }
 
 // path retreives the block id of a block at a given hegiht from the path
-func (db *setDB) path(h types.BlockHeight) (id types.BlockID, err error) {
+func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID, err error) {
 	idBytes, err := db.getItem("Path", h)
 	if err != nil {
 		return

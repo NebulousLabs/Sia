@@ -12,7 +12,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -47,12 +46,12 @@ type ConsensusSet struct {
 	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
 	// up loading blocks from memory.
-	verificationRigor verificationRigor
+	verificationRigor verificationRigor // DEPRECATED
 
 	// updatePath is a flag that determines if a block node will
 	// be added to the path. It should be false when loading the
 	// current path from disk and true otherwise
-	updatePath bool
+	updatePath bool // DEPRECATED
 
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
@@ -103,8 +102,7 @@ type ConsensusSet struct {
 
 	// block database, used for saving/loading the current path,
 	// and storing processed blocks
-	db  persist.DB
-	sdb *setDB
+	db *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
 	gateway modules.Gateway

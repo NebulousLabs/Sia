@@ -5,19 +5,14 @@ import (
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // load pulls all the blocks that have been saved to disk into memory, using
 // them to fill out the ConsensusSet.
 func (cs *ConsensusSet) load(saveDir string) error {
-	db, err := persist.OpenDB(filepath.Join(saveDir, "chain.db"))
-	if err != nil {
-		return err
-	}
-	sdb, err := openDB(filepath.Join(saveDir, "set.db"))
-	cs.sdb = sdb
+	db, err := openDB(filepath.Join(saveDir, "set.db"))
+	cs.db = db
 
 	if err != nil {
 		return err
@@ -25,30 +20,24 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// Check the height. If the height is 0, then it's a new file and the
 	// genesis block should be added.
-	height, err := sdb.pathHeight()
+	height, err := db.pathHeight()
 	if err != nil {
 		return err
 	}
 	if height == 0 {
 		// add genesis block
-		cs.db = db
-		return sdb.addPath(cs.blockRoot.block)
+		return db.pushPath(cs.blockRoot.block)
 	}
 
 	// Check that the db's genesis block matches our genesis block.
-	bID, err := sdb.path(0)
+	bid, err := db.getPath(0)
 	if err != nil {
 		return err
 	}
 	// If this happens, print a warning and start a new db.
-	if bID != cs.currentPath[0] {
+	if bid != cs.currentPath[0] {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		db.Close()
-		sdb.Close()
-		err := os.Rename(filepath.Join(saveDir, "chain.db"), filepath.Join(saveDir, "chain.db.bck"))
-		if err != nil {
-			return err
-		}
 		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))
 		if err != nil {
 			return err
@@ -59,16 +48,13 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	}
 
 	// load blocks from the db, starting after the genesis block
-	// NOTE: during load, the state uses the NilDB. This prevents AcceptBlock
-	// from adding duplicate blocks to the real database.
-	cs.db = persist.NilDB
 	for i := types.BlockHeight(1); i < height; i++ {
-		bID, err := sdb.path(i)
+		bid, err := db.getPath(i)
 		if err != nil {
 			// should never happen
 			return err
 		}
-		pb, err := sdb.getBlockMap(bID)
+		pb, err := db.getBlockMap(bid)
 		if err != nil {
 			return err
 		}
@@ -80,9 +66,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 		cs.updatePath = false
 		cs.commitDiffSet(&bn, modules.DiffApply)
 		cs.updatePath = true
+		cs.updateSubscribers(nil, []*blockNode{&bn})
 		cs.mu.Unlock(lockID)
 	}
-	// start using the real db
-	cs.db = db
 	return nil
 }
