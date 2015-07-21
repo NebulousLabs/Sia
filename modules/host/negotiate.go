@@ -135,27 +135,21 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 
 // addCollateral takes a transaction and its contract terms and adds the host
 // collateral to the transaction.
-func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms) (fundedTxn types.Transaction, txnID int, err error) {
+func (h *Host) addCollateral(txn types.Transaction, terms modules.ContractTerms) (fundedTxn types.Transaction, txnBuilder modules.TransactionBuilder, err error) {
 	// Determine the amount of colletaral the host needs to provide.
 	sizeCurrency := types.NewCurrency64(terms.FileSize)
 	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
 	collateral := terms.Collateral.Mul(sizeCurrency).Mul(durationCurrency)
 
-	txnID, err = h.wallet.RegisterTransaction(txn, nil)
-	if err != nil {
-		return
-	}
+	txnBuilder = h.wallet.RegisterTransaction(txn, nil)
 	if collateral.Cmp(types.NewCurrency64(0)) == 0 {
-		return txn, txnID, nil
+		return txn, txnBuilder, nil
 	}
-	err = h.wallet.FundTransaction(txnID, collateral)
+	err = txnBuilder.FundSiacoins(collateral)
 	if err != nil {
 		return
 	}
-	fundedTxn, _, err = h.wallet.ViewTransaction(txnID)
-	if err != nil {
-		return
-	}
+	fundedTxn, _ = txnBuilder.View()
 	return
 }
 
@@ -234,7 +228,7 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	}
 
 	// Add the collateral to the transaction, but do not sign the transaction.
-	collateralTxn, txnID, err := h.addCollateral(unsignedTxn, terms)
+	collateralTxn, txnBuilder, err := h.addCollateral(unsignedTxn, terms)
 	if err != nil {
 		return
 	}
@@ -258,12 +252,12 @@ func (h *Host) rpcContract(conn net.Conn) (err error) {
 	// Add the signatures from the renter signed transaction, and then sign the
 	// transaction, then submit the transaction.
 	for _, sig := range signedTxn.TransactionSignatures {
-		_, err = h.wallet.AddTransactionSignature(txnID, sig)
+		txnBuilder.AddTransactionSignature(sig)
 		if err != nil {
 			return
 		}
 	}
-	txnSet, err := h.wallet.SignTransaction(txnID, true)
+	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return
 	}

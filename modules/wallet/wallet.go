@@ -72,17 +72,6 @@ type Wallet struct {
 	siafundAddresses map[types.UnlockHash]struct{}
 	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
-	// The transaction registry contains all of the persistent information
-	// required by the transaction builder. Currently, there is no garbage
-	// collection scheme for the registry, if a module or program is
-	// erroneously registering transactions without closing them, the memory
-	// usage will grow indefinitely.
-	//
-	// The transaction builder is further explained and implemented in
-	// transactionbuilder.go
-	registryCounter     int
-	transactionRegistry map[int]*openTransaction
-
 	saveDir string
 	mu      *sync.RWMutex
 }
@@ -109,8 +98,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		visibleAddresses: make(map[types.UnlockHash]struct{}),
 		siafundAddresses: make(map[types.UnlockHash]struct{}),
 		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
-
-		transactionRegistry: make(map[int]*openTransaction),
 
 		saveDir: saveDir,
 		mu:      sync.New(modules.SafeMutexDelay, 1),
@@ -154,29 +141,20 @@ func (w *Wallet) Close() error {
 // SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	// Create and send the transaction.
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	id, err := w.RegisterTransaction(types.Transaction{}, nil)
+
+	txnBuilder := w.RegisterTransaction(types.Transaction{}, nil)
+	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		return nil, err
 	}
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
-	err = w.FundTransaction(id, amount.Add(tpoolFee))
-	if err != nil {
-		return nil, err
-	}
-	_, err = w.AddMinerFee(id, tpoolFee)
-	if err != nil {
-		return nil, err
-	}
-	_, err = w.AddSiacoinOutput(id, output)
-	if err != nil {
-		return nil, err
-	}
-	txnSet, err := w.SignTransaction(id, true)
+	txnBuilder.AddMinerFee(tpoolFee)
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return nil, err
 	}

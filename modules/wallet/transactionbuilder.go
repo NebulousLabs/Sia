@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -11,9 +12,9 @@ var (
 	ErrInvalidID = errors.New("no transaction of given id found")
 )
 
-// openTransaction is a type that the wallet uses to track a transaction while
-// building it out as a custom transaction.
-type openTransaction struct {
+// transactionBuilder is an implementation of the modules.TransactionBuilder
+// interface.
+type transactionBuilder struct {
 	// parents is a list of all unconfirmed dependencies to 'transaction'.
 	// 'transaction' is the work-in-progress transaction.
 	parents     []types.Transaction
@@ -23,56 +24,44 @@ type openTransaction struct {
 	// transaction using 'FundTransaction'. These are the inputs that will be
 	// signed when 'SignTransaction' is called.
 	inputs []int
+
+	// The wallet is necessary for calls like 'FundSiacoins'.
+	wallet *Wallet
 }
 
-// RegisterTransaction takes a transaction and its parents returns an id that
-// can be used to modify the transaction. The most typical call is
-// 'RegisterTransaction(types.Transaction{}, nil)', which registers a new
-// transaction that doesn't have any parents. The id that gets returned is not
-// a types.TransactionID, it is an int and is only useful within the
-// transaction builder.
-func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) (int, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	id := w.registryCounter
-	w.registryCounter++
-	w.transactionRegistry[id] = &openTransaction{
+// RegisterTransaction takes a transaction and its parents and returns a
+// TransactionBuilder which can be used to expand the transaction. The most
+// typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
+// registers a new transaction without parents.
+func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
+	return &transactionBuilder{
 		parents:     parents,
 		transaction: t,
+
+		wallet: w,
 	}
-	return id, nil
 }
 
-// FundTransaction will create a transaction with a siacoin output containing a
-// value of exactly 'amount' - this prevents any refunds from appearing in the
-// primary transaction, but adds some number (usually one, but can be more or
-// less) of parent transactions. The parent transactions are signed
-// immediately, but the child transaction will not be signed until
-// 'SignTransaction' is called.
-//
-// TODO: Make sure that the addressing leverages the wallet's age controls to
-// prevent stalled money from becoming a problem.
-func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+// FundSiacoins will add a siacoin input of exaclty 'amount' to the
+// transaction. A parent transaction may be needed to achieve an input with the
+// correct value. The siacoin input will not be signed until 'Sign' is called
+// on the transaction builder.
+func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
+	lockID := tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock(lockID)
 
-	// Get the transaction that was originally meant to be funded.
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return ErrInvalidID
-	}
-
-	// Create a parent transaction and supply it with enough inputs to cover
-	// 'amount'.
+	// Initialize a parent transaction that will create a siacoin output
+	// exactly 'amount' in value.
 	parentTxn := types.Transaction{}
-	fundingOutputs, fundingTotal, err := w.findOutputs(amount)
+
+	// Find wallet inputs to use to fund the parent transaction.
+	fundingOutputs, fundingTotal, err := tb.wallet.findOutputs(amount)
 	if err != nil {
 		return err
 	}
 	for _, output := range fundingOutputs {
-		output.age = w.age
-		key := w.keys[output.output.UnlockHash]
+		output.age = tb.wallet.age
+		key := tb.wallet.keys[output.output.UnlockHash]
 		newInput := types.SiacoinInput{
 			ParentID:         output.id,
 			UnlockConditions: key.unlockConditions,
@@ -82,7 +71,7 @@ func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
 
 	// Create and add the output that will be used to fund the standard
 	// transaction.
-	parentDest, parentSpendConds, err := w.coinAddress(false) // false indicates that the address should not be visible to the user
+	parentDest, parentSpendConds, err := tb.wallet.coinAddress(false) // false indicates that the address should not be visible to the user
 	exactOutput := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: parentDest,
@@ -92,7 +81,7 @@ func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
 	// Create a refund output if needed.
 	if amount.Cmp(fundingTotal) != 0 {
 		var refundDest types.UnlockHash
-		refundDest, _, err = w.coinAddress(false) // false indicates that the address should not be visible to the user
+		refundDest, _, err = tb.wallet.coinAddress(false) // false indicates that the address should not be visible to the user
 		if err != nil {
 			return err
 		}
@@ -116,7 +105,7 @@ func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
 		// Hash the transaction according to the covered fields.
 		coinAddress := input.UnlockConditions.UnlockHash()
 		sigIndex := len(parentTxn.TransactionSignatures) - 1
-		secKey := w.keys[coinAddress].secretKey
+		secKey := tb.wallet.keys[coinAddress].secretKey
 		sigHash := parentTxn.SigHash(sigIndex)
 
 		// Get the signature.
@@ -130,13 +119,13 @@ func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
 
 	// Add the exact output to the wallet's knowledgebase before releasing the
 	// lock, to prevent the wallet from using the exact output elsewhere.
-	key := w.keys[parentSpendConds.UnlockHash()]
+	key := tb.wallet.keys[parentSpendConds.UnlockHash()]
 	key.outputs[parentTxn.SiacoinOutputID(0)] = &knownOutput{
 		id:     parentTxn.SiacoinOutputID(0),
 		output: exactOutput,
 
 		spendable: true,
-		age:       w.age,
+		age:       tb.wallet.age,
 	}
 
 	// Add the exact output.
@@ -144,180 +133,100 @@ func (w *Wallet) FundTransaction(id int, amount types.Currency) error {
 		ParentID:         parentTxn.SiacoinOutputID(0),
 		UnlockConditions: parentSpendConds,
 	}
-	openTxn.parents = append(openTxn.parents, parentTxn)
-	openTxn.inputs = append(openTxn.inputs, len(openTxn.transaction.SiacoinInputs))
-	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, newInput)
+	tb.parents = append(tb.parents, parentTxn)
+	tb.inputs = append(tb.inputs, len(tb.transaction.SiacoinInputs))
+	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
 	return nil
 }
 
-// AddMinerFee adds a single miner fee of value 'fee' to a transaction
-// specified by the registration id. The index of the fee within the
-// transaction is returned.
-func (w *Wallet) AddMinerFee(id int, fee types.Currency) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.MinerFees = append(openTxn.transaction.MinerFees, fee)
-	return uint64(len(openTxn.transaction.MinerFees) - 1), nil
+// AddMinerFee adds a miner fee to the transaction, returning the index of the
+// miner fee within the transaction.
+func (tb *transactionBuilder) AddMinerFee(fee types.Currency) uint64 {
+	tb.transaction.MinerFees = append(tb.transaction.MinerFees, fee)
+	return uint64(len(tb.transaction.MinerFees) - 1)
 }
 
-// AddSiacoinInput adds a siacoin input to a transaction, specified by the
-// registration id.  When 'SignTransaction' gets called, this input will be
-// left unsigned.  The index of the siacoin input within the transaction is
-// returned.
-func (w *Wallet) AddSiacoinInput(id int, input types.SiacoinInput) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.SiacoinInputs = append(openTxn.transaction.SiacoinInputs, input)
-	return uint64(len(openTxn.transaction.SiacoinInputs) - 1), nil
+// AddSiacoinInput adds a siacoin input to the transaction, returning the index
+// of the siacoin input within the transaction. When 'Sign' gets called, this
+// input will be left unsigned.
+func (tb *transactionBuilder) AddSiacoinInput(input types.SiacoinInput) uint64 {
+	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, input)
+	return uint64(len(tb.transaction.SiacoinInputs) - 1)
 }
 
-// AddSiacoinOutput adds an output to a transaction, specified by id. The index
-// of the siacoin output within the transaction is returned.
-func (w *Wallet) AddSiacoinOutput(id int, output types.SiacoinOutput) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.SiacoinOutputs = append(openTxn.transaction.SiacoinOutputs, output)
-	return uint64(len(openTxn.transaction.SiacoinOutputs) - 1), nil
+// AddSiacoinOutput adds a siacoin output to the transaction, returning the
+// index of the siacoin output within the transaction.
+func (tb *transactionBuilder) AddSiacoinOutput(output types.SiacoinOutput) uint64 {
+	tb.transaction.SiacoinOutputs = append(tb.transaction.SiacoinOutputs, output)
+	return uint64(len(tb.transaction.SiacoinOutputs) - 1)
 }
 
-// AddFileContract adds a file contract to a transaction, specified by id.  The
-// index of the file contract within the transaction is returned.
-func (w *Wallet) AddFileContract(id int, fc types.FileContract) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.FileContracts = append(openTxn.transaction.FileContracts, fc)
-	return uint64(len(openTxn.transaction.FileContracts) - 1), nil
+// AddFileContract adds a file contract to the transaction, returning the index
+// of the file contract within the transaction.
+func (tb *transactionBuilder) AddFileContract(fc types.FileContract) uint64 {
+	tb.transaction.FileContracts = append(tb.transaction.FileContracts, fc)
+	return uint64(len(tb.transaction.FileContracts) - 1)
 }
 
-// AddFileContract adds a file contract to a transaction, specified by id.  The
-// index of the file contract within the transaction is returned.
-func (w *Wallet) AddFileContractRevision(id int, fcr types.FileContractRevision) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.FileContractRevisions = append(openTxn.transaction.FileContractRevisions, fcr)
-	return uint64(len(openTxn.transaction.FileContractRevisions) - 1), nil
+// AddFileContractRevision adds a file contract revision to the transaction,
+// returning the index of the file contract revision within the transaction.
+// When 'Sign' gets called, this revision will be left unsigned.
+func (tb *transactionBuilder) AddFileContractRevision(fcr types.FileContractRevision) uint64 {
+	tb.transaction.FileContractRevisions = append(tb.transaction.FileContractRevisions, fcr)
+	return uint64(len(tb.transaction.FileContractRevisions) - 1)
 }
 
-// AddStorageProof adds a storage proof to a transaction, specified by id.  The
-// index of the storage proof within the transaction is returned.
-func (w *Wallet) AddStorageProof(id int, sp types.StorageProof) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.StorageProofs = append(openTxn.transaction.StorageProofs, sp)
-	return uint64(len(openTxn.transaction.StorageProofs) - 1), nil
+// AddStorageProof adds a storage proof to the transaction, returning the index
+// of the storage proof within the transaction.
+func (tb *transactionBuilder) AddStorageProof(sp types.StorageProof) uint64 {
+	tb.transaction.StorageProofs = append(tb.transaction.StorageProofs, sp)
+	return uint64(len(tb.transaction.StorageProofs) - 1)
 }
 
-// AddSiafundInput adds a siacoin input to the transaction, specified by id.
-// When 'SignTransaction' gets called, this input will be left unsigned. The
-// index of the siafund input within the transaction is returned.
-func (w *Wallet) AddSiafundInput(id int, input types.SiafundInput) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.SiafundInputs = append(openTxn.transaction.SiafundInputs, input)
-	return uint64(len(openTxn.transaction.SiafundInputs) - 1), nil
+// AddSiafundInput adds a siafund input to the transaction, returning the index
+// of the siafund input within the transaction. When 'Sign' is called, this
+// input will be left unsigned.
+func (tb *transactionBuilder) AddSiafundInput(input types.SiafundInput) uint64 {
+	tb.transaction.SiafundInputs = append(tb.transaction.SiafundInputs, input)
+	return uint64(len(tb.transaction.SiafundInputs) - 1)
 }
 
-// AddSiafundOutput adds an output to a transaction, specified by registration
-// id. The index of the siafund output within the transaction is returned.
-func (w *Wallet) AddSiafundOutput(id int, output types.SiafundOutput) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.SiafundOutputs = append(openTxn.transaction.SiafundOutputs, output)
-	return uint64(len(openTxn.transaction.SiafundOutputs) - 1), nil
+// AddSiafundOutput adds a siafund output to the transaction, returning the
+// index of the siafund output within the transaction.
+func (tb *transactionBuilder) AddSiafundOutput(output types.SiafundOutput) uint64 {
+	tb.transaction.SiafundOutputs = append(tb.transaction.SiafundOutputs, output)
+	return uint64(len(tb.transaction.SiafundOutputs) - 1)
 }
 
-// AddArbitraryData adds a byte slice to the arbitrary data section of the
-// transaction. The index of the arbitrary data within the transaction is
-// returned.
-func (w *Wallet) AddArbitraryData(id int, arb []byte) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-
-	openTxn.transaction.ArbitraryData = append(openTxn.transaction.ArbitraryData, arb)
-	return uint64(len(openTxn.transaction.ArbitraryData) - 1), nil
+// AddArbitraryData adds arbitrary data to the transaction, returning the index
+// of the data within the transaction.
+func (tb *transactionBuilder) AddArbitraryData(arb []byte) uint64 {
+	tb.transaction.ArbitraryData = append(tb.transaction.ArbitraryData, arb)
+	return uint64(len(tb.transaction.ArbitraryData) - 1)
 }
 
-// AddTransactionSignature adds a signature to the transaction, the signature
+// AddTransactionSignature adds a transaction signature to the transaction,
+// returning the index of the signature within the transaction. The signature
 // should already be valid, and shouldn't sign any of the inputs that were
-// added by calling 'FundTransaction'. The updated transaction and the index of
-// the new signature are returned.
-func (w *Wallet) AddTransactionSignature(id int, sig types.TransactionSignature) (uint64, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return 0, ErrInvalidID
-	}
-	openTxn.transaction.TransactionSignatures = append(openTxn.transaction.TransactionSignatures, sig)
-	return uint64(len(openTxn.transaction.TransactionSignatures) - 1), nil
+// added by calling 'FundSiacoins' or 'FundSiafunds'.
+func (tb *transactionBuilder) AddTransactionSignature(sig types.TransactionSignature) uint64 {
+	tb.transaction.TransactionSignatures = append(tb.transaction.TransactionSignatures, sig)
+	return uint64(len(tb.transaction.TransactionSignatures) - 1)
 }
 
-// SignTransaction will sign and delete a transaction, specified by
-// registration id. If the whole transaction flag is set to true, then the
-// covered fields object in each of the transaction signatures will have the
-// whole transaction field set. Otherwise, the flag will not be set but the
-// signature will cover all known fields in the transaction (see an
-// implementation for more clarity). After signing, a transaction set will be
-// returned that contains all parents followed by the transaction. The
-// transaction is then deleted from the builder registry.
-func (w *Wallet) SignTransaction(id int, wholeTransaction bool) ([]types.Transaction, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	// Fetch the transaction.
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return nil, ErrInvalidID
-	}
-	txn := openTxn.transaction
-
+// Sign will sign any inputs added by 'FundSiacoins' or 'FundSiafunds' and
+// return a transaction set that contains all parents prepended to the
+// transaction. If more fields need to be added, a new transaction builder will
+// need to be created.
+//
+// If the whole transaction flag  is set to true, then the whole transaction
+// flag will be set in the covered fields object. If the whole transaction flag
+// is set to false, then the covered fields object will cover all fields that
+// have already been added to the transaction, but will also leave room for
+// more fields to be added.
+func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, error) {
 	// Create the coveredfields struct.
+	txn := tb.transaction
 	var coveredFields types.CoveredFields
 	if wholeTransaction {
 		coveredFields = types.CoveredFields{WholeTransaction: true}
@@ -357,7 +266,9 @@ func (w *Wallet) SignTransaction(id int, wholeTransaction bool) ([]types.Transac
 	}
 
 	// For each input in the transaction that we added, provide a signature.
-	for _, inputIndex := range openTxn.inputs {
+	lockID := tb.wallet.mu.Lock()
+	defer tb.wallet.mu.Unlock(lockID)
+	for _, inputIndex := range tb.inputs {
 		input := txn.SiacoinInputs[inputIndex]
 		sig := types.TransactionSignature{
 			ParentID:       crypto.Hash(input.ParentID),
@@ -369,7 +280,7 @@ func (w *Wallet) SignTransaction(id int, wholeTransaction bool) ([]types.Transac
 		// Hash the transaction according to the covered fields.
 		coinAddress := input.UnlockConditions.UnlockHash()
 		sigIndex := len(txn.TransactionSignatures) - 1
-		secKey := w.keys[coinAddress].secretKey
+		secKey := tb.wallet.keys[coinAddress].secretKey
 		sigHash := txn.SigHash(sigIndex)
 
 		// Get the signature.
@@ -381,9 +292,7 @@ func (w *Wallet) SignTransaction(id int, wholeTransaction bool) ([]types.Transac
 	}
 
 	// Get the transaction set and delete the transaction from the registry.
-	txnSet := append(openTxn.parents, txn)
-	delete(w.transactionRegistry, id)
-
+	txnSet := append(tb.parents, txn)
 	return txnSet, nil
 }
 
@@ -391,13 +300,6 @@ func (w *Wallet) SignTransaction(id int, wholeTransaction bool) ([]types.Transac
 // parents, specified by id. An error is returned if the id is invalid.  Note
 // that ids become invalid for a transaction after 'SignTransaction' has been
 // called because the transaction gets deleted.
-func (w *Wallet) ViewTransaction(id int) (types.Transaction, []types.Transaction, error) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	openTxn, exists := w.transactionRegistry[id]
-	if !exists {
-		return types.Transaction{}, nil, ErrInvalidID
-	}
-	return openTxn.transaction, openTxn.parents, nil
+func (tb *transactionBuilder) View() (types.Transaction, []types.Transaction) {
+	return tb.transaction, tb.parents
 }

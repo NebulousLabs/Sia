@@ -59,17 +59,9 @@ func (h *Host) threadedCreateStorageProof(obligation contractObligation, heightF
 	copy(sp.Segment[:], base)
 
 	// Create and send the transaction.
-	id, err := h.wallet.RegisterTransaction(types.Transaction{}, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	_, err = h.wallet.AddStorageProof(id, sp)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	txnSet, err := h.wallet.SignTransaction(id, true)
+	txnBuilder := h.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder.AddStorageProof(sp)
+	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		fmt.Println(err)
 		return

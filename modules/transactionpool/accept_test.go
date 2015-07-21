@@ -66,17 +66,14 @@ func TestIntegrationConflictingTransactionSets(t *testing.T) {
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
-	id, err := tpt.wallet.RegisterTransaction(types.Transaction{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = tpt.wallet.FundTransaction(id, fund)
+	txnBuilder := tpt.wallet.RegisterTransaction(types.Transaction{}, nil)
+	err = txnBuilder.FundSiacoins(fund)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// wholeTransaction is set to false so that we can use the same signature
 	// to create a double spend.
-	txnSet, err := tpt.wallet.SignTransaction(id, false)
+	txnSet, err := txnBuilder.Sign(false)
 	if err != nil {
 		t.Fatal(err)
 	}

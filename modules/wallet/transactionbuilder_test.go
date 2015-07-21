@@ -12,23 +12,15 @@ import (
 // is created that is valid.
 func (wt *walletTester) testFundTransaction() error {
 	// Build a transaction that intentionally needs a refund.
-	id, err := wt.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := wt.wallet.RegisterTransaction(types.Transaction{}, nil)
 	fund := wt.wallet.Balance(false).Sub(types.NewCurrency64(1))
+	err := txnBuilder.FundSiacoins(fund)
 	if err != nil {
 		return err
 	}
-	err = wt.wallet.FundTransaction(id, fund)
-	if err != nil {
-		return err
-	}
-	_, err = wt.wallet.AddMinerFee(id, fund)
-	if err != nil {
-		return err
-	}
-	txnSet, err := wt.wallet.SignTransaction(id, true)
-	if err != nil {
-		return err
-	}
+	txnBuilder.AddMinerFee(fund)
+	txn, parents := txnBuilder.View()
+	txnSet := append(parents, txn)
 	err = wt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		return err

@@ -24,115 +24,97 @@ type WalletInfo struct {
 	NumAddresses     int
 }
 
-// The TransactionBuilder is used to construct custom transactions. The general
-// flow is to register a transaction, fund the transaction, add custom fields,
-// and then sign the transaction. When signing a transaction, the only objects
-// that get signatures are those added during the call 'FundTransaction'.
-// Modifications are all additive.
+// The TransactionBuilder is used to construct custom transactions. A
+// transaction builder is intialized via 'RegisterTransaction' and then can be
+// modified by adding funds or other fields. The transaction is completed by
+// calling 'Sign', which will sign all inputs added via the 'FundSiacoins' or
+// 'FundSiafunds' call. All modifications are additive.
 //
-// Transactions are tracked by an id, which is provided after registering a
-// transaction. When manipulating or viewing a transaction, the id must be used
-// to specify which transaction is being manipulated. The
-// transaction-in-progress can be viewed at any time (in an incomplete,
-// unsigned form) by calling 'ViewTransaction'.
+// Parents of the transaction are kept in the transaction builder. A parent is
+// any unconfirmed transaction that is required for the child to be valid.
 //
-// Transactions are kept with their parents. A parent is any unconfirmed
-// transaction that is required for the child to be valid.
+// Transaction builders are not thread safe.
 type TransactionBuilder interface {
-	// RegisterTransaction takes a transaction and its parents returns an id
-	// that can be used to modify the transaction. The most typical call is
-	// 'RegisterTransaction(types.Transaction{}, nil)', which registers a new
-	// transaction that doesn't have any parents. The id that gets returned is
-	// not a types.TransactionID, it is an int and is only useful within the
-	// transaction builder.
-	RegisterTransaction(t types.Transaction, parents []types.Transaction) (id int, err error)
+	// FundSiacoins will add a siacoin input of exaclty 'amount' to the
+	// transaction. A parent transaction may be needed to achieve an input with
+	// the correct value. The siacoin input will not be signed until 'Sign' is
+	// called on the transaction builder.
+	FundSiacoins(amount types.Currency) error
 
-	// FundTransaction will create a transaction with a siacoin output
-	// containing a value of exactly 'amount' - this prevents any refunds from
-	// appearing in the primary transaction, but adds some number (usually one,
-	// but can be more or less) of parent transactions. The parent transactions
-	// are signed immediately, but the child transaction will not be signed
-	// until 'SignTransaction' is called.
-	FundTransaction(id int, amount types.Currency) error
+	// TODO: Add a function 'FundSiafunds' - maybe best to wait for a clear use
+	// case, but maybe not - the builder is supposed to be general.
 
-	// AddMinerFee adds a single miner fee of value 'fee' to a transaction
-	// specified by the registration id. The index of the fee within the
-	// transaction is returned.
-	AddMinerFee(id int, fee types.Currency) (uint64, error)
+	// AddMinerFee adds a miner fee to the transaction, returning the index of
+	// the miner fee within the transaction.
+	AddMinerFee(fee types.Currency) uint64
 
-	// AddSiacoinInput adds a siacoin input to a transaction, specified by the
-	// registration id.  When 'SignTransaction' gets called, this input will be
-	// left unsigned.  The index of the siacoin input within the transaction is
-	// returned.
-	AddSiacoinInput(int, types.SiacoinInput) (uint64, error)
+	// AddSiacoinInput adds a siacoin input to the transaction, returning the
+	// index of the siacoin input within the transaction. When 'Sign' gets
+	// called, this input will be left unsigned.
+	AddSiacoinInput(types.SiacoinInput) uint64
 
-	// AddSiacoinOutput adds an output to a transaction, specified by id. The
-	// index of the siacoin output within the transaction is returned.
-	AddSiacoinOutput(int, types.SiacoinOutput) (uint64, error)
+	// AddSiacoinOutput adds a siacoin output to the transaction, returning the
+	// index of the siacoin output within the transaction.
+	AddSiacoinOutput(types.SiacoinOutput) uint64
 
-	// AddFileContract adds a file contract to a transaction, specified by id.
-	// The index of the file contract within the transaction is returned.
-	AddFileContract(int, types.FileContract) (uint64, error)
+	// AddFileContract adds a file contract to the transaction, returning the
+	// index of the file contract within the transaction.
+	AddFileContract(types.FileContract) uint64
 
-	// AddFileContractRevision adds a file contract revision to a transaction,
-	// specified by id. The index of the file contract revision within the
-	// transaction is returned.
-	AddFileContractRevision(int, types.FileContractRevision) (uint64, error)
+	// AddFileContractRevision adds a file contract revision to the
+	// transaction, returning the index of the file contract revision within
+	// the transaction. When 'Sign' gets called, this revision will be left
+	// unsigned.
+	AddFileContractRevision(types.FileContractRevision) uint64
 
-	// AddStorageProof adds a storage proof to a transaction, specified by id.
-	// The index of the storage proof within the transaction is returned.
-	AddStorageProof(int, types.StorageProof) (uint64, error)
+	// AddStorageProof adds a storage proof to the transaction, returning the
+	// index of the storage proof within the transaction.
+	AddStorageProof(types.StorageProof) uint64
 
-	// AddSiafundInput adds a siacoin input to the transaction, specified by
-	// id. When 'SignTransaction' gets called, this input will be left
-	// unsigned. The index of the siafund input within the transaction is
-	// returned.
-	AddSiafundInput(int, types.SiafundInput) (uint64, error)
+	// AddSiafundInput adds a siafund input to the transaction, returning the
+	// index of the siafund input within the transaction. When 'Sign' is
+	// called, this input will be left unsigned.
+	AddSiafundInput(types.SiafundInput) uint64
 
-	// AddSiafundOutput adds an output to a transaction, specified by
-	// registration id. The index of the siafund output within the transaction
-	// is returned.
-	AddSiafundOutput(int, types.SiafundOutput) (uint64, error)
+	// AddSiafundOutput adds a siafund output to the transaction, returning the
+	// index of the siafund output within the transaction.
+	AddSiafundOutput(types.SiafundOutput) uint64
 
-	// AddArbitraryData adds a byte slice to the arbitrary data section of the
-	// transaction. The index of the arbitrary data within the transaction is
-	// returned.
-	AddArbitraryData(id int, arb []byte) (uint64, error)
+	// AddArbitraryData adds arbitrary data to the transaction, returning the
+	// index of the data within the transaction.
+	AddArbitraryData(arb []byte) uint64
 
-	// AddTransactionSignature adds a signature to the transaction, the
+	// AddTransactionSignature adds a transaction signature to the transaction,
+	// returning the index of the signature within the transaction. The
 	// signature should already be valid, and shouldn't sign any of the inputs
-	// that were added by calling 'FundTransaction'. The updated transaction
-	// and the index of the new signature are returned.
-	AddTransactionSignature(int, types.TransactionSignature) (uint64, error)
+	// that were added by calling 'FundSiacoins' or 'FundSiafunds'.
+	AddTransactionSignature(types.TransactionSignature) uint64
 
-	// SignTransaction will sign and delete a transaction, specified by
-	// registration id. If the whole transaction flag is set to true, then the
-	// covered fields object in each of the transaction signatures will have
-	// the whole transaction field set. Otherwise, the flag will not be set but
-	// the signature will cover all known fields in the transaction (see an
-	// implementation for more clarity). After signing, a transaction set will
-	// be returned that contains all parents followed by the transaction. The
-	// transaction is then deleted from the builder registry.
-	SignTransaction(id int, wholeTransaction bool) (txnSet []types.Transaction, err error)
+	// Sign will sign any inputs added by 'FundSiacoins' or 'FundSiafunds' and
+	// return a transaction set that contains all parents prepended to the
+	// transaction. If more fields need to be added, a new transaction builder
+	// will need to be created.
+	//
+	// If the whole transaction flag  is set to true, then the whole
+	// transaction flag will be set in the covered fields object. If the whole
+	// transaction flag is set to false, then the covered fields object will
+	// cover all fields that have already been added to the transaction, but
+	// will also leave room for more fields to be added.
+	Sign(wholeTransaction bool) ([]types.Transaction, error)
 
-	// ViewTransaction returns a transaction-in-progress along with all of its
-	// parents, specified by id. An error is returned if the id is invalid.
-	// Note that ids become invalid for a transaction after 'SignTransaction'
-	// has been called because the transaction gets deleted.
-	ViewTransaction(id int) (txn types.Transaction, parents []types.Transaction, err error)
+	// View returns the incomplete transaction along with all of its parents.
+	View() (txn types.Transaction, parents []types.Transaction)
 }
 
-// Wallet is an interface that keeps track of addresses and balance. Using
-// TransactionBuilder it also streamlines sending coins.
 type Wallet interface {
-	TransactionBuilder
+	// RegisterTransaction takes a transaction and its parents and returns a
+	// TransactionBuilder which can be used to expand the transaction. The most
+	// typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
+	// registers a new transaction without parents.
+	RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
-	// Balance returns the total number of coins accessible to the wallet. If
-	// full == true, the number of coins returned will also include coins that
-	// have been spent in unconfirmed transactions.
 	Balance(full bool) types.Currency
 
-	// Close safely closes the wallet file.
 	Close() error
 
 	// CoinAddress return an address into which coins can be paid. The bool
