@@ -27,7 +27,8 @@ type BoltItem struct {
 }
 
 var (
-	ErrNilEntry = errors.New("entry does not exist")
+	ErrNilEntry  = errors.New("entry does not exist")
+	ErrNilBucket = errors.New("bucket does not exist")
 )
 
 // checkDbMetadata confirms that the metadata in the database is
@@ -141,6 +142,16 @@ func (db *BoltDatabase) Exists(bucketName string, key []byte) (bool, error) {
 		return nil
 	})
 	return exists, err
+}
+
+func (db *BoltDatabase) BucketSize(bucketName string) (uint64, error) {
+	var size uint64
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketName))
+		size = uint64(b.Stats().KeyN)
+		return nil
+	})
+	return size, err
 }
 
 // BulkUpdate is a function to both take readings from a database,

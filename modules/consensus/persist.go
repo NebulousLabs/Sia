@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -24,26 +25,31 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// Check the height. If the height is 0, then it's a new file and the
 	// genesis block should be added.
-	height, err := db.Height()
+	height, err := sdb.pathHeight()
 	if err != nil {
 		return err
 	}
 	if height == 0 {
 		// add genesis block
 		cs.db = db
-		return db.AddBlock(cs.blockRoot.block)
+		return sdb.addPath(cs.blockRoot.block)
 	}
 
 	// Check that the db's genesis block matches our genesis block.
-	b, err := db.Block(0)
+	bID, err := sdb.path(0)
 	if err != nil {
 		return err
 	}
 	// If this happens, print a warning and start a new db.
-	if b.ID() != cs.currentPath[0] {
+	if bID != cs.currentPath[0] {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		db.Close()
+		sdb.Close()
 		err := os.Rename(filepath.Join(saveDir, "chain.db"), filepath.Join(saveDir, "chain.db.bck"))
+		if err != nil {
+			return err
+		}
+		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))
 		if err != nil {
 			return err
 		}
@@ -57,20 +63,24 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	// from adding duplicate blocks to the real database.
 	cs.db = persist.NilDB
 	for i := types.BlockHeight(1); i < height; i++ {
-		b, err := db.Block(i)
+		bID, err := sdb.path(i)
 		if err != nil {
 			// should never happen
 			return err
 		}
-
-		// Blocks loaded from disk are trusted, don't bother with verification.
-		lockID := cs.mu.Lock()
-		cs.verificationRigor = partialVerification
-		err = cs.acceptBlock(b)
-		cs.mu.Unlock(lockID)
+		pb, err := sdb.getBlockMap(bID)
 		if err != nil {
 			return err
 		}
+		bn := cs.pbToBn(pb)
+
+		// Blocks loaded from disk are trusted, don't bother with verification.
+		lockID := cs.mu.Lock()
+		cs.blockMap[bn.block.ID()] = &bn
+		cs.updatePath = false
+		cs.commitDiffSet(&bn, modules.DiffApply)
+		cs.updatePath = true
+		cs.mu.Unlock(lockID)
 	}
 	// start using the real db
 	cs.db = db

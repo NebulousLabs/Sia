@@ -112,7 +112,7 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
-		"BlockMap",
+		"Path", "BlockMap",
 	}
 
 	// Create buckets
@@ -168,6 +168,43 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 		return nil
 	})
 	return
+}
+
+// AddBlock inserts a block into the database at the "end" of the chain, i.e.
+// the current height + 1.
+func (db *setDB) addPath(block types.Block) error {
+	value := encoding.Marshal(block.ID())
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Path"))
+		key := encoding.EncUint64(uint64(b.Stats().KeyN))
+		return b.Put(key, value)
+	})
+}
+
+// RemoveBlock removes a block from the "end" of the chain, i.e. the block
+// with the largest height.
+func (db *setDB) rmPath() error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Path"))
+		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
+		return b.Delete(key)
+	})
+}
+
+// path retreives the block id of a block at a given hegiht from the path
+func (db *setDB) path(h types.BlockHeight) (id types.BlockID, err error) {
+	idBytes, err := db.getItem("Path", h)
+	if err != nil {
+		return
+	}
+	err = encoding.Unmarshal(idBytes, &id)
+	return
+}
+
+// pathHeight returns the size of the current path
+func (db *setDB) pathHeight() (types.BlockHeight, error) {
+	h, err := db.BucketSize("Path")
+	return types.BlockHeight(h), err
 }
 
 // addBlockMap adds a block node to the block map

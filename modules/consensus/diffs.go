@@ -290,9 +290,15 @@ func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirecti
 	if dir == modules.DiffApply {
 		cs.currentPath = append(cs.currentPath, bn.block.ID())
 		cs.db.AddBlock(bn.block)
+		if cs.updatePath {
+			cs.sdb.addPath(bn.block)
+		}
 	} else {
 		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
 		cs.db.RemoveBlock()
+		if cs.updatePath {
+			cs.sdb.rmPath()
+		}
 	}
 }
 
@@ -363,5 +369,9 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	if build.DEBUG {
 		bn.consensusSetHash = cs.consensusSetHash()
 	}
-	return cs.sdb.addBlockMap(*bn)
+	err := cs.sdb.addBlockMap(*bn)
+	if err != nil {
+		return err
+	}
+	return cs.sdb.addPath(bn.block)
 }

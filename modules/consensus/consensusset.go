@@ -9,7 +9,6 @@ package consensus
 import (
 	"errors"
 	"os"
-	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -194,15 +193,10 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
-	// During short tests, use an in-memory database.
-	if build.Release == "testing" && testing.Short() {
-		cs.db = persist.NilDB
-	} else {
-		// Otherwise, try to load an existing database from disk.
-		err = cs.load(saveDir)
-		if err != nil {
-			return nil, err
-		}
+	// Try to load an existing database from disk.
+	err = cs.load(saveDir)
+	if err != nil {
+		return nil, err
 	}
 
 	// Register RPCs
