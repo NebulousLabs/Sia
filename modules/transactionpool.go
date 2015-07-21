@@ -13,6 +13,8 @@ const (
 
 var (
 	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
+	ErrLargeTransaction        = errors.New("transaction is too large for this transaction pool")
+	ErrLargeTransactionSet     = errors.New("transaction set is too large for this transaction pool")
 	ErrInvalidArbPrefix        = errors.New("transaction contains non-standard arbitrary data")
 
 	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
