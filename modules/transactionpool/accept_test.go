@@ -1,6 +1,7 @@
 package transactionpool
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -42,14 +43,14 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tpt.tpool.transactionSets) != 0 {
+	if len(tpt.tpool.TransactionList()) != 0 {
 		t.Error("transaction pool was not emptied after mining a block")
 	}
 
 	// Try to resubmit the transaction set to verify
 	err = tpt.tpool.AcceptTransactionSet(txns)
 	if err == nil {
-		t.Error("transaction set was apparently not mined into a block")
+		t.Error("transaction set was supposed to be rejected")
 	}
 }
 
@@ -57,16 +58,37 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 // transaction pool.
 func TestIntegrationCheckMinerFees(t *testing.T) {
 	// Create a transaction pool tester.
-	tpt, err := creatTpoolTester("TestIntegrationCheckMinerFees")
+	tpt, err := createTpoolTester("TestIntegrationCheckMinerFees")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Fill the transaction pool to the fee limit.
-	for i := 0; i < TransactionPoolSizeForFee / 10e3; i++ {
+	for i := 0; i < TransactionPoolSizeForFee/10e3; i++ {
 		arbData := make([]byte, 10e3)
+		copy(arbData, modules.PrefixNonSia[:])
+		_, err = rand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
+		if err != nil {
+			t.Fatal(err)
+		}
 		txn := types.Transaction{ArbitraryData: [][]byte{arbData}}
-		tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	// t.Error(tpt.tpool.I//
+
+	// Add another transaction, this one should fail for having too few fees.
+	err = tpt.tpool.AcceptTransactionSet([]types.Transaction{{}})
+	if err != ErrLowMinerFees {
+		t.Error(err)
+	}
+
+	// Add a transaction that has sufficient fees.
+	_, err = tpt.wallet.SendCoins(types.NewCurrency64(100), types.UnlockHash{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// TODO: fill the pool up all the way and try again.
 }
