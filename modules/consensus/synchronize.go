@@ -17,24 +17,6 @@ const (
 	ResynchronizeBatchTimeout = time.Minute * 3
 )
 
-// threadedResynchronize will call synchronize on up to 8 random peers.
-func (s *ConsensusSet) threadedResynchronize() {
-	for {
-		peers := s.gateway.Peers()
-		for _, peer := range peers {
-			// NOTE: error is not checked, because nothing happens whether
-			// there is an error or not, the node continuously synchronizes
-			// to all peers.
-			err := s.Synchronize(peer)
-			if err != nil {
-				continue
-			}
-			time.Sleep(ResynchronizePeerTimeout)
-		}
-		time.Sleep(ResynchronizeBatchTimeout)
-	}
-}
-
 // receiveBlocks is the calling end of the SendBlocks RPC.
 func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 	// get blockIDs to send
