@@ -50,6 +50,11 @@ type ConsensusSet struct {
 	// up loading blocks from memory.
 	verificationRigor verificationRigor
 
+	// updatePath is a flag that determines if a block node will
+	// be added to the path. It should be false when loading the
+	// current path from disk and true otherwise
+	updatePath bool
+
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
@@ -97,8 +102,10 @@ type ConsensusSet struct {
 	changeLog   []changeEntry
 	subscribers []modules.ConsensusSetSubscriber
 
-	// block database, used for saving/loading the current path
-	db persist.DB
+	// block database, used for saving/loading the current path,
+	// and storing processed blocks
+	db  persist.DB
+	sdb *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
 	gateway modules.Gateway

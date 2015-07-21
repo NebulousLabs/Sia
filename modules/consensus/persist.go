@@ -15,6 +15,12 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	if err != nil {
 		return err
 	}
+	sdb, err := openDB(filepath.Join(saveDir, "set.db"))
+	cs.sdb = sdb
+
+	if err != nil {
+		return err
+	}
 
 	// Check the height. If the height is 0, then it's a new file and the
 	// genesis block should be added.

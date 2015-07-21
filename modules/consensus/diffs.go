@@ -118,7 +118,7 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
 func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twoice, or deleting an
+	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
 		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight]
@@ -363,5 +363,5 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	if build.DEBUG {
 		bn.consensusSetHash = cs.consensusSetHash()
 	}
-	return nil
+	return cs.sdb.addBlockMap(*bn)
 }
