@@ -288,16 +288,9 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modul
 func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		cs.currentPath = append(cs.currentPath, bn.block.ID())
-		if cs.updatePath {
-			cs.db.pushPath(bn.block.ID())
-		}
+		cs.db.pushPath(bn.block.ID())
 	} else {
-		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
-		if cs.updatePath {
-			cs.db.popPath()
-			3
-		}
+		cs.db.popPath()
 	}
 }
 
@@ -307,7 +300,9 @@ func (cs *ConsensusSet) commitDiffSet(bn *blockNode, dir modules.DiffDirection) 
 	cs.createUpcomingDelayedOutputMaps(bn, dir)
 	cs.commitNodeDiffs(bn, dir)
 	cs.deleteObsoleteDelayedOutputMaps(bn, dir)
-	cs.updateCurrentPath(bn, dir)
+	if cs.updatePath {
+		cs.updateCurrentPath(bn, dir)
+	}
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
@@ -331,7 +326,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	}
 
 	// Update the state to point to the new block.
-	cs.currentPath = append(cs.currentPath, bn.block.ID())
 	err := cs.db.addPath(bn.block.ID())
 	if err != nil {
 		return err

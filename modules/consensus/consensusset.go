@@ -62,9 +62,6 @@ type ConsensusSet struct {
 	blockMap  map[types.BlockID]*blockNode
 	dosBlocks map[types.BlockID]struct{}
 
-	// The currentPath is the longest known blockchain.
-	currentPath []types.BlockID
-
 	// These are the consensus variables. All nodes with the same current path
 	// will also have these variables matching.
 	//
@@ -128,8 +125,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		currentPath: make([]types.BlockID, 1),
-
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
@@ -176,7 +171,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
-	cs.currentPath[0] = genesisBlock.ID()
 
 	// Send out genesis block update.
 	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
