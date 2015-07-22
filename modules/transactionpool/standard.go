@@ -38,11 +38,6 @@ import (
 //		A group of dependent transactions cannot exceed 100kb to limit how
 //		quickly the transaction pool can be filled with new transactions.
 
-var (
-	ErrLargeTransaction    = errors.New("transaction is too large")
-	ErrLargeTransactionSet = errors.New("transaction set is too large")
-)
-
 // checkUnlockConditions looks at the UnlockConditions and verifies that all
 // public keys are recognized. Unrecognized public keys are automatically
 // accepted as valid by the consnensus set, but rejected by the transaction
@@ -70,7 +65,7 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 	// more difficult for attackers to exploid this DOS vector, though a miner
 	// with sufficient power could still create unfriendly blocks.
 	if len(encoding.Marshal(t)) > modules.TransactionSizeLimit {
-		return ErrLargeTransaction
+		return modules.ErrLargeTransaction
 	}
 
 	// Check that all public keys are of a recognized type. Need to check all
@@ -126,20 +121,20 @@ func (tp *TransactionPool) IsStandardTransaction(t types.Transaction) error {
 // IsStandard guidelines, and that the set as a whole follows the guidelines as
 // well.
 func (tp *TransactionPool) IsStandardTransactionSet(ts []types.Transaction) error {
-	// Check that each transaction is acceptable.
-	for i := range ts {
-		err := tp.IsStandardTransaction(ts[i])
-		if err != nil {
-			return err
-		}
-	}
-
 	// Check that the set is a reasonable size.
 	totalSize := 0
 	for i := range ts {
 		totalSize += len(encoding.Marshal(ts[i]))
 		if totalSize > modules.TransactionSetSizeLimit {
-			return ErrLargeTransactionSet
+			return modules.ErrLargeTransactionSet
+		}
+	}
+
+	// Check that each transaction is acceptable.
+	for i := range ts {
+		err := tp.IsStandardTransaction(ts[i])
+		if err != nil {
+			return err
 		}
 	}
 	return nil

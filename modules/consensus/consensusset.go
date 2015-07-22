@@ -203,9 +203,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
 	gateway.RegisterConnectCall("SendBlocks", cs.receiveBlocks)
 
-	// Spawn resynchronize loop.
-	go cs.threadedResynchronize()
-
 	return cs, nil
 }
 

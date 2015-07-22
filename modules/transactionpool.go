@@ -12,13 +12,15 @@ const (
 )
 
 var (
-	// ErrTransactionPoolDuplicate is returned when a duplicate transaction is
-	// submitted to the transaction pool.
-	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
-	ErrInvalidArbPrefix         = errors.New("transaction contains non-standard arbitrary data")
+	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
+	ErrLargeTransaction        = errors.New("transaction is too large for this transaction pool")
+	ErrLargeTransactionSet     = errors.New("transaction set is too large for this transaction pool")
+	ErrInvalidArbPrefix        = errors.New("transaction contains non-standard arbitrary data")
 
 	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
 	PrefixStrNonSia = "NonSia" // COMPATv0.3.3.3
+
+	TransactionPoolDir = "transactionpool"
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and
@@ -35,14 +37,10 @@ type TransactionPoolSubscriber interface {
 	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
 }
 
+// A TransactionPool manages unconfirmed transactions.
 type TransactionPool interface {
-	// AcceptTransaction takes a transaction, analyzes it, and either rejects
-	// it or adds it to the transaction pool. Accepted transactions will be
-	// relayed to connected peers.
-	//
-	// DEPRECATED
-	AcceptTransaction(types.Transaction) error
-
+	// AcceptTransactionSet accepts a set of potentially interdependent
+	// transactions.
 	AcceptTransactionSet([]types.Transaction) error
 
 	// RelayTransactionSet is an RPC that accepts a transaction set from a

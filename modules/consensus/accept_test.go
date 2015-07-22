@@ -774,7 +774,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	}
 	sfoid0 := txn.SiafundOutputID(0)
 	sfoid1 := txn.SiafundOutputID(1)
-	cst.tpool.AcceptTransaction(txn)
+	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
 
 	// Mine a block containing the txn.
 	block, _ := cst.miner.FindBlock()
@@ -885,7 +885,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 		},
 	}
 	sfoid1 = txn.SiafundOutputID(1)
-	cst.tpool.AcceptTransaction(txn)
+	cst.tpool.AcceptTransactionSet([]types.Transaction{txn})
 	block, _ = cst.miner.FindBlock()
 	err = cst.cs.AcceptBlock(block)
 	if err != nil {
@@ -1130,7 +1130,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	}
 
 	// Try to submit the refund transaction before the timelock has expired.
-	err = cst.tpool.AcceptTransaction(refundTxn)
+	err = cst.tpool.AcceptTransactionSet([]types.Transaction{refundTxn})
 	if err != types.ErrPrematureSignature {
 		return err
 	}
@@ -1176,7 +1176,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		return err
 	}
 	closeTxn.TransactionSignatures[1].Signature = cryptoSig4[:]
-	err = cst.tpool.AcceptTransaction(closeTxn)
+	err = cst.tpool.AcceptTransactionSet([]types.Transaction{closeTxn})
 	if err != nil {
 		return err
 	}
@@ -1448,7 +1448,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 				return err
 			}
 		}
-		err = cst.tpool.AcceptTransaction(refundTxn)
+		err = cst.tpool.AcceptTransactionSet([]types.Transaction{refundTxn})
 		if err != nil {
 			return err
 		}

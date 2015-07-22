@@ -9,6 +9,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	errNilCS      = errors.New("transaction pool cannot initialize with a nil consensus set")
+	errNilGateway = errors.New("transaction pool cannot initialize with a nil gateway")
+)
+
 type (
 	// ObjectIDs are the IDs of objects such as siacoin outputs and file
 	// contracts, and are used to see if there are conflicts or overlaps within
@@ -58,19 +63,17 @@ type (
 )
 
 // New creates a transaction pool that is ready to receive transactions.
-func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err error) {
+func New(cs modules.ConsensusSet, g modules.Gateway) (*TransactionPool, error) {
 	// Check that the input modules are non-nil.
 	if cs == nil {
-		err = errors.New("transaction pool cannot use a nil state")
-		return
+		return nil, errNilCS
 	}
 	if g == nil {
-		err = errors.New("transaction pool cannot use a nil gateway")
-		return
+		return nil, errNilGateway
 	}
 
 	// Initialize a transaction pool.
-	tp = &TransactionPool{
+	tp := &TransactionPool{
 		consensusSet: cs,
 		gateway:      g,
 
@@ -91,7 +94,8 @@ func New(cs modules.ConsensusSet, g modules.Gateway) (tp *TransactionPool, err e
 
 	// Subscribe the transaction pool to the consensus set.
 	cs.ConsensusSetSubscribe(tp)
-	return
+
+	return tp, nil
 }
 
 // TransactionList returns a list of all transactions in the transaction pool.

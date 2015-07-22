@@ -14,53 +14,39 @@ import (
 )
 
 // A tpoolTester is used during testing to initialize a transaction pool and
-// useful helper modules. The update channels are used to synchronize updates
-// that occur during testing. Any time that an update is submitted to the
-// transaction pool or consensus set, updateWait() should be called or
-// desynchronization could be introduced.
+// useful helper modules.
 type tpoolTester struct {
 	cs      *consensus.ConsensusSet
 	gateway modules.Gateway
 	tpool   *TransactionPool
 	miner   modules.Miner
 	wallet  modules.Wallet
-
-	t *testing.T
 }
 
-// newTpoolTester returns a ready-to-use tpool tester, with all modules
+// createTpoolTester returns a ready-to-use tpool tester, with all modules
 // initialized.
-func newTpoolTester(name string, t *testing.T) *tpoolTester {
-	testdir := build.TempDir("transactionpool", name)
-
-	// Create the gateway.
+func createTpoolTester(name string) (*tpoolTester, error) {
+	// Initialize the modules.
+	testdir := build.TempDir(modules.TransactionPoolDir, name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the transaction pool.
 	tp, err := New(cs, g)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	// Assebmle all of the objects in to a tpoolTester
@@ -70,8 +56,6 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		tpool:   tp,
 		miner:   m,
 		wallet:  w,
-
-		t: t,
 	}
 
 	// Mine blocks until there is money in the wallet.
@@ -79,18 +63,17 @@ func newTpoolTester(name string, t *testing.T) *tpoolTester {
 		b, _ := tpt.miner.FindBlock()
 		err = tpt.cs.AcceptBlock(b)
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 	}
 
-	return tpt
+	return tpt, nil
 }
 
-// TestNewNilInputs tries to trigger a panic with nil inputs.
-func TestNewNilInputs(t *testing.T) {
-	testdir := build.TempDir("transactionpool", "TestNewNilInputs")
-
+// TestIntegrationNewNilInputs tries to trigger a panic with nil inputs.
+func TestIntegrationNewNilInputs(t *testing.T) {
 	// Create a gateway and consensus set.
+	testdir := build.TempDir(modules.TransactionPoolDir, "TestNewNilInputs")
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +82,22 @@ func TestNewNilInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	New(nil, nil)
-	New(cs, nil)
-	New(nil, g)
+
+	// Try all combinations of nil inputs.
+	_, err = New(nil, nil)
+	if err == nil {
+		t.Error(err)
+	}
+	_, err = New(nil, g)
+	if err != errNilCS {
+		t.Error(err)
+	}
+	_, err = New(cs, nil)
+	if err != errNilGateway {
+		t.Error(err)
+	}
+	_, err = New(cs, g)
+	if err != nil {
+		t.Error(err)
+	}
 }
