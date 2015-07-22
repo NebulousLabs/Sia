@@ -30,7 +30,7 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 			return errors.New("current path block not found in block map")
 		}
 		// Current node should match the id in the current path.
-		if currentNode.block.ID() != cs.currentPath[i] {
+		if currentNode.block.ID() != cs.db.path(i) {
 			return errors.New("current path points to an incorrect block")
 		}
 		// Height of node needs to be listed correctly.
@@ -149,8 +149,8 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	tree.PushObject(cs.currentBlockNode().earliestChildTimestamp())
 
 	// Add all the blocks in the current path TODO: along with their diffs.
-	for i := 0; i < len(cs.currentPath); i++ {
-		tree.PushObject(cs.currentPath[types.BlockHeight(i)])
+	for i := 0; i < int(cs.db.pathHeight()); i++ {
+		tree.PushObject(cs.db.path(types.BlockHeight(i)))
 	}
 
 	// Add all of the siacoin outputs, sorted by id.

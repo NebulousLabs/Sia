@@ -10,7 +10,6 @@ import (
 	"errors"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -177,9 +176,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		}
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
-	}
-	if build.DEBUG {
-		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
 	}
 
 	// Send out genesis block update.

@@ -59,8 +59,7 @@ type processedBlock struct {
 // DEPRECATED
 func bnToPb(bn blockNode) processedBlock {
 	pb := processedBlock{
-		Block:  bn.block,
-		Parent: bn.parent.block.ID(),
+		Block: bn.block,
 
 		Height:      bn.height,
 		Depth:       bn.depth,
@@ -78,6 +77,10 @@ func bnToPb(bn blockNode) processedBlock {
 	for _, c := range bn.children {
 		pb.Children = append(pb.Children, c.block.ID())
 	}
+	if bn.parent != nil {
+		pb.Parent = bn.parent.block.ID()
+	}
+
 	return pb
 }
 
