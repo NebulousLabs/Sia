@@ -67,7 +67,7 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 	knownBlocks := make([]types.BlockID, 0, 32)
 	step := types.BlockHeight(1)
 	for height := s.height(); ; height -= step {
-		knownBlocks = append(knownBlocks, s.currentPath[height])
+		knownBlocks = append(knownBlocks, s.db.path(height))
 
 		// after 12, start doubling
 		if len(knownBlocks) >= 12 {
@@ -81,7 +81,7 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 		}
 	}
 	// always include the genesis block
-	knownBlocks = append(knownBlocks, s.currentPath[0])
+	knownBlocks = append(knownBlocks, s.db.path(0))
 
 	copy(blockIDs[:], knownBlocks)
 	return
@@ -106,7 +106,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	lockID := s.mu.RLock()
 	for _, id := range knownBlocks {
 		bn, exists := s.blockMap[id]
-		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
+		if exists && bn.height <= s.height() && id == s.db.path(bn.height) {
 			found = true
 			start = bn.height + 1 // start at child
 			break
@@ -136,9 +136,9 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node, exists := s.blockMap[s.currentPath[i]]
+				node, exists := s.blockMap[s.db.path(i)]
 				if build.DEBUG && !exists {
-					panic("blockMap is missing a block whose ID is in the currentPath")
+					panic("blockMap is missing a block whose ID is in the current path")
 				}
 				blocks = append(blocks, node.block)
 			}

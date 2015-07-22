@@ -290,7 +290,7 @@ func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirecti
 	if dir == modules.DiffApply {
 		cs.currentPath = append(cs.currentPath, bn.block.ID())
 		if cs.updatePath {
-			cs.db.pushPath(bn.block)
+			cs.db.pushPath(bn.block.ID())
 		}
 	} else {
 		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
@@ -332,7 +332,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 
 	// Update the state to point to the new block.
 	cs.currentPath = append(cs.currentPath, bn.block.ID())
-	err := cs.db.addPath(bn.block)
+	err := cs.db.addPath(bn.block.ID())
 	if err != nil {
 		return err
 	}

@@ -81,7 +81,7 @@ func TestSynchronize(t *testing.T) {
 	// extend cst2 with a "bad" (old) block, and synchronize. cst1 should
 	// reject the bad block.
 	lockID := cst2.cs.mu.Lock()
-	cst2.cs.currentPath = append(cst2.cs.currentPath, cst2.cs.currentPath[0])
+	cst2.cs.db.addPath(cst2.cs.db.path(0))
 	cst2.cs.mu.Unlock(lockID)
 	// ErrBlockKnown will be converted to nil
 	err = cst1.cs.Synchronize(cst2.gateway.Address())
@@ -134,7 +134,10 @@ func TestResynchronize(t *testing.T) {
 	}
 	lockID := cst2.cs.mu.Lock()
 	id := cst2.cs.currentBlockID()
-	cst2.cs.currentPath = cst2.cs.currentPath[:len(cst2.cs.currentPath)-1]
+	err = cst2.cs.db.rmPath()
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst2.cs.mu.Unlock(lockID)
 
 	err = cst1.gateway.Connect(cst2.gateway.Address())
@@ -144,7 +147,10 @@ func TestResynchronize(t *testing.T) {
 
 	// add id back to cst2's current path
 	lockID = cst2.cs.mu.Lock()
-	cst2.cs.currentPath = append(cst2.cs.currentPath, id)
+	err = cst2.cs.db.addPath(id)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst2.cs.mu.Unlock(lockID)
 
 	// cst1 should not have the block
@@ -187,20 +193,20 @@ func TestBlockHistory(t *testing.T) {
 	lockID := cst.cs.mu.Lock()
 	// first 12 IDs are linear
 	for i := types.BlockHeight(0); i < 12; i++ {
-		if history[i] != cst.cs.currentPath[cst.cs.height()-i] {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.currentPath[cst.cs.height()-i], history[i])
+		if history[i] != cst.cs.db.path(cst.cs.height()-i) {
+			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.path(cst.cs.height()-i), history[i])
 		}
 	}
 	// next 4 IDs are exponential
 	heights := []types.BlockHeight{14, 18, 26, 42}
 	for i, height := range heights {
-		if history[12+i] != cst.cs.currentPath[cst.cs.height()-height+1] {
-			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.currentPath[cst.cs.height()-height], history[12+i])
+		if history[12+i] != cst.cs.db.path(cst.cs.height()-height+1) {
+			t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.path(cst.cs.height()-height), history[12+i])
 		}
 	}
 	// finally, the genesis ID
-	if history[16] != cst.cs.currentPath[0] {
-		t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.currentPath[0], history[16])
+	if history[16] != cst.cs.db.path(0) {
+		t.Errorf("Wrong ID in history: expected %v, got %v", cst.cs.db.path(0), history[16])
 	}
 
 	cst.cs.mu.Unlock(lockID)

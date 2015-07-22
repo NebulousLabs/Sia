@@ -188,8 +188,8 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
-func (db *setDB) pushPath(block types.Block) error {
-	value := encoding.Marshal(block.ID())
+func (db *setDB) pushPath(bid types.BlockID) error {
+	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN))
@@ -207,7 +207,7 @@ func (db *setDB) popPath() error {
 	})
 }
 
-// path retreives the block id of a block at a given hegiht from the path
+// getPath retreives the block id of a block at a given hegiht from the path
 func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem("Path", h)
 	if err != nil {

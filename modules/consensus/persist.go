@@ -16,7 +16,7 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
-	err = cs.db.addPath(cs.blockRoot.block)
+	err = cs.db.addPath(cs.blockRoot.block.ID())
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	// Check that the db's genesis block matches our genesis block.
 	bID := cs.db.getPath(0)
 	// If this happens, print a warning and start a new db.
-	if bid != cs.currentPath[0] {
+	if bid != cs.blockRoot.block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		cs.db.Close()
 		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))

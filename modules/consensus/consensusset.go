@@ -159,7 +159,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
 
 	// Fill out the consensus information for the genesis block.
-	cs.currentPath[0] = genesisBlock.ID()
 	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.ZeroUnlockHash,
@@ -177,6 +176,7 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
+	cs.currentPath[0] = genesisBlock.ID()
 
 	// Send out genesis block update.
 	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
