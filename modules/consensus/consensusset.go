@@ -56,7 +56,7 @@ type ConsensusSet struct {
 	// from memory. This variable only exists while some
 	// structures are still in memory, and should always equal
 	// db.pathHeight after loading from disk
-	blocksLoaded types.BlockHeight
+	blocksLoaded types.BlockHeight // DEPRECATED
 
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode

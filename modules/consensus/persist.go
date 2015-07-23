@@ -80,7 +80,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
-		// This gaurd is for when the program is stopped. It is temporary.
+		// This guard is for when the program is stopped. It is temporary.
+		// DEPRICATED
 		if !cs.db.open {
 			break
 		}

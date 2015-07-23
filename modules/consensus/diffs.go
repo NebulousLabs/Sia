@@ -291,14 +291,14 @@ func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirecti
 		if cs.updatePath {
 			err := cs.db.pushPath(bn.block.ID())
 
-			if err != nil {
+			if build.DEBUG && err != nil {
 				panic(err)
 			}
 		}
 		cs.blocksLoaded += 1
 	} else {
 		err := cs.db.popPath()
-		if err != nil {
+		if build.DEBUG && err != nil {
 			panic(err)
 		}
 		cs.blocksLoaded -= 1
