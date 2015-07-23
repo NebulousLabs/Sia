@@ -20,6 +20,8 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
+	// Explicit initilization preferred to implicit
+	cs.blocksLoaded = 0
 	if build.DEBUG {
 		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
 	}
@@ -64,6 +66,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 		return err
 	}
 	cs.blockRoot.consensusSetHash = pb.ConsensusSetHash
+	// Explicit initilization preferred to implicit
+	cs.blocksLoaded = 0
 
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
@@ -76,6 +80,10 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
+		// This gaurd is for when the program is stopped
+		if !cs.db.open {
+			break
+		}
 		cs.blockMap[bn.block.ID()] = &bn
 		cs.updatePath = false
 		cs.commitDiffSet(&bn, modules.DiffApply)

@@ -52,6 +52,12 @@ type ConsensusSet struct {
 	// current path from disk and true otherwise
 	updatePath bool // DEPRECATED
 
+	// blocksLoaded is the number of blocks that have been loaded
+	// from memory. This variable only exists while some
+	// structures are still in memory, and should always equal
+	// db.pathHeight after loading from disk
+	blocksLoaded types.BlockHeight
+
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
@@ -199,5 +205,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	lockID := cs.mu.Lock()
+	defer cs.mu.Unlock(lockID)
+	cs.db.open = false
 	return cs.db.Close()
 }

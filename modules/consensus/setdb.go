@@ -27,6 +27,9 @@ var (
 // consensus set
 type setDB struct {
 	*persist.BoltDatabase
+	// The open flag is used to prevent reading from the database
+	// after closing sia when the loading loop is still running
+	open bool
 }
 
 // processedBlock is a copy/rename of blockNode, with the pointers to
@@ -135,7 +138,7 @@ func openDB(filename string) (*setDB, error) {
 		}
 		return nil
 	})
-	return &setDB{db}, nil
+	return &setDB{db, true}, nil
 }
 
 // addItem should only be called from this file, and adds a new item

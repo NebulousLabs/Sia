@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"errors"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -43,6 +44,9 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			// Blocks received during synchronize aren't trusted; activate full
 			// verification.
 			lockID := s.mu.Lock()
+			if !s.db.open {
+				return errors.New("database not open")
+			}
 			s.verificationRigor = fullVerification
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
