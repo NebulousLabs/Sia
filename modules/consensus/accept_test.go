@@ -90,7 +90,7 @@ func (cst *consensusSetTester) testBlockKnownHandling() error {
 	}
 
 	// Try the genesis block edge case.
-	genesisBlock := cst.cs.blockMap[cst.cs.db.path(0)].block
+	genesisBlock := cst.cs.blockMap[cst.cs.db.getPath(0)].block
 	err = cst.cs.acceptBlock(genesisBlock)
 	if err != ErrBlockKnown {
 		return errors.New("expecting known block err: " + err.Error())
@@ -365,7 +365,7 @@ func (cst *consensusSetTester) testSimpleBlock() error {
 		return errors.New("the state's current block is not reporting as the recently mined block.")
 	}
 	// Check that the current path has updated correctly.
-	if block.ID() != cst.cs.db.path(newNode.height) {
+	if block.ID() != cst.cs.db.getPath(newNode.height) {
 		return errors.New("the state's current path didn't update correctly after accepting a new block")
 	}
 

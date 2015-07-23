@@ -20,7 +20,7 @@ func (cs *ConsensusSet) deleteNode(bn *blockNode) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
 		if types.BlockHeight(cs.db.pathHeight()) > bn.height &&
-			cs.db.path(bn.height) == bn.block.ID() {
+			cs.db.getPath(bn.height) == bn.block.ID() {
 			panic(errDeleteCurrentPath)
 		}
 	}
@@ -55,7 +55,7 @@ func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 	path := []*blockNode{bn}
 	for {
 		// Stop when we reach the common parent.
-		if bn.height <= cs.height() && cs.db.path(bn.height) == bn.block.ID() {
+		if bn.height <= cs.height() && cs.db.getPath(bn.height) == bn.block.ID() {
 			break
 		}
 		bn = bn.parent
@@ -70,7 +70,7 @@ func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
 func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
 	// Sanity check - make sure that bn is in the current path.
 	if build.DEBUG {
-		if cs.height() < bn.height || cs.db.path(bn.height) != bn.block.ID() {
+		if cs.height() < bn.height || cs.db.getPath(bn.height) != bn.block.ID() {
 			panic(errExternalRevert)
 		}
 	}

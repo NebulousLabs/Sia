@@ -29,7 +29,7 @@ type setDB struct {
 	*persist.BoltDatabase
 	// The open flag is used to prevent reading from the database
 	// after closing sia when the loading loop is still running
-	open bool
+	open bool // DEPRECATED
 }
 
 // processedBlock is a copy/rename of blockNode, with the pointers to

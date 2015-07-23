@@ -16,7 +16,7 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
-	err = cs.db.addPath(cs.blockRoot.block.ID())
+	err = cs.db.pushPath(cs.blockRoot.block.ID())
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	}
 
 	// Check that the db's genesis block matches our genesis block.
-	bID := cs.db.getPath(0)
+	bid := cs.db.getPath(0)
 	// If this happens, print a warning and start a new db.
 	if bid != cs.blockRoot.block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
@@ -61,7 +61,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// The state cannot be easily reverted to a point where the
 	// consensusSetHash can be re-made. Load from disk instead
-	pb, err := cs.db.getBlockMap(bID)
+	pb, err := cs.db.getBlockMap(bid)
 	if err != nil {
 		return err
 	}
@@ -71,8 +71,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
-		bID := cs.db.getPath(i)
-		pb, err := cs.db.getBlockMap(bID)
+		bid := cs.db.getPath(i)
+		pb, err := cs.db.getBlockMap(bid)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
-		// This gaurd is for when the program is stopped
+		// This gaurd is for when the program is stopped. It is temporary.
 		if !cs.db.open {
 			break
 		}

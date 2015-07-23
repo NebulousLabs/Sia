@@ -335,7 +335,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	}
 
 	// Update the state to point to the new block.
-	err := cs.db.addPath(bn.block.ID())
+	err := cs.db.pushPath(bn.block.ID())
 	if err != nil {
 		return err
 	}
