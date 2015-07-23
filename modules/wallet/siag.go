@@ -90,20 +90,13 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 	// Truncate the keys to exactly the number needed.
 	skps = skps[:skps[0].UnlockConditions.SignaturesRequired]
 
-	// Assemble the base transction, including a 10 siacoin fee if possible.
-	id, err := w.RegisterTransaction(types.Transaction{}, nil)
-	if err != nil {
-		return nil, err
-	}
-	// Add a miner fee - if funding the transaction fails, we'll just send a
-	// transaction with no fee.
-	err = w.FundTransaction(id, types.NewCurrency64(TransactionFee))
+	// Register the transaction and add a fee, if possible.
+	txnBuilder := w.StartTransaction()
+	err := txnBuilder.FundSiacoins(types.NewCurrency64(TransactionFee))
 	if err == nil {
-		_, err = w.AddMinerFee(id, types.NewCurrency64(TransactionFee))
-		if err != nil {
-			return nil, err
-		}
+		txnBuilder.AddMinerFee(types.NewCurrency64(TransactionFee))
 	}
+
 	// Add the siafund inputs to the transcation.
 	for _, sfoid := range sfoids {
 		// Get an address for the siafund claims.
@@ -120,20 +113,15 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 			UnlockConditions: skps[0].UnlockConditions,
 			ClaimUnlockHash:  claimDest,
 		}
-		_, err = w.AddSiafundInput(id, sfi)
-		if err != nil {
-			return nil, err
-		}
+		txnBuilder.AddSiafundInput(sfi)
 	}
+
 	// Add the siafund output to the transaction.
 	sfo := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	_, err = w.AddSiafundOutput(id, sfo)
-	if err != nil {
-		return nil, err
-	}
+	txnBuilder.AddSiafundOutput(sfo)
 	// Add a refund siafund output if needed.
 	if amount.Cmp(availableSiafunds) != 0 {
 		refund := availableSiafunds.Sub(amount)
@@ -141,17 +129,12 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 			Value:      refund,
 			UnlockHash: baseUnlockHash,
 		}
-		_, err = w.AddSiafundOutput(id, sfo)
-		if err != nil {
-			return nil, err
-		}
+		txnBuilder.AddSiafundOutput(sfo)
 	}
+
 	// Add signatures for the siafund inputs.
 	sigIndex := 0
-	txn, _, err := w.ViewTransaction(id)
-	if err != nil {
-		return nil, err
-	}
+	txn, _ := txnBuilder.View()
 	for _, sfoid := range sfoids {
 		for _, key := range skps {
 			txnSig := types.TransactionSignature{
@@ -166,17 +149,13 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 				return nil, err
 			}
 			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
-
-			_, err = w.AddTransactionSignature(id, txn.TransactionSignatures[sigIndex])
-			if err != nil {
-				return nil, err
-			}
+			txnBuilder.AddTransactionSignature(txn.TransactionSignatures[sigIndex])
 			sigIndex++
 		}
 	}
 
 	// Sign the transaction.
-	txnSet, err := w.SignTransaction(id, true)
+	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return nil, err
 	}
