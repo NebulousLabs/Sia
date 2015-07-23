@@ -15,16 +15,19 @@ const (
 	iterationsPerAttempt = 16 * 1024
 
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
-	// that are remembered.
-	headerForWorkMemory = 20
+	// that are remembered. Additionally, 'headerForWork' will only poll for a
+	// new block every 'headerForWorkMemory / blockForWorkMemory' times it is
+	// called. This reduces the amount of memory used, but comes at the cost of
+	// not always having the most recent transactions
+	headerForWorkMemory = 1000
 
-	// headersPerBlockMemory is the number of headers created by changing the
-	// random transaction of a block before updating the block to contain any
-	// new transactions
-	headersPerBlockMemory = 5
+	// blockForWorkMemory is the maximum number of blocks the miner will store
+	// Blocks take up to 2 megabytes of memory, so it is important to keep a cap
+	blockForWorkMemory = 50
 )
 
-// TODO: docstring
+// Miner struct contains all variables the miner needs
+// in order to create and submit blocks.
 type Miner struct {
 	// Module dependencies.
 	cs     modules.ConsensusSet
@@ -45,9 +48,12 @@ type Miner struct {
 	// BlockManager variables. The BlockManager passes out and receives unique
 	// block headers on each call, these variables help to map the received
 	// block header to the original block. The headers are passed instead of
-	// the block because a full block is 2mb and is a lot to send over http.
+	// the block because a full block is 2mB and is a lot to send over http.
+	// In order to store multiple headers per block, some headers map to an
+	// identical address, but each header maps to a unique arbData, which can
+	// be used to construct a unique block
 	blockMem    map[types.BlockHeader]*types.Block
-	randTxnMem  map[types.BlockHeader]types.Transaction
+	arbDataMem  map[types.BlockHeader][]byte
 	headerMem   []types.BlockHeader
 	memProgress int
 
@@ -75,7 +81,8 @@ type Miner struct {
 }
 
 // New returns a ready-to-go miner that is not mining.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) { // Create the miner and its dependencies.
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*Miner, error) {
+	// Create the miner and its dependencies.
 	if cs == nil {
 		return nil, errors.New("miner cannot use a nil state")
 	}
@@ -115,7 +122,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		address:           addr,
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
-		randTxnMem: make(map[types.BlockHeader]types.Transaction),
+		arbDataMem: make(map[types.BlockHeader][]byte),
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,

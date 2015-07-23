@@ -8,22 +8,15 @@ import (
 )
 
 // reconstructBlock reconstructs a block given the miner and the header
-func reconstructBlock(m *Miner, header types.BlockHeader) (b types.Block, err error) {
+func reconstructBlock(m *Miner, header types.BlockHeader) (block *types.Block, err error) {
 	block, exists := m.blockMem[header]
 	if !exists {
 		err = errors.New("Header is either invalid or too old")
 		return
 	}
-	randTxn := m.randTxnMem[header]
+	arbData := m.arbDataMem[header]
 
-	blockTransactions := append([]types.Transaction{randTxn}, block.Transactions[1:]...)
-
-	b = types.Block{
-		ParentID:     block.ParentID,
-		Timestamp:    block.Timestamp,
-		MinerPayouts: block.MinerPayouts,
-		Transactions: blockTransactions,
-	}
+	block.Transactions[0].ArbitraryData[0] = arbData
 	return
 }
 
@@ -34,7 +27,7 @@ func mineHeader(m *Miner, header types.BlockHeader) (bh types.BlockHeader, err e
 	if err != nil {
 		return
 	}
-	b, _ = m.SolveBlock(b, m.target)
+	*b, _ = m.SolveBlock(*b, m.target)
 	bh = b.Header()
 	return
 }
@@ -60,7 +53,7 @@ func TestBlockManager(t *testing.T) {
 		if !exists {
 			t.Error("Miner did not remember enough headers")
 		}
-		_, exists = mt.miner.randTxnMem[headers[i]]
+		_, exists = mt.miner.arbDataMem[headers[i]]
 		if !exists {
 			t.Error("Miner did not remember enough headers")
 		}
@@ -75,7 +68,7 @@ func TestBlockManager(t *testing.T) {
 			numUniqueBlocks++
 		}
 	}
-	if numUniqueBlocks != headerForWorkMemory/headersPerBlockMemory {
+	if numUniqueBlocks != blockForWorkMemory {
 		t.Error("Miner is storing an incorrect number of blocks ", numUniqueBlocks)
 	}
 
@@ -88,7 +81,7 @@ func TestBlockManager(t *testing.T) {
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}
-		_, exists = mt.miner.randTxnMem[headers[i-headerForWorkMemory]]
+		_, exists = mt.miner.arbDataMem[headers[i-headerForWorkMemory]]
 		if exists {
 			t.Error("Miner remembered too many headers")
 		}

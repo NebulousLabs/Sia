@@ -69,45 +69,36 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
+	// The header that will be returned for nonce grinding.
+	// The header is constructed from a block and some arbitrary data. The
+	// arbitrary data allows for multiple unique blocks to be generated from
+	// a single block in memory. A block pointer is used in order to avoid
+	// storing multiple copies of the same block in memory
 	var header types.BlockHeader
-	var randTxn types.Transaction
+	var arbData []byte
 	var block *types.Block
 
-	if m.memProgress%headersPerBlockMemory == 0 {
-		// Grab a new block
+	if m.memProgress%(headerForWorkMemory/blockForWorkMemory) == 0 {
+		// Grab a new block. Allocate space for the pointer to store it as well
 		block = new(types.Block)
 		*block, _ = m.blockForWork()
 		header = block.Header()
-		randTxn = block.Transactions[0]
+		arbData = block.Transactions[0].ArbitraryData[0]
 	} else {
-		// Set block to previous block and create a randTxn
+		// Set block to previous block, but create new arbData
 		block = m.blockMem[m.headerMem[m.memProgress-1]]
-
-		randBytes, _ := crypto.RandBytes(types.SpecifierLen)
-		randTxn = types.Transaction{
-			ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], randBytes...)},
-		}
-
-		// Overwrite the old block's random transaction
-		blockTransactions := append([]types.Transaction{randTxn}, block.Transactions[1:]...)
-
-		// Assemble the block
-		newBlock := types.Block{
-			ParentID:     block.ParentID,
-			Timestamp:    block.Timestamp,
-			MinerPayouts: block.MinerPayouts,
-			Transactions: blockTransactions,
-		}
-		header = newBlock.Header()
+		arbData, _ = crypto.RandBytes(types.SpecifierLen)
+		block.Transactions[0].ArbitraryData[0] = arbData
+		header = block.Header()
 	}
 
-	// Save a mapping between the block and its header as well as the
-	// random transaction and its header, replacing the block that was
+	// Save a mapping from the header to its block as well as from the
+	// header to its arbitrary data, replacing the block that was
 	// stored 'headerForWorkMemory' requests ago.
 	delete(m.blockMem, m.headerMem[m.memProgress])
-	delete(m.randTxnMem, m.headerMem[m.memProgress])
+	delete(m.arbDataMem, m.headerMem[m.memProgress])
 	m.blockMem[header] = block
-	m.randTxnMem[header] = randTxn
+	m.arbDataMem[header] = arbData
 	m.headerMem[m.memProgress] = header
 	m.memProgress++
 	if m.memProgress == headerForWorkMemory {
@@ -150,27 +141,15 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	lookupBH.Nonce = zeroNonce
 	lockID := m.mu.Lock()
 	b, bExists := m.blockMem[lookupBH]
-	randTxn, txnExists := m.randTxnMem[lookupBH]
-
-	if !bExists || !txnExists {
-		m.mu.Unlock(lockID)
+	arbData, arbExists := m.arbDataMem[lookupBH]
+	m.mu.Unlock(lockID)
+	if !bExists || !arbExists {
 		err := errors.New("block header returned late - block was cleared from memory")
 		m.log.Println("ERROR:", err)
 		return err
 	}
-	// Reset block memory
-	m.memProgress = 0
-	m.mu.Unlock(lockID)
 
-	// Write the correct randTxn to a new block
-	blockTransactions := append([]types.Transaction{randTxn}, b.Transactions[1:]...)
-	block := types.Block{
-		ParentID:     b.ParentID,
-		Timestamp:    b.Timestamp,
-		MinerPayouts: b.MinerPayouts,
-		Transactions: blockTransactions,
-	}
-
-	block.Nonce = bh.Nonce
-	return m.SubmitBlock(block)
+	b.Transactions[0].ArbitraryData[0] = arbData
+	b.Nonce = bh.Nonce
+	return m.SubmitBlock(*b)
 }
