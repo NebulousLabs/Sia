@@ -25,7 +25,7 @@ func TestDoSBlockHandling(t *testing.T) {
 	// Mine a DoS block and submit it to the state, expect a normal error.
 	// Create a transaction that is funded but the funds are never spent. This
 	// transaction is invalid in a way that triggers the DoS block detection.
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(types.NewCurrency64(50))
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +413,7 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 
 	// Create a block containing a transaction with a valid siacoin output.
 	txnValue := types.NewCurrency64(1200)
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(txnValue)
 	if err != nil {
 		return err
@@ -541,7 +541,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Create and fund a transaction with a file contract.
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(payout.Mul(types.NewCurrency64(2)))
 	if err != nil {
 		return err
@@ -805,7 +805,7 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	fc.MissedProofOutputs = []types.SiacoinOutput{{Value: outputSize}}
 
 	// Create and fund a transaction with a file contract.
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		return err
@@ -1010,7 +1010,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		SignaturesRequired: 1,
 	}
 	channelFundingAddr := channelFundingUC.UnlockHash()
-	fundTxnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	fundTxnBuilder := cst.wallet.StartTransaction()
 	if err != nil {
 		return err
 	}
@@ -1191,7 +1191,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 			SignaturesRequired: 1,
 		}
 		channelFundingAddr := channelFundingUC.UnlockHash()
-		fundTxnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+		fundTxnBuilder := cst.wallet.StartTransaction()
 		err = fundTxnBuilder.FundSiacoins(channelSize)
 		if err != nil {
 			return err
@@ -1310,7 +1310,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 			SignaturesRequired: 1,
 		}
 		channelFundingAddr := channelFundingUC.UnlockHash()
-		fundTxnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+		fundTxnBuilder := cst.wallet.StartTransaction()
 		err = fundTxnBuilder.FundSiacoins(channelSize)
 		if err != nil {
 			return err
@@ -1653,7 +1653,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 
 	// Create a good transaction using the wallet.
 	txnValue := types.NewCurrency64(1200)
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(txnValue)
 	if err != nil {
 		t.Fatal(err)
@@ -1720,7 +1720,7 @@ func TestTaxHardfork(t *testing.T) {
 	fc.MissedProofOutputs[0].Value = outputSize
 
 	// Create and fund a transaction with a file contract.
-	txnBuilder := cst.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := cst.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(payout)
 	if err != nil {
 		t.Fatal(err)

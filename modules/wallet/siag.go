@@ -91,7 +91,7 @@ func (w *Wallet) SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, 
 	skps = skps[:skps[0].UnlockConditions.SignaturesRequired]
 
 	// Register the transaction and add a fee, if possible.
-	txnBuilder := w.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(types.NewCurrency64(TransactionFee))
 	if err == nil {
 		txnBuilder.AddMinerFee(types.NewCurrency64(TransactionFee))

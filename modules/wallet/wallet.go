@@ -147,7 +147,7 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]type
 		UnlockHash: dest,
 	}
 
-	txnBuilder := w.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := w.StartTransaction()
 	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		return nil, err

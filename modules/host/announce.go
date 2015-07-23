@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -28,7 +27,7 @@ func ping(addr modules.NetAddress) bool {
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
 	// Create a transaction with a host announcement.
-	txnBuilder := h.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := h.wallet.StartTransaction()
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: addr,
 	})

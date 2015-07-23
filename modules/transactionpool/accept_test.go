@@ -66,7 +66,7 @@ func TestIntegrationConflictingTransactionSets(t *testing.T) {
 
 	// Fund a partial transaction.
 	fund := types.NewCurrency64(30e6)
-	txnBuilder := tpt.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := tpt.wallet.StartTransaction()
 	err = txnBuilder.FundSiacoins(fund)
 	if err != nil {
 		t.Fatal(err)

@@ -42,6 +42,12 @@ func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transa
 	}
 }
 
+// StartTransaction is a convenience function that calls
+// RegisterTransaction(types.Transaction{}, nil).
+func (w *Wallet) StartTransaction() modules.TransactionBuilder {
+	return w.RegisterTransaction(types.Transaction{}, nil)
+}
+
 // FundSiacoins will add a siacoin input of exaclty 'amount' to the
 // transaction. A parent transaction may be needed to achieve an input with the
 // correct value. The siacoin input will not be signed until 'Sign' is called

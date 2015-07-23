@@ -113,6 +113,10 @@ type Wallet interface {
 	// registers a new transaction without parents.
 	RegisterTransaction(t types.Transaction, parents []types.Transaction) TransactionBuilder
 
+	// StartTransaction is a convenience method that calls
+	// RegisterTransaction(types.Transaction{}, nil)
+	StartTransaction() TransactionBuilder
+
 	Balance(full bool) types.Currency
 
 	Close() error

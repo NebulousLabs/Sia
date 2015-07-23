@@ -12,7 +12,7 @@ import (
 // is created that is valid.
 func (wt *walletTester) testFundTransaction() error {
 	// Build a transaction that intentionally needs a refund.
-	txnBuilder := wt.wallet.RegisterTransaction(types.Transaction{}, nil)
+	txnBuilder := wt.wallet.StartTransaction()
 	fund := wt.wallet.Balance(false).Sub(types.NewCurrency64(1))
 	err := txnBuilder.FundSiacoins(fund)
 	if err != nil {
