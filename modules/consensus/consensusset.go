@@ -9,11 +9,9 @@ package consensus
 import (
 	"errors"
 	"os"
-	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -48,7 +46,12 @@ type ConsensusSet struct {
 	// verificationRigor is a flag that tells the state whether or not to do
 	// transaction verification while accepting a block. This should help speed
 	// up loading blocks from memory.
-	verificationRigor verificationRigor
+	verificationRigor verificationRigor // DEPRECATED
+
+	// updatePath is a flag that determines if a block node will
+	// be added to the path. It should be false when loading the
+	// current path from disk and true otherwise
+	updatePath bool // DEPRECATED
 
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
@@ -97,8 +100,9 @@ type ConsensusSet struct {
 	changeLog   []changeEntry
 	subscribers []modules.ConsensusSetSubscriber
 
-	// block database, used for saving/loading the current path
-	db persist.DB
+	// block database, used for saving/loading the current path,
+	// and storing processed blocks
+	db *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
 	gateway modules.Gateway
@@ -187,15 +191,10 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
-	// During short tests, use an in-memory database.
-	if build.Release == "testing" && testing.Short() {
-		cs.db = persist.NilDB
-	} else {
-		// Otherwise, try to load an existing database from disk.
-		err = cs.load(saveDir)
-		if err != nil {
-			return nil, err
-		}
+	// Try to load an existing database from disk.
+	err = cs.load(saveDir)
+	if err != nil {
+		return nil, err
 	}
 
 	// Register RPCs
