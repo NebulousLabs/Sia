@@ -63,15 +63,6 @@ func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, sav
 		return nil, err
 	}
 
-	// TODO: I'm worried about balances here. Because of the way that the
-	// re-try algorithm works, it won't be a problem, but without that we would
-	// need to make sure that scanAllFiles() didn't get called until the entire
-	// balance had loaded, which would require loading the entire blockchain.
-	// This also won't be a problem once we're also saving the addresses.
-	//
-	// TODO: bring back this functionality when we have resumable uploads.
-	//r.scanAllFiles()
-
 	r.cs.ConsensusSetSubscribe(r)
 
 	return r, nil
