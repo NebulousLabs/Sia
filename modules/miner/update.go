@@ -59,4 +59,5 @@ func (m *Miner) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, unconfi
 	}
 	m.target = target
 	m.earliestTimestamp = timestamp
+	m.prepareNewBlock()
 }
