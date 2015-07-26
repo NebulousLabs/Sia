@@ -2,6 +2,7 @@ package miner
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -52,6 +53,20 @@ func (m *Miner) blockForWork() (types.Block, types.Target) {
 	return b, m.target
 }
 
+// prepareNewBlock sets the blockmanager up to generate a new block next time
+// HeaderForWork is called. Note that calling this may diminish from the max
+// number of headers that can be stored (because memProgress gets shifted forward)
+func (m *Miner) prepareNewBlock() {
+	// Move mem progress forward. This prevents more than blockForWorkMemory
+	// blocks from being created in the case of a slow miner. We also have
+	// to delete all headers as we go to ensure old blocks get removed from memory
+	for m.memProgress%(headerForWorkMemory/blockForWorkMemory) != 0 {
+		delete(m.blockMem, m.headerMem[m.memProgress])
+		delete(m.arbDataMem, m.headerMem[m.memProgress])
+		m.memProgress++
+	}
+}
+
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target) {
@@ -69,6 +84,10 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
+	if time.Since(m.lastBlock).Seconds() > secondsBetweenBlocks {
+		m.prepareNewBlock()
+	}
+
 	// The header that will be returned for nonce grinding.
 	// The header is constructed from a block and some arbitrary data. The
 	// arbitrary data allows for multiple unique blocks to be generated from
@@ -84,6 +103,8 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 		*block, _ = m.blockForWork()
 		header = block.Header()
 		arbData = block.Transactions[0].ArbitraryData[0]
+
+		m.lastBlock = time.Now()
 	} else {
 		// Set block to previous block, but create new arbData
 		block = m.blockMem[m.headerMem[m.memProgress-1]]

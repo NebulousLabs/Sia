@@ -8,28 +8,26 @@ import (
 )
 
 // reconstructBlock reconstructs a block given the miner and the header
-func reconstructBlock(m *Miner, header types.BlockHeader) (block *types.Block, err error) {
+func reconstructBlock(m *Miner, header types.BlockHeader) (*types.Block, error) {
 	block, exists := m.blockMem[header]
 	if !exists {
-		err = errors.New("Header is either invalid or too old")
-		return
+		return nil, errors.New("Header is either invalid or too old")
 	}
 	arbData := m.arbDataMem[header]
 
 	block.Transactions[0].ArbitraryData[0] = arbData
-	return
+	return block, nil
 }
 
 // mineHeader takes a header, and nonce grinds it. It returns
 // the header with a nonce that solves the corresponding block
-func mineHeader(m *Miner, header types.BlockHeader) (bh types.BlockHeader, err error) {
+func mineHeader(m *Miner, header types.BlockHeader) (types.BlockHeader, error) {
 	b, err := reconstructBlock(m, header)
 	if err != nil {
-		return
+		return types.BlockHeader{}, err
 	}
 	*b, _ = m.SolveBlock(*b, m.target)
-	bh = b.Header()
-	return
+	return b.Header(), nil
 }
 
 // TestBlockManager creates a miner, then polls the Miner for block
@@ -41,6 +39,9 @@ func TestBlockManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Once we have polled for 2*headerForWorkMemory headers, the first
+	// headerForWorkMemory headers should be overwritten and no longer
+	// work.
 	headers := make([]types.BlockHeader, 2*headerForWorkMemory)
 
 	for i := 0; i < headerForWorkMemory; i++ {

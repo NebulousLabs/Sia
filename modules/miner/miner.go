@@ -23,7 +23,15 @@ const (
 
 	// blockForWorkMemory is the maximum number of blocks the miner will store
 	// Blocks take up to 2 megabytes of memory, so it is important to keep a cap
-	blockForWorkMemory = 50
+	blockForWorkMemory = 20
+
+	// secondsBetweenBlocks is the maximum amount of time the block manager will
+	// go between generating new blocks. If the miner is not polling more than
+	// headerForWorkMemory / blockForWorkMemory blocks every secondsBetweenBlocks
+	// then the block manager will create new blocks in order to keep the miner
+	// mining on the most recent block, but this will come at the cost of preventing
+	// the block manger from storing as many headers
+	secondsBetweenBlocks = 30
 )
 
 // Miner struct contains all variables the miner needs
@@ -52,9 +60,11 @@ type Miner struct {
 	// In order to store multiple headers per block, some headers map to an
 	// identical address, but each header maps to a unique arbData, which can
 	// be used to construct a unique block
+	// lastBlock stores the Time the last block was requested.
 	blockMem    map[types.BlockHeader]*types.Block
 	arbDataMem  map[types.BlockHeader][]byte
 	headerMem   []types.BlockHeader
+	lastBlock   time.Time
 	memProgress int
 
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
