@@ -1,12 +1,14 @@
 package modules
 
 import (
+	"log"
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 )
 
 var (
+	LogSettings    = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
 	SafeMutexDelay time.Duration
 )
 

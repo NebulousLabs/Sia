@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -24,46 +25,15 @@ const (
 	TransactionFee = 10
 )
 
-// A Wallet uses the state and transaction pool to track the unconfirmed
-// balance of a user. All of the keys are stored in 'saveDir'/wallet.dat.
-//
-// One feature of the wallet is preventing accidental double spends. The wallet
-// will block an output from being spent if it has been spent in the last
-// 'AgeDelay' blocks. This is managed by tracking a global age for the wallet
-// and then an age for each output, set to the age of the wallet that the
-// output was most recently spent. If the wallet is 'AgeDelay' blocks older
-// than an output, then the output can be spent again.
-//
-// A second feature of the wallet is the transaction builder, which is a series
-// of functions that can be used to build independent transactions for use with
-// untrusted parties. The transactions can be cobbled together piece by piece
-// and then signed. When using the transaction builder, the wallet will always
-// have exact outputs (by creating another transaction first if needed) and
-// thus the transaction does not need to be spent for the transaction builder
-// to be able to use any refunds.
 type Wallet struct {
+	unlocked bool
+	settings WalletSettings
+
 	state            modules.ConsensusSet
 	tpool            modules.TransactionPool
 	unconfirmedDiffs []modules.SiacoinOutputDiff
 	siafundPool      types.Currency
 
-	// A key contains all the information necessary to spend a particular
-	// address, as well as all the known outputs that use the address.
-	//
-	// age is a tool to determine whether or not an output can be spent. When
-	// an output is spent by the wallet, the age of the output is marked equal
-	// to the age of the wallet. It will not be spent again until the age is
-	// `AgeDelay` less than the wallet. The wallet ages by 1 every block. The
-	// wallet can also be manually aged, which is a convenient and efficient
-	// way of resetting spent outputs. Transactions are not intended to be
-	// broadcast for a while can be given an age that is much greater than the
-	// wallet.
-	//
-	// Timelocked keys is a list of addresses found in `keys` that can't be
-	// spent until a certain height. The wallet will use `timelockedKeys` to
-	// mark keys as unspendable until the timelock has lifted.
-	//
-	// Visible keys will be displayed to the user.
 	consensusHeight  types.BlockHeight
 	age              int
 	keys             map[types.UnlockHash]*key
@@ -72,41 +42,44 @@ type Wallet struct {
 	siafundAddresses map[types.UnlockHash]struct{}
 	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
-	saveDir string
-	mu      *sync.RWMutex
+	trackedKeys map[types.UnlockHash]struct{}
+
+	persistDir string
+	log        *log.Logger
+	mu         *sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file
 // name and then using the file to save in the future.
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string) (w *Wallet, err error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
+	// Check for nil dependencies.
 	if cs == nil {
-		err = errors.New("wallet cannot use a nil state")
-		return
+		return nil, errors.New("wallet cannot use a nil state")
 	}
 	if tpool == nil {
-		err = errors.New("wallet cannot use a nil transaction pool")
-		return
+		return nil, errors.New("wallet cannot use a nil transaction pool")
 	}
 
-	w = &Wallet{
+	// Initialize the data structure.
+	w := &Wallet{
 		state: cs,
 		tpool: tpool,
 
-		age:              AgeDelay + 100,
+		age:              AgeDelay * 2,
 		keys:             make(map[types.UnlockHash]*key),
 		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
 		visibleAddresses: make(map[types.UnlockHash]struct{}),
 		siafundAddresses: make(map[types.UnlockHash]struct{}),
 		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		saveDir: saveDir,
-		mu:      sync.New(modules.SafeMutexDelay, 1),
+		persistDir: persistDir,
+		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
 
-	// Create the wallet folder.
-	err = os.MkdirAll(saveDir, 0700)
+	// Initialize the persistent structures.
+	err := w.initPersist()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	// Try to load a previously saved wallet file. If it doesn't exist, assume
@@ -122,13 +95,12 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		}
 	}
 	if err != nil {
-		err = fmt.Errorf("couldn't load wallet file %s: %v", saveDir, err)
-		return
+		return nil, fmt.Errorf("couldn't load wallet file %s: %v", persistDir, err)
 	}
 
 	w.tpool.TransactionPoolSubscribe(w)
 
-	return
+	return w, nil
 }
 
 // Close will save the wallet before shutting down.
