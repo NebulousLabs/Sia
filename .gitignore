@@ -1,6 +1,6 @@
+*.swp
 cover
 release
 doc/whitepaper.aux
 doc/whitepaper.log
 doc/whitepaper.pdf
-*.swp

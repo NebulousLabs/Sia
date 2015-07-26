@@ -47,9 +47,6 @@ type Wallet struct {
 	unconfirmedDiffs []modules.SiacoinOutputDiff
 	siafundPool      types.Currency
 
-	// Location of the wallet directory, for saving and loading keys.
-	saveDir string
-
 	// A key contains all the information necessary to spend a particular
 	// address, as well as all the known outputs that use the address.
 	//
@@ -75,15 +72,8 @@ type Wallet struct {
 	siafundAddresses map[types.UnlockHash]struct{}
 	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
-	// transactions is a list of transactions that are currently being built by
-	// the wallet. Each transaction has a unique id, which is enforced by the
-	// transactionCounter.
-	transactionCounter int
-	transactions       map[string]*openTransaction
-
-	subscribers []chan struct{}
-
-	mu *sync.RWMutex
+	saveDir string
+	mu      *sync.RWMutex
 }
 
 // New creates a new wallet, loading any known addresses from the input file
@@ -102,8 +92,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		state: cs,
 		tpool: tpool,
 
-		saveDir: saveDir,
-
 		age:              AgeDelay + 100,
 		keys:             make(map[types.UnlockHash]*key),
 		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
@@ -111,9 +99,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, saveDir string)
 		siafundAddresses: make(map[types.UnlockHash]struct{}),
 		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
 
-		transactions: make(map[string]*openTransaction),
-
-		mu: sync.New(modules.SafeMutexDelay, 1),
+		saveDir: saveDir,
+		mu:      sync.New(modules.SafeMutexDelay, 1),
 	}
 
 	// Create the wallet folder.
@@ -153,39 +140,27 @@ func (w *Wallet) Close() error {
 
 // SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) (t types.Transaction, err error) {
-	// Add a transaction fee of 10 siacoins.
+func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
 	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
-
-	// Create and send the transaction.
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
 	}
-	id, err := w.RegisterTransaction(t)
-	if err != nil {
-		return
-	}
-	_, err = w.FundTransaction(id, amount.Add(tpoolFee))
-	if err != nil {
-		return
-	}
-	_, _, err = w.AddMinerFee(id, tpoolFee)
-	if err != nil {
-		return
-	}
-	_, _, err = w.AddSiacoinOutput(id, output)
-	if err != nil {
-		return
-	}
-	t, err = w.SignTransaction(id, true)
-	if err != nil {
-		return
-	}
-	err = w.tpool.AcceptTransaction(t)
-	if err != nil {
-		return
-	}
 
-	return
+	txnBuilder := w.StartTransaction()
+	err := txnBuilder.FundSiacoins(amount.Add(tpoolFee))
+	if err != nil {
+		return nil, err
+	}
+	txnBuilder.AddMinerFee(tpoolFee)
+	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		return nil, err
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		return nil, err
+	}
+	return txnSet, nil
 }

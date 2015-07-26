@@ -7,7 +7,6 @@ import (
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -27,36 +26,23 @@ func ping(addr modules.NetAddress) bool {
 
 // announce creates an announcement transaction and submits it to the network.
 func (h *Host) announce(addr modules.NetAddress) error {
-	// create the transaction that will hold the announcement
-	var t types.Transaction
-	id, err := h.wallet.RegisterTransaction(t)
-	if err != nil {
-		return err
-	}
-
-	// create and encode the announcement and add it to the arbitrary data of
-	// the transaction.
+	// Create a transaction with a host announcement.
+	txnBuilder := h.wallet.StartTransaction()
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: addr,
 	})
-	_, _, err = h.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
-	if err != nil {
-		return err
-	}
-	t, err = h.wallet.SignTransaction(id, true)
-	if err != nil {
-		return err
-	}
+	_ = txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
+	txn, parents := txnBuilder.View()
+	txnSet := append(parents, txn)
 
 	// Add the transaction to the transaction pool.
-	err = h.tpool.AcceptTransaction(t)
-	if err == modules.ErrTransactionPoolDuplicate {
+	err := h.tpool.AcceptTransactionSet(txnSet)
+	if err == modules.ErrDuplicateTransactionSet {
 		return errors.New("you have already announced yourself")
 	}
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 

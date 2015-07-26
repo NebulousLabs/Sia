@@ -8,10 +8,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Handles updates recieved from the consensus subscription. Keeps
-// track of transaction volume, block timestamps and block sizes, as
-// well as the current block height
-func (e *Explorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange follows the most recent changes to the consensus set,
+// including parsing new blocks and updating the utxo sets.
+func (e *Explorer) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := e.mu.Lock()
 
 	// Modify the number of file contracts and how much they costed
@@ -53,6 +52,5 @@ func (e *Explorer) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
 	e.currentBlock = cc.AppliedBlocks[len(cc.AppliedBlocks)-1]
 
 	// Notify subscribers about updates
-	e.updateSubscribers()
 	e.mu.Unlock(lockID)
 }

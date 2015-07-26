@@ -47,33 +47,16 @@ func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirec
 				panic("trying to delete an output that doesn't exist?")
 			}
 		}
-
 		key.outputs[scod.ID].spendable = false
 	}
 }
 
-// ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
-// unconfirmed set and uses them to update the balance and transaction history
-// of the wallet.
-func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []types.Transaction, unconfirmedSiacoinDiffs []modules.SiacoinOutputDiff) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-
-	// Remove all of the current unconfirmed diffs - they are being replaced
-	// wholesale.
-	for _, diff := range w.unconfirmedDiffs {
-		w.applyDiff(diff, modules.DiffRevert)
-	}
+func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
+	// TODO: Restruture whole wallet.
 
 	// Adjust the confirmed set of diffs.
 	for _, scod := range cc.SiacoinOutputDiffs {
 		w.applyDiff(scod, modules.DiffApply)
-	}
-
-	// Add all of the unconfirmed diffs to the wallet.
-	w.unconfirmedDiffs = unconfirmedSiacoinDiffs
-	for _, diff := range w.unconfirmedDiffs {
-		w.applyDiff(diff, modules.DiffApply)
 	}
 
 	// Update the wallet age and consensus height. Though they update together,
@@ -90,13 +73,35 @@ func (w *Wallet) ReceiveTransactionPoolUpdate(cc modules.ConsensusChange, _ []ty
 			w.applySiafundDiff(diff, modules.DiffApply)
 		}
 	}
-	if len(cc.SiafundPoolDiffs) > 0 {
-		if cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Direction == modules.DiffApply {
-			w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Adjusted
-		} else {
-			w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Previous
-		}
-	}
+}
 
-	w.notifySubscribers()
+// ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
+// unconfirmed set and uses them to update the balance and transaction history
+// of the wallet.
+func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, unconfirmedCC modules.ConsensusChange) {
+	// TODO: Restructure whole wallet.
+	/*
+		lockID := w.mu.Lock()
+		defer w.mu.Unlock(lockID)
+
+		// Remove all of the current unconfirmed diffs - they are being replaced
+		// wholesale.
+		for _, diff := range w.unconfirmedDiffs {
+			w.applyDiff(diff, modules.DiffRevert)
+		}
+
+		// Add all of the unconfirmed diffs to the wallet.
+		w.unconfirmedDiffs = unconfirmedSiacoinDiffs
+		for _, diff := range w.unconfirmedDiffs {
+			w.applyDiff(diff, modules.DiffApply)
+		}
+		if len(cc.SiafundPoolDiffs) > 0 {
+			if cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Direction == modules.DiffApply {
+				w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Adjusted
+			} else {
+				w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Previous
+			}
+		}
+
+	*/
 }

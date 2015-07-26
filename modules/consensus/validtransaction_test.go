@@ -134,7 +134,6 @@ func TestValidStorageProofs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cst.csUpdateWait()
 	}
 
 	// Create a file contract for which a storage proof can be created.
@@ -567,8 +566,8 @@ func TestValidTransaction(t *testing.T) {
 	}
 }
 
-// TestTryTransactions probes the TryTransactions method of the consensus set.
-func TestTryTransactions(t *testing.T) {
+// TestTryTransactionSet probes the TryTransactionSet method of the consensus set.
+func TestTryTransactionSet(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -584,13 +583,16 @@ func TestTryTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txns = cst.tpool.TransactionSet()
-	err = cst.cs.TryTransactions(txns)
+	txns = cst.tpool.TransactionList()
+	cc, err := cst.cs.TryTransactionSet(txns)
 	if err != nil {
 		t.Error(err)
 	}
 	if cst.cs.consensusSetHash() != initialHash {
-		t.Error("TryTransactions did not resotre order")
+		t.Error("TryTransactionSet did not resotre order")
+	}
+	if len(cc.SiacoinOutputDiffs) == 0 {
+		t.Error("consensus change is missing diffs after verifying a transction clump")
 	}
 
 	// Try a valid transaction followed by an invalid transaction.
@@ -598,11 +600,17 @@ func TestTryTransactions(t *testing.T) {
 		SiacoinInputs: []types.SiacoinInput{{}},
 	}
 	txns = append(txns, txn)
-	err = cst.cs.TryTransactions(txns)
+	cc, err = cst.cs.TryTransactionSet(txns)
 	if err == nil {
 		t.Error("bad transaction survived filter")
 	}
 	if cst.cs.consensusSetHash() != initialHash {
-		t.Error("TryTransactions did not restore order")
+		t.Error("TryTransactionSet did not restore order")
 	}
+	if len(cc.SiacoinOutputDiffs) != 0 {
+		t.Error("consensus change was not empty despite an error being returned")
+	}
+
+	// TODO: Try invalid transactions on the corner cases. (transaction is
+	// about to expire, etc.)
 }

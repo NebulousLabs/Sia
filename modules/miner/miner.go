@@ -82,9 +82,6 @@ type Miner struct {
 	miningOn  bool
 	mining    bool
 
-	// Subscription management variables.
-	subscribers []chan struct{}
-
 	persistDir string
 	log        *log.Logger
 	mu         *sync.RWMutex

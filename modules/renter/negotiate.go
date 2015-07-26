@@ -23,7 +23,7 @@ const (
 // them to build a transaction containing a file contract that satisfies the
 // terms, including providing an input balance. The transaction does not get
 // signed.
-func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, id string, err error) {
+func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRoot crypto.Hash) (txn types.Transaction, txnBuilder modules.TransactionBuilder, err error) {
 	// Get the payout as set by the missed proofs, and the client fund as determined by the terms.
 	sizeCurrency := types.NewCurrency64(terms.FileSize)
 	durationCurrency := types.NewCurrency64(uint64(terms.Duration))
@@ -43,19 +43,13 @@ func (r *Renter) createContractTransaction(terms modules.ContractTerms, merkleRo
 	}
 
 	// Create the transaction.
-	id, err = r.wallet.RegisterTransaction(txn)
+	txnBuilder = r.wallet.RegisterTransaction(txn, nil)
+	err = txnBuilder.FundSiacoins(clientCost)
 	if err != nil {
 		return
 	}
-	_, err = r.wallet.FundTransaction(id, clientCost)
-	if err != nil {
-		return
-	}
-	txn, _, err = r.wallet.AddFileContract(id, contract)
-	if err != nil {
-		return
-	}
-
+	txnBuilder.AddFileContract(contract)
+	txn, _ = txnBuilder.View()
 	return
 }
 
@@ -178,7 +172,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	// transaction is created sooner, which will impact the user's wallet
 	// balance faster vs. waiting for the whole thing to upload before
 	// affecting the user's balance.
-	unsignedTxn, txnRef, err := r.createContractTransaction(terms, merkleRoot)
+	unsignedTxn, txnBuilder, err := r.createContractTransaction(terms, merkleRoot)
 	if err != nil {
 		return err
 	}
@@ -198,12 +192,9 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		return err
 	}
 	for i := len(unsignedTxn.SiacoinInputs); i < len(collateralTxn.SiacoinInputs); i++ {
-		_, _, err = r.wallet.AddSiacoinInput(txnRef, collateralTxn.SiacoinInputs[i])
-		if err != nil {
-			return err
-		}
+		txnBuilder.AddSiacoinInput(collateralTxn.SiacoinInputs[i])
 	}
-	signedTxn, err := r.wallet.SignTransaction(txnRef, true)
+	signedTxn, err := txnBuilder.Sign(true)
 	if err != nil {
 		return err
 	}
@@ -228,11 +219,12 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 	// file contract made it.
 
 	// Negotiation was successful; update the filePiece.
+	txIndex := len(signedTxn) - 1
 	lockID = r.mu.Lock()
 	piece.Active = true
 	piece.Repairing = false
-	piece.Contract = signedTxn.FileContracts[0]
-	piece.ContractID = signedTxn.FileContractID(0)
+	piece.Contract = signedTxn[txIndex].FileContracts[0]
+	piece.ContractID = signedTxn[txIndex].FileContractID(0)
 	piece.HostIP = host.IPAddress
 	piece.EncryptionKey = key
 	r.save()

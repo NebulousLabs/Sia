@@ -90,54 +90,9 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 	return
 }
 
-// threadedSendUpdates sends updates to a specific subscriber as they become
-// available. One thread is needed per subscriber. A separate function was
-// needed due to race conditions; subscribers must receive updates in the
-// correct order. Furthermore, a deadlocked subscriber should not interfere
-// with consensus; updates cannot make blocking calls from any thread that is
-// holding a lock on consensus. The result is a construction where all updates
-// are added to a list of updates in the consensus set while the consensus set
-// is locked. Then, a separate thread for each subscriber will be notified (via
-// the update chan) that there are new updates. The thread will lock the
-// consensus set for long enough to get the updates, and then will unlock the
-// consensus set while it makes a blocking call to the subscriber. If the
-// subscriber deadlocks or has problems, the thread will stall indefinitely,
-// but the rest of consensus will not be disrupted.
-func (cs *ConsensusSet) threadedSendUpdates(update chan struct{}, subscriber modules.ConsensusSetSubscriber) {
-	i := 0
-	for {
-		id := cs.mu.RLock()
-		updateCount := len(cs.changeLog)
-		cs.mu.RUnlock(id)
-		for i < updateCount {
-			// Build the consensus change that occured at the current index.
-			id := cs.mu.RLock()
-			cc, err := cs.computeConsensusChange(i)
-			if build.DEBUG && err != nil {
-				panic("error returned when querying consensus change log")
-			}
-			cs.mu.RUnlock(id)
-
-			// Update the subscriber with the changes.
-			subscriber.ReceiveConsensusSetUpdate(cc)
-			i++
-		}
-
-		// Wait until there has been another update.
-		<-update
-	}
-}
-
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
 func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
-	// Sanity check - len(appliedNodes) should never be 0.
-	if build.DEBUG {
-		if len(appliedNodes) == 0 {
-			panic("cannot have len(appliedNodes) = 0 in consensus set - blockchain must always get heavier")
-		}
-	}
-
 	// Log the changes in the change log.
 	var ce changeEntry
 	for _, rn := range revertedNodes {
@@ -149,41 +104,36 @@ func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNod
 	cs.changeLog = append(cs.changeLog, ce)
 
 	// Notify each update channel that a new update is ready.
-	for _, subscriber := range cs.subscriptions {
-		// If the channel is already full, don't block.
-		select {
-		case subscriber <- struct{}{}:
-		default:
-		}
+	cc, err := cs.computeConsensusChange(len(cs.changeLog) - 1)
+	if err != nil && build.DEBUG {
+		panic(err)
+	}
+	for _, subscriber := range cs.subscribers {
+		subscriber.ProcessConsensusChange(cc)
 	}
 }
 
 // ConsensusChange returns the consensus change that occured at index 'i',
-// returning an error if the input is out of bounds.
+// returning an error if the input is out of bounds. For example,
+// ConsensusChange(5) will return the 6th consensus change that was issued to
+// subscribers. ConsensusChanges can be assumed to be consecutive.
 func (cs *ConsensusSet) ConsensusChange(i int) (modules.ConsensusChange, error) {
 	id := cs.mu.RLock()
 	defer cs.mu.RUnlock(id)
 	return cs.computeConsensusChange(i)
 }
 
-// ConsensusSetNotify returns a channel that will be sent an empty struct every
-// time the consensus set changes.
-func (cs *ConsensusSet) ConsensusSetNotify() <-chan struct{} {
-	c := make(chan struct{}, modules.NotifyBuffer)
-	c <- struct{}{} // Notify subscriber about the genesis block.
-	id := cs.mu.Lock()
-	cs.subscriptions = append(cs.subscriptions, c)
-	cs.mu.Unlock(id)
-	return c
-}
-
 // ConsensusSetSubscribe accepts a new subscriber who will receive a call to
-// ReceiveConsensusSetUpdate every time there is a change in the consensus set.
+// ProcessConsensusChange every time there is a change in the consensus set.
 func (cs *ConsensusSet) ConsensusSetSubscribe(subscriber modules.ConsensusSetSubscriber) {
-	c := make(chan struct{}, modules.NotifyBuffer)
-	c <- struct{}{} // Notify subscriber about the genesis block.
 	id := cs.mu.Lock()
-	cs.subscriptions = append(cs.subscriptions, c)
+	cs.subscribers = append(cs.subscribers, subscriber)
+	for i := range cs.changeLog {
+		cc, err := cs.computeConsensusChange(i)
+		if err != nil && build.DEBUG {
+			panic(err)
+		}
+		subscriber.ProcessConsensusChange(cc)
+	}
 	cs.mu.Unlock(id)
-	go cs.threadedSendUpdates(c, subscriber)
 }

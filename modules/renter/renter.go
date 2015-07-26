@@ -28,8 +28,6 @@ type Renter struct {
 	downloadQueue []*Download
 	saveDir       string
 
-	subscriptions []chan struct{}
-
 	mu *sync.RWMutex
 }
 

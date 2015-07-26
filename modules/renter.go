@@ -107,10 +107,6 @@ type Renter interface {
 	// Rename changes the nickname of a file.
 	RenameFile(currentName, newName string) error
 
-	// RenterNotify will push a struct down the channel every time it receives
-	// an update.
-	RenterNotify() <-chan struct{}
-
 	// ShareFiles creates a '.sia' file that can be shared with others, so that
 	// they may download files which they have not uploaded.
 	ShareFiles(nicknames []string, sharedest string) error

@@ -20,66 +20,13 @@ type walletTester struct {
 	miner  modules.Miner
 	wallet *Wallet
 
-	csUpdateChan     <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	persistDir string
-}
-
-// sendCoins sends the desired amount of coins to the desired address, calling
-// wait at all of the appropriate places to assist synchronization.
-func (wt *walletTester) sendCoins(amount types.Currency, dest types.UnlockHash) (types.Transaction, error) {
-	output := types.SiacoinOutput{
-		Value:      amount,
-		UnlockHash: dest,
-	}
-	id, err := wt.wallet.RegisterTransaction(types.Transaction{})
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	_, err = wt.wallet.FundTransaction(id, amount)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	wt.tpUpdateWait()
-	_, _, err = wt.wallet.AddSiacoinOutput(id, output)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	txn, err := wt.wallet.SignTransaction(id, true)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	err = wt.tpool.AcceptTransaction(txn)
-	if err != nil {
-		return types.Transaction{}, err
-	}
-	wt.tpUpdateWait()
-	return txn, nil
-}
-
-// csUpdateWait should be called any time that an update is pushed from the
-// consensus package. This will keep all of the modules synchronized.
-func (wt *walletTester) csUpdateWait() {
-	<-wt.csUpdateChan
-	wt.tpUpdateWait()
-}
-
-// tpUpdateWait should be called any time an update is pushed from the
-// transaction pool. This will keep all of the modules synchronized.
-func (wt *walletTester) tpUpdateWait() {
-	<-wt.tpoolUpdateChan
-	<-wt.minerUpdateChan
-	<-wt.walletUpdateChan
 }
 
 // createWalletTester takes a testing.T and creates a WalletTester.
 func createWalletTester(name string) (*walletTester, error) {
-	testdir := build.TempDir("wallet", name)
-
 	// Create the modules
+	testdir := build.TempDir(modules.WalletDir, name)
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		return nil, err
@@ -108,14 +55,8 @@ func createWalletTester(name string) (*walletTester, error) {
 		miner:  m,
 		wallet: w,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		persistDir: testdir,
 	}
-	wt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -124,8 +65,6 @@ func createWalletTester(name string) (*walletTester, error) {
 		if err != nil {
 			return nil, err
 		}
-		wt.csUpdateWait()
 	}
-
 	return wt, nil
 }
