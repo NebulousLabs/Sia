@@ -4,9 +4,9 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// ReceiveConsensusSetUpdate gets called by the consensus set every time there
-// is a change to the blockchain.
-func (srv *Server) ReceiveConsensusSetUpdate(cc modules.ConsensusChange) {
+// ProcessConsensusChange gets called by the consensus set every time there is
+// a change to the blockchain.
+func (srv *Server) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := srv.mu.Lock()
 	defer srv.mu.Unlock(lockID)
 

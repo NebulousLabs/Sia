@@ -8,30 +8,41 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// Try to add a transaction that is too large to the transaction pool.
-func TestLargeTransaction(t *testing.T) {
-	tpt := newTpoolTester("TestLargeTransaction", t)
-
-	// Create a transaction that's larger than the size limit.
-	largeArbitraryData := make([]byte, modules.TransactionSizeLimit)
-	rand.Read(largeArbitraryData)
-	acceptableData := append(modules.PrefixNonSia[:], largeArbitraryData...)
-	txn := types.Transaction{
-		ArbitraryData: [][]byte{acceptableData},
+// TestIntegrationLargeTransactions tries to add a large transaction to the
+// transaction pool.
+func TestIntegrationLargeTransactions(t *testing.T) {
+	tpt, err := createTpoolTester("TestIntegrationLargeTransaction")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Check IsStandard.
-	err := tpt.tpool.IsStandardTransaction(txn)
-	if err != ErrLargeTransaction {
-		t.Error("expecting errLargeTransaction, got:", err)
+	// Create a large transaction and try to get it accepted.
+	arbData := make([]byte, modules.TransactionSizeLimit)
+	copy(arbData, modules.PrefixNonSia[:])
+	_, err = rand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn := types.Transaction{ArbitraryData: [][]byte{arbData}}
+	err = tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+	if err != modules.ErrLargeTransaction {
+		t.Fatal(err)
 	}
 
-	// Check that transaction is rejected when calling 'accept'.
-	err = tpt.tpool.AcceptTransaction(txn)
-	if err != ErrLargeTransaction {
-		t.Error("expecting errLargeTransaction, got:", err)
+	// Create a large transaction set and try to get it accepted.
+	var tset []types.Transaction
+	for i := 0; i <= modules.TransactionSetSizeLimit/10e3; i++ {
+		arbData := make([]byte, 10e3)
+		copy(arbData, modules.PrefixNonSia[:])
+		_, err = rand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
+		if err != nil {
+			t.Fatal(err)
+		}
+		txn := types.Transaction{ArbitraryData: [][]byte{arbData}}
+		tset = append(tset, txn)
 	}
-	if len(tpt.tpool.TransactionSet()) != 0 {
-		t.Error("tpool is not empty after accepting a bad transaction")
+	err = tpt.tpool.AcceptTransactionSet(tset)
+	if err != modules.ErrLargeTransactionSet {
+		t.Fatal(err)
 	}
 }

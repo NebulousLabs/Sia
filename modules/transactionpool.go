@@ -7,36 +7,45 @@ import (
 )
 
 const (
-	TransactionSizeLimit = 16 * 1024
+	TransactionSizeLimit    = 16e3
+	TransactionSetSizeLimit = 100e3
 )
 
 var (
-	// ErrTransactionPoolDuplicate is returned when a duplicate transaction is
-	// submitted to the transaction pool.
-	ErrTransactionPoolDuplicate = errors.New("transaction is a duplicate")
-	ErrInvalidArbPrefix         = errors.New("transaction contains non-standard arbitrary data")
+	ErrDuplicateTransactionSet = errors.New("transaction is a duplicate")
+	ErrLargeTransaction        = errors.New("transaction is too large for this transaction pool")
+	ErrLargeTransactionSet     = errors.New("transaction set is too large for this transaction pool")
+	ErrInvalidArbPrefix        = errors.New("transaction contains non-standard arbitrary data")
 
 	PrefixNonSia    = types.Specifier{'N', 'o', 'n', 'S', 'i', 'a'}
 	PrefixStrNonSia = "NonSia" // COMPATv0.3.3.3
+
+	TransactionPoolDir = "transactionpool"
 )
 
 // A TransactionPoolSubscriber receives updates about the confirmed and
 // unconfirmed set from the transaction pool. Generally, there is no need to
 // subscribe to both the consensus set and the transaction pool.
 type TransactionPoolSubscriber interface {
+	// All transaction pool subscribers must also be able to receive consensus
+	// set updates.
+	ConsensusSetSubscriber
+
 	// ReceiveTransactionPoolUpdate notifies subscribers of a change to the
-	// consensus set and/or unconfirmed set.
-	ReceiveTransactionPoolUpdate(cc ConsensusChange, unconfirmedTransactions []types.Transaction, unconfirmedSiacoinOutputDiffs []SiacoinOutputDiff)
+	// consensus set and/or unconfirmed set, and includes the consensus change
+	// that would result if all of the transactions made it into a block.
+	ReceiveUpdatedUnconfirmedTransactions([]types.Transaction, ConsensusChange)
 }
 
+// A TransactionPool manages unconfirmed transactions.
 type TransactionPool interface {
-	// AcceptTransaction takes a transaction, analyzes it, and either rejects
-	// it or adds it to the transaction pool. Accepted transactions will be
-	// relayed to connected peers.
-	AcceptTransaction(types.Transaction) error
+	// AcceptTransactionSet accepts a set of potentially interdependent
+	// transactions.
+	AcceptTransactionSet([]types.Transaction) error
 
-	// RelayTransaction is an RPC that accepts a block from a peer.
-	RelayTransaction(PeerConn) error
+	// RelayTransactionSet is an RPC that accepts a transaction set from a
+	// peer.
+	RelayTransactionSet(PeerConn) error
 
 	// IsStandardTransaction returns `err = nil` if the transaction is
 	// standard, otherwise it returns an error explaining what is not standard.
@@ -49,15 +58,13 @@ type TransactionPool interface {
 	// that make this condition necessary.
 	PurgeTransactionPool()
 
-	// TransactionSet returns the set of unconfirmed transactions.
-	TransactionSet() []types.Transaction
+	// TransactionList returns a list of all transactions in the transaction
+	// pool. The transactions are provided in an order that can acceptably be
+	// put into a block.
+	TransactionList() []types.Transaction
 
-	// TransactionPoolNotify will push a struct down the channel any time that
-	// the transaction pool updates. An update occurs any time there is a new
-	// transaction or block introduced to the transaction pool.
-	TransactionPoolNotify() <-chan struct{}
-
-	// TransactionPoolSubscribe will subscribe the input object to the changes
-	// in the transaction pool.
+	// TransactionPoolSubscribe adds a subscriber to the transaction pool.
+	// Subscribers will receive all consensus set changes as well as
+	// transaction pool changes, and should not subscribe to both.
 	TransactionPoolSubscribe(TransactionPoolSubscriber)
 }

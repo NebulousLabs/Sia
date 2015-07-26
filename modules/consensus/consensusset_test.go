@@ -25,26 +25,6 @@ type consensusSetTester struct {
 	cs *ConsensusSet
 
 	persistDir string
-
-	csUpdateChan     <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-}
-
-// csUpdateWait blocks until an update to the consensus set has propagated to
-// all modules.
-func (cst *consensusSetTester) csUpdateWait() {
-	<-cst.csUpdateChan
-	cst.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until an update to the transaction pool has propagated
-// to all modules.
-func (cst *consensusSetTester) tpUpdateWait() {
-	<-cst.tpoolUpdateChan
-	<-cst.minerUpdateChan
-	<-cst.walletUpdateChan
 }
 
 // createConsensusSetTester creates a consensusSetTester that's ready for use.
@@ -83,13 +63,7 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 		cs: cs,
 
 		persistDir: testdir,
-
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		walletUpdateChan: w.WalletNotify(),
 	}
-	cst.csUpdateWait()
 
 	// Mine until the wallet has money.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -98,7 +72,6 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 		if err != nil {
 			return nil, err
 		}
-		cst.csUpdateWait()
 	}
 	return cst, nil
 }

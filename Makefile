@@ -77,10 +77,26 @@ test-v: clean fmt REBUILD
 	go test -race -v -short -tags='debug testing' -timeout=15s $(pkgs)
 test-long: clean fmt REBUILD
 	go test -v -race -tags='testing debug' -timeout=180s $(pkgs)
+bench: clean fmt REBUILD
+	go test -tags='testing' -timeout=120s -run=XXX -bench=. $(pkgs)
 cover: clean REBUILD
 	@mkdir -p cover/modules
 	@for package in $(pkgs); do                                                                                     \
 		go test -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
+		&& rm cover/$$package.out ;                                                                                 \
+	done
+cover-integration: clean REBUILD
+	@mkdir -p cover/modules
+	@for package in $(pkgs); do                                                                                     \
+		go test -run=TestIntegration -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
+		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
+		&& rm cover/$$package.out ;                                                                                 \
+	done
+cover-unit: clean REBUILD
+	@mkdir -p cover/modules
+	@for package in $(pkgs); do                                                                                     \
+		go test -run=TestUnit -tags='testing debug' -timeout=180s -covermode=atomic -coverprofile=cover/$$package.out ./$$package \
 		&& go tool cover -html=cover/$$package.out -o=cover/$$package.html                                          \
 		&& rm cover/$$package.out ;                                                                                 \
 	done

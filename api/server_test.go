@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -45,32 +46,7 @@ type serverTester struct {
 
 	server *Server
 
-	csUpdateChan     <-chan struct{}
-	hostUpdateChan   <-chan struct{}
-	hostdbUpdateChan <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	renterUpdateChan <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWait blocks until an update from the consensus set has propagated to
-// all modules.
-func (st *serverTester) csUpdateWait() {
-	<-st.csUpdateChan
-	<-st.hostUpdateChan
-	<-st.renterUpdateChan
-	st.tpUpdateWait()
-}
-
-// tpUpdateWait blocks until and update from the transaction pool has
-// propagated too all modules.
-func (st *serverTester) tpUpdateWait() {
-	<-st.tpoolUpdateChan
-	<-st.minerUpdateChan
-	<-st.walletUpdateChan
 }
 
 // newServerTester creates a server tester object that is ready for testing,
@@ -137,17 +113,8 @@ func newServerTester(name string, t *testing.T) *serverTester {
 
 		server: srv,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		hostUpdateChan:   h.HostNotify(),
-		hostdbUpdateChan: hdb.HostDBNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		renterUpdateChan: r.RenterNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	st.csUpdateWait()
 
 	// TODO: A more reasonable way of listening for server errors.
 	go func() {
@@ -164,7 +131,6 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		st.csUpdateWait()
 	}
 
 	return st
@@ -184,37 +150,48 @@ func (st *serverTester) coinAddress() string {
 	return addr.Address
 }
 
-// get wraps a GET request with a status code check, such that if the GET does
-// not return 200, the error will be read and returned. The response body is
-// not closed.
-func (st *serverTester) get(call string) (resp *http.Response) {
+// getAPI makes an API call and decodes the response.
+func (st *serverTester) getAPI(call string, obj interface{}) error {
 	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
 	if err != nil {
-		st.t.Fatalf("GET %s failed: %v", call, err)
+		return err
 	}
-	// check error code
-	if resp.StatusCode != http.StatusOK {
-		errResp, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		st.t.Fatalf("GET %s returned error %v: %s", call, resp.StatusCode, errResp)
-	}
-	return
-}
-
-// getAPI makes an API call and decodes the response.
-func (st *serverTester) getAPI(call string, obj interface{}) {
-	resp := st.get(call)
 	defer resp.Body.Close()
-	err := json.NewDecoder(resp.Body).Decode(obj)
-	if err != nil {
-		st.t.Fatalf("Could not decode API response: %s", call)
+
+	// Check for a call error.
+	if resp.StatusCode != http.StatusOK {
+		respErr, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(respErr))
 	}
-	return
+
+	// Decode the response into 'obj'.
+	err = json.NewDecoder(resp.Body).Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // callAPI makes an API call and discards the response.
-func (st *serverTester) callAPI(call string) {
-	st.get(call).Body.Close()
+func (st *serverTester) callAPI(call string) error {
+	resp, err := http.Get("http://localhost" + st.server.apiServer.Addr + call)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check for a call error.
+	if resp.StatusCode != http.StatusOK {
+		respErr, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(string(respErr))
+	}
+	return nil
 }
 
 // TestCreateServer creates a serverTester and immediately stops it.

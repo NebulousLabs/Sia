@@ -243,23 +243,32 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 	return nil
 }
 
-// TryTransactions applies the input transactions to the consensus set to
+// TryTransactionSet applies the input transactions to the consensus set to
 // determine if they are valid. An error is returned IFF they are not a valid
 // set in the current consensus set. The size of the transactions and the set
-// is not checked.
-func (cs *ConsensusSet) TryTransactions(txns []types.Transaction) error {
+// is not checked. After the transactions have been validated, a consensus
+// change is returned detailing the diffs that the transaciton set would have.
+func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
 	diffHolder := new(blockNode)
+	diffHolder.height = cs.height()
 	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)
 		if err != nil {
-			return err
+			return modules.ConsensusChange{}, err
 		}
 		cs.applyTransaction(diffHolder, txn)
 	}
-	return nil
+	cc := modules.ConsensusChange{
+		SiacoinOutputDiffs:        diffHolder.siacoinOutputDiffs,
+		FileContractDiffs:         diffHolder.fileContractDiffs,
+		SiafundOutputDiffs:        diffHolder.siafundOutputDiffs,
+		DelayedSiacoinOutputDiffs: diffHolder.delayedSiacoinOutputDiffs,
+		SiafundPoolDiffs:          diffHolder.siafundPoolDiffs,
+	}
+	return cc, nil
 }

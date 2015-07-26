@@ -11,6 +11,8 @@ Transaction Size
 Consensus rules limit the size of a block, but not the size of a transaction.
 Standard rules however limit the size of a single transaction to 16kb.
 
+A chain of dependent transactions cannot exceed 500kb.
+
 Double Spend Rules
 ------------------
 

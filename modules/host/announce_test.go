@@ -18,12 +18,11 @@ func TestAnnouncement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ht.tpUpdateWait()
 
 	// Check that the announcement made it into the transaction pool correctly.
-	txns := ht.tpool.TransactionSet()
+	txns := ht.tpool.TransactionList()
 	if len(txns) != 1 {
-		t.Error("Expecting 1 transaction in transaction pool, instead there was", len(txns))
+		t.Fatal("Expecting 1 transaction in transaction pool, instead there was", len(txns))
 	}
 	encodedAnnouncement := txns[0].ArbitraryData[0][types.SpecifierLen:]
 	var ha modules.HostAnnouncement

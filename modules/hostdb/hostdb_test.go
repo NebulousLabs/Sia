@@ -18,12 +18,6 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// hdbTester is used during testing to initialize a hostdb and useful helper
-// modules, and helps to keep them all synchronized. The update channels are
-// used for this synchronization. Any time that an update is submitted to the
-// consensus set, consensusUpdateWait should be called. Any time that an update
-// is submitted to the transaction pool (such as a new transaction),
-// tpoolUpdateWait should be called.
 type hdbTester struct {
 	cs      *consensus.ConsensusSet
 	gateway modules.Gateway
@@ -34,34 +28,7 @@ type hdbTester struct {
 
 	hostdb *HostDB
 
-	csUpdateChan     <-chan struct{}
-	hostUpdateChan   <-chan struct{}
-	hostdbUpdateChan <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWait listens on all channels until a consensus set update has
-// reached all modules. csUpdateWait should be called every time that there is
-// an update to the consensus set (typically only when there is a new block),
-// this will keep all of the modules in the hostdb synchronized.
-func (hdbt *hdbTester) csUpdateWait() {
-	<-hdbt.csUpdateChan
-	<-hdbt.hostdbUpdateChan
-	<-hdbt.hostUpdateChan
-	hdbt.tpUpdateWait()
-}
-
-// tpUpdateWait listens on all channels until a transaction pool update has
-// reached all modules. tpUpdateWait should be called any time that an update
-// is pushed to the transaction pool.
-func (hdbt *hdbTester) tpUpdateWait() {
-	<-hdbt.tpoolUpdateChan
-	<-hdbt.minerUpdateChan
-	<-hdbt.walletUpdateChan
 }
 
 // newHDBTester returns a ready-to-use hdb tester, with all modules
@@ -122,16 +89,8 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 
 		hostdb: hdb,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		hostUpdateChan:   h.HostNotify(),
-		hostdbUpdateChan: hdb.HostDBNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	hdbt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -140,7 +99,6 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		hdbt.csUpdateWait()
 	}
 
 	// TODO: Reconsider the way that the RPC's happen.

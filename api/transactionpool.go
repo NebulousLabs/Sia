@@ -7,5 +7,5 @@ import (
 // transactionpoolTransactionsHandler handles the API call to get the
 // transaction pool trasactions.
 func (srv *Server) transactionpoolTransactionsHandler(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, srv.tpool.TransactionSet())
+	writeJSON(w, srv.tpool.TransactionList())
 }

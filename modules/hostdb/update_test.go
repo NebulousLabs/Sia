@@ -49,23 +49,16 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	announcement := encoding.Marshal(modules.HostAnnouncement{
 		IPAddress: hdbt.gateway.Address(),
 	})
-	id, err := hdbt.wallet.RegisterTransaction(types.Transaction{})
+	txnBuilder := hdbt.wallet.StartTransaction()
+	txnBuilder.AddArbitraryData(append(modules.PrefixHostAnnouncement[:], announcement...))
+	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = hdbt.wallet.AddArbitraryData(id, append(modules.PrefixHostAnnouncement[:], announcement...))
+	err = hdbt.tpool.AcceptTransactionSet(txnSet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn, err := hdbt.wallet.SignTransaction(id, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = hdbt.tpool.AcceptTransaction(txn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hdbt.tpUpdateWait()
 
 	// Check that, prior to mining, the hostdb has no hosts.
 	if len(hdbt.hostdb.allHosts) != 0 {
@@ -78,7 +71,6 @@ func TestReceiveConsensusSetUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hdbt.csUpdateWait()
 
 	// Check that there is now a host in the hostdb.
 	if len(hdbt.hostdb.allHosts) != 1 {

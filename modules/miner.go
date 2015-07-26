@@ -66,8 +66,4 @@ type Miner interface {
 	// BlocksMined returns the number of blocks and stale blocks that have been
 	// mined using this miner.
 	BlocksMined() (goodBlocks, staleBlocks int)
-
-	// MinerNotify is a channel to inform subscribers of when the miner has
-	// updated. This is primarily used for synchronization during testing.
-	MinerNotify() <-chan struct{}
 }

@@ -25,31 +25,7 @@ type renterTester struct {
 
 	renter *Renter
 
-	csUpdateChan     <-chan struct{}
-	hostdbUpdateChan <-chan struct{}
-	minerUpdateChan  <-chan struct{}
-	renterUpdateChan <-chan struct{}
-	tpoolUpdateChan  <-chan struct{}
-	walletUpdateChan <-chan struct{}
-
 	t *testing.T
-}
-
-// csUpdateWiat waits until a consensus set update has propagated to all
-// modules.
-func (rt *renterTester) csUpdateWait() {
-	<-rt.csUpdateChan
-	<-rt.hostdbUpdateChan
-	<-rt.renterUpdateChan
-	rt.tpUpdateWait()
-}
-
-// tpUpdateWait waits until a transaction pool update has propagated to all
-// modules.
-func (rt *renterTester) tpUpdateWait() {
-	<-rt.tpoolUpdateChan
-	<-rt.minerUpdateChan
-	<-rt.walletUpdateChan
 }
 
 // newRenterTester creates a ready-to-use renter tester with money in the
@@ -109,16 +85,8 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 
 		renter: r,
 
-		csUpdateChan:     cs.ConsensusSetNotify(),
-		hostdbUpdateChan: hdb.HostDBNotify(),
-		renterUpdateChan: r.RenterNotify(),
-		tpoolUpdateChan:  tp.TransactionPoolNotify(),
-		minerUpdateChan:  m.MinerNotify(),
-		walletUpdateChan: w.WalletNotify(),
-
 		t: t,
 	}
-	rt.csUpdateWait()
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
@@ -127,7 +95,6 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rt.csUpdateWait()
 	}
 	return rt
 }

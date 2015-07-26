@@ -4,133 +4,146 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// addSiacoinTransactionToPool creates a transaction with siacoin outputs and
-// adds them to the pool, returning the transaction.
-func (tpt *tpoolTester) addSiacoinTransactionToPool() (txn types.Transaction) {
-	// sendCoins will automatically add transaction(s) to the transaction pool.
-	// They will contain siacoin output(s).
-	txn, err := tpt.sendCoins(types.NewCurrency64(1), types.ZeroUnlockHash)
+// TestIntegrationAcceptTransactionSet probes the AcceptTransactionSet method
+// of the transaction pool.
+func TestIntegrationAcceptTransactionSet(t *testing.T) {
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester("TestIntegrationAcceptTransactionSet")
 	if err != nil {
-		tpt.t.Fatal(err)
+		t.Fatal(err)
 	}
 
-	return
-}
+	// Check that the transaction pool is empty.
+	if len(tpt.tpool.transactionSets) != 0 {
+		t.Error("transaction pool is not empty")
+	}
 
-// addDependentSiacoinTransactionToPool adds a transaction to the pool with a
-// siacoin output, and then adds a second transaction to the pool that requires
-// the unconfirmed siacoin output.
-func (tpt *tpoolTester) addDependentSiacoinTransactionToPool() (firstTxn, dependentTxn types.Transaction) {
-	// Get an address to receive coins.
-	addr, _, err := tpt.wallet.CoinAddress(false) // false means hide the address from the user; doesn't matter for test.
+	// Create a valid transaction set using the wallet.
+	txns, err := tpt.wallet.SendCoins(types.NewCurrency64(100), types.UnlockHash{})
 	if err != nil {
-		tpt.t.Fatal(err)
+		t.Fatal(err)
+	}
+	if len(tpt.tpool.transactionSets) != 1 {
+		t.Error("sending coins did not increase the transaction sets by 1")
 	}
 
-	// sendCoins will automatically add transaction(s) to the transaction
-	// pool. They will contain siacoin output(s). We send all of our coins to
-	// ourself to guarantee that the next transaction will depend on an
-	// existing unconfirmed transaction.
-	balance := tpt.wallet.Balance(false)
-	firstTxn, err = tpt.sendCoins(balance, addr)
+	// Submit the transaction set again to trigger a duplication error.
+	err = tpt.tpool.AcceptTransactionSet(txns)
+	if err != modules.ErrDuplicateTransactionSet {
+		t.Error(err)
+	}
+
+	// Mine a block and check that the transaction pool gets emptied.
+	block, _ := tpt.miner.FindBlock()
+	err = tpt.cs.AcceptBlock(block)
 	if err != nil {
-		tpt.t.Fatal(err)
+		t.Fatal(err)
+	}
+	if len(tpt.tpool.TransactionList()) != 0 {
+		t.Error("transaction pool was not emptied after mining a block")
 	}
 
-	// Send the full balance to ourselves again. The second transaction will
-	// necesarily require the first transaction as a dependency, since we're
-	// sending all of the coins again.
-	dependentTxn, err = tpt.sendCoins(balance, addr)
+	// Try to resubmit the transaction set to verify
+	err = tpt.tpool.AcceptTransactionSet(txns)
+	if err == nil {
+		t.Error("transaction set was supposed to be rejected")
+	}
+}
+
+// TestIntegrationConflictingTransactionSets tries to add two transaction sets
+// to the transaction pool that are each legal individually, but double spend
+// an output.
+func TestIntegrationConflictingTransactionSets(t *testing.T) {
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester("TestIntegrationConflictingTransactionSets")
 	if err != nil {
-		tpt.t.Fatal(err)
+		t.Fatal(err)
 	}
 
-	return
-}
-
-// TestAddSiacoinTransactionToPool creates a tpoolTester and uses it to call
-// addSiacoinTransactionToPool.
-func TestAddSiacoinTransactionToPool(t *testing.T) {
-	tpt := newTpoolTester("TestAddSiacoinTransactionToPool", t)
-	tpt.addSiacoinTransactionToPool()
-}
-
-// TestAddDependentSiacoinTransactionToPool creates a tpoolTester and uses it
-// to cal addDependentSiacoinTransactionToPool.
-func TestAddDependentSiacoinTransactionToPool(t *testing.T) {
-	tpt := newTpoolTester("TestAddDependentSiacoinTransactionToPool", t)
-	tpt.addDependentSiacoinTransactionToPool()
-}
-
-// TestDuplicateTransaction checks that a duplicate transaction error is
-// triggered when duplicate transactions are added to the transaction pool.
-// This test won't be needed after the duplication prevention mechanism is
-// removed, and that will be removed after fees are required in all
-// transactions submitted to the pool.
-func TestDuplicateTransaction(t *testing.T) {
-	tpt := newTpoolTester("TestDuplicateTransaction", t)
-	txn := tpt.addSiacoinTransactionToPool()
-	err := tpt.tpool.AcceptTransaction(txn)
-	if err != modules.ErrTransactionPoolDuplicate {
-		t.Fatal("expecting ErrTransactionPoolDuplicate got:", err)
+	// Fund a partial transaction.
+	fund := types.NewCurrency64(30e6)
+	txnBuilder := tpt.wallet.StartTransaction()
+	err = txnBuilder.FundSiacoins(fund)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
+	// wholeTransaction is set to false so that we can use the same signature
+	// to create a double spend.
+	txnSet, err := txnBuilder.Sign(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txnSetDoubleSpend := make([]types.Transaction, len(txnSet))
+	copy(txnSetDoubleSpend, txnSet)
 
-/* TODO: Implement wallet fee adding to test ErrLargeTransactionPool
-func TestLargePoolTransaction(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
+	// There are now two sets of transactions that are signed and ready to
+	// spend the same output. Have one spend the money in a miner fee, and the
+	// other create a siacoin output.
+	txnIndex := len(txnSet) - 1
+	txnSet[txnIndex].MinerFees = append(txnSet[txnIndex].MinerFees, fund)
+	txnSetDoubleSpend[txnIndex].SiacoinOutputs = append(txnSetDoubleSpend[txnIndex].SiacoinOutputs, types.SiacoinOutput{Value: fund})
+
+	// Add the first and then the second txn set.
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		t.Error(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSetDoubleSpend)
+	if err != errObjectConflict {
+		t.Error(err)
 	}
 
-	tpt := newTpoolTester("TestLargePoolTransaction", t)
-	// Needed: for loop to add Transactions until transactionPoolSize = 60 MB?
-	txn := tpt.addSiacoinTransactionToPool()
-
-	// Test the transaction that should be rejected at >60 MB
-	err := tpt.tpool.AcceptTransaction(txn)
-	if err != ErrLargeTransactionPool {
-		t.Fatal("expecting ErrLargeTransactionPool got:", err)
+	// Purge and try the sets in the reverse order.
+	tpt.tpool.PurgeTransactionPool()
+	err = tpt.tpool.AcceptTransactionSet(txnSetDoubleSpend)
+	if err != nil {
+		t.Error(err)
+	}
+	err = tpt.tpool.AcceptTransactionSet(txnSet)
+	if err != errObjectConflict {
+		t.Error(err)
 	}
 }
-*/
 
-func TestLowFeeTransaction(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
+// TestIntegrationCheckMinerFees probes the checkMinerFees method of the
+// transaction pool.
+func TestIntegrationCheckMinerFees(t *testing.T) {
+	// Create a transaction pool tester.
+	tpt, err := createTpoolTester("TestIntegrationCheckMinerFees")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Initialize variables to populate transaction pool
-	tpt := newTpoolTester("TestLowFeeTransaction", t)
-	emptyData := make([]byte, 15e3-16)
-	randData := make([]byte, 16) // not yet random
-	emptyTxn := types.Transaction{
-		ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], (append(emptyData, randData...))...)},
-	}
-	transSize := len(encoding.Marshal(emptyTxn))
-
-	// Fill it to 20 MB
-	for i := 0; i <= (TransactionPoolSizeForFee / transSize); i++ {
-		// Make a unique transaction to accept
-		rand.Read(randData)
-		uniqueTxn := types.Transaction{
-			ArbitraryData: [][]byte{append(modules.PrefixNonSia[:], append(emptyData, randData...)...)},
-		}
-
-		// Accept said transaction
-		err := tpt.tpool.AcceptTransaction(uniqueTxn)
+	// Fill the transaction pool to the fee limit.
+	for i := 0; i < TransactionPoolSizeForFee/10e3; i++ {
+		arbData := make([]byte, 10e3)
+		copy(arbData, modules.PrefixNonSia[:])
+		_, err = rand.Read(arbData[100:116]) // prevents collisions with other transacitons in the loop.
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
+		}
+		txn := types.Transaction{ArbitraryData: [][]byte{arbData}}
+		err := tpt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
-	// Should be the straw to break the camel's back (i.e. the transaction at >20 MB)
-	err := tpt.tpool.AcceptTransaction(emptyTxn)
-	if err != ErrLowMinerFees {
-		t.Fatal("expecting ErrLowMinerFees got:", err)
+	// Add another transaction, this one should fail for having too few fees.
+	err = tpt.tpool.AcceptTransactionSet([]types.Transaction{{}})
+	if err != errLowMinerFees {
+		t.Error(err)
 	}
+
+	// Add a transaction that has sufficient fees.
+	_, err = tpt.wallet.SendCoins(types.NewCurrency64(100), types.UnlockHash{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// TODO: fill the pool up all the way and try again.
 }

@@ -56,8 +56,6 @@ type HostDB struct {
 	// scan.
 	scanPool chan *hostEntry
 
-	subscribers []chan struct{}
-
 	mu *sync.RWMutex
 }
 
