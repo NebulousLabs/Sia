@@ -76,6 +76,9 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/miner/submitblock", srv.minerSubmitblockHandler)
 		handleHTTPRequest(mux, "/miner/headerforwork", srv.minerHeaderforworkHandler)
 		handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
+		handleHTTPRequest(mux, "/miner/connecttopool", srv.minerConnectToPoolHandler)
+		handleHTTPRequest(mux, "/miner/poolheaderforwork", srv.minerPoolHeaderForWorkHandler)
+		handleHTTPRequest(mux, "/miner/submitpoolheader", srv.minerSubmitPoolHeaderHandler)
 	}
 
 	// Renter API Calls

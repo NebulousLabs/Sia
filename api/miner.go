@@ -98,3 +98,53 @@ func (srv *Server) minerSubmitheaderHandler(w http.ResponseWriter, req *http.Req
 	}
 	writeSuccess(w)
 }
+
+// minerConnectToPoolHandler handles the API call to connect to a mining pool
+func (srv *Server) minerConnectToPoolHandler(w http.ResponseWriter, req *http.Request) {
+	var ip string
+	encodedIP, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = encoding.Unmarshal(encodedIP, &ip)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.miner.ConnectToPool(ip)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// minerPoolHeaderForWorkHandler handles the API call to request a header
+// from the miner for pool ming
+func (srv *Server) minerPoolHeaderForWorkHandler(w http.ResponseWriter, req *http.Request) {
+	bhfw, target := srv.miner.PoolHeaderForWork()
+	w.Write(encoding.MarshalAll(target, bhfw))
+}
+
+// minerSubmitPoolHeaderHandler handles the API call to submit a header to
+// the miner
+func (srv *Server) minerSubmitPoolHeaderHandler(w http.ResponseWriter, req *http.Request) {
+	var bh types.BlockHeader
+	encodedHeader, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = encoding.Unmarshal(encodedHeader, &bh)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = srv.miner.SubmitPoolHeader(bh)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
