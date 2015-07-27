@@ -61,21 +61,23 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// The state cannot be easily reverted to a point where the
 	// consensusSetHash can be re-made. Load from disk instead
-	pb, err := cs.db.getBlockMap(bid)
-	if err != nil {
-		return err
-	}
+	pb := cs.db.getBlockMap(bid)
+
 	cs.blockRoot.consensusSetHash = pb.ConsensusSetHash
 	// Explicit initilization preferred to implicit
 	cs.blocksLoaded = 0
 
+	return nil
+}
+
+// loadDiffs is a transitional function to load the processed blocks
+// from disk and move the diffs into memory
+func (cs *ConsensusSet) loadDiffs() {
+	height := cs.db.pathHeight()
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
-		pb, err := cs.db.getBlockMap(bid)
-		if err != nil {
-			return err
-		}
+		pb := cs.db.getBlockMap(bid)
 		bn := cs.pbToBn(pb)
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
@@ -92,5 +94,4 @@ func (cs *ConsensusSet) load(saveDir string) error {
 		cs.updateSubscribers(nil, []*blockNode{&bn})
 		cs.mu.Unlock(lockID)
 	}
-	return nil
 }
