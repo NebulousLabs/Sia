@@ -10,7 +10,6 @@ import (
 	"errors"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -53,6 +52,12 @@ type ConsensusSet struct {
 	// current path from disk and true otherwise
 	updatePath bool // DEPRECATED
 
+	// blocksLoaded is the number of blocks that have been loaded
+	// from memory. This variable only exists while some
+	// structures are still in memory, and should always equal
+	// db.pathHeight after loading from disk
+	blocksLoaded types.BlockHeight // DEPRECATED
+
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *blockNode
 
@@ -62,9 +67,6 @@ type ConsensusSet struct {
 	// invalid.
 	blockMap  map[types.BlockID]*blockNode
 	dosBlocks map[types.BlockID]struct{}
-
-	// The currentPath is the longest known blockchain.
-	currentPath []types.BlockID
 
 	// These are the consensus variables. All nodes with the same current path
 	// will also have these variables matching.
@@ -129,8 +131,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		currentPath: make([]types.BlockID, 1),
-
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
@@ -160,7 +160,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
 
 	// Fill out the consensus information for the genesis block.
-	cs.currentPath[0] = genesisBlock.ID()
 	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
 		UnlockHash: types.ZeroUnlockHash,
@@ -178,9 +177,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
-	if build.DEBUG {
-		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
-	}
 
 	// Send out genesis block update.
 	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
@@ -197,6 +193,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
+	cs.updatePath = true
+
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
@@ -207,5 +205,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	lockID := cs.mu.Lock()
+	defer cs.mu.Unlock(lockID)
+	cs.db.open = false
 	return cs.db.Close()
 }

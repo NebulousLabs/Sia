@@ -36,7 +36,7 @@ type blockNode struct {
 	// prevents duplicate work from being performed.
 	//
 	// Note that diffsGenerated == true iff the node has ever been in the
-	// ConsensusSet's currentPath; this is because diffs must be generated to
+	// ConsensusSet's current path; this is because diffs must be generated to
 	// apply the node.
 	diffsGenerated            bool
 	siacoinOutputDiffs        []modules.SiacoinOutputDiff

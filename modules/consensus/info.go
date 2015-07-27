@@ -13,7 +13,7 @@ type ConsensusSetInfo struct {
 
 // currentBlockID returns the ID of the current block.
 func (cs *ConsensusSet) currentBlockID() types.BlockID {
-	return cs.currentPath[cs.height()]
+	return cs.db.getPath(cs.height())
 }
 
 // currentBlockNode returns the blockNode of the current block.
@@ -23,7 +23,7 @@ func (s *ConsensusSet) currentBlockNode() *blockNode {
 
 // height returns the current height of the state.
 func (s *ConsensusSet) height() types.BlockHeight {
-	return types.BlockHeight(len(s.currentPath) - 1)
+	return s.blocksLoaded
 }
 
 // CurrentBlock returns the highest block on the tallest fork.
@@ -67,7 +67,7 @@ func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp type
 func (s *ConsensusSet) GenesisBlock() types.Block {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
-	return s.blockMap[s.currentPath[0]].block
+	return s.blockMap[s.db.getPath(0)].block
 }
 
 // Height returns the height of the current blockchain (the longest fork).
@@ -87,7 +87,7 @@ func (s *ConsensusSet) InCurrentPath(bid types.BlockID) bool {
 	if !exists {
 		return false
 	}
-	return s.currentPath[node.height] == bid
+	return s.db.getPath(node.height) == bid
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

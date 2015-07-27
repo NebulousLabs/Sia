@@ -62,7 +62,7 @@ func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index ui
 	if triggerHeight > cs.height() {
 		return 0, ErrUnfinishedFileContract
 	}
-	triggerID := cs.currentPath[triggerHeight]
+	triggerID := cs.db.getPath(triggerHeight)
 
 	// Get the index by appending the file contract ID to the trigger block and
 	// taking the hash, then converting the hash to a numerical value and

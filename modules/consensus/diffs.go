@@ -288,15 +288,20 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modul
 func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		cs.currentPath = append(cs.currentPath, bn.block.ID())
 		if cs.updatePath {
-			cs.db.pushPath(bn.block)
+			err := cs.db.pushPath(bn.block.ID())
+
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 		}
+		cs.blocksLoaded += 1
 	} else {
-		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
-		if cs.updatePath {
-			cs.db.popPath()
+		err := cs.db.popPath()
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
+		cs.blocksLoaded -= 1
 	}
 }
 
@@ -330,7 +335,11 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	}
 
 	// Update the state to point to the new block.
-	cs.currentPath = append(cs.currentPath, bn.block.ID())
+	err := cs.db.pushPath(bn.block.ID())
+	if err != nil {
+		return err
+	}
+	cs.blocksLoaded += 1
 	cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
@@ -366,9 +375,5 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	if build.DEBUG {
 		bn.consensusSetHash = cs.consensusSetHash()
 	}
-	err := cs.db.addBlockMap(*bn)
-	if err != nil {
-		return err
-	}
-	return cs.db.pushPath(bn.block)
+	return cs.db.addBlockMap(*bn)
 }

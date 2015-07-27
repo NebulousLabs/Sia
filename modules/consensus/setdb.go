@@ -27,6 +27,9 @@ var (
 // consensus set
 type setDB struct {
 	*persist.BoltDatabase
+	// The open flag is used to prevent reading from the database
+	// after closing sia when the loading loop is still running
+	open bool // DEPRECATED
 }
 
 // processedBlock is a copy/rename of blockNode, with the pointers to
@@ -59,8 +62,7 @@ type processedBlock struct {
 // DEPRECATED
 func bnToPb(bn blockNode) processedBlock {
 	pb := processedBlock{
-		Block:  bn.block,
-		Parent: bn.parent.block.ID(),
+		Block: bn.block,
 
 		Height:      bn.height,
 		Depth:       bn.depth,
@@ -78,6 +80,10 @@ func bnToPb(bn blockNode) processedBlock {
 	for _, c := range bn.children {
 		pb.Children = append(pb.Children, c.block.ID())
 	}
+	if bn.parent != nil {
+		pb.Parent = bn.parent.block.ID()
+	}
+
 	return pb
 }
 
@@ -132,7 +138,7 @@ func openDB(filename string) (*setDB, error) {
 		}
 		return nil
 	})
-	return &setDB{db}, nil
+	return &setDB{db, true}, nil
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -185,8 +191,8 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
-func (db *setDB) pushPath(block types.Block) error {
-	value := encoding.Marshal(block.ID())
+func (db *setDB) pushPath(bid types.BlockID) error {
+	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN))
@@ -204,20 +210,26 @@ func (db *setDB) popPath() error {
 	})
 }
 
-// path retreives the block id of a block at a given hegiht from the path
-func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID, err error) {
+// getPath retreives the block id of a block at a given hegiht from the path
+func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem("Path", h)
 	if err != nil {
-		return
+		panic(err)
 	}
 	err = encoding.Unmarshal(idBytes, &id)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 // pathHeight returns the size of the current path
-func (db *setDB) pathHeight() (types.BlockHeight, error) {
+func (db *setDB) pathHeight() types.BlockHeight {
 	h, err := db.BucketSize("Path")
-	return types.BlockHeight(h), err
+	if err != nil {
+		panic(err)
+	}
+	return types.BlockHeight(h)
 }
 
 // addBlockMap adds a block node to the block map
