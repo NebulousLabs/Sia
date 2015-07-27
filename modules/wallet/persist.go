@@ -38,11 +38,6 @@ type (
 		// 32 '0' bytes.
 		EncryptionVerification crypto.Ciphertext
 	}
-
-	SeedFile struct {
-		EncryptionVerification crypto.Ciphertext
-		Seed                   seed
-	}
 )
 
 // saveSettings writes the wallet's settings to the wallet's settings file,

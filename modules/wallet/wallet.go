@@ -71,6 +71,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		siafundAddresses: make(map[types.UnlockHash]struct{}),
 		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
 
+		generatedKeys: make(map[types.UnlockHash]generatedSignatureKey),
+		trackedKeys:   make(map[types.UnlockHash]struct{}),
+
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
 	}
