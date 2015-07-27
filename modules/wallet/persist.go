@@ -2,13 +2,10 @@ package wallet
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -19,6 +16,7 @@ import (
 const (
 	logFile        = modules.WalletDir + ".log"
 	settingsFile   = modules.WalletDir + ".json"
+	seedFilePrefix = "Sia Wallet Seed - "
 	seedFileSuffix = ".seed"
 
 	encryptionVerificationLen = 32
@@ -31,8 +29,7 @@ var (
 	settingsMetadata = persist.Metadata{"Wallet Settings", "0.4.0"}
 	seedMetadata     = persist.Metadata{"Wallet Seed", "0.4.0"}
 
-	encryptionTestModifier = types.Specifier{'e', 'n', 'c', 't', 'e', 's', 't'}
-	seedModifier           = types.Specifier{'k', 'e', 'y', 's', 'e', 'e', 'd'}
+	unlockModifier = types.Specifier{'u', 'n', 'l', 'o', 'c', 'k'}
 )
 
 type (
@@ -44,18 +41,26 @@ type (
 
 	SeedFile struct {
 		EncryptionVerification crypto.Ciphertext
-		Seed                   [32]byte
+		Seed                   seed
 	}
 )
 
+// saveSettings writes the wallet's settings to the wallet's settings file,
+// replacing the existing file.
 func (w *Wallet) saveSettings() error {
 	return persist.SaveFile(settingsMetadata, &w.settings, filepath.Join(w.persistDir, settingsFile))
 }
 
+// loadSettings reads the wallet's settings from the wallet's settings file,
+// overwriting the settings object in memory. loadSettings should only be
+// called at startup.
 func (w *Wallet) loadSettings() error {
 	return persist.LoadFile(settingsMetadata, &w.settings, settingsFile)
 }
 
+// initLog begins logging the wallet, appending to any existing wallet file and
+// writing a startup message to indicate that a new logging instance has been
+// created.
 func (w *Wallet) initLog() error {
 	logFile, err := os.OpenFile(filepath.Join(w.persistDir, logFile), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
 	if err != nil {
@@ -66,6 +71,9 @@ func (w *Wallet) initLog() error {
 	return nil
 }
 
+// initSettings creates the settings object at startup. If a settings file
+// exists, the settings file will be loaded into memory. If the settings file
+// does not exist, a new settings file will be created.
 func (w *Wallet) initSettings() error {
 	// Check if the settings file exists, if not create it.
 	settingsFilename := filepath.Join(w.persistDir, settingsFile)
@@ -80,6 +88,8 @@ func (w *Wallet) initSettings() error {
 	return w.loadSettings()
 }
 
+// initPersist loads all of the wallet's persistence files into memory,
+// creating them if they do not exist.
 func (w *Wallet) initPersist() error {
 	// Create a directory for the wallet without overwriting an existing
 	// directory.
@@ -94,6 +104,7 @@ func (w *Wallet) initPersist() error {
 		return err
 	}
 
+	// Load the settings file.
 	err = w.initSettings()
 	if err != nil {
 		return err
@@ -101,22 +112,16 @@ func (w *Wallet) initPersist() error {
 	return nil
 }
 
-// encryptionVerificationKey turns the master key in to a verification key.
-func encryptionVerificationKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
-	keyBase := append(masterKey[:], encryptionTestModifier[:]...)
+// unlockingKey creates a wallet unlocking key from the input master key.
+func unlockingKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
+	keyBase := append(masterKey[:], unlockModifier[:]...)
 	return crypto.TwofishKey(crypto.HashObject(keyBase))
 }
 
-// seedKey turns the master key into a seed key.
-func seedKey(masterKey crypto.TwofishKey, seedFilename string) crypto.TwofishKey {
-	modifier := append(seedModifier[:], []byte(seedFilename)...)
-	keyBase := append(masterKey[:], modifier[:]...)
-	return crypto.TwofishKey(crypto.HashObject(keyBase))
-}
-
-// checkEncryptionKey checks that the correct encryption key was used.
-func (w *Wallet) checkEncryptionKey(masterKey crypto.TwofishKey) error {
-	verificationKey := encryptionVerificationKey(masterKey)
+// checkUnlockingKey verifies that the unlocking key provided to unlock the
+// wallet matches the unlocking key given to the wallet.
+func (w *Wallet) checkUnlockingKey(masterKey crypto.TwofishKey) error {
+	verificationKey := unlockingKey(masterKey)
 	decryptedBytes, err := verificationKey.DecryptBytes(w.settings.EncryptionVerification)
 	if err != nil {
 		return err
@@ -128,95 +133,24 @@ func (w *Wallet) checkEncryptionKey(masterKey crypto.TwofishKey) error {
 	return nil
 }
 
+// initEncryption checks that the provided encryption key is the valid
+// encryption key for the wallet. If encryption has not yet been established
+// for the wallet, an encryption key is created.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 	// Check if the wallet encryption key has already been set.
 	encryptionBase := make([]byte, encryptionVerificationLen)
 	if !bytes.Equal(w.settings.EncryptionVerification, encryptionBase) {
-		return w.checkEncryptionKey(masterKey)
+		return w.checkUnlockingKey(masterKey)
 	}
 
 	// Encryption key has not been created yet - create it.
 	var err error
-	verificationKey := encryptionVerificationKey(masterKey)
-	w.settings.EncryptionVerification, err = verificationKey.EncryptBytes(encryptionBase)
+	unlockingKey := unlockingKey(masterKey)
+	w.settings.EncryptionVerification, err = unlockingKey.EncryptBytes(encryptionBase)
 	if err != nil {
 		return err
 	}
 	return w.saveSettings()
-}
-
-func (w *Wallet) loadSeed(fileInfo os.FileInfo, masterKey crypto.TwofishKey) error {
-	// Load the seed.
-	var seedFile SeedFile
-	err := persist.LoadFile(seedMetadata, &seedFile, fileInfo.Name())
-	if err != nil {
-		return err
-	}
-
-	// Check that the master key is correct.
-	key := seedKey(masterKey, fileInfo.Name())
-	expected := make([]byte, encryptionVerificationLen)
-	decryptedBytes, err := key.DecryptBytes(seedFile.EncryptionVerification)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(decryptedBytes, expected) {
-		return errBadEncryptionKey
-	}
-
-	// TODO: Generate the addresses and move them into memory.
-	return nil
-}
-
-func (w *Wallet) createSeed(masterKey crypto.TwofishKey) error {
-	var seedFile SeedFile
-	filename := persist.RandomSuffix() + seedFileSuffix
-	key := seedKey(masterKey, filename)
-	encTest := make([]byte, encryptionVerificationLen)
-	encVerification, err := key.EncryptBytes(encTest)
-	if err != nil {
-		return err
-	}
-	seedFile.EncryptionVerification = encVerification
-	_, err = rand.Read(seedFile.Seed[:])
-	if err != nil {
-		return err
-	}
-	err = persist.SaveFile(seedMetadata, seedFile, filename)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Generate the addresses and move them into memory.
-	return nil
-}
-
-func (w *Wallet) initWalletSeeds(masterKey crypto.TwofishKey) error {
-	// Scan for existing wallet seed files.
-	foundSeed := false
-	filesInfo, err := ioutil.ReadDir(w.persistDir)
-	if err != nil {
-		return err
-	}
-	for _, fileInfo := range filesInfo {
-		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) {
-			err = w.loadSeed(fileInfo, masterKey)
-			if err != nil {
-				w.log.Println("WARNING: loading a seed", fileInfo.Name(), "returned an error:", err)
-			} else {
-				foundSeed = true
-			}
-		}
-	}
-
-	// If no seed was found, create a new seed.
-	if !foundSeed {
-		err = w.createSeed(masterKey)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // unlock loads all of the encrypted file structures into wallet memory. Even

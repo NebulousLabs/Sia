@@ -42,7 +42,8 @@ type Wallet struct {
 	siafundAddresses map[types.UnlockHash]struct{}
 	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
-	trackedKeys map[types.UnlockHash]struct{}
+	generatedKeys map[types.UnlockHash]generatedSignatureKey
+	trackedKeys   map[types.UnlockHash]struct{}
 
 	persistDir string
 	log        *log.Logger

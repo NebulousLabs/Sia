@@ -18,7 +18,7 @@ func TestSaveLoad(t *testing.T) {
 	}
 
 	// create a new wallet using the saved data
-	newWallet, err := New(wt.cs, wt.tpool, wt.wallet.saveDir)
+	newWallet, err := New(wt.cs, wt.tpool, wt.wallet.persistDir)
 	if err != nil {
 		t.Fatal(err)
 	}
