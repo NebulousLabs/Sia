@@ -151,16 +151,15 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) error {
 	if err != nil {
 		return err
 	}
+	w.settings.PrimarySeed = filename
+	w.settings.AddressProgress = 0
 	return persist.SaveFile(seedMetadata, &SeedFile{encryptionVerification, cryptSeed}, filename)
 }
 
-// initWalletSeeds scans the wallet folder for wallet seeds, creating a new
-// seed if no seed is found. The new seed will be encrypted with a key derived
-// from the master key. Any existing seed not encrypted with the master key
-// will be logged and ignored.
-func (w *Wallet) initWalletSeeds(masterKey crypto.TwofishKey) error {
+// initAuxillarySeeds scans the wallet folder for wallet seeds. Auxiallry seeds
+// are not used to generate new addresses.
+func (w *Wallet) initAuxillarySeeds(masterKey crypto.TwofishKey) error {
 	// Scan for existing wallet seed files.
-	foundSeed := false
 	filesInfo, err := ioutil.ReadDir(w.persistDir)
 	if err != nil {
 		return err
@@ -170,17 +169,7 @@ func (w *Wallet) initWalletSeeds(masterKey crypto.TwofishKey) error {
 			err = w.loadSeedFile(masterKey, fileInfo)
 			if err != nil {
 				w.log.Println("WARNING: loading a seed", fileInfo.Name(), "returned an error:", err)
-			} else {
-				foundSeed = true
 			}
-		}
-	}
-
-	// If no seed was found, create a new seed.
-	if !foundSeed {
-		err = w.createSeed(masterKey)
-		if err != nil {
-			return err
 		}
 	}
 	return nil

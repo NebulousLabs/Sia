@@ -32,13 +32,14 @@ var (
 	unlockModifier = types.Specifier{'u', 'n', 'l', 'o', 'c', 'k'}
 )
 
-type (
-	WalletSettings struct {
-		// EncryptionVerification is an encrypted string that, when decrypted, is
-		// 32 '0' bytes.
-		EncryptionVerification crypto.Ciphertext
-	}
-)
+type WalletSettings struct {
+	// EncryptionVerification is an encrypted string that, when decrypted, is
+	// 32 '0' bytes.
+	EncryptionVerification crypto.Ciphertext
+
+	PrimarySeed     string // Name of the primary seed for the wallet.
+	AddressProgress uint64 // Number of addresses used in the primary seed.
+}
 
 // saveSettings writes the wallet's settings to the wallet's settings file,
 // replacing the existing file.
@@ -148,6 +149,27 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 	return w.saveSettings()
 }
 
+// initPrimarySeed loads the primary seed into the wallet, creating a new one
+// if the primary seed does not exist. The primary seed is used to generate new
+// addresses.
+func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
+	if w.settings.PrimarySeed == "" {
+		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
+		return w.createSeed(masterKey)
+	}
+	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeed))
+	if err != nil {
+		w.log.Println("UNLOCK: Issue loading primary seed file:", err)
+		return err
+	}
+	err = w.loadSeedFile(masterKey, fileInfo)
+	if err != nil {
+		w.log.Println("UNLOCK: Issue loading primary seed:", err)
+		return err
+	}
+	return nil
+}
+
 // unlock loads all of the encrypted file structures into wallet memory. Even
 // after loading, the structures are kept encrypted, but some data such as
 // addresses are decrypted so that the wallet knows what to track.
@@ -163,8 +185,14 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 		return err
 	}
 
-	// Handle scanning and creating wallet seeds.
-	err = w.initWalletSeeds(masterKey)
+	// Load the wallet seed that is used to generate new addresses.
+	err = w.initPrimarySeed(masterKey)
+	if err != nil {
+		return err
+	}
+
+	// Load all wallet seeds that are not used to generate new addresses.
+	err = w.initAuxillarySeeds(masterKey)
 	if err != nil {
 		return err
 	}
