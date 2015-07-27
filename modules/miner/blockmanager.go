@@ -2,6 +2,7 @@ package miner
 
 import (
 	"errors"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -52,6 +53,20 @@ func (m *Miner) blockForWork() (types.Block, types.Target) {
 	return b, m.target
 }
 
+// prepareNewBlock sets the blockmanager up to generate a new block next time
+// HeaderForWork is called. Note that calling this may diminish from the max
+// number of headers that can be stored (because memProgress gets shifted forward)
+func (m *Miner) prepareNewBlock() {
+	// Move mem progress forward. This prevents more than blockForWorkMemory
+	// blocks from being created in the case of a slow miner. We also have
+	// to delete all headers as we go to ensure old blocks get removed from memory
+	for m.memProgress%(headerForWorkMemory/blockForWorkMemory) != 0 {
+		delete(m.blockMem, m.headerMem[m.memProgress])
+		delete(m.arbDataMem, m.headerMem[m.memProgress])
+		m.memProgress++
+	}
+}
+
 // BlockForWork returns a block that is ready for nonce grinding, along with
 // the root hash of the block.
 func (m *Miner) BlockForWork() (b types.Block, merkleRoot crypto.Hash, t types.Target) {
@@ -69,21 +84,50 @@ func (m *Miner) HeaderForWork() (types.BlockHeader, types.Target) {
 	lockID := m.mu.Lock()
 	defer m.mu.Unlock(lockID)
 
-	// Grab a block for work.
-	block, target := m.blockForWork()
+	if time.Since(m.lastBlock).Seconds() > secondsBetweenBlocks {
+		m.prepareNewBlock()
+	}
 
-	// Save a mapping between the block and its header, replacing the block
-	// that was stored 'headerForWorkMemory' requests ago.
+	// The header that will be returned for nonce grinding.
+	// The header is constructed from a block and some arbitrary data. The
+	// arbitrary data allows for multiple unique blocks to be generated from
+	// a single block in memory. A block pointer is used in order to avoid
+	// storing multiple copies of the same block in memory
+	var header types.BlockHeader
+	var arbData []byte
+	var block *types.Block
+
+	if m.memProgress%(headerForWorkMemory/blockForWorkMemory) == 0 {
+		// Grab a new block. Allocate space for the pointer to store it as well
+		block = new(types.Block)
+		*block, _ = m.blockForWork()
+		header = block.Header()
+		arbData = block.Transactions[0].ArbitraryData[0]
+
+		m.lastBlock = time.Now()
+	} else {
+		// Set block to previous block, but create new arbData
+		block = m.blockMem[m.headerMem[m.memProgress-1]]
+		arbData, _ = crypto.RandBytes(types.SpecifierLen)
+		block.Transactions[0].ArbitraryData[0] = arbData
+		header = block.Header()
+	}
+
+	// Save a mapping from the header to its block as well as from the
+	// header to its arbitrary data, replacing the block that was
+	// stored 'headerForWorkMemory' requests ago.
 	delete(m.blockMem, m.headerMem[m.memProgress])
-	m.blockMem[block.Header()] = block
-	m.headerMem[m.memProgress] = block.Header()
+	delete(m.arbDataMem, m.headerMem[m.memProgress])
+	m.blockMem[header] = block
+	m.arbDataMem[header] = arbData
+	m.headerMem[m.memProgress] = header
 	m.memProgress++
 	if m.memProgress == headerForWorkMemory {
 		m.memProgress = 0
 	}
 
 	// Return the header and target.
-	return block.Header(), target
+	return header, m.target
 }
 
 // submitBlock takes a solved block and submits it to the blockchain.
@@ -117,13 +161,16 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
 	lockID := m.mu.Lock()
-	b, exists := m.blockMem[lookupBH]
+	b, bExists := m.blockMem[lookupBH]
+	arbData, arbExists := m.arbDataMem[lookupBH]
 	m.mu.Unlock(lockID)
-	if !exists {
+	if !bExists || !arbExists {
 		err := errors.New("block header returned late - block was cleared from memory")
 		m.log.Println("ERROR:", err)
 		return err
 	}
+
+	b.Transactions[0].ArbitraryData[0] = arbData
 	b.Nonce = bh.Nonce
-	return m.SubmitBlock(b)
+	return m.SubmitBlock(*b)
 }

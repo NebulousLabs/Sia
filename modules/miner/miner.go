@@ -15,10 +15,27 @@ const (
 	iterationsPerAttempt = 16 * 1024
 
 	// headerForWorkMemory is the number of previous calls to 'headerForWork'
-	// that are remembered.
-	headerForWorkMemory = 50
+	// that are remembered. Additionally, 'headerForWork' will only poll for a
+	// new block every 'headerForWorkMemory / blockForWorkMemory' times it is
+	// called. This reduces the amount of memory used, but comes at the cost of
+	// not always having the most recent transactions
+	headerForWorkMemory = 1000
+
+	// blockForWorkMemory is the maximum number of blocks the miner will store
+	// Blocks take up to 2 megabytes of memory, so it is important to keep a cap
+	blockForWorkMemory = 20
+
+	// secondsBetweenBlocks is the maximum amount of time the block manager will
+	// go between generating new blocks. If the miner is not polling more than
+	// headerForWorkMemory / blockForWorkMemory blocks every secondsBetweenBlocks
+	// then the block manager will create new blocks in order to keep the miner
+	// mining on the most recent block, but this will come at the cost of preventing
+	// the block manger from storing as many headers
+	secondsBetweenBlocks = 30
 )
 
+// Miner struct contains all variables the miner needs
+// in order to create and submit blocks.
 type Miner struct {
 	// Module dependencies.
 	cs     modules.ConsensusSet
@@ -33,15 +50,21 @@ type Miner struct {
 	earliestTimestamp types.Timestamp
 	address           types.UnlockHash
 
-	// A list of blocks that have been through SubmitBlock.
+	// A list of blocks that have been submitted through SubmitBlock.
 	blocksFound []types.BlockID
 
 	// BlockManager variables. The BlockManager passes out and receives unique
 	// block headers on each call, these variables help to map the received
 	// block header to the original block. The headers are passed instead of
-	// the block because a full block is 2mb and is a lot to send over http.
-	blockMem    map[types.BlockHeader]types.Block
+	// the block because a full block is 2mB and is a lot to send over http.
+	// In order to store multiple headers per block, some headers map to an
+	// identical address, but each header maps to a unique arbData, which can
+	// be used to construct a unique block
+	// lastBlock stores the Time the last block was requested.
+	blockMem    map[types.BlockHeader]*types.Block
+	arbDataMem  map[types.BlockHeader][]byte
 	headerMem   []types.BlockHeader
+	lastBlock   time.Time
 	memProgress int
 
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
@@ -105,8 +128,9 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		earliestTimestamp: earliestTimestamp,
 		address:           addr,
 
-		blockMem:  make(map[types.BlockHeader]types.Block),
-		headerMem: make([]types.BlockHeader, headerForWorkMemory),
+		blockMem:   make(map[types.BlockHeader]*types.Block),
+		arbDataMem: make(map[types.BlockHeader][]byte),
+		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
