@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -103,7 +104,7 @@ func (w *Wallet) loadSeedFile(fileInfo os.FileInfo, masterKey crypto.TwofishKey)
 
 func (w *Wallet) createSeed(masterKey crypto.TwofishKey) error {
 	var seedFile SeedFile
-	filename := seedFilePrefix + persist.RandomSuffix() + seedFileSuffix
+	filename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	key := seedEncryptionKey(masterKey, filename)
 	encTest := make([]byte, encryptionVerificationLen)
 	encVerification, err := key.EncryptBytes(encTest)

@@ -55,7 +55,7 @@ func (w *Wallet) saveSettings() error {
 // overwriting the settings object in memory. loadSettings should only be
 // called at startup.
 func (w *Wallet) loadSettings() error {
-	return persist.LoadFile(settingsMetadata, &w.settings, settingsFile)
+	return persist.LoadFile(settingsMetadata, &w.settings, filepath.Join(w.persistDir, settingsFile))
 }
 
 // initLog begins logging the wallet, appending to any existing wallet file and
@@ -138,14 +138,14 @@ func (w *Wallet) checkUnlockingKey(masterKey crypto.TwofishKey) error {
 // for the wallet, an encryption key is created.
 func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 	// Check if the wallet encryption key has already been set.
-	encryptionBase := make([]byte, encryptionVerificationLen)
-	if !bytes.Equal(w.settings.EncryptionVerification, encryptionBase) {
+	if len(w.settings.EncryptionVerification) != 0 {
 		return w.checkUnlockingKey(masterKey)
 	}
 
 	// Encryption key has not been created yet - create it.
 	var err error
 	unlockingKey := unlockingKey(masterKey)
+	encryptionBase := make([]byte, encryptionVerificationLen)
 	w.settings.EncryptionVerification, err = unlockingKey.EncryptBytes(encryptionBase)
 	if err != nil {
 		return err
@@ -178,4 +178,12 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 
 	w.unlocked = true
 	return nil
+}
+
+// Unlock will decrypt the wallet seed and load all of the addresses into
+// memory.
+func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	return w.unlock(masterKey)
 }

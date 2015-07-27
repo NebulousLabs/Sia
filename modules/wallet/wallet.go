@@ -2,9 +2,7 @@ package wallet
 
 import (
 	"errors"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -81,22 +79,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 	err := w.initPersist()
 	if err != nil {
 		return nil, err
-	}
-
-	// Try to load a previously saved wallet file. If it doesn't exist, assume
-	// that we're creating a new wallet file.
-	// TODO: log warning if no file found?
-	err = w.load()
-	if os.IsNotExist(err) {
-		err = nil
-		// No wallet file exists... make a visible address for the user.
-		_, _, err = w.coinAddress(true)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("couldn't load wallet file %s: %v", persistDir, err)
 	}
 
 	w.tpool.TransactionPoolSubscribe(w)
