@@ -87,7 +87,7 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.blockMap[bn.block.ID()] = &bn
+		cs.blockMap[bn.block.ID()] = &bn // DEPRICATED
 		cs.updatePath = false
 		cs.commitDiffSet(&bn, modules.DiffApply)
 		cs.updatePath = true

@@ -33,6 +33,7 @@ func (cs *ConsensusSet) deleteNode(bn *blockNode) {
 	// Remove the node from the block map, and from its parents list of
 	// children.
 	delete(cs.blockMap, bn.block.ID())
+	cs.db.rmBlockMap(bn.block.ID())
 	for i := range bn.parent.children {
 		if bn.parent.children[i] == bn {
 			// If 'i' is not the last element, remove it from the array by

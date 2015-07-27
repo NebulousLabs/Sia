@@ -189,6 +189,7 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 	return item, err
 }
 
+// rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket string, key interface{}) error {
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -206,6 +207,15 @@ func (db *setDB) rmItem(bucket string, key interface{}) error {
 		}
 		return b.Delete(k)
 	})
+}
+
+// inBucket checks if an item with the given key is in the bucket
+func (db *setDB) inBucket(bucket string, key interface{}) bool {
+	exists, err := db.Exists(bucket, encoding.Marshal(key))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return exists
 }
 
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
@@ -261,22 +271,28 @@ func (db *setDB) addBlockMap(bn blockNode) error {
 // with the given ID
 func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	bnBytes, err := db.getItem("BlockMap", id)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 	var pb processedBlock
 	err = encoding.Unmarshal(bnBytes, &pb)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 	return &pb
 }
 
 // getBlockMapBn is a transitional wrapper for getting a block node
-// from the blockMap
+// from the blockMap // DEPRICATED
 func (cs *ConsensusSet) getBlockMapBn(id types.BlockID) *blockNode {
 	bn := cs.pbToBn(cs.db.getBlockMap(id))
 	return &bn
+}
+
+// inBlockMap checks for the existance of a block with a given ID in
+// the consensus set
+func (db *setDB) inBlockMap(id types.BlockID) bool {
+	return db.inBucket("BlockMap", id)
 }
 
 // rmBlockMap removes a processedBlock from the blockMap bucket

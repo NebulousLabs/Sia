@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -109,11 +108,13 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
 	for _, id := range knownBlocks {
-		bn, exists := s.blockMap[id]
-		if exists && bn.height <= s.height() && id == s.db.getPath(bn.height) {
-			found = true
-			start = bn.height + 1 // start at child
-			break
+		if s.db.inBlockMap(id) {
+			bn := s.getBlockMapBn(id)
+			if bn.height <= s.height() && id == s.db.getPath(bn.height) {
+				found = true
+				start = bn.height + 1 // start at child
+				break
+			}
 		}
 	}
 	s.mu.RUnlock(lockID)
@@ -140,10 +141,7 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node, exists := s.blockMap[s.db.getPath(i)]
-				if build.DEBUG && !exists {
-					panic("blockMap is missing a block whose ID is in the current path")
-				}
+				node := s.getBlockMapBn(s.db.getPath(i))
 				blocks = append(blocks, node.block)
 			}
 
