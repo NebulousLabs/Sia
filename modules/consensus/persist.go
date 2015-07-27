@@ -20,20 +20,14 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// Check the height. If the height is 0, then it's a new file and the
 	// genesis block should be added.
-	height, err := db.pathHeight()
-	if err != nil {
-		return err
-	}
+	height := db.pathHeight()
 	if height == 0 {
 		// add genesis block
 		return db.pushPath(cs.blockRoot.block)
 	}
 
 	// Check that the db's genesis block matches our genesis block.
-	bid, err := db.getPath(0)
-	if err != nil {
-		return err
-	}
+	bID := db.getPath(0)
 	// If this happens, print a warning and start a new db.
 	if bid != cs.currentPath[0] {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
@@ -49,12 +43,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
-		bid, err := db.getPath(i)
-		if err != nil {
-			// should never happen
-			return err
-		}
-		pb, err := db.getBlockMap(bid)
+		bID := db.getPath(i)
+		pb, err := db.getBlockMap(bID)
 		if err != nil {
 			return err
 		}

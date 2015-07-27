@@ -296,6 +296,7 @@ func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirecti
 		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
 		if cs.updatePath {
 			cs.db.popPath()
+			3
 		}
 	}
 }

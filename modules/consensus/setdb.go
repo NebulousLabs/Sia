@@ -205,19 +205,25 @@ func (db *setDB) popPath() error {
 }
 
 // path retreives the block id of a block at a given hegiht from the path
-func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID, err error) {
+func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem("Path", h)
 	if err != nil {
-		return
+		panic(err)
 	}
 	err = encoding.Unmarshal(idBytes, &id)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 // pathHeight returns the size of the current path
-func (db *setDB) pathHeight() (types.BlockHeight, error) {
+func (db *setDB) pathHeight() types.BlockHeight {
 	h, err := db.BucketSize("Path")
-	return types.BlockHeight(h), err
+	if err != nil {
+		panic(err)
+	}
+	return types.BlockHeight(h)
 }
 
 // addBlockMap adds a block node to the block map
