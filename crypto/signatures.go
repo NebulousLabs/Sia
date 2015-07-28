@@ -4,18 +4,19 @@ import (
 	"crypto/rand"
 	"errors"
 
-	"github.com/agl/ed25519"
+	"github.com/NebulousLabs/ed25519"
 )
 
 const (
+	EntropySize   = ed25519.EntropySize
 	PublicKeySize = ed25519.PublicKeySize
-	SecretKeySize = ed25519.PrivateKeySize
+	SecretKeySize = ed25519.SecretKeySize
 	SignatureSize = ed25519.SignatureSize
 )
 
 type (
 	PublicKey [ed25519.PublicKeySize]byte
-	SecretKey [ed25519.PrivateKeySize]byte
+	SecretKey [ed25519.SecretKeySize]byte
 	Signature [ed25519.SignatureSize]byte
 )
 
@@ -27,13 +28,21 @@ var (
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
 func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
-	pkPointer, skPointer, err := ed25519.GenerateKey(rand.Reader)
+	var entropy [32]byte
+	_, err = rand.Read(entropy[:])
 	if err != nil {
-		return
+		return sk, pk, err
 	}
-	sk = *skPointer
-	pk = *pkPointer
-	return
+
+	skPointer, pkPointer := ed25519.GenerateKey(entropy)
+	return *skPointer, *pkPointer, nil
+}
+
+// DeterministicSignatureKeys generates keys deterministically using the input
+// entropy. The input entropy must be 32 bytes in length.
+func DeterministicSignatureKeys(entropy [EntropySize]byte) (SecretKey, PublicKey) {
+	skPointer, pkPointer := ed25519.GenerateKey(entropy)
+	return *skPointer, *pkPointer
 }
 
 // SignHash signs a message using a secret key.
