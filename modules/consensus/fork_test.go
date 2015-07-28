@@ -54,9 +54,11 @@ func TestDeleteNode(t *testing.T) {
 		t.Fatal("good block has children")
 	}
 
-	// Rewind so that 'bn' is the current block again.
-	cst.cs.commitDiffSet(bn.children[0].children[0], modules.DiffRevert)
-	cst.cs.commitDiffSet(bn.children[0], modules.DiffRevert)
+	// Rewind so that 'pb' is the current block again.
+	childchild := bnToPb(*bn.children[0].children[0])
+	child := bnToPb(*bn.children[0])
+	cst.cs.commitDiffSet(&childchild, modules.DiffRevert)
+	cst.cs.commitDiffSet(&child, modules.DiffRevert)
 
 	// Call 'deleteNode' on child0
 	child0Node := bn.children[0]

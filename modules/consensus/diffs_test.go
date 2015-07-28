@@ -437,7 +437,7 @@ func TestCommitDiffSetSanity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	defer func() {
 		r := recover()
@@ -452,8 +452,8 @@ func TestCommitDiffSetSanity(t *testing.T) {
 		}
 
 		// Trigger a panic about diffs not being generated.
-		bn.diffsGenerated = false
-		cst.cs.commitDiffSetSanity(bn, modules.DiffRevert)
+		pb.DiffsGenerated = false
+		cst.cs.commitDiffSetSanity(pb, modules.DiffRevert)
 	}()
 	defer func() {
 		r := recover()
@@ -462,13 +462,13 @@ func TestCommitDiffSetSanity(t *testing.T) {
 		}
 
 		// trigger a panic about applying the wrong block.
-		bn.block.ParentID[0]++
-		cst.cs.commitDiffSetSanity(bn, modules.DiffApply)
+		pb.Block.ParentID[0]++
+		cst.cs.commitDiffSetSanity(pb, modules.DiffApply)
 	}()
 
 	// Trigger a panic about incorrectly reverting a diff set.
-	bn.block.MinerPayouts = append(bn.block.MinerPayouts, types.SiacoinOutput{}) // change the block id by adding a miner payout
-	cst.cs.commitDiffSetSanity(bn, modules.DiffRevert)
+	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{}) // change the block id by adding a miner payout
+	cst.cs.commitDiffSetSanity(pb, modules.DiffRevert)
 }
 
 // TestCreateUpcomingDelayedOutputMaps probes the createUpcomingDelayedMaps
@@ -481,35 +481,37 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Check that a map gets created upon revert.
-	_, exists := cst.cs.delayedSiacoinOutputs[bn.height]
+	_, exists := cst.cs.delayedSiacoinOutputs[pb.Height]
 	if exists {
-		t.Fatal("unexpected delayed output map at bn.height")
+		t.Fatal("unexpected delayed output map at pb.Height")
 	}
-	cst.cs.commitDiffSet(bn, modules.DiffRevert) // revert the current block node
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height]
+	cst.cs.commitDiffSet(pb, modules.DiffRevert) // revert the current block node
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height]
 	if !exists {
 		t.Error("delayed output map was not created when reverting diffs")
 	}
 
 	// Check that a map gets created on apply.
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
 	if exists {
 		t.Fatal("delayed output map exists when it shouldn't")
 	}
-	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
 	if !exists {
 		t.Error("delayed output map was not created")
 	}
 
 	// Check that a map is not created on revert when the height is
 	// sufficiently low.
-	cst.cs.commitDiffSet(bn.parent, modules.DiffRevert)
-	cst.cs.commitDiffSet(bn.parent.parent, modules.DiffRevert)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.parent.parent.height]
+	parent := cst.cs.db.getBlockMap(pb.Parent)
+	cst.cs.commitDiffSet(parent, modules.DiffRevert)
+	grandparent := cst.cs.db.getBlockMap(parent.Parent)
+	cst.cs.commitDiffSet(grandparent, modules.DiffRevert)
+	_, exists = cst.cs.delayedSiacoinOutputs[grandparent.Height]
 	if exists {
 		t.Error("delayed output map was created when bringing the height too low")
 	}
@@ -527,11 +529,11 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 		}
 
 		// Trigger a panic by creating a map that's already there during a revert.
-		cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffRevert)
+		cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffRevert)
 	}()
 
 	// Trigger a panic by creating a map that's already there during an apply.
-	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
+	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
 }
 
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
@@ -543,8 +545,8 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
-	cst.cs.commitDiffSet(bn, modules.DiffRevert) // pull the block node out of the consensus set.
+	pb := cst.cs.currentProcessedBlock()
+	cst.cs.commitDiffSet(pb, modules.DiffRevert) // pull the block node out of the consensus set.
 
 	// For diffs that can be destroyed in the same block they are created,
 	// create diffs that do just that. This has in the past caused issues upon
@@ -587,16 +589,16 @@ func TestCommitNodeDiffs(t *testing.T) {
 		Previous:  cst.cs.siafundPool,
 		Adjusted:  cst.cs.siafundPool.Add(types.NewCurrency64(1)),
 	}
-	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod0)
-	bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod1)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd0)
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd1)
-	bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod0)
-	bn.siafundOutputDiffs = append(bn.siafundOutputDiffs, sfod1)
-	bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
-	bn.siafundPoolDiffs = append(bn.siafundPoolDiffs, sfpd)
-	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
-	cst.cs.commitNodeDiffs(bn, modules.DiffApply)
+	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod0)
+	pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod1)
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd0)
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd1)
+	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod0)
+	pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod1)
+	pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
+	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
+	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
+	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
 	_, exists := cst.cs.siacoinOutputs[scoid]
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
@@ -609,7 +611,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	cst.cs.commitNodeDiffs(bn, modules.DiffRevert)
+	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
 	_, exists = cst.cs.siacoinOutputs[scoid]
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
@@ -634,33 +636,34 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
-	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+	pb := cst.cs.currentProcessedBlock()
 
-	// Check that maps are deleted at bn.height when applying changes.
-	_, exists := cst.cs.delayedSiacoinOutputs[bn.height]
+	cst.cs.commitDiffSet(pb, modules.DiffRevert)
+
+	// Check that maps are deleted at pb.Height when applying changes.
+	_, exists := cst.cs.delayedSiacoinOutputs[pb.Height]
 	if !exists {
-		t.Fatal("expected a delayed output map at bn.height")
+		t.Fatal("expected a delayed output map at pb.Height")
 	}
 	// Prepare for and then apply the obsolete maps.
-	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
-	cst.cs.commitNodeDiffs(bn, modules.DiffApply)
-	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffApply)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height]
+	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
+	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height]
 	if exists {
 		t.Error("delayed output map was not deleted on apply")
 	}
 
-	// Check that maps are deleted at bn.height+types.MaturityDelay when
+	// Check that maps are deleted at pb.Height+types.MaturityDelay when
 	// reverting changes.
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
 	if !exists {
-		t.Fatal("expected a delayed output map at bn.height+maturity delay")
+		t.Fatal("expected a delayed output map at pb.Height+maturity delay")
 	}
-	cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffRevert)
-	cst.cs.commitNodeDiffs(bn, modules.DiffRevert)
-	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffRevert)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffRevert)
+	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
+	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
 	if exists {
 		t.Error("delayed siacoin output map was not deleted upon revert")
 	}
@@ -676,8 +679,8 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
-	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+	pb := cst.cs.currentProcessedBlock()
+	cst.cs.commitDiffSet(pb, modules.DiffRevert)
 
 	defer func() {
 		r := recover()
@@ -692,13 +695,13 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 		}
 
 		// Trigger a panic by deleting a map with outputs in it during revert.
-		cst.cs.createUpcomingDelayedOutputMaps(bn, modules.DiffApply)
-		cst.cs.commitNodeDiffs(bn, modules.DiffApply)
-		cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffRevert)
+		cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
+		cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+		cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
 	}()
 
 	// Trigger a panic by deleting a map with outputs in it during apply.
-	cst.cs.deleteObsoleteDelayedOutputMaps(bn, modules.DiffApply)
+	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
 }
 
 // TestGenerateAndApplyDiffSanity triggers the sanity checks in the
@@ -711,8 +714,8 @@ func TestGenerateAndApplyDiffSanity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
-	cst.cs.commitDiffSet(bn, modules.DiffRevert)
+	pb := cst.cs.currentProcessedBlock()
+	cst.cs.commitDiffSet(pb, modules.DiffRevert)
 
 	defer func() {
 		r := recover()
@@ -727,10 +730,11 @@ func TestGenerateAndApplyDiffSanity(t *testing.T) {
 		}
 
 		// Trigger errRegenerteDiffs
-		_ = cst.cs.generateAndApplyDiff(bn)
+		_ = cst.cs.generateAndApplyDiff(pb)
 	}()
 
 	// Trigger errInvalidSuccessor
-	bn.parent.diffsGenerated = false
-	_ = cst.cs.generateAndApplyDiff(bn.parent)
+	parent := cst.cs.db.getBlockMap(pb.Parent)
+	parent.DiffsGenerated = false
+	_ = cst.cs.generateAndApplyDiff(parent)
 }

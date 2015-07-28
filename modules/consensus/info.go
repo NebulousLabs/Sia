@@ -17,8 +17,13 @@ func (cs *ConsensusSet) currentBlockID() types.BlockID {
 }
 
 // currentBlockNode returns the blockNode of the current block.
+// DEPRICATED
 func (s *ConsensusSet) currentBlockNode() *blockNode {
 	return s.blockMap[s.currentBlockID()]
+}
+
+func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
+	return cs.db.getBlockMap(cs.currentBlockID())
 }
 
 // height returns the current height of the state.
