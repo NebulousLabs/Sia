@@ -54,10 +54,7 @@ func signatureKeyEncryptionKey(masterKey crypto.TwofishKey, seedFilename string,
 func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, s seed, seedFilename string, index uint64) error {
 	// Generate the key.
 	entropy := crypto.HashAll(s, index)
-	sk, pk, err := crypto.DeterministicSignatureKeys(entropy)
-	if err != nil {
-		return err
-	}
+	sk, pk := crypto.DeterministicSignatureKeys(entropy)
 
 	// Fetch the unlock hash.
 	unlockHash := types.UnlockConditions{
@@ -85,7 +82,10 @@ func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, s seed, seedFi
 // 'publicKeysPerSeed' addresses that the wallet is able to spend.
 func (w *Wallet) integrateSeed(masterKey crypto.TwofishKey, s seed, seedFilename string) error {
 	for i := uint64(0); i < publicKeysPerSeed; i++ {
-		w.generateAndTrackKey(masterKey, s, seedFilename, i)
+		err := w.generateAndTrackKey(masterKey, s, seedFilename, i)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -156,9 +156,9 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) error {
 	return persist.SaveFile(seedMetadata, &SeedFile{encryptionVerification, cryptSeed}, filename)
 }
 
-// initAuxillarySeeds scans the wallet folder for wallet seeds. Auxiallry seeds
+// initAuxiliarySeeds scans the wallet folder for wallet seeds. Auxiliary seeds
 // are not used to generate new addresses.
-func (w *Wallet) initAuxillarySeeds(masterKey crypto.TwofishKey) error {
+func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 	// Scan for existing wallet seed files.
 	filesInfo, err := ioutil.ReadDir(w.persistDir)
 	if err != nil {
