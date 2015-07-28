@@ -24,13 +24,7 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 	}
 
 	for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
-		revertedNode, exists := cs.blockMap[revertedBlockID]
-		// Sanity check - node should exist.
-		if build.DEBUG {
-			if !exists {
-				panic("grabbed a node that does not exist during a consensus change")
-			}
-		}
+		revertedNode := cs.getBlockMapBn(revertedBlockID)
 
 		// Because the direction is 'revert', the order of the diffs needs to
 		// be flipped and the direction of the diffs also needs to be flipped.
@@ -62,13 +56,7 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 		}
 	}
 	for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
-		appliedNode, exists := cs.blockMap[appliedBlockID]
-		// Sanity check - node should exist.
-		if build.DEBUG {
-			if !exists {
-				panic("grabbed a node that does not exist during a consensus change")
-			}
-		}
+		appliedNode := cs.getBlockMapBn(appliedBlockID)
 
 		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.block)
 		for _, scod := range appliedNode.siacoinOutputDiffs {

@@ -157,16 +157,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 		diffsGenerated: true,
 	}
-	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
 
-	// Fill out the consensus information for the genesis block.
-	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.ZeroUnlockHash,
-	}
-
-	// Allocate the Siafund addresses by putting them all in a big transaction
-	// and applying the diffs.
+	// Allocate the Siafund addresses by putting them all in a big transaction inside the genesis block
 	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
 		sfid := genesisBlock.Transactions[0].SiafundOutputID(i)
 		sfod := modules.SiafundOutputDiff{
@@ -178,8 +170,14 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
 	}
 
-	// Send out genesis block update.
-	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
+	// Temporarly required for database loading
+	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
+
+	// Fill out the consensus information for the genesis block.
+	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
+		Value:      types.CalculateCoinbase(0),
+		UnlockHash: types.ZeroUnlockHash,
+	}
 
 	// Create the consensus directory.
 	err := os.MkdirAll(saveDir, 0700)
@@ -192,6 +190,12 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Send out genesis block update.
+	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
+
+	// Load the saved processed blocks into memory and send out updates
+	cs.loadDiffs()
 
 	cs.updatePath = true
 

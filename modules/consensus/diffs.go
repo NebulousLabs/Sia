@@ -375,5 +375,12 @@ func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
 	if build.DEBUG {
 		bn.consensusSetHash = cs.consensusSetHash()
 	}
+
+	// Replace the unprocessed block in the block map with a processed one
+	err = cs.db.rmBlockMap(bn.block.ID())
+	if err != nil {
+		return err
+	}
+
 	return cs.db.addBlockMap(*bn)
 }

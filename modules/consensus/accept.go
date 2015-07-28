@@ -99,6 +99,10 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 
 	newNode := parentNode.newChild(b)
 	cs.blockMap[b.ID()] = newNode
+	err = cs.db.addBlockMap(*newNode)
+	if err != nil {
+		return nil, nil, err
+	}
 	if newNode.heavierThan(cs.currentBlockNode()) {
 		return cs.forkBlockchain(newNode)
 	}
