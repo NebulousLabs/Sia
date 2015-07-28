@@ -79,7 +79,8 @@ func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode)
 	// Rewind blocks until we reach 'bn'.
 	for cs.currentBlockID() != bn.block.ID() {
 		node := cs.currentBlockNode()
-		cs.commitDiffSet(node, modules.DiffRevert)
+		bn := bnToPb(*node)
+		cs.commitDiffSet(&bn, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
@@ -94,9 +95,11 @@ func (s *ConsensusSet) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode,
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
 		if node.diffsGenerated {
-			s.commitDiffSet(node, modules.DiffApply)
+			bn := bnToPb(*node)
+			s.commitDiffSet(&bn, modules.DiffApply)
 		} else {
-			err = s.generateAndApplyDiff(node)
+			bn := bnToPb(*node)
+			err = s.generateAndApplyDiff(&bn)
 			if err != nil {
 				break
 			}

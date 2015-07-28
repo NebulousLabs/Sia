@@ -261,10 +261,16 @@ func (db *setDB) pathHeight() types.BlockHeight {
 	return types.BlockHeight(h)
 }
 
-// addBlockMap adds a block node to the block map
-// This will eventually take a processed block as an argument
-func (db *setDB) addBlockMap(bn blockNode) error {
+// addBlockMapBn adds a block node to the block map
+// DEPRICATED
+func (db *setDB) addBlockMapBn(bn blockNode) error {
 	return db.addItem("BlockMap", bn.block.ID(), bnToPb(bn))
+}
+
+// addBlockMap adds a processedBlock to the block map
+// This will eventually take a processed block as an argument
+func (db *setDB) addBlockMap(pb processedBlock) error {
+	return db.addItem("BlockMap", pb.Block.ID(), pb)
 }
 
 // getBlockMap queries the set database to return a processedBlock

@@ -17,13 +17,13 @@ var (
 
 // applyMinerPayouts adds a block's miner payouts to the consensus set as
 // delayed siacoin outputs.
-func (cs *ConsensusSet) applyMinerPayouts(bn *blockNode) {
-	for i, payout := range bn.block.MinerPayouts {
+func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) {
+	for i, payout := range pb.Block.MinerPayouts {
 		// Sanity check - input should not exist in the consensus set.
-		mpid := bn.block.MinerPayoutID(uint64(i))
+		mpid := pb.Block.MinerPayoutID(uint64(i))
 		if build.DEBUG {
 			// Check the delayed outputs set.
-			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][mpid]
+			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][mpid]
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -39,9 +39,9 @@ func (cs *ConsensusSet) applyMinerPayouts(bn *blockNode) {
 			Direction:      modules.DiffApply,
 			ID:             mpid,
 			SiacoinOutput:  payout,
-			MaturityHeight: bn.height + types.MaturityDelay,
+			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
-		bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	}
 	return
@@ -50,15 +50,15 @@ func (cs *ConsensusSet) applyMinerPayouts(bn *blockNode) {
 // applyMaturedSiacoinOutputs goes through the list of siacoin outputs that
 // have matured and adds them to the consensus set. This also updates the block
 // node diff set.
-func (cs *ConsensusSet) applyMaturedSiacoinOutputs(bn *blockNode) {
+func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 	// Skip this step if the blockchain is not old enough to have maturing
 	// outputs.
-	if !(bn.height > types.MaturityDelay) {
+	if !(pb.Height > types.MaturityDelay) {
 		return
 	}
 
 	// Add all of the matured outputs to the full siaocin output set.
-	for dscoid, dsco := range cs.delayedSiacoinOutputs[bn.height] {
+	for dscoid, dsco := range cs.delayedSiacoinOutputs[pb.Height] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG {
 			_, exists := cs.siacoinOutputs[dscoid]
@@ -74,7 +74,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(bn *blockNode) {
 			ID:            dscoid,
 			SiacoinOutput: dsco,
 		}
-		bn.siacoinOutputDiffs = append(bn.siacoinOutputDiffs, scod)
+		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
 		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 
 		// Remove the delayed siacoin output from the consensus set.
@@ -82,25 +82,25 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(bn *blockNode) {
 			Direction:      modules.DiffRevert,
 			ID:             dscoid,
 			SiacoinOutput:  dsco,
-			MaturityHeight: bn.height,
+			MaturityHeight: pb.Height,
 		}
-		bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	}
 
 	// Delete the map that held the now-matured outputs.
 	// Sanity check - map should be empty.
 	if build.DEBUG {
-		if len(cs.delayedSiacoinOutputs[bn.height]) != 0 {
+		if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
 			panic("deleting non-empty map")
 		}
 	}
-	delete(cs.delayedSiacoinOutputs, bn.height)
+	delete(cs.delayedSiacoinOutputs, pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
 // contract expiring.
-func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileContractID) {
+func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) {
 	// Sanity checks.
 	fc, exists := cs.fileContracts[fcid]
 	if build.DEBUG {
@@ -109,8 +109,8 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 			panic(errMissingFileContract)
 		}
 
-		// Check that the file contract in question expires at bn.height.
-		if fc.WindowEnd != bn.height {
+		// Check that the file contract in question expires at pb.Height.
+		if fc.WindowEnd != pb.Height {
 			panic(errStorageProofTiming)
 		}
 	}
@@ -120,7 +120,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 		// Sanity check - output should not already exist.
 		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
 		if build.DEBUG {
-			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
+			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid]
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -134,9 +134,9 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 			Direction:      modules.DiffApply,
 			ID:             spoid,
 			SiacoinOutput:  mpo,
-			MaturityHeight: bn.height + types.MaturityDelay,
+			MaturityHeight: pb.Height + types.MaturityDelay,
 		}
-		bn.delayedSiacoinOutputDiffs = append(bn.delayedSiacoinOutputDiffs, dscod)
+		pb.DelayedSiacoinOutputDiffs = append(pb.DelayedSiacoinOutputDiffs, dscod)
 		cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	}
 
@@ -147,7 +147,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 		ID:           fcid,
 		FileContract: fc,
 	}
-	bn.fileContractDiffs = append(bn.fileContractDiffs, fcd)
+	pb.FileContractDiffs = append(pb.FileContractDiffs, fcd)
 	cs.commitFileContractDiff(fcd, modules.DiffApply)
 
 	return
@@ -156,25 +156,25 @@ func (cs *ConsensusSet) applyMissedStorageProof(bn *blockNode, fcid types.FileCo
 // applyFileContractMaintenance looks for all of the file contracts that have
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
-func (cs *ConsensusSet) applyFileContractMaintenance(bn *blockNode) {
+func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) {
 	// Because you can't modify a map safely while iterating through it, a
 	// slice of contracts to be handled is created, then acted upon after
 	// iterating through the map.
 	var expiredFileContracts []types.FileContractID
-	for id, _ := range cs.fileContractExpirations[bn.height] {
+	for id, _ := range cs.fileContractExpirations[pb.Height] {
 		expiredFileContracts = append(expiredFileContracts, id)
 	}
 	for _, id := range expiredFileContracts {
-		cs.applyMissedStorageProof(bn, id)
+		cs.applyMissedStorageProof(pb, id)
 	}
 
 	// Sanity check - map with expiring file contracts should now be empty.
 	if build.DEBUG {
-		if len(cs.fileContractExpirations[bn.height]) != 0 {
+		if len(cs.fileContractExpirations[pb.Height]) != 0 {
 			panic("an expiring file contract was missed")
 		}
 	}
-	delete(cs.fileContractExpirations, bn.height)
+	delete(cs.fileContractExpirations, pb.Height)
 
 	return
 }
@@ -182,8 +182,8 @@ func (cs *ConsensusSet) applyFileContractMaintenance(bn *blockNode) {
 // applyMaintenance applies block-level alterations to the consensus set.
 // Maintenance is applied after all of the transcations for the block have been
 // applied.
-func (cs *ConsensusSet) applyMaintenance(bn *blockNode) {
-	cs.applyMinerPayouts(bn)
-	cs.applyMaturedSiacoinOutputs(bn)
-	cs.applyFileContractMaintenance(bn)
+func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) {
+	cs.applyMinerPayouts(pb)
+	cs.applyMaturedSiacoinOutputs(pb)
+	cs.applyFileContractMaintenance(pb)
 }
