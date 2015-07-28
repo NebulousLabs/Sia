@@ -177,13 +177,13 @@ func (db *setDB) pathHeight() types.BlockHeight {
 
 // addBlockMapBn adds a block node to the block map
 // DEPRICATED
-func (db *setDB) addBlockMapBn(bn blockNode) error {
+func (db *setDB) addBlockMapBn(bn *blockNode) error {
 	return db.addItem("BlockMap", bn.block.ID(), bnToPb(bn))
 }
 
 // addBlockMap adds a processedBlock to the block map
 // This will eventually take a processed block as an argument
-func (db *setDB) addBlockMap(pb processedBlock) error {
+func (db *setDB) addBlockMap(pb *processedBlock) error {
 	return db.addItem("BlockMap", pb.Block.ID(), pb)
 }
 
@@ -194,19 +194,19 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	var pb processedBlock
-	err = encoding.Unmarshal(bnBytes, &pb)
+	var pb *processedBlock
+	err = encoding.Unmarshal(bnBytes, pb)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return &pb
+	return pb
 }
 
 // getBlockMapBn is a transitional wrapper for getting a block node
 // from the blockMap // DEPRICATED
 func (cs *ConsensusSet) getBlockMapBn(id types.BlockID) *blockNode {
 	bn := cs.pbToBn(cs.db.getBlockMap(id))
-	return &bn
+	return bn
 }
 
 // inBlockMap checks for the existance of a block with a given ID in
@@ -221,7 +221,7 @@ func (db *setDB) rmBlockMap(id types.BlockID) error {
 }
 
 // updateBlockMap is a wrapper function for modification of
-func (db *setDB) updateBlockMap(pb processedBlock) {
+func (db *setDB) updateBlockMap(pb *processedBlock) {
 	// These errors will only be caused by an error by bolt
 	// e.g. database being closed.
 	err := db.rmBlockMap(pb.Block.ID())

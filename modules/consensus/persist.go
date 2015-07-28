@@ -12,7 +12,7 @@ import (
 // initDatabase is run when the database
 func (cs *ConsensusSet) initSetDB() error {
 	// add genesis block
-	err := cs.db.addBlockMap(bnToPb(*cs.blockRoot))
+	err := cs.db.addBlockMap(bnToPb(cs.blockRoot))
 	if err != nil {
 		return err
 	}
@@ -87,11 +87,11 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.blockMap[bn.block.ID()] = &bn // DEPRICATED
+		cs.blockMap[bn.block.ID()] = bn // DEPRICATED
 		cs.updatePath = false
 		cs.commitDiffSet(pb, modules.DiffApply)
 		cs.updatePath = true
-		cs.updateSubscribers(nil, []*blockNode{&bn})
+		cs.updateSubscribers(nil, []*blockNode{bn})
 		cs.mu.Unlock(lockID)
 	}
 }

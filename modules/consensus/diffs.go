@@ -362,12 +362,12 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
 			bn := cs.pbToBn(pb)
-			cs.deleteNode(&bn)
+			cs.deleteNode(bn)
 			return err
 		}
 
 		bn := cs.pbToBn(pb)
-		cs.applyTransaction(&bn, txn)
+		cs.applyTransaction(bn, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
@@ -386,5 +386,5 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		return err
 	}
 
-	return cs.db.addBlockMap(*pb)
+	return cs.db.addBlockMap(pb)
 }

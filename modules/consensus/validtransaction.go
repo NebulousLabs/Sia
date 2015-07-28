@@ -256,8 +256,8 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	diffHolder := new(blockNode)
 	diffHolder.height = cs.height()
 	defer func() {
-		pb := bnToPb(*diffHolder)
-		cs.commitNodeDiffs(&pb, modules.DiffRevert)
+		pb := bnToPb(diffHolder)
+		cs.commitNodeDiffs(pb, modules.DiffRevert)
 	}()
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)

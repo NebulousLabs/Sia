@@ -138,7 +138,7 @@ func (pb *processedBlock) newChild(b types.Block, db *setDB) *processedBlock {
 	// Add the child to the parent.
 	pb.Children = append(pb.Children, child.Block.ID())
 
-	db.updateBlockMap(*pb)
+	db.updateBlockMap(pb)
 
 	return child
 }
@@ -149,8 +149,8 @@ func (pb *processedBlock) newChild(b types.Block, db *setDB) *processedBlock {
 
 // bnToPb converts a blockNode to a processed block
 // DEPRECATED
-func bnToPb(bn blockNode) processedBlock {
-	pb := processedBlock{
+func bnToPb(bn *blockNode) *processedBlock {
+	pb := &processedBlock{
 		Block: bn.block,
 
 		Height:      bn.height,
@@ -179,13 +179,13 @@ func bnToPb(bn blockNode) processedBlock {
 // pbToBn exists to move a processed block to a block node. It
 // requires the consensus block Map.
 // DEPRECATED
-func (cs *ConsensusSet) pbToBn(pb *processedBlock) blockNode {
+func (cs *ConsensusSet) pbToBn(pb *processedBlock) *blockNode {
 	parent, exists := cs.blockMap[pb.Parent]
 	if !exists {
 		parent = nil
 	}
 
-	bn := blockNode{
+	bn := &blockNode{
 		block:  pb.Block,
 		parent: parent,
 
