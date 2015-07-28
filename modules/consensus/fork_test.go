@@ -55,10 +55,10 @@ func TestDeleteNode(t *testing.T) {
 	}
 
 	// Rewind so that 'pb' is the current block again.
-	childchild := bnToPb(*bn.children[0].children[0])
-	child := bnToPb(*bn.children[0])
-	cst.cs.commitDiffSet(&childchild, modules.DiffRevert)
-	cst.cs.commitDiffSet(&child, modules.DiffRevert)
+	childchild := bnToPb(bn.children[0].children[0])
+	child := bnToPb(bn.children[0])
+	cst.cs.commitDiffSet(childchild, modules.DiffRevert)
+	cst.cs.commitDiffSet(child, modules.DiffRevert)
 
 	// Call 'deleteNode' on child0
 	child0Node := bn.children[0]

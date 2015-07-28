@@ -184,7 +184,7 @@ func (db *setDB) addBlockMapBn(bn *blockNode) error {
 // addBlockMap adds a processedBlock to the block map
 // This will eventually take a processed block as an argument
 func (db *setDB) addBlockMap(pb *processedBlock) error {
-	return db.addItem("BlockMap", pb.Block.ID(), pb)
+	return db.addItem("BlockMap", pb.Block.ID(), *pb)
 }
 
 // getBlockMap queries the set database to return a processedBlock
@@ -194,12 +194,12 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	var pb *processedBlock
-	err = encoding.Unmarshal(bnBytes, pb)
+	var pb processedBlock
+	err = encoding.Unmarshal(bnBytes, &pb)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	return pb
+	return &pb
 }
 
 // getBlockMapBn is a transitional wrapper for getting a block node
