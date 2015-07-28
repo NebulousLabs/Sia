@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -20,6 +21,8 @@ const (
 var (
 	seedModifier         = types.Specifier{'s', 'e', 'e', 'd'}
 	generatedKeyModifier = types.Specifier{'g', 'e', 'n', 'k', 'e', 'y'}
+
+	errAddressExhaustion = errors.New("current seed has used all available addresses")
 )
 
 type (
@@ -151,9 +154,10 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) error {
 	if err != nil {
 		return err
 	}
-	w.settings.PrimarySeed = filename
+	w.settings.PrimarySeedFile = SeedFile{encryptionVerification, cryptSeed}
+	w.settings.PrimarySeedFilename = filename
 	w.settings.AddressProgress = 0
-	return persist.SaveFile(seedMetadata, &SeedFile{encryptionVerification, cryptSeed}, filename)
+	return persist.SaveFile(seedMetadata, &w.settings.PrimarySeedFile, filename)
 }
 
 // initAuxiliarySeeds scans the wallet folder for wallet seeds. Auxiliary seeds
@@ -173,4 +177,55 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 		}
 	}
 	return nil
+}
+
+// nextAddress fetches the next address in the seed file.
+func (w *Wallet) nextAddress(masterKey crypto.TwofishKey) (types.UnlockHash, error) {
+	// Check that the wallet has been unlocked.
+	if !w.unlocked {
+		return types.UnlockHash{}, errLockedWallet
+	}
+
+	// Check that the seed has room for more addresses.
+	if w.settings.AddressProgress == publicKeysPerSeed {
+		return types.UnlockHash{}, errAddressExhaustion
+	}
+
+	// Check that the masterKey is correct.
+	sek := seedEncryptionKey(masterKey, w.settings.PrimarySeedFilename)
+	expected := make([]byte, encryptionVerificationLen)
+	decryptedBytes, err := sek.DecryptBytes(w.settings.PrimarySeedFile.EncryptionVerification)
+	if err != nil {
+		return types.UnlockHash{}, err
+	}
+	if !bytes.Equal(decryptedBytes, expected) {
+		return types.UnlockHash{}, errBadEncryptionKey
+	}
+
+	// Decrypt the seed.
+	var s seed
+	plainSeed, err := sek.DecryptBytes(w.settings.PrimarySeedFile.Seed)
+	if err != nil {
+		return types.UnlockHash{}, err
+	}
+	copy(s[:], plainSeed[:])
+
+	// Using the seed, determine the public key of the next address.
+	entropy := crypto.HashAll(s, w.settings.AddressProgress)
+	_, pk := crypto.DeterministicSignatureKeys(entropy)
+
+	// Increase the address usage.
+	w.settings.AddressProgress++
+	err = w.saveSettings()
+	if err != nil {
+		return types.UnlockHash{}, err
+	}
+
+	return types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{{
+			Algorithm: types.SignatureEd25519,
+			Key:       pk[:],
+		}},
+		SignaturesRequired: 1,
+	}.UnlockHash(), nil
 }

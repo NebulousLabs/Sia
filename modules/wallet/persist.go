@@ -37,8 +37,9 @@ type WalletSettings struct {
 	// 32 '0' bytes.
 	EncryptionVerification crypto.Ciphertext
 
-	PrimarySeed     string // Name of the primary seed for the wallet.
-	AddressProgress uint64 // Number of addresses used in the primary seed.
+	PrimarySeedFile     SeedFile // The encrypted seed.
+	PrimarySeedFilename string   // Name of the primary seed for the wallet.
+	AddressProgress     uint64   // Number of addresses used in the primary seed.
 }
 
 // saveSettings writes the wallet's settings to the wallet's settings file,
@@ -153,11 +154,11 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 // if the primary seed does not exist. The primary seed is used to generate new
 // addresses.
 func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
-	if w.settings.PrimarySeed == "" {
+	if w.settings.PrimarySeedFilename == "" {
 		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
 		return w.createSeed(masterKey)
 	}
-	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeed))
+	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeedFilename))
 	if err != nil {
 		w.log.Println("UNLOCK: Issue loading primary seed file:", err)
 		return err

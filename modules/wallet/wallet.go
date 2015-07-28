@@ -23,6 +23,10 @@ const (
 	TransactionFee = 10
 )
 
+var (
+	errLockedWallet = errors.New("wallet must be unlocked before it can be used")
+)
+
 type Wallet struct {
 	unlocked bool
 	settings WalletSettings

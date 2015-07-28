@@ -148,4 +148,9 @@ type Wallet interface {
 
 	// WatchSiagSiafundAddress adds a siafund address pulled from a siag keyfile.
 	WatchSiagSiafundAddress(keyfile string) error
+
+	// Unlock
+	// NewSeed
+	// ListSeeds
+	// NextAddress
 }
