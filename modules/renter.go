@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"io"
 	"time"
 
 	"github.com/NebulousLabs/Sia/types"
@@ -9,6 +10,26 @@ import (
 var (
 	RenterDir = "renter"
 )
+
+// An ECC is an error correcting code.
+type ECC interface {
+	// ChunkSize is the size of one chunk.
+	ChunkSize() uint64
+
+	// NumPieces is the number of pieces per chunk.
+	NumPieces() int
+
+	// Encode reads a chunk from r (a byte slice of length ChunkSize) and
+	// splits it into equal-length pieces, with some pieces containing parity
+	// data. The total number of pieces is equal to NumPieces.
+	Encode(r io.Reader) ([][]byte, error)
+
+	// Recover recovers the original data from pieces (including parity) and
+	// writes it to w. pieces should be identical to the slice returned by
+	// Encode (length and order must be preserved), but with missing elements
+	// set to nil.
+	Recover(pieces [][]byte, w io.Writer) error
+}
 
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
