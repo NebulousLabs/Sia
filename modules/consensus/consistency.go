@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -210,10 +209,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// Add the siafund pool
 	tree.PushObject(cs.siafundPool)
 
-	root := tree.Root()
-	cs.printConsensusSet(root)
-
-	return root
+	return tree.Root()
 }
 
 // checkRewindApply rewinds and reapplies the current block, checking that the
@@ -232,7 +228,6 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	parent := cs.db.getBlockMap(currentNode.Parent)
 	cs.revertToNode(parent)
 	if cs.consensusSetHash() != parent.ConsensusSetHash {
-		fmt.Printf("Calculated: %x Saved: %x\n", cs.consensusSetHash(), parent.ConsensusSetHash)
 		return errors.New("rewinding a block resulted in unexpected consensus set hash")
 	}
 	cs.applyUntilNode(currentNode)

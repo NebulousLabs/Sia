@@ -96,6 +96,9 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)

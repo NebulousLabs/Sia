@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -332,7 +331,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 
 		// Current node must be the input node's parent.
 		if pb.Parent != cs.currentBlockID() {
-			fmt.Printf("Processing: %x, Current: %x\n", pb.Parent, cs.currentBlockID())
 			panic(errInvalidSuccessor)
 		}
 	}
@@ -377,7 +375,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 
 	if build.DEBUG {
 		pb.ConsensusSetHash = cs.consensusSetHash()
-		fmt.Printf("Set cs hash of %x to %x\n", pb.Block.ID(), pb.ConsensusSetHash)
 	}
 
 	// Replace the unprocessed block in the block map with a processed one

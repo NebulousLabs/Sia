@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -1487,7 +1486,7 @@ func TestComplexForking(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.SkipNow()
+
 	cst1, err := createConsensusSetTester("TestComplexForking - 1")
 	if err != nil {
 		t.Fatal(err)
@@ -1516,11 +1515,9 @@ func TestComplexForking(t *testing.T) {
 	}
 
 	for _, block := range cst1Blocks {
-		fmt.Printf("Applying to cst3: %x\n", block.ID())
 		// Some blocks will return errors.
 		err = cst3.cs.AcceptBlock(block)
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
+		if err == nil {
 		}
 	}
 	if cst3.cs.currentBlockID() != cst1.cs.currentBlockID() {
@@ -1546,7 +1543,7 @@ func TestComplexForking(t *testing.T) {
 	}
 	var cst2Blocks []types.Block
 	pb = cst2.cs.currentProcessedBlock()
-	for pb != cst2.cs.blockRoot {
+	for pb.Block.ID() != cst2.cs.blockRoot.Block.ID() {
 		cst2Blocks = append([]types.Block{pb.Block}, cst2Blocks...) // prepend
 		pb = cst2.cs.db.getBlockMap(pb.Parent)
 	}
@@ -1573,7 +1570,7 @@ func TestComplexForking(t *testing.T) {
 	}
 	var cst3Blocks []types.Block
 	pb = cst3.cs.currentProcessedBlock()
-	for pb != cst3.cs.blockRoot {
+	for pb.Block.ID() != cst3.cs.blockRoot.Block.ID() {
 		cst3Blocks = append([]types.Block{pb.Block}, cst3Blocks...) // prepend
 		pb = cst3.cs.db.getBlockMap(pb.Parent)
 	}
@@ -1600,7 +1597,7 @@ func TestBuriedBadFork(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.SkipNow()
+
 	cst, err := createConsensusSetTester("TestBuriedBadFork")
 	if err != nil {
 		t.Fatal(err)

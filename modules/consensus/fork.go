@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -65,10 +64,6 @@ func (cs *ConsensusSet) backtrackToCurrentPath(pb *processedBlock) []*processedB
 		pb = cs.db.getBlockMap(pb.Parent)
 		path = append([]*processedBlock{pb}, path...) // prepend
 	}
-	fmt.Printf("Backtracking path:\n")
-	for _, b := range path {
-		fmt.Printf("    %x\n", b.Block.ID())
-	}
 	return path
 }
 
@@ -87,7 +82,6 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 	for cs.currentBlockID() != pb.Block.ID() {
 		node := cs.currentProcessedBlock()
 		cs.commitDiffSet(node, modules.DiffRevert)
-		fmt.Printf("Reverted %x\n", node.Block.ID())
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
@@ -98,18 +92,13 @@ func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*proce
 func (s *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
 	newPath := s.backtrackToCurrentPath(pb)
-	fmt.Printf("new path:\n")
-	for _, b := range newPath {
-		fmt.Printf("    %x\n", b.Block.ID())
-	}
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
-		fmt.Printf("Applying %x, with diffs %d\n", node.Block.ID(), node.DiffsGenerated)
 		if node.DiffsGenerated {
-			s.commitDiffSet(pb, modules.DiffApply)
+			s.commitDiffSet(node, modules.DiffApply)
 		} else {
-			err = s.generateAndApplyDiff(pb)
+			err = s.generateAndApplyDiff(node)
 			if err != nil {
 				break
 			}
