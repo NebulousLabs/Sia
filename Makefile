@@ -15,7 +15,6 @@ dependencies:
 	go get -u github.com/inconshreveable/muxado
 	go get -u github.com/kardianos/osext
 	go get -u github.com/laher/goxc
-	go get -u github.com/mitchellh/go-homedir
 	go get -u github.com/spf13/cobra
 	go get -u github.com/stretchr/graceful
 	go get -u golang.org/x/crypto/twofish

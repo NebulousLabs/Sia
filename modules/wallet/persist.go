@@ -192,7 +192,7 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 	}
 
 	// Load all wallet seeds that are not used to generate new addresses.
-	err = w.initAuxillarySeeds(masterKey)
+	err = w.initAuxiliarySeeds(masterKey)
 	if err != nil {
 		return err
 	}
