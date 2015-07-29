@@ -35,7 +35,7 @@ func benchmarkEmptyBlocks(b *testing.B) error {
 	}
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
-		err = cs.AcceptBlock(cst.cs.blockMap[cst.cs.db.getPath(i)].block)
+		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
 		if err != nil {
 			return err
 		}

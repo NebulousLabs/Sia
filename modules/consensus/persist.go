@@ -24,7 +24,9 @@ func (cs *ConsensusSet) initSetDB() error {
 	cs.blocksLoaded = 0
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
+		cs.db.updateBlockMap(cs.blockRoot)
 	}
+
 	return nil
 }
 
