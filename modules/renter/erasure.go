@@ -11,25 +11,18 @@ import (
 // rsCode is a Reed-Solomon encoder/decoder. It implements the modules.ECC
 // interface.
 type rsCode struct {
-	enc   reedsolomon.Encoder
-	chunk []byte // allocated during initialization to save memory
+	enc reedsolomon.Encoder
 
-	chunkSize uint64
 	numPieces int
 }
 
-func (rs *rsCode) ChunkSize() uint64 { return rs.chunkSize }
-
+// NumPieces returns the number of pieces returned by Encode.
 func (rs *rsCode) NumPieces() int { return rs.numPieces }
 
-// Encode reads a chunk from r and splits it into equal-length pieces. If a
-// full chunk cannot be read, the remainder of the chunk will contain zeros.
-func (rs *rsCode) Encode(r io.Reader) ([][]byte, error) {
-	_, err := io.ReadFull(r, rs.chunk)
-	if err != nil && err != io.ErrUnexpectedEOF {
-		return nil, err
-	}
-	pieces, err := rs.enc.Split(rs.chunk)
+// Encode splits data into equal-length pieces, some containing the original
+// data and some containing parity data.
+func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
+	pieces, err := rs.enc.Split(data)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +48,7 @@ func (rs *rsCode) Recover(pieces [][]byte, w io.Writer) error {
 
 // NewRSCode creates a new Reed-Solomon encoder/decoder using the supplied
 // parameters.
-func NewRSCode(nData, nParity int, chunksize uint64) (modules.ECC, error) {
+func NewRSCode(nData, nParity int) (modules.ECC, error) {
 	enc, err := reedsolomon.New(nData, nParity)
 	if err != nil {
 		return nil, err
@@ -63,7 +56,6 @@ func NewRSCode(nData, nParity int, chunksize uint64) (modules.ECC, error) {
 	return &rsCode{
 		enc:       enc,
 		chunk:     make([]byte, chunksize),
-		chunkSize: chunksize,
 		numPieces: nData + nParity,
 	}, nil
 }

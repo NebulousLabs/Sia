@@ -13,16 +13,12 @@ var (
 
 // An ECC is an error correcting code.
 type ECC interface {
-	// ChunkSize is the size of one chunk.
-	ChunkSize() uint64
-
-	// NumPieces is the number of pieces per chunk.
+	// NumPieces is the number of pieces returned by Encode.
 	NumPieces() int
 
-	// Encode reads a chunk from r (a byte slice of length ChunkSize) and
-	// splits it into equal-length pieces, with some pieces containing parity
-	// data. The total number of pieces is equal to NumPieces.
-	Encode(r io.Reader) ([][]byte, error)
+	// Encode splits data into equal-length pieces, with some pieces
+	// containing parity data.
+	Encode(data []byte) ([][]byte, error)
 
 	// Recover recovers the original data from pieces (including parity) and
 	// writes it to w. pieces should be identical to the slice returned by

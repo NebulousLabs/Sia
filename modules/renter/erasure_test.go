@@ -9,26 +9,28 @@ import (
 )
 
 func TestRSEncode(t *testing.T) {
-	ecc, err := NewRSCode(10, 3, 130)
+	ecc, err := NewRSCode(10, 3, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := make([]byte, 650)
+
+	data := make([]byte, 777)
 	rand.Read(data)
-	r := bytes.NewReader(data)
-	buf := new(bytes.Buffer)
-	for {
-		pieces, err := ecc.Encode(r)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			t.Fatal(err)
-		}
-		err = ecc.Recover(pieces, buf)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+	pieces, err := ecc.Encode(data)
+	if err == io.EOF {
+		break
+	} else if err != nil {
+		t.Fatal(err)
 	}
+
+	buf := new(bytes.Buffer)
+	err = ecc.Recover(pieces, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf.Truncate(777)
 	if bytes.Compare(data, buf.Bytes()) != 0 {
 		t.Fatal("recovered data does not match original")
 	}
@@ -41,12 +43,10 @@ func BenchmarkRSEncode(b *testing.B) {
 	}
 	data := make([]byte, 1<<20)
 	rand.Read(data)
-	r := bytes.NewReader(data)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r.Seek(0, 0)
-		ecc.Encode(r)
+		ecc.Encode(data)
 	}
 }
 
@@ -55,7 +55,9 @@ func BenchmarkRSRecover(b *testing.B) {
 	if err != nil {
 		panic(err)
 	}
-	pieces, err := ecc.Encode(rand.Reader)
+	data := make([]byte, 1<<20)
+	rand.Read(data)
+	pieces, err := ecc.Encode(data)
 	if err != nil {
 		panic(err)
 	}
