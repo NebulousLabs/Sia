@@ -28,10 +28,10 @@ var (
 // GenerateKeyPair creates a public-secret keypair that can be used to sign and
 // verify messages.
 func GenerateSignatureKeys() (sk SecretKey, pk PublicKey, err error) {
-	var entropy [32]byte
+	var entropy [EntropySize]byte
 	_, err = rand.Read(entropy[:])
 	if err != nil {
-		return sk, pk, err
+		return
 	}
 
 	skPointer, pkPointer := ed25519.GenerateKey(entropy)
@@ -49,18 +49,16 @@ func DeterministicSignatureKeys(entropy [EntropySize]byte) (SecretKey, PublicKey
 func SignHash(data Hash, sk SecretKey) (sig Signature, err error) {
 	skNorm := [SecretKeySize]byte(sk)
 	sig = *ed25519.Sign(&skNorm, data[:])
-	return
+	return sig, nil
 }
 
 // VerifyHash uses a public key and input data to verify a signature.
-func VerifyHash(data Hash, pk PublicKey, sig Signature) (err error) {
+func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	pkNorm := [PublicKeySize]byte(pk)
 	sigNorm := [SignatureSize]byte(sig)
 	verifies := ed25519.Verify(&pkNorm, data[:], &sigNorm)
 	if !verifies {
-		err = ErrInvalidSignature
-		return
+		return ErrInvalidSignature
 	}
-
-	return
+	return nil
 }

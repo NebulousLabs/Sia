@@ -20,6 +20,6 @@ func (m *Miner) initPersist() error {
 		return err
 	}
 	m.log = log.New(logFile, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)
-	m.log.Println("INFO: Miner logger opened, logging has started.")
+	m.log.Println("STARTUP: Miner logger opened, logging has started.")
 	return nil
 }

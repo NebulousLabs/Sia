@@ -1,9 +1,11 @@
 package wallet
 
 import (
+	"crypto/rand"
 	"path/filepath"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -19,6 +21,8 @@ type walletTester struct {
 	tpool  modules.TransactionPool
 	miner  modules.Miner
 	wallet *Wallet
+
+	walletMasterKey crypto.TwofishKey
 
 	persistDir string
 }
@@ -56,6 +60,16 @@ func createWalletTester(name string) (*walletTester, error) {
 		wallet: w,
 
 		persistDir: testdir,
+	}
+
+	// Unlock the wallet.
+	_, err = rand.Read(wt.walletMasterKey[:])
+	if err != nil {
+		return nil, err
+	}
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err != nil {
+		return nil, err
 	}
 
 	// Mine blocks until there is money in the wallet.

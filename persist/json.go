@@ -2,22 +2,11 @@ package persist
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"os"
 )
 
-var (
-	ErrBadVersion = errors.New("incompatible version")
-	ErrBadHeader  = errors.New("wrong header")
-)
-
-// Metadata contains the header and version of the data being stored.
-type Metadata struct {
-	Header, Version string
-}
-
-// Save saves data to a writer.
+// Save saves json data to a writer.
 func Save(meta Metadata, data interface{}, w io.Writer) error {
 	b, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
@@ -38,7 +27,7 @@ func Save(meta Metadata, data interface{}, w io.Writer) error {
 	return nil
 }
 
-// Load loads data from a reader.
+// Load loads json data from a reader.
 func Load(meta Metadata, data interface{}, r io.Reader) error {
 	var header, version string
 	dec := json.NewDecoder(r)
@@ -61,7 +50,7 @@ func Load(meta Metadata, data interface{}, r io.Reader) error {
 	return nil
 }
 
-// SaveFile saves data to a file.
+// SaveFile saves json data to a file.
 func SaveFile(meta Metadata, data interface{}, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -71,7 +60,7 @@ func SaveFile(meta Metadata, data interface{}, filename string) error {
 	return Save(meta, data, file)
 }
 
-// LoadFile loads data from a file.
+// LoadFile loads json data from a file.
 func LoadFile(meta Metadata, data interface{}, filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
