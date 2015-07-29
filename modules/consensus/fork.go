@@ -16,111 +16,111 @@ var (
 
 // deleteNode recursively deletes its children from the set of known blocks.
 // The node being deleted should not be a part of the current path.
-func (cs *ConsensusSet) deleteNode(bn *blockNode) {
+func (cs *ConsensusSet) deleteNode(pb *processedBlock) {
 	// Sanity check - the node being deleted should not be in the current path.
 	if build.DEBUG {
-		if types.BlockHeight(cs.db.pathHeight()) > bn.height &&
-			cs.db.getPath(bn.height) == bn.block.ID() {
+		if types.BlockHeight(cs.db.pathHeight()) > pb.Height &&
+			cs.db.getPath(pb.Height) == pb.Block.ID() {
 			panic(errDeleteCurrentPath)
 		}
 	}
 
 	// Recusively call 'deleteNode' on of the input node's children.
-	for i := range bn.children {
-		cs.deleteNode(bn.children[i])
+	for i := range pb.Children {
+		child := cs.db.getBlockMap(pb.Children[i])
+		cs.deleteNode(child)
 	}
 
 	// Remove the node from the block map, and from its parents list of
 	// children.
-	delete(cs.blockMap, bn.block.ID())
-	cs.db.rmBlockMap(bn.block.ID())
-	for i := range bn.parent.children {
-		if bn.parent.children[i] == bn {
+	delete(cs.blockMap, pb.Block.ID())
+	cs.db.rmBlockMap(pb.Block.ID())
+	parent := cs.db.getBlockMap(pb.Parent)
+	for i := range parent.Children {
+		if parent.Children[i] == pb.Block.ID() {
 			// If 'i' is not the last element, remove it from the array by
 			// copying the remaining array over it.
-			if i < len(bn.parent.children)-1 {
-				copy(bn.parent.children[i:], bn.parent.children[i+1:])
+			if i < len(parent.Children)-1 {
+				copy(parent.Children[i:], parent.Children[i+1:])
 			}
 			// Trim the last element.
-			bn.parent.children = bn.parent.children[:len(bn.parent.children)-1]
+			parent.Children = parent.Children[:len(parent.Children)-1]
 			break
 		}
 	}
+	cs.db.updateBlockMap(parent)
 }
 
-// backtrackToCurrentPath traces backwards from 'bn' until it reaches a node in
+// backtrackToCurrentPath traces backwards from 'pb' until it reaches a node in
 // the ConsensusSet's current path (the "common parent"). It returns the
-// (inclusive) set of nodes between the common parent and 'bn', starting from
+// (inclusive) set of nodes between the common parent and 'pb', starting from
 // the former.
-func (cs *ConsensusSet) backtrackToCurrentPath(bn *blockNode) []*blockNode {
-	path := []*blockNode{bn}
+func (cs *ConsensusSet) backtrackToCurrentPath(pb *processedBlock) []*processedBlock {
+	path := []*processedBlock{pb}
 	for {
 		// Stop when we reach the common parent.
-		if bn.height <= cs.height() && cs.db.getPath(bn.height) == bn.block.ID() {
+		if pb.Height <= cs.height() && cs.db.getPath(pb.Height) == pb.Block.ID() {
 			break
 		}
-		bn = bn.parent
-		path = append([]*blockNode{bn}, path...) // prepend
+		pb = cs.db.getBlockMap(pb.Parent)
+		path = append([]*processedBlock{pb}, path...) // prepend
 	}
 	return path
 }
 
 // revertToNode will revert blocks from the ConsensusSet's current path until
-// 'bn' is the current block. Blocks are returned in the order that they were
-// reverted.  'bn' is not reverted.
-func (cs *ConsensusSet) revertToNode(bn *blockNode) (revertedNodes []*blockNode) {
-	// Sanity check - make sure that bn is in the current path.
+// 'pb' is the current block. Blocks are returned in the order that they were
+// reverted.  'pb' is not reverted.
+func (cs *ConsensusSet) revertToNode(pb *processedBlock) (revertedNodes []*processedBlock) {
+	// Sanity check - make sure that pb is in the current path.
 	if build.DEBUG {
-		if cs.height() < bn.height || cs.db.getPath(bn.height) != bn.block.ID() {
+		if cs.height() < pb.Height || cs.db.getPath(pb.Height) != pb.Block.ID() {
 			panic(errExternalRevert)
 		}
 	}
 
-	// Rewind blocks until we reach 'bn'.
-	for cs.currentBlockID() != bn.block.ID() {
-		node := cs.currentBlockNode()
-		pb := bnToPb(node)
-		cs.commitDiffSet(pb, modules.DiffRevert)
+	// Rewind blocks until we reach 'pb'.
+	for cs.currentBlockID() != pb.Block.ID() {
+		node := cs.currentProcessedBlock()
+		cs.commitDiffSet(node, modules.DiffRevert)
 		revertedNodes = append(revertedNodes, node)
 	}
 	return
 }
 
 // applyUntilNode will successively apply the blocks between the consensus
-// set's current path and 'bn'.
-func (s *ConsensusSet) applyUntilNode(bn *blockNode) (appliedNodes []*blockNode, err error) {
+// set's current path and 'pb'.
+func (s *ConsensusSet) applyUntilNode(pb *processedBlock) (appliedBlocks []*processedBlock, err error) {
 	// Backtrack to the common parent of 'bn' and current path and then apply the new nodes.
-	newPath := s.backtrackToCurrentPath(bn)
+	newPath := s.backtrackToCurrentPath(pb)
 	for _, node := range newPath[1:] {
 		// If the diffs for this node have already been generated, apply diffs
 		// directly instead of generating them. This is much faster.
-		if node.diffsGenerated {
-			pb := bnToPb(node)
+		if node.DiffsGenerated {
 			s.commitDiffSet(pb, modules.DiffApply)
 		} else {
-			pb := bnToPb(node)
 			err = s.generateAndApplyDiff(pb)
 			if err != nil {
 				break
 			}
 		}
-		appliedNodes = append(appliedNodes, node)
+		appliedBlocks = append(appliedBlocks, node)
 	}
-	return
+	return appliedBlocks, err
 }
 
 // forkBlockchain will move the consensus set onto the 'newNode' fork. An error
 // will be returned if any of the blocks applied in the transition are found to
 // be invalid. forkBlockchain is atomic; the ConsensusSet is only updated if
 // the function returns nil.
-func (cs *ConsensusSet) forkBlockchain(newNode *blockNode) (revertedNodes, appliedNodes []*blockNode, err error) {
+func (cs *ConsensusSet) forkBlockchain(newNode *processedBlock) (revertedNodes, appliedNodes []*processedBlock, err error) {
 	// In debug mode, record the old state hash before attempting the fork.
 	// This variable is otherwise unused.
 	var oldHash crypto.Hash
 	if build.DEBUG {
 		oldHash = cs.consensusSetHash()
 	}
-	oldHead := cs.currentBlockNode()
+	oldHead := cs.currentProcessedBlock()
 
 	// revert to the common parent
 	commonParent := cs.backtrackToCurrentPath(newNode)[0]

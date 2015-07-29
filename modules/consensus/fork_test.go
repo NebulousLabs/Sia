@@ -15,7 +15,7 @@ func TestDeleteNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Set up the following structure:
 	//		parent -> child0 + child1
@@ -44,26 +44,27 @@ func TestDeleteNode(t *testing.T) {
 	}
 
 	// Check the structure is as intended.
-	if len(bn.children) != 2 {
+	if len(pb.Children) != 2 {
 		t.Fatal("wrong number of children on parent block")
 	}
-	if len(bn.children[0].children) != 1 {
+	pbChild0 := cst.cs.db.getBlockMap(pb.Children[0])
+	if len(pbChild0.Children) != 1 {
 		t.Fatal("bad block doesn't have the right number of children")
 	}
-	if len(bn.children[1].children) != 0 {
+	pbChild1 := cst.cs.db.getBlockMap(pb.Children[1])
+	if len(pbChild1.Children) != 0 {
 		t.Fatal("good block has children")
 	}
 
 	// Rewind so that 'pb' is the current block again.
-	childchild := bnToPb(bn.children[0].children[0])
-	child := bnToPb(bn.children[0])
+	childchild := cst.cs.db.getBlockMap(child0.Children[0])
 	cst.cs.commitDiffSet(childchild, modules.DiffRevert)
 	cst.cs.commitDiffSet(child, modules.DiffRevert)
 
 	// Call 'deleteNode' on child0
-	child0Node := bn.children[0]
-	cst.cs.deleteNode(bn.children[0])
-	if len(bn.children) != 1 {
+	child0Node := cst.cs.db.getBlockMap(pb.Children[0])
+	cst.cs.deleteNode(child0Node)
+	if len(pb.Children) != 1 {
 		t.Error("children not correctly deleted")
 	}
 	if len(child0Node.children) != 0 {

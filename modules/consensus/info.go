@@ -16,12 +16,6 @@ func (cs *ConsensusSet) currentBlockID() types.BlockID {
 	return cs.db.getPath(cs.height())
 }
 
-// currentBlockNode returns the blockNode of the current block.
-// DEPRICATED
-func (s *ConsensusSet) currentBlockNode() *blockNode {
-	return s.blockMap[s.currentBlockID()]
-}
-
 func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
 	return cs.db.getBlockMap(cs.currentBlockID())
 }
@@ -35,7 +29,7 @@ func (s *ConsensusSet) height() types.BlockHeight {
 func (s *ConsensusSet) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
-	return s.currentBlockNode().block
+	return s.currentProcessedBlock().Block
 }
 
 // ChildTarget does not need a lock, as the values being read are not changed
@@ -45,11 +39,12 @@ func (s *ConsensusSet) CurrentBlock() types.Block {
 // 'ReceiveConsensusSetUpdate', but that should change once boltdb replaces the
 // block mape
 func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exists bool) {
-	bn, exists := s.blockMap[bid]
+	exists = s.db.inBlockMap(bid)
 	if !exists {
 		return
 	}
-	target = bn.childTarget
+	pb := s.db.getBlockMap(bid)
+	target = pb.ChildTarget
 	return
 }
 
@@ -60,11 +55,12 @@ func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exis
 // 'ReceiveConsensusSetUpdate', but that should change once boltdb replaces the
 // block mape
 func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
-	bn, exists := s.blockMap[bid]
+	exists = s.db.inBlockMap(bid)
 	if !exists {
 		return
 	}
-	timestamp = bn.earliestChildTimestamp()
+	pb := s.db.getBlockMap(bid)
+	timestamp = pb.earliestChildTimestamp(s.db)
 	return
 }
 

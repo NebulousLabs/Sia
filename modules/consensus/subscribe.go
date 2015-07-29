@@ -80,14 +80,14 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
-func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
+func (cs *ConsensusSet) updateSubscribers(revertedNodes []*processedBlock, appliedNodes []*processedBlock) {
 	// Log the changes in the change log.
 	var ce changeEntry
 	for _, rn := range revertedNodes {
-		ce.revertedBlocks = append(ce.revertedBlocks, rn.block.ID())
+		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
 	}
 	for _, an := range appliedNodes {
-		ce.appliedBlocks = append(ce.appliedBlocks, an.block.ID())
+		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
 	}
 	cs.changeLog = append(cs.changeLog, ce)
 

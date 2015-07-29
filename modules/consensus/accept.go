@@ -81,15 +81,15 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
-	parentNode := cs.blockMap[b.ParentID]
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*processedBlock, err error) {
+	parentNode := cs.db.getBlockMap(b.ParentID)
 	// COMPATv0.4.0
 	//
 	// When validating/accepting a block, the types height needs to be set to
 	// the height of the block that's being analyzed. After analysis is
 	// finished, the height needs to be set to the height of the current block.
 	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = parentNode.height
+	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()
 	defer func() {
 		types.CurrentHeightLock.Lock()
@@ -97,13 +97,14 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := parentNode.newChild(b)
-	cs.blockMap[b.ID()] = newNode
-	err = cs.db.addBlockMapBn(newNode)
+	newNode := parentNode.newChild(b, cs.db)
+	bn := cs.pbToBn(newNode)
+	cs.blockMap[b.ID()] = bn
+	err = cs.db.addBlockMap(newNode)
 	if err != nil {
 		return nil, nil, err
 	}
-	if newNode.heavierThan(cs.currentBlockNode()) {
+	if newNode.heavierThan(cs.currentProcessedBlock()) {
 		return cs.forkBlockchain(newNode)
 	}
 	return nil, nil, modules.ErrNonExtendingBlock

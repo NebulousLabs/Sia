@@ -361,13 +361,11 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 			cs.applyMaturedSiacoinOutputs(pb)
 			cs.commitDiffSet(pb, modules.DiffRevert)
 			cs.dosBlocks[pb.Block.ID()] = struct{}{}
-			bn := cs.pbToBn(pb)
-			cs.deleteNode(bn)
+			cs.deleteNode(pb)
 			return err
 		}
 
-		bn := cs.pbToBn(pb)
-		cs.applyTransaction(bn, txn)
+		cs.applyTransaction(pb, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is

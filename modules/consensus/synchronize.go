@@ -109,10 +109,10 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	lockID := s.mu.RLock()
 	for _, id := range knownBlocks {
 		if s.db.inBlockMap(id) {
-			bn := s.getBlockMapBn(id)
-			if bn.height <= s.height() && id == s.db.getPath(bn.height) {
+			pb := s.db.getBlockMap(id)
+			if pb.Height <= s.height() && id == s.db.getPath(pb.Height) {
 				found = true
-				start = bn.height + 1 // start at child
+				start = pb.Height + 1 // start at child
 				break
 			}
 		}

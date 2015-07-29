@@ -253,11 +253,10 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
-	diffHolder := new(blockNode)
-	diffHolder.height = cs.height()
+	diffHolder := new(processedBlock)
+	diffHolder.Height = cs.height()
 	defer func() {
-		pb := bnToPb(diffHolder)
-		cs.commitNodeDiffs(pb, modules.DiffRevert)
+		cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	}()
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)
@@ -267,11 +266,11 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		cs.applyTransaction(diffHolder, txn)
 	}
 	cc := modules.ConsensusChange{
-		SiacoinOutputDiffs:        diffHolder.siacoinOutputDiffs,
-		FileContractDiffs:         diffHolder.fileContractDiffs,
-		SiafundOutputDiffs:        diffHolder.siafundOutputDiffs,
-		DelayedSiacoinOutputDiffs: diffHolder.delayedSiacoinOutputDiffs,
-		SiafundPoolDiffs:          diffHolder.siafundPoolDiffs,
+		SiacoinOutputDiffs:        diffHolder.SiacoinOutputDiffs,
+		FileContractDiffs:         diffHolder.FileContractDiffs,
+		SiafundOutputDiffs:        diffHolder.SiafundOutputDiffs,
+		DelayedSiacoinOutputDiffs: diffHolder.DelayedSiacoinOutputDiffs,
+		SiafundPoolDiffs:          diffHolder.SiafundPoolDiffs,
 	}
 	return cc, nil
 }

@@ -59,7 +59,7 @@ type ConsensusSet struct {
 	blocksLoaded types.BlockHeight // DEPRECATED
 
 	// The blockRoot is the block node that contains the genesis block.
-	blockRoot *blockNode
+	blockRoot *processedBlock
 
 	// blockMap and dosBlocks keep track of seen blocks. blockMap holds all
 	// valid blocks, including those not on the main blockchain. dosBlocks is a
@@ -150,12 +150,12 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			{SiafundOutputs: types.GenesisSiafundAllocation},
 		},
 	}
-	cs.blockRoot = &blockNode{
-		block:       genesisBlock,
-		childTarget: types.RootTarget,
-		depth:       types.RootDepth,
+	cs.blockRoot = &processedBlock{
+		Block:       genesisBlock,
+		ChildTarget: types.RootTarget,
+		Depth:       types.RootDepth,
 
-		diffsGenerated: true,
+		DiffsGenerated: true,
 	}
 
 	// Allocate the Siafund addresses by putting them all in a big transaction inside the genesis block
@@ -167,11 +167,11 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			SiafundOutput: siafundOutput,
 		}
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
+		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
 	}
 
 	// Temporarly required for database loading
-	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
+	cs.blockMap[genesisBlock.ID()] = cs.pbToBn(cs.blockRoot)
 
 	// Fill out the consensus information for the genesis block.
 	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
@@ -192,7 +192,7 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	}
 
 	// Send out genesis block update.
-	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
+	cs.updateSubscribers(nil, []*processedBlock{cs.blockRoot})
 
 	// Load the saved processed blocks into memory and send out updates
 	cs.loadDiffs()

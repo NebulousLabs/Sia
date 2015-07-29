@@ -22,27 +22,28 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 		return nil
 	}
 
-	currentNode := cs.currentBlockNode()
+	currentNode := cs.currentProcessedBlock()
 	for i := cs.height(); i != 0; i-- {
 		// The block should be in the block map.
-		_, exists := cs.blockMap[currentNode.block.ID()]
+		exists := cs.db.inBlockMap(currentNode.Block.ID())
 		if !exists {
 			return errors.New("current path block not found in block map")
 		}
 		// Current node should match the id in the current path.
-		if currentNode.block.ID() != cs.db.getPath(i) {
+		if currentNode.Block.ID() != cs.db.getPath(i) {
 			return errors.New("current path points to an incorrect block")
 		}
 		// Height of node needs to be listed correctly.
-		if currentNode.height != i {
+		if currentNode.Height != i {
 			return errors.New("node height mismatches its location in the blockchain")
 		}
 		// Current node's parent needs the right id.
-		if currentNode.block.ParentID != currentNode.parent.block.ID() {
+		parent := cs.db.getBlockMap(currentNode.Parent)
+		if currentNode.Block.ParentID != parent.Block.ID() {
 			return errors.New("node parent id mismatches actual parent id")
 		}
 
-		currentNode = currentNode.parent
+		currentNode = cs.db.getBlockMap(currentNode.Parent)
 	}
 	return nil
 }
@@ -142,11 +143,11 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 
 	// Create a slice of hashes representing all items of interest.
 	tree := crypto.NewTree()
-	tree.PushObject(cs.blockRoot.block)
+	tree.PushObject(cs.blockRoot.Block)
 	tree.PushObject(cs.height())
-	tree.PushObject(cs.currentBlockNode().childTarget)
-	tree.PushObject(cs.currentBlockNode().depth)
-	tree.PushObject(cs.currentBlockNode().earliestChildTimestamp())
+	tree.PushObject(cs.currentProcessedBlock().ChildTarget)
+	tree.PushObject(cs.currentProcessedBlock().Depth)
+	tree.PushObject(cs.currentProcessedBlock().earliestChildTimestamp(cs.db))
 
 	// Add all the blocks in the current path TODO: along with their diffs.
 	for i := 0; i < int(cs.db.pathHeight()); i++ {
@@ -223,13 +224,14 @@ func (cs *ConsensusSet) checkRewindApply() error {
 	// same as it was before the current block was added, then reapply the
 	// block and check that the new consensus set has is the same as originally
 	// calculated.
-	currentNode := cs.currentBlockNode()
-	cs.revertToNode(currentNode.parent)
-	if cs.consensusSetHash() != currentNode.parent.consensusSetHash {
+	currentNode := cs.currentProcessedBlock()
+	parent := cs.db.getBlockMap(currentNode.Parent)
+	cs.revertToNode(parent)
+	if cs.consensusSetHash() != parent.ConsensusSetHash {
 		return errors.New("rewinding a block resulted in unexpected consensus set hash")
 	}
 	cs.applyUntilNode(currentNode)
-	if cs.consensusSetHash() != currentNode.consensusSetHash {
+	if cs.consensusSetHash() != currentNode.ConsensusSetHash {
 		return errors.New("reapplying a block resulted in unexpected consensus set hash")
 	}
 	return nil
