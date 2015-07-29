@@ -175,12 +175,6 @@ func (db *setDB) pathHeight() types.BlockHeight {
 	return types.BlockHeight(h)
 }
 
-// addBlockMapBn adds a block node to the block map
-// DEPRICATED
-func (db *setDB) addBlockMapBn(bn *blockNode) error {
-	return db.addItem("BlockMap", bn.block.ID(), bnToPb(bn))
-}
-
 // addBlockMap adds a processedBlock to the block map
 // This will eventually take a processed block as an argument
 func (db *setDB) addBlockMap(pb *processedBlock) error {
@@ -200,13 +194,6 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 		panic(err)
 	}
 	return &pb
-}
-
-// getBlockMapBn is a transitional wrapper for getting a block node
-// from the blockMap // DEPRICATED
-func (cs *ConsensusSet) getBlockMapBn(id types.BlockID) *blockNode {
-	bn := cs.pbToBn(cs.db.getBlockMap(id))
-	return bn
 }
 
 // inBlockMap checks for the existance of a block with a given ID in

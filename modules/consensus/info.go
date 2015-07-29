@@ -68,7 +68,7 @@ func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp type
 func (s *ConsensusSet) GenesisBlock() types.Block {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
-	return s.blockMap[s.db.getPath(0)].block
+	return s.db.getBlockMap(s.db.getPath(0)).Block
 }
 
 // Height returns the height of the current blockchain (the longest fork).
@@ -84,11 +84,12 @@ func (s *ConsensusSet) InCurrentPath(bid types.BlockID) bool {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
 
-	node, exists := s.blockMap[bid]
+	exists := s.db.inBlockMap(bid)
 	if !exists {
 		return false
 	}
-	return s.db.getPath(node.height) == bid
+	node := s.db.getBlockMap(bid)
+	return s.db.getPath(node.Height) == bid
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

@@ -8,6 +8,15 @@ import (
 	"sort"
 )
 
+// SurpassThreshold is a percentage that dictates how much heavier ac ompeting
+// chain has to be before the node will switch to mining on that chain. This is
+// not a consensus rule. This percentage is only applied to the most recent
+// block, not the entire chain; see blockNode.heavierThan.
+//
+// If no threshold were in place, it would be possible to manipulate a block's
+// timestamp to produce a sufficiently heavier block.
+var SurpassThreshold = big.NewRat(20, 100)
+
 // processedBlock is a copy/rename of blockNode, with the pointers to
 // other blockNodes replaced with block ID's, and all the fields
 // exported, so that a block node can be marshalled
@@ -141,75 +150,4 @@ func (pb *processedBlock) newChild(b types.Block, db *setDB) *processedBlock {
 	db.updateBlockMap(pb)
 
 	return child
-}
-
-// bnToPb and pbToBn convert between blockNodes and
-// processedBlocks. As block nodes will be replaced with
-// processedBlocks, this code should be considered deprecated
-
-// bnToPb converts a blockNode to a processed block
-// DEPRECATED
-func bnToPb(bn *blockNode) *processedBlock {
-	pb := &processedBlock{
-		Block: bn.block,
-
-		Height:      bn.height,
-		Depth:       bn.depth,
-		ChildTarget: bn.childTarget,
-
-		DiffsGenerated:            bn.diffsGenerated,
-		SiacoinOutputDiffs:        bn.siacoinOutputDiffs,
-		FileContractDiffs:         bn.fileContractDiffs,
-		SiafundOutputDiffs:        bn.siafundOutputDiffs,
-		DelayedSiacoinOutputDiffs: bn.delayedSiacoinOutputDiffs,
-		SiafundPoolDiffs:          bn.siafundPoolDiffs,
-
-		ConsensusSetHash: bn.consensusSetHash,
-	}
-	for _, c := range bn.children {
-		pb.Children = append(pb.Children, c.block.ID())
-	}
-	if bn.parent != nil {
-		pb.Parent = bn.parent.block.ID()
-	}
-
-	return pb
-}
-
-// pbToBn exists to move a processed block to a block node. It
-// requires the consensus block Map.
-// DEPRECATED
-func (cs *ConsensusSet) pbToBn(pb *processedBlock) *blockNode {
-	parent, exists := cs.blockMap[pb.Parent]
-	if !exists {
-		parent = nil
-	}
-
-	bn := &blockNode{
-		block:  pb.Block,
-		parent: parent,
-
-		height:      pb.Height,
-		depth:       pb.Depth,
-		childTarget: pb.ChildTarget,
-
-		diffsGenerated:            pb.DiffsGenerated,
-		siacoinOutputDiffs:        pb.SiacoinOutputDiffs,
-		fileContractDiffs:         pb.FileContractDiffs,
-		siafundOutputDiffs:        pb.SiafundOutputDiffs,
-		delayedSiacoinOutputDiffs: pb.DelayedSiacoinOutputDiffs,
-		siafundPoolDiffs:          pb.SiafundPoolDiffs,
-
-		consensusSetHash: pb.ConsensusSetHash,
-	}
-
-	// Attempt to add children
-	for _, childID := range pb.Children {
-		child, exists := cs.blockMap[childID]
-		if exists {
-			bn.children = append(bn.children, child)
-		}
-	}
-
-	return bn
 }

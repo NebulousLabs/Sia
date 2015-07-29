@@ -141,8 +141,8 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node := s.getBlockMapBn(s.db.getPath(i))
-				blocks = append(blocks, node.block)
+				node := s.db.getBlockMap(s.db.getPath(i))
+				blocks = append(blocks, node.Block)
 			}
 
 			// TODO: Check for off-by-one here too.

@@ -78,7 +78,6 @@ func (cs *ConsensusSet) loadDiffs() {
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
 		pb := cs.db.getBlockMap(bid)
-		bn := cs.pbToBn(pb)
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
@@ -87,7 +86,6 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.blockMap[bn.block.ID()] = bn // DEPRICATED
 		cs.updatePath = false
 		cs.commitDiffSet(pb, modules.DiffApply)
 		cs.updatePath = true

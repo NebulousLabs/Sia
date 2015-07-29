@@ -61,11 +61,9 @@ type ConsensusSet struct {
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *processedBlock
 
-	// blockMap and dosBlocks keep track of seen blocks. blockMap holds all
-	// valid blocks, including those not on the main blockchain. dosBlocks is a
-	// "blacklist" of blocks known to be invalid, but expensive to prove
-	// invalid.
-	blockMap  map[types.BlockID]*blockNode
+	// dosBlocks keeps track of seen blocks. It is a
+	// "blacklist" of blocks known to be invalid, but expensive to
+	// prove
 	dosBlocks map[types.BlockID]struct{}
 
 	// These are the consensus variables. All nodes with the same current path
@@ -128,7 +126,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
-		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
 
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
@@ -169,9 +166,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
 	}
-
-	// Temporarly required for database loading
-	cs.blockMap[genesisBlock.ID()] = cs.pbToBn(cs.blockRoot)
 
 	// Fill out the consensus information for the genesis block.
 	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{

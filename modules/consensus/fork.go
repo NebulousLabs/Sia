@@ -33,7 +33,6 @@ func (cs *ConsensusSet) deleteNode(pb *processedBlock) {
 
 	// Remove the node from the block map, and from its parents list of
 	// children.
-	delete(cs.blockMap, pb.Block.ID())
 	cs.db.rmBlockMap(pb.Block.ID())
 	parent := cs.db.getBlockMap(pb.Parent)
 	for i := range parent.Children {
