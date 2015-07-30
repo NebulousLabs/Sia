@@ -109,15 +109,10 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	return nil, nil, modules.ErrNonExtendingBlock
 }
 
-// acceptBlock is the internal consensus function for adding blocks. There is
-// no block relaying. The speed of 'acceptBlock' is effected by the value of
-// 'cs.verificationRigor'. If rigor is set to 'fullVerification', all of the
-// transactions will be checked and verified. This is a requirement when
-// receiving blocks from untrusted sources. When set to 'partialVerification',
-// verification of transactions is skipped. This is acceptable when receiving
-// blocks from a trust source, such as blocks that were previously verified and
-// saved to disk. The value of 'cs.verificationRigor' should be set before
-// 'acceptBlock' is called.
+// acceptBlock is the internal consensus function for adding
+// blocks. There is no block relaying. acceptBlock will verify all
+// transactions. Trusted blocks, like those on disk, should already
+// be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
@@ -175,8 +170,6 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 
-	// Set the flag to do full verification.
-	cs.verificationRigor = fullVerification
 	err := cs.acceptBlock(b)
 	if err != nil {
 		return err

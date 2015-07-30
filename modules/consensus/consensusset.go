@@ -15,38 +15,15 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-const (
-	// fullVerification indicates that a block should be fully verified when
-	// being loaded from disk.
-	fullVerification verificationRigor = 0
-
-	// partialVerification indicates that transaction verification can be
-	// skipped. Transaction verification is computationally intensive, and
-	// skipping such a step noticably increases speed when loading many blocks
-	// at once. Usually, partialVerification is used when loading blocks from
-	// disk.
-	partialVerification verificationRigor = 1
-)
-
 var (
 	ErrNilGateway = errors.New("cannot have a nil gateway as input")
 )
-
-// verificationRigor is a type indicating the intensity of verification that
-// should be using while accepting a block. For blocks that come from trusted
-// sources, the computationally expensive steps can be skipped.
-type verificationRigor byte
 
 // The ConsensusSet is the object responsible for tracking the current status
 // of the blockchain. Broadly speaking, it is responsible for maintaining
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// verificationRigor is a flag that tells the state whether or not to do
-	// transaction verification while accepting a block. This should help speed
-	// up loading blocks from memory.
-	verificationRigor verificationRigor // DEPRECATED
-
 	// updatePath is a flag that determines if a block node will
 	// be added to the path. It should be false when loading the
 	// current path from disk and true otherwise

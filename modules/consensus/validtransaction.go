@@ -208,12 +208,6 @@ func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
 func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
-	// Skip transaction verification if the ConsensusSet is accepting trusted
-	// blocks.
-	if cs.verificationRigor != fullVerification && (build.Release == "testing" || !build.DEBUG) {
-		return nil
-	}
-
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
 	err := t.StandaloneValid(cs.height())

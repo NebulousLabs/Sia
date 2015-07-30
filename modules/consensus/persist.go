@@ -84,7 +84,7 @@ func (cs *ConsensusSet) loadDiffs() {
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
 		// This guard is for when the program is stopped. It is temporary.
-		// DEPRICATED
+		// DEPRECATED
 		if !cs.db.open {
 			break
 		}
