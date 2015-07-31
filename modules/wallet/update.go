@@ -46,4 +46,5 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, unconfirmedCC modules.ConsensusChange) {
+	// To be managed later...
 }
