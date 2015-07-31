@@ -42,21 +42,21 @@ type WalletSettings struct {
 	AddressProgress     uint64   // Number of addresses used in the primary seed.
 }
 
-// unlockingKey creates a wallet unlocking key from the input master key.
-func unlockingKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
+// unlockKey creates a wallet unlocking key from the input master key.
+func unlockKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
 	keyBase := append(masterKey[:], unlockModifier[:]...)
 	return crypto.TwofishKey(crypto.HashObject(keyBase))
 }
 
 // checkMasterKey verifies that the master key is correct.
 func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
-	verificationKey := unlockingKey(masterKey)
-	decryptedBytes, err := verificationKey.DecryptBytes(w.settings.EncryptionVerification)
+	unlockKey := unlockKey(masterKey)
+	verification, err := unlockKey.DecryptBytes(w.settings.EncryptionVerification)
 	if err != nil {
 		return err
 	}
 	expected := make([]byte, encryptionVerificationLen)
-	if bytes.Equal(expected, decryptedBytes) {
+	if bytes.Equal(expected, verification) {
 		return errBadEncryptionKey
 	}
 	return nil
@@ -140,9 +140,9 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 
 	// Encryption key has not been created yet - create it.
 	var err error
-	unlockingKey := unlockingKey(masterKey)
+	unlockKey := unlockKey(masterKey)
 	encryptionBase := make([]byte, encryptionVerificationLen)
-	w.settings.EncryptionVerification, err = unlockingKey.EncryptBytes(encryptionBase)
+	w.settings.EncryptionVerification, err = unlockKey.EncryptBytes(encryptionBase)
 	if err != nil {
 		return err
 	}
