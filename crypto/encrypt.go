@@ -18,7 +18,7 @@ var (
 
 type (
 	Ciphertext []byte
-	TwofishKey [32]byte
+	TwofishKey [EntropySize]byte
 )
 
 // GenerateEncryptionKey produces a key that can be used for encrypting and

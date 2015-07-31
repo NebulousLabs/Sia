@@ -125,6 +125,14 @@ type TransactionBuilder interface {
 // encrypted using a user-specified password. Common addresses are all dervied
 // from a single address seed.
 type Wallet interface {
+	// Encrypted returns whether or not the wallet has been encrypted yet. User
+	// facings apps are recommended to check if the wallet is encrypted before
+	// calling Unlock, because the key used in the first call to 'Unlock' will
+	// be the key that encrypts the wallet going forward. User facing apps
+	// should verify that the correct password/phrase/key was chosen before
+	// permanently encrypting the wallet.
+	Encrypted() bool
+
 	// Unlock must be called before the wallet is usable. All wallets and
 	// wallet seeds are encrypted by default, and the wallet will not know
 	// which addresses to watch for on the blockchain until unlock has been
