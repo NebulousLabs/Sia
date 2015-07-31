@@ -6,71 +6,38 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// applyDiff will take the output and either add or delete it from the set of
-// outputs known to the wallet. If adding is true, then new outputs will be
-// added and expired outputs will be deleted. If adding is false, then new
-// outputs will be deleted and expired outputs will be added.
-func (w *Wallet) applyDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	// See if the output in the diff is known to the wallet.
-	key, exists := w.keys[scod.SiacoinOutput.UnlockHash]
-	if !exists {
-		return
-	}
-
-	if scod.Direction == dir {
-		// FundTransaction creates outputs and adds them immediately. They will
-		// also show up from the transaction pool, occasionally causing
-		// repeats. Additionally, outputs that used to exist are not deleted.
-		// If they get re-added, we need to know the age of the output.
-		output, exists := key.outputs[scod.ID]
-		if exists {
-			if !output.spendable {
-				output.spendable = true
-			}
-			return
-		}
-
-		// Add the output. Age is set to 0 because the output has not been
-		// spent yet.
-		ko := &knownOutput{
-			id:     scod.ID,
-			output: scod.SiacoinOutput,
-
-			spendable: true,
-			age:       0,
-		}
-		key.outputs[scod.ID] = ko
-	} else {
-		if build.DEBUG {
-			_, exists := key.outputs[scod.ID]
-			if !exists {
-				panic("trying to delete an output that doesn't exist?")
-			}
-		}
-		key.outputs[scod.ID].spendable = false
-	}
-}
-
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	// TODO: Restruture whole wallet.
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
 
-	// Adjust the confirmed set of diffs.
-	for _, scod := range cc.SiacoinOutputDiffs {
-		w.applyDiff(scod, modules.DiffApply)
+	// Iterate through the output diffs (siacoin and siafund) and apply all of
+	// them. Only apply the outputs that relate to unlock hashes we understand.
+	for _, diff := range cc.SiacoinOutputDiffs {
+		_, exists := w.SiacoinOutputs[diff.ID]
+		if diff.Direction == modules.DiffApply {
+			if exists && build.DEBUG {
+				panic("adding an existing output to wallet")
+			}
+			w.siacoinOutputs[diff.ID] = diff.SiacoinOutput
+		} else {
+			if !exists && build.DEBUG {
+				panic("deleting nonexisting output from wallet")
+			}
+			delete(w.siacoinOutputs, diff.ID)
+		}
 	}
-
-	// Update the wallet age and consensus height. Though they update together,
-	// the wallet age can be altered/reset, but the consensus height cannot.
-	w.age -= len(cc.RevertedBlocks)
-	w.consensusHeight -= types.BlockHeight(len(cc.RevertedBlocks))
-	w.age += len(cc.AppliedBlocks)
-	w.consensusHeight += types.BlockHeight(len(cc.AppliedBlocks))
-
-	// Update the siafund addresses.
 	for _, diff := range cc.SiafundOutputDiffs {
-		_, exists := w.siafundAddresses[diff.SiafundOutput.UnlockHash]
-		if exists {
-			w.applySiafundDiff(diff, modules.DiffApply)
+		_, exists := w.SiafundOutputs[diff.ID]
+		if diff.Direction == modules.DiffApply {
+			if exists && build.DEBUG {
+				panic("adding an existing output to wallet")
+			}
+			w.siafundOutputs[diff.ID] = diff.SiafundOutput
+		} else {
+			if !exists && build.DEBUG {
+				panic("deleting nonexisting output from wallet")
+			}
+			delete(w.siafundOutputs, diff.ID)
 		}
 	}
 }
@@ -79,29 +46,4 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // unconfirmed set and uses them to update the balance and transaction history
 // of the wallet.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, unconfirmedCC modules.ConsensusChange) {
-	// TODO: Restructure whole wallet.
-	/*
-		lockID := w.mu.Lock()
-		defer w.mu.Unlock(lockID)
-
-		// Remove all of the current unconfirmed diffs - they are being replaced
-		// wholesale.
-		for _, diff := range w.unconfirmedDiffs {
-			w.applyDiff(diff, modules.DiffRevert)
-		}
-
-		// Add all of the unconfirmed diffs to the wallet.
-		w.unconfirmedDiffs = unconfirmedSiacoinDiffs
-		for _, diff := range w.unconfirmedDiffs {
-			w.applyDiff(diff, modules.DiffApply)
-		}
-		if len(cc.SiafundPoolDiffs) > 0 {
-			if cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Direction == modules.DiffApply {
-				w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Adjusted
-			} else {
-				w.siafundPool = cc.SiafundPoolDiffs[len(cc.SiafundPoolDiffs)-1].Previous
-			}
-		}
-
-	*/
 }

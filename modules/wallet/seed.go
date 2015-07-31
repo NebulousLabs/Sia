@@ -179,8 +179,8 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 	return nil
 }
 
-// nextAddress fetches the next address in the seed file.
-func (w *Wallet) nextAddress(masterKey crypto.TwofishKey) (types.UnlockHash, error) {
+// nextPrimarySeedAddress fetches the next address from the primary seed.
+func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.UnlockHash, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
 		return types.UnlockHash{}, errLockedWallet

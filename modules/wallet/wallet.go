@@ -27,6 +27,13 @@ var (
 	errLockedWallet = errors.New("wallet must be unlocked before it can be used")
 )
 
+type ProcessedTransaction struct {
+	minerPayout bool
+	confirmationHeight types.BlockHeight
+	Transaction *types.Transaction
+	outputIDs []OutputID
+}
+
 type Wallet struct {
 	unlocked bool
 	settings WalletSettings
@@ -42,10 +49,10 @@ type Wallet struct {
 	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
 	visibleAddresses map[types.UnlockHash]struct{}
 	siafundAddresses map[types.UnlockHash]struct{}
-	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
 
 	generatedKeys map[types.UnlockHash]generatedSignatureKey
-	trackedKeys   map[types.UnlockHash]struct{}
+	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
+	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
 
 	persistDir string
 	log        *log.Logger
