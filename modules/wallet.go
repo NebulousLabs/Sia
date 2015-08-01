@@ -172,15 +172,14 @@ type Wallet interface {
 	// ConfirmedBalance returns the confirmed balance of the wallet, minus any
 	// outgoing transactions. ConfirmedBalance will include unconfirmed refund
 	// transacitons.
-	ConfirmedBalance() types.Currency
+	ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
 	// UnconfirmedBalance returns the unconfirmed balance of the wallet.
 	// Outgoing funds and incoming funds are reported separately. Refund
-	// outputs are not included in 'incoming', and are subracted from
-	// 'outgoing'. (For example, if a transaction is created with an output of
-	// 10 coins, with a 9 coin refund, UnconfirmedBalance would report
-	// 'outgoing: 1, incoming: 0'.)
-	UnconfirmedBalance() (outgoing types.Currency, incoming types.Currency)
+	// outputs are included, meaning that a sending a single coin to someone
+	// could result in 'outgoing: 12, incoming: 11'. Siafunds are not
+	// considered in the unconfirmed balance.
+	UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
 	// TransacitonHistory will return a chronologically ordered set of
 	// 'WalletTransactions' that make up the history of the wallet.
@@ -202,10 +201,6 @@ type Wallet interface {
 	// are automatically given to the transaction pool, and are also returned
 	// to the caller.
 	SendCoins(masterKey crypto.TwofishKey, amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
-
-	// SiafundBalance returns the number of siafunds owned by the wallet, and
-	// the number of siacoins available through siafund claims.
-	SiafundBalance() (siafundBalance types.Currency, siacoinClaimBalance types.Currency)
 
 	// RegisterTransaction takes a transaction and its parents and returns a
 	// TransactionBuilder which can be used to expand the transaction. The most

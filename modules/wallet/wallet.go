@@ -40,15 +40,8 @@ type Wallet struct {
 
 	state            modules.ConsensusSet
 	tpool            modules.TransactionPool
-	unconfirmedDiffs []modules.SiacoinOutputDiff
 	siafundPool      types.Currency
-
-	consensusHeight  types.BlockHeight
-	age              int
-	keys             map[types.UnlockHash]*key
-	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
-	visibleAddresses map[types.UnlockHash]struct{}
-	siafundAddresses map[types.UnlockHash]struct{}
+	unconfirmedTransactions []types.Transaction
 
 	generatedKeys map[types.UnlockHash]generatedSignatureKey
 	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput

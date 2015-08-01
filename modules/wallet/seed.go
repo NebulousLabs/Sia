@@ -23,6 +23,9 @@ var (
 )
 
 type (
+	// SeedFileUID is a unique id randomly generated and put at the front of
+	// every seed file. It is used to make sure that a different encryption key
+	// can be used for every seed file.
 	SeedFileUID [crypto.EntropySize]byte
 
 	// generatedSignatureKey is a key that can be used to sign outputs. All of
@@ -353,7 +356,7 @@ func (w *Wallet) AllSeeds(masterKey crypto.TwofishKey) ([]modules.Seed, error) {
 			}
 			seed, err := decryptSeedFile(masterKey, seedFile)
 			if err != nil {
-				return err
+				continue
 			}
 
 			// Check that the seed is actively being used by the wallet.

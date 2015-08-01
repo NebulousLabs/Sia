@@ -6,6 +6,8 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// ProcessConsensusChange parses a consensus change to update the set of
+// confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
@@ -40,11 +42,19 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			delete(w.siafundOutputs, diff.ID)
 		}
 	}
+	for _, diff := range cc.SiafundPoolDiffs {
+		if diff.Direction == modules.DiffApply {
+			w.siafundPool = diff.Adjusted
+		} else {
+			w.siafundPool = diff.Previous
+		}
+	}
 }
 
-// ReceiveTransactionPoolUpdate gets all of the changes in the confirmed and
-// unconfirmed set and uses them to update the balance and transaction history
-// of the wallet.
-func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(_ []types.Transaction, unconfirmedCC modules.ConsensusChange) {
-	// To be managed later...
+// ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
+// transaction set.
+func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	w.unconfirmedTransactions = txns
 }
