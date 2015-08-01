@@ -37,9 +37,13 @@ type WalletSettings struct {
 	// 32 '0' bytes.
 	EncryptionVerification crypto.Ciphertext
 
-	PrimarySeedFile     SeedFile // The encrypted seed.
-	PrimarySeedFilename string   // Name of the primary seed for the wallet.
-	AddressProgress     uint64   // Number of addresses used in the primary seed.
+	// The primary seed is used to generate new addresses as they are required.
+	// All addresses are tracked and spendable. Only modules.PublicKeysPerSeed
+	// keys/addresses can be created per seed, after which a new seed will need
+	// to be generated.
+	PrimarySeedFilename string
+	PrimarySeedFile     SeedFile
+	AddressProgress     uint64
 }
 
 // unlockKey creates a wallet unlocking key from the input master key.

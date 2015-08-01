@@ -23,17 +23,20 @@ var (
 )
 
 type (
+	SeedFileUID [crypto.EntropySize]byte
+
 	// generatedSignatureKey is a key that can be used to sign outputs. All of
 	// the generated keys are encrypted and kept in memory, to avoid needing to
 	// keep track of different seed files and passwords.
 	generatedSignatureKey struct {
-		seedFilename string
+		seedFileUID SeedFileUID
 		keyIndex     uint64
 		encryptedKey crypto.Ciphertext
 	}
 
 	// SeedFile stores an encrypted wallet seed on disk.
 	SeedFile struct {
+		SeedFileUID SeedFileUID
 		EncryptionVerification crypto.Ciphertext
 		Seed                   crypto.Ciphertext
 	}
@@ -41,20 +44,36 @@ type (
 
 // seedFileEncryptionKey creates an encryption key that is used to decrypt a
 // specific key file.
-func seedFileEncryptionKey(masterKey crypto.TwofishKey, seedFilename string) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, seedModifier, seedFilename))
+func seedFileEncryptionKey(masterKey crypto.TwofishKey, sfuid SeedFileUID) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, seedModifier, sfuid))
 }
 
 // signatureKeyEncryptionKey creates the encryption key for a generated
 // signature key.
-func signatureKeyEncryptionKey(masterKey crypto.TwofishKey, seedFilename string, keyIndex uint64) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, generatedKeyModifier, seedFilename, keyIndex))
+func signatureKeyEncryptionKey(masterKey crypto.TwofishKey, sfuid SeedFileUID, keyIndex uint64) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, generatedKeyModifier, sfuid, keyIndex))
+}
+
+// generateAddress creates the keys and unlock conditions for key 'index' of
+// seed 's'.
+func generateAddress(seed modules.Seed, index uint64) (crypto.SecretKey, crypto.PublicKey, types.UnlockConditions) {
+	// Generate the keys and unlock conditions.
+	entropy := crypto.HashAll(seed, index)
+	sk, pk := crypto.DeterministicSignatureKeys(entropy)
+	uc := types.UnlockConditions{
+		PublicKeys: []types.SiaPublicKey{{
+			Algorithm: types.SignatureEd25519,
+			Key:       pk[:],
+		}},
+		SignaturesRequired: 1,
+	}
+	return sk, pk, uc
 }
 
 // decryptSeedFile decrypts a seed file using the encryption key.
-func decryptSeedFile(masterKey crypto.TwofishKey, seedFileName string, sf SeedFile) (seed modules.Seed, error) {
+func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.Seed, error) {
 	// Verify that the provided master key is the correct key.
-	decryptionKey := seedFileEncryptionKey(maskerKey, seedFileName)
+	decryptionKey := seedFileEncryptionKey(maskerKey, sf.SeedFileUID)
 	expectedDecryptedVerification := make([]byte, 32)
 	decryptedVerification, err := decryptionKey.DecryptBytes(seedfile.EncryptionVerification)
 	if err != nil {
@@ -75,44 +94,32 @@ func decryptSeedFile(masterKey crypto.TwofishKey, seedFileName string, sf SeedFi
 
 // generateAndTrackKey will create key 'index' from seed 's', tracking the
 // public key. The secret key will be encrypted and stored.
-func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, s seed, seedFilename string, index uint64) error {
-	// Generate the key.
-	entropy := crypto.HashAll(s, index)
-	sk, pk := crypto.DeterministicSignatureKeys(entropy)
-
-	// Fetch the unlock hash.
-	unlockHash := types.UnlockConditions{
-		PublicKeys: []types.SiaPublicKey{{
-			Algorithm: types.SignatureEd25519,
-			Key:       pk[:],
-		}},
-		SignaturesRequired: 1,
-	}.UnlockHash()
-
-	// Check that the key is not already in the wallet.
-	_, exists := w.generatedKeys[unlockHash]
+func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, seed modules.Seed, sfuid SeedFileUID, index uint64) error {
+	// Generate the key and check it is new to the wallet.
+	sk, pk, uc := generateAddress(seed, index)
+	_, exists := w.generatedKeys[uc.UnlockHash()]
 	if exists {
 		return errors.New("key is already being tracked")
 	}
 
 	// Encrypt the secret key.
-	skek := signatureKeyEncryptionKey(masterKey, seedFilename, index)
+	skek := signatureKeyEncryptionKey(masterKey, sfuid, index)
 	encryptedSignatureKey, err := skek.EncryptBytes(sk[:])
 	if err != nil {
 		return err
 	}
 
 	// Add the key to the set of tracked keys.
-	w.generatedKeys[unlockHash] = generatedSignatureKey{index: index, encryptedKey: encryptedSignatureKey}
-	w.trackedKeys[unlockHash] = struct{}{}
+	w.generatedKeys[uc.unlockHash] = generatedSignatureKey{sfuid, index, encryptedSignatureKey}
+	w.trackedKeys[uc.unlockHash] = struct{}{}
 	return nil
 }
 
 // integrateSeed takes an address seed as input and from that generates
 // 'publicKeysPerSeed' addresses that the wallet is able to spend.
-func (w *Wallet) integrateSeed(masterKey crypto.TwofishKey, s seed, seedFilename string) error {
+func (w *Wallet) integrateSeed(masterKey crypto.TwofishKey, seed modules.Seed, sfuid SeedFileUID) error {
 	for i := uint64(0); i < publicKeysPerSeed; i++ {
-		err := w.generateAndTrackKey(masterKey, s, seedFilename, i)
+		err := w.generateAndTrackKey(masterKey, seed, sfuid, i)
 		if err != nil {
 			return err
 		}
@@ -133,7 +140,7 @@ func (w *Wallet) loadSeedFile(masterKey crypto.TwofishKey, fileInfo os.FileInfo)
 	if err != nil {
 		return err
 	}
-	return w.integrateSeed(masterKey, s, fileInfo.Name())
+	return w.integrateSeed(masterKey, seed, seedFile.seedFileUID)
 }
 
 // recoverSeed integrates a recovery seed into the wallet.
@@ -146,7 +153,12 @@ func recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	}
 
 	// Encrypt the seed and save the seed file.
-	sek := seedEncryptionKey(masterKey, filename)
+	var sfuid SeedFileUID
+	_, err = rand.Read(sfuid)
+	if err != nil {
+		return err
+	}
+	sek := seedEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	encryptionVerification, err := sek.EncryptBytes(plaintextVerification)
 	if err != nil {
@@ -156,7 +168,7 @@ func recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	if err != nil {
 		return err
 	}
-	return persist.SaveFile(seedMetadata, SeedFile{encryptionVerification, cryptSeed}, filename)
+	return persist.SaveFile(seedMetadata, SeedFile{sfuid, encryptionVerification, cryptSeed}, seedFilename)
 }
 
 // createSeed creates a wallet seed and encrypts it using a key derived from
@@ -164,8 +176,12 @@ func recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	// Derive the key used to encrypt the seed file, and create the encryption
 	// verification object.
-	filename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
-	sek := seedEncryptionKey(masterKey, filename)
+	var sfuid SeedFileUID
+	_, err = rand.Read(sfuid)
+	if err != nil {
+		return modules.Seed{}, err
+	}
+	sek := seedEncryptionKey(masterKey, sfuid)
 	plaintextVerification := make([]byte, encryptionVerificationLen)
 	encryptionVerification, err := sek.EncryptBytes(plaintextVerification)
 	if err != nil {
@@ -178,30 +194,29 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	err = w.integrateSeed(masterKey, seed, filename)
+	err = w.integrateSeed(masterKey, seed, sfuid)
 	if err != nil {
 		return modules.Seed{}, err
 	}
 
 	// Encrypt the seed and save the seed file.
+	filename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	cryptSeed, err := sek.EncryptBytes(seed[:])
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	w.settings.PrimarySeedFile = SeedFile{encryptionVerification, cryptSeed}
 	w.settings.PrimarySeedFilename = filename
+	w.settings.PrimarySeedFile = SeedFile{sfuid, encryptionVerification, cryptSeed}
 	w.settings.AddressProgress = 0
 	err = persist.SaveFile(seedMetadata, &w.settings.PrimarySeedFile, filename)
 	if err != nil {
 		return modules.Seed{}, err
 	}
+	err = w.saveSettings()
+	if err != nil {
+		return err
+	}
 	return seed, nil
-}
-
-// TODO
-func (w *Wallet) RecoverSeed(seed modules.Seed) {
-	// TODO: determine 
-	seedFilename := filepath.Join(w.perist
 }
 
 // initAuxiliarySeeds scans the wallet folder for wallet seeds. Auxiliary seeds
@@ -216,7 +231,7 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) {
 			err = w.loadSeedFile(masterKey, fileInfo)
 			if err != nil {
-				w.log.Println("WARNING: loading a seed", fileInfo.Name(), "returned an error:", err)
+				w.log.Println("WARNING: loading seed", fileInfo.Name(), "returned an error:", err)
 			}
 		}
 	}
@@ -318,4 +333,37 @@ func (w *Wallet) RecoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 		return seed, err
 	}
 	return w.recoverSeed(masterKey, seed)
+}
+
+// AllSeeds returns a list of all seeds known to the wallet.
+func (w *Wallet) AllSeeds(masterKey crypto.TwofishKey) ([]modules.Seed, error) {
+	// Scan for existing wallet seed files.
+	var seeds []modules.Seed
+	filesInfo, err := ioutil.ReadDir(w.persistDir)
+	if err != nil {
+		return err
+	}
+	for _, fileInfo := range filesInfo {
+		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) {
+			// Open the seed file.
+			var seedFile SeedFile
+			err := persist.LoadFile(seedMetadata, &seedFile, fileInfo.Name())
+			if err != nil {
+				return err
+			}
+			seed, err := decryptSeedFile(masterKey, seedFile)
+			if err != nil {
+				return err
+			}
+
+			// Check that the seed is actively being used by the wallet.
+			_, _, unlockConditions := generateAddress(seed, 0)
+			_, exists := w.generatedAddresses[unlockConditions.UnlockHash()]
+			if !exists {
+				continue
+			}
+			seeds = append(seeds, seed)
+		}
+	}
+	return seeds, nil
 }
