@@ -17,6 +17,7 @@ var (
 	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
 	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
 	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	ErrInconsistentSet        = errors.New("consensus set is not in a consistent state")
 	ErrLargeBlock             = errors.New("block is too large to be accepted")
 	ErrMissedTarget           = errors.New("block does not meet target")
 	ErrOrphan                 = errors.New("block has no known parent")
@@ -114,6 +115,12 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // transactions. Trusted blocks, like those on disk, should already
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+	// Simple check for consistency
+	if cs.db.consistencyCounterA != cs.db.consistencyCounterB {
+		return ErrInconsistentSet
+	}
+	cs.db.consistencyCounterA++
+
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
@@ -158,6 +165,8 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
+
+	cs.db.consistencyCounterB++
 
 	return nil
 }

@@ -18,7 +18,8 @@ var meta = persist.Metadata{
 var (
 	errBadSetInsert = errors.New("attempting to add an already existing item to the consensus set")
 	errNilBucket    = errors.New("using a bucket that does not exist")
-	errNilItem      = errors.New("Requested item does not exist")
+	errNilItem      = errors.New("requested item does not exist")
+	errNotGaurded   = errors.New("database modification not protected by gaurd")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -28,6 +29,13 @@ type setDB struct {
 	// The open flag is used to prevent reading from the database
 	// after closing sia when the loading loop is still running
 	open bool // DEPRECATED
+
+	// consistencyCounterA and consistencyCounterB detect when the
+	// database was closed in a partial state. Counter A is
+	// incremented at the beginning and B is incremented at the
+	// end, and should always be the same before starting anything
+	consistencyCounterA int
+	consistencyCounterB int
 }
 
 // openDB loads the set database and populates it with the necessary buckets
@@ -52,7 +60,7 @@ func openDB(filename string) (*setDB, error) {
 		}
 		return nil
 	})
-	return &setDB{db, true}, nil
+	return &setDB{db, true, 0, 0}, nil
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -61,6 +69,10 @@ func openDB(filename string) (*setDB, error) {
 // addItem and getItem are part of consensus due to stricter error
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
+	// Check that this transaction is gaurded by consensusGaurd.
+	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+		panic(errNotGaurded)
+	}
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -105,6 +117,9 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket string, key interface{}) error {
+	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+		panic(errNotGaurded)
+	}
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -135,6 +150,9 @@ func (db *setDB) inBucket(bucket string, key interface{}) bool {
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
 func (db *setDB) pushPath(bid types.BlockID) error {
+	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+		panic(errNotGaurded)
+	}
 	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
@@ -146,6 +164,9 @@ func (db *setDB) pushPath(bid types.BlockID) error {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func (db *setDB) popPath() error {
+	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+		panic(errNotGaurded)
+	}
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
