@@ -186,8 +186,8 @@ type Wallet interface {
 	TransactionHistory() []WalletTransaction
 
 	// PartialTransactionHistory returns all of the transactions that were
-	// confirmed at heights [startingBlock, endingBlock].
-	PartialTransactionHistory(startingBlock types.BlockHeight, endingBlock types.BlockHeight) ([]WalletTransaction, error)
+	// confirmed at heights [startBlock, endBlock].
+	PartialTransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]WalletTransaction, error)
 
 	// AddressTransactionHistory returns all of the transactions that are
 	// related to a given address.

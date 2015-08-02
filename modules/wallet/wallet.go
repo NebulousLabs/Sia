@@ -10,13 +10,6 @@ import (
 )
 
 const (
-	// AgeDelay indicates how long the wallet will wait before allowing the
-	// user to double-spend a transaction under standard circumstances. The
-	// rationale is that most transactions are meant to be submitted to the
-	// blockchain immediately, and ones that take more than AgeDelay blocks
-	// have probably failed in some way.
-	AgeDelay = 80
-
 	// TransactionFee is yet another deprecated-on-arrival constant that says
 	// how large the transaction fees should be. This should really be a
 	// function supplied by the transaction pool.
@@ -37,6 +30,7 @@ type ProcessedTransaction struct {
 type Wallet struct {
 	unlocked                bool
 	settings                WalletSettings
+
 	state                   modules.ConsensusSet
 	tpool                   modules.TransactionPool
 	consensusSetHeight      types.BlockHeight

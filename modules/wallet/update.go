@@ -49,7 +49,7 @@ func (w *Wallet) revertWalletTransaction(uh UnlockHash, wtid modules.WalletTrans
 			panic("wallet transactions are being deleted in the wrong order")
 		}
 		w.walletTransactions = w.walletTransactions[:lastIndex]
-		return retu
+		return true
 	}
 	return false
 }
@@ -273,5 +273,43 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	w.unconfirmedTransactions = txns
+
+	w.unconfirmedWalletTransactions = nil
+	for _, txn :=range txns {
+		for _, sci := range txn.SiacoinInputs {
+			_, exists := w.generatedKeys(sci.UnlockConditions.UnlockHash())
+			if exists {
+				wt := WalletTransaction{
+					WalletTransactionID: modules.WalletTransactionID(txn.ID(), sci.UnlockConditions.UnlockHash()),
+					ConfirmationHeight: types.BlockHeight(0) - 1,
+					ConfirmationTimestamp: types.Timestamp(0) - 1,
+					Transaction: txn,
+
+					FundType: types.SpecifierSiacoinInput,
+					OutputID: OutputID(sci.ParentID),
+					RelatedAddress: sci.UnlockConditions.UnlockHash(),
+					Value: w.historicalOutputs[oid],
+				}
+				w.unconfirmedWalletTransactions = append(w.walletTransactions, wt)
+			}
+		}
+		for i, sco := range txn.SiacoinOutputs {
+			_, exists := w.generatedKeys(sco.UnlockHash)
+			if exists {
+				wt := WalletTransaction{
+					WalletTransactionID: modules.WalletTransactionID(txn.ID(), sco.UnlockHash),
+					ConfirmationHeight: types.BlockHeight(0) - 1,
+					ConfirmationTimestamp: types.Timestamp(0) - 1,
+					Transaction: txn,
+
+					FundType: types.SpecifierSiacoinOutput,
+					OutputID: OutputID(txn.SiacoinOutputID(i)),
+					RelatedAddress: sco.UnlockHash,
+					Value: sco.Value,
+				}
+				w.unconfirmedWalletTransactions = append(w.walletTransactions, wt)
+				w.historicOutputs[oid] = value
+			}
+		}
+	}
 }
