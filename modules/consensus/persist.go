@@ -94,4 +94,13 @@ func (cs *ConsensusSet) loadDiffs() {
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}
+
+	// Do a consistency check after loading the database. This
+	// will be redundant when debug is turned on
+	if height > 1 {
+		err := cs.checkConsistency()
+		if err != nil {
+			panic(err)
+		}
+	}
 }
