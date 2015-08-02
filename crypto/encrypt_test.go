@@ -26,7 +26,7 @@ func TestTwofishEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
+	if !bytes.Equal(plaintext, decryptedPlaintext) {
 		t.Fatal("Encrypted and decrypted zero plaintext do not match")
 	}
 
@@ -44,7 +44,7 @@ func TestTwofishEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(plaintext, decryptedPlaintext) != 0 {
+	if !bytes.Equal(plaintext, decryptedPlaintext) {
 		t.Fatal("Encrypted and decrypted zero plaintext do not match")
 	}
 
@@ -103,7 +103,7 @@ func TestReaderWriter(t *testing.T) {
 	var decrypted = make([]byte, plaintextSize)
 	key.NewReader(buf).Read(decrypted)
 
-	if bytes.Compare(plaintext, decrypted) != 0 {
+	if !bytes.Equal(plaintext, decrypted) {
 		t.Error("couldn't decrypt encrypted stream")
 	}
 }

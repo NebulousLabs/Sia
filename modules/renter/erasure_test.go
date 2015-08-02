@@ -31,7 +31,7 @@ func TestRSEncode(t *testing.T) {
 	}
 
 	buf.Truncate(777)
-	if bytes.Compare(data, buf.Bytes()) != 0 {
+	if !bytes.Equal(data, buf.Bytes()) {
 		t.Fatal("recovered data does not match original")
 	}
 }
