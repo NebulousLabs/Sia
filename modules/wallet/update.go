@@ -6,32 +6,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// decrementFileContractListing decreasing the counter in the file contract map
-// for the given file contract id. When the counter hits 0, the item is removed
-// from the map.
-func (w *Wallet) decrementFileContractListing(fcid types.FileContractID) {
-	count, exists := w.fileContracts[fcid]
-	if !exists && build.DEBUG {
-		panic("trying to decrement a nonexistant file contract listing")
-	}
-	if count == 1 {
-		delete(w.fileContracts, fcid)
-	} else {
-		w.fileContracts[fcid] = count-1
-	}
-}
-
-// incrementFileContractListing increases the counter for the number of times a
-// file contract has been seen in the wallet history.
-func (w *Wallet) incrementFileContractListing(fcid types.FileContractID) {
-	w.fileContracts[fcid] = w.fileContracts[fcid]+1
-}
-
 // revertOutput reverts an output from the wallet. The output must be the
 // output in the most recent wallet transaction of the wallet transaction array
 // if the unlock hash belongs to the wallet. If the unlock hash is
 // unrecognized, this function is a no-op.
-func (w *Wallet) revertWalletTransaction(uh UnlockHash, wtid modules.WalletTransactionID) bool {
+func (w *Wallet) revertWalletTransaction(uh UnlockHash, wtid modules.WalletTransactionID) {
 	_, exists := w.generatedKeys(uh)
 	if exists {
 		// Sanity check - the output should exist in the wallet transaction map
@@ -56,7 +35,7 @@ func (w *Wallet) revertWalletTransaction(uh UnlockHash, wtid modules.WalletTrans
 
 // applyWalletTransaction adds a wallet transaction to the wallet transaction
 // history.
-func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) bool {
+func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) {
 	_, exists := w.generatedKeys(uh)
 	if exists {
 		// Sanity check - the output should not exist in the wallet transaction
@@ -145,46 +124,6 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 				w.revertWalletTransaction(txn.SiafundInputs[i].ClaimUnlockHash, walletTransactionID(txid, OutputID(txn.SiaClaimOutputID(i))))
 				w.revertWalletTransaction(txn.SiafundInputs[i].UnlockHash, walletTransactionID(txid, OutputID(txn.SiafundInputs[i].ParentID)))
 			}
-			for i := len(txn.StorageProofs)-1; i >= 0; i-- {
-				// Because the file contract map is referenced instead of the
-				// generated keys map, lookup and deletion is done manually for
-				// storage proofs.
-				_, exists := w.fileContracts[txn.StorageProofs[i].ParentID]
-				if exists {
-					delete(w.walletTransactionMap, walletTransactionID(txid, OutputID(txn.StorageProofs[i].ParentID)))
-					w.walletTransactions = w.walletTransactions[:len(w.walletTransactions)-1]
-				}
-			}
-			for i := len(txn.FileContractRevisions)-1; i >= 0; i-- {
-				parentID := txn.FileContractRevisions[i].ParentID
-				for j := len(txn.FileContractRevisions.NewMissedProofOutputs)-1; j >= 0; j-- {
-					nmpo := txn.FileContractRevisions[i].NewMissedProofOutputs[j]
-					if w.revertWalletTransaction(nmpo.UnlockHash, walletTransactionID(txid, OutputID(parentID.StorageProofOutputID(types.ProofMissed, j)))) {
-						w.decrementFileContractListing(parentID)
-					}
-				}
-				for j := len(txn.FileContractRevisions.NewValidProofOutputs)-1; j >= 0; j-- {
-					nvpo := txn.FileContractRevisions[i].NewValidProofOutputs[j]
-					if w.revertWalletTransaction(nvpo.UnlockHash, walletTransactionID(txid, OutputID(parentID.StorageProofOutputID(types.ProofValid, j)))) {
-						w.decrementFileContractListing(parentID)
-					}
-				}
-			}
-			for i := len(txn.FileContracts)-1; i >= 0; i-- {
-				fcid := txn.FileContractID(i)
-				for j := len(txn.FileContracts[i].MissedProofOutputs)-1; j >= 0; j-- {
-					mpo := txn.FileContracts[i].MissedProofOutputs[j].UnlockHash
-					if w.revertWalletTransaction(mpo, walletTransactionID(txid, fcid.StorageProofOutputID(types.ProofMissed, j))) {
-						w.decrementFileContractListing(fcid)
-					}
-				}
-				for j := len(txn.FileContractRevisions.NewValidProofOutputs)-1; j >= 0; j-- {
-					vpo := txn.FileContracts[i].ValidProofOutputs[j].UnlockHash
-					if w.revertWalletTransaction(vpo, walletTransactionID(txid, fcid.StorageProofOutputID(types.ProofValid, j))) {
-						w.decrementFileContractListing(fcid)
-					}
-				}
-			}
 			for i := len(txn.SiacoinOutputs)-1; i >= 0; i-- {
 				w.revertWalletTransaction(txn.SiacoinOutputs[i].UnlockHash, walletTransactionID(txid, OutputID(txn.SiacoinOutputID(i))))
 			}
@@ -211,52 +150,6 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			}
 			for i, sco := range txn.SiacoinOutputs {
 				w.applyWalletTransaction(types.SpecifierSiacoinOutput, sco.UnlockHash, txn, block.Timestamp, OutputID(txn.SiacoinOutputID(i)), sco.Value)
-			}
-			for i, fc := range txn.FileContracts {
-				fcid := txn.FileContractID(i)
-				for j, vpo := range fc.ValidProofOutputs {
-					if w.applyWalletTransaction(types.SpecifierFileContract, vpo.UnlockHash, txn, block.Timestamp, OutputID(fcid.StorageProofOutput(types.ProofValid, j), vpo.Value) {
-						w.incrementFileContractListing(fcid)
-					}
-				}
-				for j, mpo := range fc.MissedProofOutputs {
-					if w.applyWalletTransaction(types.SpecifierFileContract, mpo.UnlockHash, txn, block.Timestamp, OutputID(fcid.StorageProofOutput(types.ProofMissed, j), mpo.Value) {
-						w.incrementFileContractListing(fcid)
-					}
-				}
-			}
-			for i, fcr := range txn.FileContractRevisions {
-				for j, nvpo := range fcr.NewValidProofOutputs {
-					if w.applyWalletTransaction(types.SpecifierFileContract, nvpo.UnlockHash, txn, block.Timestamp, OutputID(fcr.ParentID.StorageProofOutput(types.ProofValid, j), nvpo.Value) {
-						w.incrementFileContractListing(fcr.ParentID)
-					}
-				}
-				for j, nmpo := range fcr.NewMissedProofOutputs {
-					if w.applyWalletTransaction(types.SpecifierFileContract, nmpo.UnlockHash, txn, block.Timestamp, OutputID(fcr.ParentID.StorageProofOutput(types.ProofMissed, j), nmpo.Value) {
-						w.incrementFileContractListing(fcr.ParentID)
-					}
-				}
-			}
-			for i, sp := range txn.StorageProofs {
-				// Because the file contract map is referenced instead of the
-				// generated keys map, lookup and insertion is done manually
-				// for storage proofs.
-				//
-				// TODO: Storage proofs are handled in a really special way...
-				_, exists := w.fileContracts[sp.ParentID]
-				if exists {
-					wt := WalletTransaction{
-						WalletTransactionID: modules.CalculateWalletTransactionID(txn.ID(), OutputID(sp.ParentID)),
-						ConfirmationHeight: w.consensusSetHeight,
-						ConfirmationTimestamp: block.Timestamp,
-						Transaction: txn,
-
-						FundType: types.SpecifierStorageProof,
-						OutputID: oid,
-					}
-					w.walletTransactionMap[wtid] = wt
-					w.walletTransactions = append(w.walletTransactions, wt)
-				}
 			}
 			for _, sfi := range txn.SiafundInputs{
 				w.applyWalletTransaction(types.SpecifierSiafundInput, sfi.UnlockConditions.UnlockHash(), txn, block.Timestamp, OutputID(sfi.ParentID), w.historicOutputs[OutputID(sfi.ParentID)])

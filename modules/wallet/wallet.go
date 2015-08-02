@@ -40,7 +40,6 @@ type Wallet struct {
 	generatedKeys   map[types.UnlockHash]generatedSignatureKey
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
 	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
-	fileContracts   map[types.FileContractID]int
 	historicOutputs map[types.OutputID]types.Currency
 
 	walletTransactions            []WalletTransaction // A doubly linked list would be safer when adding and removing items.
