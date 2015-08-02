@@ -13,6 +13,20 @@ const (
 	SpecifierLen = 16
 )
 
+// These Specifiers are used internally when calculating a type's ID. See
+// Specifier for more details.
+var (
+	SpecifierMinerPayout          = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'p', 'a', 'y', 'o', 'u', 't'}
+	SpecifierMinerInput           = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'i', 'n', 'p', 'u', 't'}
+	SpecifierSiacoinOutput        = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+	SpecifierFileContract         = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	SpecifierFileContractRevision = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't', ' ', 'r', 'e'}
+	SpecifierStorageProof         = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
+	SpecifierStorageProofOutput   = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
+	SpecifierSiafundInput         = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'i', 'n', 'p', 'u', 't'}
+	SpecifierSiafundOutput        = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+)
+
 type (
 	Siafund Currency // arbitrary-precision unsigned integer
 
@@ -32,6 +46,7 @@ type (
 	// are constructed by hashing specific fields of the type, along with a
 	// Specifier. While all of these types are hashes, defining type aliases
 	// gives us type safety and makes the code more readable.
+	TransactionID   crypto.Hash
 	SiacoinOutputID crypto.Hash
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
@@ -107,19 +122,9 @@ type (
 	}
 )
 
-// These Specifiers are used internally when calculating a type's ID. See
-// Specifier for more details.
-var (
-	SpecifierSiacoinOutput                 = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-	SpecifierFileContract                  = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
-	SpecifierFileContractTerminationPayout = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't', ' ', 't'}
-	SpecifierStorageProofOutput            = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
-	SpecifierSiafundOutput                 = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
-)
-
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
-func (t Transaction) ID() crypto.Hash {
+func (t Transaction) ID() TransactionID {
 	return crypto.HashAll(
 		t.SiacoinInputs,
 		t.SiacoinOutputs,

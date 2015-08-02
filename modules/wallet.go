@@ -20,22 +20,22 @@ var (
 // addresses.
 type Seed [crypto.EntropySize]byte
 
+type WalletTransactionID crypto.Hash
+
 // WalletTransaction contains the metadata of a single output that changed the
 // balance of the wallet, either incoming or outgoing (which can be gleaned
 // from the 'Source' and 'Destination'. A WalletTransaction will never contain
 // a refund output.
 type WalletTransaction struct {
-	TransactionID crypto.Hash
-	Confirmations uint64
+	TransactionID types.TransactionID
 	ConfirmationHeight types.BlockHeight
 	ConfirmationTimestamp types.Timestamp
 	Transaction types.Transaction
 
 	FundType types.Specifier
-	Source types.UnlockHash
-	Destination types.UnlockHash
+	OutputID OutputID
+	RelatedAddress types.UnlockHash
 	Value types.Currency
-
 }
 
 // The TransactionBuilder is used to construct custom transactions. A
@@ -193,14 +193,16 @@ type Wallet interface {
 	// related to a given address.
 	AddressTransactionHistory(types.UnlockHash) []WalletTransaction
 
+	// UnconfirmedTransactions returns the list of known unconfirmed wallet
+	// transactions.
+	UnconfirmedTransactions() []WalletTransaction
+
+	// AddressUnconfirmedTransactions returns all of the wallet transactions
+	// related to a given address.
+	AddressUnconfirmedTransactions(types.UnlockHash) []WalletTransaction
+
 	// CoinAddress returns an address that can receive coins.
 	CoinAddress() (types.UnlockHash, types.UnlockConditions, error)
-
-	// SendCoins is a tool for sending coins from the wallet to an address.
-	// Sending money usually results in multiple transactions. The transactions
-	// are automatically given to the transaction pool, and are also returned
-	// to the caller.
-	SendCoins(masterKey crypto.TwofishKey, amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
 	// RegisterTransaction takes a transaction and its parents and returns a
 	// TransactionBuilder which can be used to expand the transaction. The most
@@ -212,6 +214,18 @@ type Wallet interface {
 	// RegisterTransaction(types.Transaction{}, nil)
 	StartTransaction() TransactionBuilder
 
+	// SendSiacoins is a tool for sending siacoins from the wallet to an
+	// address. Sending money usually results in multiple transactions. The
+	// transactions are automatically given to the transaction pool, and are
+	// also returned to the caller.
+	SendSiacoins(masterKey crypto.TwofishKey, amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+	// SendSiafunds is a tool for sending siafunds from the wallet to an
+	// address. Sending money usually results in multiple transactions. The
+	// transactions are automatically given to the transaction pool, and are
+	// also returned to the caller.
+	SendSiafunds(masterKey crypto.TwofishKey, amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
 	// SendSiagSiafunds sends siafunds to another address. The siacoins stored
 	// in the siafunds are sent to an address in the wallet.
 	SendSiagSiafunds(amount types.Currency, dest types.UnlockHash, keyfiles []string) ([]types.Transaction, error)
@@ -221,4 +235,10 @@ type Wallet interface {
 
 	// Close prepares the wallet for shutdown.
 	Close() error
+}
+
+// CalculateWalletTransactionID is a helper function for determining the id of
+// a wallet transaction.
+func CalcualteWalletTransactionID(tid types.TransactionID, oid OutputID) WalletTransactionID {
+	return WalletTransactionID(crypto.HashAll(t, oid))
 }

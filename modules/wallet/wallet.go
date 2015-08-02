@@ -28,24 +28,30 @@ var (
 )
 
 type ProcessedTransaction struct {
-	minerPayout bool
+	minerPayout        bool
 	confirmationHeight types.BlockHeight
-	Transaction *types.Transaction
-	outputIDs []OutputID
+	Transaction        *types.Transaction
+	outputIDs          []OutputID
 }
 
 type Wallet struct {
-	unlocked bool
-	settings WalletSettings
-
-	state            modules.ConsensusSet
-	tpool            modules.TransactionPool
-	siafundPool      types.Currency
+	unlocked                bool
+	settings                WalletSettings
+	state                   modules.ConsensusSet
+	tpool                   modules.TransactionPool
+	consensusSetHeight      types.BlockHeight
+	siafundPool             types.Currency
 	unconfirmedTransactions []types.Transaction
 
-	generatedKeys map[types.UnlockHash]generatedSignatureKey
-	siacoinOutputs map[types.SiacoinOutputID]types.SiacoinOutput
-	siafundOutputs map[types.SiafundOutputID]types.SiafundOutput
+	generatedKeys   map[types.UnlockHash]generatedSignatureKey
+	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
+	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
+	fileContracts   map[types.FileContractID]int
+	historicOutputs map[types.OutputID]types.Currency
+
+	walletTransactions            []WalletTransaction // A doubly linked list would be safer when adding and removing items.
+	walletTransactionMap          map[WalletTransactionID]*WalletTransaction
+	unconfirmedWalletTransactions []WalletTransaction // no map, just iterate through the whole thing
 
 	persistDir string
 	log        *log.Logger
