@@ -242,7 +242,7 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 }
 
 // nextPrimarySeedAddress fetches the next address from the primary seed.
-func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.UnlockHash, error) {
+func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.UnlockConditions, types.UnlockHash, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
 		return types.UnlockHash{}, errLockedWallet
@@ -283,13 +283,14 @@ func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.Unlo
 		return types.UnlockHash{}, err
 	}
 
-	return types.UnlockConditions{
+	uc := types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{{
 			Algorithm: types.SignatureEd25519,
 			Key:       pk[:],
 		}},
 		SignaturesRequired: 1,
-	}.UnlockHash(), nil
+	}
+	return uc, uc.UnlockHash(), nil
 }
 
 // NewPrimarySeed has the wallet create a new primary seed for the wallet,

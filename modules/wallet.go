@@ -20,6 +20,7 @@ var (
 // addresses.
 type Seed [crypto.EntropySize]byte
 
+// WalletTransactionID is a unique identifier for a wallet transaction.
 type WalletTransactionID crypto.Hash
 
 // WalletTransaction contains the metadata of a single output that changed the
@@ -38,10 +39,10 @@ type WalletTransaction struct {
 	Value types.Currency
 }
 
-// The TransactionBuilder is used to construct custom transactions. A
-// transaction builder is intialized via 'RegisterTransaction' and then can be
-// modified by adding funds or other fields. The transaction is completed by
-// calling 'Sign', which will sign all inputs added via the 'FundSiacoins' or
+// TransactionBuilder is used to construct custom transactions. A transaction
+// builder is intialized via 'RegisterTransaction' and then can be modified by
+// adding funds or other fields. The transaction is completed by calling
+// 'Sign', which will sign all inputs added via the 'FundSiacoins' or
 // 'FundSiafunds' call. All modifications are additive.
 //
 // Parents of the transaction are kept in the transaction builder. A parent is
@@ -53,7 +54,7 @@ type TransactionBuilder interface {
 	// transaction. A parent transaction may be needed to achieve an input with
 	// the correct value. The siacoin input will not be signed until 'Sign' is
 	// called on the transaction builder.
-	FundSiacoins(amount types.Currency) error
+	FundSiacoins(masterKey crypto.TwofishKey, amount types.Currency) error
 
 	// FundSiafunds will add a siafund input of exaclty 'amount' to the
 	// transaction. A parent transaction may be needed to achieve an input with
@@ -61,7 +62,7 @@ type TransactionBuilder interface {
 	// called on the transaction builder. Any siacoins that are released by
 	// spending the siafund outputs will be sent to another address owned by
 	// the wallet.
-	FundSiafunds(amount types.Currency) error
+	FundSiafunds(masterKey crypto.TwofishKey, amount types.Currency) error
 
 	// AddMinerFee adds a miner fee to the transaction, returning the index of
 	// the miner fee within the transaction.
@@ -202,7 +203,7 @@ type Wallet interface {
 	AddressUnconfirmedTransactions(types.UnlockHash) []WalletTransaction
 
 	// CoinAddress returns an address that can receive coins.
-	CoinAddress() (types.UnlockHash, types.UnlockConditions, error)
+	CoinAddress(masterKey crypto.TwofishKey) (types.UnlockConditions, types.UnlockHash, error)
 
 	// RegisterTransaction takes a transaction and its parents and returns a
 	// TransactionBuilder which can be used to expand the transaction. The most
