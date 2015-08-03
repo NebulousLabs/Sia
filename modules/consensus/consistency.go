@@ -147,7 +147,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	tree.PushObject(cs.height())
 	tree.PushObject(cs.currentProcessedBlock().ChildTarget)
 	tree.PushObject(cs.currentProcessedBlock().Depth)
-	tree.PushObject(cs.currentProcessedBlock().earliestChildTimestamp(cs.db))
+	tree.PushObject(cs.earliestChildTimestamp(cs.currentProcessedBlock()))
 
 	// Add all the blocks in the current path TODO: along with their diffs.
 	for i := 0; i < int(cs.db.pathHeight()); i++ {

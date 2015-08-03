@@ -202,7 +202,7 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	// Create a block with a too early timestamp - block should be rejected
 	// outright.
 	block, _, target := cst.miner.BlockForWork()
-	earliestTimestamp := cst.cs.db.getBlockMap(block.ParentID).earliestChildTimestamp(cst.cs.db)
+	earliestTimestamp := cst.cs.earliestChildTimestamp(cst.cs.db.getBlockMap(block.ParentID))
 	block.Timestamp = earliestTimestamp - 1
 	earlyBlock, _ := cst.miner.SolveBlock(block, target)
 	err = cst.cs.acceptBlock(earlyBlock)

@@ -44,7 +44,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 
 	// Check that the timestamp is not in 'the past', where the past is defined
 	// by earliestChildTimestamp.
-	if parent.earliestChildTimestamp(cs.db) > b.Timestamp {
+	if cs.earliestChildTimestamp(parent) > b.Timestamp {
 		return ErrEarlyTimestamp
 	}
 
@@ -99,7 +99,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := parentNode.newChild(b, cs.db)
+	newNode := cs.newChild(parentNode, b)
 	err = cs.db.addBlockMap(newNode)
 	if err != nil {
 		return nil, nil, err

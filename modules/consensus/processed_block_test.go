@@ -2,25 +2,15 @@ package consensus
 
 import (
 	"math/big"
-	"os"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestEarliestChildTimestamp probes the earliestChildTimestamp method of the
 // block node type.
 func TestEarliestChildTimestamp(t *testing.T) {
-	// Open a dummy database to store the processedBlocs
-	testdir := build.TempDir(modules.ConsensusDir, "TestEarliestChildTimestamp")
-	// Create the consensus directory.
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := openDB(testdir + "/set.db")
+	cst, err := createConsensusSetTester("TestEarliestChildTimestamp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +18,7 @@ func TestEarliestChildTimestamp(t *testing.T) {
 	// Check the earliest timestamp generated when the block node has no
 	// parent.
 	pb1 := &processedBlock{Block: types.Block{Timestamp: 1}}
-	if pb1.earliestChildTimestamp(db) != 1 {
+	if cst.cs.earliestChildTimestamp(pb1) != 1 {
 		t.Error("earliest child timestamp has been calculated incorrectly.")
 	}
 
@@ -46,19 +36,19 @@ func TestEarliestChildTimestamp(t *testing.T) {
 
 	pbs := []*processedBlock{pb1, pb2, pb3, pb4, pb5, pb6, pb7, pb8, pb9, pb10, pb11}
 	for _, pb := range pbs {
-		db.addBlockMap(pb)
+		cst.cs.db.addBlockMap(pb)
 	}
 
 	// Median should be '1' for pb6.
-	if pb6.earliestChildTimestamp(db) != 1 {
+	if cst.cs.earliestChildTimestamp(pb6) != 1 {
 		t.Error("incorrect child timestamp")
 	}
 	// Median should be '2' for pb7.
-	if pb7.earliestChildTimestamp(db) != 2 {
+	if cst.cs.earliestChildTimestamp(pb7) != 2 {
 		t.Error("incorrect child timestamp")
 	}
 	// Median should be '6' for pb11.
-	if pb11.earliestChildTimestamp(db) != 6 {
+	if cst.cs.earliestChildTimestamp(pb11) != 6 {
 		t.Error("incorrect child timestamp")
 	}
 }
@@ -131,14 +121,7 @@ func TestChildDept(t *testing.T) {
 // TestTargetAdjustmentBase probes the targetAdjustmentBase method of the block
 // node type.
 func TestTargetAdjustmentBase(t *testing.T) {
-	// Open a dummy database to store the processedBlocs
-	testdir := build.TempDir(modules.ConsensusDir, "TestTargetAdjustmentBase")
-	// Create the consensus directory.
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := openDB(testdir + "/set.db")
+	cst, err := createConsensusSetTester("TestTargetAdjustmentBase")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +130,7 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	genesisNode := &processedBlock{
 		Block: types.Block{Timestamp: 10000},
 	}
-	db.addBlockMap(genesisNode)
+	cst.cs.db.addBlockMap(genesisNode)
 	exactTimeNode := &processedBlock{
 		Block: types.Block{
 			Nonce:     types.BlockNonce{1, 0, 0, 0, 0, 0, 0, 0},
@@ -155,10 +138,10 @@ func TestTargetAdjustmentBase(t *testing.T) {
 		},
 	}
 	exactTimeNode.Parent = genesisNode.Block.ID()
-	db.addBlockMap(exactTimeNode)
+	cst.cs.db.addBlockMap(exactTimeNode)
 
 	// Base adjustment for the exactTimeNode should be 1.
-	adjustment, exact := exactTimeNode.targetAdjustmentBase(db).Float64()
+	adjustment, exact := cst.cs.targetAdjustmentBase(exactTimeNode).Float64()
 	if !exact {
 		t.Fatal("did not get an exact target adjustment")
 	}
@@ -171,8 +154,8 @@ func TestTargetAdjustmentBase(t *testing.T) {
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency)},
 	}
 	doubleSpeedNode.Parent = exactTimeNode.Block.ID()
-	db.addBlockMap(doubleSpeedNode)
-	adjustment, exact = doubleSpeedNode.targetAdjustmentBase(db).Float64()
+	cst.cs.db.addBlockMap(doubleSpeedNode)
+	adjustment, exact = cst.cs.targetAdjustmentBase(doubleSpeedNode).Float64()
 	if !exact {
 		t.Fatal("did not get an exact adjustment")
 	}
@@ -185,8 +168,8 @@ func TestTargetAdjustmentBase(t *testing.T) {
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*6)},
 	}
 	halfSpeedNode.Parent = doubleSpeedNode.Block.ID()
-	db.addBlockMap(halfSpeedNode)
-	adjustment, exact = halfSpeedNode.targetAdjustmentBase(db).Float64()
+	cst.cs.db.addBlockMap(halfSpeedNode)
+	adjustment, exact = cst.cs.targetAdjustmentBase(halfSpeedNode).Float64()
 	if !exact {
 		t.Fatal("did not get an exact adjustment")
 	}
@@ -203,17 +186,17 @@ func TestTargetAdjustmentBase(t *testing.T) {
 		Block: types.Block{Timestamp: 125000},
 	}
 	comparisonNode.Parent = halfSpeedNode.Block.ID()
-	db.addBlockMap(comparisonNode)
+	cst.cs.db.addBlockMap(comparisonNode)
 	startingNode := comparisonNode
 	for i := types.BlockHeight(0); i < types.TargetWindow; i++ {
 		newNode := new(processedBlock)
 		newNode.Parent = startingNode.Block.ID()
 		newNode.Block.Nonce = types.BlockNonce{byte(i), byte(i / 256), 0, 0, 0, 0, 0, 0}
-		db.addBlockMap(newNode)
+		cst.cs.db.addBlockMap(newNode)
 		startingNode = newNode
 	}
 	startingNode.Block.Timestamp = types.Timestamp(125000 + types.BlockFrequency*types.TargetWindow)
-	adjustment, exact = startingNode.targetAdjustmentBase(db).Float64()
+	adjustment, exact = cst.cs.targetAdjustmentBase(startingNode).Float64()
 	if !exact {
 		t.Error("failed to get exact result")
 	}
@@ -221,7 +204,7 @@ func TestTargetAdjustmentBase(t *testing.T) {
 		t.Error("got wrong long-range adjustment")
 	}
 	startingNode.Block.Timestamp = types.Timestamp(125000 + 2*types.BlockFrequency*types.TargetWindow)
-	adjustment, exact = startingNode.targetAdjustmentBase(db).Float64()
+	adjustment, exact = cst.cs.targetAdjustmentBase(startingNode).Float64()
 	if !exact {
 		t.Error("failed to get exact result")
 	}
@@ -268,14 +251,7 @@ func TestClampTargetAdjustment(t *testing.T) {
 
 // TestSetChildTarget probes the setChildTarget method of the block node type.
 func TestSetChildTarget(t *testing.T) {
-	// Open a dummy database to store the processedBlocs
-	testdir := build.TempDir(modules.ConsensusDir, "TestSetChildTarget")
-	// Create the consensus directory.
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := openDB(testdir + "/set.db")
+	cst, err := createConsensusSetTester("TestSetChildTarget")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,16 +261,16 @@ func TestSetChildTarget(t *testing.T) {
 		Block: types.Block{Timestamp: 10000},
 	}
 	genesisNode.ChildTarget[0] = 64
-	db.addBlockMap(genesisNode)
+	cst.cs.db.addBlockMap(genesisNode)
 	doubleTimeNode := &processedBlock{
 		Block: types.Block{Timestamp: types.Timestamp(10000 + types.BlockFrequency*2)},
 	}
 	doubleTimeNode.Parent = genesisNode.Block.ID()
-	db.addBlockMap(doubleTimeNode)
+	cst.cs.db.addBlockMap(doubleTimeNode)
 
 	// Check the resulting childTarget of the new node and see that the clamp
 	// was applied.
-	doubleTimeNode.setChildTarget(db)
+	cst.cs.setChildTarget(doubleTimeNode)
 	if doubleTimeNode.ChildTarget.Cmp(genesisNode.ChildTarget) <= 0 {
 		t.Error("double time node target did not increase")
 	}
@@ -306,14 +282,7 @@ func TestSetChildTarget(t *testing.T) {
 
 // TestNewChild probes the newChild method of the block node type.
 func TestNewChild(t *testing.T) {
-	// Open a dummy database to store the processedBlocs
-	testdir := build.TempDir(modules.ConsensusDir, "TestSetChildTarget")
-	// Create the consensus directory.
-	err := os.MkdirAll(testdir, 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := openDB(testdir + "/set.db")
+	cst, err := createConsensusSetTester("TestSetChildTarget")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,9 +294,9 @@ func TestNewChild(t *testing.T) {
 	parent.Block.Timestamp = 100
 	parent.ChildTarget[0] = 90
 
-	db.addBlockMap(parent)
+	cst.cs.db.addBlockMap(parent)
 
-	child := parent.newChild(types.Block{Timestamp: types.Timestamp(100 + types.BlockFrequency)}, db)
+	child := cst.cs.newChild(parent, types.Block{Timestamp: types.Timestamp(100 + types.BlockFrequency)})
 	if child.Parent != parent.Block.ID() {
 		t.Error("parent-child relationship incorrect")
 	}

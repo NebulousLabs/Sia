@@ -42,7 +42,7 @@ type processedBlock struct {
 // earliestChildTimestamp returns the earliest timestamp that a child node
 // can have while still being valid. See section 'Timestamp Rules' in
 // Consensus.md.
-func (pb *processedBlock) earliestChildTimestamp(db *setDB) types.Timestamp {
+func (cs *ConsensusSet) earliestChildTimestamp(pb *processedBlock) types.Timestamp {
 	// Get the previous MedianTimestampWindow timestamps.
 	windowTimes := make(types.TimestampSlice, types.MedianTimestampWindow)
 	current := pb
@@ -52,7 +52,7 @@ func (pb *processedBlock) earliestChildTimestamp(db *setDB) types.Timestamp {
 		// If we are at the genesis block, keep using the genesis block for the
 		// remaining times.
 		if current.Parent != types.ZeroID {
-			current = db.getBlockMap(current.Parent)
+			current = cs.db.getBlockMap(current.Parent)
 		}
 	}
 	sort.Sort(windowTimes)
@@ -79,7 +79,7 @@ func (pb *processedBlock) childDepth() types.Target {
 
 // targetAdjustmentBase returns the magnitude that the target should be
 // adjusted by before a clamp is applied.
-func (pb *processedBlock) targetAdjustmentBase(db *setDB) *big.Rat {
+func (cs *ConsensusSet) targetAdjustmentBase(pb *processedBlock) *big.Rat {
 	// Target only adjusts twice per window.
 	if pb.Height%(types.TargetWindow/2) != 0 {
 		return big.NewRat(1, 1)
@@ -91,7 +91,7 @@ func (pb *processedBlock) targetAdjustmentBase(db *setDB) *big.Rat {
 	var windowSize types.BlockHeight
 	windowStart := pb
 	for windowSize = 0; windowSize < types.TargetWindow && windowStart.Parent != types.ZeroID; windowSize++ {
-		windowStart = db.getBlockMap(windowStart.Parent)
+		windowStart = cs.db.getBlockMap(windowStart.Parent)
 	}
 
 	// The target of a child is determined by the amount of time that has
@@ -110,9 +110,9 @@ func (pb *processedBlock) targetAdjustmentBase(db *setDB) *big.Rat {
 
 // setChildTarget computes the target of a blockNode's child. All children of a node
 // have the same target.
-func (pb *processedBlock) setChildTarget(db *setDB) {
-	adjustment := clampTargetAdjustment(pb.targetAdjustmentBase(db))
-	parent := db.getBlockMap(pb.Parent)
+func (cs *ConsensusSet) setChildTarget(pb *processedBlock) {
+	adjustment := clampTargetAdjustment(cs.targetAdjustmentBase(pb))
+	parent := cs.db.getBlockMap(pb.Parent)
 	adjustedRatTarget := new(big.Rat).Mul(parent.ChildTarget.Rat(), adjustment)
 	pb.ChildTarget = types.RatToTarget(adjustedRatTarget)
 }
@@ -133,7 +133,7 @@ func clampTargetAdjustment(base *big.Rat) *big.Rat {
 
 // newChild creates a blockNode from a block and adds it to the parent's set of
 // children. The new node is also returned. It necessairly modifies the database
-func (pb *processedBlock) newChild(b types.Block, db *setDB) *processedBlock {
+func (cs *ConsensusSet) newChild(pb *processedBlock, b types.Block) *processedBlock {
 	// Create the child node.
 	child := &processedBlock{
 		Block:  b,
@@ -142,12 +142,12 @@ func (pb *processedBlock) newChild(b types.Block, db *setDB) *processedBlock {
 		Height: pb.Height + 1,
 		Depth:  pb.childDepth(),
 	}
-	child.setChildTarget(db)
+	cs.setChildTarget(child)
 
 	// Add the child to the parent.
 	pb.Children = append(pb.Children, child.Block.ID())
 
-	db.updateBlockMap(pb)
+	cs.db.updateBlockMap(pb)
 
 	return child
 }
