@@ -129,6 +129,7 @@ func (db *setDB) checkConsistencyGaurd() bool {
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	// Check that this transaction is gaurded by consensusGaurd.
+	// However, allow direct database modifications when testing
 	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
 		panic(errNotGaurded)
 	}

@@ -119,8 +119,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	if cs.db.checkConsistencyGaurd() {
 		return ErrInconsistentSet
 	}
-	cs.db.startConsistencyGaurd()
-	defer cs.db.stopConsistencyGaurd()
 
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
@@ -144,10 +142,13 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
+	cs.db.startConsistencyGaurd()
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
+		cs.db.stopConsistencyGaurd()
 		return err
 	}
+
 	if len(appliedNodes) > 0 {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
@@ -166,6 +167,8 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
+
+	cs.db.stopConsistencyGaurd()
 
 	return nil
 }

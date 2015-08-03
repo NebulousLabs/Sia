@@ -12,7 +12,7 @@ import (
 // initDatabase is run when the database
 func (cs *ConsensusSet) initSetDB() error {
 	if cs.db.checkConsistencyGaurd() {
-		panic(ErrInconsistentSet)
+		return ErrInconsistentSet
 	}
 	cs.db.startConsistencyGaurd()
 
