@@ -11,8 +11,9 @@ import (
 // Info fills out and returns a WalletInfo struct.
 func (w *Wallet) Info() modules.WalletInfo {
 	wi := modules.WalletInfo{
-		Balance:     w.Balance(false),
-		FullBalance: w.Balance(true),
+		Balance:          w.Balance(false),
+		FullBalance:      w.Balance(true),
+		VisibleAddresses: []types.UnlockHash{},
 	}
 
 	counter := w.mu.RLock()
