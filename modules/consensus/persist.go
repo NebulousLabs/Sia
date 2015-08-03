@@ -11,10 +11,10 @@ import (
 
 // initDatabase is run when the database
 func (cs *ConsensusSet) initSetDB() error {
-	if cs.db.checkConsistencyGaurd() {
+	if cs.db.checkConsistencyGuard() {
 		return ErrInconsistentSet
 	}
-	cs.db.startConsistencyGaurd()
+	cs.db.startConsistencyGuard()
 
 	// add genesis block
 	err := cs.db.addBlockMap(cs.blockRoot)
@@ -32,7 +32,7 @@ func (cs *ConsensusSet) initSetDB() error {
 		cs.db.updateBlockMap(cs.blockRoot)
 	}
 
-	cs.db.stopConsistencyGaurd()
+	cs.db.stopConsistencyGuard()
 
 	return nil
 }
@@ -83,12 +83,12 @@ func (cs *ConsensusSet) load(saveDir string) error {
 // from disk and move the diffs into memory
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
-	// consistency gaurd
-	if cs.db.checkConsistencyGaurd() {
+	// consistency guard
+	if cs.db.checkConsistencyGuard() {
 		panic(ErrInconsistentSet)
 	}
-	cs.db.startConsistencyGaurd()
-	defer cs.db.stopConsistencyGaurd()
+	cs.db.startConsistencyGuard()
+	defer cs.db.stopConsistencyGuard()
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)

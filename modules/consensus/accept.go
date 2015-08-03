@@ -116,7 +116,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// Simple check for consistency
-	if cs.db.checkConsistencyGaurd() {
+	if cs.db.checkConsistencyGuard() {
 		return ErrInconsistentSet
 	}
 
@@ -142,10 +142,10 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
-	cs.db.startConsistencyGaurd()
+	cs.db.startConsistencyGuard()
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
-		cs.db.stopConsistencyGaurd()
+		cs.db.stopConsistencyGuard()
 		return err
 	}
 
@@ -168,7 +168,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		}
 	}
 
-	cs.db.stopConsistencyGaurd()
+	cs.db.stopConsistencyGuard()
 
 	return nil
 }

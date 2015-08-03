@@ -19,7 +19,7 @@ var (
 	errBadSetInsert = errors.New("attempting to add an already existing item to the consensus set")
 	errNilBucket    = errors.New("using a bucket that does not exist")
 	errNilItem      = errors.New("requested item does not exist")
-	errNotGaurded   = errors.New("database modification not protected by gaurd")
+	errNotGuarded   = errors.New("database modification not protected by guard")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -52,74 +52,74 @@ func openDB(filename string) (*setDB, error) {
 				return err
 			}
 		}
-		// Initilize the consistency gaurds
+		// Initilize the consistency guards
 		b := tx.Bucket([]byte("Metadata"))
-		err := b.Put([]byte("GaurdA"), encoding.Marshal(0))
+		err := b.Put([]byte("GuardA"), encoding.Marshal(0))
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GaurdB"), encoding.Marshal(0))
+		return b.Put([]byte("GuardB"), encoding.Marshal(0))
 	})
 	return &setDB{db, true}, err
 }
 
-// startConsistencyGaurd increments the first gaurd. If this is not
+// startConsistencyGuard increments the first guard. If this is not
 // equal to the second, a transaction is taking place in the database
-func (db *setDB) startConsistencyGaurd() {
+func (db *setDB) startConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Metadata"))
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte("GaurdA")), &i)
+		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GaurdA"), encoding.Marshal(i+1))
+		return b.Put([]byte("GuardA"), encoding.Marshal(i+1))
 	})
 	if err != nil {
 		panic(err)
 	}
 }
 
-// startConsistencyGaurd increments the first gaurd. If this is not
+// startConsistencyGuard increments the first guard. If this is not
 // equal to the second, a transaction is taking place in the database
-func (db *setDB) stopConsistencyGaurd() {
+func (db *setDB) stopConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Metadata"))
 		var i int
-		err := encoding.Unmarshal(b.Get([]byte("GaurdB")), &i)
+		err := encoding.Unmarshal(b.Get([]byte("GuardB")), &i)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte("GaurdB"), encoding.Marshal(i+1))
+		return b.Put([]byte("GuardB"), encoding.Marshal(i+1))
 	})
 	if err != nil {
 		panic(err)
 	}
 }
 
-// checkConsistencyGaurd checks the two gaurds and returns true if
+// checkConsistencyGuard checks the two guards and returns true if
 // they differ. This signifies that thaer there is a transaction
 // taking place.
-func (db *setDB) checkConsistencyGaurd() bool {
-	var gaurded bool
+func (db *setDB) checkConsistencyGuard() bool {
+	var guarded bool
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Metadata"))
 		var x, y int
-		err := encoding.Unmarshal(b.Get([]byte("GaurdA")), &x)
+		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &x)
 		if err != nil {
 			return err
 		}
-		err = encoding.Unmarshal(b.Get([]byte("GaurdB")), &y)
+		err = encoding.Unmarshal(b.Get([]byte("GuardB")), &y)
 		if err != nil {
 			return err
 		}
-		gaurded = x != y
+		guarded = x != y
 		return nil
 	})
 	if err != nil {
 		panic(err)
 	}
-	return gaurded
+	return guarded
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -128,10 +128,10 @@ func (db *setDB) checkConsistencyGaurd() bool {
 // addItem and getItem are part of consensus due to stricter error
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
-	// Check that this transaction is gaurded by consensusGaurd.
+	// Check that this transaction is guarded by consensusGuard.
 	// However, allow direct database modifications when testing
-	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
-		panic(errNotGaurded)
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
 	}
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
@@ -177,8 +177,8 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket string, key interface{}) error {
-	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
-		panic(errNotGaurded)
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
 	}
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -210,8 +210,8 @@ func (db *setDB) inBucket(bucket string, key interface{}) bool {
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
 func (db *setDB) pushPath(bid types.BlockID) error {
-	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
-		panic(errNotGaurded)
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
 	}
 	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -224,8 +224,8 @@ func (db *setDB) pushPath(bid types.BlockID) error {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func (db *setDB) popPath() error {
-	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
-		panic(errNotGaurded)
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
 	}
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))

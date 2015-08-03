@@ -54,10 +54,10 @@ func acceptRecover(cs *ConsensusSet, block types.Block) (err error) {
 	return cs.AcceptBlock(block)
 }
 
-// TestConsistencyGaurd verifies that the database cannot be modified
+// TestConsistencyGuard verifies that the database cannot be modified
 // after it has been corrupted
-func TestConsistencyGaurd(t *testing.T) {
-	cst, err := createConsensusSetTester("TestConsistencyGaurd")
+func TestConsistencyGuard(t *testing.T) {
+	cst, err := createConsensusSetTester("TestConsistencyGuard")
 	if err != nil {
 		t.Fatal(err)
 	}
