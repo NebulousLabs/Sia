@@ -244,7 +244,7 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
 	// Simple consistency gaurd
-	if cs.db.consistencyCounterA != cs.db.consistencyCounterB {
+	if cs.db.checkConsistencyGaurd() {
 		return modules.ConsensusChange{}, ErrInconsistentSet
 	}
 	// applyTransaction will apply the diffs from a transaction and store them
@@ -255,9 +255,9 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 	diffHolder.Height = cs.height()
 	defer func() {
 		cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
-		cs.db.consistencyCounterB++
+		cs.db.stopConsistencyGaurd()
 	}()
-	cs.db.consistencyCounterA++
+	cs.db.startConsistencyGaurd()
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)
 		if err != nil {

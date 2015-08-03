@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-// SurpassThreshold is a percentage that dictates how much heavier ac ompeting
+// SurpassThreshold is a percentage that dictates how much heavier a competing
 // chain has to be before the node will switch to mining on that chain. This is
 // not a consensus rule. This percentage is only applied to the most recent
 // block, not the entire chain; see blockNode.heavierThan.

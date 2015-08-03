@@ -116,10 +116,11 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 // be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// Simple check for consistency
-	if cs.db.consistencyCounterA != cs.db.consistencyCounterB {
+	if cs.db.checkConsistencyGaurd() {
 		return ErrInconsistentSet
 	}
-	cs.db.consistencyCounterA++
+	cs.db.startConsistencyGaurd()
+	defer cs.db.stopConsistencyGaurd()
 
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
@@ -165,8 +166,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 			panic(err)
 		}
 	}
-
-	cs.db.consistencyCounterB++
 
 	return nil
 }

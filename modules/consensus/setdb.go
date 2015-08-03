@@ -29,13 +29,6 @@ type setDB struct {
 	// The open flag is used to prevent reading from the database
 	// after closing sia when the loading loop is still running
 	open bool // DEPRECATED
-
-	// consistencyCounterA and consistencyCounterB detect when the
-	// database was closed in a partial state. Counter A is
-	// incremented at the beginning and B is incremented at the
-	// end, and should always be the same before starting anything
-	consistencyCounterA int
-	consistencyCounterB int
 }
 
 // openDB loads the set database and populates it with the necessary buckets
@@ -48,6 +41,7 @@ func openDB(filename string) (*setDB, error) {
 	var buckets []string = []string{
 		"Path",
 		"BlockMap",
+		"Metadata",
 	}
 
 	// Create buckets
@@ -58,9 +52,74 @@ func openDB(filename string) (*setDB, error) {
 				return err
 			}
 		}
+		// Initilize the consistency gaurds
+		b := tx.Bucket([]byte("Metadata"))
+		err := b.Put([]byte("GaurdA"), encoding.Marshal(0))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GaurdB"), encoding.Marshal(0))
+	})
+	return &setDB{db, true}, err
+}
+
+// startConsistencyGaurd increments the first gaurd. If this is not
+// equal to the second, a transaction is taking place in the database
+func (db *setDB) startConsistencyGaurd() {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var i int
+		err := encoding.Unmarshal(b.Get([]byte("GaurdA")), &i)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GaurdA"), encoding.Marshal(i+1))
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// startConsistencyGaurd increments the first gaurd. If this is not
+// equal to the second, a transaction is taking place in the database
+func (db *setDB) stopConsistencyGaurd() {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var i int
+		err := encoding.Unmarshal(b.Get([]byte("GaurdB")), &i)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GaurdB"), encoding.Marshal(i+1))
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// checkConsistencyGaurd checks the two gaurds and returns true if
+// they differ. This signifies that thaer there is a transaction
+// taking place.
+func (db *setDB) checkConsistencyGaurd() bool {
+	var gaurded bool
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var x, y int
+		err := encoding.Unmarshal(b.Get([]byte("GaurdA")), &x)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(b.Get([]byte("GaurdB")), &y)
+		if err != nil {
+			return err
+		}
+		gaurded = x != y
 		return nil
 	})
-	return &setDB{db, true, 0, 0}, nil
+	if err != nil {
+		panic(err)
+	}
+	return gaurded
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -70,7 +129,7 @@ func openDB(filename string) (*setDB, error) {
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	// Check that this transaction is gaurded by consensusGaurd.
-	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
 		panic(errNotGaurded)
 	}
 	v := encoding.Marshal(value)
@@ -117,7 +176,7 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 
 // rmItem removes an item from a bucket
 func (db *setDB) rmItem(bucket string, key interface{}) error {
-	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
 		panic(errNotGaurded)
 	}
 	k := encoding.Marshal(key)
@@ -150,7 +209,7 @@ func (db *setDB) inBucket(bucket string, key interface{}) bool {
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
 func (db *setDB) pushPath(bid types.BlockID) error {
-	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
 		panic(errNotGaurded)
 	}
 	value := encoding.Marshal(bid)
@@ -164,7 +223,7 @@ func (db *setDB) pushPath(bid types.BlockID) error {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func (db *setDB) popPath() error {
-	if build.DEBUG && db.consistencyCounterA == db.consistencyCounterB && build.Release != "testing" {
+	if build.DEBUG && !db.checkConsistencyGaurd() && build.Release != "testing" {
 		panic(errNotGaurded)
 	}
 	return db.Update(func(tx *bolt.Tx) error {
