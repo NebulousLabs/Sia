@@ -37,13 +37,13 @@ func (rs *rsCode) Encode(data []byte) ([][]byte, error) {
 // writes it to w. pieces should be identical to the slice returned by
 // Encode (length and order must be preserved), but with missing elements
 // set to nil.
-func (rs *rsCode) Recover(pieces [][]byte, w io.Writer) error {
+func (rs *rsCode) Recover(pieces [][]byte, n uint64, w io.Writer) error {
 	err := rs.enc.Reconstruct(pieces)
 	if err != nil {
 		return err
 	}
 	// TODO: implement this manually
-	return rs.enc.Join(w, pieces, int(rs.chunkSize))
+	return rs.enc.Join(w, pieces, int(n))
 }
 
 // NewRSCode creates a new Reed-Solomon encoder/decoder using the supplied
@@ -55,7 +55,6 @@ func NewRSCode(nData, nParity int) (modules.ECC, error) {
 	}
 	return &rsCode{
 		enc:       enc,
-		chunk:     make([]byte, chunksize),
 		numPieces: nData + nParity,
 	}, nil
 }

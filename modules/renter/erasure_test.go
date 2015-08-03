@@ -3,13 +3,12 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
-	"io"
 	"io/ioutil"
 	"testing"
 )
 
 func TestRSEncode(t *testing.T) {
-	ecc, err := NewRSCode(10, 3, 1024)
+	ecc, err := NewRSCode(10, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,26 +17,23 @@ func TestRSEncode(t *testing.T) {
 	rand.Read(data)
 
 	pieces, err := ecc.Encode(data)
-	if err == io.EOF {
-		break
-	} else if err != nil {
-		t.Fatal(err)
-	}
-
-	buf := new(bytes.Buffer)
-	err = ecc.Recover(pieces, buf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	buf.Truncate(777)
+	buf := new(bytes.Buffer)
+	err = ecc.Recover(pieces, 777, buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if !bytes.Equal(data, buf.Bytes()) {
 		t.Fatal("recovered data does not match original")
 	}
 }
 
 func BenchmarkRSEncode(b *testing.B) {
-	ecc, err := NewRSCode(80, 20, 1<<20) // 1 MB
+	ecc, err := NewRSCode(80, 20)
 	if err != nil {
 		panic(err)
 	}
@@ -51,7 +47,7 @@ func BenchmarkRSEncode(b *testing.B) {
 }
 
 func BenchmarkRSRecover(b *testing.B) {
-	ecc, err := NewRSCode(50, 200, 1<<20)
+	ecc, err := NewRSCode(50, 200)
 	if err != nil {
 		panic(err)
 	}
@@ -64,6 +60,6 @@ func BenchmarkRSRecover(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ecc.Recover(pieces, ioutil.Discard)
+		ecc.Recover(pieces, 1<<20, ioutil.Discard)
 	}
 }
