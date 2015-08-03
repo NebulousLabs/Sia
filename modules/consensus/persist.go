@@ -12,19 +12,21 @@ import (
 // initDatabase is run when the database
 func (cs *ConsensusSet) initSetDB() error {
 	// add genesis block
-	err := cs.db.addBlockMap(*cs.blockRoot)
+	err := cs.db.addBlockMap(cs.blockRoot)
 	if err != nil {
 		return err
 	}
-	err = cs.db.pushPath(cs.blockRoot.block.ID())
+	err = cs.db.pushPath(cs.blockRoot.Block.ID())
 	if err != nil {
 		return err
 	}
 	// Explicit initilization preferred to implicit
 	cs.blocksLoaded = 0
 	if build.DEBUG {
-		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
+		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
+		cs.db.updateBlockMap(cs.blockRoot)
 	}
+
 	return nil
 }
 
@@ -47,7 +49,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	// Check that the db's genesis block matches our genesis block.
 	bid := cs.db.getPath(0)
 	// If this happens, print a warning and start a new db.
-	if bid != cs.blockRoot.block.ID() {
+	if bid != cs.blockRoot.Block.ID() {
 		println("WARNING: blockchain has wrong genesis block. A new blockchain will be created.")
 		cs.db.Close()
 		err = os.Rename(filepath.Join(saveDir, "set.db"), filepath.Join(saveDir, "set.db.bck"))
@@ -63,7 +65,7 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	// consensusSetHash can be re-made. Load from disk instead
 	pb := cs.db.getBlockMap(bid)
 
-	cs.blockRoot.consensusSetHash = pb.ConsensusSetHash
+	cs.blockRoot.ConsensusSetHash = pb.ConsensusSetHash
 	// Explicit initilization preferred to implicit
 	cs.blocksLoaded = 0
 
@@ -78,7 +80,6 @@ func (cs *ConsensusSet) loadDiffs() {
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
 		pb := cs.db.getBlockMap(bid)
-		bn := cs.pbToBn(pb)
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
@@ -87,11 +88,10 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.blockMap[bn.block.ID()] = &bn // DEPRICATED
 		cs.updatePath = false
-		cs.commitDiffSet(&bn, modules.DiffApply)
+		cs.commitDiffSet(pb, modules.DiffApply)
 		cs.updatePath = true
-		cs.updateSubscribers(nil, []*blockNode{&bn})
+		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}
 }

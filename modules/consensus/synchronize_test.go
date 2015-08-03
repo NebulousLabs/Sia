@@ -13,6 +13,7 @@ func TestSynchronize(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+
 	cst1, err := createConsensusSetTester("TestSynchronize1")
 	if err != nil {
 		t.Fatal(err)

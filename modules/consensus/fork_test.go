@@ -15,7 +15,7 @@ func TestDeleteNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Set up the following structure:
 	//		parent -> child0 + child1
@@ -43,31 +43,38 @@ func TestDeleteNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// refresh pb
+	pb = cst.cs.db.getBlockMap(pb.Block.ID())
 	// Check the structure is as intended.
-	if len(bn.children) != 2 {
+	if len(pb.Children) != 2 {
 		t.Fatal("wrong number of children on parent block")
 	}
-	if len(bn.children[0].children) != 1 {
+	pbChild0 := cst.cs.db.getBlockMap(pb.Children[0])
+	if len(pbChild0.Children) != 1 {
 		t.Fatal("bad block doesn't have the right number of children")
 	}
-	if len(bn.children[1].children) != 0 {
+	pbChild1 := cst.cs.db.getBlockMap(pb.Children[1])
+	if len(pbChild1.Children) != 0 {
 		t.Fatal("good block has children")
 	}
 
-	// Rewind so that 'bn' is the current block again.
-	cst.cs.commitDiffSet(bn.children[0].children[0], modules.DiffRevert)
-	cst.cs.commitDiffSet(bn.children[0], modules.DiffRevert)
+	// Rewind so that 'pb' is the current block again.
+	childchild := cst.cs.db.getBlockMap(pbChild0.Children[0])
+	cst.cs.commitDiffSet(childchild, modules.DiffRevert)
+	cst.cs.commitDiffSet(pbChild0, modules.DiffRevert)
 
 	// Call 'deleteNode' on child0
-	child0Node := bn.children[0]
-	cst.cs.deleteNode(bn.children[0])
-	if len(bn.children) != 1 {
+	child0Node := cst.cs.db.getBlockMap(pb.Children[0])
+	cst.cs.deleteNode(child0Node)
+	pb = cst.cs.db.getBlockMap(pb.Block.ID())
+	if len(pb.Children) != 1 {
 		t.Error("children not correctly deleted")
 	}
-	if len(child0Node.children) != 0 {
+	exists := cst.cs.db.inBlockMap(childchild.Block.ID())
+	if exists {
 		t.Error("grandchild not deleted correctly")
 	}
-	if bn.children[0] == child0Node {
+	if pb.Children[0] == child0Node.Block.ID() {
 		t.Error("wrong child was deleted")
 	}
 
@@ -79,7 +86,7 @@ func TestDeleteNode(t *testing.T) {
 			t.Error("expecting errDeleteCurrentPath, got", r)
 		}
 	}()
-	cst.cs.deleteNode(bn)
+	cst.cs.deleteNode(pb)
 }
 
 // TestBacktrackToCurrentPath probes the backtrackToCurrentPath method of the
@@ -92,14 +99,14 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Backtrack from the current node to the blockchain.
-	nodes := cst.cs.backtrackToCurrentPath(bn)
+	nodes := cst.cs.backtrackToCurrentPath(pb)
 	if len(nodes) != 1 {
 		t.Fatal("backtracking to the current node gave incorrect result")
 	}
-	if nodes[0].block.ID() != bn.block.ID() {
+	if nodes[0].Block.ID() != pb.Block.ID() {
 		t.Error("backtrack returned the wrong node")
 	}
 
@@ -114,15 +121,16 @@ func TestBacktrackToCurrentPath(t *testing.T) {
 	if err != modules.ErrNonExtendingBlock {
 		t.Fatal(err)
 	}
-	bn = cst.cs.blockMap[child1.ID()]
-	nodes = cst.cs.backtrackToCurrentPath(bn)
+	pb = cst.cs.db.getBlockMap(child1.ID())
+	nodes = cst.cs.backtrackToCurrentPath(pb)
 	if len(nodes) != 2 {
 		t.Error("backtracking grabbed wrong number of nodes")
 	}
-	if nodes[0].block.ID() != bn.parent.block.ID() {
+	parent := cst.cs.db.getBlockMap(pb.Parent)
+	if nodes[0].Block.ID() != parent.Block.ID() {
 		t.Error("grabbed the wrong block as the common block")
 	}
-	if nodes[1].block.ID() != bn.block.ID() {
+	if nodes[1].Block.ID() != pb.Block.ID() {
 		t.Error("backtracked from the wrong node")
 	}
 }
@@ -136,17 +144,19 @@ func TestRevertToNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Revert to a grandparent and verify the returned array is correct.
-	revertedNodes := cst.cs.revertToNode(bn.parent.parent)
+	parent := cst.cs.db.getBlockMap(pb.Parent)
+	grandParent := cst.cs.db.getBlockMap(parent.Parent)
+	revertedNodes := cst.cs.revertToNode(grandParent)
 	if len(revertedNodes) != 2 {
 		t.Error("wrong number of nodes reverted")
 	}
-	if revertedNodes[0] != bn {
+	if revertedNodes[0].Block.ID() != pb.Block.ID() {
 		t.Error("wrong composition of reverted nodes")
 	}
-	if revertedNodes[1] != bn.parent {
+	if revertedNodes[1].Block.ID() != parent.Block.ID() {
 		t.Error("wrong composition of reverted nodes")
 	}
 
@@ -158,5 +168,5 @@ func TestRevertToNode(t *testing.T) {
 			t.Error(r)
 		}
 	}()
-	cst.cs.revertToNode(bn)
+	cst.cs.revertToNode(pb)
 }

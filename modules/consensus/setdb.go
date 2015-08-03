@@ -4,9 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/boltdb/bolt"
@@ -30,90 +28,6 @@ type setDB struct {
 	// The open flag is used to prevent reading from the database
 	// after closing sia when the loading loop is still running
 	open bool // DEPRECATED
-}
-
-// processedBlock is a copy/rename of blockNode, with the pointers to
-// other blockNodes replaced with block ID's, and all the fields
-// exported, so that a block node can be marshalled
-type processedBlock struct {
-	Block    types.Block
-	Parent   types.BlockID
-	Children []types.BlockID
-
-	Height      types.BlockHeight
-	Depth       types.Target
-	ChildTarget types.Target
-
-	DiffsGenerated            bool
-	SiacoinOutputDiffs        []modules.SiacoinOutputDiff
-	FileContractDiffs         []modules.FileContractDiff
-	SiafundOutputDiffs        []modules.SiafundOutputDiff
-	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
-	SiafundPoolDiffs          []modules.SiafundPoolDiff
-
-	ConsensusSetHash crypto.Hash
-}
-
-// bnToPb and pbToBn convert between blockNodes and
-// processedBlocks. As block nodes will be replaced with
-// processedBlocks, this code should be considered deprecated
-
-// bnToPb converts a blockNode to a processed block
-// DEPRECATED
-func bnToPb(bn blockNode) processedBlock {
-	pb := processedBlock{
-		Block: bn.block,
-
-		Height:      bn.height,
-		Depth:       bn.depth,
-		ChildTarget: bn.childTarget,
-
-		DiffsGenerated:            bn.diffsGenerated,
-		SiacoinOutputDiffs:        bn.siacoinOutputDiffs,
-		FileContractDiffs:         bn.fileContractDiffs,
-		SiafundOutputDiffs:        bn.siafundOutputDiffs,
-		DelayedSiacoinOutputDiffs: bn.delayedSiacoinOutputDiffs,
-		SiafundPoolDiffs:          bn.siafundPoolDiffs,
-
-		ConsensusSetHash: bn.consensusSetHash,
-	}
-	for _, c := range bn.children {
-		pb.Children = append(pb.Children, c.block.ID())
-	}
-	if bn.parent != nil {
-		pb.Parent = bn.parent.block.ID()
-	}
-
-	return pb
-}
-
-// pbToBn exists to move a processed block to a block node. It
-// requires the consensus block Map.
-// DEPRECATED
-func (cs *ConsensusSet) pbToBn(pb *processedBlock) blockNode {
-	parent, exists := cs.blockMap[pb.Parent]
-	if !exists {
-		parent = nil
-	}
-
-	bn := blockNode{
-		block:  pb.Block,
-		parent: parent,
-
-		height:      pb.Height,
-		depth:       pb.Depth,
-		childTarget: pb.ChildTarget,
-
-		diffsGenerated:            pb.DiffsGenerated,
-		siacoinOutputDiffs:        pb.SiacoinOutputDiffs,
-		fileContractDiffs:         pb.FileContractDiffs,
-		siafundOutputDiffs:        pb.SiafundOutputDiffs,
-		delayedSiacoinOutputDiffs: pb.DelayedSiacoinOutputDiffs,
-		siafundPoolDiffs:          pb.SiafundPoolDiffs,
-
-		consensusSetHash: pb.ConsensusSetHash,
-	}
-	return bn
 }
 
 // openDB loads the set database and populates it with the necessary buckets
@@ -261,10 +175,10 @@ func (db *setDB) pathHeight() types.BlockHeight {
 	return types.BlockHeight(h)
 }
 
-// addBlockMap adds a block node to the block map
+// addBlockMap adds a processedBlock to the block map
 // This will eventually take a processed block as an argument
-func (db *setDB) addBlockMap(bn blockNode) error {
-	return db.addItem("BlockMap", bn.block.ID(), bnToPb(bn))
+func (db *setDB) addBlockMap(pb *processedBlock) error {
+	return db.addItem("BlockMap", pb.Block.ID(), *pb)
 }
 
 // getBlockMap queries the set database to return a processedBlock
@@ -282,13 +196,6 @@ func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	return &pb
 }
 
-// getBlockMapBn is a transitional wrapper for getting a block node
-// from the blockMap // DEPRICATED
-func (cs *ConsensusSet) getBlockMapBn(id types.BlockID) *blockNode {
-	bn := cs.pbToBn(cs.db.getBlockMap(id))
-	return &bn
-}
-
 // inBlockMap checks for the existance of a block with a given ID in
 // the consensus set
 func (db *setDB) inBlockMap(id types.BlockID) bool {
@@ -298,4 +205,18 @@ func (db *setDB) inBlockMap(id types.BlockID) bool {
 // rmBlockMap removes a processedBlock from the blockMap bucket
 func (db *setDB) rmBlockMap(id types.BlockID) error {
 	return db.rmItem("BlockMap", id)
+}
+
+// updateBlockMap is a wrapper function for modification of
+func (db *setDB) updateBlockMap(pb *processedBlock) {
+	// These errors will only be caused by an error by bolt
+	// e.g. database being closed.
+	err := db.rmBlockMap(pb.Block.ID())
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = db.addBlockMap(pb)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }

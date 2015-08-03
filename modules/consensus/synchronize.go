@@ -96,6 +96,9 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
@@ -109,10 +112,10 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	lockID := s.mu.RLock()
 	for _, id := range knownBlocks {
 		if s.db.inBlockMap(id) {
-			bn := s.getBlockMapBn(id)
-			if bn.height <= s.height() && id == s.db.getPath(bn.height) {
+			pb := s.db.getBlockMap(id)
+			if pb.Height <= s.height() && id == s.db.getPath(pb.Height) {
 				found = true
-				start = bn.height + 1 // start at child
+				start = pb.Height + 1 // start at child
 				break
 			}
 		}
@@ -141,8 +144,8 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node := s.getBlockMapBn(s.db.getPath(i))
-				blocks = append(blocks, node.block)
+				node := s.db.getBlockMap(s.db.getPath(i))
+				blocks = append(blocks, node.Block)
 			}
 
 			// TODO: Check for off-by-one here too.

@@ -27,11 +27,12 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 	// Grab the parent of the block and verify the ID of the child meets the
 	// target. This is done as early as possible to enforce that any
 	// block-related DoS must use blocks that have sufficient work.
-	parent, exists := cs.blockMap[b.ParentID]
+	exists := cs.db.inBlockMap(b.ParentID)
 	if !exists {
 		return ErrOrphan
 	}
-	if !b.CheckTarget(parent.childTarget) {
+	parent := cs.db.getBlockMap(b.ParentID)
+	if !b.CheckTarget(parent.ChildTarget) {
 		return ErrMissedTarget
 	}
 
@@ -42,7 +43,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 
 	// Check that the timestamp is not in 'the past', where the past is defined
 	// by earliestChildTimestamp.
-	if parent.earliestChildTimestamp() > b.Timestamp {
+	if parent.earliestChildTimestamp(cs.db) > b.Timestamp {
 		return ErrEarlyTimestamp
 	}
 
@@ -55,7 +56,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 	}
 
 	// Verify that the miner payouts are valid.
-	if !b.CheckMinerPayouts(parent.height + 1) {
+	if !b.CheckMinerPayouts(parent.Height + 1) {
 		return ErrBadMinerPayouts
 	}
 
@@ -81,15 +82,15 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
-	parentNode := cs.blockMap[b.ParentID]
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*processedBlock, err error) {
+	parentNode := cs.db.getBlockMap(b.ParentID)
 	// COMPATv0.4.0
 	//
 	// When validating/accepting a block, the types height needs to be set to
 	// the height of the block that's being analyzed. After analysis is
 	// finished, the height needs to be set to the height of the current block.
 	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = parentNode.height
+	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()
 	defer func() {
 		types.CurrentHeightLock.Lock()
@@ -97,13 +98,12 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := parentNode.newChild(b)
-	cs.blockMap[b.ID()] = newNode
-	err = cs.db.addBlockMap(*newNode)
+	newNode := parentNode.newChild(b, cs.db)
+	err = cs.db.addBlockMap(newNode)
 	if err != nil {
 		return nil, nil, err
 	}
-	if newNode.heavierThan(cs.currentBlockNode()) {
+	if newNode.heavierThan(cs.currentProcessedBlock()) {
 		return cs.forkBlockchain(newNode)
 	}
 	return nil, nil, modules.ErrNonExtendingBlock
@@ -124,7 +124,7 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	if exists {
 		return ErrDoSBlock
 	}
-	_, exists = cs.blockMap[b.ID()]
+	exists = cs.db.inBlockMap(b.ID())
 	if exists {
 		return ErrBlockKnown
 	}
