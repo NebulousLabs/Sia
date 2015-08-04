@@ -1,0 +1,59 @@
+package types
+
+import (
+	"testing"
+
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+)
+
+// BenchmarkStandaloneValid times how long it takes to verify a single
+// large transaction, with 100 signatures
+func BenchmarkStandaloneValid(b *testing.B) {
+	// make a transaction 10 with valid inputs with valid signatures
+	b.ReportAllocs()
+	txn := Transaction{}
+	numSigs := 100
+	sk := make([]crypto.SecretKey, numSigs)
+	pk := make([]crypto.PublicKey, numSigs)
+	for i := 0; i < numSigs; i++ {
+		s, p, err := crypto.GenerateSignatureKeys()
+		if err != nil {
+			b.Fatal(err)
+		}
+		sk[i] = s
+		pk[i] = p
+	}
+	for i := 0; i < numSigs; i++ {
+		uc := UnlockConditions{
+			PublicKeys: []SiaPublicKey{
+				{Algorithm: SignatureEd25519, Key: pk[i][:]},
+			},
+			SignaturesRequired: 1,
+		}
+		txn.SiacoinInputs = append(txn.SiacoinInputs, SiacoinInput{
+			UnlockConditions: uc,
+		})
+		copy(txn.SiacoinInputs[i].ParentID[:], encoding.Marshal(i))
+		txn.TransactionSignatures = append(txn.TransactionSignatures, TransactionSignature{
+			CoveredFields: CoveredFields{WholeTransaction: true},
+		})
+		copy(txn.TransactionSignatures[i].ParentID[:], encoding.Marshal(i))
+	}
+	for i := 0; i < numSigs; i++ {
+		sigHash := txn.SigHash(i)
+		sig0, err := crypto.SignHash(sigHash, sk[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		txn.TransactionSignatures[i].Signature = sig0[:]
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := txn.StandaloneValid(10)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
