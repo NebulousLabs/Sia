@@ -1,4 +1,5 @@
 package wallet
+/*
 
 import (
 	"testing"
@@ -28,3 +29,4 @@ func TestSiagKeyLoading(t *testing.T) {
 	// TODO: Need some way to rescan. Until then, manual testing will need to
 	// suffice.
 }
+*/

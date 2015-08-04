@@ -37,10 +37,11 @@ type Wallet struct {
 	siafundPool             types.Currency
 	unconfirmedTransactions []types.Transaction
 
-	generatedKeys   map[types.UnlockHash]generatedSignatureKey
+	generatedKeys   map[types.UnlockHash]*[]modules.Seed
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
 	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
 	historicOutputs map[types.OutputID]types.Currency
+	spentOutputs    map[types.OutputID]types.BlockHeight
 
 	walletTransactions            []WalletTransaction // A doubly linked list would be safer when adding and removing items.
 	walletTransactionMap          map[WalletTransactionID]*WalletTransaction

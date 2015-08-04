@@ -28,15 +28,6 @@ type (
 	// can be used for every seed file.
 	SeedFileUID [crypto.EntropySize]byte
 
-	// generatedSignatureKey is a key that can be used to sign outputs. All of
-	// the generated keys are encrypted and kept in memory, to avoid needing to
-	// keep track of different seed files and passwords.
-	generatedSignatureKey struct {
-		seedFileUID SeedFileUID
-		keyIndex     uint64
-		encryptedKey crypto.Ciphertext
-	}
-
 	// SeedFile stores an encrypted wallet seed on disk.
 	SeedFile struct {
 		SeedFileUID SeedFileUID
@@ -51,25 +42,25 @@ func seedFileEncryptionKey(masterKey crypto.TwofishKey, sfuid SeedFileUID) crypt
 	return crypto.TwofishKey(crypto.HashAll(masterKey, seedModifier, sfuid))
 }
 
-// signatureKeyEncryptionKey creates the encryption key for a generated
-// signature key.
-func signatureKeyEncryptionKey(masterKey crypto.TwofishKey, sfuid SeedFileUID, keyIndex uint64) crypto.TwofishKey {
-	return crypto.TwofishKey(crypto.HashAll(masterKey, generatedKeyModifier, sfuid, keyIndex))
-}
-
-// generateAddress creates the keys and unlock conditions for key 'index' of
-// seed 's'.
-func generateAddress(seed modules.Seed, index uint64) (crypto.SecretKey, crypto.PublicKey, types.UnlockConditions) {
-	// Generate the keys and unlock conditions.
-	entropy := crypto.HashAll(seed, index)
-	sk, pk := crypto.DeterministicSignatureKeys(entropy)
-	uc := types.UnlockConditions{
+// generateUnlockConditions provides the unlock conditions that would be
+// automatically generated from the input public key.
+func generateUnlockConditions(pk crypto.PublicKey) types.UnlockConditions {
+	return types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{{
 			Algorithm: types.SignatureEd25519,
 			Key:       pk[:],
 		}},
 		SignaturesRequired: 1,
 	}
+}
+
+// generateAddress creates the keys and unlock conditions a given index of a
+// seed.
+func generateAddress(seed modules.Seed, index uint64) (crypto.SecretKey, crypto.PublicKey, types.UnlockConditions) {
+	// Generate the keys and unlock conditions.
+	entropy := crypto.HashAll(seed, index)
+	sk, pk := crypto.DeterministicSignatureKeys(entropy)
+	uc := generateUnlockConditions(pk)
 	return sk, pk, uc
 }
 
@@ -113,7 +104,7 @@ func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, seed modules.S
 	}
 
 	// Add the key to the set of tracked keys.
-	w.generatedKeys[uc.unlockHash] = generatedSignatureKey{sfuid, index, encryptedSignatureKey}
+	w.generatedKeys[uc.unlockHash] = generatedSignatureKey{sfuid, index, pk, encryptedSignatureKey}
 	w.trackedKeys[uc.unlockHash] = struct{}{}
 	return nil
 }
