@@ -60,7 +60,7 @@ func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp type
 		return
 	}
 	pb := s.db.getBlockMap(bid)
-	timestamp = pb.earliestChildTimestamp(s.db)
+	timestamp = s.earliestChildTimestamp(pb)
 	return
 }
 

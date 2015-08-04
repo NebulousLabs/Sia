@@ -46,7 +46,6 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			if !s.db.open {
 				return errors.New("database not open")
 			}
-			s.verificationRigor = fullVerification
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
 			// these errors are benign

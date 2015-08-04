@@ -11,6 +11,11 @@ import (
 
 // initDatabase is run when the database
 func (cs *ConsensusSet) initSetDB() error {
+	if cs.db.checkConsistencyGuard() {
+		return ErrInconsistentSet
+	}
+	cs.db.startConsistencyGuard()
+
 	// add genesis block
 	err := cs.db.addBlockMap(cs.blockRoot)
 	if err != nil {
@@ -26,6 +31,8 @@ func (cs *ConsensusSet) initSetDB() error {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
 		cs.db.updateBlockMap(cs.blockRoot)
 	}
+
+	cs.db.stopConsistencyGuard()
 
 	return nil
 }
@@ -76,6 +83,12 @@ func (cs *ConsensusSet) load(saveDir string) error {
 // from disk and move the diffs into memory
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
+	// consistency guard
+	if cs.db.checkConsistencyGuard() {
+		panic(ErrInconsistentSet)
+	}
+	cs.db.startConsistencyGuard()
+	defer cs.db.stopConsistencyGuard()
 	// load blocks from the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
@@ -84,7 +97,7 @@ func (cs *ConsensusSet) loadDiffs() {
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
 		// This guard is for when the program is stopped. It is temporary.
-		// DEPRICATED
+		// DEPRECATED
 		if !cs.db.open {
 			break
 		}
@@ -94,4 +107,14 @@ func (cs *ConsensusSet) loadDiffs() {
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}
+
+	// Do a consistency check after loading the database. This
+	// will be redundant when debug is turned on
+	if height > 1 {
+		err := cs.checkConsistency()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 }

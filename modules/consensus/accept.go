@@ -17,6 +17,7 @@ var (
 	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
 	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
 	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	ErrInconsistentSet        = errors.New("consensus set is not in a consistent state")
 	ErrLargeBlock             = errors.New("block is too large to be accepted")
 	ErrMissedTarget           = errors.New("block does not meet target")
 	ErrOrphan                 = errors.New("block has no known parent")
@@ -43,7 +44,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 
 	// Check that the timestamp is not in 'the past', where the past is defined
 	// by earliestChildTimestamp.
-	if parent.earliestChildTimestamp(cs.db) > b.Timestamp {
+	if cs.earliestChildTimestamp(parent) > b.Timestamp {
 		return ErrEarlyTimestamp
 	}
 
@@ -98,7 +99,7 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := parentNode.newChild(b, cs.db)
+	newNode := cs.newChild(parentNode, b)
 	err = cs.db.addBlockMap(newNode)
 	if err != nil {
 		return nil, nil, err
@@ -109,16 +110,16 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	return nil, nil, modules.ErrNonExtendingBlock
 }
 
-// acceptBlock is the internal consensus function for adding blocks. There is
-// no block relaying. The speed of 'acceptBlock' is effected by the value of
-// 'cs.verificationRigor'. If rigor is set to 'fullVerification', all of the
-// transactions will be checked and verified. This is a requirement when
-// receiving blocks from untrusted sources. When set to 'partialVerification',
-// verification of transactions is skipped. This is acceptable when receiving
-// blocks from a trust source, such as blocks that were previously verified and
-// saved to disk. The value of 'cs.verificationRigor' should be set before
-// 'acceptBlock' is called.
+// acceptBlock is the internal consensus function for adding
+// blocks. There is no block relaying. acceptBlock will verify all
+// transactions. Trusted blocks, like those on disk, should already
+// be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+	// Simple check for consistency
+	if cs.db.checkConsistencyGuard() {
+		return ErrInconsistentSet
+	}
+
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
@@ -141,10 +142,13 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
+	cs.db.startConsistencyGuard()
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
+		cs.db.stopConsistencyGuard()
 		return err
 	}
+
 	if len(appliedNodes) > 0 {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
@@ -164,6 +168,8 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		}
 	}
 
+	cs.db.stopConsistencyGuard()
+
 	return nil
 }
 
@@ -175,8 +181,6 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 
-	// Set the flag to do full verification.
-	cs.verificationRigor = fullVerification
 	err := cs.acceptBlock(b)
 	if err != nil {
 		return err
