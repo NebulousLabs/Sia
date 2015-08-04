@@ -165,9 +165,12 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// create hosts
-	hosts := make([]testHost, 3)
+	hosts := make([]fileHost, 3)
 	for i := range hosts {
-		hosts[i].pieceMap = make(map[uint64][]pieceData)
+		h := &testHost{
+			pieceMap: make(map[uint64][]pieceData),
+		}
+		hosts[i] = h
 	}
 
 	// upload data to hosts
@@ -186,7 +189,7 @@ func TestErasureDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		for j, p := range pieces {
-			host := &hosts[j%len(hosts)] // distribute evenly
+			host := hosts[j%len(hosts)].(*testHost) // distribute evenly
 			host.pieceMap[i] = append(host.pieceMap[i], pieceData{
 				uint64(j),
 				uint64(len(host.data)),
@@ -196,14 +199,8 @@ func TestErasureDownload(t *testing.T) {
 		}
 	}
 
-	// annoying -- have to convert to proper interface
-	var hs []fileHost
-	for i := range hosts {
-		hs = append(hs, &hosts[i])
-	}
-
 	// download data
-	d := newDownloader(ecc, chunkSize, dataSize, hs, "", "")
+	d := newDownloader(ecc, chunkSize, dataSize, hosts, "", "")
 	buf := new(bytes.Buffer)
 	err = d.run(buf)
 	if err != nil {
