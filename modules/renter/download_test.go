@@ -3,6 +3,7 @@ package renter
 import (
 	"bytes"
 	"crypto/rand"
+	"io"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/modules"
@@ -81,7 +82,7 @@ func orchestrate(ecc modules.ECC, dataSize int, chunkSize int, reqChans []chan i
 // TestErasureDownload tests parallel downloading of erasure-coded data.
 func TestErasureDownload(t *testing.T) {
 	// generate data
-	const dataSize = 900
+	const dataSize = 777
 	data := make([]byte, dataSize)
 	rand.Read(data)
 
@@ -99,8 +100,16 @@ func TestErasureDownload(t *testing.T) {
 
 	// upload data to hosts
 	const chunkSize = 100
-	for i := 0; i < len(data)/chunkSize; i++ {
-		pieces, err := ecc.Encode(data[i*100 : (i+1)*100])
+	r := bytes.NewReader(data) // makes chunking easier
+	chunk := make([]byte, chunkSize)
+	for i := 0; ; i++ {
+		_, err := io.ReadFull(r, chunk)
+		if err == io.EOF {
+			break
+		} else if err != nil && err != io.ErrUnexpectedEOF {
+			t.Fatal(err)
+		}
+		pieces, err := ecc.Encode(chunk)
 		if err != nil {
 			t.Fatal(err)
 		}
