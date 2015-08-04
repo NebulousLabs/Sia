@@ -11,22 +11,22 @@ import (
 )
 
 type pieceData struct {
-	piece  int
-	offset int
-	length int
+	piece  uint64
+	offset uint64
+	length uint64
 }
 
 type fileHost interface {
-	pieces(chunkIndex int) []pieceData
+	pieces(chunkIndex uint64) []pieceData
 	fetch(pieceData) ([]byte, error)
 }
 
 type testHost struct {
 	data     []byte
-	pieceMap map[int][]pieceData // key is chunkIndex
+	pieceMap map[uint64][]pieceData // key is chunkIndex
 }
 
-func (h testHost) pieces(chunkIndex int) []pieceData {
+func (h testHost) pieces(chunkIndex uint64) []pieceData {
 	return h.pieceMap[chunkIndex]
 }
 
@@ -36,14 +36,14 @@ func (h testHost) fetch(p pieceData) ([]byte, error) {
 
 type downloader struct {
 	ecc       modules.ECC
-	chunkSize int
-	fileSize  int
+	chunkSize uint64
+	fileSize  uint64
 	hosts     []fileHost
-	reqChans  []chan int
+	reqChans  []chan uint64
 	respChans []chan []byte
 	// interface stuff
 	startTime   time.Time
-	received    int
+	received    uint64
 	destination string
 	nickname    string
 }
@@ -55,15 +55,15 @@ func (d *downloader) StartTime() time.Time {
 
 // Filesize is the size of the file being downloaded.
 func (d *downloader) Filesize() uint64 {
-	return uint64(d.fileSize)
+	return d.fileSize
 }
 
 // Received is the number of bytes downloaded so far.
 func (d *downloader) Received() uint64 {
-	return uint64(d.received)
+	return d.received
 }
 
-// Destination is the filepath that the file was downloaded into.
+// Destination is the filepath that the file was downloaded uint64o.
 func (d *downloader) Destination() string {
 	return d.destination
 }
@@ -73,7 +73,7 @@ func (d *downloader) Nickname() string {
 	return d.nickname
 }
 
-func (d *downloader) worker(host fileHost, reqChan chan int) {
+func (d *downloader) worker(host fileHost, reqChan chan uint64) {
 	for chunkIndex := range reqChan {
 		for _, p := range host.pieces(chunkIndex) {
 			data, err := host.fetch(p)
@@ -99,12 +99,12 @@ func (d *downloader) run(w io.Writer) error {
 	}()
 
 	chunk := make([][]byte, d.ecc.NumPieces())
-	for i := 0; d.received < d.fileSize; i++ {
+	for i := uint64(0); d.received < d.fileSize; i++ {
 		// tell all workers to download chunk i
 		for _, ch := range d.reqChans {
 			ch <- i
 		}
-		// load pieces into chunk
+		// load pieces uint64o chunk
 		for j, ch := range d.respChans {
 			chunk[j] = <-ch
 		}
@@ -125,11 +125,11 @@ func (d *downloader) run(w io.Writer) error {
 	return nil
 }
 
-func newDownloader(ecc modules.ECC, chunkSize, fileSize int, hosts []fileHost, destination, nickname string) *downloader {
+func newDownloader(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fileHost, destination, nickname string) *downloader {
 	// create channels
-	reqChans := make([]chan int, len(hosts))
+	reqChans := make([]chan uint64, len(hosts))
 	for i := range reqChans {
-		reqChans[i] = make(chan int)
+		reqChans[i] = make(chan uint64)
 	}
 	respChans := make([]chan []byte, ecc.NumPieces())
 	for i := range respChans {
@@ -167,14 +167,14 @@ func TestErasureDownload(t *testing.T) {
 	// create hosts
 	hosts := make([]testHost, 3)
 	for i := range hosts {
-		hosts[i].pieceMap = make(map[int][]pieceData)
+		hosts[i].pieceMap = make(map[uint64][]pieceData)
 	}
 
 	// upload data to hosts
 	const chunkSize = 100
 	r := bytes.NewReader(data) // makes chunking easier
 	chunk := make([]byte, chunkSize)
-	for i := 0; ; i++ {
+	for i := uint64(0); ; i++ {
 		_, err := io.ReadFull(r, chunk)
 		if err == io.EOF {
 			break
@@ -187,7 +187,11 @@ func TestErasureDownload(t *testing.T) {
 		}
 		for j, p := range pieces {
 			host := &hosts[j%len(hosts)] // distribute evenly
-			host.pieceMap[i] = append(host.pieceMap[i], pieceData{j, len(host.data), len(p)})
+			host.pieceMap[i] = append(host.pieceMap[i], pieceData{
+				uint64(j),
+				uint64(len(host.data)),
+				uint64(len(p)),
+			})
 			host.data = append(host.data, p...)
 		}
 	}
