@@ -5,39 +5,10 @@ import (
 	"crypto/rand"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
 )
-
-type downloader struct {
-	ecc       modules.ECC
-	chunkSize int
-	remaining int
-	hosts     []fileHost
-	reqChans  []chan int
-	respChans []chan []byte
-}
-
-func newDownloader(ecc modules.ECC, chunkSize, fileSize int, hosts []fileHost) *downloader {
-	// create channels
-	reqChans := make([]chan int, len(hosts))
-	for i := range reqChans {
-		reqChans[i] = make(chan int)
-	}
-	respChans := make([]chan []byte, ecc.NumPieces())
-	for i := range respChans {
-		respChans[i] = make(chan []byte)
-	}
-
-	return &downloader{
-		ecc:       ecc,
-		chunkSize: chunkSize,
-		remaining: fileSize,
-		hosts:     hosts,
-		reqChans:  reqChans,
-		respChans: respChans,
-	}
-}
 
 type pieceData struct {
 	piece  int
@@ -61,6 +32,45 @@ func (h testHost) pieces(chunkIndex int) []pieceData {
 
 func (h testHost) fetch(p pieceData) ([]byte, error) {
 	return h.data[p.offset : p.offset+p.length], nil
+}
+
+type downloader struct {
+	ecc       modules.ECC
+	chunkSize int
+	fileSize  int
+	hosts     []fileHost
+	reqChans  []chan int
+	respChans []chan []byte
+	// interface stuff
+	startTime   time.Time
+	received    int
+	destination string
+	nickname    string
+}
+
+// StartTime is when the download was initiated.
+func (d *downloader) StartTime() time.Time {
+	return d.startTime
+}
+
+// Filesize is the size of the file being downloaded.
+func (d *downloader) Filesize() uint64 {
+	return uint64(d.fileSize)
+}
+
+// Received is the number of bytes downloaded so far.
+func (d *downloader) Received() uint64 {
+	return uint64(d.received)
+}
+
+// Destination is the filepath that the file was downloaded into.
+func (d *downloader) Destination() string {
+	return d.destination
+}
+
+// Nickname is the identifier assigned to the file when it was uploaded.
+func (d *downloader) Nickname() string {
+	return d.nickname
 }
 
 func (d *downloader) worker(host fileHost, reqChan chan int) {
@@ -89,7 +99,7 @@ func (d *downloader) run(w io.Writer) error {
 	}()
 
 	chunk := make([][]byte, d.ecc.NumPieces())
-	for i := 0; d.remaining > 0; i++ {
+	for i := 0; d.received < d.fileSize; i++ {
 		// tell all workers to download chunk i
 		for _, ch := range d.reqChans {
 			ch <- i
@@ -102,17 +112,43 @@ func (d *downloader) run(w io.Writer) error {
 		// Write pieces to w. We always write chunkSize bytes unless this is
 		// the last chunk; in that case, we write the remainder.
 		n := d.chunkSize
-		if n > d.remaining {
-			n = d.remaining
+		if n > d.fileSize-d.received {
+			n = d.fileSize - d.received
 		}
 		err := d.ecc.Recover(chunk, uint64(n), w)
 		if err != nil {
 			return err
 		}
-		d.remaining -= d.chunkSize
+		d.received += d.chunkSize
 	}
 
 	return nil
+}
+
+func newDownloader(ecc modules.ECC, chunkSize, fileSize int, hosts []fileHost, destination, nickname string) *downloader {
+	// create channels
+	reqChans := make([]chan int, len(hosts))
+	for i := range reqChans {
+		reqChans[i] = make(chan int)
+	}
+	respChans := make([]chan []byte, ecc.NumPieces())
+	for i := range respChans {
+		respChans[i] = make(chan []byte)
+	}
+
+	return &downloader{
+		ecc:       ecc,
+		chunkSize: chunkSize,
+		fileSize:  fileSize,
+		hosts:     hosts,
+		reqChans:  reqChans,
+		respChans: respChans,
+
+		startTime:   time.Now(),
+		received:    0,
+		destination: destination,
+		nickname:    nickname,
+	}
 }
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
@@ -163,7 +199,7 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// download data
-	d := newDownloader(ecc, chunkSize, dataSize, hs)
+	d := newDownloader(ecc, chunkSize, dataSize, hs, "", "")
 	buf := new(bytes.Buffer)
 	err = d.run(buf)
 	if err != nil {
