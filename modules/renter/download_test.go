@@ -14,15 +14,32 @@ type pieceData struct {
 	length int
 }
 
-type testHost struct {
-	data   []byte
-	pieces map[int][]pieceData // key is chunk index
+type fileHost interface {
+	pieces(chunkIndex int) []pieceData
+	fetch(pieceData) ([]byte, error)
 }
 
-func retrieve(host testHost, reqChan chan int, respChans []chan []byte) {
+type testHost struct {
+	data     []byte
+	pieceMap map[int][]pieceData // key is chunkIndex
+}
+
+func (h testHost) pieces(chunkIndex int) []pieceData {
+	return h.pieceMap[chunkIndex]
+}
+
+func (h testHost) fetch(p pieceData) ([]byte, error) {
+	return h.data[p.offset : p.offset+p.length], nil
+}
+
+func retrieve(host fileHost, reqChan chan int, respChans []chan []byte) {
 	for chunkIndex := range reqChan {
-		for _, p := range host.pieces[chunkIndex] {
-			respChans[p.piece] <- host.data[p.offset : p.offset+p.length]
+		for _, p := range host.pieces(chunkIndex) {
+			data, err := host.fetch(p)
+			if err != nil {
+				data = nil
+			}
+			respChans[p.piece] <- data
 		}
 	}
 }
@@ -77,7 +94,7 @@ func TestErasureDownload(t *testing.T) {
 	// create hosts
 	hosts := make([]testHost, 3)
 	for i := range hosts {
-		hosts[i].pieces = make(map[int][]pieceData)
+		hosts[i].pieceMap = make(map[int][]pieceData)
 	}
 
 	// upload data to hosts
@@ -89,7 +106,7 @@ func TestErasureDownload(t *testing.T) {
 		}
 		for j, p := range pieces {
 			host := &hosts[j%len(hosts)] // distribute evenly
-			host.pieces[i] = append(host.pieces[i], pieceData{j, len(host.data), len(p)})
+			host.pieceMap[i] = append(host.pieceMap[i], pieceData{j, len(host.data), len(p)})
 			host.data = append(host.data, p...)
 		}
 	}
