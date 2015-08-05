@@ -9,8 +9,9 @@ import (
 type rpcID [8]byte
 
 var (
-	idSubmit   = rpcID{'S', 'u', 'b', 'm', 'i', 't'}
+	idChannel  = rpcID{'C', 'h', 'a', 'n', 'n', 'e', 'l'}
 	idSettings = rpcID{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
+	idSubmit   = rpcID{'S', 'u', 'b', 'm', 'i', 't'}
 )
 
 func (mp *MiningPool) listen() {
@@ -31,6 +32,8 @@ func (mp *MiningPool) handleConn(conn net.Conn) {
 		return
 	}
 	switch id {
+	case idChannel:
+		mp.rpcNegotiatePaymentChannel(conn)
 	case idSettings:
 		mp.rpcSettings(conn)
 	case idSubmit:

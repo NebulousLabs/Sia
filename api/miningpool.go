@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-// MinerStatus contains all of the fields returned when querying the miner's
+// MininingPoolStatus contains all of the fields returned when querying the pool's
 // status.
 type MiningPoolStatus struct {
 	BlocksMined      int
@@ -12,7 +12,7 @@ type MiningPoolStatus struct {
 	NumConnections   int
 }
 
-// minerStatusHandler handles the API call that queries the miner's status.
+// miningpoolStatusHandler handles the API call that queries the pool's status.
 func (srv *Server) miningpoolStatusHandler(w http.ResponseWriter, req *http.Request) {
 	//blocksMined, staleMined := srv.miningpool.BlocksMined()
 	mps := MiningPoolStatus{

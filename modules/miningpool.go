@@ -1,9 +1,5 @@
 package modules
 
-import (
-//"math/big"
-)
-
 const (
 	MiningPoolDir = "miningpool"
 )
@@ -11,11 +7,6 @@ const (
 // The MiningPool interface provides functions that allow external miners
 // mine for the pool
 type MiningPool interface {
-	// CreatePaymentChannel creates a payment channel from the MiningPool to the
-	// miner. This allows for the pool to send currency to the miner off-chain
-	// in order to prevent cluttering the network
-	CreatePaymentChannel() error
-
 	// Settings returns the host's settings
 	Settings() MiningPoolSettings
 
@@ -23,8 +14,9 @@ type MiningPool interface {
 }
 
 type MiningPoolSettings struct {
-	MaxConnections uint32
+	// The target multiple for this specfic pool
 	TargetMultiple uint32
+
 	//MiningPoolCut  big.Rat
 	//MinerCut       big.Rat
 }

@@ -44,6 +44,21 @@ type Miner struct {
 	headerMem   []types.BlockHeader
 	memProgress int
 
+	// PoolManager variables. This is where addresses and contracts negotiated
+	// with the pool are stored as well as constants like the percentage of a
+	// block's subsidy that goes to the miner.
+	// The poolTransaction is the transaction in the payment channel whose
+	// output is the miner's wallet. The miner may broadcast this transaction
+	// to the network at any time in order to receive payment from the pool.
+	// poolHeaderMap is a map from headers of blocks that payout to the pool to
+	// headers of blocks with normal payouts. This allows the poolmanager to
+	// use the blockmanager and only have to worry about changing payouts.
+	poolNetAddr        modules.NetAddress
+	minerPercentPayout float64
+	poolPayoutAddress  types.UnlockHash
+	poolTransaction    types.Transaction
+	poolHeaderMap      map[types.BlockHeader]types.BlockHeader
+
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
 	// calculate the hashrate. When attempts reaches a certain threshold, the
 	// time is compared to the startTime, and divided against the number of

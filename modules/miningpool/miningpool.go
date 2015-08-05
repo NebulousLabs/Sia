@@ -79,8 +79,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		wallet: w,
 
 		MiningPoolSettings: modules.MiningPoolSettings{
-			MaxConnections: 1024,
-			TargetMultiple: 255,
+			TargetMultiple: 256,
 			//MiningPoolCut:  *big.NewRat(5, 100), // 0.05
 			//MinerCut:       *big.NewRat(3, 100), // 0.03
 		},
