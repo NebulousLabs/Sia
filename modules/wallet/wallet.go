@@ -28,14 +28,14 @@ var (
 )
 
 type spendableKey struct {
-	unlockConditions UnlockConditions
+	unlockConditions types.UnlockConditions
 	secretKeys       []crypto.SecretKey
 }
 
 type Wallet struct {
 	unlocked    bool
 	settings    WalletSettings
-	primarySeed Seed
+	primarySeed modules.Seed
 
 	state                   modules.ConsensusSet
 	tpool                   modules.TransactionPool
@@ -49,9 +49,9 @@ type Wallet struct {
 	historicOutputs map[types.OutputID]types.Currency
 	spentOutputs    map[types.OutputID]types.BlockHeight
 
-	walletTransactions            []WalletTransaction // A doubly linked list would be safer when adding and removing items.
-	walletTransactionMap          map[WalletTransactionID]*WalletTransaction
-	unconfirmedWalletTransactions []WalletTransaction // no map, just iterate through the whole thing
+	walletTransactions            []modules.WalletTransaction
+	walletTransactionMap          map[modules.WalletTransactionID]*modules.WalletTransaction
+	unconfirmedWalletTransactions []modules.WalletTransaction
 
 	persistDir string
 	log        *log.Logger
@@ -74,15 +74,13 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		state: cs,
 		tpool: tpool,
 
-		age:              AgeDelay * 2,
-		keys:             make(map[types.UnlockHash]*key),
-		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
-		visibleAddresses: make(map[types.UnlockHash]struct{}),
-		siafundAddresses: make(map[types.UnlockHash]struct{}),
-		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
+		keys:            make(map[types.UnlockHash]spendableKey),
+		siacoinOutputs:  make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		siafundOutputs:  make(map[types.SiafundOutputID]types.SiafundOutput),
+		historicOutputs: make(map[types.OutputID]types.Currency),
+		spentOutputs:    make(map[types.OutputID]types.BlockHeight),
 
-		generatedKeys: make(map[types.UnlockHash]generatedSignatureKey),
-		trackedKeys:   make(map[types.UnlockHash]struct{}),
+		walletTransactionMap: make(map[modules.WalletTransactionID]*modules.WalletTransaction),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
@@ -103,7 +101,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 func (w *Wallet) Close() error {
 	id := w.mu.RLock()
 	defer w.mu.RUnlock(id)
-	return w.save()
+	return w.saveSettings()
 }
 
 // SendCoins creates a transaction sending 'amount' to 'dest'. The transaction

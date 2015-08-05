@@ -1,8 +1,13 @@
 package wallet
 
+import (
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/types"
+)
+
 // ConfirmedBalance returns the balance of the wallet according to all of the
 // confirmed transactions.
-func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance)  {
+func (w *Wallet) ConfirmedBalance() (siacoinBalance types.Currency, siafundBalance types.Currency, siafundClaimBalance types.Currency) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
@@ -28,13 +33,13 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 	for _, txn := range w.unconfirmedTransactions {
 		for _, sci := range txn.SiacoinInputs {
 			uh := sci.UnlockConditions.UnlockHash()
-			_, exists := w.generatedKeys[uh]
+			_, exists := w.keys[uh]
 			if exists {
-				sco, exists := w.siacoinOutputs[uh]
+				sco, exists := w.siacoinOutputs[sci.ParentID]
 				if exists {
 					outgoingSiacoins = outgoingSiacoins.Add(sco.Value)
 				} else {
-					sco, exists = unconfirmedOutputs[uh]
+					sco, exists = unconfirmedOutputs[sci.ParentID]
 					if exists {
 						outgoingSiacoins = outgoingSiacoins.Add(sco.Value)
 					} else if build.DEBUG {
@@ -43,19 +48,22 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 				}
 			}
 		}
-		for _, sco := range txn.SiacoinOutputs {
-			_, exists := w.generatedKeys[uh]
+		for i, sco := range txn.SiacoinOutputs {
+			scoid := txn.SiacoinOutputID(i)
+			_, exists := w.keys[sco.UnlockHash]
 			if exists {
 				incomingSiacoins = incomingSiacoins.Add(sco.Value)
 			}
+			unconfirmedOutputs[scoid] = sco
 		}
 	}
+	return
 }
 
-// CoinAddress returns an unlock hash that is ready to recieve siacoins or
+// NextAddress returns an unlock hash that is ready to recieve siacoins or
 // siafunds. The address is generated using the primary address seed.
-func (w *Wallet) CoinAddress(masterKey crypto.TwofishKey) (types.UnlockConditions, types.UnlockHash, error) {
+func (w *Wallet) NextAddress() (types.UnlockConditions, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
-	return w.nextPrimarySeedAddress(masterKey)
+	return w.nextPrimarySeedAddress()
 }

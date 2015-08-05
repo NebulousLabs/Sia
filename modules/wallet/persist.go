@@ -159,7 +159,8 @@ func (w *Wallet) initEncryption(masterKey crypto.TwofishKey) error {
 func (w *Wallet) initPrimarySeed(masterKey crypto.TwofishKey) error {
 	if w.settings.PrimarySeedFilename == "" {
 		w.log.Println("UNLOCK: Primary seed undefined, creating a new seed.")
-		return w.createSeed(masterKey)
+		_, err := w.createSeed(masterKey)
+		return err
 	}
 	fileInfo, err := os.Stat(filepath.Join(w.persistDir, w.settings.PrimarySeedFilename))
 	if err != nil {

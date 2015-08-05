@@ -17,7 +17,7 @@ const (
 // Specifier for more details.
 var (
 	SpecifierMinerPayout          = Specifier{'m', 'i', 'n', 'e', 'r', ' ', 'p', 'a', 'y', 'o', 'u', 't'}
-	SpecifierMinerInput           = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'i', 'n', 'p', 'u', 't'}
+	SpecifierSiacoinInput         = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'i', 'n', 'p', 'u', 't'}
 	SpecifierSiacoinOutput        = Specifier{'s', 'i', 'a', 'c', 'o', 'i', 'n', ' ', 'o', 'u', 't', 'p', 'u', 't'}
 	SpecifierFileContract         = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't'}
 	SpecifierFileContractRevision = Specifier{'f', 'i', 'l', 'e', ' ', 'c', 'o', 'n', 't', 'r', 'a', 'c', 't', ' ', 'r', 'e'}
@@ -28,7 +28,9 @@ var (
 )
 
 type (
-	Siafund Currency // arbitrary-precision unsigned integer
+	// OutputID is any type of output id, such as SiacoinOutputID or
+	// StorageProofOutputID.
+	OutputID crypto.Hash
 
 	// A Specifier is a fixed-length byte-array that serves two purposes. In
 	// the wire protocol, they are used to identify a particular encoding
@@ -125,7 +127,7 @@ type (
 // ID returns the id of a transaction, which is taken by marshalling all of the
 // fields except for the signatures and taking the hash of the result.
 func (t Transaction) ID() TransactionID {
-	return crypto.HashAll(
+	return TransactionID(crypto.HashAll(
 		t.SiacoinInputs,
 		t.SiacoinOutputs,
 		t.FileContracts,
@@ -135,7 +137,7 @@ func (t Transaction) ID() TransactionID {
 		t.SiafundOutputs,
 		t.MinerFees,
 		t.ArbitraryData,
-	)
+	))
 }
 
 // SiacoinOutputID returns the ID of a siacoin output at the given index,
@@ -198,12 +200,6 @@ func (t Transaction) SiafundOutputID(i int) SiafundOutputID {
 	))
 }
 
-// SiaClaimOutputID returns the ID of the SiacoinOutput that is created when
-// the siafund output is spent. The ID is the hash the SiafundOutputID.
-func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
-	return SiacoinOutputID(crypto.HashObject(id))
-}
-
 // SiacoinOutputSum returns the sum of all the siacoin outputs in the
 // transaction, which must match the sum of all the siacoin inputs. Siacoin
 // outputs created by storage proofs and siafund outputs are not considered, as
@@ -226,4 +222,10 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 	}
 
 	return
+}
+
+// SiaClaimOutputID returns the ID of the SiacoinOutput that is created when
+// the siafund output is spent. The ID is the hash the SiafundOutputID.
+func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
+	return SiacoinOutputID(crypto.HashObject(id))
 }

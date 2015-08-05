@@ -1,5 +1,12 @@
 package wallet
 
+import (
+	"errors"
+
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
+)
+
 var (
 	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
@@ -26,7 +33,7 @@ func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBloc
 	}
 
 	i := 0
-	for i < startBlock {
+	for i < len(w.walletTransactions) {
 		if w.walletTransactions[i].ConfirmationHeight >= startBlock {
 			break
 		}
@@ -57,7 +64,7 @@ func (w *Wallet) AddressTransactionHistory(uh types.UnlockHash) (wts []modules.W
 }
 
 // UnconfirmedTransactions returns the set of unconfirmed wallet transactions.
-func (w *Wallet) UnconfirmedTransactions() []WalletTransaction {
+func (w *Wallet) UnconfirmedTransactions() []modules.WalletTransaction {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	return w.unconfirmedWalletTransactions

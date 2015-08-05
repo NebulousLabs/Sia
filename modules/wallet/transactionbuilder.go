@@ -1,8 +1,10 @@
 package wallet
 
 import (
+	"bytes"
 	"errors"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -26,7 +28,7 @@ type transactionBuilder struct {
 // typical call is 'RegisterTransaction(types.Transaction{}, nil)', which
 // registers a new transaction without parents.
 func (w *Wallet) RegisterTransaction(t types.Transaction, parents []types.Transaction) modules.TransactionBuilder {
-	return transactionBuilder{
+	return &transactionBuilder{
 		parents:     parents,
 		transaction: t,
 
@@ -52,22 +54,25 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// siacoins to the transaction.
 	var fund types.Currency
 	parentTxn := types.Transaction{}
-	for scoid, sco := range w.siacoinOutputs {
+	for scoid, sco := range tb.wallet.siacoinOutputs {
 		// Check that this output has not recently been spent by the wallet.
-		spendHeight := w.spentOutputs[OutputID(scoid)]
-		if spendHeight > w.consensusSetHeight-RespendTimeout {
+		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
+		if spendHeight > tb.wallet.consensusSetHeight-RespendTimeout {
+			continue
+		}
+		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].unlockConditions
+		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}
 		// Mark the output as spent.
-		w.spentOutputs[OutputID(scoid)] = w.consensusSetHeight
+		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
 
 		// Add a siacoin input for this output.
-		correspondingPublicKey := w.generatedKeys[sco.UnlockHash].publicKey
 		sci := types.SiacoinInput{
 			ParentID:         scoid,
-			UnlockConditions: generatedUnlockConditions(correspondingPublicKey),
+			UnlockConditions: outputUnlockConditions,
 		}
-		parent.SiacoinInputs = append(parent.SiacoinInputs, sci)
+		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
 
 		// Add the output to the total fund
 		fund = fund.Add(sco.Value)
@@ -90,8 +95,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 
 	// Create a refund output if needed.
 	if amount.Cmp(fund) != 0 {
-		var refundDest types.UnlockHash
-		refundUnlockConditions, err = tb.wallet.nextPrimarySeedAddress()
+		refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err
 		}
@@ -130,10 +134,10 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) error {
 	// Add the exact output.
 	newInput := types.SiacoinInput{
 		ParentID:         parentTxn.SiacoinOutputID(0),
-		UnlockConditions: parentSpendConds,
+		UnlockConditions: parentUnlockConditions,
 	}
 	tb.parents = append(tb.parents, parentTxn)
-	tb.inputs = append(tb.inputs, len(tb.transaction.SiacoinInputs))
+	tb.siacoinInputs = append(tb.siacoinInputs, len(tb.transaction.SiacoinInputs))
 	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, newInput)
 	return nil
 }
@@ -150,27 +154,30 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	// siafunds to the transaction.
 	var fund types.Currency
 	parentTxn := types.Transaction{}
-	for scoid, sco := range w.siafundOutputs {
+	for scoid, sco := range tb.wallet.siafundOutputs {
 		// Check that this output has not recently been spent by the wallet.
-		spendHeight := w.spentOutputs[OutputID(scoid)]
-		if spendHeight > w.consensusSetHeight-RespendTimeout {
+		spendHeight := tb.wallet.spentOutputs[types.OutputID(scoid)]
+		if spendHeight > tb.wallet.consensusSetHeight-RespendTimeout {
+			continue
+		}
+		outputUnlockConditions := tb.wallet.keys[sco.UnlockHash].unlockConditions
+		if tb.wallet.consensusSetHeight < outputUnlockConditions.Timelock {
 			continue
 		}
 		// Mark the output as spent.
-		w.spentOutputs[OutputID(scoid)] = w.consensusSetHeight
+		tb.wallet.spentOutputs[types.OutputID(scoid)] = tb.wallet.consensusSetHeight
 
 		// Add a siafund input for this output.
-		parentClaimUnlockConditions, err := w.nextPrimarySeedAddress()
+		parentClaimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err
 		}
-		correspondingPublicKey := w.generatedKeys[sco.UnlockHash].publicKey
 		sci := types.SiafundInput{
 			ParentID:         scoid,
-			UnlockConditions: generatedUnlockConditions(correspondingPublicKey),
+			UnlockConditions: outputUnlockConditions,
 			ClaimUnlockHash:  parentClaimUnlockConditions.UnlockHash(),
 		}
-		parent.SiafundInputs = append(parent.SiafundInputs, sci)
+		parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sci)
 
 		// Add the output to the total fund
 		fund = fund.Add(sco.Value)
@@ -193,8 +200,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 
 	// Create a refund output if needed.
 	if amount.Cmp(fund) != 0 {
-		var refundDest types.UnlockHash
-		refundUnlockConditions, err = tb.wallet.nextPrimarySeedAddress()
+		refundUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 		if err != nil {
 			return err
 		}
@@ -231,17 +237,17 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) error {
 	}
 
 	// Add the exact output.
-	claimUnlockConditions, err := w.nextPrimarySeedAddress()
+	claimUnlockConditions, err := tb.wallet.nextPrimarySeedAddress()
 	if err != nil {
 		return err
 	}
 	newInput := types.SiafundInput{
 		ParentID:         parentTxn.SiafundOutputID(0),
-		UnlockConditions: parentSpendConds,
+		UnlockConditions: parentUnlockConditions,
 		ClaimUnlockHash:  claimUnlockConditions.UnlockHash(),
 	}
 	tb.parents = append(tb.parents, parentTxn)
-	tb.inputs = append(tb.inputs, len(tb.transaction.SiafundInputs))
+	tb.siafundInputs = append(tb.siafundInputs, len(tb.transaction.SiafundInputs))
 	tb.transaction.SiafundInputs = append(tb.transaction.SiafundInputs, newInput)
 	return nil
 }
@@ -372,30 +378,95 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		coveredFields.TransactionSignatures = append(coveredFields.TransactionSignatures, uint64(i))
 	}
 
-	// For each input in the transaction that we added, provide a signature.
+	// For each siacoin input in the transaction that we added, provide a
+	// signature.
 	lockID := tb.wallet.mu.Lock()
 	defer tb.wallet.mu.Unlock(lockID)
-	for _, inputIndex := range tb.inputs {
+	for _, inputIndex := range tb.siacoinInputs {
 		input := txn.SiacoinInputs[inputIndex]
-		sig := types.TransactionSignature{
-			ParentID:       crypto.Hash(input.ParentID),
-			CoveredFields:  coveredFields,
-			PublicKeyIndex: 0,
-		}
-		txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+		spendableKey := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		usedIndices := make(map[int]struct{})
+		for _, secretKey := range spendableKey.secretKeys {
+			// Find the public key index that corresponds to this key.
+			found := false
+			keyIndex := 0
+			pubKey := secretKey.PublicKey()
+			for i, siaPublicKey := range input.UnlockConditions.PublicKeys {
+				_, exists := usedIndices[i]
+				if bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 && exists {
+					found = true
+					keyIndex = i
+					break
+				}
+			}
+			if !found && build.DEBUG {
+				panic("transaction builder cannot sign an input that it added")
+			}
+			usedIndices[keyIndex] = struct{}{}
 
-		// Hash the transaction according to the covered fields.
-		coinAddress := input.UnlockConditions.UnlockHash()
-		sigIndex := len(txn.TransactionSignatures) - 1
-		secKey := tb.wallet.keys[coinAddress].secretKey
-		sigHash := txn.SigHash(sigIndex)
+			// Create the unsigned transaction signature.
+			input := txn.SiacoinInputs[inputIndex]
+			sig := types.TransactionSignature{
+				ParentID:       crypto.Hash(input.ParentID),
+				CoveredFields:  coveredFields,
+				PublicKeyIndex: uint64(keyIndex),
+			}
+			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
 
-		// Get the signature.
-		encodedSig, err := crypto.SignHash(sigHash, secKey)
-		if err != nil {
-			return nil, err
+			// Hash the transaction according to the covered fields.
+			sigIndex := len(txn.TransactionSignatures) - 1
+			sigHash := txn.SigHash(sigIndex)
+
+			// Get the signature.
+			encodedSig, err := crypto.SignHash(sigHash, secretKey)
+			if err != nil {
+				return nil, err
+			}
+			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
 		}
-		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
+	}
+	for _, inputIndex := range tb.siafundInputs {
+		input := txn.SiafundInputs[inputIndex]
+		spendableKey := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
+		usedIndices := make(map[int]struct{})
+		for _, secretKey := range spendableKey.secretKeys {
+			// Find the public key index that corresponds to this key.
+			found := false
+			keyIndex := 0
+			pubKey := secretKey.PublicKey()
+			for i, siaPublicKey := range input.UnlockConditions.PublicKeys {
+				_, exists := usedIndices[i]
+				if bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 && exists {
+					found = true
+					keyIndex = i
+					break
+				}
+			}
+			if !found && build.DEBUG {
+				panic("transaction builder cannot sign an input that it added")
+			}
+			usedIndices[keyIndex] = struct{}{}
+
+			// Create the unsigned transaction signature.
+			input := txn.SiafundInputs[inputIndex]
+			sig := types.TransactionSignature{
+				ParentID:       crypto.Hash(input.ParentID),
+				CoveredFields:  coveredFields,
+				PublicKeyIndex: uint64(keyIndex),
+			}
+			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+
+			// Hash the transaction according to the covered fields.
+			sigIndex := len(txn.TransactionSignatures) - 1
+			sigHash := txn.SigHash(sigIndex)
+
+			// Get the signature.
+			encodedSig, err := crypto.SignHash(sigHash, secretKey)
+			if err != nil {
+				return nil, err
+			}
+			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
+		}
 	}
 
 	// Get the transaction set and delete the transaction from the registry.
