@@ -24,7 +24,7 @@ type Renter struct {
 	blockHeight types.BlockHeight
 
 	files         map[string]*file
-	downloadQueue []*Download
+	downloadQueue []*download
 	saveDir       string
 
 	mu *sync.RWMutex

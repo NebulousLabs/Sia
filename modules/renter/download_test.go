@@ -5,21 +5,7 @@ import (
 	"crypto/rand"
 	"io"
 	"testing"
-	"time"
-
-	"github.com/NebulousLabs/Sia/modules"
 )
-
-type pieceData struct {
-	piece  uint64
-	offset uint64
-	length uint64
-}
-
-type fileHost interface {
-	pieces(chunkIndex uint64) []pieceData
-	fetch(pieceData) ([]byte, error)
-}
 
 type testHost struct {
 	data     []byte
@@ -32,123 +18,6 @@ func (h testHost) pieces(chunkIndex uint64) []pieceData {
 
 func (h testHost) fetch(p pieceData) ([]byte, error) {
 	return h.data[p.offset : p.offset+p.length], nil
-}
-
-type downloader struct {
-	ecc       modules.ECC
-	chunkSize uint64
-	fileSize  uint64
-	hosts     []fileHost
-	reqChans  []chan uint64
-	respChans []chan []byte
-	// interface stuff
-	startTime   time.Time
-	received    uint64
-	destination string
-	nickname    string
-}
-
-// StartTime is when the download was initiated.
-func (d *downloader) StartTime() time.Time {
-	return d.startTime
-}
-
-// Filesize is the size of the file being downloaded.
-func (d *downloader) Filesize() uint64 {
-	return d.fileSize
-}
-
-// Received is the number of bytes downloaded so far.
-func (d *downloader) Received() uint64 {
-	return d.received
-}
-
-// Destination is the filepath that the file was downloaded uint64o.
-func (d *downloader) Destination() string {
-	return d.destination
-}
-
-// Nickname is the identifier assigned to the file when it was uploaded.
-func (d *downloader) Nickname() string {
-	return d.nickname
-}
-
-func (d *downloader) worker(host fileHost, reqChan chan uint64) {
-	for chunkIndex := range reqChan {
-		for _, p := range host.pieces(chunkIndex) {
-			data, err := host.fetch(p)
-			if err != nil {
-				data = nil
-			}
-			d.respChans[p.piece] <- data
-		}
-	}
-}
-
-func (d *downloader) run(w io.Writer) error {
-	// spawn download workers
-	for i, h := range d.hosts {
-		go d.worker(h, d.reqChans[i])
-	}
-
-	defer func() {
-		// close request channels, terminating the worker goroutines
-		for _, ch := range d.reqChans {
-			close(ch)
-		}
-	}()
-
-	chunk := make([][]byte, d.ecc.NumPieces())
-	for i := uint64(0); d.received < d.fileSize; i++ {
-		// tell all workers to download chunk i
-		for _, ch := range d.reqChans {
-			ch <- i
-		}
-		// load pieces uint64o chunk
-		for j, ch := range d.respChans {
-			chunk[j] = <-ch
-		}
-
-		// Write pieces to w. We always write chunkSize bytes unless this is
-		// the last chunk; in that case, we write the remainder.
-		n := d.chunkSize
-		if n > d.fileSize-d.received {
-			n = d.fileSize - d.received
-		}
-		err := d.ecc.Recover(chunk, uint64(n), w)
-		if err != nil {
-			return err
-		}
-		d.received += d.chunkSize
-	}
-
-	return nil
-}
-
-func newDownloader(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fileHost, destination, nickname string) *downloader {
-	// create channels
-	reqChans := make([]chan uint64, len(hosts))
-	for i := range reqChans {
-		reqChans[i] = make(chan uint64)
-	}
-	respChans := make([]chan []byte, ecc.NumPieces())
-	for i := range respChans {
-		respChans[i] = make(chan []byte)
-	}
-
-	return &downloader{
-		ecc:       ecc,
-		chunkSize: chunkSize,
-		fileSize:  fileSize,
-		hosts:     hosts,
-		reqChans:  reqChans,
-		respChans: respChans,
-
-		startTime:   time.Now(),
-		received:    0,
-		destination: destination,
-		nickname:    nickname,
-	}
 }
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
@@ -165,7 +34,7 @@ func TestErasureDownload(t *testing.T) {
 	}
 
 	// create hosts
-	hosts := make([]fileHost, 3)
+	hosts := make([]fetcher, 3)
 	for i := range hosts {
 		h := &testHost{
 			pieceMap: make(map[uint64][]pieceData),
@@ -177,7 +46,8 @@ func TestErasureDownload(t *testing.T) {
 	const chunkSize = 100
 	r := bytes.NewReader(data) // makes chunking easier
 	chunk := make([]byte, chunkSize)
-	for i := uint64(0); ; i++ {
+	var i uint64
+	for i = uint64(0); ; i++ {
 		_, err := io.ReadFull(r, chunk)
 		if err == io.EOF {
 			break
@@ -199,8 +69,14 @@ func TestErasureDownload(t *testing.T) {
 		}
 	}
 
+	// check hosts (not strictly necessary)
+	err = checkHosts(hosts, ecc.MinPieces(), i)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// download data
-	d := newDownloader(ecc, chunkSize, dataSize, hosts, "", "")
+	d := newDownload(ecc, chunkSize, dataSize, hosts, "", "")
 	buf := new(bytes.Buffer)
 	err = d.run(buf)
 	if err != nil {

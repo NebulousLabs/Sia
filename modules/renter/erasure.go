@@ -13,11 +13,16 @@ import (
 type rsCode struct {
 	enc reedsolomon.Encoder
 
-	numPieces int
+	numPieces  int
+	dataPieces int
 }
 
 // NumPieces returns the number of pieces returned by Encode.
 func (rs *rsCode) NumPieces() int { return rs.numPieces }
+
+// MinPieces return the minimum number of pieces that must be present to
+// recover the original data.
+func (rs *rsCode) MinPieces() int { return rs.dataPieces }
 
 // Encode splits data into equal-length pieces, some containing the original
 // data and some containing parity data.
@@ -54,7 +59,8 @@ func NewRSCode(nData, nParity int) (modules.ECC, error) {
 		return nil, err
 	}
 	return &rsCode{
-		enc:       enc,
-		numPieces: nData + nParity,
+		enc:        enc,
+		numPieces:  nData + nParity,
+		dataPieces: nData,
 	}, nil
 }

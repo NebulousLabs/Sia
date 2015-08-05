@@ -11,10 +11,15 @@ var (
 	RenterDir = "renter"
 )
 
-// An ECC is an error correcting code.
+// An ECC is an error-correcting code.
+// TODO: rename? (can be confused with Elliptic Curve Crypto)
 type ECC interface {
 	// NumPieces is the number of pieces returned by Encode.
 	NumPieces() int
+
+	// MinPieces is the minimum number of pieces that must be present to
+	// recover the original data.
+	MinPieces() int
 
 	// Encode splits data into equal-length pieces, with some pieces
 	// containing parity data.
