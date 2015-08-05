@@ -33,7 +33,7 @@ func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
 
 // walletAddressHandler handles the API request for a new address.
 func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	coinAddress, _, err := srv.wallet.CoinAddress(true) // true indicates that the address should be visible to the user
+	unlockConditions, err := srv.wallet.NextAddress()
 	if err != nil {
 		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
 		return
@@ -42,9 +42,10 @@ func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request
 	// Since coinAddress is not a struct, we define one here so that writeJSON
 	// writes an object instead of a bare value. In addition, we transmit the
 	// coinAddress as a hex-encoded string rather than a byte array.
-	writeJSON(w, struct{ Address types.UnlockHash }{coinAddress})
+	writeJSON(w, struct{ Address types.UnlockHash }{unlockConditions.UnlockHash()})
 }
 
+/*
 // walletMergeHandler handles the API call to merge a different wallet into the
 // current wallet.
 func (srv *Server) walletMergeHandler(w http.ResponseWriter, req *http.Request) {
@@ -56,6 +57,7 @@ func (srv *Server) walletMergeHandler(w http.ResponseWriter, req *http.Request) 
 	}
 	writeSuccess(w)
 }
+*/
 
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
@@ -74,7 +76,7 @@ func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Send the coins.
-	_, err = srv.wallet.SendCoins(amount, dest)
+	_, err = srv.wallet.SendSiacoins(amount, dest)
 	if err != nil {
 		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -87,7 +89,7 @@ func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
 // siafunds.
 func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http.Request) {
 	var wsb WalletSiafundsBalance
-	wsb.SiafundBalance, wsb.SiacoinClaimBalance = srv.wallet.SiafundBalance()
+	_, wsb.SiafundBalance, wsb.SiacoinClaimBalance = srv.wallet.ConfirmedBalance()
 	writeJSON(w, wsb)
 }
 
@@ -134,7 +136,9 @@ func (srv *Server) walletSiafundsWatchsiagaddressHandler(w http.ResponseWriter, 
 	writeSuccess(w)
 }
 
+/*
 // walletStatusHandler handles the API call querying the status of the wallet.
 func (srv *Server) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, srv.wallet.Info())
 }
+*/
