@@ -61,7 +61,7 @@ func (w *Wallet) checkMasterKey(masterKey crypto.TwofishKey) error {
 		return err
 	}
 	expected := make([]byte, encryptionVerificationLen)
-	if bytes.Equal(expected, verification) {
+	if !bytes.Equal(expected, verification) {
 		return errBadEncryptionKey
 	}
 	return nil

@@ -6,6 +6,7 @@ package crypto
 import (
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"io"
 
@@ -85,4 +86,18 @@ func (key TwofishKey) NewReader(r io.Reader) io.Reader {
 	stream := cipher.NewOFB(key.NewCipher(), iv)
 
 	return &cipher.StreamReader{S: stream, R: r}
+}
+
+func (c Ciphertext) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]byte(c))
+}
+
+func (c *Ciphertext) UnmarshalJSON(b []byte) error {
+	var umarB []byte
+	err := json.Unmarshal(b, &umarB)
+	if err != nil {
+		return err
+	}
+	*c = Ciphertext(umarB)
+	return nil
 }

@@ -116,7 +116,7 @@ func (w *Wallet) integrateSeed(seed modules.Seed) error {
 // decryption fails.
 func (w *Wallet) loadSeedFile(masterKey crypto.TwofishKey, fileInfo os.FileInfo) error {
 	var seedFile SeedFile
-	err := persist.LoadFile(seedMetadata, &seedFile, fileInfo.Name())
+	err := persist.LoadFile(seedMetadata, &seedFile, filepath.Join(w.persistDir, fileInfo.Name()))
 	if err != nil {
 		return err
 	}
@@ -184,14 +184,15 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	}
 
 	// Encrypt the seed and save the seed file.
-	filename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
+	randomSuffix := persist.RandomSuffix()
+	filename := filepath.Join(w.persistDir, seedFilePrefix+randomSuffix+seedFileSuffix)
 	cryptSeed, err := sek.EncryptBytes(seed[:])
 	if err != nil {
 		return modules.Seed{}, err
 	}
 	w.settings.PrimarySeedFile = SeedFile{sfuid, encryptionVerification, cryptSeed}
 	w.settings.PrimarySeedProgress = 0
-	w.settings.PrimarySeedFilename = filename
+	w.settings.PrimarySeedFilename = seedFilePrefix + randomSuffix + seedFileSuffix
 	err = persist.SaveFile(seedMetadata, &w.settings.PrimarySeedFile, filename)
 	if err != nil {
 		return modules.Seed{}, err
