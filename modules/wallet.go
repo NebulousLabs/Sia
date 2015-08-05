@@ -27,15 +27,15 @@ type WalletTransactionID crypto.Hash
 // balance of the wallet, either incoming or outgoing (which can be gleaned
 // from the 'Source' and 'Destination'.
 type WalletTransaction struct {
-	TransactionID types.TransactionID
-	ConfirmationHeight types.BlockHeight
+	TransactionID         types.TransactionID
+	ConfirmationHeight    types.BlockHeight
 	ConfirmationTimestamp types.Timestamp
-	Transaction types.Transaction
+	Transaction           types.Transaction
 
-	FundType types.Specifier
-	OutputID OutputID
+	FundType       types.Specifier
+	OutputID       OutputID
 	RelatedAddress types.UnlockHash
-	Value types.Currency
+	Value          types.Currency
 }
 
 // TransactionBuilder is used to construct custom transactions. A transaction
@@ -169,7 +169,7 @@ type Wallet interface {
 	// RecoverSeed only needs to be called if the original seed file or
 	// encryption password was lost. The master key is used encrypt the
 	// recovery seed before saving it to disk.
-	RecoverSeed(masterKey crypto.TwofishKey, Seed) error
+	RecoverSeed(crypto.TwofishKey, Seed) error
 
 	// AllSeeds returns all of the seeds that are being tracked by the wallet,
 	// including the primary seed. Only the primary seed is used to generate
@@ -209,8 +209,9 @@ type Wallet interface {
 	// related to a given address.
 	AddressUnconfirmedTransactions(types.UnlockHash) []WalletTransaction
 
-	// CoinAddress returns an address that can receive coins.
-	CoinAddress() (types.UnlockConditions, types.UnlockHash, error)
+	// NextSeedAddress returns a new coin addresses generated from the primary
+	// seed.
+	NextSeedAddress() (types.UnlockConditions, error)
 
 	// RegisterTransaction takes a transaction and its parents and returns a
 	// TransactionBuilder which can be used to expand the transaction. The most

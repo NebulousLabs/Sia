@@ -54,14 +54,16 @@ func generateUnlockConditions(pk crypto.PublicKey) types.UnlockConditions {
 	}
 }
 
-// generateAddress creates the keys and unlock conditions a given index of a
+// generateSpendableKey creates the keys and unlock conditions a given index of a
 // seed.
-func generateAddress(seed modules.Seed, index uint64) (crypto.SecretKey, crypto.PublicKey, types.UnlockConditions) {
+func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 	// Generate the keys and unlock conditions.
 	entropy := crypto.HashAll(seed, index)
 	sk, pk := crypto.DeterministicSignatureKeys(entropy)
-	uc := generateUnlockConditions(pk)
-	return sk, pk, uc
+	return spendableKey{
+		unlockConditions: generateUnlockConditions(pk),
+		secrektKeys: []crypto.SecretKey{sk}
+	}
 }
 
 // decryptSeedFile decrypts a seed file using the encryption key.
@@ -86,34 +88,23 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.See
 	return seed, nil
 }
 
-// generateAndTrackKey will create key 'index' from seed 's', tracking the
-// public key. The secret key will be encrypted and stored.
-func (w *Wallet) generateAndTrackKey(masterKey crypto.TwofishKey, seed modules.Seed, sfuid SeedFileUID, index uint64) error {
+// generateAndTrackKey tracks a key of a given index from a given seed.
+func (w *Wallet) generateAndTrackKey(seed modules.Seed, index uint64) error {
 	// Generate the key and check it is new to the wallet.
-	sk, pk, uc := generateAddress(seed, index)
-	_, exists := w.generatedKeys[uc.UnlockHash()]
+	spendableKey := generateSpendableKey(seed, index)
+	_, exists := w.generatedKeys[spendableKey.unlockConditions.UnlockHash()]
 	if exists {
 		return errors.New("key is already being tracked")
 	}
-
-	// Encrypt the secret key.
-	skek := signatureKeyEncryptionKey(masterKey, sfuid, index)
-	encryptedSignatureKey, err := skek.EncryptBytes(sk[:])
-	if err != nil {
-		return err
-	}
-
-	// Add the key to the set of tracked keys.
-	w.generatedKeys[uc.unlockHash] = generatedSignatureKey{sfuid, index, pk, encryptedSignatureKey}
-	w.trackedKeys[uc.unlockHash] = struct{}{}
+	w.generatedKeys[uc.UnlockHash()] = spendableKey
 	return nil
 }
 
 // integrateSeed takes an address seed as input and from that generates
 // 'publicKeysPerSeed' addresses that the wallet is able to spend.
-func (w *Wallet) integrateSeed(masterKey crypto.TwofishKey, seed modules.Seed, sfuid SeedFileUID) error {
-	for i := uint64(0); i < publicKeysPerSeed; i++ {
-		err := w.generateAndTrackKey(masterKey, seed, sfuid, i)
+func (w *Wallet) integrateSeed(seed modules.Seed) error {
+	for i := uint64(0); i < modules.PublicKeysPerSeed; i++ {
+		err := w.generateAndTrackKey(seed, i)
 		if err != nil {
 			return err
 		}
@@ -233,38 +224,19 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 }
 
 // nextPrimarySeedAddress fetches the next address from the primary seed.
-func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.UnlockConditions, types.UnlockHash, error) {
+func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
 		return types.UnlockHash{}, errLockedWallet
 	}
 
 	// Check that the seed has room for more addresses.
-	if w.settings.AddressProgress == publicKeysPerSeed {
+	if w.settings.PrimarySeedProfress == publicKeysPerSeed {
 		return types.UnlockHash{}, errAddressExhaustion
 	}
 
-	// Check that the masterKey is correct.
-	sek := seedEncryptionKey(masterKey, w.settings.PrimarySeedFilename)
-	expected := make([]byte, encryptionVerificationLen)
-	decryptedBytes, err := sek.DecryptBytes(w.settings.PrimarySeedFile.EncryptionVerification)
-	if err != nil {
-		return types.UnlockHash{}, err
-	}
-	if !bytes.Equal(decryptedBytes, expected) {
-		return types.UnlockHash{}, errBadEncryptionKey
-	}
-
-	// Decrypt the seed.
-	var s seed
-	plainSeed, err := sek.DecryptBytes(w.settings.PrimarySeedFile.Seed)
-	if err != nil {
-		return types.UnlockHash{}, err
-	}
-	copy(s[:], plainSeed[:])
-
 	// Using the seed, determine the public key of the next address.
-	entropy := crypto.HashAll(s, w.settings.AddressProgress)
+	entropy := crypto.HashAll(w.seed, w.settings.AddressProgress)
 	_, pk := crypto.DeterministicSignatureKeys(entropy)
 
 	// Increase the address usage.
@@ -281,7 +253,7 @@ func (w *Wallet) nextPrimarySeedAddress(masterKey crypto.TwofishKey) (types.Unlo
 		}},
 		SignaturesRequired: 1,
 	}
-	return uc, uc.UnlockHash(), nil
+	return uc, nil
 }
 
 // NewPrimarySeed has the wallet create a new primary seed for the wallet,

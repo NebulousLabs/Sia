@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -14,22 +15,27 @@ const (
 	// how large the transaction fees should be. This should really be a
 	// function supplied by the transaction pool.
 	TransactionFee = 10
+
+	// RespendTimeout records the number of blocks that the wallet will wait
+	// before spending an output that has been spent in the past. If the
+	// transaction spending the output has not made it to the transaction pool
+	// after the limit, the assumption is that it never will.
+	RespendTimeout = 40
 )
 
 var (
 	errLockedWallet = errors.New("wallet must be unlocked before it can be used")
 )
 
-type ProcessedTransaction struct {
-	minerPayout        bool
-	confirmationHeight types.BlockHeight
-	Transaction        *types.Transaction
-	outputIDs          []OutputID
+type spendableKey struct {
+	unlockConditions UnlockConditions
+	secretKeys       []crypto.SecretKey
 }
 
 type Wallet struct {
-	unlocked                bool
-	settings                WalletSettings
+	unlocked    bool
+	settings    WalletSettings
+	primarySeed Seed
 
 	state                   modules.ConsensusSet
 	tpool                   modules.TransactionPool
@@ -37,7 +43,7 @@ type Wallet struct {
 	siafundPool             types.Currency
 	unconfirmedTransactions []types.Transaction
 
-	generatedKeys   map[types.UnlockHash]*[]modules.Seed
+	keys            map[types.UnlockHash]spendableKey
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
 	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
 	historicOutputs map[types.OutputID]types.Currency

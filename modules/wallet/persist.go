@@ -41,9 +41,9 @@ type WalletSettings struct {
 	// All addresses are tracked and spendable. Only modules.PublicKeysPerSeed
 	// keys/addresses can be created per seed, after which a new seed will need
 	// to be generated.
-	PrimarySeedFilename string
 	PrimarySeedFile     SeedFile
-	AddressProgress     uint64
+	PrimarySeedProgress uint64
+	PrimarySeedFilename string
 }
 
 // unlockKey creates a wallet unlocking key from the input master key.

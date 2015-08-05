@@ -25,7 +25,7 @@ func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBloc
 		return nil, nil
 	}
 
-	i := 0;
+	i := 0
 	for i < startBlock {
 		if w.walletTransactions[i].ConfirmationHeight >= startBlock {
 			break
