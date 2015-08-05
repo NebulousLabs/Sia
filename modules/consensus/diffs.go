@@ -103,15 +103,17 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.siafundOutputs[sfod.ID]
+		exists := cs.db.inSiafundOutputs(sfod.ID)
 		if exists == (sfod.Direction == dir) {
 			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
 	if sfod.Direction == dir {
+		cs.db.addSiafundOutputs(sfod.ID)
 		cs.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 	} else {
+		cs.db.rmSiafundOutputs(sfod.ID)
 		delete(cs.siafundOutputs, sfod.ID)
 	}
 }

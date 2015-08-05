@@ -39,6 +39,7 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
+		"SiafundOutputs",
 		"Path",
 		"BlockMap",
 		"Metadata",
