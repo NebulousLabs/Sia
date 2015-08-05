@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
-	"github.com/NebulousLabs/Sia/modules"
+	// "github.com/NebulousLabs/Sia/modules"
 )
 
 // coinUnits converts a siacoin amount to base units.
@@ -58,7 +58,7 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
   MS (mega, 10^6 SC)
   GS (giga, 10^9 SC)
   TS (tera, 10^12 SC)`,
-		Run: wrap(walletstatuscmd),
+		Run: wrap(walletsiafundscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
@@ -108,12 +108,14 @@ Run 'wallet send --help' to see a list of available units.`,
 		Run:   wrap(walletsiafundstrackcmd),
 	}
 
-	walletStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "View wallet status",
-		Long:  "View wallet status, including the current balance and number of addresses.",
-		Run:   wrap(walletstatuscmd),
-	}
+	/*
+		walletStatusCmd = &cobra.Command{
+			Use:   "status",
+			Short: "View wallet status",
+			Long:  "View wallet status, including the current balance and number of addresses.",
+			Run:   wrap(walletstatuscmd),
+		}
+	*/
 )
 
 // TODO: this should be defined outside of siac
@@ -200,6 +202,7 @@ Do not delete the original keyfile.
 `, keyfile)
 }
 
+/*
 func walletstatuscmd() {
 	status := new(modules.WalletInfo)
 	err := getAPI("/wallet/status", status)
@@ -216,3 +219,4 @@ Exact:     %v H
 Addresses: %d
 `, sc, status.Balance, status.NumAddresses)
 }
+*/
