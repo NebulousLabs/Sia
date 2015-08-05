@@ -34,6 +34,7 @@ type spendableKey struct {
 
 type Wallet struct {
 	unlocked    bool
+	subscribed  bool
 	settings    WalletSettings
 	primarySeed modules.Seed
 
@@ -92,8 +93,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 
-	w.tpool.TransactionPoolSubscribe(w)
-
 	return w, nil
 }
 
@@ -101,7 +100,25 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 func (w *Wallet) Close() error {
 	id := w.mu.RLock()
 	defer w.mu.RUnlock(id)
-	return w.saveSettings()
+	w.log.Println("INFO: Closing wallet")
+
+	// Save the wallet data.
+	err := w.saveSettings()
+	if err != nil {
+		return err
+	}
+
+	// Wipe all of the secret keys, they will be replaced upon calling 'Unlock'
+	// again.
+	for _, key := range w.keys {
+		// Must use 'for i :=  range' otherwise a copy of the secret data is
+		// made.
+		for i := range key.secretKeys {
+			crypto.SecureWipe(key.secretKeys[i][:])
+		}
+	}
+	w.unlocked = false
+	return nil
 }
 
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction

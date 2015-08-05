@@ -205,6 +205,13 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 
 	// Load all special files.
 
+	// Subscribe to the consensus set if this is the first unlock for the
+	// wallet object.
+	if !w.subscribed {
+		w.tpool.TransactionPoolSubscribe(w)
+		w.subscribed = true
+	}
+
 	w.unlocked = true
 	return nil
 }
@@ -227,5 +234,6 @@ func (w *Wallet) Encrypted() bool {
 func (w *Wallet) Unlock(masterKey crypto.TwofishKey) error {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
+	w.log.Println("INFO: Unlocking wallet.")
 	return w.unlock(masterKey)
 }

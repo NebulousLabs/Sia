@@ -42,5 +42,16 @@ func (tp *TransactionPool) TransactionPoolSubscribe(subscriber modules.Transacti
 		}
 		subscriber.ProcessConsensusChange(cc)
 	}
+
+	// Send the new subscriber the transaction pool set.
+	var txns []types.Transaction
+	var cc modules.ConsensusChange
+	for _, tSet := range tp.transactionSets {
+		txns = append(txns, tSet...)
+	}
+	for _, tSetDiff := range tp.transactionSetDiffs {
+		cc = cc.Append(tSetDiff)
+	}
+	subscriber.ReceiveUpdatedUnconfirmedTransactions(txns, cc)
 	tp.mu.Unlock(id)
 }

@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/rand"
 	"path/filepath"
 	"testing"
@@ -90,4 +91,45 @@ func TestIntegrationEncrypted(t *testing.T) {
 	if err == nil {
 		t.Error(err)
 	}
+}
+
+// TestCloseUnlock checks the consistency of the wallet after closing and then
+// later unlocking the wallet.
+func TestCloseUnlock(t *testing.T) {
+	wt, err := createWalletTester("TestCloseUnlock")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Close the wallet.
+	siacoinBalance, _, _ := wt.wallet.ConfirmedBalance()
+	err = wt.wallet.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	// Compare to the original balance.
+	siacoinBalance2, _, _ := wt.wallet.ConfirmedBalance()
+	if siacoinBalance2.Cmp(siacoinBalance) != 0 {
+		t.Error("siacoin balance reporting changed upon closing the wallet")
+	}
+	// Check that the keys were wiped.
+	wipedKey := make([]byte, crypto.SecretKeySize)
+	for _, key := range wt.wallet.keys {
+		for i := range key.secretKeys {
+			if !bytes.Equal(wipedKey, key.secretKeys[i][:]) {
+				t.Error("Key was not wiped after closing the wallet")
+			}
+		}
+	}
+
+	// Reopen the wallet.
+	err = wt.wallet.Unlock(wt.walletMasterKey)
+	if err != nil {
+		t.Error(err)
+	}
+	siacoinBalance3, _, _ := wt.wallet.ConfirmedBalance()
+	if siacoinBalance3.Cmp(siacoinBalance) != 0 {
+		t.Error("siacoin balance reporting changed upon closing the wallet")
+	}
+	// TODO: Try spending money.
 }

@@ -17,7 +17,7 @@ import (
 // A Wallet tester contains a ConsensusTester and has a bunch of helpful
 // functions for facilitating wallet integration testing.
 type walletTester struct {
-	cs     *consensus.ConsensusSet
+	cs     modules.ConsensusSet
 	tpool  modules.TransactionPool
 	miner  modules.Miner
 	wallet *Wallet
@@ -47,6 +47,15 @@ func createWalletTester(name string) (*walletTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	var masterKey crypto.TwofishKey
+	_, err = rand.Read(masterKey[:])
+	if err != nil {
+		return nil, err
+	}
+	err = w.Unlock(masterKey)
+	if err != nil {
+		return nil, err
+	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		return nil, err
@@ -59,17 +68,9 @@ func createWalletTester(name string) (*walletTester, error) {
 		miner:  m,
 		wallet: w,
 
-		persistDir: testdir,
-	}
+		walletMasterKey: masterKey,
 
-	// Unlock the wallet.
-	_, err = rand.Read(wt.walletMasterKey[:])
-	if err != nil {
-		return nil, err
-	}
-	err = wt.wallet.Unlock(wt.walletMasterKey)
-	if err != nil {
-		return nil, err
+		persistDir: testdir,
 	}
 
 	// Mine blocks until there is money in the wallet.

@@ -88,27 +88,18 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.See
 }
 
 // generateAndTrackKey tracks a key of a given index from a given seed.
-func (w *Wallet) generateAndTrackKey(seed modules.Seed, index uint64) error {
+func (w *Wallet) generateAndTrackKey(seed modules.Seed, index uint64) {
 	// Generate the key and check it is new to the wallet.
 	spendableKey := generateSpendableKey(seed, index)
-	_, exists := w.keys[spendableKey.unlockConditions.UnlockHash()]
-	if exists {
-		return errors.New("key is already being tracked")
-	}
 	w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
-	return nil
 }
 
 // integrateSeed takes an address seed as input and from that generates
 // 'publicKeysPerSeed' addresses that the wallet is able to spend.
-func (w *Wallet) integrateSeed(seed modules.Seed) error {
+func (w *Wallet) integrateSeed(seed modules.Seed) {
 	for i := uint64(0); i < modules.PublicKeysPerSeed; i++ {
-		err := w.generateAndTrackKey(seed, i)
-		if err != nil {
-			return err
-		}
+		w.generateAndTrackKey(seed, i)
 	}
-	return nil
 }
 
 // loadSeedFile loads an encrypted seed from disk, decrypting it and
@@ -124,21 +115,19 @@ func (w *Wallet) loadSeedFile(masterKey crypto.TwofishKey, fileInfo os.FileInfo)
 	if err != nil {
 		return err
 	}
-	return w.integrateSeed(seed)
+	w.integrateSeed(seed)
+	return nil
 }
 
 // recoverSeed integrates a recovery seed into the wallet.
 func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	// Integrate the seed with the wallet.
 	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
-	err := w.integrateSeed(seed)
-	if err != nil {
-		return err
-	}
+	w.integrateSeed(seed)
 
 	// Encrypt the seed and save the seed file.
 	var sfuid SeedFileUID
-	_, err = rand.Read(sfuid[:])
+	_, err := rand.Read(sfuid[:])
 	if err != nil {
 		return err
 	}
@@ -178,10 +167,7 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	err = w.integrateSeed(seed)
-	if err != nil {
-		return modules.Seed{}, err
-	}
+	w.integrateSeed(seed)
 
 	// Encrypt the seed and save the seed file.
 	randomSuffix := persist.RandomSuffix()

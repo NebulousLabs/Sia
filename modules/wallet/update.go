@@ -69,8 +69,16 @@ func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.Unloc
 // ProcessConsensusChange parses a consensus change to update the set of
 // confirmed outputs known to the wallet.
 func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	// There are two different situations under which a subscribee calls
+	// ProcessConsensusChange. The first is when w.subscribed is set to false
+	// AND the mutex is already locked. The other situation is that subscribed
+	// is set to true and is not going to be changed. Therefore there is no
+	// race condition here. If w.subscribed is set to false, trying to grab the
+	// lock would cause a deadlock.
+	if w.subscribed {
+		lockID := w.mu.Lock()
+		defer w.mu.Unlock(lockID)
+	}
 
 	// Iterate through the output diffs (siacoin and siafund) and apply all of
 	// them. Only apply the outputs that relate to unlock hashes we understand.
@@ -167,8 +175,16 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 // ReceiveUpdatedUnconfirmedTransactions updates the wallet's unconfirmed
 // transaction set.
 func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction, _ modules.ConsensusChange) {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
+	// There are two different situations under which a subscribee calls
+	// ProcessConsensusChange. The first is when w.subscribed is set to false
+	// AND the mutex is already locked. The other situation is that subscribed
+	// is set to true and is not going to be changed. Therefore there is no
+	// race condition here. If w.subscribed is set to false, trying to grab the
+	// lock would cause a deadlock.
+	if w.subscribed {
+		lockID := w.mu.Lock()
+		defer w.mu.Unlock(lockID)
+	}
 
 	w.unconfirmedWalletTransactions = nil
 	for _, txn := range txns {

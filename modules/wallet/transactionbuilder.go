@@ -386,11 +386,13 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		input := txn.SiacoinInputs[inputIndex]
 		spendableKey := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
 		usedIndices := make(map[int]struct{})
-		for _, secretKey := range spendableKey.secretKeys {
+		// Must use 'i := range' to prevent a copy of the secret key from being
+		// made.
+		for i := range spendableKey.secretKeys {
 			// Find the public key index that corresponds to this key.
 			found := false
 			keyIndex := 0
-			pubKey := secretKey.PublicKey()
+			pubKey := spendableKey.secretKeys[i].PublicKey()
 			for i, siaPublicKey := range input.UnlockConditions.PublicKeys {
 				_, exists := usedIndices[i]
 				if bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 && exists {
@@ -418,7 +420,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 			sigHash := txn.SigHash(sigIndex)
 
 			// Get the signature.
-			encodedSig, err := crypto.SignHash(sigHash, secretKey)
+			encodedSig, err := crypto.SignHash(sigHash, spendableKey.secretKeys[i])
 			if err != nil {
 				return nil, err
 			}
@@ -429,11 +431,13 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 		input := txn.SiafundInputs[inputIndex]
 		spendableKey := tb.wallet.keys[input.UnlockConditions.UnlockHash()]
 		usedIndices := make(map[int]struct{})
-		for _, secretKey := range spendableKey.secretKeys {
+		// Must use 'i := range' to prevent copies of the secret data from
+		// being made.
+		for i := range spendableKey.secretKeys {
 			// Find the public key index that corresponds to this key.
 			found := false
 			keyIndex := 0
-			pubKey := secretKey.PublicKey()
+			pubKey := spendableKey.secretKeys[i].PublicKey()
 			for i, siaPublicKey := range input.UnlockConditions.PublicKeys {
 				_, exists := usedIndices[i]
 				if bytes.Compare(pubKey[:], siaPublicKey.Key) == 0 && exists {
@@ -461,7 +465,7 @@ func (tb *transactionBuilder) Sign(wholeTransaction bool) ([]types.Transaction, 
 			sigHash := txn.SigHash(sigIndex)
 
 			// Get the signature.
-			encodedSig, err := crypto.SignHash(sigHash, secretKey)
+			encodedSig, err := crypto.SignHash(sigHash, spendableKey.secretKeys[i])
 			if err != nil {
 				return nil, err
 			}
