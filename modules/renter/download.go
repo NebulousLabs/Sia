@@ -8,53 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
 	rpcRetrieve = [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
 	rpcClose    = [8]byte{'C', 'l', 'o', 's', 'e'}
 )
-
-// A file is a single file that has been uploaded to the network. Files are
-// split into equal-length chunks, which are then erasure-coded into pieces.
-// Each piece is separately encrypted, using a key derived from the file's
-// master key. The pieces are uploaded to hosts in groups, such that one file
-// contract covers many pieces.
-type dfile struct {
-	Name      string
-	Size      uint64
-	Contracts []fileContract
-	MasterKey crypto.TwofishKey
-	ecc       modules.ECC
-	chunkSize uint64
-}
-
-// numChunks returns the number of chunks that f was split into.
-func (f *dfile) numChunks() uint64 {
-	n := f.Size / f.chunkSize
-	if f.Size%f.chunkSize != 0 {
-		n++
-	}
-	return n
-}
-
-// A fileContract is a contract covering an arbitrary number of file pieces.
-// Chunk/Piece metadata is used to split the raw contract data appropriately.
-type fileContract struct {
-	types.FileContract
-	ID     types.FileContractID
-	IP     modules.NetAddress
-	Pieces []struct {
-		Chunk  uint64 // which chunk the piece belongs to
-		Piece  uint64 // the index of the piece in the chunk
-		Offset uint64 // the offset of the piece in the file contract
-		Length uint64 // the length of the piece
-	}
-}
 
 // pieceData contains the metadata necessary to request a piece from a
 // fetcher.
@@ -285,12 +246,11 @@ func newDownload(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fetcher, n
 func (r *Renter) Download(nickname, destination string) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.Lock()
-	// file, exists := r.files[nickname]
+	file, exists := r.files[nickname]
 	r.mu.Unlock(lockID)
-	// if !exists {
-	// 	return errors.New("no file of that nickname")
-	// }
-	file := new(dfile)
+	if !exists {
+		return errors.New("no file of that nickname")
+	}
 
 	// Create file on disk.
 	f, err := os.Create(destination)

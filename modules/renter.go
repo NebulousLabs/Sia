@@ -52,22 +52,18 @@ type FileInfo interface {
 	// UploadProgress is a percentage indicating the progress of the file as
 	// it is being uploaded. This percentage is calculated internally (unlike
 	// DownloadInfo) because redundancy schemes complicate the definition of
-	// "progress." As a rule, Available == true IFF UploadProgress == 100.0.
+	// "progress." Since UploadProgress includes redundancy, files will almost
+	// certainly be Available before UploadProgress == 100.
 	UploadProgress() float32
 
-	// Nickname gives the nickname of the file.
+	// Nickname is the nickname of the file.
 	Nickname() string
 
 	// Filesize is the size of the file.
 	Filesize() uint64
 
-	// Repairing indicates whether the file is actively being repaired. If
-	// there are files being repaired, it is best to let them finish before
-	// shutting down the program.
-	Repairing() bool
-
-	// TimeRemaining indicates how many blocks remain before the file expires.
-	TimeRemaining() types.BlockHeight
+	// Expiration is the block height at which the file will expire.
+	Expiration() types.BlockHeight
 }
 
 // DownloadInfo is an interface providing information about a file that has
