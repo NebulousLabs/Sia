@@ -55,7 +55,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	miningpool, err := miningpool.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
+	miningpool, err := miningpool.New(state, tpool, wallet, config.Siad.MiningPoolAddr, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
 	if err != nil {
 		return err
 	}

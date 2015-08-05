@@ -3,6 +3,8 @@ package miningpool
 import (
 	"errors"
 	"log"
+	//"math/big"
+	"net"
 
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
@@ -34,14 +36,24 @@ type MiningPool struct {
 	// List of headers whose miner has already been paid (prevent double submits)
 	spentHeaders []types.Block // Should this be a map?
 
-	// A list of blocks that have been submitted to the network
+	// A list of blocks that have been submitted to the network. netPayout is
+	// the total amount of money sent to miners, while profit is the amount of
+	// money earned
 	blocksFound []types.BlockID
+	netPayout   types.Currency
+	profit      types.Currency
 
-	// Some variables to keep track of payment channels?
-	// I'll figure this out once I start implementing payment channel functionality
+	// Some variables to keep track of each miner's payment channel
+	// For now, the payment channels are a map of miner addresses to channels. The problem with this is that if miners want to change to a new address (e.g. avoid address reuse), they have to create a new payment channel
+	channels map[types.UnlockHash]paymentChannel
 
 	// Subscription management variables.
 	subscribers []chan struct{}
+
+	myAddr   modules.NetAddress
+	listener net.Listener
+
+	modules.MiningPoolSettings
 
 	persistDir string
 	log        *log.Logger
@@ -49,7 +61,7 @@ type MiningPool struct {
 }
 
 // New returns a ready-to-go miningpool
-func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, persistDir string) (*MiningPool, error) {
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Wallet, addr string, persistDir string) (*MiningPool, error) {
 	// Creates the mining pool and its dependencies
 	if cs == nil {
 		return nil, errors.New("mining pool cannot use a nil state")
@@ -66,13 +78,45 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		tpool:  tpool,
 		wallet: w,
 
+		MiningPoolSettings: modules.MiningPoolSettings{
+			MaxConnections: 1024,
+			TargetMultiple: 255,
+			//MiningPoolCut:  *big.NewRat(5, 100), // 0.05
+			//MinerCut:       *big.NewRat(3, 100), // 0.03
+		},
+
 		persistDir: persistDir,
-		mu:         sync.New(modules.SafeMutexDelay, 1),
+
+		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
 	err := mp.initPersist()
 	if err != nil {
 		return nil, err
 	}
+
+	// Create listener and set address
+	mp.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	_, port, _ := net.SplitHostPort(mp.listener.Addr().String())
+	mp.myAddr = modules.NetAddress(net.JoinHostPort("::1", port))
+
+	// Learn our external IP.
+	//go mp.learnHostName()
+
+	// Forward the hosting port, if possible
+	//go mp.forwardPort(port)
+
+	// spawn listener
+	go mp.listen()
+
 	// mp.tpool.TransactionPoolSubscribe(mp) ?
 	return mp, nil
+}
+
+func (mp *MiningPool) Settings() modules.MiningPoolSettings {
+	lockID := mp.mu.RLock()
+	defer mp.mu.RUnlock(lockID)
+	return mp.MiningPoolSettings
 }

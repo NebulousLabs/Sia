@@ -1,11 +1,15 @@
 package miningpool
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/NebulousLabs/Sia/types"
 )
 
 // SubmitBlockShare does TODO
-func (mp *MiningPool) SubmitBlockShare(block types.Block) error {
+func (mp *MiningPool) rpcSubmit(conn net.Conn) error {
+	fmt.Println("Block attempt submitted") // testing statement
 	return nil
 }
 

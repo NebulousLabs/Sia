@@ -80,7 +80,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
-	mpool, err := miningpool.New(cs, tp, w, filepath.Join(testdir, modules.MiningPoolDir))
+	mpool, err := miningpool.New(cs, tp, w, ":0", filepath.Join(testdir, modules.MiningPoolDir))
 	if err != nil {
 		t.Fatal("Failed to create mining pool:", err)
 	}

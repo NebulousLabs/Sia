@@ -24,9 +24,10 @@ type Config struct {
 	Siad struct {
 		NoBootstrap bool
 
-		APIaddr  string
-		RPCaddr  string
-		HostAddr string
+		APIaddr        string
+		RPCaddr        string
+		HostAddr       string
+		MiningPoolAddr string
 
 		SiaDir string
 
@@ -68,6 +69,7 @@ func main() {
 	root.PersistentFlags().StringVarP(&config.Siad.APIaddr, "api-addr", "a", "localhost:9980", "which host:port the API server listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.RPCaddr, "rpc-addr", "r", ":9981", "which port the gateway listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.HostAddr, "host-addr", "H", ":9982", "which port the host listens on")
+	root.PersistentFlags().StringVarP(&config.Siad.MiningPoolAddr, "miningpool-addr", "m", ":9983", "which port the mining pool listens on")
 	root.PersistentFlags().StringVarP(&config.Siad.SiaDir, "sia-directory", "d", "", "location of the sia directory")
 	root.PersistentFlags().BoolVarP(&config.Siad.Profile, "profile", "p", false, "enable profiling")
 	root.PersistentFlags().StringVarP(&config.Siad.ProfileDir, "profile-directory", "P", "profiles", "location of the profiling directory")
