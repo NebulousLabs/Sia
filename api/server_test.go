@@ -17,6 +17,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/miningpool"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -39,6 +40,7 @@ type serverTester struct {
 	host    modules.Host
 	hostdb  modules.HostDB
 	miner   modules.Miner
+	mpool   modules.MiningPool
 	renter  modules.Renter
 	tpool   modules.TransactionPool
 	exp     modules.Explorer
@@ -78,6 +80,10 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
 	}
+	mpool, err := miningpool.New(cs, tp, w, filepath.Join(testdir, modules.MiningPoolDir))
+	if err != nil {
+		t.Fatal("Failed to create mining pool:", err)
+	}
 	hdb, err := hostdb.New(cs, g)
 	if err != nil {
 		t.Fatal("Failed to create hostdb:", err)
@@ -94,7 +100,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create explorer:", err)
 	}
-	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, r, tp, w, exp)
+	srv, err := NewServer(APIAddr, cs, g, h, hdb, m, mpool, r, tp, w, exp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,6 +112,7 @@ func newServerTester(name string, t *testing.T) *serverTester {
 		host:    h,
 		hostdb:  hdb,
 		miner:   m,
+		mpool:   mpool,
 		renter:  r,
 		tpool:   tp,
 		exp:     exp,

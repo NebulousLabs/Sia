@@ -81,6 +81,11 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/miner/submitpoolheader", srv.minerSubmitPoolHeaderHandler)
 	}
 
+	// MiningPool API Calls
+	if srv.mpool != nil {
+		handleHTTPRequest(mux, "/miningpool/status", srv.miningpoolStatusHandler)
+	}
+
 	// Renter API Calls
 	if srv.renter != nil {
 		handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)

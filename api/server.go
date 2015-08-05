@@ -20,6 +20,7 @@ type Server struct {
 	host    modules.Host
 	hostdb  modules.HostDB
 	miner   modules.Miner
+	mpool   modules.MiningPool
 	renter  modules.Renter
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
@@ -35,13 +36,14 @@ type Server struct {
 }
 
 // NewServer creates a new API server from the provided modules.
-func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
+func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h modules.Host, hdb modules.HostDB, m modules.Miner, mpool modules.MiningPool, r modules.Renter, tp modules.TransactionPool, w modules.Wallet, exp modules.Explorer) (*Server, error) {
 	srv := &Server{
 		cs:      s,
 		gateway: g,
 		host:    h,
 		hostdb:  hdb,
 		miner:   m,
+		mpool:   mpool,
 		renter:  r,
 		tpool:   tp,
 		wallet:  w,
@@ -62,7 +64,7 @@ func NewServer(APIaddr string, s *consensus.ConsensusSet, g modules.Gateway, h m
 	return srv, nil
 }
 
-// Serve listens for and handles API calls. It a blocking function.
+// Serve listens for and handles API calls. It's a blocking function.
 func (srv *Server) Serve() error {
 	// graceful will run until it catches a signal.
 	// It can also be stopped manually by stopHandler.

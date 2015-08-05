@@ -13,6 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/hostdb"
 	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/miningpool"
 	"github.com/NebulousLabs/Sia/modules/renter"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	"github.com/NebulousLabs/Sia/modules/wallet"
@@ -54,6 +55,10 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
+	miningpool, err := miningpool.New(state, tpool, wallet, filepath.Join(config.Siad.SiaDir, modules.MinerDir))
+	if err != nil {
+		return err
+	}
 	hostdb, err := hostdb.New(state, gateway)
 	if err != nil {
 		return err
@@ -66,7 +71,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, renter, tpool, wallet, nil)
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, host, hostdb, miner, miningpool, renter, tpool, wallet, nil)
 	if err != nil {
 		return err
 	}

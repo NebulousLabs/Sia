@@ -32,7 +32,7 @@ func startDaemon() error {
 	if err != nil {
 		return err
 	}
-	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, nil, nil, nil, nil, nil, explorer)
+	srv, err := api.NewServer(config.Siad.APIaddr, state, gateway, nil, nil, nil, nil, nil, nil, nil, explorer)
 	if err != nil {
 		return err
 	}

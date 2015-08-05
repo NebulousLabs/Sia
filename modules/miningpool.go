@@ -14,7 +14,7 @@ type MiningPool interface {
 	// CreatePaymentChannel creates a payment channel from the MiningPool to the
 	// miner. This allows for the pool to send currency to the miner off-chain
 	// in order to prevent cluttering the network
-	CreatePaymentChannel()
+	CreatePaymentChannel() error
 
 	// SubmitBlockShare is called by the miner via a RPC. The miner submits a partial
 	// block (one that meets an easier target set by the pool). The mining pool then
