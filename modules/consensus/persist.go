@@ -25,7 +25,15 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
-	// Explicit initilization preferred to implicit
+
+	// Update the siafundoutput diffs map for the genesis block
+	// on disk
+	cs.updateDatabase = true
+	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+	}
+
+	// Explicit initilization preferred to implicit for blocksLoaded
 	cs.blocksLoaded = 0
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
@@ -51,6 +59,15 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	height := cs.db.pathHeight()
 	if height == 0 {
 		return cs.initSetDB()
+	} else {
+		cs.updateDatabase = false
+		// Update the siafundoutput diffs map for the genesis block
+		// in memory
+		// DEPRECATED
+		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+			cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+		}
+		cs.updateDatabase = true
 	}
 
 	// Check that the db's genesis block matches our genesis block.
@@ -101,9 +118,9 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.updatePath = false
+		cs.updateDatabase = false
 		cs.commitDiffSet(pb, modules.DiffApply)
-		cs.updatePath = true
+		cs.updateDatabase = true
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}

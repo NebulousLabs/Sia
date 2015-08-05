@@ -104,16 +104,22 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 	// output that does not exist.
 	if build.DEBUG {
 		exists := cs.db.inSiafundOutputs(sfod.ID)
-		if exists == (sfod.Direction == dir) {
+		// Loading will commit saifundOutputs that are already
+		// in the database.
+		if exists == (sfod.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
 	if sfod.Direction == dir {
-		cs.db.addSiafundOutputs(sfod.ID)
+		if cs.updateDatabase {
+			cs.db.addSiafundOutputs(sfod.ID, sfod.SiafundOutput)
+		}
 		cs.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 	} else {
-		cs.db.rmSiafundOutputs(sfod.ID)
+		if cs.updateDatabase {
+			cs.db.rmSiafundOutputs(sfod.ID)
+		}
 		delete(cs.siafundOutputs, sfod.ID)
 	}
 }
@@ -291,7 +297,7 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		if cs.updatePath {
+		if cs.updateDatabase {
 			err := cs.db.pushPath(pb.Block.ID())
 
 			if build.DEBUG && err != nil {
