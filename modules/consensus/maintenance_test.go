@@ -19,14 +19,14 @@ func TestApplyMinerPayouts(t *testing.T) {
 	}
 
 	// Create a block node with a single miner payout.
-	bn := new(blockNode)
-	bn.height = cst.cs.height()
-	bn.block.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
-	bn.block.MinerPayouts = append(bn.block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
-	mpid0 := bn.block.MinerPayoutID(0)
+	pb := new(processedBlock)
+	pb.Height = cst.cs.height()
+	pb.Block.Timestamp = 2 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
+	pb.Block.MinerPayouts = append(pb.Block.MinerPayouts, types.SiacoinOutput{Value: types.NewCurrency64(12)})
+	mpid0 := pb.Block.MinerPayoutID(0)
 
 	// Apply the single miner payout.
-	cst.cs.applyMinerPayouts(bn)
+	cst.cs.applyMinerPayouts(pb)
 	dsco, exists := cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][mpid0]
 	if !exists {
 		t.Error("miner payout was not created in the delayed outputs set")
@@ -41,27 +41,27 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if len(cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay]) != 2 { // 1 for consensus set creation, 1 for the output that just got added.
 		t.Error("wrong number of delayed siacoin outputs in consensus set")
 	}
-	if len(bn.delayedSiacoinOutputDiffs) != 1 {
+	if len(pb.DelayedSiacoinOutputDiffs) != 1 {
 		t.Fatal("block node did not get the delayed siacoin output diff")
 	}
-	if bn.delayedSiacoinOutputDiffs[0].Direction != modules.DiffApply {
+	if pb.DelayedSiacoinOutputDiffs[0].Direction != modules.DiffApply {
 		t.Error("delayed siacoin output diff has the wrong direction")
 	}
-	if bn.delayedSiacoinOutputDiffs[0].ID != mpid0 {
+	if pb.DelayedSiacoinOutputDiffs[0].ID != mpid0 {
 		t.Error("delayed siacoin output diff has wrong id")
 	}
 
-	// Apply a block node with two miner payouts.
-	bn2 := new(blockNode)
-	bn2.height = cst.cs.height()
-	bn2.block.Timestamp = 5 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
-	bn2.block.MinerPayouts = []types.SiacoinOutput{
+	// Apply a processed block with two miner payouts.
+	pb2 := new(processedBlock)
+	pb2.Height = cst.cs.height()
+	pb2.Block.Timestamp = 5 // MinerPayout id is determined by block id + index; add uniqueness to the block id.
+	pb2.Block.MinerPayouts = []types.SiacoinOutput{
 		{Value: types.NewCurrency64(5)},
 		{Value: types.NewCurrency64(10)},
 	}
-	mpid1 := bn2.block.MinerPayoutID(0)
-	mpid2 := bn2.block.MinerPayoutID(1)
-	cst.cs.applyMinerPayouts(bn2)
+	mpid1 := pb2.Block.MinerPayoutID(0)
+	mpid2 := pb2.Block.MinerPayoutID(1)
+	cst.cs.applyMinerPayouts(pb2)
 	_, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][mpid1]
 	if !exists {
 		t.Error("delayed siacoin output was not created")
@@ -70,7 +70,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if !exists {
 		t.Error("delayed siacoin output was not created")
 	}
-	if len(bn2.delayedSiacoinOutputDiffs) != 2 {
+	if len(pb2.DelayedSiacoinOutputDiffs) != 2 {
 		t.Error("block node should have 2 delayed outputs")
 	}
 
@@ -86,11 +86,11 @@ func TestApplyMinerPayouts(t *testing.T) {
 		if r != errPayoutsAlreadyPaid {
 			t.Error(r)
 		}
-		delete(cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay], mpid0)
+		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], mpid0)
 		cst.cs.siacoinOutputs[mpid0] = types.SiacoinOutput{}
-		cst.cs.applyMinerPayouts(bn)
+		cst.cs.applyMinerPayouts(pb)
 	}()
-	cst.cs.applyMinerPayouts(bn)
+	cst.cs.applyMinerPayouts(pb)
 }
 
 // TestApplyMaturedSiacoinOutputs probes the applyMaturedSiacoinOutputs method
@@ -103,7 +103,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bn := cst.cs.currentBlockNode()
+	pb := cst.cs.currentProcessedBlock()
 
 	// Trigger the sanity check concerning already-matured outputs.
 	defer func() {
@@ -113,9 +113,9 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.siacoinOutputs[types.SiacoinOutputID{}] = types.SiacoinOutput{}
-	cst.cs.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
-	cst.cs.delayedSiacoinOutputs[bn.height][types.SiacoinOutputID{}] = types.SiacoinOutput{}
-	cst.cs.applyMaturedSiacoinOutputs(bn)
+	cst.cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	cst.cs.delayedSiacoinOutputs[pb.Height][types.SiacoinOutputID{}] = types.SiacoinOutput{}
+	cst.cs.applyMaturedSiacoinOutputs(pb)
 }
 
 // TestApplyMissedStorageProof probes the applyMissedStorageProof method of the
@@ -130,25 +130,25 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	}
 
 	// Create a block node.
-	bn := new(blockNode)
-	bn.height = cst.cs.height()
+	pb := new(processedBlock)
+	pb.Height = cst.cs.height()
 
 	// Create a file contract that's expiring and has 1 missed proof output.
 	expiringFC := types.FileContract{
 		Payout:             types.NewCurrency64(300e3),
-		WindowEnd:          bn.height,
+		WindowEnd:          pb.Height,
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
-	cst.cs.fileContractExpirations[bn.height] = make(map[types.FileContractID]struct{})
-	cst.cs.fileContractExpirations[bn.height][types.FileContractID{}] = struct{}{}
-	cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
+	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
+	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	_, exists := cst.cs.fileContracts[types.FileContractID{}]
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
 	spoid := types.FileContractID{}.StorageProofOutputID(types.ProofMissed, 0)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid]
 	if !exists {
 		t.Error("missed proof output was never created")
 	}
@@ -175,7 +175,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 			t.Error(r)
 		}
 		// Trigger errMissingFileContract
-		cst.cs.applyMissedStorageProof(bn, types.FileContractID(spoid))
+		cst.cs.applyMissedStorageProof(pb, types.FileContractID(spoid))
 	}()
 	defer func() {
 		r := recover()
@@ -186,7 +186,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		// Trigger errStorageProofTiming
 		expiringFC.WindowEnd = 0
 		cst.cs.fileContracts[types.FileContractID{}] = expiringFC
-		cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	defer func() {
 		r := recover()
@@ -195,14 +195,14 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		}
 
 		// Trigger errPayoutsAlreadyPaid from siacoin outputs.
-		delete(cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay], spoid)
+		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], spoid)
 		cst.cs.siacoinOutputs[spoid] = types.SiacoinOutput{}
-		cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	// Trigger errPayoutsAlreadyPaid from delayed outputs.
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC
-	cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid] = types.SiacoinOutput{}
-	cst.cs.applyMissedStorageProof(bn, types.FileContractID{})
+	cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid] = types.SiacoinOutput{}
+	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 }
 
 // TestApplyFileContractMaintenance probes the applyFileContractMaintenance
@@ -217,25 +217,25 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	}
 
 	// Create a block node.
-	bn := new(blockNode)
-	bn.height = cst.cs.height()
+	pb := new(processedBlock)
+	pb.Height = cst.cs.height()
 
 	// Create a file contract that's expiring and has 1 missed proof output.
 	expiringFC := types.FileContract{
 		Payout:             types.NewCurrency64(300e3),
-		WindowEnd:          bn.height,
+		WindowEnd:          pb.Height,
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
-	cst.cs.fileContractExpirations[bn.height] = make(map[types.FileContractID]struct{})
-	cst.cs.fileContractExpirations[bn.height][types.FileContractID{}] = struct{}{}
-	cst.cs.applyFileContractMaintenance(bn)
+	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
+	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
+	cst.cs.applyFileContractMaintenance(pb)
 	_, exists := cst.cs.fileContracts[types.FileContractID{}]
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
 	spoid := types.FileContractID{}.StorageProofOutputID(types.ProofMissed, 0)
-	_, exists = cst.cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay][spoid]
+	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid]
 	if !exists {
 		t.Error("missed proof output was never created")
 	}

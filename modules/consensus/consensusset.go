@@ -10,61 +10,38 @@ import (
 	"errors"
 	"os"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
-)
-
-const (
-	// fullVerification indicates that a block should be fully verified when
-	// being loaded from disk.
-	fullVerification verificationRigor = 0
-
-	// partialVerification indicates that transaction verification can be
-	// skipped. Transaction verification is computationally intensive, and
-	// skipping such a step noticably increases speed when loading many blocks
-	// at once. Usually, partialVerification is used when loading blocks from
-	// disk.
-	partialVerification verificationRigor = 1
 )
 
 var (
 	ErrNilGateway = errors.New("cannot have a nil gateway as input")
 )
 
-// verificationRigor is a type indicating the intensity of verification that
-// should be using while accepting a block. For blocks that come from trusted
-// sources, the computationally expensive steps can be skipped.
-type verificationRigor byte
-
 // The ConsensusSet is the object responsible for tracking the current status
 // of the blockchain. Broadly speaking, it is responsible for maintaining
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// verificationRigor is a flag that tells the state whether or not to do
-	// transaction verification while accepting a block. This should help speed
-	// up loading blocks from memory.
-	verificationRigor verificationRigor // DEPRECATED
-
 	// updatePath is a flag that determines if a block node will
 	// be added to the path. It should be false when loading the
 	// current path from disk and true otherwise
 	updatePath bool // DEPRECATED
 
+	// blocksLoaded is the number of blocks that have been loaded
+	// from memory. This variable only exists while some
+	// structures are still in memory, and should always equal
+	// db.pathHeight after loading from disk
+	blocksLoaded types.BlockHeight // DEPRECATED
+
 	// The blockRoot is the block node that contains the genesis block.
-	blockRoot *blockNode
+	blockRoot *processedBlock
 
-	// blockMap and dosBlocks keep track of seen blocks. blockMap holds all
-	// valid blocks, including those not on the main blockchain. dosBlocks is a
-	// "blacklist" of blocks known to be invalid, but expensive to prove
-	// invalid.
-	blockMap  map[types.BlockID]*blockNode
+	// dosBlocks keeps track of seen blocks. It is a
+	// "blacklist" of blocks known to be invalid, but expensive to
+	// prove
 	dosBlocks map[types.BlockID]struct{}
-
-	// The currentPath is the longest known blockchain.
-	currentPath []types.BlockID
 
 	// These are the consensus variables. All nodes with the same current path
 	// will also have these variables matching.
@@ -126,10 +103,7 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
-		blockMap:  make(map[types.BlockID]*blockNode),
 		dosBlocks: make(map[types.BlockID]struct{}),
-
-		currentPath: make([]types.BlockID, 1),
 
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
@@ -150,24 +124,15 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			{SiafundOutputs: types.GenesisSiafundAllocation},
 		},
 	}
-	cs.blockRoot = &blockNode{
-		block:       genesisBlock,
-		childTarget: types.RootTarget,
-		depth:       types.RootDepth,
+	cs.blockRoot = &processedBlock{
+		Block:       genesisBlock,
+		ChildTarget: types.RootTarget,
+		Depth:       types.RootDepth,
 
-		diffsGenerated: true,
-	}
-	cs.blockMap[genesisBlock.ID()] = cs.blockRoot
-
-	// Fill out the consensus information for the genesis block.
-	cs.currentPath[0] = genesisBlock.ID()
-	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.ZeroUnlockHash,
+		DiffsGenerated: true,
 	}
 
-	// Allocate the Siafund addresses by putting them all in a big transaction
-	// and applying the diffs.
+	// Allocate the Siafund addresses by putting them all in a big transaction inside the genesis block
 	for i, siafundOutput := range genesisBlock.Transactions[0].SiafundOutputs {
 		sfid := genesisBlock.Transactions[0].SiafundOutputID(i)
 		sfod := modules.SiafundOutputDiff{
@@ -176,14 +141,14 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			SiafundOutput: siafundOutput,
 		}
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-		cs.blockRoot.siafundOutputDiffs = append(cs.blockRoot.siafundOutputDiffs, sfod)
-	}
-	if build.DEBUG {
-		cs.blockRoot.consensusSetHash = cs.consensusSetHash()
+		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
 	}
 
-	// Send out genesis block update.
-	cs.updateSubscribers(nil, []*blockNode{cs.blockRoot})
+	// Fill out the consensus information for the genesis block.
+	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
+		Value:      types.CalculateCoinbase(0),
+		UnlockHash: types.ZeroUnlockHash,
+	}
 
 	// Create the consensus directory.
 	err := os.MkdirAll(saveDir, 0700)
@@ -197,6 +162,14 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 		return nil, err
 	}
 
+	// Send out genesis block update.
+	cs.updateSubscribers(nil, []*processedBlock{cs.blockRoot})
+
+	// Load the saved processed blocks into memory and send out updates
+	cs.loadDiffs()
+
+	cs.updatePath = true
+
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
 	gateway.RegisterRPC("RelayBlock", cs.RelayBlock)
@@ -207,5 +180,8 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 // Close safely closes the block database.
 func (cs *ConsensusSet) Close() error {
+	lockID := cs.mu.Lock()
+	defer cs.mu.Unlock(lockID)
+	cs.db.open = false
 	return cs.db.Close()
 }

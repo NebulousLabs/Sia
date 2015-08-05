@@ -101,6 +101,7 @@ Daemon
 Queries:
 
 * /daemon/stop
+* /daemon/version
 * /daemon/updates/apply
 * /daemon/updates/check
 
@@ -111,6 +112,17 @@ Function: Cleanly shuts down the daemon. May take a while.
 Parameters: none
 
 Response: standard
+
+#### /daemon/version
+
+Function: Returns the daemon's version
+
+Parameters: none
+
+Response:
+```
+version string
+```
 
 #### /daemon/updates/apply:
 

@@ -17,6 +17,7 @@ var (
 	ErrEarlyTimestamp         = errors.New("block timestamp is too early")
 	ErrExtremeFutureTimestamp = errors.New("block timestamp too far in future, discarded")
 	ErrFutureTimestamp        = errors.New("block timestamp too far in future, but saved for later use")
+	ErrInconsistentSet        = errors.New("consensus set is not in a consistent state")
 	ErrLargeBlock             = errors.New("block is too large to be accepted")
 	ErrMissedTarget           = errors.New("block does not meet target")
 	ErrOrphan                 = errors.New("block has no known parent")
@@ -27,11 +28,12 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 	// Grab the parent of the block and verify the ID of the child meets the
 	// target. This is done as early as possible to enforce that any
 	// block-related DoS must use blocks that have sufficient work.
-	parent, exists := cs.blockMap[b.ParentID]
+	exists := cs.db.inBlockMap(b.ParentID)
 	if !exists {
 		return ErrOrphan
 	}
-	if !b.CheckTarget(parent.childTarget) {
+	parent := cs.db.getBlockMap(b.ParentID)
+	if !b.CheckTarget(parent.ChildTarget) {
 		return ErrMissedTarget
 	}
 
@@ -42,7 +44,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 
 	// Check that the timestamp is not in 'the past', where the past is defined
 	// by earliestChildTimestamp.
-	if parent.earliestChildTimestamp() > b.Timestamp {
+	if cs.earliestChildTimestamp(parent) > b.Timestamp {
 		return ErrEarlyTimestamp
 	}
 
@@ -55,7 +57,7 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 	}
 
 	// Verify that the miner payouts are valid.
-	if !b.CheckMinerPayouts(parent.height + 1) {
+	if !b.CheckMinerPayouts(parent.Height + 1) {
 		return ErrBadMinerPayouts
 	}
 
@@ -81,15 +83,15 @@ func (cs *ConsensusSet) validHeader(b types.Block) error {
 // node, the blockchain is forked to put the new block and its parents at the
 // tip. An error will be returned if block verification fails or if the block
 // does not extend the longest fork.
-func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*blockNode, err error) {
-	parentNode := cs.blockMap[b.ParentID]
+func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNodes []*processedBlock, err error) {
+	parentNode := cs.db.getBlockMap(b.ParentID)
 	// COMPATv0.4.0
 	//
 	// When validating/accepting a block, the types height needs to be set to
 	// the height of the block that's being analyzed. After analysis is
 	// finished, the height needs to be set to the height of the current block.
 	types.CurrentHeightLock.Lock()
-	types.CurrentHeight = parentNode.height
+	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()
 	defer func() {
 		types.CurrentHeightLock.Lock()
@@ -97,30 +99,33 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 		types.CurrentHeightLock.Unlock()
 	}()
 
-	newNode := parentNode.newChild(b)
-	cs.blockMap[b.ID()] = newNode
-	if newNode.heavierThan(cs.currentBlockNode()) {
+	newNode := cs.newChild(parentNode, b)
+	err = cs.db.addBlockMap(newNode)
+	if err != nil {
+		return nil, nil, err
+	}
+	if newNode.heavierThan(cs.currentProcessedBlock()) {
 		return cs.forkBlockchain(newNode)
 	}
 	return nil, nil, modules.ErrNonExtendingBlock
 }
 
-// acceptBlock is the internal consensus function for adding blocks. There is
-// no block relaying. The speed of 'acceptBlock' is effected by the value of
-// 'cs.verificationRigor'. If rigor is set to 'fullVerification', all of the
-// transactions will be checked and verified. This is a requirement when
-// receiving blocks from untrusted sources. When set to 'partialVerification',
-// verification of transactions is skipped. This is acceptable when receiving
-// blocks from a trust source, such as blocks that were previously verified and
-// saved to disk. The value of 'cs.verificationRigor' should be set before
-// 'acceptBlock' is called.
+// acceptBlock is the internal consensus function for adding
+// blocks. There is no block relaying. acceptBlock will verify all
+// transactions. Trusted blocks, like those on disk, should already
+// be processed and this function can be bypassed.
 func (cs *ConsensusSet) acceptBlock(b types.Block) error {
+	// Simple check for consistency
+	if cs.db.checkConsistencyGuard() {
+		return ErrInconsistentSet
+	}
+
 	// See if the block is known already.
 	_, exists := cs.dosBlocks[b.ID()]
 	if exists {
 		return ErrDoSBlock
 	}
-	_, exists = cs.blockMap[b.ID()]
+	exists = cs.db.inBlockMap(b.ID())
 	if exists {
 		return ErrBlockKnown
 	}
@@ -137,10 +142,13 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	// verification on the block before adding the block to the block tree. An
 	// error is returned if verification fails or if the block does not extend
 	// the longest fork.
+	cs.db.startConsistencyGuard()
 	revertedNodes, appliedNodes, err := cs.addBlockToTree(b)
 	if err != nil {
+		cs.db.stopConsistencyGuard()
 		return err
 	}
+
 	if len(appliedNodes) > 0 {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
@@ -160,6 +168,8 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		}
 	}
 
+	cs.db.stopConsistencyGuard()
+
 	return nil
 }
 
@@ -171,8 +181,6 @@ func (cs *ConsensusSet) AcceptBlock(b types.Block) error {
 	lockID := cs.mu.Lock()
 	defer cs.mu.Unlock(lockID)
 
-	// Set the flag to do full verification.
-	cs.verificationRigor = fullVerification
 	err := cs.acceptBlock(b)
 	if err != nil {
 		return err

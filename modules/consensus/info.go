@@ -13,24 +13,23 @@ type ConsensusSetInfo struct {
 
 // currentBlockID returns the ID of the current block.
 func (cs *ConsensusSet) currentBlockID() types.BlockID {
-	return cs.currentPath[cs.height()]
+	return cs.db.getPath(cs.height())
 }
 
-// currentBlockNode returns the blockNode of the current block.
-func (s *ConsensusSet) currentBlockNode() *blockNode {
-	return s.blockMap[s.currentBlockID()]
+func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
+	return cs.db.getBlockMap(cs.currentBlockID())
 }
 
 // height returns the current height of the state.
 func (s *ConsensusSet) height() types.BlockHeight {
-	return types.BlockHeight(len(s.currentPath) - 1)
+	return s.blocksLoaded
 }
 
 // CurrentBlock returns the highest block on the tallest fork.
 func (s *ConsensusSet) CurrentBlock() types.Block {
 	counter := s.mu.RLock()
 	defer s.mu.RUnlock(counter)
-	return s.currentBlockNode().block
+	return s.currentProcessedBlock().Block
 }
 
 // ChildTarget does not need a lock, as the values being read are not changed
@@ -40,11 +39,12 @@ func (s *ConsensusSet) CurrentBlock() types.Block {
 // 'ReceiveConsensusSetUpdate', but that should change once boltdb replaces the
 // block mape
 func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exists bool) {
-	bn, exists := s.blockMap[bid]
+	exists = s.db.inBlockMap(bid)
 	if !exists {
 		return
 	}
-	target = bn.childTarget
+	pb := s.db.getBlockMap(bid)
+	target = pb.ChildTarget
 	return
 }
 
@@ -55,11 +55,12 @@ func (s *ConsensusSet) ChildTarget(bid types.BlockID) (target types.Target, exis
 // 'ReceiveConsensusSetUpdate', but that should change once boltdb replaces the
 // block mape
 func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp types.Timestamp, exists bool) {
-	bn, exists := s.blockMap[bid]
+	exists = s.db.inBlockMap(bid)
 	if !exists {
 		return
 	}
-	timestamp = bn.earliestChildTimestamp()
+	pb := s.db.getBlockMap(bid)
+	timestamp = s.earliestChildTimestamp(pb)
 	return
 }
 
@@ -67,7 +68,7 @@ func (s *ConsensusSet) EarliestChildTimestamp(bid types.BlockID) (timestamp type
 func (s *ConsensusSet) GenesisBlock() types.Block {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
-	return s.blockMap[s.currentPath[0]].block
+	return s.db.getBlockMap(s.db.getPath(0)).Block
 }
 
 // Height returns the height of the current blockchain (the longest fork).
@@ -83,11 +84,12 @@ func (s *ConsensusSet) InCurrentPath(bid types.BlockID) bool {
 	lockID := s.mu.RLock()
 	defer s.mu.RUnlock(lockID)
 
-	node, exists := s.blockMap[bid]
+	exists := s.db.inBlockMap(bid)
 	if !exists {
 		return false
 	}
-	return s.currentPath[node.height] == bid
+	node := s.db.getBlockMap(bid)
+	return s.db.getPath(node.Height) == bid
 }
 
 // StorageProofSegment returns the segment to be used in the storage proof for

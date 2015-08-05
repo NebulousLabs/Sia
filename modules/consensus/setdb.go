@@ -4,9 +4,7 @@ import (
 	"errors"
 
 	"github.com/NebulousLabs/Sia/build"
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
-	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 	"github.com/boltdb/bolt"
@@ -20,94 +18,17 @@ var meta = persist.Metadata{
 var (
 	errBadSetInsert = errors.New("attempting to add an already existing item to the consensus set")
 	errNilBucket    = errors.New("using a bucket that does not exist")
-	errNilItem      = errors.New("Requested item does not exist")
+	errNilItem      = errors.New("requested item does not exist")
+	errNotGuarded   = errors.New("database modification not protected by guard")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
 // consensus set
 type setDB struct {
 	*persist.BoltDatabase
-}
-
-// processedBlock is a copy/rename of blockNode, with the pointers to
-// other blockNodes replaced with block ID's, and all the fields
-// exported, so that a block node can be marshalled
-type processedBlock struct {
-	Block    types.Block
-	Parent   types.BlockID
-	Children []types.BlockID
-
-	Height      types.BlockHeight
-	Depth       types.Target
-	ChildTarget types.Target
-
-	DiffsGenerated            bool
-	SiacoinOutputDiffs        []modules.SiacoinOutputDiff
-	FileContractDiffs         []modules.FileContractDiff
-	SiafundOutputDiffs        []modules.SiafundOutputDiff
-	DelayedSiacoinOutputDiffs []modules.DelayedSiacoinOutputDiff
-	SiafundPoolDiffs          []modules.SiafundPoolDiff
-
-	ConsensusSetHash crypto.Hash
-}
-
-// bnToPb and pbToBn convert between blockNodes and
-// processedBlocks. As block nodes will be replaced with
-// processedBlocks, this code should be considered deprecated
-
-// bnToPb converts a blockNode to a processed block
-// DEPRECATED
-func bnToPb(bn blockNode) processedBlock {
-	pb := processedBlock{
-		Block:  bn.block,
-		Parent: bn.parent.block.ID(),
-
-		Height:      bn.height,
-		Depth:       bn.depth,
-		ChildTarget: bn.childTarget,
-
-		DiffsGenerated:            bn.diffsGenerated,
-		SiacoinOutputDiffs:        bn.siacoinOutputDiffs,
-		FileContractDiffs:         bn.fileContractDiffs,
-		SiafundOutputDiffs:        bn.siafundOutputDiffs,
-		DelayedSiacoinOutputDiffs: bn.delayedSiacoinOutputDiffs,
-		SiafundPoolDiffs:          bn.siafundPoolDiffs,
-
-		ConsensusSetHash: bn.consensusSetHash,
-	}
-	for _, c := range bn.children {
-		pb.Children = append(pb.Children, c.block.ID())
-	}
-	return pb
-}
-
-// pbToBn exists to move a processed block to a block node. It
-// requires the consensus block Map.
-// DEPRECATED
-func (cs *ConsensusSet) pbToBn(pb *processedBlock) blockNode {
-	parent, exists := cs.blockMap[pb.Parent]
-	if !exists {
-		panic("block parent not in consensus set")
-	}
-
-	bn := blockNode{
-		block:  pb.Block,
-		parent: parent,
-
-		height:      pb.Height,
-		depth:       pb.Depth,
-		childTarget: pb.ChildTarget,
-
-		diffsGenerated:            pb.DiffsGenerated,
-		siacoinOutputDiffs:        pb.SiacoinOutputDiffs,
-		fileContractDiffs:         pb.FileContractDiffs,
-		siafundOutputDiffs:        pb.SiafundOutputDiffs,
-		delayedSiacoinOutputDiffs: pb.DelayedSiacoinOutputDiffs,
-		siafundPoolDiffs:          pb.SiafundPoolDiffs,
-
-		consensusSetHash: pb.ConsensusSetHash,
-	}
-	return bn
+	// The open flag is used to prevent reading from the database
+	// after closing sia when the loading loop is still running
+	open bool // DEPRECATED
 }
 
 // openDB loads the set database and populates it with the necessary buckets
@@ -120,6 +41,7 @@ func openDB(filename string) (*setDB, error) {
 	var buckets []string = []string{
 		"Path",
 		"BlockMap",
+		"Metadata",
 	}
 
 	// Create buckets
@@ -130,9 +52,74 @@ func openDB(filename string) (*setDB, error) {
 				return err
 			}
 		}
+		// Initilize the consistency guards
+		b := tx.Bucket([]byte("Metadata"))
+		err := b.Put([]byte("GuardA"), encoding.Marshal(0))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GuardB"), encoding.Marshal(0))
+	})
+	return &setDB{db, true}, err
+}
+
+// startConsistencyGuard increments the first guard. If this is not
+// equal to the second, a transaction is taking place in the database
+func (db *setDB) startConsistencyGuard() {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var i int
+		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &i)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GuardA"), encoding.Marshal(i+1))
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// startConsistencyGuard increments the first guard. If this is not
+// equal to the second, a transaction is taking place in the database
+func (db *setDB) stopConsistencyGuard() {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var i int
+		err := encoding.Unmarshal(b.Get([]byte("GuardB")), &i)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte("GuardB"), encoding.Marshal(i+1))
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// checkConsistencyGuard checks the two guards and returns true if
+// they differ. This signifies that thaer there is a transaction
+// taking place.
+func (db *setDB) checkConsistencyGuard() bool {
+	var guarded bool
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Metadata"))
+		var x, y int
+		err := encoding.Unmarshal(b.Get([]byte("GuardA")), &x)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(b.Get([]byte("GuardB")), &y)
+		if err != nil {
+			return err
+		}
+		guarded = x != y
 		return nil
 	})
-	return &setDB{db}, nil
+	if err != nil {
+		panic(err)
+	}
+	return guarded
 }
 
 // addItem should only be called from this file, and adds a new item
@@ -141,6 +128,11 @@ func openDB(filename string) (*setDB, error) {
 // addItem and getItem are part of consensus due to stricter error
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
+	// Check that this transaction is guarded by consensusGuard.
+	// However, allow direct database modifications when testing
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
+	}
 	v := encoding.Marshal(value)
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -180,13 +172,48 @@ func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error
 		}
 		return nil
 	})
-	return
+	return item, err
+}
+
+// rmItem removes an item from a bucket
+func (db *setDB) rmItem(bucket string, key interface{}) error {
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
+	}
+	k := encoding.Marshal(key)
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if build.DEBUG {
+			// Sanity check to make sure the bucket exists.
+			if b == nil {
+				panic(errNilBucket)
+			}
+			// Sanity check to make sure you are deleting an item that exists
+			item := b.Get(k)
+			if item == nil {
+				panic(errNilItem)
+			}
+		}
+		return b.Delete(k)
+	})
+}
+
+// inBucket checks if an item with the given key is in the bucket
+func (db *setDB) inBucket(bucket string, key interface{}) bool {
+	exists, err := db.Exists(bucket, encoding.Marshal(key))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return exists
 }
 
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
-func (db *setDB) pushPath(block types.Block) error {
-	value := encoding.Marshal(block.ID())
+func (db *setDB) pushPath(bid types.BlockID) error {
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
+	}
+	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN))
@@ -197,6 +224,9 @@ func (db *setDB) pushPath(block types.Block) error {
 // popPath removes a block from the "end" of the chain, i.e. the block
 // with the largest height.
 func (db *setDB) popPath() error {
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
+	}
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Path"))
 		key := encoding.EncUint64(uint64(b.Stats().KeyN - 1))
@@ -204,36 +234,70 @@ func (db *setDB) popPath() error {
 	})
 }
 
-// path retreives the block id of a block at a given hegiht from the path
-func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID, err error) {
+// getPath retreives the block id of a block at a given hegiht from the path
+func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem("Path", h)
 	if err != nil {
-		return
+		panic(err)
 	}
 	err = encoding.Unmarshal(idBytes, &id)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 // pathHeight returns the size of the current path
-func (db *setDB) pathHeight() (types.BlockHeight, error) {
+func (db *setDB) pathHeight() types.BlockHeight {
 	h, err := db.BucketSize("Path")
-	return types.BlockHeight(h), err
-}
-
-// addBlockMap adds a block node to the block map
-func (db *setDB) addBlockMap(bn blockNode) error {
-	return db.addItem("BlockMap", bn.block.ID(), bnToPb(bn))
-}
-
-// Function needs to have access to the blockMap inside consensusSet
-// because bnFromPb requires the parent ID. This could be fixed at
-// some point, as this function really should be part of setDB
-func (db *setDB) getBlockMap(id types.BlockID) (*processedBlock, error) {
-	bnBytes, err := db.getItem("BlockMap", id)
 	if err != nil {
-		return nil, err
+		panic(err)
+	}
+	return types.BlockHeight(h)
+}
+
+// addBlockMap adds a processedBlock to the block map
+// This will eventually take a processed block as an argument
+func (db *setDB) addBlockMap(pb *processedBlock) error {
+	return db.addItem("BlockMap", pb.Block.ID(), *pb)
+}
+
+// getBlockMap queries the set database to return a processedBlock
+// with the given ID
+func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
+	bnBytes, err := db.getItem("BlockMap", id)
+	if build.DEBUG && err != nil {
+		panic(err)
 	}
 	var pb processedBlock
 	err = encoding.Unmarshal(bnBytes, &pb)
-	return &pb, err
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return &pb
+}
+
+// inBlockMap checks for the existance of a block with a given ID in
+// the consensus set
+func (db *setDB) inBlockMap(id types.BlockID) bool {
+	return db.inBucket("BlockMap", id)
+}
+
+// rmBlockMap removes a processedBlock from the blockMap bucket
+func (db *setDB) rmBlockMap(id types.BlockID) error {
+	return db.rmItem("BlockMap", id)
+}
+
+// updateBlockMap is a wrapper function for modification of
+func (db *setDB) updateBlockMap(pb *processedBlock) {
+	// These errors will only be caused by an error by bolt
+	// e.g. database being closed.
+	err := db.rmBlockMap(pb.Block.ID())
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = db.addBlockMap(pb)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
 }

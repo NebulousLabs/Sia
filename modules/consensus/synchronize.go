@@ -1,9 +1,9 @@
 package consensus
 
 import (
+	"errors"
 	"time"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -43,7 +43,9 @@ func (s *ConsensusSet) receiveBlocks(conn modules.PeerConn) error {
 			// Blocks received during synchronize aren't trusted; activate full
 			// verification.
 			lockID := s.mu.Lock()
-			s.verificationRigor = fullVerification
+			if !s.db.open {
+				return errors.New("database not open")
+			}
 			acceptErr := s.acceptBlock(block)
 			s.mu.Unlock(lockID)
 			// these errors are benign
@@ -67,7 +69,7 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 	knownBlocks := make([]types.BlockID, 0, 32)
 	step := types.BlockHeight(1)
 	for height := s.height(); ; height -= step {
-		knownBlocks = append(knownBlocks, s.currentPath[height])
+		knownBlocks = append(knownBlocks, s.db.getPath(height))
 
 		// after 12, start doubling
 		if len(knownBlocks) >= 12 {
@@ -81,7 +83,7 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 		}
 	}
 	// always include the genesis block
-	knownBlocks = append(knownBlocks, s.currentPath[0])
+	knownBlocks = append(knownBlocks, s.db.getPath(0))
 
 	copy(blockIDs[:], knownBlocks)
 	return
@@ -93,6 +95,9 @@ func (s *ConsensusSet) blockHistory() (blockIDs [32]types.BlockID) {
 // that BlockHeight onwards are returned. It also sends a boolean indicating
 // whether more blocks are available.
 func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
+	if !s.db.open {
+		return errors.New("database not open")
+	}
 	// Read known blocks.
 	var knownBlocks [32]types.BlockID
 	err := encoding.ReadObject(conn, &knownBlocks, 32*crypto.HashSize)
@@ -105,11 +110,13 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 	var start types.BlockHeight
 	lockID := s.mu.RLock()
 	for _, id := range knownBlocks {
-		bn, exists := s.blockMap[id]
-		if exists && bn.height <= s.height() && id == s.currentPath[bn.height] {
-			found = true
-			start = bn.height + 1 // start at child
-			break
+		if s.db.inBlockMap(id) {
+			pb := s.db.getBlockMap(id)
+			if pb.Height <= s.height() && id == s.db.getPath(pb.Height) {
+				found = true
+				start = pb.Height + 1 // start at child
+				break
+			}
 		}
 	}
 	s.mu.RUnlock(lockID)
@@ -136,11 +143,8 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 			height := s.height()
 			// TODO: unit test for off-by-one errors here
 			for i := start; i <= height && i < start+MaxCatchUpBlocks; i++ {
-				node, exists := s.blockMap[s.currentPath[i]]
-				if build.DEBUG && !exists {
-					panic("blockMap is missing a block whose ID is in the currentPath")
-				}
-				blocks = append(blocks, node.block)
+				node := s.db.getBlockMap(s.db.getPath(i))
+				blocks = append(blocks, node.Block)
 			}
 
 			// TODO: Check for off-by-one here too.

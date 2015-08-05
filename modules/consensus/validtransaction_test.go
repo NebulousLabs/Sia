@@ -517,14 +517,6 @@ func TestValidTransaction(t *testing.T) {
 		t.Error("transaction is valid")
 	}
 
-	// Try when the verificationRigor is turned down.
-	cst.cs.verificationRigor = partialVerification
-	err = cst.cs.validTransaction(txn)
-	if err != nil {
-		t.Error(err)
-	}
-	cst.cs.verificationRigor = fullVerification
-
 	// Create a transaction with invalid siacoins.
 	txn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{}},

@@ -62,7 +62,7 @@ func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index ui
 	if triggerHeight > cs.height() {
 		return 0, ErrUnfinishedFileContract
 	}
-	triggerID := cs.currentPath[triggerHeight]
+	triggerID := cs.db.getPath(triggerHeight)
 
 	// Get the index by appending the file contract ID to the trigger block and
 	// taking the hash, then converting the hash to a numerical value and
@@ -208,12 +208,6 @@ func (cs *ConsensusSet) ValidStorageProofs(t types.Transaction) (err error) {
 // validTransaction checks that all fields are valid within the current
 // consensus state. If not an error is returned.
 func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
-	// Skip transaction verification if the ConsensusSet is accepting trusted
-	// blocks.
-	if cs.verificationRigor != fullVerification && (build.Release == "testing" || !build.DEBUG) {
-		return nil
-	}
-
 	// StandaloneValid will check things like signatures and properties that
 	// should be inherent to the transaction. (storage proof rules, etc.)
 	err := t.StandaloneValid(cs.height())
@@ -249,13 +243,21 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
+	// Simple consistency guard
+	if cs.db.checkConsistencyGuard() {
+		return modules.ConsensusChange{}, ErrInconsistentSet
+	}
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
-	diffHolder := new(blockNode)
-	diffHolder.height = cs.height()
-	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
+	diffHolder := new(processedBlock)
+	diffHolder.Height = cs.height()
+	cs.db.startConsistencyGuard()
+	defer func() {
+		cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
+		cs.db.stopConsistencyGuard()
+	}()
 	for _, txn := range txns {
 		err := cs.validTransaction(txn)
 		if err != nil {
@@ -264,11 +266,11 @@ func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.Con
 		cs.applyTransaction(diffHolder, txn)
 	}
 	cc := modules.ConsensusChange{
-		SiacoinOutputDiffs:        diffHolder.siacoinOutputDiffs,
-		FileContractDiffs:         diffHolder.fileContractDiffs,
-		SiafundOutputDiffs:        diffHolder.siafundOutputDiffs,
-		DelayedSiacoinOutputDiffs: diffHolder.delayedSiacoinOutputDiffs,
-		SiafundPoolDiffs:          diffHolder.siafundPoolDiffs,
+		SiacoinOutputDiffs:        diffHolder.SiacoinOutputDiffs,
+		FileContractDiffs:         diffHolder.FileContractDiffs,
+		SiafundOutputDiffs:        diffHolder.SiafundOutputDiffs,
+		DelayedSiacoinOutputDiffs: diffHolder.DelayedSiacoinOutputDiffs,
+		SiafundPoolDiffs:          diffHolder.SiafundPoolDiffs,
 	}
 	return cc, nil
 }

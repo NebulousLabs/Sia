@@ -33,6 +33,7 @@ func (m *Miner) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 	m.target = target
 	m.earliestTimestamp = timestamp
+	m.prepareNewBlock()
 }
 
 // ReceiveUpdatedUnconfirmedTransactions will replace the current unconfirmed

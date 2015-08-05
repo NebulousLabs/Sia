@@ -171,22 +171,23 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 
 // commitDiffSetSanity performs a series of sanity checks before commiting a
 // diff set.
-func (cs *ConsensusSet) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.DiffDirection) {
 	// Sanity checks.
 	if build.DEBUG {
 		// Diffs should have already been generated for this node.
-		if !bn.diffsGenerated {
+		if !pb.DiffsGenerated {
 			panic(errDiffsNotGenerated)
 		}
 
 		// Current node must be the input node's parent if applying, and
 		// current node must be the input node if reverting.
 		if dir == modules.DiffApply {
-			if bn.parent.block.ID() != cs.currentBlockID() {
+			parent := cs.db.getBlockMap(pb.Parent)
+			if parent.Block.ID() != cs.currentBlockID() {
 				panic(errWrongAppliedDiffSet)
 			}
 		} else {
-			if bn.block.ID() != cs.currentBlockID() {
+			if pb.Block.ID() != cs.currentBlockID() {
 				panic(errWrongRevertDiffSet)
 			}
 		}
@@ -195,118 +196,123 @@ func (cs *ConsensusSet) commitDiffSetSanity(bn *blockNode, dir modules.DiffDirec
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
 			// exist.
-			_, exists := cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]
+			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
 			if exists {
 				panic(errCreatingExistingUpcomingMap)
 			}
 		}
-		cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+		cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	} else {
 		// Skip creating maps for heights that can't have delayed outputs.
-		if bn.height > types.MaturityDelay {
+		if pb.Height > types.MaturityDelay {
 			// Sanity check - the output map being created should not already
 			// exist.
 			if build.DEBUG {
-				_, exists := cs.delayedSiacoinOutputs[bn.height]
+				_, exists := cs.delayedSiacoinOutputs[pb.Height]
 				if exists {
 					panic(errCreatingExistingUpcomingMap)
 				}
 			}
-			cs.delayedSiacoinOutputs[bn.height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+			cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 		}
 	}
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
-func (cs *ConsensusSet) commitNodeDiffs(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
-		for _, scod := range bn.siacoinOutputDiffs {
+		for _, scod := range pb.SiacoinOutputDiffs {
 			cs.commitSiacoinOutputDiff(scod, dir)
 		}
-		for _, fcd := range bn.fileContractDiffs {
+		for _, fcd := range pb.FileContractDiffs {
 			cs.commitFileContractDiff(fcd, dir)
 		}
-		for _, sfod := range bn.siafundOutputDiffs {
+		for _, sfod := range pb.SiafundOutputDiffs {
 			cs.commitSiafundOutputDiff(sfod, dir)
 		}
-		for _, dscod := range bn.delayedSiacoinOutputDiffs {
+		for _, dscod := range pb.DelayedSiacoinOutputDiffs {
 			cs.commitDelayedSiacoinOutputDiff(dscod, dir)
 		}
-		for _, sfpd := range bn.siafundPoolDiffs {
+		for _, sfpd := range pb.SiafundPoolDiffs {
 			cs.commitSiafundPoolDiff(sfpd, dir)
 		}
 	} else {
-		for i := len(bn.siacoinOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitSiacoinOutputDiff(bn.siacoinOutputDiffs[i], dir)
+		for i := len(pb.SiacoinOutputDiffs) - 1; i >= 0; i-- {
+			cs.commitSiacoinOutputDiff(pb.SiacoinOutputDiffs[i], dir)
 		}
-		for i := len(bn.fileContractDiffs) - 1; i >= 0; i-- {
-			cs.commitFileContractDiff(bn.fileContractDiffs[i], dir)
+		for i := len(pb.FileContractDiffs) - 1; i >= 0; i-- {
+			cs.commitFileContractDiff(pb.FileContractDiffs[i], dir)
 		}
-		for i := len(bn.siafundOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitSiafundOutputDiff(bn.siafundOutputDiffs[i], dir)
+		for i := len(pb.SiafundOutputDiffs) - 1; i >= 0; i-- {
+			cs.commitSiafundOutputDiff(pb.SiafundOutputDiffs[i], dir)
 		}
-		for i := len(bn.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitDelayedSiacoinOutputDiff(bn.delayedSiacoinOutputDiffs[i], dir)
+		for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			cs.commitDelayedSiacoinOutputDiff(pb.DelayedSiacoinOutputDiffs[i], dir)
 		}
-		for i := len(bn.siafundPoolDiffs) - 1; i >= 0; i-- {
-			cs.commitSiafundPoolDiff(bn.siafundPoolDiffs[i], dir)
+		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
+			cs.commitSiafundPoolDiff(pb.SiafundPoolDiffs[i], dir)
 		}
 	}
 }
 
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
-func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
-		if bn.height > types.MaturityDelay {
+		if pb.Height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if len(cs.delayedSiacoinOutputs[bn.height]) != 0 {
+				if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
 					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
-			delete(cs.delayedSiacoinOutputs, bn.height)
+			delete(cs.delayedSiacoinOutputs, pb.Height)
 		}
 	} else {
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
-			if len(cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay]) != 0 {
+			if len(cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]) != 0 {
 				panic(errDeletingNonEmptyDelayedMap)
 			}
 		}
-		delete(cs.delayedSiacoinOutputs, bn.height+types.MaturityDelay)
+		delete(cs.delayedSiacoinOutputs, pb.Height+types.MaturityDelay)
 	}
 }
 
 // updateCurrentPath updates the current path after applying a diff set.
-func (cs *ConsensusSet) updateCurrentPath(bn *blockNode, dir modules.DiffDirection) {
+func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		cs.currentPath = append(cs.currentPath, bn.block.ID())
 		if cs.updatePath {
-			cs.db.pushPath(bn.block)
+			err := cs.db.pushPath(pb.Block.ID())
+
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 		}
+		cs.blocksLoaded += 1
 	} else {
-		cs.currentPath = cs.currentPath[:len(cs.currentPath)-1]
-		if cs.updatePath {
-			cs.db.popPath()
+		err := cs.db.popPath()
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
+		cs.blocksLoaded -= 1
 	}
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (cs *ConsensusSet) commitDiffSet(bn *blockNode, dir modules.DiffDirection) {
-	cs.commitDiffSetSanity(bn, dir)
-	cs.createUpcomingDelayedOutputMaps(bn, dir)
-	cs.commitNodeDiffs(bn, dir)
-	cs.deleteObsoleteDelayedOutputMaps(bn, dir)
-	cs.updateCurrentPath(bn, dir)
+func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) {
+	cs.commitDiffSetSanity(pb, dir)
+	cs.createUpcomingDelayedOutputMaps(pb, dir)
+	cs.commitNodeDiffs(pb, dir)
+	cs.deleteObsoleteDelayedOutputMaps(pb, dir)
+	cs.updateCurrentPath(pb, dir)
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
@@ -314,61 +320,68 @@ func (cs *ConsensusSet) commitDiffSet(bn *blockNode, dir modules.DiffDirection) 
 // transactions are allowed to depend on each other. We can't be sure that a
 // transaction is valid unless we have applied all of the previous transactions
 // in the block, which means we need to apply while we verify.
-func (cs *ConsensusSet) generateAndApplyDiff(bn *blockNode) error {
+func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	// Sanity check
 	if build.DEBUG {
 		// Generate should only be called if the diffs have not yet been
 		// generated.
-		if bn.diffsGenerated {
+		if pb.DiffsGenerated {
 			panic(errRegenerateDiffs)
 		}
 
 		// Current node must be the input node's parent.
-		if bn.parent.block.ID() != cs.currentBlockID() {
+		if pb.Parent != cs.currentBlockID() {
 			panic(errInvalidSuccessor)
 		}
 	}
 
 	// Update the state to point to the new block.
-	cs.currentPath = append(cs.currentPath, bn.block.ID())
-	cs.delayedSiacoinOutputs[bn.height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	err := cs.db.pushPath(pb.Block.ID())
+	if err != nil {
+		return err
+	}
+	cs.blocksLoaded += 1
+	cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
 	// invalid, the diffs can be safely reversed from whatever point.
-	bn.diffsGenerated = true
+	pb.DiffsGenerated = true
 
 	// Validate and apply each transaction in the block. They cannot be
 	// validated all at once because some transactions may not be valid until
 	// previous transactions have been applied.
-	for _, txn := range bn.block.Transactions {
+	for _, txn := range pb.Block.Transactions {
 		err := cs.validTransaction(txn)
 		if err != nil {
 			// Awkward: need to apply the matured outputs otherwise the diff
 			// structure malforms due to the way the delayedOutput maps are
 			// created and destroyed.
-			cs.applyMaturedSiacoinOutputs(bn)
-			cs.commitDiffSet(bn, modules.DiffRevert)
-			cs.dosBlocks[bn.block.ID()] = struct{}{}
-			cs.deleteNode(bn)
+			cs.applyMaturedSiacoinOutputs(pb)
+			cs.commitDiffSet(pb, modules.DiffRevert)
+			cs.dosBlocks[pb.Block.ID()] = struct{}{}
+			cs.deleteNode(pb)
 			return err
 		}
 
-		cs.applyTransaction(bn, txn)
+		cs.applyTransaction(pb, txn)
 	}
 
 	// After all of the transactions have been applied, 'maintenance' is
 	// applied on the block. This includes adding any outputs that have reached
 	// maturity, applying any contracts with missed storage proofs, and adding
 	// the miner payouts to the list of delayed outputs.
-	cs.applyMaintenance(bn)
+	cs.applyMaintenance(pb)
 
 	if build.DEBUG {
-		bn.consensusSetHash = cs.consensusSetHash()
+		pb.ConsensusSetHash = cs.consensusSetHash()
 	}
-	err := cs.db.addBlockMap(*bn)
+
+	// Replace the unprocessed block in the block map with a processed one
+	err = cs.db.rmBlockMap(pb.Block.ID())
 	if err != nil {
 		return err
 	}
-	return cs.db.pushPath(bn.block)
+
+	return cs.db.addBlockMap(pb)
 }

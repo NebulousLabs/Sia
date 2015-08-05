@@ -24,66 +24,54 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 	}
 
 	for _, revertedBlockID := range cs.changeLog[i].revertedBlocks {
-		revertedNode, exists := cs.blockMap[revertedBlockID]
-		// Sanity check - node should exist.
-		if build.DEBUG {
-			if !exists {
-				panic("grabbed a node that does not exist during a consensus change")
-			}
-		}
+		revertedNode := cs.db.getBlockMap(revertedBlockID)
 
 		// Because the direction is 'revert', the order of the diffs needs to
 		// be flipped and the direction of the diffs also needs to be flipped.
-		cc.RevertedBlocks = append(cc.RevertedBlocks, revertedNode.block)
-		for i := len(revertedNode.siacoinOutputDiffs) - 1; i >= 0; i-- {
-			scod := revertedNode.siacoinOutputDiffs[i]
+		cc.RevertedBlocks = append(cc.RevertedBlocks, revertedNode.Block)
+		for i := len(revertedNode.SiacoinOutputDiffs) - 1; i >= 0; i-- {
+			scod := revertedNode.SiacoinOutputDiffs[i]
 			scod.Direction = !scod.Direction
 			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
 		}
-		for i := len(revertedNode.fileContractDiffs) - 1; i >= 0; i-- {
-			fcd := revertedNode.fileContractDiffs[i]
+		for i := len(revertedNode.FileContractDiffs) - 1; i >= 0; i-- {
+			fcd := revertedNode.FileContractDiffs[i]
 			fcd.Direction = !fcd.Direction
 			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
 		}
-		for i := len(revertedNode.siafundOutputDiffs) - 1; i >= 0; i-- {
-			sfod := revertedNode.siafundOutputDiffs[i]
+		for i := len(revertedNode.SiafundOutputDiffs) - 1; i >= 0; i-- {
+			sfod := revertedNode.SiafundOutputDiffs[i]
 			sfod.Direction = !sfod.Direction
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
-		for i := len(revertedNode.delayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			dscod := revertedNode.delayedSiacoinOutputDiffs[i]
+		for i := len(revertedNode.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
+			dscod := revertedNode.DelayedSiacoinOutputDiffs[i]
 			dscod.Direction = !dscod.Direction
 			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
 		}
-		for i := len(revertedNode.siafundPoolDiffs) - 1; i >= 0; i-- {
-			sfpd := revertedNode.siafundPoolDiffs[i]
+		for i := len(revertedNode.SiafundPoolDiffs) - 1; i >= 0; i-- {
+			sfpd := revertedNode.SiafundPoolDiffs[i]
 			sfpd.Direction = modules.DiffRevert
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
 	for _, appliedBlockID := range cs.changeLog[i].appliedBlocks {
-		appliedNode, exists := cs.blockMap[appliedBlockID]
-		// Sanity check - node should exist.
-		if build.DEBUG {
-			if !exists {
-				panic("grabbed a node that does not exist during a consensus change")
-			}
-		}
+		appliedNode := cs.db.getBlockMap(appliedBlockID)
 
-		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.block)
-		for _, scod := range appliedNode.siacoinOutputDiffs {
+		cc.AppliedBlocks = append(cc.AppliedBlocks, appliedNode.Block)
+		for _, scod := range appliedNode.SiacoinOutputDiffs {
 			cc.SiacoinOutputDiffs = append(cc.SiacoinOutputDiffs, scod)
 		}
-		for _, fcd := range appliedNode.fileContractDiffs {
+		for _, fcd := range appliedNode.FileContractDiffs {
 			cc.FileContractDiffs = append(cc.FileContractDiffs, fcd)
 		}
-		for _, sfod := range appliedNode.siafundOutputDiffs {
+		for _, sfod := range appliedNode.SiafundOutputDiffs {
 			cc.SiafundOutputDiffs = append(cc.SiafundOutputDiffs, sfod)
 		}
-		for _, dscod := range appliedNode.delayedSiacoinOutputDiffs {
+		for _, dscod := range appliedNode.DelayedSiacoinOutputDiffs {
 			cc.DelayedSiacoinOutputDiffs = append(cc.DelayedSiacoinOutputDiffs, dscod)
 		}
-		for _, sfpd := range appliedNode.siafundPoolDiffs {
+		for _, sfpd := range appliedNode.SiafundPoolDiffs {
 			cc.SiafundPoolDiffs = append(cc.SiafundPoolDiffs, sfpd)
 		}
 	}
@@ -92,14 +80,14 @@ func (cs *ConsensusSet) computeConsensusChange(i int) (cc modules.ConsensusChang
 
 // updateSubscribers will inform all subscribers of the new update to the
 // consensus set.
-func (cs *ConsensusSet) updateSubscribers(revertedNodes []*blockNode, appliedNodes []*blockNode) {
+func (cs *ConsensusSet) updateSubscribers(revertedNodes []*processedBlock, appliedNodes []*processedBlock) {
 	// Log the changes in the change log.
 	var ce changeEntry
 	for _, rn := range revertedNodes {
-		ce.revertedBlocks = append(ce.revertedBlocks, rn.block.ID())
+		ce.revertedBlocks = append(ce.revertedBlocks, rn.Block.ID())
 	}
 	for _, an := range appliedNodes {
-		ce.appliedBlocks = append(ce.appliedBlocks, an.block.ID())
+		ce.appliedBlocks = append(ce.appliedBlocks, an.Block.ID())
 	}
 	cs.changeLog = append(cs.changeLog, ce)
 

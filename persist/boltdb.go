@@ -3,7 +3,6 @@ package persist
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/boltdb/bolt"
 )
 
@@ -12,18 +11,6 @@ import (
 type BoltDatabase struct {
 	*bolt.DB
 	meta Metadata
-}
-
-type BoltModification struct {
-	BucketName string
-	Key        []byte
-	Map        func([]byte) (BoltItem, error)
-}
-
-type BoltItem struct {
-	BucketName string
-	Key        []byte
-	Value      []byte
 }
 
 var (
@@ -81,26 +68,6 @@ func (db *BoltDatabase) updateMetadata(tx *bolt.Tx) error {
 	return nil
 }
 
-// InsertIntoBucket is a generic function to insert a value into a
-// specific bucket in the database
-func (db *BoltDatabase) InsertIntoBucket(bucketName string, key []byte, value []byte) error {
-	err := db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
-		if build.DEBUG {
-			if bucket == nil {
-				panic(bucketName + "bucket was not created correcty")
-			}
-		}
-
-		err := bucket.Put(key, value)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	return err
-}
-
 // GetFromBucket is a wrapper around a bolt database lookup. If the
 // element does not exist, no error will be thrown, but the requested
 // element will be nil.
@@ -152,49 +119,6 @@ func (db *BoltDatabase) BucketSize(bucketName string) (uint64, error) {
 		return nil
 	})
 	return size, err
-}
-
-// BulkUpdate is a function to both take readings from a database,
-// modify them, then add the modified elements plus the specified
-// additions to the database
-func (db *BoltDatabase) BulkUpdate(modifications []BoltModification, additions []BoltItem) error {
-	err := db.Update(func(tx *bolt.Tx) error {
-		// A modification gets some data, perfrorms some
-		// function on it (specified by the modifications' map
-		// element), then appends the new element to the list of changes
-		for _, mod := range modifications {
-			bucket := tx.Bucket([]byte(mod.BucketName))
-			if bucket == nil {
-				return errors.New("requested bucket does not exist: " + mod.BucketName)
-			}
-
-			modBytes := bucket.Get(mod.Key)
-			// The check to see if modBytes is nil needs
-			// to be done inside the map function, as some
-			// expect nil input
-
-			newItem, err := mod.Map(modBytes)
-			if err != nil {
-				return err
-			}
-			additions = append(additions, newItem)
-		}
-
-		// Analagous to BulkInsert
-		for _, addition := range additions {
-			bucket := tx.Bucket([]byte(addition.BucketName))
-			if bucket == nil {
-				return errors.New("requested bucket does not exist: " + addition.BucketName)
-			}
-
-			err := bucket.Put(addition.Key, addition.Value)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return err
 }
 
 // closeDatabase saves the bolt database to a file, and updates metadata

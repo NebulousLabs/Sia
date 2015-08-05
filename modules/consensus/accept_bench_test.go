@@ -9,6 +9,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // benchmarkEmptyBlocks is a benchmark that mines many blocks, and
@@ -32,8 +33,9 @@ func benchmarkEmptyBlocks(b *testing.B) error {
 	if err != nil {
 		return errors.New("Error creating tester: " + err.Error())
 	}
-	for _, bID := range cst.cs.currentPath[1:] {
-		err = cs.AcceptBlock(cst.cs.blockMap[bID].block)
+	h := cst.cs.db.pathHeight()
+	for i := types.BlockHeight(1); i < h; i++ {
+		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
 		if err != nil {
 			return err
 		}
