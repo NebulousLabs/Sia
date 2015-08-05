@@ -14,6 +14,11 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+var (
+	rpcRetrieve = [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
+	rpcClose    = [8]byte{'C', 'l', 'o', 's', 'e'}
+)
+
 // A file is a single file that has been uploaded to the network. Files are
 // split into equal-length chunks, which are then erasure-coded into pieces.
 // Each piece is separately encrypted, using a key derived from the file's
@@ -85,13 +90,28 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	// RPC...
-	return nil, nil
+	err := encoding.WriteObject(hf.conn, struct {
+		Offset uint64
+		Length uint64
+	}{p.offset, p.length})
+	if err != nil {
+		return nil, err
+	}
+	// TODO: would it be more efficient to do this manually?
+	// i.e. read directly into a bytes.Buffer
+	var b []byte
+	err = encoding.ReadObject(hf.conn, &b, p.length)
+	if err != nil {
+		return nil, err
+	}
+	// decrypt, verify
+	//...
+	return b, nil
 }
 
 func (hf *hostFetcher) Close() error {
-	// RPC?
-	//...
+	// ignore error; we'll need to close conn anyway
+	encoding.WriteObject(hf.conn, rpcClose)
 	return hf.conn.Close()
 }
 
@@ -102,7 +122,7 @@ func newHostFetcher(fc fileContract) (*hostFetcher, error) {
 	}
 
 	// send RPC
-	err = encoding.WriteObject(conn, [...]byte{'T', 'O', 'D', 'O'})
+	err = encoding.WriteObject(conn, rpcRetrieve)
 	if err != nil {
 		return nil, err
 	}
