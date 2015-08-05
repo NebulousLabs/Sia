@@ -104,9 +104,9 @@ func (w *Wallet) Close() error {
 	return w.saveSettings()
 }
 
-// SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
+// SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
 	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
 	output := types.SiacoinOutput{
 		Value:      amount,
@@ -120,6 +120,37 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]type
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		return nil, err
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		return nil, err
+	}
+	return txnSet, nil
+}
+
+// SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
+// is submitted to the transaction pool and is also returned.
+func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
+	output := types.SiafundOutput{
+		Value:      amount,
+		UnlockHash: dest,
+	}
+
+	txnBuilder := w.StartTransaction()
+	err := txnBuilder.FundSiacoins(tpoolFee)
+	if err != nil {
+		return nil, err
+	}
+	err = txnBuilder.FundSiafunds(amount)
+	if err != nil {
+		return nil, err
+	}
+	txnBuilder.AddMinerFee(tpoolFee)
+	txnBuilder.AddSiafundOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return nil, err

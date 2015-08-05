@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -76,7 +77,7 @@ func (w *Wallet) saveSettings() error {
 // overwriting the settings object in memory. loadSettings should only be
 // called at startup.
 func (w *Wallet) loadSettings() error {
-	return persist.LoadFile(settingsMetadata, w.settings, filepath.Join(w.persistDir, settingsFile))
+	return persist.LoadFile(settingsMetadata, &w.settings, filepath.Join(w.persistDir, settingsFile))
 }
 
 // initLog begins logging the wallet, appending to any existing wallet file and
@@ -212,6 +213,12 @@ func (w *Wallet) unlock(masterKey crypto.TwofishKey) error {
 func (w *Wallet) Encrypted() bool {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
+
+	if build.DEBUG {
+		if w.unlocked && len(w.settings.EncryptionVerification) == 0 {
+			panic("wallet is both unlocked and unencrypted")
+		}
+	}
 	return len(w.settings.EncryptionVerification) != 0
 }
 
