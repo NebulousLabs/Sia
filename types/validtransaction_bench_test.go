@@ -8,12 +8,12 @@ import (
 )
 
 // BenchmarkStandaloneValid times how long it takes to verify a single
-// large transaction, with 100 signatures
+// large transaction, with a certain number of signatures
 func BenchmarkStandaloneValid(b *testing.B) {
-	// make a transaction 10 with valid inputs with valid signatures
+	numSigs := 7
+	// make a transaction numSigs with valid inputs with valid signatures
 	b.ReportAllocs()
 	txn := Transaction{}
-	numSigs := 100
 	sk := make([]crypto.SecretKey, numSigs)
 	pk := make([]crypto.PublicKey, numSigs)
 	for i := 0; i < numSigs; i++ {
@@ -23,8 +23,7 @@ func BenchmarkStandaloneValid(b *testing.B) {
 		}
 		sk[i] = s
 		pk[i] = p
-	}
-	for i := 0; i < numSigs; i++ {
+
 		uc := UnlockConditions{
 			PublicKeys: []SiaPublicKey{
 				{Algorithm: SignatureEd25519, Key: pk[i][:]},
@@ -40,6 +39,7 @@ func BenchmarkStandaloneValid(b *testing.B) {
 		})
 		copy(txn.TransactionSignatures[i].ParentID[:], encoding.Marshal(i))
 	}
+	// Transaction must be constructed before signing
 	for i := 0; i < numSigs; i++ {
 		sigHash := txn.SigHash(i)
 		sig0, err := crypto.SignHash(sigHash, sk[i])
