@@ -72,11 +72,11 @@ func (tx *boltTx) putObject(bucket string, key, val interface{}) {
 
 // addAddress either creates a new list of transactions for the given
 // address, or adds the txid to the list if such a list already exists
-func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
+func (tx *boltTx) addAddress(addr types.UnlockHash, txid types.TransactionID) {
 	tx.putObject("Hashes", crypto.Hash(addr), hashUnlockHash)
 
 	oldErr := tx.err
-	var txns []crypto.Hash
+	var txns []types.TransactionID
 	tx.getObject("Addresses", addr, &txns)
 	if oldErr == nil && tx.err == persist.ErrNilEntry {
 		// NOTE: this is a special case where a nil entry is not an error, so
@@ -90,7 +90,7 @@ func (tx *boltTx) addAddress(addr types.UnlockHash, txid crypto.Hash) {
 
 // addSiacoinInput changes an existing outputTransactions struct to
 // point to the place where that output was used
-func (tx *boltTx) addSiacoinInput(outputID types.SiacoinOutputID, txid crypto.Hash) {
+func (tx *boltTx) addSiacoinInput(outputID types.SiacoinOutputID, txid types.TransactionID) {
 	var ot outputTransactions
 	tx.getObject("SiacoinOutputs", outputID, &ot)
 	ot.InputTx = txid
@@ -98,7 +98,7 @@ func (tx *boltTx) addSiacoinInput(outputID types.SiacoinOutputID, txid crypto.Ha
 }
 
 // addSiafundInpt does the same thing as addSiacoinInput except with siafunds
-func (tx *boltTx) addSiafundInput(outputID types.SiafundOutputID, txid crypto.Hash) {
+func (tx *boltTx) addSiafundInput(outputID types.SiafundOutputID, txid types.TransactionID) {
 	var ot outputTransactions
 	tx.getObject("SiafundOutputs", outputID, &ot)
 	ot.InputTx = txid
@@ -107,7 +107,7 @@ func (tx *boltTx) addSiafundInput(outputID types.SiafundOutputID, txid crypto.Ha
 
 // addFcRevision changes an existing fcInfo struct to contain the txid
 // of the contract revision
-func (tx *boltTx) addFcRevision(fcid types.FileContractID, txid crypto.Hash) {
+func (tx *boltTx) addFcRevision(fcid types.FileContractID, txid types.TransactionID) {
 	var fi fcInfo
 	tx.getObject("FileContracts", fcid, &fi)
 	fi.Revisions = append(fi.Revisions, txid)
@@ -116,7 +116,7 @@ func (tx *boltTx) addFcRevision(fcid types.FileContractID, txid crypto.Hash) {
 
 // addFcProof changes an existing fcInfo struct in the database to
 // contain the txid of its storage proof
-func (tx *boltTx) addFcProof(fcid types.FileContractID, txid crypto.Hash) {
+func (tx *boltTx) addFcProof(fcid types.FileContractID, txid types.TransactionID) {
 	var fi fcInfo
 	tx.getObject("FileContracts", fcid, &fi)
 	fi.Proof = txid
@@ -129,14 +129,14 @@ func (tx *boltTx) addNewHash(bucketName string, t int, hash crypto.Hash, value i
 }
 
 // addNewOutput creats a new outputTransactions struct and adds it to the database
-func (tx *boltTx) addNewOutput(outputID types.SiacoinOutputID, txid crypto.Hash) {
-	otx := outputTransactions{txid, crypto.Hash{}}
+func (tx *boltTx) addNewOutput(outputID types.SiacoinOutputID, txid types.TransactionID) {
+	otx := outputTransactions{txid, types.TransactionID{}}
 	tx.addNewHash("SiacoinOutputs", hashCoinOutputID, crypto.Hash(outputID), otx)
 }
 
 // addNewSFOutput does the same thing as addNewOutput does, except for siafunds
-func (tx *boltTx) addNewSFOutput(outputID types.SiafundOutputID, txid crypto.Hash) {
-	otx := outputTransactions{txid, crypto.Hash{}}
+func (tx *boltTx) addNewSFOutput(outputID types.SiafundOutputID, txid types.TransactionID) {
+	otx := outputTransactions{txid, types.TransactionID{}}
 	tx.addNewHash("SiafundOutputs", hashFundOutputID, crypto.Hash(outputID), otx)
 }
 
@@ -197,13 +197,13 @@ func (e *Explorer) addBlockDB(b types.Block) error {
 
 	// Insert the miner payouts as new outputs
 	for i, payout := range b.MinerPayouts {
-		tx.addAddress(payout.UnlockHash, crypto.Hash(b.ID()))
-		tx.addNewOutput(b.MinerPayoutID(uint64(i)), crypto.Hash(b.ID()))
+		tx.addAddress(payout.UnlockHash, types.TransactionID(b.ID()))
+		tx.addNewOutput(b.MinerPayoutID(uint64(i)), types.TransactionID(b.ID()))
 	}
 
 	// Insert each transaction
 	for i, txn := range b.Transactions {
-		tx.addNewHash("Transactions", hashTransaction, txn.ID(), txInfo{b.ID(), i})
+		tx.addNewHash("Transactions", hashTransaction, crypto.Hash(txn.ID()), txInfo{b.ID(), i})
 		tx.addTransaction(txn)
 	}
 

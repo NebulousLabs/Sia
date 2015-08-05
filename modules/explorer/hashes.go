@@ -211,7 +211,7 @@ func (db *explorerDB) getAddressTransactions(address types.UnlockHash) (modules.
 		return ar, err
 	}
 
-	var atxids []crypto.Hash
+	var atxids []types.TransactionID
 	err = encoding.Unmarshal(txBytes, &atxids)
 	if err != nil {
 		return ar, err
