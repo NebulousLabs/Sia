@@ -163,7 +163,7 @@ func TestCommitSiafundOutputDiff(t *testing.T) {
 	}
 
 	// Commit a siafund output diff.
-	initialScosLen := len(cst.cs.siafundOutputs)
+	initialScosLen := cst.cs.db.lenSiafundOutputs()
 	id := types.SiafundOutputID{'1'}
 	sfo := types.SiafundOutput{Value: types.NewCurrency64(1)}
 	sfod := modules.SiafundOutputDiff{
@@ -172,19 +172,20 @@ func TestCommitSiafundOutputDiff(t *testing.T) {
 		SiafundOutput: sfo,
 	}
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-	if len(cst.cs.siafundOutputs) != initialScosLen+1 {
+	if cst.cs.db.lenSiafundOutputs() != initialScosLen+1 {
 		t.Error("siafund output diff set did not increase in size")
 	}
-	if cst.cs.siafundOutputs[id].Value.Cmp(sfo.Value) != 0 {
+	sfo1 := cst.cs.db.getSiafundOutputs(id)
+	if sfo1.Value.Cmp(sfo.Value) != 0 {
 		t.Error("wrong siafund output value after committing a diff")
 	}
 
 	// Rewind the diff.
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffRevert)
-	if len(cst.cs.siafundOutputs) != initialScosLen {
+	if cst.cs.db.lenSiafundOutputs() != initialScosLen {
 		t.Error("siafund output diff set did not increase in size")
 	}
-	_, exists := cst.cs.siafundOutputs[id]
+	exists := cst.cs.db.inSiafundOutputs(id)
 	if exists {
 		t.Error("siafund output was not reverted")
 	}
@@ -193,20 +194,21 @@ func TestCommitSiafundOutputDiff(t *testing.T) {
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 	sfod.Direction = modules.DiffRevert
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-	if len(cst.cs.siafundOutputs) != initialScosLen {
+	if cst.cs.db.lenSiafundOutputs() != initialScosLen {
 		t.Error("siafund output diff set did not increase in size")
 	}
-	_, exists = cst.cs.siafundOutputs[id]
+	exists = cst.cs.db.inSiafundOutputs(id)
 	if exists {
 		t.Error("siafund output was not reverted")
 	}
 
 	// Revert the inverse diff.
 	cst.cs.commitSiafundOutputDiff(sfod, modules.DiffRevert)
-	if len(cst.cs.siafundOutputs) != initialScosLen+1 {
+	if cst.cs.db.lenSiafundOutputs() != initialScosLen+1 {
 		t.Error("siafund output diff set did not increase in size")
 	}
-	if cst.cs.siafundOutputs[id].Value.Cmp(sfo.Value) != 0 {
+	sfo2 := cst.cs.db.getSiafundOutputs(id)
+	if sfo2.Value.Cmp(sfo.Value) != 0 {
 		t.Error("wrong siafund output value after committing a diff")
 	}
 
@@ -607,7 +609,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	_, exists = cst.cs.siafundOutputs[sfoid]
+	exists = cst.cs.db.inSiafundOutputs(sfoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
@@ -620,7 +622,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	_, exists = cst.cs.siafundOutputs[sfoid]
+	exists = cst.cs.db.inSiafundOutputs(sfoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}

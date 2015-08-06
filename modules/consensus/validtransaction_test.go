@@ -468,10 +468,10 @@ func TestValidSiafunds(t *testing.T) {
 
 	// Create a transaction with invalid unlock conditions.
 	var sfoid types.SiafundOutputID
-	for mapSfoid, _ := range cst.cs.siafundOutputs {
+	cst.cs.db.forEachSiafundOutputs(func(mapSfoid types.SiafundOutputID, sfo types.SiafundOutput) {
 		sfoid = mapSfoid
-		break
-	}
+		// pointless to do this but I can't think of a better way.
+	})
 	txn = types.Transaction{
 		SiafundInputs: []types.SiafundInput{{
 			ParentID:         sfoid,

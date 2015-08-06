@@ -321,13 +321,13 @@ func TestInconsistentCheck(t *testing.T) {
 	// Corrupt the consensus set.
 	var sfod types.SiafundOutputID
 	var sfo types.SiafundOutput
-	for id, output := range cst.cs.siafundOutputs {
+	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, output types.SiafundOutput) {
 		sfod = id
 		sfo = output
-		break
-	}
+	})
 	sfo.Value = sfo.Value.Add(types.NewCurrency64(1))
-	cst.cs.siafundOutputs[sfod] = sfo
+	cst.cs.db.rmSiafundOutputs(sfod)
+	cst.cs.db.addSiafundOutputs(sfod, sfo)
 
 	// Mine and submit a block, triggering the inconsistency check.
 	defer func() {
@@ -730,13 +730,12 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	var srcID types.SiafundOutputID
 	var srcValue types.Currency
 	anyoneSpends := types.UnlockConditions{}.UnlockHash()
-	for id, sfo := range cst.cs.siafundOutputs {
+	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, sfo types.SiafundOutput) {
 		if sfo.UnlockHash == anyoneSpends {
 			srcID = id
 			srcValue = sfo.Value
-			break
 		}
-	}
+	})
 
 	// Create a transaction that spends siafunds.
 	txn := types.Transaction{
@@ -767,24 +766,26 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	}
 
 	// Check that the input got consumed, and that the outputs got created.
-	_, exists := cst.cs.siafundOutputs[srcID]
+	exists := cst.cs.db.inSiafundOutputs(srcID)
 	if exists {
 		return errors.New("siafund output was not properly consumed")
 	}
-	sfo, exists := cst.cs.siafundOutputs[sfoid0]
+	exists = cst.cs.db.inSiafundOutputs(sfoid0)
 	if !exists {
 		return errors.New("siafund output was not properly created")
 	}
+	sfo := cst.cs.db.getSiafundOutputs(sfoid0)
 	if sfo.Value.Cmp(srcValue.Sub(types.NewCurrency64(1))) != 0 {
 		return errors.New("created siafund has wrong value")
 	}
 	if sfo.UnlockHash != anyoneSpends {
 		return errors.New("siafund output sent to wrong unlock hash")
 	}
-	sfo, exists = cst.cs.siafundOutputs[sfoid1]
+	exists = cst.cs.db.inSiafundOutputs(sfoid1)
 	if !exists {
 		return errors.New("second siafund output was not properly created")
 	}
+	sfo = cst.cs.db.getSiafundOutputs(sfoid1)
 	if sfo.Value.Cmp(types.NewCurrency64(1)) != 0 {
 		return errors.New("second siafund output has wrong value")
 	}
@@ -836,14 +837,13 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 		return err
 	}
 	var srcClaimStart types.Currency
-	for id, sfo := range cst.cs.siafundOutputs {
+	cst.cs.db.forEachSiafundOutputs(func(id types.SiafundOutputID, sfo types.SiafundOutput) {
 		if sfo.UnlockHash == anyoneSpends {
 			srcID = id
 			srcValue = sfo.Value
 			srcClaimStart = sfo.ClaimStart
-			break
 		}
-	}
+	})
 	txn = types.Transaction{
 		SiafundInputs: []types.SiafundInput{{
 			ParentID:         srcID,

@@ -25,7 +25,16 @@ func (cs *ConsensusSet) initSetDB() error {
 	if err != nil {
 		return err
 	}
-	// Explicit initilization preferred to implicit
+
+	// Update the siafundoutput diffs map for the genesis block on
+	// disk. This needs to happen between the database being
+	// opened/initilized and the consensus set hash being calculated
+	cs.updateDatabase = true
+	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
+		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
+	}
+
+	// Explicit initilization preferred to implicit for blocksLoaded
 	cs.blocksLoaded = 0
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
@@ -101,9 +110,9 @@ func (cs *ConsensusSet) loadDiffs() {
 		if !cs.db.open {
 			break
 		}
-		cs.updatePath = false
+		cs.updateDatabase = false
 		cs.commitDiffSet(pb, modules.DiffApply)
-		cs.updatePath = true
+		cs.updateDatabase = true
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}

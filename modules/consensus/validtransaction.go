@@ -176,10 +176,11 @@ func (cs *ConsensusSet) validSiafunds(t types.Transaction) (err error) {
 	var siafundInputSum types.Currency
 	var siafundOutputSum types.Currency
 	for _, sfi := range t.SiafundInputs {
-		sfo, exists := cs.siafundOutputs[sfi.ParentID]
+		exists := cs.db.inSiafundOutputs(sfi.ParentID)
 		if !exists {
 			return ErrMissingSiafundOutput
 		}
+		sfo := cs.db.getSiafundOutputs(sfi.ParentID)
 
 		// Check the unlock conditions match the unlock hash.
 		if sfi.UnlockConditions.UnlockHash() != sfo.UnlockHash {
