@@ -639,9 +639,9 @@ func TestApplySiafundInputs(t *testing.T) {
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiafundOutputID
-	for id, _ := range cst.cs.siafundOutputs {
-		ids = append(ids, id)
-	}
+	cst.cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+		ids = append(ids, sfoid)
+	})
 
 	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
@@ -650,12 +650,12 @@ func TestApplySiafundInputs(t *testing.T) {
 		},
 	}
 	cst.cs.applySiafundInputs(pb, txn)
-	_, exists := cst.cs.siafundOutputs[ids[0]]
+	exists := cst.cs.db.inSiafundOutputs(ids[0])
 	if exists {
 		t.Error("Failed to conusme a siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 2 {
-		t.Error("siafund outputs not correctly updated", len(cst.cs.siafundOutputs))
+	if cst.cs.db.lenSiafundOutputs() != 2 {
+		t.Error("siafund outputs not correctly updated", cst.cs.db.lenSiafundOutputs())
 	}
 	if len(pb.SiafundOutputDiffs) != 1 {
 		t.Error("block node was not updated for single transaction")
@@ -688,9 +688,9 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiafundOutputID
-	for id, _ := range cst.cs.siafundOutputs {
-		ids = append(ids, id)
-	}
+	cst.cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+		ids = append(ids, sfoid)
+	})
 
 	// Apply a transaction with a single siafund input.
 	txn := types.Transaction{
@@ -733,11 +733,11 @@ func TestApplySiafundOutputs(t *testing.T) {
 	}
 	cst.cs.applySiafundOutputs(pb, txn)
 	sfoid := txn.SiafundOutputID(0)
-	_, exists := cst.cs.siafundOutputs[sfoid]
+	exists := cst.cs.db.inSiafundOutputs(sfoid)
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 4 {
+	if cst.cs.db.lenSiafundOutputs() != 4 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(pb.SiafundOutputDiffs) != 1 {
@@ -763,15 +763,15 @@ func TestApplySiafundOutputs(t *testing.T) {
 	cst.cs.applySiafundOutputs(pb, txn)
 	sfoid0 := txn.SiafundOutputID(0)
 	sfoid1 := txn.SiafundOutputID(1)
-	_, exists = cst.cs.siafundOutputs[sfoid0]
+	exists = cst.cs.db.inSiafundOutputs(sfoid0)
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	_, exists = cst.cs.siafundOutputs[sfoid1]
+	exists = cst.cs.db.inSiafundOutputs(sfoid1)
 	if !exists {
 		t.Error("Failed to create siafund output")
 	}
-	if len(cst.cs.siafundOutputs) != 6 {
+	if cst.cs.db.lenSiafundOutputs() != 6 {
 		t.Error("siafund outputs not correctly updated")
 	}
 	if len(pb.SiafundOutputDiffs) != 3 {

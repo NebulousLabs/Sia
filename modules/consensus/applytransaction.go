@@ -196,14 +196,14 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 	for _, sfi := range t.SiafundInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if build.DEBUG {
-			_, exists := cs.siafundOutputs[sfi.ParentID]
+			exists := cs.db.inSiafundOutputs(sfi.ParentID)
 			if !exists {
 				panic(ErrMisuseApplySiafundInput)
 			}
 		}
 
 		// Calculate the volume of siacoins to put in the claim output.
-		sfo := cs.siafundOutputs[sfi.ParentID]
+		sfo := cs.db.getSiafundOutputs(sfi.ParentID)
 		claimPortion := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 
 		// Add the claim output to the delayed set of outputs.
@@ -226,7 +226,7 @@ func (cs *ConsensusSet) applySiafundInputs(pb *processedBlock, t types.Transacti
 		sfod := modules.SiafundOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sfi.ParentID,
-			SiafundOutput: cs.siafundOutputs[sfi.ParentID],
+			SiafundOutput: cs.db.getSiafundOutputs(sfi.ParentID),
 		}
 		pb.SiafundOutputDiffs = append(pb.SiafundOutputDiffs, sfod)
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
@@ -240,7 +240,7 @@ func (cs *ConsensusSet) applySiafundOutputs(pb *processedBlock, t types.Transact
 		// Sanity check - the output should not exist within the blockchain.
 		sfoid := t.SiafundOutputID(i)
 		if build.DEBUG {
-			_, exists := cs.siafundOutputs[sfoid]
+			exists := cs.db.inSiafundOutputs(sfoid)
 			if exists {
 				panic(ErrMisuseApplySiafundOutput)
 			}

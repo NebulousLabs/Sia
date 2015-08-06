@@ -366,7 +366,7 @@ func (db *setDB) lenSiafundOutputs() uint64 {
 	return db.lenBucket("SiafundOutputs")
 }
 
-func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput) error) {
+func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
 	db.forEachItem("SiafundOutputs", func(kb, vb []byte) error {
 		var key types.SiafundOutputID
 		var value types.SiafundOutput
@@ -378,6 +378,7 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 		if err != nil {
 			return err
 		}
-		return fn(key, value)
+		fn(key, value)
+		return nil
 	})
 }
