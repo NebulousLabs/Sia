@@ -26,8 +26,9 @@ func (cs *ConsensusSet) initSetDB() error {
 		return err
 	}
 
-	// Update the siafundoutput diffs map for the genesis block
-	// on disk
+	// Update the siafundoutput diffs map for the genesis block on
+	// disk. This needs to happen between the database being
+	// opened/initilized and the consensus set hash being calculated
 	cs.updateDatabase = true
 	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
@@ -59,15 +60,6 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	height := cs.db.pathHeight()
 	if height == 0 {
 		return cs.initSetDB()
-	} else {
-		cs.updateDatabase = false
-		// Update the siafundoutput diffs map for the genesis block
-		// in memory
-		// DEPRECATED
-		for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
-			cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
-		}
-		cs.updateDatabase = true
 	}
 
 	// Check that the db's genesis block matches our genesis block.

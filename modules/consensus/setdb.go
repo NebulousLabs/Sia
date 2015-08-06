@@ -20,7 +20,6 @@ var (
 	errNilBucket    = errors.New("using a bucket that does not exist")
 	errNilItem      = errors.New("requested item does not exist")
 	errNotGuarded   = errors.New("database modification not protected by guard")
-	errNilInterface = errors.New("attempted to use a nil interface")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -182,9 +181,6 @@ func (db *setDB) rmItem(bucket string, key interface{}) error {
 	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
 		panic(errNotGuarded)
 	}
-	if build.DEBUG && key == nil {
-		panic(errNilInterface)
-	}
 	k := encoding.Marshal(key)
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -205,9 +201,6 @@ func (db *setDB) rmItem(bucket string, key interface{}) error {
 
 // inBucket checks if an item with the given key is in the bucket
 func (db *setDB) inBucket(bucket string, key interface{}) bool {
-	if key == nil {
-		return false
-	}
 	exists, err := db.Exists(bucket, encoding.Marshal(key))
 	if build.DEBUG && err != nil {
 		panic(err)
@@ -224,7 +217,7 @@ func (db *setDB) lenBucket(bucket string) uint64 {
 	return s
 }
 
-// forEachInBucket runs a given function on every element in a given
+// forEachItem runs a given function on every element in a given
 // bucket name, and will panic on any error
 func (db *setDB) forEachItem(bucket string, fn func(k, v []byte) error) {
 	err := db.View(func(tx *bolt.Tx) error {

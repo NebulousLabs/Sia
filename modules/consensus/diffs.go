@@ -100,25 +100,26 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
+	// This function only modifies the database now, so the whole
+	// nothing happens when this flag is false
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
 		exists := cs.db.inSiafundOutputs(sfod.ID)
 		// Loading will commit saifundOutputs that are already
 		// in the database.
-		if exists == (sfod.Direction == dir) && cs.updateDatabase {
+		if exists == (sfod.Direction == dir) {
 			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
 	if sfod.Direction == dir {
-		if cs.updateDatabase {
-			cs.db.addSiafundOutputs(sfod.ID, sfod.SiafundOutput)
-		}
+		cs.db.addSiafundOutputs(sfod.ID, sfod.SiafundOutput)
 	} else {
-		if cs.updateDatabase {
-			cs.db.rmSiafundOutputs(sfod.ID)
-		}
+		cs.db.rmSiafundOutputs(sfod.ID)
 	}
 }
 
