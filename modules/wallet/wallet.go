@@ -24,7 +24,9 @@ const (
 )
 
 var (
-	errLockedWallet = errors.New("wallet must be unlocked before it can be used")
+	errLockedWallet    = errors.New("wallet must be unlocked before it can be used")
+	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
+	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
 )
 
 type spendableKey struct {
@@ -64,10 +66,10 @@ type Wallet struct {
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
-		return nil, errors.New("wallet cannot use a nil state")
+		return nil, errNilConsensusSet
 	}
 	if tpool == nil {
-		return nil, errors.New("wallet cannot use a nil transaction pool")
+		return nil, errNilTpool
 	}
 
 	// Initialize the data structure.

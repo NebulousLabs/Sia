@@ -3,6 +3,7 @@ package wallet
 import (
 	"crypto/rand"
 	"path/filepath"
+	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -82,4 +83,35 @@ func createWalletTester(name string) (*walletTester, error) {
 		}
 	}
 	return wt, nil
+}
+
+// TestNilInputs tries starting the wallet using nil inputs.
+func TestNilInputs(t *testing.T) {
+	testdir := build.TempDir(modules.WalletDir, "TestNilInputs")
+	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp, err := transactionpool.New(cs, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wdir := filepath.Join(testdir, modules.WalletDir)
+	_, err = New(cs, nil, wdir)
+	if err != errNilTpool {
+		t.Error(err)
+	}
+	_, err = New(nil, tp, wdir)
+	if err != errNilConsensusSet {
+		t.Error(err)
+	}
+	_, err = New(nil, nil, wdir)
+	if err != errNilConsensusSet {
+		t.Error(err)
+	}
 }
