@@ -246,11 +246,12 @@ func newDownload(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fetcher, n
 func (r *Renter) Download(nickname, destination string) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.Lock()
-	file, exists := r.files[nickname]
+	// file, exists := r.files[nickname]
 	r.mu.Unlock(lockID)
-	if !exists {
-		return errors.New("no file of that nickname")
-	}
+	// if !exists {
+	// 	return errors.New("no file of that nickname")
+	// }
+	file := new(dfile)
 
 	// Create file on disk.
 	f, err := os.Create(destination)
