@@ -361,7 +361,7 @@ func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
 	return db.rmItem("SiafundOutputs", id)
 }
 
-// lenSiafundOutputs returns the size of the siafundOutputs map
+// lenSiafundOutputs returns the size of the SiafundOutputs bucket
 func (db *setDB) lenSiafundOutputs() uint64 {
 	return db.lenBucket("SiafundOutputs")
 }

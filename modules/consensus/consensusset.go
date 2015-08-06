@@ -62,7 +62,6 @@ type ConsensusSet struct {
 	siafundPool           types.Currency
 	siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
 	fileContracts         map[types.FileContractID]types.FileContract
-	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
 	// fileContractExpirations is not actually a part of the consensus set, but
@@ -108,7 +107,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
-		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
 
 		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),

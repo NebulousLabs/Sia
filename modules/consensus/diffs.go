@@ -115,12 +115,10 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 		if cs.updateDatabase {
 			cs.db.addSiafundOutputs(sfod.ID, sfod.SiafundOutput)
 		}
-		cs.siafundOutputs[sfod.ID] = sfod.SiafundOutput
 	} else {
 		if cs.updateDatabase {
 			cs.db.rmSiafundOutputs(sfod.ID)
 		}
-		delete(cs.siafundOutputs, sfod.ID)
 	}
 }
 
