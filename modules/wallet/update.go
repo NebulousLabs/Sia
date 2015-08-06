@@ -83,7 +83,13 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// Iterate through the output diffs (siacoin and siafund) and apply all of
 	// them. Only apply the outputs that relate to unlock hashes we understand.
 	for _, diff := range cc.SiacoinOutputDiffs {
-		_, exists := w.siacoinOutputs[diff.ID]
+		// Verify that the diff is relevant to the wallet.
+		_, exists := w.keys[diff.SiacoinOutput.UnlockHash]
+		if !exists {
+			continue
+		}
+
+		_, exists = w.siacoinOutputs[diff.ID]
 		if diff.Direction == modules.DiffApply {
 			if exists && build.DEBUG {
 				panic("adding an existing output to wallet")
@@ -97,7 +103,13 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 		}
 	}
 	for _, diff := range cc.SiafundOutputDiffs {
-		_, exists := w.siafundOutputs[diff.ID]
+		// Verify that the diff is relevant to the wallet.
+		_, exists := w.keys[diff.SiafundOutput.UnlockHash]
+		if !exists {
+			continue
+		}
+
+		_, exists = w.siafundOutputs[diff.ID]
 		if diff.Direction == modules.DiffApply {
 			if exists && build.DEBUG {
 				panic("adding an existing output to wallet")
@@ -202,7 +214,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 					RelatedAddress: sci.UnlockConditions.UnlockHash(),
 					Value:          w.historicOutputs[types.OutputID(sci.ParentID)],
 				}
-				w.unconfirmedWalletTransactions = append(w.walletTransactions, wt)
+				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
 			}
 		}
 		for i, sco := range txn.SiacoinOutputs {
@@ -219,7 +231,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 					RelatedAddress: sco.UnlockHash,
 					Value:          sco.Value,
 				}
-				w.unconfirmedWalletTransactions = append(w.walletTransactions, wt)
+				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
 				oid := types.OutputID(txn.SiacoinOutputID(i))
 				w.historicOutputs[oid] = sco.Value
 			}

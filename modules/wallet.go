@@ -10,11 +10,11 @@ import (
 const (
 	WalletDir = "wallet"
 
-	PublicKeysPerSeed = 100
+	PublicKeysPerSeed = 10
 )
 
 var (
-	LowBalanceErr = errors.New("Insufficient Balance")
+	ErrLowBalance = errors.New("Insufficient Balance")
 )
 
 type (
@@ -25,9 +25,6 @@ type (
 	// WalletTransactionID is a unique identifier for a wallet transaction.
 	WalletTransactionID crypto.Hash
 
-	// WalletTransaction contains the metadata of a single output that changed
-	// the balance of the wallet, either incoming or outgoing (which can be
-	// gleaned from the 'Source' and 'Destination'.
 	WalletTransaction struct {
 		TransactionID         types.TransactionID
 		ConfirmationHeight    types.BlockHeight

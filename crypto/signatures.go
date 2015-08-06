@@ -65,6 +65,6 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 
 // PublicKey returns the public key that corresponds to a secret key.
 func (sk SecretKey) PublicKey() (pk PublicKey) {
-	copy(pk[:], sk[:32])
+	copy(pk[:], sk[32:])
 	return
 }

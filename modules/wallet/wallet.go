@@ -11,11 +11,6 @@ import (
 )
 
 const (
-	// TransactionFee is yet another deprecated-on-arrival constant that says
-	// how large the transaction fees should be. This should really be a
-	// function supplied by the transaction pool.
-	TransactionFee = 10
-
 	// RespendTimeout records the number of blocks that the wallet will wait
 	// before spending an output that has been spent in the past. If the
 	// transaction spending the output has not made it to the transaction pool
@@ -40,11 +35,10 @@ type Wallet struct {
 	settings    WalletSettings
 	primarySeed modules.Seed
 
-	state                   modules.ConsensusSet
-	tpool                   modules.TransactionPool
-	consensusSetHeight      types.BlockHeight
-	siafundPool             types.Currency
-	unconfirmedTransactions []types.Transaction
+	state              modules.ConsensusSet
+	tpool              modules.TransactionPool
+	consensusSetHeight types.BlockHeight
+	siafundPool        types.Currency
 
 	keys            map[types.UnlockHash]spendableKey
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
@@ -126,7 +120,7 @@ func (w *Wallet) Close() error {
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -153,7 +147,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]t
 // SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
 	output := types.SiafundOutput{
 		Value:      amount,
 		UnlockHash: dest,

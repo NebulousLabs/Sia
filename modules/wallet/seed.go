@@ -176,6 +176,7 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 	if err != nil {
 		return modules.Seed{}, err
 	}
+	w.primarySeed = seed
 	w.settings.PrimarySeedFile = SeedFile{sfuid, encryptionVerification, cryptSeed}
 	w.settings.PrimarySeedProgress = 0
 	w.settings.PrimarySeedFilename = seedFilePrefix + randomSuffix + seedFileSuffix

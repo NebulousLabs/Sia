@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -28,33 +27,11 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	// Tally up all outgoing siacoins.
-	unconfirmedOutputs := make(map[types.SiacoinOutputID]types.SiacoinOutput) // helps where unconfirmed outputs have been spent.
-	for _, txn := range w.unconfirmedTransactions {
-		for _, sci := range txn.SiacoinInputs {
-			uh := sci.UnlockConditions.UnlockHash()
-			_, exists := w.keys[uh]
-			if exists {
-				sco, exists := w.siacoinOutputs[sci.ParentID]
-				if exists {
-					outgoingSiacoins = outgoingSiacoins.Add(sco.Value)
-				} else {
-					sco, exists = unconfirmedOutputs[sci.ParentID]
-					if exists {
-						outgoingSiacoins = outgoingSiacoins.Add(sco.Value)
-					} else if build.DEBUG {
-						panic("unconfirmed siacoin output not found, yet spent")
-					}
-				}
-			}
-		}
-		for i, sco := range txn.SiacoinOutputs {
-			scoid := txn.SiacoinOutputID(i)
-			_, exists := w.keys[sco.UnlockHash]
-			if exists {
-				incomingSiacoins = incomingSiacoins.Add(sco.Value)
-			}
-			unconfirmedOutputs[scoid] = sco
+	for _, uwt := range w.unconfirmedWalletTransactions {
+		if uwt.FundType == types.SpecifierSiacoinOutput {
+			incomingSiacoins = incomingSiacoins.Add(uwt.Value)
+		} else if uwt.FundType == types.SpecifierSiacoinInput {
+			outgoingSiacoins = outgoingSiacoins.Add(uwt.Value)
 		}
 	}
 	return
