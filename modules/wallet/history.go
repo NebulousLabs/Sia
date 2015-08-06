@@ -20,7 +20,7 @@ func (w *Wallet) TransactionHistory() []modules.WalletTransaction {
 }
 
 // PartialTransactionHistory returns all of the confirmed transactions between
-// 'startBlock' and 'endBlock'.
+// 'startBlock' and 'endBlock' (inclusive).
 func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)

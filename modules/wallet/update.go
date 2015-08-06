@@ -158,10 +158,12 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 		for i := len(block.MinerPayouts) - 1; i >= 0; i-- {
 			w.revertWalletTransaction(block.MinerPayouts[i].UnlockHash, modules.CalculateWalletTransactionID(types.Transaction{}.ID(), types.OutputID(block.MinerPayoutID(uint64(i)))))
 		}
+		w.consensusSetHeight--
 	}
 
 	// Apply all of the new blocks.
 	for _, block := range cc.AppliedBlocks {
+		w.consensusSetHeight++
 		// Apply any miner outputs.
 		for i, mp := range block.MinerPayouts {
 			w.applyWalletTransaction(types.SpecifierMinerPayout, mp.UnlockHash, types.Transaction{}, block.Timestamp, types.OutputID(block.MinerPayoutID(uint64(i))), mp.Value)
