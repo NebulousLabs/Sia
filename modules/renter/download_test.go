@@ -12,11 +12,11 @@ type testHost struct {
 	pieceMap map[uint64][]pieceData // key is chunkIndex
 }
 
-func (h testHost) pieces(chunkIndex uint64) []pieceData {
+func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 	return h.pieceMap[chunkIndex]
 }
 
-func (h testHost) fetch(p pieceData) ([]byte, error) {
+func (h *testHost) fetch(p pieceData) ([]byte, error) {
 	return h.data[p.offset : p.offset+p.length], nil
 }
 
@@ -36,10 +36,9 @@ func TestErasureDownload(t *testing.T) {
 	// create hosts
 	hosts := make([]fetcher, 3)
 	for i := range hosts {
-		h := &testHost{
+		hosts[i] = &testHost{
 			pieceMap: make(map[uint64][]pieceData),
 		}
-		hosts[i] = h
 	}
 
 	// upload data to hosts

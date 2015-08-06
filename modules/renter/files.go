@@ -26,6 +26,8 @@ type dfile struct {
 	MasterKey crypto.TwofishKey
 	ecc       modules.ECC
 	chunkSize uint64
+
+	uploaded uint64
 }
 
 // numChunks returns the number of chunks that f was split into.

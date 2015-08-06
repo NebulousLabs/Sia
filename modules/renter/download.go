@@ -193,7 +193,8 @@ func (d *download) run(w io.Writer) error {
 		for _, ch := range d.reqChans {
 			ch <- i
 		}
-		// load pieces uint64o chunk
+		// load pieces into chunk
+		// TODO: this deadlocks if any pieces are missing.
 		for j, ch := range d.respChans {
 			chunk[j] = <-ch
 		}
