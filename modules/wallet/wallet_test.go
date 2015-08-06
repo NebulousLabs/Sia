@@ -118,6 +118,10 @@ func TestNilInputs(t *testing.T) {
 
 // TestSendSiacoins probes the SendSiacoins method of the wallet.
 func TestSendSiacoins(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Create a wallet tester.
 	wt, err := createWalletTester("TestSendSiacoins")
 	if err != nil {

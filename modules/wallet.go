@@ -10,7 +10,7 @@ import (
 const (
 	WalletDir = "wallet"
 
-	PublicKeysPerSeed = 10
+	PublicKeysPerSeed = 100
 )
 
 var (
