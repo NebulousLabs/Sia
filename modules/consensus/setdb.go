@@ -39,6 +39,7 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
+		"FileContracts",
 		"SiafundOutputs",
 		"Path",
 		"BlockMap",
@@ -349,7 +350,7 @@ func (db *setDB) inSiafundOutputs(id types.SiafundOutputID) bool {
 	return db.inBucket("SiafundOutputs", id)
 }
 
-// nrmSiafundOutputs removes a siafund output from the database
+// rmSiafundOutputs removes a siafund output from the database
 func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
 	return db.rmItem("SiafundOutputs", id)
 }
@@ -363,6 +364,61 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 	db.forEachItem("SiafundOutputs", func(kb, vb []byte) error {
 		var key types.SiafundOutputID
 		var value types.SiafundOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		fn(key, value)
+		return nil
+	})
+}
+
+// addFileContracts is a wrapper around addItem for adding a file
+// contract to the consensusset
+func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
+	return db.addItem("FileContracts", id, fc)
+}
+
+// getFileContracts is a wrapper around getItem for retrieving a file contract
+func (db *setDB) getFileContracts(id types.FileContractID) types.FileContract {
+	fcBytes, err := db.getItem("FileContracts", id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var fc types.FileContract
+	err = encoding.Unmarshal(fcBytes, &fc)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return fc
+}
+
+// inFileContracts is a wrapper around inBucket which returns true if
+// a file contract is in the consensus set
+func (db *setDB) inFileContracts(id types.FileContractID) bool {
+	return db.inBucket("FileContracts", id)
+}
+
+// rmFileContracts removes a file contract from the consensus set
+func (db *setDB) rmFileContracts(id types.FileContractID) error {
+	return db.rmItem("FileContracts", id)
+}
+
+// lenFileContracts returns the number of file contracts in the consensus set
+func (db *setDB) lenFileContracts() uint64 {
+	return db.lenBucket("FileContracts")
+}
+
+// forEachFileContracts applies a function to each (file contract id, filecontract)
+// pair in the consensus set
+func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.FileContract)) {
+	db.forEachItem("FileContracts", func(kb, vb []byte) error {
+		var key types.FileContractID
+		var value types.FileContract
 		err := encoding.Unmarshal(kb, &key)
 		if err != nil {
 			return err
