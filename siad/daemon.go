@@ -78,16 +78,6 @@ func startDaemon() error {
 		}
 	}
 
-	// Send a struct down the started channel, so the testing package knows
-	// that daemon startup has completed. A gofunc is used with the hope that
-	// srv.Serve() will start running before the value is sent down the
-	// channel.
-	//
-	// TODO: There are better ways to approach this.
-	go func() {
-		started <- struct{}{}
-	}()
-
 	// Print a 'startup complete' message.
 	//
 	// TODO: This message can be removed once the api starts up in under 1/2

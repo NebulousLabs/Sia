@@ -12,10 +12,6 @@ import (
 var (
 	// A global config variable is needed to work with cobra's flag system.
 	config Config
-
-	// started is a channel that's used during testing to inform the test suite
-	// that initialization of the daemon has completed.
-	started chan struct{}
 )
 
 // The Config struct contains all configurable variables for siad. It is
@@ -33,13 +29,6 @@ type Config struct {
 		Profile    bool
 		ProfileDir string
 	}
-}
-
-// init creates the channel that's used to communicate with the testing
-// framework.
-func init() {
-	// Initialize the started channel, only used for testing.
-	started = make(chan struct{}, 1)
 }
 
 // versionCmd is a cobra command that prints the version of siad.

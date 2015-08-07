@@ -13,6 +13,9 @@ import (
 // TestSaveLoad populates a blockchain, saves it, loads it, and checks
 // the consensus set hash before and after
 func TestSaveLoad(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := createConsensusSetTester("TestSaveLoad")
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +42,7 @@ func TestSaveLoad(t *testing.T) {
 	}
 }
 
+// acceptRecover recovers after triggering a panic while calling AcceptBlock.
 func acceptRecover(cs *ConsensusSet, block types.Block) (err error) {
 	defer func() {
 		r := recover()
@@ -57,6 +61,9 @@ func acceptRecover(cs *ConsensusSet, block types.Block) (err error) {
 // TestConsistencyGuard verifies that the database cannot be modified
 // after it has been corrupted
 func TestConsistencyGuard(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	cst, err := createConsensusSetTester("TestConsistencyGuard")
 	if err != nil {
 		t.Fatal(err)

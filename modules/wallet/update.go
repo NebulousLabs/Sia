@@ -134,7 +134,8 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 	// related to the wallet. Wallet transactions must be removed in the same
 	// order they were added.
 	for _, block := range cc.RevertedBlocks {
-		for _, txn := range block.Transactions {
+		for i := len(block.Transactions) - 1; i >= 0; i-- {
+			txn := block.Transactions[i]
 			// Revert all wallet transactions made from items in the
 			// transaction - use the reverse order of apply because using a
 			// slice means its easiet to remove the last element.
