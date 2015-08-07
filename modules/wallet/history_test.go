@@ -21,7 +21,7 @@ func TestTransactionHistory(t *testing.T) {
 	// has money, which means types.MaturityDelay+1 blocks are created, and
 	// each block is going to have a transaction (the miner payout) going to
 	// the wallet.
-	if len(wt.wallet.TransactionHistory()) != int(types.MaturityDelay+1) {
+	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
 	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5000), types.UnlockHash{})
@@ -29,7 +29,7 @@ func TestTransactionHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	// No more confirmed transactions have been added.
-	if len(wt.wallet.TransactionHistory()) != int(types.MaturityDelay+1) {
+	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
 	// Four transactions were added: to fund the parent txn (an input), create
@@ -47,7 +47,7 @@ func TestTransactionHistory(t *testing.T) {
 	}
 	// A confirmed transaction was added for the miner payout, and the 4
 	// transactions that were previously unconfirmed.
-	if len(wt.wallet.TransactionHistory()) != int(types.MaturityDelay+2+4) {
+	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+2+4) {
 		t.Error("unexpected transaction history length")
 	}
 

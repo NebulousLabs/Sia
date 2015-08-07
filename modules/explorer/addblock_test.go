@@ -93,7 +93,7 @@ func (et *explorerTester) testAddBlock(t *testing.T) error {
 	if err != nil {
 		return errors.New("Could not decode loaded block")
 	}
-	if ot.InputTx == *new(crypto.Hash) {
+	if ot.InputTx == (types.TransactionID{}) {
 		return errors.New("Input not added as output")
 	}
 	return nil

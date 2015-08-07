@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/explorer"
@@ -34,15 +35,16 @@ var (
 // serverTester contains a server and a set of channels for keeping all of the
 // modules synchronized during testing.
 type serverTester struct {
-	cs      *consensus.ConsensusSet
-	gateway modules.Gateway
-	host    modules.Host
-	hostdb  modules.HostDB
-	miner   modules.Miner
-	renter  modules.Renter
-	tpool   modules.TransactionPool
-	exp     modules.Explorer
-	wallet  modules.Wallet
+	cs        *consensus.ConsensusSet
+	gateway   modules.Gateway
+	host      modules.Host
+	hostdb    modules.HostDB
+	miner     modules.Miner
+	renter    modules.Renter
+	tpool     modules.TransactionPool
+	exp       modules.Explorer
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	server *Server
 
@@ -74,6 +76,14 @@ func newServerTester(name string, t *testing.T) *serverTester {
 	if err != nil {
 		t.Fatal("Failed to create wallet:", err)
 	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal("Failed to create miner:", err)
@@ -101,15 +111,16 @@ func newServerTester(name string, t *testing.T) *serverTester {
 
 	// Assemble the serverTester.
 	st := &serverTester{
-		cs:      cs,
-		gateway: g,
-		host:    h,
-		hostdb:  hdb,
-		miner:   m,
-		renter:  r,
-		tpool:   tp,
-		exp:     exp,
-		wallet:  w,
+		cs:        cs,
+		gateway:   g,
+		host:      h,
+		hostdb:    hdb,
+		miner:     m,
+		renter:    r,
+		tpool:     tp,
+		exp:       exp,
+		wallet:    w,
+		walletKey: key,
 
 		server: srv,
 
@@ -192,9 +203,4 @@ func (st *serverTester) callAPI(call string) error {
 		return errors.New(string(respErr))
 	}
 	return nil
-}
-
-// TestCreateServer creates a serverTester and immediately stops it.
-func TestCreateServer(t *testing.T) {
-	newServerTester("TestCreateServer", t).callAPI("/daemon/stop")
 }

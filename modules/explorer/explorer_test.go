@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -17,11 +18,12 @@ import (
 // Explorer tester struct is the helper object for explorer
 // testing. It holds the helper modules for its testing
 type explorerTester struct {
-	cs      *consensus.ConsensusSet
-	gateway modules.Gateway
-	miner   modules.Miner
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	cs        *consensus.ConsensusSet
+	gateway   modules.Gateway
+	miner     modules.Miner
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	explorer *Explorer
 
@@ -48,6 +50,14 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.RenterDir))
 	if err != nil {
 		t.Fatal(err)
@@ -58,11 +68,12 @@ func createExplorerTester(name string, t *testing.T) (*explorerTester, error) {
 	}
 
 	et := &explorerTester{
-		cs:      cs,
-		gateway: g,
-		miner:   m,
-		tpool:   tp,
-		wallet:  w,
+		cs:        cs,
+		gateway:   g,
+		miner:     m,
+		tpool:     tp,
+		wallet:    w,
+		walletKey: key,
 
 		explorer: e,
 

@@ -104,15 +104,15 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		}
 	}
 
-	// TODO: Reconsider the way that the RPC's happen.
-	//g.RegisterRPC("HostSettings", h.Settings)
-
 	return hdbt
 }
 
 // TestNilInputs tries supplying the hostdb with nil inputs and checks for
 // correct rejection.
 func TestNilInputs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdbt := newHDBTester("TestNilInputs", t)
 	_, err := New(nil, nil)
 	if err == nil {

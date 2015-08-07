@@ -11,9 +11,9 @@ var (
 	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
 
-// TransactionHistory returns all of the transactions known to the wallet's
-// history.
-func (w *Wallet) TransactionHistory() []modules.WalletTransaction {
+// ConfirmedTransactionHistory returns all of the confirmed transactions known
+// to the wallet's history.
+func (w *Wallet) ConfirmedTransactionHistory() []modules.WalletTransaction {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	return w.walletTransactions

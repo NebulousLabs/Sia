@@ -26,7 +26,7 @@ type (
 // decrypting files.
 func GenerateTwofishKey() (key TwofishKey, err error) {
 	_, err = rand.Read(key[:])
-	return
+	return key, err
 }
 
 // NewCipher creates a new Twofish cipher from the key.

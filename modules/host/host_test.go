@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -18,11 +19,12 @@ import (
 // A hostTester is the helper object for host testing, including helper modules
 // and methods for controlling synchronization.
 type hostTester struct {
-	cs      *consensus.ConsensusSet
-	gateway modules.Gateway
-	miner   modules.Miner
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	cs        *consensus.ConsensusSet
+	gateway   modules.Gateway
+	miner     modules.Miner
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	host *Host
 
@@ -47,6 +49,14 @@ func CreateHostTester(name string, t *testing.T) *hostTester {
 		t.Fatal(err)
 	}
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(key)
 	if err != nil {
 		t.Fatal(err)
 	}

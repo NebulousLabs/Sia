@@ -43,6 +43,9 @@ func TestFindHostAnnouncements(t *testing.T) {
 // TestReceiveConsensusSetUpdate probes teh ReveiveConsensusSetUpdate method of
 // the hostdb type.
 func TestReceiveConsensusSetUpdate(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdbt := newHDBTester("TestFindHostAnnouncements", t)
 
 	// Put a host announcement into the blockchain.

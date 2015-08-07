@@ -1,10 +1,12 @@
 package transactionpool
 
 import (
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -16,11 +18,12 @@ import (
 // A tpoolTester is used during testing to initialize a transaction pool and
 // useful helper modules.
 type tpoolTester struct {
-	cs      *consensus.ConsensusSet
-	gateway modules.Gateway
-	tpool   *TransactionPool
-	miner   modules.Miner
-	wallet  modules.Wallet
+	cs        *consensus.ConsensusSet
+	gateway   modules.Gateway
+	tpool     *TransactionPool
+	miner     modules.Miner
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 }
 
 // createTpoolTester returns a ready-to-use tpool tester, with all modules
@@ -44,6 +47,15 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	var key crypto.TwofishKey
+	_, err = rand.Read(key[:])
+	if err != nil {
+		return nil, err
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
@@ -51,11 +63,12 @@ func createTpoolTester(name string) (*tpoolTester, error) {
 
 	// Assebmle all of the objects in to a tpoolTester
 	tpt := &tpoolTester{
-		cs:      cs,
-		gateway: g,
-		tpool:   tp,
-		miner:   m,
-		wallet:  w,
+		cs:        cs,
+		gateway:   g,
+		tpool:     tp,
+		miner:     m,
+		wallet:    w,
+		walletKey: key,
 	}
 
 	// Mine blocks until there is money in the wallet.
