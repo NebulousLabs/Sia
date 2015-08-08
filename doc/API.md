@@ -10,7 +10,6 @@ Consensus
 Queries:
 
 * /consensus [GET]
-* /consensus/synchronize [GET]
 
 #### /consensus [GET]
 
@@ -26,18 +25,6 @@ struct {
 	currentBlock string
 	target       string
 }
-```
-
-#### /consensus/synchronize [GET]
-
-Function: Sends a command to the consensus package to try synchronizing to the
-network.
-
-Parameters: none
-
-Response:
-```
-UNDECIDED
 ```
 
 Siad API (Deprecated)

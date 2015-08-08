@@ -34,23 +34,24 @@ func (srv *Server) initAPI(addr string) {
 	// 404 Calls
 	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
-	// Consensus API Calls
-	handleHTTPRequest(mux, "/consensus", srv.consensusHandler) // GET
-
 	// Daemon API Calls
+	handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
 	handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
 	handleHTTPRequest(mux, "/daemon/updates/apply", srv.daemonUpdatesApplyHandler)
 	handleHTTPRequest(mux, "/daemon/updates/check", srv.daemonUpdatesCheckHandler)
 
-	// Debugging API Calls
-	handleHTTPRequest(mux, "/debug/constants", srv.debugConstantsHandler)
-	handleHTTPRequest(mux, "/debug/mutextest", srv.debugMutextestHandler)
+	// Consensus API Calls
+	if srv.cs != nil {
+		handleHTTPRequest(mux, "/consensus", srv.consensusHandler) // GET
+	}
 
 	// Gateway API Calls
-	handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
-	handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
-	handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+	if srv.gateway != nil {
+		handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
+		handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
+		handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
+	}
 
 	// Host API Calls
 	if srv.host != nil {
