@@ -193,7 +193,7 @@ func main() {
 	updateCmd.AddCommand(updateCheckCmd, updateApplyCmd)
 
 	// consensus cmds have no leading qualifier
-	root.AddCommand(consensusSynchronizeCmd, consensusStatusCmd)
+	root.AddCommand(consensusStatusCmd)
 	root.AddCommand(stopCmd)
 
 	// parse flags

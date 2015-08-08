@@ -208,7 +208,7 @@ func (cs *ConsensusSet) RelayBlock(conn modules.PeerConn) error {
 		// If the block is an orphan, try to find the parents. The block
 		// received from the peer is discarded and will be downloaded again if
 		// the parent is found.
-		go cs.Synchronize(modules.NetAddress(conn.RemoteAddr().String()))
+		go cs.gateway.RPC(modules.NetAddress(conn.RemoteAddr().String()), "SendBlocks", cs.receiveBlocks)
 	}
 	if err != nil {
 		return err

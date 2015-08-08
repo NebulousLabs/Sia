@@ -163,10 +163,6 @@ type (
 		// current path, false otherwise.
 		InCurrentPath(types.BlockID) bool
 
-		// Synchronize will try to synchronize to a specific peer. During general
-		// use, this call should never be necessary.
-		Synchronize(NetAddress) error
-
 		// TryTransactionSet checks whether the transaction set would be valid if
 		// it were added in the next block. A consensus change is returned
 		// detailing the diffs that would result from the application of the
