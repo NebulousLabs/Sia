@@ -30,10 +30,11 @@ func (cs *ConsensusSet) validSiacoins(t types.Transaction) (err error) {
 	var inputSum types.Currency
 	for _, sci := range t.SiacoinInputs {
 		// Check that the input spends an existing output.
-		sco, exists := cs.siacoinOutputs[sci.ParentID]
+		exists := cs.db.inSiacoinOutputs(sci.ParentID)
 		if !exists {
 			return ErrMissingSiacoinOutput
 		}
+		sco := cs.db.getSiacoinOutputs(sci.ParentID)
 
 		// Check that the unlock conditions match the required unlock hash.
 		if sci.UnlockConditions.UnlockHash() != sco.UnlockHash {

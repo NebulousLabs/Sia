@@ -34,7 +34,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if dsco.Value.Cmp(types.NewCurrency64(12)) != 0 {
 		t.Error("miner payout created with wrong currency value")
 	}
-	_, exists = cst.cs.siacoinOutputs[mpid0]
+	exists = cst.cs.db.inSiacoinOutputs(mpid0)
 	if exists {
 		t.Error("miner payout was added to the siacoin output set")
 	}
@@ -155,7 +155,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if !exists {
 		t.Error("missed proof output was never created")
 	}
-	_, exists = cst.cs.siacoinOutputs[spoid]
+	exists = cst.cs.db.inSiacoinOutputs(spoid)
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}
@@ -244,7 +244,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if !exists {
 		t.Error("missed proof output was never created")
 	}
-	_, exists = cst.cs.siacoinOutputs[spoid]
+	exists = cst.cs.db.inSiacoinOutputs(spoid)
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}

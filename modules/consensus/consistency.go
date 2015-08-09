@@ -84,9 +84,9 @@ func (cs *ConsensusSet) checkSiacoins() error {
 	}
 
 	totalSiacoins := types.ZeroCurrency
-	for _, sco := range cs.siacoinOutputs {
+	cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
 		totalSiacoins = totalSiacoins.Add(sco.Value)
-	}
+	})
 	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
 		var payout types.Currency
 		for _, output := range fc.ValidProofOutputs {
@@ -156,12 +156,12 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 
 	// Add all of the siacoin outputs, sorted by id.
 	var openSiacoinOutputs crypto.HashSlice
-	for siacoinOutputID, _ := range cs.siacoinOutputs {
-		openSiacoinOutputs = append(openSiacoinOutputs, crypto.Hash(siacoinOutputID))
-	}
+	cs.db.forEachSiacoinOutputs(func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+		openSiacoinOutputs = append(openSiacoinOutputs, crypto.Hash(scoid))
+	})
 	sort.Sort(openSiacoinOutputs)
 	for _, id := range openSiacoinOutputs {
-		sco, _ := cs.siacoinOutputs[types.SiacoinOutputID(id)]
+		sco := cs.db.getSiacoinOutputs(types.SiacoinOutputID(id))
 		tree.PushObject(id)
 		tree.PushObject(sco)
 	}

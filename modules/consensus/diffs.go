@@ -39,7 +39,7 @@ func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, 
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.siacoinOutputs[scod.ID]
+		exists := cs.db.inSiacoinOutputs(scod.ID)
 		if exists == (scod.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitSiacoinOutputDiff)
 		}

@@ -19,7 +19,7 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 	}
 
 	// Commit a siacoin output diff.
-	initialScosLen := len(cst.cs.siacoinOutputs)
+	initialScosLen := cst.cs.db.lenSiacoinOutputs()
 	id := types.SiacoinOutputID{'1'}
 	sco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
 	scod := modules.SiacoinOutputDiff{
@@ -28,19 +28,19 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 		SiacoinOutput: sco,
 	}
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
-	if len(cst.cs.siacoinOutputs) != initialScosLen+1 {
+	if cst.cs.db.lenSiacoinOutputs() != initialScosLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	if cst.cs.siacoinOutputs[id].Value.Cmp(sco.Value) != 0 {
+	if cst.cs.db.getSiacoinOutputs(id).Value.Cmp(sco.Value) != 0 {
 		t.Error("wrong siacoin output value after committing a diff")
 	}
 
 	// Rewind the diff.
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffRevert)
-	if len(cst.cs.siacoinOutputs) != initialScosLen {
+	if cst.cs.db.lenSiacoinOutputs() != initialScosLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists := cst.cs.siacoinOutputs[id]
+	exists := cst.cs.db.inSiacoinOutputs(id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
@@ -49,20 +49,20 @@ func TestCommitSiacoinOutputDiff(t *testing.T) {
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
 	scod.Direction = modules.DiffRevert
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
-	if len(cst.cs.siacoinOutputs) != initialScosLen {
+	if cst.cs.db.lenSiacoinOutputs() != initialScosLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists = cst.cs.siacoinOutputs[id]
+	exists = cst.cs.db.inSiacoinOutputs(id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
 
 	// Revert the inverse diff.
 	cst.cs.commitSiacoinOutputDiff(scod, modules.DiffRevert)
-	if len(cst.cs.siacoinOutputs) != initialScosLen+1 {
+	if cst.cs.db.lenSiacoinOutputs() != initialScosLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	if cst.cs.siacoinOutputs[id].Value.Cmp(sco.Value) != 0 {
+	if cst.cs.db.getSiacoinOutputs(id).Value.Cmp(sco.Value) != 0 {
 		t.Error("wrong siacoin output value after committing a diff")
 	}
 
@@ -601,7 +601,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	pb.SiafundPoolDiffs = append(pb.SiafundPoolDiffs, sfpd)
 	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
 	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
-	_, exists := cst.cs.siacoinOutputs[scoid]
+	exists := cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
@@ -614,7 +614,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 		t.Error("intradependent outputs not treated correctly")
 	}
 	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
-	_, exists = cst.cs.siacoinOutputs[scoid]
+	exists = cst.cs.db.inSiacoinOutputs(scoid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
