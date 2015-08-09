@@ -90,7 +90,7 @@ func TestCommitFileContractDiff(t *testing.T) {
 	}
 
 	// Commit a file contract diff.
-	initialFcsLen := len(cst.cs.fileContracts)
+	initialFcsLen := cst.cs.db.lenFileContracts()
 	id := types.FileContractID{'1'}
 	fc := types.FileContract{Payout: types.NewCurrency64(1)}
 	fcd := modules.FileContractDiff{
@@ -99,19 +99,19 @@ func TestCommitFileContractDiff(t *testing.T) {
 		FileContract: fc,
 	}
 	cst.cs.commitFileContractDiff(fcd, modules.DiffApply)
-	if len(cst.cs.fileContracts) != initialFcsLen+1 {
+	if cst.cs.db.lenFileContracts() != initialFcsLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	if cst.cs.fileContracts[id].Payout.Cmp(fc.Payout) != 0 {
+	if cst.cs.db.getFileContracts(id).Payout.Cmp(fc.Payout) != 0 {
 		t.Error("wrong siacoin output value after committing a diff")
 	}
 
 	// Rewind the diff.
 	cst.cs.commitFileContractDiff(fcd, modules.DiffRevert)
-	if len(cst.cs.fileContracts) != initialFcsLen {
+	if cst.cs.db.lenFileContracts() != initialFcsLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists := cst.cs.fileContracts[id]
+	exists := cst.cs.db.inFileContracts(id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
@@ -120,17 +120,17 @@ func TestCommitFileContractDiff(t *testing.T) {
 	cst.cs.commitFileContractDiff(fcd, modules.DiffApply)
 	fcd.Direction = modules.DiffRevert
 	cst.cs.commitFileContractDiff(fcd, modules.DiffApply)
-	if len(cst.cs.fileContracts) != initialFcsLen {
+	if cst.cs.db.lenFileContracts() != initialFcsLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists = cst.cs.fileContracts[id]
+	exists = cst.cs.db.inFileContracts(id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
 
 	// Revert the inverse diff.
 	cst.cs.commitFileContractDiff(fcd, modules.DiffRevert)
-	if len(cst.cs.fileContracts) != initialFcsLen+1 {
+	if cst.cs.db.lenFileContracts() != initialFcsLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
 	if cst.cs.fileContracts[id].Payout.Cmp(fc.Payout) != 0 {
@@ -605,7 +605,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	_, exists = cst.cs.fileContracts[fcid]
+	exists = cst.cs.db.inFileContracts(fcid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
@@ -618,7 +618,7 @@ func TestCommitNodeDiffs(t *testing.T) {
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}
-	_, exists = cst.cs.fileContracts[fcid]
+	exists = cst.cs.db.inFileContracts(fcid)
 	if exists {
 		t.Error("intradependent outputs not treated correctly")
 	}

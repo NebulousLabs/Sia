@@ -410,7 +410,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 
 	// Submit a file contract revision for a file contract whose window has
 	// already opened.
-	fc = cst.cs.fileContracts[fcid]
+	fc = cst.cs.db.getFileContracts(fcid)
 	fc.WindowStart = 0
 	cst.cs.fileContracts[fcid] = fc
 	cst.cs.db.addFileContracts(fcid, fc)

@@ -87,13 +87,13 @@ func (cs *ConsensusSet) checkSiacoins() error {
 	for _, sco := range cs.siacoinOutputs {
 		totalSiacoins = totalSiacoins.Add(sco.Value)
 	}
-	for _, fc := range cs.fileContracts {
+	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
 		var payout types.Currency
 		for _, output := range fc.ValidProofOutputs {
 			payout = payout.Add(output.Value)
 		}
 		totalSiacoins = totalSiacoins.Add(payout)
-	}
+	})
 	for _, dsoMap := range cs.delayedSiacoinOutputs {
 		for _, dso := range dsoMap {
 			totalSiacoins = totalSiacoins.Add(dso.Value)
@@ -168,13 +168,13 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 
 	// Add all of the file contracts, sorted by id.
 	var openFileContracts crypto.HashSlice
-	for fileContractID, _ := range cs.fileContracts {
-		openFileContracts = append(openFileContracts, crypto.Hash(fileContractID))
-	}
+	cs.db.forEachFileContracts(func(fcid types.FileContractID, fc types.FileContract) {
+		openFileContracts = append(openFileContracts, crypto.Hash(fcid))
+	})
 	sort.Sort(openFileContracts)
 	for _, id := range openFileContracts {
 		// Sanity Check - file contract should exist.
-		fc, _ := cs.fileContracts[types.FileContractID(id)]
+		fc := cs.db.getFileContracts(types.FileContractID(id))
 		tree.PushObject(id)
 		tree.PushObject(fc)
 	}
