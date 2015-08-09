@@ -25,7 +25,7 @@ func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBloc
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	if startBlock > w.consensusSetHeight || endBlock > w.consensusSetHeight || startBlock > endBlock {
+	if startBlock > w.consensusSetHeight || startBlock > endBlock {
 		return nil, errOutOfBounds
 	}
 	if len(w.walletTransactions) == 0 {

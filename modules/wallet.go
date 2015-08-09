@@ -29,7 +29,6 @@ type (
 		TransactionID         types.TransactionID
 		ConfirmationHeight    types.BlockHeight
 		ConfirmationTimestamp types.Timestamp
-		Transaction           types.Transaction
 
 		FundType       types.Specifier
 		OutputID       types.OutputID

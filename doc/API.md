@@ -4,6 +4,11 @@ Siad API
 The siad API is currently under construction. The deprecated way of doing
 things is documented at the end of the (incomplete) new documentation.
 
+All responses from the API contain a 'success' field (a bool) and an 'error'
+field (a string). If the query returns an error, the 'success' field will be
+set to false and there will be an error message. If no error occurs, 'success'
+will be set to true and the error field will be empty.
+
 Consensus
 ---------
 
@@ -26,6 +31,360 @@ struct {
 	target       string
 }
 ```
+
+Wallet
+------
+
+Queries:
+
+* /wallet                   [GET]
+* /wallet/close             [PUT]
+* /wallet/history           [GET]
+* /wallet/history/$(addr)   [GET]
+* /wallet/seed              [GET]
+* /wallet/seed              [PUT]
+* /wallet/seed              [POST]
+* /wallet/siacoins          [GET]
+* /wallet/siacoins          [PUT]
+* /wallet/siafunds          [GET]
+* /wallet/siafunds          [PUT]
+* /wallet/transaction/$(id) [GET]
+* /wallet/unlock            [PUT]
+
+#### /wallet [GET]
+
+Function: Returns basic information about the wallet, such as whether the
+wallet is locked or unlocked.
+
+Parameters: none
+
+Response:
+```
+struct {
+	encrypted bool
+	unlocked  bool
+}
+```
+'encrypted' indicates whether the wallet has been encrypted or not. If the
+wallet has not been encrypted, then no data has been generated at all, and the
+first time the wallet is unlocked, the password given will be used as the
+password for encrypting all of the data. Encrypted will only be set to false if
+the wallet has never been unlocked before (the unlocked wallet is still
+encryped - but the encryption key is in memory).
+
+'unlocked' indicates whether the wallet is currently locked or unlocked. Some
+calls become unavailable when the wallet is locked.
+
+#### /wallet/close [PUT]
+
+Function: Locks and closes the wallet, preparing for shutdown. After being
+closed, the keys are encrypted. Queries for the seed, to send siafunds, and
+related queries become unavailable. Queries concerning transaction history and
+balance are still available.
+
+Parameters: none
+
+Response: Standard.
+
+#### /wallet/history [GET]
+
+Function: Return a list of transactions related to the wallet.
+
+Parameters:
+```
+struct {
+	start int
+	end   int
+}
+```
+
+Response:
+```
+struct {
+	transactions []WalletTransaction
+}
+```
+'transactions' is a list of 'WalletTransactions'. Wallet transactions are
+transactions that have been processed by the wallet and given more information,
+such as a confirmation height and a timestamp. Each wallet transaction contins
+information about only a single input or output. One network transaction with
+many inputs an outputs can result in many wallet transactions. All of the
+wallet transactions created by a network transaction are guaranteed to be
+consecutive in history. Wallet transactions will always be returned in
+chronological order.
+
+A wallet transaction takes the
+following form:
+```
+struct WalletTransaction {
+	TransactionID         string
+	ConfirmationHeight    int
+	ConfirmationTimestamp uint64
+
+	FundType       string
+	OutputID       string
+	RelatedAddress string
+	Value          int
+}
+```
+'TransactionID' is the id of the transaction from which the wallet transaction
+was derived. The full transaction can be obtaied by calling
+'/wallet/transaction/$(id)'
+
+'ConfirmationHeight' is the height at which the transaction was confirmed. The
+height will be set to 'uint64MAX' if the transaction has not been confirmed.
+
+'ConfirmationTimestamp' is the time at which a transaction was confirmed. The
+timestamp is a 64bit unix timestamp, and will be set to uint64MAX if the
+transaction is unconfirmed.
+
+'FundType' indicates what type of fund is represented by the wallet
+transaction. The options are 'Siacoin Input', 'Siacoin Output', 'Siafund
+Input', and 'Siafund Output', corresponding to whether the fund is related to
+siacoins or siafunds, and to whether the fund is an input to the transaction or
+an output of the transaction. When looking at transactions, it should be noted
+that a 'Siacoin Input' actually represents outgoing siacoins, as they are an
+input to the transaction; they are being spent. A 'Siacoin Output' represents
+incoming coins, because the output is being created by the transaction and made
+available to the wallet.
+
+'OutputID' is the id of the output. OutputIDs will always be unique.
+
+'RelatedAddress' is the address that is affected. For inputs (outgoing money),
+the related address is usually not important because the wallet arbitrarily
+selects which addresses will fund a transaction. For outputs (incoming money),
+the related address field can be used to determine who has sent money to the
+wallet.
+
+'Value' indicates how much money has been moved in the input or output.
+
+#### /wallet/history/$(addr) [GET]
+
+Function: Return all of the transaction related to a specific address.
+
+Parameters: none
+
+Response:
+```
+struct {
+	transactions []WalletTransaction
+}
+```
+'transactions' is a list of 'WalletTransactions' that affect the input address.
+See the documentation for '/wallet/history' for more information.
+
+#### /wallet/seed [GET]
+
+Function: Return the seed that is being used to generate addresses. This seed
+can be used to derive secret keys, and must be kept safe. This call is
+unavailable when the wallet is locked or closed.
+
+Parameters:
+```
+struct {
+	dictionary string
+}
+```
+'dictionary' is the name of the dicitionary that should be used when encoding
+the seed.
+
+Response:
+```
+struct {
+	primarySeed        string
+	addressesRemaining int
+	backupSeeds        []string
+}
+```
+'primarySeed' is the seed that is actively being used to generate new addresses
+for the wallet.
+
+'addressesRemaining' is the number of addresses that remain in the primary seed
+until exhaustion has been reached and no more addresses will be generated.
+
+'backupSeeds' is a list of seeds that are no longer used to generate new
+addresses, but are still tracked can have spendable outputs.
+
+A seed is an encoded version of a 128 bit random seed. The output is 15 words
+chosen from a small dictionary as indicated by the input. The most common
+choice for the dictionary is going to be 'english'. The underlying seed is the
+same no matter what dictionary is used for the encoding. The encoding also
+contains a small checksum of the seed, to help catch simple mistakes when
+copying. The library
+[entropy-mnemonics](https://github.com/NebulousLabs/entropy-mnemonics) is used
+when encoding.
+
+#### /wallet/seed [PUT]
+
+Function: Get a new address from the wallet generated by the primary seed. An
+error will be returned if the seed has been exhausted (there is a limit on the
+number of addresses that can be generated from one seed), or if the wallet is
+locked/closed.
+
+Parameters: none
+
+Response:
+```
+struct {
+	address string
+}
+```
+'address' is the address that cna
+
+#### /wallet/seed [POST]
+
+Function: Fetch a new seed for the wallet. The old seed will be added to the
+list of backup seeds. In general, this call should be avoided unless address
+exhaustion is reached. Because making a new seed is considered a significant
+action, there is a verification field that must be set to true. This is to
+prevent mistakes e.g. calling POST instead of GET or PUT.
+
+Parameters:
+```
+struct {
+	verification bool
+	dictionary   string
+}
+```
+'verification' must be set to true, or an error is returned. This is to prevent
+an implementation mistake where POST is called instead of GET or PUT.
+
+'dictionary' is the name of the dictionary that should be used when encoding
+the newly created seed. 'english' is the most common choice.
+
+Response:
+```
+struct {
+	newSeed string
+}
+```
+'newSeed' is the new seed that will be used as the seed for generating new
+addresses.
+
+#### /wallet/siacoins [GET]
+
+Function: get the siacoin balance (confirmed and unconfirmed) of the wallet.
+
+Parameters: none
+
+Response:
+```
+struct {
+	confirmedSiacoinBalance     int
+	unconfirmedOutgoingSiacoins int
+	unconfirmedIncomingSiacoins int
+}
+```
+'confirmedSiacoinBalance' is the number of siacoins available to the wallet as
+of the most recent block in the blockchain.
+
+'unconfirmedOutgoingSiacoins' is the number of siacoins that are leaving the
+wallet according to the set of unconfirmed transactions. Often this number
+appears inflated, because outputs are frequently larger than the number of
+coins being sent, and there is a refund. These coins are counted as outgoing,
+and the refund is counted as incoming. The difference in balance can be
+claculated using 'unconfirmedIncomingSiacoins' - 'unconfirmedOutgoingSiacoins'
+
+'unconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
+according to the set of unconfirmed transactions. This number is often inflated
+by outgoing siacoins, because outputs are frequently larger than the amount
+being sent. The refund will be included in the unconfirmed incoming siacoins
+balance.
+
+#### /wallet/siacoins [PUT]
+
+Function: Send siacoins to an address. The outputs are arbitrarily selected
+from addresses in the wallet.
+
+Parameters:
+```
+struct {
+	amount      int
+	destination string
+}
+```
+'amount' is the number of siacoins being sent.
+
+'destination' is the address that is receiving the coins.
+
+Response: standard
+
+#### /wallet/siafunds [GET]
+
+Function: get the siafund balance of the wallet. Only the confirmed balance is
+displayed for siafunds.
+
+Parameters: none
+
+Response:
+```
+struct {
+	siafundBalance      int
+	siacoinClaimBalance int
+}
+```
+'siafundBalance' is the number of siafunds available to the wallet as
+of the most recent block in the blockchain.
+
+'siacoinClaimBalance' is the number of siacoins that can be claimed from the
+siafunds as of the most recent block. Because the claim balance increases every
+time a file contract is created, it is possible that the balance will increase
+before any claim transaction is confirmed.
+
+#### /wallet/siafunds [PUT]
+
+Function: Send siafunds to an address. The outputs are arbitrarily selected
+from addresses in the wallet. Any siacoins available in the siafunds being sent
+(as well as the siacoins available in any siafunds that end up in a refund
+address) will become available to the wallet as siacoins after 144
+confirmations. To access all of the siacoins in the siacoin claim balance, send
+all of the siafunds to an address in your control (this will give you all the
+siacoins, while still letting you control the siafunds).
+
+Parameters:
+```
+struct {
+	amount      int
+	destination string
+}
+```
+'amount' is the number of siafunds being sent.
+
+'destination' is the address that is receiving the funds.
+
+Response: standard
+
+#### /wallet/transaction/$(id) [GET]
+
+Function: Get the transaction associated with a specific transaction id.
+
+Parameters: none
+
+Response:
+```
+struct {
+	transaction Transaction
+}
+```
+'transaction' is a 'types.Transaction'. The full transaction can be seen in
+types.transaction.go. All hashes in the transaction are encoded as strings.
+
+#### /wallet/unlock [PUT]
+
+Function: Unlock the wallet. The wallet is capable of knowing whether the
+correct password was provided. The first time that the wallet is unlocked ever,
+the password used will become the permanent password. Any string can be used as
+the key, though it is generally recommended that the encoded primary seed be
+used.
+
+Parameters:
+```
+struct {
+	key string
+}
+```
+
+Response: standard
 
 Siad API (Deprecated)
 =====================

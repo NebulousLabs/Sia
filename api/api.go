@@ -34,7 +34,7 @@ func (srv *Server) initAPI(addr string) {
 	// 404 Calls
 	handleHTTPRequest(mux, "/", srv.unrecognizedCallHandler)
 
-	// Daemon API Calls
+	// Daemon API Calls - Unfinished
 	handleHTTPRequest(mux, "/daemon/constants", srv.daemonConstantsHandler)
 	handleHTTPRequest(mux, "/daemon/stop", srv.daemonStopHandler)
 	handleHTTPRequest(mux, "/daemon/version", srv.daemonVersionHandler)
@@ -46,27 +46,27 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/consensus", srv.consensusHandler) // GET
 	}
 
-	// Gateway API Calls
+	// Gateway API Calls - Unfinished
 	if srv.gateway != nil {
 		handleHTTPRequest(mux, "/gateway/status", srv.gatewayStatusHandler)
 		handleHTTPRequest(mux, "/gateway/peers/add", srv.gatewayPeersAddHandler)
 		handleHTTPRequest(mux, "/gateway/peers/remove", srv.gatewayPeersRemoveHandler)
 	}
 
-	// Host API Calls
+	// Host API Calls - Unfinished
 	if srv.host != nil {
 		handleHTTPRequest(mux, "/host/announce", srv.hostAnnounceHandler)
 		handleHTTPRequest(mux, "/host/configure", srv.hostConfigureHandler)
 		handleHTTPRequest(mux, "/host/status", srv.hostStatusHandler)
 	}
 
-	// HostDB API Calls
+	// HostDB API Calls - Unfinished
 	if srv.hostdb != nil {
 		handleHTTPRequest(mux, "/hostdb/hosts/active", srv.hostdbHostsActiveHandler)
 		handleHTTPRequest(mux, "/hostdb/hosts/all", srv.hostdbHostsAllHandler)
 	}
 
-	// Miner API Calls
+	// Miner API Calls - Unfinished
 	if srv.miner != nil {
 		handleHTTPRequest(mux, "/miner/start", srv.minerStartHandler)
 		handleHTTPRequest(mux, "/miner/status", srv.minerStatusHandler)
@@ -77,7 +77,7 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/miner/submitheader", srv.minerSubmitheaderHandler)
 	}
 
-	// Renter API Calls
+	// Renter API Calls - Unfinished
 	if srv.renter != nil {
 		handleHTTPRequest(mux, "/renter/downloadqueue", srv.renterDownloadqueueHandler)
 		handleHTTPRequest(mux, "/renter/files/delete", srv.renterFilesDeleteHandler)
@@ -92,12 +92,12 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/renter/status", srv.renterStatusHandler)
 	}
 
-	// TransactionPool API Calls
+	// TransactionPool API Calls - Unfinished
 	if srv.tpool != nil {
 		handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
-	// Wallet API Calls
+	// Wallet API Calls - Unfinished
 	if srv.wallet != nil {
 		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
 		// handleHTTPRequest(mux, "/wallet/merge", srv.walletMergeHandler)
@@ -108,15 +108,14 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
 	}
 
-	// BlockExplorer API Calls
+	// BlockExplorer API Calls - Unfinished
 	if srv.exp != nil {
 		handleHTTPRequest(mux, "/explorer/status", srv.explorerStatusHandler)
 		handleHTTPRequest(mux, "/explorer/blockdata", srv.explorerBlockDataHandler)
 		handleHTTPRequest(mux, "/explorer/gethash", srv.explorerGetHashHandler)
-
 	}
 
-	// create graceful HTTP server
+	// create graceful HTTP server - Unfinished
 	srv.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},
