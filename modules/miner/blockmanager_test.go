@@ -22,7 +22,7 @@ func reconstructBlock(m *Miner, header types.BlockHeader) (*types.Block, error) 
 // mineHeader takes a header, and nonce grinds it. It returns
 // the header with a nonce that solves the corresponding block
 func mineHeader(m *Miner, header types.BlockHeader) (types.BlockHeader, error) {
-	b, err := reconstructBlock(m, header)
+	b, err := m.reconstructBlock(header)
 	if err != nil {
 		return types.BlockHeader{}, err
 	}

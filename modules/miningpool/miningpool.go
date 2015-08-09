@@ -15,10 +15,6 @@ const (
 	// Will only support maxConnections miners
 	maxConnections = 1024
 
-	// How much easier a partial block is than a block
-	// pool target is target * targetMultiple
-	targetMultiple = 255
-
 	// Percent of block payout that the pool keeps
 	miningPoolCut = 0.05
 
@@ -73,22 +69,28 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		return nil, errors.New("mining pool cannot use a nil wallet")
 	}
 
+	coinAddress, _, err := w.CoinAddress(false)
+	if err != nil {
+		return nil, err
+	}
+
 	mp := &MiningPool{
 		cs:     cs,
 		tpool:  tpool,
 		wallet: w,
 
 		MiningPoolSettings: modules.MiningPoolSettings{
-			TargetMultiple: 256,
-			//MiningPoolCut:  *big.NewRat(5, 100), // 0.05
-			//MinerCut:       *big.NewRat(3, 100), // 0.03
+			Address:         coinAddress,
+			TargetMultiple:  256,
+			PoolPercentCut:  5,
+			MinerPercentCut: 3,
 		},
 
 		persistDir: persistDir,
 
 		mu: sync.New(modules.SafeMutexDelay, 1),
 	}
-	err := mp.initPersist()
+	err = mp.initPersist()
 	if err != nil {
 		return nil, err
 	}

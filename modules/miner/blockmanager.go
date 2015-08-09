@@ -9,6 +9,21 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// reconstructBlock reconstructs a block from its header
+func (m *Miner) reconstructBlock(header types.BlockHeader) (*types.Block, error) {
+	block, exists := m.blockMem[header]
+	if !exists {
+		return nil, errors.New("Header is either invalid or too old")
+	}
+	arbData, exists := m.arbDataMem[header]
+	if !exists {
+		return nil, errors.New("Header is either invalid or too old")
+	}
+
+	block.Transactions[0].ArbitraryData[0] = arbData
+	return block, nil
+}
+
 // Creates a block ready for nonce grinding, also returning the MerkleRoot of
 // the block. Getting the MerkleRoot of a block requires encoding and hashing
 // in a specific way, which are implementation details we didn't want to
@@ -161,16 +176,12 @@ func (m *Miner) SubmitHeader(bh types.BlockHeader) error {
 	lookupBH := bh
 	lookupBH.Nonce = zeroNonce
 	lockID := m.mu.Lock()
-	b, bExists := m.blockMem[lookupBH]
-	arbData, arbExists := m.arbDataMem[lookupBH]
+	b, err := m.reconstructBlock(lookupBH)
 	m.mu.Unlock(lockID)
-	if !bExists || !arbExists {
-		err := errors.New("block header returned late - block was cleared from memory")
-		m.log.Println("ERROR:", err)
+	if err != nil {
 		return err
 	}
 
-	b.Transactions[0].ArbitraryData[0] = arbData
 	b.Nonce = bh.Nonce
 	return m.SubmitBlock(*b)
 }

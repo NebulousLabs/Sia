@@ -43,8 +43,12 @@ func (m *Miner) ConnectToPool(ip string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(mps)
-	//TODO: Save pool settings
+	m.minerPercentCut = mps.MinerPercentCut
+	m.targetMultiple = mps.TargetMultiple
+	m.poolPayoutAddress = mps.Address
+	fmt.Println("Miner payout: ", m.minerPercentCut)
+	fmt.Println("Target multiple: ", m.targetMultiple)
+	fmt.Println("Pool address: ", m.poolPayoutAddress)
 
 	// Negotiate a payment channel with the pool
 	err = m.negotiatePaymentChannel()
@@ -60,15 +64,44 @@ func (m *Miner) ConnectToPool(ip string) error {
 // through SubmitHeaderToPool. Note that the target returned is a fraction of
 // the real block target.
 func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
+	// TODO: make sure we connected to a pool already
+
 	fmt.Println("pool header get")
 	// Get a header from the block manager
+	header, target := m.HeaderForWork()
+
+	// TODO: Set the target to be easier
+	//target = types.Target{uint32(target) * m.targetMultiple}
 
 	// Change the payouts of the block manager's block
+	block, err := m.reconstructBlock(header)
+	if err != nil {
+		return types.BlockHeader{}, types.Target{}
+	}
+	subsidy := block.MinerPayouts[0].Value
+	fmt.Println(subsidy, target)
+	minerPayout := subsidy.Div(types.NewCurrency64(100)).Mul(types.NewCurrency64(uint64(m.minerPercentCut)))
+	poolPayout := subsidy.Sub(minerPayout)
+	blockPayouts := []types.SiacoinOutput{
+		types.SiacoinOutput{Value: minerPayout, UnlockHash: m.address},
+		types.SiacoinOutput{Value: poolPayout, UnlockHash: m.poolPayoutAddress}}
+
+	fmt.Println(minerPayout)
+	fmt.Println(poolPayout)
+
+	newBlock := types.Block{
+		ParentID:     block.ParentID,
+		Timestamp:    block.Timestamp,
+		MinerPayouts: blockPayouts,
+		Transactions: block.Transactions,
+	}
 
 	// Generate the new pool-ready header and store a mapping to the non-pool
 	// header it was derived from
+	poolHeader := newBlock.Header()
+	m.poolHeaderMap[poolHeader] = header
 
-	return types.BlockHeader{}, types.Target{}
+	return poolHeader, target
 }
 
 // SubmitPoolHeader takes a header that has been solved and submits it

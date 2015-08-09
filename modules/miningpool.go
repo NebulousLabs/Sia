@@ -1,5 +1,9 @@
 package modules
 
+import (
+	"github.com/NebulousLabs/Sia/types"
+)
+
 const (
 	MiningPoolDir = "miningpool"
 )
@@ -14,9 +18,17 @@ type MiningPool interface {
 }
 
 type MiningPoolSettings struct {
+	// The wallet address the miner should pay to
+	Address types.UnlockHash
+
 	// The target multiple for this specfic pool
 	TargetMultiple uint32
 
-	//MiningPoolCut  big.Rat
-	//MinerCut       big.Rat
+	// Miners will mine blocks which pay MinerPercentCut of the subsidy to
+	// themselves and the rest to the pool. The pool takes its cut then and
+	// keeps PoolPercentCut then uses the rest to pay miners based on work. A
+	// partial block is therefore worth:
+	// subsidy * ((1 - MinerPercentCut/100) * PoolPercentCut/100) / TargetMultiple
+	PoolPercentCut  uint8
+	MinerPercentCut uint8
 }
