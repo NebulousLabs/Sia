@@ -99,10 +99,10 @@ func (cs *ConsensusSet) checkSiacoins() error {
 			totalSiacoins = totalSiacoins.Add(dso.Value)
 		}
 	}
-	for _, sfo := range cs.siafundOutputs {
+	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
 		sfoSiacoins := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
-	}
+	})
 	if expectedSiacoins.Cmp(totalSiacoins) != 0 {
 		return errSiacoinMiscount
 	}
@@ -112,9 +112,9 @@ func (cs *ConsensusSet) checkSiacoins() error {
 // checkSiafunds counts the siafund outputs and checks that there are 10,000.
 func (cs *ConsensusSet) checkSiafunds() error {
 	totalSiafunds := types.ZeroCurrency
-	for _, sfo := range cs.siafundOutputs {
+	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
 		totalSiafunds = totalSiafunds.Add(sfo.Value)
-	}
+	})
 	if totalSiafunds.Cmp(types.SiafundCount) != 0 {
 		return errSiafundMiscount
 	}
@@ -181,12 +181,12 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 
 	// Add all of the siafund outputs, sorted by id.
 	var openSiafundOutputs crypto.HashSlice
-	for siafundOutputID, _ := range cs.siafundOutputs {
-		openSiafundOutputs = append(openSiafundOutputs, crypto.Hash(siafundOutputID))
-	}
+	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+		openSiafundOutputs = append(openSiafundOutputs, crypto.Hash(sfoid))
+	})
 	sort.Sort(openSiafundOutputs)
 	for _, id := range openSiafundOutputs {
-		sco, _ := cs.siafundOutputs[types.SiafundOutputID(id)]
+		sco := cs.db.getSiafundOutputs(types.SiafundOutputID(id))
 		tree.PushObject(id)
 		tree.PushObject(sco)
 	}

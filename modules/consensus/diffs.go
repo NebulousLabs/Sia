@@ -100,19 +100,26 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
+	// This function only modifies the database now, so the whole
+	// nothing happens when this flag is false
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.siafundOutputs[sfod.ID]
+		exists := cs.db.inSiafundOutputs(sfod.ID)
+		// Loading will commit saifundOutputs that are already
+		// in the database.
 		if exists == (sfod.Direction == dir) {
 			panic(errBadCommitSiafundOutputDiff)
 		}
 	}
 
 	if sfod.Direction == dir {
-		cs.siafundOutputs[sfod.ID] = sfod.SiafundOutput
+		cs.db.addSiafundOutputs(sfod.ID, sfod.SiafundOutput)
 	} else {
-		delete(cs.siafundOutputs, sfod.ID)
+		cs.db.rmSiafundOutputs(sfod.ID)
 	}
 }
 
@@ -289,7 +296,7 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		if cs.updatePath {
+		if cs.updateDatabase {
 			err := cs.db.pushPath(pb.Block.ID())
 
 			if build.DEBUG && err != nil {

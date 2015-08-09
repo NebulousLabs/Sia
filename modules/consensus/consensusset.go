@@ -24,10 +24,11 @@ var (
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// updatePath is a flag that determines if a block node will
-	// be added to the path. It should be false when loading the
-	// current path from disk and true otherwise
-	updatePath bool // DEPRECATED
+	// updateDatabase is a flag that determines if a block will be
+	// added to the database when commiting diffs. It should be
+	// false when loading the current path from disk and true
+	// otherwise
+	updateDatabase bool // DEPRECATED
 
 	// blocksLoaded is the number of blocks that have been loaded
 	// from memory. This variable only exists while some
@@ -61,7 +62,6 @@ type ConsensusSet struct {
 	siafundPool           types.Currency
 	siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
 	fileContracts         map[types.FileContractID]types.FileContract
-	siafundOutputs        map[types.SiafundOutputID]types.SiafundOutput
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
 	// fileContractExpirations is not actually a part of the consensus set, but
@@ -107,7 +107,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
 		fileContracts:         make(map[types.FileContractID]types.FileContract),
-		siafundOutputs:        make(map[types.SiafundOutputID]types.SiafundOutput),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
 
 		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
@@ -140,7 +139,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			ID:            sfid,
 			SiafundOutput: siafundOutput,
 		}
-		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
 	}
 
@@ -168,7 +166,7 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	// Load the saved processed blocks into memory and send out updates
 	cs.loadDiffs()
 
-	cs.updatePath = true
+	cs.updateDatabase = true
 
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)

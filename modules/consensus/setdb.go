@@ -39,6 +39,7 @@ func openDB(filename string) (*setDB, error) {
 	}
 
 	var buckets []string = []string{
+		"SiafundOutputs",
 		"Path",
 		"BlockMap",
 		"Metadata",
@@ -207,6 +208,30 @@ func (db *setDB) inBucket(bucket string, key interface{}) bool {
 	return exists
 }
 
+// lenBucket is a simple wrapper for bucketSize that panics on error
+func (db *setDB) lenBucket(bucket string) uint64 {
+	s, err := db.BucketSize(bucket)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// forEachItem runs a given function on every element in a given
+// bucket name, and will panic on any error
+func (db *setDB) forEachItem(bucket string, fn func(k, v []byte) error) {
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if build.DEBUG && b == nil {
+			panic(errNilBucket)
+		}
+		return b.ForEach(fn)
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
 func (db *setDB) pushPath(bid types.BlockID) error {
@@ -249,11 +274,7 @@ func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 
 // pathHeight returns the size of the current path
 func (db *setDB) pathHeight() types.BlockHeight {
-	h, err := db.BucketSize("Path")
-	if err != nil {
-		panic(err)
-	}
-	return types.BlockHeight(h)
+	return types.BlockHeight(db.lenBucket("Path"))
 }
 
 // addBlockMap adds a processedBlock to the block map
@@ -300,4 +321,57 @@ func (db *setDB) updateBlockMap(pb *processedBlock) {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
+}
+
+// addSiafundOutputs is a wrapper around addItem for adding a siafundOutput.
+func (db *setDB) addSiafundOutputs(id types.SiafundOutputID, output types.SiafundOutput) error {
+	return db.addItem("SiafundOutputs", id, output)
+}
+
+// getSiafundOutputs is a wrapper around getItem which decodes the
+// result into a siafundOutput
+func (db *setDB) getSiafundOutputs(id types.SiafundOutputID) types.SiafundOutput {
+	sfoBytes, err := db.getItem("SiafundOutputs", id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sfo types.SiafundOutput
+	err = encoding.Unmarshal(sfoBytes, &sfo)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfo
+}
+
+// inSiafundOutputs is a wrapper around inBucket which returns a true
+// if an output with the given id is in the database
+func (db *setDB) inSiafundOutputs(id types.SiafundOutputID) bool {
+	return db.inBucket("SiafundOutputs", id)
+}
+
+// nrmSiafundOutputs removes a siafund output from the database
+func (db *setDB) rmSiafundOutputs(id types.SiafundOutputID) error {
+	return db.rmItem("SiafundOutputs", id)
+}
+
+// lenSiafundOutputs returns the size of the SiafundOutputs bucket
+func (db *setDB) lenSiafundOutputs() uint64 {
+	return db.lenBucket("SiafundOutputs")
+}
+
+func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.SiafundOutput)) {
+	db.forEachItem("SiafundOutputs", func(kb, vb []byte) error {
+		var key types.SiafundOutputID
+		var value types.SiafundOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		fn(key, value)
+		return nil
+	})
 }
