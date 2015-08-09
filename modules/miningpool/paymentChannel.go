@@ -33,9 +33,10 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 	return nil
 }
 
-// updateChannelPayment updates the payment channel whose recipient is `addr`
-// by creating a new transaction that sends `newAmount` to `addr` and returning
-// it. This new transaction is meant to then be sent to the miner off-chain
-func (mp *MiningPool) updateChannelPayment(newAmount types.Currency, addr types.UnlockHash) (types.Transaction, error) {
+// sendPayment sends 'amount' through the payment channel whose recipient is
+// `addr` by creating a new transaction that sends `amount + oldAmount` to
+// `addr` and returning it. This new transaction is meant to then be sent to
+// the miner off-chain
+func (mp *MiningPool) sendPayment(amount types.Currency, addr types.UnlockHash) (types.Transaction, error) {
 	return types.Transaction{}, nil
 }

@@ -76,12 +76,12 @@ type Miner struct {
 	// poolHeaderMap is a map from headers of blocks that payout to the pool to
 	// headers of blocks with normal payouts. This allows the poolmanager to
 	// use the blockmanager and only have to worry about changing payouts.
-	poolNetAddr       modules.NetAddress
+	poolIP            string
 	minerPercentCut   uint8
 	targetMultiple    uint32
 	poolPayoutAddress types.UnlockHash
 	poolTransaction   types.Transaction
-	poolHeaderMap     map[types.BlockHeader]types.BlockHeader
+	poolHeaderMem     map[types.BlockHeader]types.BlockHeader
 
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
 	// calculate the hashrate. When attempts reaches a certain threshold, the
@@ -148,7 +148,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		arbDataMem: make(map[types.BlockHeader][]byte),
 		headerMem:  make([]types.BlockHeader, headerForWorkMemory),
 
-		poolHeaderMap: make(map[types.BlockHeader]types.BlockHeader),
+		poolHeaderMem: make(map[types.BlockHeader]types.BlockHeader),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
