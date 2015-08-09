@@ -139,7 +139,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		WindowEnd:          pb.Height,
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
-	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	// Assign the contract a 0-id.
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
@@ -166,13 +166,13 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	// not exist.
 	defer func() {
 		r := recover()
-		if r != errMissingFileContract {
+		if r != errNilItem {
 			t.Error(r)
 		}
 	}()
 	defer func() {
 		r := recover()
-		if r != errStorageProofTiming {
+		if r != errNilItem {
 			t.Error(r)
 		}
 		// Trigger errMissingFileContract
@@ -180,18 +180,17 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	}()
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
+		if r != errNilItem {
 			t.Error(r)
 		}
 
 		// Trigger errStorageProofTiming
 		expiringFC.WindowEnd = 0
-		cst.cs.fileContracts[types.FileContractID{}] = expiringFC
 		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
+		if r != errNilItem {
 			t.Error(r)
 		}
 
@@ -201,7 +200,6 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	// Trigger errPayoutsAlreadyPaid from delayed outputs.
-	cst.cs.fileContracts[types.FileContractID{}] = expiringFC
 	cst.cs.db.rmFileContracts(types.FileContractID{})
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid] = types.SiacoinOutput{}
@@ -229,7 +227,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 		WindowEnd:          pb.Height,
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
-	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	// Assign the contract a 0-id.
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}

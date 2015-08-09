@@ -57,14 +57,13 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
-		_, exists := cs.fileContracts[fcd.ID]
+		exists := cs.db.inFileContracts(fcd.ID)
 		if exists == (fcd.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		cs.fileContracts[fcd.ID] = fcd.FileContract
 		if cs.updateDatabase {
 			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
 		}
@@ -85,7 +84,6 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		}
 		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
 	} else {
-		delete(cs.fileContracts, fcd.ID)
 		if cs.updateDatabase {
 			cs.db.rmFileContracts(fcd.ID)
 		}

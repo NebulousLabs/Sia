@@ -423,7 +423,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	// Trigger a panic from revising a nonexistent file contract.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplyFileContractRevisions {
+		if r != errNilItem {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
@@ -569,7 +569,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	// contract.
 	defer func() {
 		r := recover()
-		if r != ErrNonexistentStorageProof {
+		if r != errNilItem {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()

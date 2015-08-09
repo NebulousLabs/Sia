@@ -71,14 +71,13 @@ func TestStorageProofSegment(t *testing.T) {
 	// Add a file contract to the consensus set that can be used to probe the
 	// storage segment.
 	var outputs []byte
-	for i := 0; i < 4*256*256; i++ {
+	for i := 0; i < 32*256; i++ {
 		var fcid types.FileContractID
 		rand.Read(fcid[:])
 		fc := types.FileContract{
 			WindowStart: 2,
 			FileSize:    256 * 64,
 		}
-		cst.cs.fileContracts[fcid] = fc
 		cst.cs.db.addFileContracts(fcid, fc)
 		index, err := cst.cs.storageProofSegment(fcid)
 		if err != nil {
@@ -106,9 +105,6 @@ func TestStorageProofSegment(t *testing.T) {
 	}
 
 	// Try to get the segment of an unfinished file contract.
-	cst.cs.fileContracts[types.FileContractID{}] = types.FileContract{
-		WindowStart: 100000,
-	}
 	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
 		WindowStart: 100000,
 	})
@@ -159,7 +155,6 @@ func TestValidStorageProofs(t *testing.T) {
 		WindowStart:    2,
 		WindowEnd:      1200,
 	}
-	cst.cs.fileContracts[fcid] = fc
 	cst.cs.db.addFileContracts(fcid, fc)
 	buffer.Seek(0, 0)
 
@@ -227,7 +222,6 @@ func TestValidStorageProofs(t *testing.T) {
 	// Find a proofIndex that has the value '1'.
 	for {
 		fcid[0]++
-		cst.cs.fileContracts[fcid] = fc
 		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
@@ -292,7 +286,6 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	var proofIndex uint64
 	for {
 		fcid[0]++
-		cst.cs.fileContracts[fcid] = fc
 		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
@@ -354,7 +347,6 @@ func TestValidFileContractRevisions(t *testing.T) {
 		UnlockHash:     unlockHash,
 		RevisionNumber: 1,
 	}
-	cst.cs.fileContracts[fcid] = fc
 	cst.cs.db.addFileContracts(fcid, fc)
 
 	// Try a working file contract revision.
@@ -412,7 +404,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	// already opened.
 	fc = cst.cs.db.getFileContracts(fcid)
 	fc.WindowStart = 0
-	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.rmFileContracts(fcid)
 	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].NewRevisionNumber = 3
 	err = cst.cs.validFileContractRevisions(txn)
@@ -422,7 +414,6 @@ func TestValidFileContractRevisions(t *testing.T) {
 
 	// Submit a file contract revision with incorrect unlock conditions.
 	fc.WindowStart = 100
-	cst.cs.fileContracts[fcid] = fc
 	cst.cs.db.rmFileContracts(fcid)
 	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].UnlockConditions.Timelock++
