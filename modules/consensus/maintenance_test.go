@@ -88,6 +88,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 		}
 		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], mpid0)
 		cst.cs.siacoinOutputs[mpid0] = types.SiacoinOutput{}
+		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
 		cst.cs.applyMinerPayouts(pb)
 	}()
 	cst.cs.applyMinerPayouts(pb)
@@ -113,6 +114,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.siacoinOutputs[types.SiacoinOutputID{}] = types.SiacoinOutput{}
+	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
 	cst.cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	cst.cs.delayedSiacoinOutputs[pb.Height][types.SiacoinOutputID{}] = types.SiacoinOutput{}
 	cst.cs.applyMaturedSiacoinOutputs(pb)
@@ -197,6 +199,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		// Trigger errPayoutsAlreadyPaid from siacoin outputs.
 		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], spoid)
 		cst.cs.siacoinOutputs[spoid] = types.SiacoinOutput{}
+		cst.cs.db.addSiacoinOutputs(spoid, types.SiacoinOutput{})
 		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	// Trigger errPayoutsAlreadyPaid from delayed outputs.

@@ -41,6 +41,7 @@ func openDB(filename string) (*setDB, error) {
 	var buckets []string = []string{
 		"FileContracts",
 		"SiafundOutputs",
+		"SiacoinOutputs",
 		"Path",
 		"BlockMap",
 		"Metadata",
@@ -438,7 +439,7 @@ func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOu
 }
 
 // getSiacoinOutputs retrieves a saicoin output by ID
-func (db *setDB) getSiacoinOutputs(id types.SaicoinOutputID) types.SiacoinOutput {
+func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput {
 	scoBytes, err := db.getItem("SiacoinOutputs", id)
 	if build.DEBUG && err != nil {
 		panic(err)

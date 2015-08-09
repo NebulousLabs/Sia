@@ -40,14 +40,20 @@ func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, 
 	// output that does not exist.
 	if build.DEBUG {
 		_, exists := cs.siacoinOutputs[scod.ID]
-		if exists == (scod.Direction == dir) {
+		if exists == (scod.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitSiacoinOutputDiff)
 		}
 	}
 
 	if scod.Direction == dir {
+		if cs.updateDatabase {
+			cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
+		}
 		cs.siacoinOutputs[scod.ID] = scod.SiacoinOutput
 	} else {
+		if cs.updateDatabase {
+			cs.db.rmSiacoinOutputs(scod.ID)
+		}
 		delete(cs.siacoinOutputs, scod.ID)
 	}
 }
