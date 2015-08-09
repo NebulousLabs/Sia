@@ -37,7 +37,7 @@ func (cs *ConsensusSet) initSetDB() error {
 	// Prevent the miner payout for the genesis block from being spent
 	cs.db.addSiacoinOutputs(cs.blockRoot.Block.MinerPayoutID(0), types.SiacoinOutput{
 		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.ZeroUnlockHash,
+		UnlockHash: types.UnlockHash{},
 	})
 
 	// Explicit initilization preferred to implicit for blocksLoaded
