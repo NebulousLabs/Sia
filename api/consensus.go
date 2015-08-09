@@ -8,7 +8,7 @@ import (
 )
 
 // The ConsensusSetStatus struct contains general information about the
-// consensus set, with tags to have idiomatic json encodings.
+// consensus set, with tags to support idiomatic json encodings.
 type ConsensusSetStatus struct {
 	Height       types.BlockHeight `json:"height"`
 	CurrentBlock types.BlockID     `json:"currentblock"`
@@ -25,9 +25,9 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 	}
 
 	writeJSON(w, ConsensusSetStatus{
-		types.BlockHeight(srv.blockchainHeight),
-		srv.currentBlock.ID(),
-		currentTarget,
+		Height:       types.BlockHeight(srv.blockchainHeight),
+		CurrentBlock: srv.currentBlock.ID(),
+		Target:       currentTarget,
 	})
 }
 

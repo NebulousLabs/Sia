@@ -144,6 +144,10 @@ type (
 		// wallet.
 		Encrypted() bool
 
+		// Unlocked returns true if the wallet is currently unlocked, false
+		// otherwise.
+		Unlocked() bool
+
 		// Unlock must be called before the wallet is usable. All wallets and
 		// wallet seeds are encrypted by default, and the wallet will not know
 		// which addresses to watch for on the blockchain until unlock has been

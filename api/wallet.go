@@ -8,6 +8,35 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+// The WalletStatus struct contains general information about the wallet, with
+// tags to support idiomatic json encodings.
+type WalletStatus struct {
+	Encrypted bool `json:"encrypted"`
+	Unlocked  bool `json:"unlocked"`
+}
+
+// walletHandlerGET handles a GET request to /wallet
+func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
+	writeJSON(w, WalletStatus{
+		Encrypted: srv.wallet.Encrypted(),
+		Unlocked:  srv.wallet.Unlocked(),
+	})
+}
+
+// walletHander handles API calls to /wallet.
+func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
+	lockID := srv.mu.RLock()
+	defer srv.mu.RUnlock(lockID)
+
+	if req.Method == "" || req.Method == "GET" {
+		srv.consensusHandlerGET(w, req)
+		return
+	}
+
+	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
+}
+
+/*
 // WalletSiafundsBalance contains fields relating to the siafunds balance.
 type WalletSiafundsBalance struct {
 	SiafundBalance      types.Currency
@@ -57,7 +86,6 @@ func (srv *Server) walletMergeHandler(w http.ResponseWriter, req *http.Request) 
 	}
 	writeSuccess(w)
 }
-*/
 
 // walletSendHandler handles the API call to send coins to another address.
 func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
@@ -122,7 +150,6 @@ func (srv *Server) walletSiafundsSendHandler(w http.ResponseWriter, req *http.Re
 			writeError(w, "Failed to send siafunds: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-	*/
 
 	// writeSuccess(w)
 	writeError(w, "Wallet does not currently implement siafunds functions", http.StatusBadRequest)
@@ -137,7 +164,6 @@ func (srv *Server) walletSiafundsWatchsiagaddressHandler(w http.ResponseWriter, 
 			writeError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-	*/
 	// writeSuccess(w)
 	writeError(w, "Wallet does not currently implement siafunds functions", http.StatusBadRequest)
 }
@@ -147,3 +173,4 @@ func (srv *Server) walletStatusHandler(w http.ResponseWriter, req *http.Request)
 	// writeJSON(w, srv.wallet.Info())
 	writeError(w, "Wallet status not currently implemented", http.StatusBadRequest)
 }
+*/

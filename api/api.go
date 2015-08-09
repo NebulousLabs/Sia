@@ -97,15 +97,16 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/transactionpool/transactions", srv.transactionpoolTransactionsHandler)
 	}
 
-	// Wallet API Calls - Unfinished
+	// Wallet API Calls
 	if srv.wallet != nil {
-		handleHTTPRequest(mux, "/wallet/address", srv.walletAddressHandler)
-		// handleHTTPRequest(mux, "/wallet/merge", srv.walletMergeHandler)
-		handleHTTPRequest(mux, "/wallet/send", srv.walletSendHandler)
-		// handleHTTPRequest(mux, "/wallet/status", srv.walletStatusHandler)
-		handleHTTPRequest(mux, "/wallet/siafunds/balance", srv.walletSiafundsBalanceHandler)
-		handleHTTPRequest(mux, "/wallet/siafunds/send", srv.walletSiafundsSendHandler)
-		handleHTTPRequest(mux, "/wallet/siafunds/watchsiagaddress", srv.walletSiafundsWatchsiagaddressHandler)
+		handleHTTPRequest(mux, "/wallet", srv.walletHandler)                        // GET
+		handleHTTPRequest(mux, "/wallet/close", srv.walletCloseHandler)             // PUT
+		handleHTTPRequest(mux, "/wallet/history", srv.walletHistoryHandler)         // GET, $(addr) GET
+		handleHTTPRequest(mux, "/wallet/seed", srv.walletSeedHandler)               // GET, PUT, POST
+		handleHTTPRequest(mux, "/wallet/siacoins", srv.walletSiacoinsHandler)       // GET, PUT
+		handleHTTPRequest(mux, "/wallet/siafunds", srv.walletSiafundsHandler)       // GET, PUT
+		handleHTTPRequest(mux, "/wallet/transaction", srv.walletTransactionHandler) // $(id) GET
+		handleHTTPRequest(mux, "/wallet/unlock", srv.walletUnlockHandler)           // PUT
 	}
 
 	// BlockExplorer API Calls - Unfinished
