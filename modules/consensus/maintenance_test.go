@@ -144,7 +144,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
-	_, exists := cst.cs.fileContracts[types.FileContractID{}]
+	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
@@ -157,7 +157,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}
-	_, exists = cst.cs.fileContracts[types.FileContractID{}]
+	exists = cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract remains after expiration")
 	}
@@ -234,7 +234,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyFileContractMaintenance(pb)
-	_, exists := cst.cs.fileContracts[types.FileContractID{}]
+	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract was not consumed in missed storage proof")
 	}
@@ -247,7 +247,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}
-	_, exists = cst.cs.fileContracts[types.FileContractID{}]
+	exists = cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
 		t.Error("file contract remains after expiration")
 	}

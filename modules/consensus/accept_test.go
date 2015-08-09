@@ -599,10 +599,10 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Check that the revision was successful.
-	if cst.cs.fileContracts[missedFCID].RevisionNumber != 1 {
+	if cst.cs.db.getFileContracts(missedFCID).RevisionNumber != 1 {
 		return errors.New("revision did not update revision number")
 	}
-	if cst.cs.fileContracts[missedFCID].FileSize != 10e3 {
+	if cst.cs.db.getFileContracts(missedFCID).FileSize != 10e3 {
 		return errors.New("revision did not update file contract size")
 	}
 
@@ -634,11 +634,11 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 
 	// Check that the valid contract was removed but the missed contract was
 	// not.
-	_, exists := cst.cs.fileContracts[validFCID]
+	exists := cst.cs.db.inFileContracts(validFCID)
 	if exists {
 		return errors.New("valid file contract still exists in the consensus set")
 	}
-	_, exists = cst.cs.fileContracts[missedFCID]
+	exists = cst.cs.db.inFileContracts(missedFCID)
 	if !exists {
 		return errors.New("missed file contract was consumed by storage proof")
 	}
@@ -657,11 +657,11 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	if err != nil {
 		return err
 	}
-	_, exists = cst.cs.fileContracts[validFCID]
+	exists = cst.cs.db.inFileContracts(validFCID)
 	if exists {
 		return errors.New("valid file contract still exists in the consensus set")
 	}
-	_, exists = cst.cs.fileContracts[missedFCID]
+	exists = cst.cs.db.inFileContracts(missedFCID)
 	if exists {
 		return errors.New("missed file contract was not consumed when the window was closed.")
 	}

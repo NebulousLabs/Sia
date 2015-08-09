@@ -133,7 +133,7 @@ func TestCommitFileContractDiff(t *testing.T) {
 	if cst.cs.db.lenFileContracts() != initialFcsLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	if cst.cs.fileContracts[id].Payout.Cmp(fc.Payout) != 0 {
+	if cst.cs.db.getFileContracts(id).Payout.Cmp(fc.Payout) != 0 {
 		t.Error("wrong siacoin output value after committing a diff")
 	}
 

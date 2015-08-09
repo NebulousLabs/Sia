@@ -74,7 +74,7 @@ func (cs *ConsensusSet) applyFileContracts(pb *processedBlock, t types.Transacti
 		// Sanity check - the file contract should not exists within the state.
 		fcid := t.FileContractID(i)
 		if build.DEBUG {
-			_, exists := cs.fileContracts[fcid]
+			exists := cs.db.inFileContracts(fcid)
 			if exists {
 				panic(ErrMisuseApplyFileContracts)
 			}
@@ -107,12 +107,8 @@ func (cs *ConsensusSet) applyFileContracts(pb *processedBlock, t types.Transacti
 func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.Transaction) {
 	for _, fcr := range t.FileContractRevisions {
 		// Sanity check - termination should affect an existing contract.
-		fc, exists := cs.fileContracts[fcr.ParentID]
-		if build.DEBUG {
-			if !exists {
-				panic(ErrMisuseApplyFileContractRevisions)
-			}
-		}
+		// Check done inside database wrapper
+		fc := cs.db.getFileContracts(fcr.ParentID)
 
 		// Add the diff to delete the old file contract.
 		fcd := modules.FileContractDiff{
@@ -151,12 +147,8 @@ func (cs *ConsensusSet) applyFileContractRevisions(pb *processedBlock, t types.T
 func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transaction) {
 	for _, sp := range t.StorageProofs {
 		// Sanity check - the file contract of the storage proof should exist.
-		fc, exists := cs.fileContracts[sp.ParentID]
-		if build.DEBUG {
-			if !exists {
-				panic(ErrNonexistentStorageProof)
-			}
-		}
+		// Check done inside database wrapper
+		fc := cs.db.getFileContracts(sp.ParentID)
 
 		// Add all of the outputs in the ValidProofOutputs of the contract.
 		for i, vpo := range fc.ValidProofOutputs {
