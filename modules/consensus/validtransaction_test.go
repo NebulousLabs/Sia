@@ -79,6 +79,7 @@ func TestStorageProofSegment(t *testing.T) {
 			FileSize:    256 * 64,
 		}
 		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		index, err := cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Error(err)
@@ -108,6 +109,9 @@ func TestStorageProofSegment(t *testing.T) {
 	cst.cs.fileContracts[types.FileContractID{}] = types.FileContract{
 		WindowStart: 100000,
 	}
+	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
+		WindowStart: 100000,
+	})
 	_, err = cst.cs.storageProofSegment(types.FileContractID{})
 	if err != ErrUnfinishedFileContract {
 		t.Error(err)
@@ -156,6 +160,7 @@ func TestValidStorageProofs(t *testing.T) {
 		WindowEnd:      1200,
 	}
 	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.addFileContracts(fcid, fc)
 	buffer.Seek(0, 0)
 
 	// Create a transaction with a storage proof.
@@ -223,6 +228,7 @@ func TestValidStorageProofs(t *testing.T) {
 	for {
 		fcid[0]++
 		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
@@ -287,6 +293,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	for {
 		fcid[0]++
 		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
@@ -348,6 +355,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 		RevisionNumber: 1,
 	}
 	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.addFileContracts(fcid, fc)
 
 	// Try a working file contract revision.
 	txn := types.Transaction{
@@ -405,6 +413,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	fc = cst.cs.fileContracts[fcid]
 	fc.WindowStart = 0
 	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].NewRevisionNumber = 3
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrLateRevision {
@@ -414,6 +423,8 @@ func TestValidFileContractRevisions(t *testing.T) {
 	// Submit a file contract revision with incorrect unlock conditions.
 	fc.WindowStart = 100
 	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.rmFileContracts(fcid)
+	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].UnlockConditions.Timelock++
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrWrongUnlockConditions {

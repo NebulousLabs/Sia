@@ -58,13 +58,16 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	// contract that does not exist.
 	if build.DEBUG {
 		_, exists := cs.fileContracts[fcd.ID]
-		if exists == (fcd.Direction == dir) {
+		if exists == (fcd.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
 		cs.fileContracts[fcd.ID] = fcd.FileContract
+		if cs.updateDatabase {
+			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
+		}
 
 		// Put a file contract into the file contract expirations map.
 		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
@@ -83,6 +86,9 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
 	} else {
 		delete(cs.fileContracts, fcd.ID)
+		if cs.updateDatabase {
+			cs.db.rmFileContracts(fcd.ID)
+		}
 
 		if build.DEBUG {
 			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]

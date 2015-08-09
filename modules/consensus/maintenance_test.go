@@ -140,6 +140,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
@@ -201,6 +202,8 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	}()
 	// Trigger errPayoutsAlreadyPaid from delayed outputs.
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC
+	cst.cs.db.rmFileContracts(types.FileContractID{})
+	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid] = types.SiacoinOutput{}
 	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 }
@@ -227,6 +230,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 		MissedProofOutputs: []types.SiacoinOutput{{Value: types.NewCurrency64(290e3)}},
 	}
 	cst.cs.fileContracts[types.FileContractID{}] = expiringFC // assign the contract a 0-id.
+	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
 	cst.cs.applyFileContractMaintenance(pb)
