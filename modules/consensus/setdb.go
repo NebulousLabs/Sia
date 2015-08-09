@@ -431,3 +431,56 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 		return nil
 	})
 }
+
+// addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
+func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	return db.addItem("SiacoinOutputs", id, sco)
+}
+
+// getSiacoinOutputs retrieves a saicoin output by ID
+func (db *setDB) getSiacoinOutputs(id types.SaicoinOutputID) types.SiacoinOutput {
+	scoBytes, err := db.getItem("SiacoinOutputs", id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sco types.SiacoinOutput
+	err = encoding.Unmarshal(scoBytes, &sco)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sco
+}
+
+// inSiacoinOutputs returns a bool showing if a soacoin output ID is
+// in the siacoin outputs bucket
+func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
+	return db.inBucket("SiacoinOutputs", id)
+}
+
+// rmSiacoinOutputs removes a siacoin output form the siacoin outputs map
+func (db *setDB) rmSiacoinOutputs(id types.SiacoinOutputID) error {
+	return db.rmItem("SiacoinOutputs", id)
+}
+
+// lenSiacoinOutputs returns the size of the siacoin outputs bucket
+func (db *setDB) lenSiacoinOutputs() uint64 {
+	return db.lenBucket("SiacoinOutputs")
+}
+
+// forEachSiacoinOutputs applies a function to every siacoin output and ID
+func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
+	db.forEachItem("SiacoinOutputs", func(kb, vb []byte) error {
+		var key types.SiacoinOutputID
+		var value types.SiacoinOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		fn(key, value)
+		return nil
+	})
+}
