@@ -16,10 +16,13 @@ var meta = persist.Metadata{
 }
 
 var (
-	errBadSetInsert = errors.New("attempting to add an already existing item to the consensus set")
-	errNilBucket    = errors.New("using a bucket that does not exist")
-	errNilItem      = errors.New("requested item does not exist")
-	errNotGuarded   = errors.New("database modification not protected by guard")
+	errBadSetInsert   = errors.New("attempting to add an already existing item to the consensus set")
+	errNilBucket      = errors.New("using a bucket that does not exist")
+	errNilItem        = errors.New("requested item does not exist")
+	errNotGuarded     = errors.New("database modification not protected by guard")
+	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
+
+	prefix_dsco = []byte("dsco_")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -45,6 +48,7 @@ func openDB(filename string) (*setDB, error) {
 		"Path",
 		"BlockMap",
 		"Metadata",
+		"DelayedSiacoinOutputs",
 	}
 
 	// Create buckets
@@ -484,4 +488,142 @@ func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.
 		fn(key, value)
 		return nil
 	})
+}
+
+// addDelayedSiacoinOutputs creats a new bucket for a certain height for delayed siacoin outputs
+func (db *setDB) addDelayedSiacoinOutputs(h types.BlockHeight) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	err := db.addItem("DelayedSiacoinOutputs", h, bucketID)
+	if err != nil {
+		// This is particularly dangerous as the map and the buckets will be out of sync.
+		// Perhaps a panic is called for to prevent silent inconsistencies
+		return err
+	}
+	return db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket(bucketID)
+		return err
+	})
+}
+
+// addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
+func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	return db.addItem(string(bucketID), id, sco)
+}
+
+// getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
+func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinOutputID) types.SiacoinOutput {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	scoBytes, err := db.getItem(string(bucketID), id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sco types.SiacoinOutput
+	err = encoding.Unmarshal(scoBytes, &sco)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sco
+}
+
+// inDelayedSiacoinOutputs returns a boolean representing the prescence of a height bucket with a given height
+func (db *setDB) inDelayedSiacoinOutputs(h types.BlockHeight) bool {
+	return db.inBucket("DelayedSiacoinOutputs", h)
+}
+
+// inDelayedSiacoinOutputsHeight returns a boolean showing if a siacoin output exists at a given height
+func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) bool {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	return db.inBucket(string(bucketID), id)
+}
+
+// rmDelayedSiacoinOutputs removes a height and its corresponding
+// bucket from the set of delayed siacoin outputs. The map must be empty
+func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketID)
+		if b == nil {
+			return errNilBucket
+		}
+		if b.Stats().KeyN != 0 {
+			return errNonEmptyBucket
+		}
+		return tx.DeleteBucket(bucketID)
+	})
+	if err != nil {
+		// Again tricky, since returning here could cause inconsistency.
+		return err
+	}
+	return db.rmItem("DelayedSiacoinOutputs", h)
+}
+
+// rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height
+func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	return db.rmItem(string(bucketID), id)
+}
+
+// lenDelayedSiacoinOutputs returns the number of unique heights in the delayed siacoin outputs map
+func (db *setDB) lenDelayedSiacoinOutputs() uint64 {
+	return db.lenBucket("DelayedSiacoinOutputs")
+}
+
+// lenDelayedSiacoinOutputsHeight returns the number of outputs stored at one height
+func (db *setDB) lenDelayedSiacoinOutputsHeight(h types.BlockHeight) uint64 {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	return db.lenBucket(string(bucketID))
+}
+
+// forEachDelayedSiacoinOutputsHeight applies a function to every siacoin output at a given height
+func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	db.forEachItem(string(bucketID), func(kb, vb []byte) error {
+		var key types.SiacoinOutputID
+		var value types.SiacoinOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		fn(key, value)
+		return nil
+	})
+}
+
+// forEachDelayedSiacoinOutputs applies a function to every siacoin
+// element across every height in the delayed siacoin output map
+func (db *setDB) forEachDelayedSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
+	err := db.View(func(tx *bolt.Tx) error {
+		bDsco := tx.Bucket([]byte("DelayedSiacoinOutputs"))
+		if bDsco == nil {
+			return errNilBucket
+		}
+		return bDsco.ForEach(func(kDsco, vDsco []byte) error {
+			b := tx.Bucket(vDsco)
+			if b == nil {
+				return errNilBucket
+			}
+			return b.ForEach(func(kb, vb []byte) error {
+				var key types.SiacoinOutputID
+				var value types.SiacoinOutput
+				err := encoding.Unmarshal(kb, &key)
+				if err != nil {
+					return err
+				}
+				err = encoding.Unmarshal(vb, &value)
+				if err != nil {
+					return err
+				}
+				fn(key, value)
+				return nil
+			})
+		})
+	})
+	if err != nil {
+		panic(err)
+	}
 }
