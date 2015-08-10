@@ -9,6 +9,22 @@ const (
 	HostDir             = "host"
 )
 
+// RPC identifiers
+var (
+	RPCSettings = [8]byte{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
+	RPCContract = [8]byte{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	RPCDownload = [8]byte{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
+	// deprecated
+	RPCRetrieve = [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
+)
+
+// A DownloadRequest is used to retrieve a particular segment of a file from a
+// host.
+type DownloadRequest struct {
+	Offset uint64
+	Length uint64
+}
+
 // ContractTerms are the parameters agreed upon by a client and a host when
 // forming a FileContract.
 type ContractTerms struct {

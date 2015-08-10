@@ -12,11 +12,6 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-var (
-	rpcRetrieve = [8]byte{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
-	rpcClose    = [8]byte{'C', 'l', 'o', 's', 'e'}
-)
-
 // pieceData contains the metadata necessary to request a piece from a
 // fetcher.
 // TODO: may not need the piece field. Think about restructuring.
@@ -51,10 +46,7 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	err := encoding.WriteObject(hf.conn, struct {
-		Offset uint64
-		Length uint64
-	}{p.offset, p.length})
+	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.offset, p.length})
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +64,7 @@ func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
 
 func (hf *hostFetcher) Close() error {
 	// ignore error; we'll need to close conn anyway
-	encoding.WriteObject(hf.conn, rpcClose)
+	encoding.WriteObject(hf.conn, modules.DownloadRequest{0, 0})
 	return hf.conn.Close()
 }
 
@@ -83,7 +75,7 @@ func newHostFetcher(fc fileContract) (*hostFetcher, error) {
 	}
 
 	// send RPC
-	err = encoding.WriteObject(conn, rpcRetrieve)
+	err = encoding.WriteObject(conn, modules.RPCDownload)
 	if err != nil {
 		return nil, err
 	}
