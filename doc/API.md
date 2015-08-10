@@ -256,8 +256,8 @@ Response: standard
 
 #### /host/status
 
-Function: Queries the host for its configuration values, as well as the amount
-of storage remaining and the number of contracts formed.
+Function: Queries the host for its configuration values, as well as some
+additional data.
 
 Parameters: none
 
@@ -274,8 +274,18 @@ struct {
 	Collateral       int
 	StorageRemaining int
 	NumContracts     int
+	PotentialProfit int
+	Competition      int
 }
 ```
+`StorageRemaining` is how much storage (in bytes) the host has available for
+renting out.
+
+`NumContracts` is the number of contacts the Host is currently handling
+
+`PotentialProfit` is how much the host's current contracts are worth 
+
+`Competition` is the estimated going rate for storage in S/GB/Month
 
 HostDB
 ------
