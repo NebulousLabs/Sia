@@ -97,21 +97,33 @@ struct {
 	end   int
 }
 ```
+'start' refers to the height of the block where transaction history should
+begin.
+
+'end' refers to the height of of the block where the transaction history should
+end. Unconfirmed transactions will never be included. If 'end' is greater than
+the current height, all transactions up to and including the most recent block
+will be provided.
 
 Response:
 ```
 struct {
-	transactions []WalletTransaction
+	confirmedTransactions   []WalletTransaction
+	unconfirmedTransactions []WalletTransaction
 }
 ```
-'transactions' is a list of 'WalletTransactions'. Wallet transactions are
-transactions that have been processed by the wallet and given more information,
-such as a confirmation height and a timestamp. Each wallet transaction contins
-information about only a single input or output. One network transaction with
-many inputs an outputs can result in many wallet transactions. All of the
-wallet transactions created by a network transaction are guaranteed to be
-consecutive in history. Wallet transactions will always be returned in
-chronological order.
+'confirmedTransactions' lists all of the confirmed wallet transactions
+appearing between height 'start' and height 'end' (inclusive).
+
+'unconfirmedTransactions' lists all of the unconfirmed transactions.
+
+Wallet transactions are transactions that have been processed by the wallet and
+given more information, such as a confirmation height and a timestamp. Each
+wallet transaction contins information about only a single input or output. One
+network transaction with many inputs an outputs can result in many wallet
+transactions. All of the wallet transactions created by a network transaction
+are guaranteed to be consecutive in history. Wallet transactions will always be
+returned in chronological order.
 
 A wallet transaction takes the
 following form:

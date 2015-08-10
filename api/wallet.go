@@ -1,23 +1,29 @@
 package api
 
 import (
-	"math/big"
 	"net/http"
-	// "strings"
+	"strconv"
 
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// The WalletStatus struct contains general information about the wallet, with
-// tags to support idiomatic json encodings.
-type WalletStatus struct {
+// WalletGET contains general information about the wallet, with tags to
+// support idiomatic json encodings.
+type WalletGET struct {
 	Encrypted bool `json:"encrypted"`
 	Unlocked  bool `json:"unlocked"`
 }
 
-// walletHandlerGET handles a GET request to /wallet
+// WalletHistoryGet contains wallet history.
+type WalletHistoryGET struct {
+	UnconfirmedTransactions []modules.WalletTransaction `json:"unconfirmedTransactions"`
+	ConfirmedTransactions   []modules.WalletTransaction `json:"confirmedTransactions"`
+}
+
+// walletHandlerGET handles a GET request to /wallet.
 func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
-	writeJSON(w, WalletStatus{
+	writeJSON(w, WalletGET{
 		Encrypted: srv.wallet.Encrypted(),
 		Unlocked:  srv.wallet.Unlocked(),
 	})
@@ -25,152 +31,82 @@ func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
 
 // walletHander handles API calls to /wallet.
 func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
-	lockID := srv.mu.RLock()
-	defer srv.mu.RUnlock(lockID)
-
 	if req.Method == "" || req.Method == "GET" {
 		srv.consensusHandlerGET(w, req)
-		return
+	} else {
+		writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 	}
-
-	writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
 }
 
-/*
-// WalletSiafundsBalance contains fields relating to the siafunds balance.
-type WalletSiafundsBalance struct {
-	SiafundBalance      types.Currency
-	SiacoinClaimBalance types.Currency
-}
-
-// scanAmount scans a types.Currency.
-func scanAmount(amount string) (types.Currency, bool) {
-	// use SetString manually to ensure that amount does not contain
-	// multiple values, which would confuse fmt.Scan
-	i, ok := new(big.Int).SetString(amount, 10)
-	if !ok {
-		return types.Currency{}, ok
+// walletCloseHandlerPUT handles a PUT request to /wallet/close.
+func (srv *Server) walletCloseHandlerPUT(w http.ResponseWriter, req *http.Request) {
+	err := srv.wallet.Close()
+	if err == nil {
+		writeSuccess(w)
+	} else {
+		writeError(w, err.Error(), http.StatusBadRequest)
 	}
-	return types.NewCurrency(i), true
 }
 
-// scanAddres scans a types.UnlockHash.
-func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
-	err = addr.LoadString(addrStr)
-	return
-}
-
-// walletAddressHandler handles the API request for a new address.
-func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
-	unlockConditions, err := srv.wallet.NextAddress()
-	if err != nil {
-		writeError(w, "Failed to get a coin address", http.StatusInternalServerError)
-		return
+// walletCloseHanlder handles API calls to /wallet/close.
+func (srv *Server) walletCloseHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "PUT" {
+		srv.walletCloseHandlerPUT(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/close", http.StatusBadRequest)
 	}
-
-	// Since coinAddress is not a struct, we define one here so that writeJSON
-	// writes an object instead of a bare value. In addition, we transmit the
-	// coinAddress as a hex-encoded string rather than a byte array.
-	writeJSON(w, struct{ Address types.UnlockHash }{unlockConditions.UnlockHash()})
 }
 
-/*
-// walletMergeHandler handles the API call to merge a different wallet into the
-// current wallet.
-func (srv *Server) walletMergeHandler(w http.ResponseWriter, req *http.Request) {
-	// Scan the wallet file.
-	err := srv.wallet.MergeWallet(req.FormValue("walletfile"))
+// walletHistoryHandlerGET handles a GET request to /wallet/history.
+func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Request) {
+	start, err := strconv.Atoi(req.FormValue("start"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
-		return
 	}
-	writeSuccess(w)
-}
-
-// walletSendHandler handles the API call to send coins to another address.
-func (srv *Server) walletSendHandler(w http.ResponseWriter, req *http.Request) {
-	// Scan the amount.
-	amount, ok := scanAmount(req.FormValue("amount"))
-	if !ok {
-		writeError(w, "Malformed amount", http.StatusBadRequest)
-		return
-	}
-
-	// Scan the destination address.
-	dest, err := scanAddress(req.FormValue("destination"))
+	end, err := strconv.Atoi(req.FormValue("end"))
 	if err != nil {
-		writeError(w, "Malformed coin address", http.StatusBadRequest)
-		return
+		writeError(w, err.Error(), http.StatusBadRequest)
 	}
 
-	// Send the coins.
-	_, err = srv.wallet.SendSiacoins(amount, dest)
+	confirmedHistory, err := srv.wallet.TransactionHistory(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
-		writeError(w, "Failed to create transaction: "+err.Error(), http.StatusInternalServerError)
-		return
+		writeError(w, "/walet/history [GET] Error:"+err.Error(), http.StatusBadRequest)
+	}
+	writeJSON(w, WalletHistoryGET{
+		UnconfirmedTransactions: srv.wallet.UnconfirmedTransactions(),
+		ConfirmedTransactions:   confirmedHistory,
+	})
+}
+
+// walletHistoryHandlerGETAddr handles a GET request to
+// /wallet/history/$(addr).
+func (srv *Server) walletHistoryHandlerGETAddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
+	addrHistory, err := srv.wallet.AddressTransactionHistory(addr)
+	if err != nil {
+		writeError(w, "error after call to /wallet/history/$(addr): "+err.Error(), http.StatusBadRequest)
+	}
+	writeJSON(w, addrHistory)
+}
+
+// walletHistoryHandler handles all API calls to /wallet/history
+func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request) {
+	// Check for a vanilla call to /wallet/history.
+	if req.URL.Path == "/wallet/history" && req.Method == "GET" || req.Method == "" {
+		srv.walletHistoryHandlerGET(w, req)
 	}
 
-	writeSuccess(w)
+	// The only remaining possibility is a GET call to /wallet/history/$(addr);
+	// check that the method is correct.
+	if req.Method != "GET" && req.Method != "" {
+		writeError(w, "unrecognized method in call to /wallet/history", http.StatusBadRequest)
+	}
+
+	// Parse the address from the url and call the GETAddr Handler.
+	jsonAddr := "\"" + req.URL.Path[len("/wallet/history"):] + "\""
+	var addr types.UnlockHash
+	err := addr.UnmarshalJSON([]byte(jsonAddr))
+	if err != nil {
+		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
+	}
+	srv.walletHistoryHandlerGETAddr(w, req, addr)
 }
-
-// walletSiafundsBalanceHandler handles the API call querying the balance of
-// siafunds.
-func (srv *Server) walletSiafundsBalanceHandler(w http.ResponseWriter, req *http.Request) {
-	var wsb WalletSiafundsBalance
-	_, wsb.SiafundBalance, wsb.SiacoinClaimBalance = srv.wallet.ConfirmedBalance()
-	writeJSON(w, wsb)
-}
-
-// walletSiafundsSendHandler handles the API request to send siafunds.
-func (srv *Server) walletSiafundsSendHandler(w http.ResponseWriter, req *http.Request) {
-	/*
-		// Scan the amount.
-		amount, ok := scanAmount(req.FormValue("amount"))
-		if !ok {
-			writeError(w, "Malformed amount", http.StatusBadRequest)
-			return
-		}
-
-		// Scan the destination address.
-		dest, err := scanAddress(req.FormValue("destination"))
-		if err != nil {
-			writeError(w, "Malformed coin address", http.StatusBadRequest)
-			return
-		}
-
-		// Scan the keyfile list.
-		keyfiles := strings.Split(req.FormValue("keyfiles"), ",")
-		if len(keyfiles) == 0 {
-			writeError(w, "Missing keyfiles", http.StatusBadRequest)
-			return
-		}
-
-		// _, err = srv.wallet.SendSiagSiafunds(amount, dest, keyfiles)
-		if err != nil {
-			writeError(w, "Failed to send siafunds: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-	// writeSuccess(w)
-	writeError(w, "Wallet does not currently implement siafunds functions", http.StatusBadRequest)
-}
-
-// walletSiafundsWatchsiagaddressHandler handles the API request to watch a
-// siag address.
-func (srv *Server) walletSiafundsWatchsiagaddressHandler(w http.ResponseWriter, req *http.Request) {
-	/*
-		err := srv.wallet.WatchSiagSiafundAddress(req.FormValue("keyfile"))
-		if err != nil {
-			writeError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	// writeSuccess(w)
-	writeError(w, "Wallet does not currently implement siafunds functions", http.StatusBadRequest)
-}
-
-// walletStatusHandler handles the API call querying the status of the wallet.
-func (srv *Server) walletStatusHandler(w http.ResponseWriter, req *http.Request) {
-	// writeJSON(w, srv.wallet.Info())
-	writeError(w, "Wallet status not currently implemented", http.StatusBadRequest)
-}
-*/

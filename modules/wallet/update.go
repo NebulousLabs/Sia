@@ -58,7 +58,6 @@ func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.Unloc
 		TransactionID:         t.ID(),
 		ConfirmationHeight:    w.consensusSetHeight,
 		ConfirmationTimestamp: confirmationTime,
-		Transaction:           t,
 
 		FundType:       fundType,
 		OutputID:       oid,
@@ -214,7 +213,6 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 					TransactionID:         txn.ID(),
 					ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
 					ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
-					Transaction:           txn,
 
 					FundType:       types.SpecifierSiacoinInput,
 					OutputID:       types.OutputID(sci.ParentID),
@@ -231,7 +229,6 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 					TransactionID:         txn.ID(),
 					ConfirmationHeight:    types.BlockHeight(math.MaxUint64),
 					ConfirmationTimestamp: types.Timestamp(math.MaxUint64),
-					Transaction:           txn,
 
 					FundType:       types.SpecifierSiacoinOutput,
 					OutputID:       types.OutputID(txn.SiacoinOutputID(i)),

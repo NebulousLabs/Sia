@@ -196,17 +196,13 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
-		// ConfirmedTransacitonHistory will return a chronologically ordered
-		// set of 'WalletTransactions' that make up the history of the wallet.
-		ConfirmedTransactionHistory() []WalletTransaction
-
-		// PartialTransactionHistory returns all of the transactions that were
+		// TransactionHistory returns all of the transactions that were
 		// confirmed at heights [startBlock, endBlock].
-		PartialTransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]WalletTransaction, error)
+		TransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]WalletTransaction, error)
 
 		// AddressTransactionHistory returns all of the transactions that are
 		// related to a given address.
-		AddressTransactionHistory(types.UnlockHash) []WalletTransaction
+		AddressTransactionHistory(types.UnlockHash) ([]WalletTransaction, error)
 
 		// UnconfirmedTransactions returns the list of known unconfirmed wallet
 		// transactions.

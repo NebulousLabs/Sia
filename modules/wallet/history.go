@@ -11,17 +11,9 @@ var (
 	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
 
-// ConfirmedTransactionHistory returns all of the confirmed transactions known
-// to the wallet's history.
-func (w *Wallet) ConfirmedTransactionHistory() []modules.WalletTransaction {
-	lockID := w.mu.Lock()
-	defer w.mu.Unlock(lockID)
-	return w.walletTransactions
-}
-
-// PartialTransactionHistory returns all of the confirmed transactions between
+// TransactionHistory returns all of the confirmed transactions between
 // 'startBlock' and 'endBlock' (inclusive).
-func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
+func (w *Wallet) TransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
@@ -48,16 +40,24 @@ func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBloc
 
 // AddressTransactionHistory returns all of the wallet transactions associated
 // with a single unlock hash.
-func (w *Wallet) AddressTransactionHistory(uh types.UnlockHash) (wts []modules.WalletTransaction) {
+func (w *Wallet) AddressTransactionHistory(uh types.UnlockHash) (wts []modules.WalletTransaction, err error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
+
+	_, exists := w.keys[uh]
+	if !exists {
+		return nil, errors.New("address not recognized by the wallet")
+	}
 
 	for _, wt := range w.walletTransactions {
 		if wt.RelatedAddress == uh {
 			wts = append(wts, wt)
 		}
 	}
-	return wts
+	if len(wts) == 0 {
+		return nil, errors.New("no history found for provided addresse")
+	}
+	return wts, nil
 }
 
 // UnconfirmedTransactions returns the set of unconfirmed wallet transactions.
