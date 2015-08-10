@@ -539,7 +539,7 @@ func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Sia
 
 // rmDelayedSiacoinOutputs removes a height and its corresponding
 // bucket from the set of delayed siacoin outputs. The map must be empty
-func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) error {
+func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketID)
@@ -552,10 +552,12 @@ func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) error {
 		return tx.DeleteBucket(bucketID)
 	})
 	if err != nil {
-		// Again tricky, since returning here could cause inconsistency.
-		return err
+		panic(err)
 	}
-	return db.rmItem("DelayedSiacoinOutputs", h)
+	err = db.rmItem("DelayedSiacoinOutputs", h)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height

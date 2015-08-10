@@ -96,6 +96,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 		}
 	}
 	delete(cs.delayedSiacoinOutputs, pb.Height)
+	cs.db.rmDelayedSiacoinOutputs(pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
