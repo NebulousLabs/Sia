@@ -661,7 +661,7 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	// Check that the file contract output made it into the set of delayed
 	// outputs.
 	validProofID := validFCID.StorageProofOutputID(types.ProofValid, 0)
-	_, exists = cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay][validProofID]
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, validProofID)
 	if !exists {
 		return errors.New("file contract payout is not in the delayed outputs set")
 	}
@@ -889,13 +889,17 @@ func (cst *consensusSetTester) testSpendSiafundsBlock() error {
 	// siafunds.
 	found := false
 	expectedBalance := cst.cs.siafundPool.Sub(srcClaimStart).Div(types.NewCurrency64(10e3)).Mul(srcValue)
-	for _, output := range cst.cs.delayedSiacoinOutputs[cst.cs.height()+types.MaturityDelay] {
+	cst.cs.db.forEachDelayedSiacoinOutputsHeight(cst.cs.height()+types.MaturityDelay, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
 		if output.UnlockHash == claimDest {
 			found = true
 			if output.Value.Cmp(expectedBalance) != 0 {
-				return errors.New("siafund output has the wrong balance")
+				// Err is scopedoutside this func
+				err = errors.New("siafund output has the wrong balance")
 			}
 		}
+	})
+	if err != nil {
+		return err
 	}
 	if !found {
 		return errors.New("could not find siafund claim output")

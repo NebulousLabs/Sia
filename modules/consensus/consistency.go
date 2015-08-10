@@ -51,18 +51,18 @@ func (cs *ConsensusSet) checkCurrentPath() error {
 // checkDelayedSiacoinOutputMaps checks that the delayed siacoin output maps
 // have the right number of maps at the right heights.
 func (cs *ConsensusSet) checkDelayedSiacoinOutputMaps() error {
-	expected := 0
+	expected := uint64(0)
 	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
 		if !(i > types.MaturityDelay) {
 			continue
 		}
-		_, exists := cs.delayedSiacoinOutputs[i]
+		exists := cs.db.inDelayedSiacoinOutputs(i)
 		if !exists {
 			return errors.New("delayed siacoin outputs are in an inconsistent state")
 		}
 		expected++
 	}
-	if len(cs.delayedSiacoinOutputs) != expected {
+	if cs.db.lenDelayedSiacoinOutputs() != expected {
 		return errors.New("delayed siacoin outputs has too many maps")
 	}
 
@@ -94,11 +94,9 @@ func (cs *ConsensusSet) checkSiacoins() error {
 		}
 		totalSiacoins = totalSiacoins.Add(payout)
 	})
-	for _, dsoMap := range cs.delayedSiacoinOutputs {
-		for _, dso := range dsoMap {
-			totalSiacoins = totalSiacoins.Add(dso.Value)
-		}
-	}
+	cs.db.forEachDelayedSiacoinOutputs(func(v types.SiacoinOutputID, dso types.SiacoinOutput) {
+		totalSiacoins = totalSiacoins.Add(dso.Value)
+	})
 	cs.db.forEachSiafundOutputs(func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
 		sfoSiacoins := cs.siafundPool.Sub(sfo.ClaimStart).Div(types.SiafundCount).Mul(sfo.Value)
 		totalSiacoins = totalSiacoins.Add(sfoSiacoins)
@@ -195,8 +193,10 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 	// sorted by id and add them.
 	for i := cs.height() + 1; i <= cs.height()+types.MaturityDelay; i++ {
 		var delayedSiacoinOutputs crypto.HashSlice
-		for id := range cs.delayedSiacoinOutputs[i] {
-			delayedSiacoinOutputs = append(delayedSiacoinOutputs, crypto.Hash(id))
+		if cs.db.inDelayedSiacoinOutputs(i) {
+			cs.db.forEachDelayedSiacoinOutputsHeight(i, func(id types.SiacoinOutputID, output types.SiacoinOutput) {
+				delayedSiacoinOutputs = append(delayedSiacoinOutputs, crypto.Hash(id))
+			})
 		}
 		sort.Sort(delayedSiacoinOutputs)
 		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {

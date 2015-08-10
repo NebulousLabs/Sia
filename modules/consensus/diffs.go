@@ -134,12 +134,12 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
-	if build.DEBUG {
-		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight]
+	if build.DEBUG && cs.updateDatabase {
+		exists := cs.db.inDelayedSiacoinOutputs(dscod.MaturityHeight)
 		if !exists && cs.updateDatabase {
 			panic(errBadMaturityHeight)
 		}
-		_, exists = cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
+		exists = cs.db.inDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
 		if exists == (dscod.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitDelayedSiacoinOutputDiff)
 		}
@@ -222,7 +222,7 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir 
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
 			// exist.
-			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+			exists := cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 			if exists && cs.updateDatabase {
 				panic(errCreatingExistingUpcomingMap)
 			}
@@ -237,7 +237,7 @@ func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir 
 			// Sanity check - the output map being created should not already
 			// exist.
 			if build.DEBUG {
-				_, exists := cs.delayedSiacoinOutputs[pb.Height]
+				exists := cs.db.inDelayedSiacoinOutputs(pb.Height)
 				if exists && cs.updateDatabase {
 					panic(errCreatingExistingUpcomingMap)
 				}
@@ -295,7 +295,7 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 		if pb.Height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
+				if cs.updateDatabase && cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
 					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
@@ -307,7 +307,7 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 	} else {
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
-			if len(cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]) != 0 {
+			if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay) != 0 {
 				panic(errDeletingNonEmptyDelayedMap)
 			}
 		}
