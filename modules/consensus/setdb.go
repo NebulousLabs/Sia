@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
@@ -595,15 +594,6 @@ func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func
 		fn(key, value)
 		return nil
 	})
-}
-
-func printHeight(h []byte) {
-	var x types.BlockHeight
-	err := encoding.Unmarshal(h[len(prefix_dsco):], x)
-	if err != nil {
-		panic("Really bad bucket name: " + string(h))
-	}
-	fmt.Printf("scanning bucket %s%d\n", prefix_dsco, x)
 }
 
 // forEachDelayedSiacoinOutputs applies a function to every siacoin

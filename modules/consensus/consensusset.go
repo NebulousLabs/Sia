@@ -44,23 +44,10 @@ type ConsensusSet struct {
 	// prove
 	dosBlocks map[types.BlockID]struct{}
 
-	// These are the consensus variables. All nodes with the same current path
-	// will also have these variables matching.
-	//
 	// The siafundPool tracks the total number of siacoins that have been
 	// taxed from file contracts. Unless a reorg occurs, the siafundPool
 	// should never decrease.
-	//
-	// siacoinOutputs, fileContracts, and siafundOutputs keep track of the
-	// unspent outputs and active contracts present in the current path. If an
-	// output is spent or a contract expires, it is removed from the consensus
-	// set. These objects may also be removed in the event of a reorg.
-	//
-	// delayedSiacoinOutputs are siacoin outputs that have been created in a
-	// block, but are not allowed to be spent until a certain height. When
-	// that height is reached, they are moved to the siacoinOutputs map.
-	siafundPool           types.Currency
-	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
+	siafundPool types.Currency
 
 	// fileContractExpirations is not actually a part of the consensus set, but
 	// it is needed to get decent order notation on the file contract lookups.
@@ -75,8 +62,18 @@ type ConsensusSet struct {
 	changeLog   []changeEntry
 	subscribers []modules.ConsensusSetSubscriber
 
-	// block database, used for saving/loading the current path,
-	// and storing processed blocks
+	// The set database stores the consensus set on disk. The
+	// variables it contains are siacoinOutputs, fileContracts,
+	// and siafundOutputs. They keep track of the unspent outputs
+	// and active contracts present in the current path. If an
+	// output is spent or a contract expires, it is removed from
+	// the consensus set.
+	//
+	// It also holds delayedSiacoinOutputs, which are siacoin
+	// outputs that have been created in a block, but are not
+	// allowed to be spent until a certain height. When that
+	// height is reached, they are moved to the siacoinOutputs
+	// map.
 	db *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
@@ -102,8 +99,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
 		dosBlocks: make(map[types.BlockID]struct{}),
-
-		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
 
 		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
 

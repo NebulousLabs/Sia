@@ -200,7 +200,7 @@ func (cs *ConsensusSet) consensusSetHash() crypto.Hash {
 		}
 		sort.Sort(delayedSiacoinOutputs)
 		for _, delayedSiacoinOutputID := range delayedSiacoinOutputs {
-			delayedSiacoinOutput, _ := cs.delayedSiacoinOutputs[i][types.SiacoinOutputID(delayedSiacoinOutputID)]
+			delayedSiacoinOutput := cs.db.getDelayedSiacoinOutputs(i, types.SiacoinOutputID(delayedSiacoinOutputID))
 			tree.PushObject(delayedSiacoinOutput)
 			tree.PushObject(delayedSiacoinOutputID)
 		}

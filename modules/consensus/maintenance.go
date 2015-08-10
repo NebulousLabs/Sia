@@ -105,7 +105,6 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 			panic("deleting non-empty map")
 		}
 	}
-	delete(cs.delayedSiacoinOutputs, pb.Height)
 	cs.db.rmDelayedSiacoinOutputs(pb.Height)
 }
 
