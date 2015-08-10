@@ -283,7 +283,7 @@ func (r *Renter) Download(nickname, destination string) error {
 	}
 
 	// Create the download object.
-	d := newDownload(file.ecc, file.chunkSize, file.Size, hosts, nickname, destination)
+	d := newDownload(file.ecc, file.chunkSize(), file.Size, hosts, nickname, destination)
 
 	// Add the download to the download queue.
 	lockID = r.mu.Lock()

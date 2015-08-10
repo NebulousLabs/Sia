@@ -25,15 +25,20 @@ type dfile struct {
 	Contracts []fileContract
 	MasterKey crypto.TwofishKey
 	ecc       modules.ECC
-	chunkSize uint64
+	pieceSize uint64
 
 	uploaded uint64
 }
 
+// chunkSize returns the size of one chunk.
+func (f *dfile) chunkSize() uint64 {
+	return f.pieceSize * uint64(f.ecc.NumPieces())
+}
+
 // numChunks returns the number of chunks that f was split into.
 func (f *dfile) numChunks() uint64 {
-	n := f.Size / f.chunkSize
-	if f.Size%f.chunkSize != 0 {
+	n := f.Size / f.chunkSize()
+	if f.Size%f.chunkSize() != 0 {
 		n++
 	}
 	return n

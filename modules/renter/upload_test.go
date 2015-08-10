@@ -38,13 +38,13 @@ func (h *testHost) upload(chunkIndex, pieceIndex uint64, piece []byte) error {
 	return nil
 }
 
-func newFile(ecc modules.ECC, chunkSize, fileSize uint64) *dfile {
+func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *dfile {
 	key, _ := crypto.GenerateTwofishKey()
 	return &dfile{
 		Size:      fileSize,
 		MasterKey: key,
 		ecc:       ecc,
-		chunkSize: chunkSize,
+		pieceSize: pieceSize,
 	}
 }
 
@@ -52,7 +52,7 @@ func (f *dfile) upload(r io.Reader, hosts []uploader) error {
 	for _, h := range hosts {
 		h.connect()
 	}
-	chunk := make([]byte, f.chunkSize)
+	chunk := make([]byte, f.chunkSize())
 	for i := uint64(0); ; i++ {
 		// read next chunk
 		n, err := io.ReadFull(r, chunk)
@@ -100,8 +100,8 @@ func TestErasureUpload(t *testing.T) {
 	}
 
 	// upload data to hosts
-	const chunkSize = 100
-	f := newFile(ecc, chunkSize, dataSize)
+	const pieceSize = 10
+	f := newFile(ecc, pieceSize, dataSize)
 	r := bytes.NewReader(data)
 	err = f.upload(r, hosts)
 	if err != nil {
@@ -121,7 +121,7 @@ func TestErasureUpload(t *testing.T) {
 				}
 			}
 		}
-		err = ecc.Recover(chunk, chunkSize, buf)
+		err = ecc.Recover(chunk, f.chunkSize(), buf)
 		if err != nil {
 			t.Fatal(err)
 		}
