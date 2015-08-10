@@ -19,7 +19,7 @@ import (
 // A hostTester is the helper object for host testing, including helper modules
 // and methods for controlling synchronization.
 type hostTester struct {
-	cs        *consensus.ConsensusSet
+	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	miner     modules.Miner
 	tpool     modules.TransactionPool

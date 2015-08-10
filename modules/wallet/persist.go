@@ -49,8 +49,7 @@ type WalletSettings struct {
 
 // unlockKey creates a wallet unlocking key from the input master key.
 func unlockKey(masterKey crypto.TwofishKey) crypto.TwofishKey {
-	keyBase := append(masterKey[:], unlockModifier[:]...)
-	return crypto.TwofishKey(crypto.HashObject(keyBase))
+	return crypto.TwofishKey(crypto.HashAll(masterKey, unlockModifier))
 }
 
 // checkMasterKey verifies that the master key is correct.

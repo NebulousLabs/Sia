@@ -87,18 +87,13 @@ func decryptSeedFile(masterKey crypto.TwofishKey, sf SeedFile) (seed modules.See
 	return seed, nil
 }
 
-// generateAndTrackKey tracks a key of a given index from a given seed.
-func (w *Wallet) generateAndTrackKey(seed modules.Seed, index uint64) {
-	// Generate the key and check it is new to the wallet.
-	spendableKey := generateSpendableKey(seed, index)
-	w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
-}
-
 // integrateSeed takes an address seed as input and from that generates
 // 'publicKeysPerSeed' addresses that the wallet is able to spend.
 func (w *Wallet) integrateSeed(seed modules.Seed) {
 	for i := uint64(0); i < modules.PublicKeysPerSeed; i++ {
-		w.generateAndTrackKey(seed, i)
+		// Generate the key and check it is new to the wallet.
+		spendableKey := generateSpendableKey(seed, i)
+		w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
 	}
 }
 
@@ -122,7 +117,6 @@ func (w *Wallet) loadSeedFile(masterKey crypto.TwofishKey, fileInfo os.FileInfo)
 // recoverSeed integrates a recovery seed into the wallet.
 func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) error {
 	// Integrate the seed with the wallet.
-	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	w.integrateSeed(seed)
 
 	// Encrypt the seed and save the seed file.
@@ -141,6 +135,7 @@ func (w *Wallet) recoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	if err != nil {
 		return err
 	}
+	seedFilename := filepath.Join(w.persistDir, seedFilePrefix+persist.RandomSuffix()+seedFileSuffix)
 	return persist.SaveFile(seedMetadata, SeedFile{sfuid, encryptionVerification, cryptSeed}, seedFilename)
 }
 

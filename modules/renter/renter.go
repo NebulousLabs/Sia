@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -19,7 +18,7 @@ var (
 // A Renter is responsible for tracking all of the files that a user has
 // uploaded to Sia, as well as the locations and health of these files.
 type Renter struct {
-	cs          *consensus.ConsensusSet
+	cs          modules.ConsensusSet
 	hostDB      modules.HostDB
 	wallet      modules.Wallet
 	blockHeight types.BlockHeight
@@ -32,7 +31,7 @@ type Renter struct {
 }
 
 // New returns an empty renter.
-func New(cs *consensus.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
+func New(cs modules.ConsensusSet, hdb modules.HostDB, wallet modules.Wallet, saveDir string) (*Renter, error) {
 	if cs == nil {
 		return nil, ErrNilCS
 	}

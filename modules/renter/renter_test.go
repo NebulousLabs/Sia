@@ -18,7 +18,7 @@ import (
 
 // renterTester contains all of the modules that are used while testing the renter.
 type renterTester struct {
-	cs        *consensus.ConsensusSet
+	cs        modules.ConsensusSet
 	hostdb    modules.HostDB
 	miner     modules.Miner
 	tpool     modules.TransactionPool

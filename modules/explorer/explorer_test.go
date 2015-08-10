@@ -18,7 +18,7 @@ import (
 // Explorer tester struct is the helper object for explorer
 // testing. It holds the helper modules for its testing
 type explorerTester struct {
-	cs        *consensus.ConsensusSet
+	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	miner     modules.Miner
 	tpool     modules.TransactionPool

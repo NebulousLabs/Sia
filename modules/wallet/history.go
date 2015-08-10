@@ -32,21 +32,18 @@ func (w *Wallet) PartialTransactionHistory(startBlock types.BlockHeight, endBloc
 		return nil, nil
 	}
 
-	i := 0
-	for i < len(w.walletTransactions) {
-		if w.walletTransactions[i].ConfirmationHeight >= startBlock {
+	var start, end int
+	for start = 0; start < len(w.walletTransactions); start++ {
+		if w.walletTransactions[start].ConfirmationHeight >= startBlock {
 			break
 		}
-		i++
 	}
-	j := i
-	for j < len(w.walletTransactions) {
-		if w.walletTransactions[j].ConfirmationHeight > endBlock {
+	for end = start; end < len(w.walletTransactions); end++ {
+		if w.walletTransactions[end].ConfirmationHeight > endBlock {
 			break
 		}
-		j++
 	}
-	return w.walletTransactions[i:j], nil
+	return w.walletTransactions[start:end], nil
 }
 
 // AddressTransactionHistory returns all of the wallet transactions associated

@@ -35,7 +35,7 @@ var (
 // serverTester contains a server and a set of channels for keeping all of the
 // modules synchronized during testing.
 type serverTester struct {
-	cs        *consensus.ConsensusSet
+	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	host      modules.Host
 	hostdb    modules.HostDB

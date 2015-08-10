@@ -18,8 +18,8 @@ var (
 )
 
 type (
-	// AddressSeed is cryptographic entropy that is used to derive spendable
-	// wallet addresses.
+	// Seed is a cryptographic entropy that is used to derive spendable wallet
+	// addresses.
 	Seed [crypto.EntropySize]byte
 
 	// WalletTransactionID is a unique identifier for a wallet transaction.

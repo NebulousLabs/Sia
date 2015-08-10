@@ -18,7 +18,7 @@ import (
 // A tpoolTester is used during testing to initialize a transaction pool and
 // useful helper modules.
 type tpoolTester struct {
-	cs        *consensus.ConsensusSet
+	cs        modules.ConsensusSet
 	gateway   modules.Gateway
 	tpool     *TransactionPool
 	miner     modules.Miner

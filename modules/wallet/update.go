@@ -14,56 +14,60 @@ import (
 // unrecognized, this function is a no-op.
 func (w *Wallet) revertWalletTransaction(uh types.UnlockHash, wtid modules.WalletTransactionID) {
 	_, exists := w.keys[uh]
-	if exists {
-		// Sanity check - the output should exist in the wallet transaction map
-		// because a prior addition to the map is being reverted.
-		_, exists := w.walletTransactionMap[wtid]
-		if build.DEBUG && !exists {
-			panic("wallet transaction not found in the wallet transaction map")
-		}
-		delete(w.walletTransactionMap, wtid)
-
-		// Sanity check - the last element of the wallet transaction array
-		// should be the item we are deleteing.
-		lastIndex := len(w.walletTransactions) - 1
-		if build.DEBUG && wtid != modules.CalculateWalletTransactionID(w.walletTransactions[lastIndex].TransactionID, w.walletTransactions[lastIndex].OutputID) {
-			panic("wallet transactions are being deleted in the wrong order")
-		}
-		w.walletTransactions = w.walletTransactions[:lastIndex]
+	if !exists {
+		// The wallet only applies and reverts transactions that are relevant
+		// to a key it knows.
 		return
 	}
-	return
+
+	// Sanity check - the output should exist in the wallet transaction map
+	// because a prior addition to the map is being reverted.
+	_, exists = w.walletTransactionMap[wtid]
+	if build.DEBUG && !exists {
+		panic("wallet transaction not found in the wallet transaction map")
+	}
+	delete(w.walletTransactionMap, wtid)
+
+	// Sanity check - the last element of the wallet transaction array
+	// should be the item we are deleteing.
+	lastIndex := len(w.walletTransactions) - 1
+	if build.DEBUG && wtid != modules.CalculateWalletTransactionID(w.walletTransactions[lastIndex].TransactionID, w.walletTransactions[lastIndex].OutputID) {
+		panic("wallet transactions are being deleted in the wrong order")
+	}
+	w.walletTransactions = w.walletTransactions[:lastIndex]
 }
 
 // applyWalletTransaction adds a wallet transaction to the wallet transaction
 // history.
 func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) {
 	_, exists := w.keys[uh]
-	if exists {
-		// Sanity check - the output should not exist in the wallet transaction
-		// map, this should be the first time it was created.
-		wtid := modules.CalculateWalletTransactionID(t.ID(), oid)
-		_, exists := w.walletTransactionMap[wtid]
-		if exists && build.DEBUG {
-			panic("a wallet transaction is being added for the second time")
-		}
-		wt := modules.WalletTransaction{
-			TransactionID:         t.ID(),
-			ConfirmationHeight:    w.consensusSetHeight,
-			ConfirmationTimestamp: confirmationTime,
-			Transaction:           t,
-
-			FundType:       fundType,
-			OutputID:       oid,
-			RelatedAddress: uh,
-			Value:          value,
-		}
-		w.walletTransactions = append(w.walletTransactions, wt)
-		w.walletTransactionMap[wtid] = &w.walletTransactions[len(w.walletTransactions)-1]
-		w.historicOutputs[oid] = value
+	if !exists {
+		// The wallet only applies and reverts transactions that are relevant
+		// to a key it knows.
 		return
 	}
-	return
+
+	// Sanity check - the output should not exist in the wallet transaction
+	// map, this should be the first time it was created.
+	wtid := modules.CalculateWalletTransactionID(t.ID(), oid)
+	_, exists = w.walletTransactionMap[wtid]
+	if exists && build.DEBUG {
+		panic("a wallet transaction is being added for the second time")
+	}
+	wt := modules.WalletTransaction{
+		TransactionID:         t.ID(),
+		ConfirmationHeight:    w.consensusSetHeight,
+		ConfirmationTimestamp: confirmationTime,
+		Transaction:           t,
+
+		FundType:       fundType,
+		OutputID:       oid,
+		RelatedAddress: uh,
+		Value:          value,
+	}
+	w.walletTransactions = append(w.walletTransactions, wt)
+	w.walletTransactionMap[wtid] = &w.walletTransactions[len(w.walletTransactions)-1]
+	w.historicOutputs[oid] = value
 }
 
 // ProcessConsensusChange parses a consensus change to update the set of
