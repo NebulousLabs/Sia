@@ -11,6 +11,8 @@ type rpcID [8]byte
 var (
 	idSettings = rpcID{'S', 'e', 't', 't', 'i', 'n', 'g', 's'}
 	idContract = rpcID{'C', 'o', 'n', 't', 'r', 'a', 'c', 't'}
+	idDownload = rpcID{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd'}
+	// deprecated
 	idRetrieve = rpcID{'R', 'e', 't', 'r', 'i', 'e', 'v', 'e'}
 )
 
@@ -37,6 +39,9 @@ func (h *Host) handleConn(conn net.Conn) {
 		h.rpcSettings(conn)
 	case idContract:
 		h.rpcContract(conn)
+	case idDownload:
+		h.rpcDownload(conn)
+	// deprecated
 	case idRetrieve:
 		h.rpcRetrieve(conn)
 	default:
