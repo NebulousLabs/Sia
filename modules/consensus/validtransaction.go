@@ -52,10 +52,11 @@ func (cs *ConsensusSet) validSiacoins(t types.Transaction) (err error) {
 // exists in a file contract.
 func (cs *ConsensusSet) storageProofSegment(fcid types.FileContractID) (index uint64, err error) {
 	// Get the file contract associated with the input id.
-	fc, exists := cs.fileContracts[fcid]
+	exists := cs.db.inFileContracts(fcid)
 	if !exists {
 		return 0, ErrUnrecognizedFileContractID
 	}
+	fc := cs.db.getFileContracts(fcid)
 
 	// Get the ID of the trigger block.
 	triggerHeight := fc.WindowStart - 1
@@ -89,7 +90,7 @@ func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 			return err
 		}
 
-		fc, _ := cs.fileContracts[sp.ParentID] // previous function verifies the file contract exists
+		fc := cs.db.getFileContracts(sp.ParentID) // previous function verifies the file contract exists
 		leaves := crypto.CalculateLeaves(fc.FileSize)
 		segmentLen := uint64(crypto.SegmentSize)
 		if segmentIndex == leaves-1 {
@@ -126,10 +127,11 @@ func (cs *ConsensusSet) validStorageProofs(t types.Transaction) error {
 func (cs *ConsensusSet) validFileContractRevisions(t types.Transaction) (err error) {
 	for _, fcr := range t.FileContractRevisions {
 		// Check that the revision revises an existing contract.
-		fc, exists := cs.fileContracts[fcr.ParentID]
+		exists := cs.db.inFileContracts(fcr.ParentID)
 		if !exists {
 			return ErrUnrecognizedFileContractID
 		}
+		fc := cs.db.getFileContracts(fcr.ParentID)
 
 		// Check that the height is less than fc.WindowStart - revisions are
 		// not allowed to be submitted once the storage proof window has

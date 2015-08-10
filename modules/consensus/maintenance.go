@@ -102,13 +102,8 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 // contract expiring.
 func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) {
 	// Sanity checks.
-	fc, exists := cs.fileContracts[fcid]
+	fc := cs.db.getFileContracts(fcid)
 	if build.DEBUG {
-		// Check that the file contract in question exists.
-		if !exists {
-			panic(errMissingFileContract)
-		}
-
 		// Check that the file contract in question expires at pb.Height.
 		if fc.WindowEnd != pb.Height {
 			panic(errStorageProofTiming)
