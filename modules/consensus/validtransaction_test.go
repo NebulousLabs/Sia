@@ -19,6 +19,7 @@ func TestValidSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction pointing to a nonexistent siacoin output.
 	txn := types.Transaction{
@@ -66,6 +67,7 @@ func TestStorageProofSegment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Add a file contract to the consensus set that can be used to probe the
 	// storage segment.
@@ -123,6 +125,7 @@ func TestValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// COMPATv0.4.0
 	//
@@ -260,6 +263,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Try a proof set where there is padding on the last segment in the file.
 	file := make([]byte, 100)
@@ -321,6 +325,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Grab an address + unlock conditions for the transaction.
 	unlockConditions, err := cst.wallet.NextAddress()
@@ -457,6 +462,7 @@ func TestValidSiafunds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction pointing to a nonexistent siafund output.
 	txn := types.Transaction{
@@ -506,6 +512,7 @@ func TestValidTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction that is not standalone valid.
 	txn := types.Transaction{
@@ -568,6 +575,7 @@ func TestTryTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	initialHash := cst.cs.consensusSetHash()
 
 	// Try a valid transaction.

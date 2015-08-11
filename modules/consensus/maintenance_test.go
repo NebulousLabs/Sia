@@ -17,6 +17,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node with a single miner payout.
 	pb := new(processedBlock)
@@ -103,6 +104,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	pb := cst.cs.currentProcessedBlock()
 
 	// Trigger the sanity check concerning already-matured outputs.
@@ -128,6 +130,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)
@@ -216,6 +219,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)

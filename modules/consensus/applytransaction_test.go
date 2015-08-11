@@ -20,6 +20,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	b, _ := cst.miner.FindBlock()
 	err = cst.cs.AcceptBlock(b)
 	if err != nil {
@@ -85,6 +86,7 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -124,6 +126,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -187,6 +190,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -218,6 +222,7 @@ func TestApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -284,6 +289,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -315,6 +321,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -416,6 +423,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -443,6 +451,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -561,6 +570,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -589,6 +599,7 @@ func TestDuplicateStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)
@@ -635,6 +646,7 @@ func TestApplySiafundInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -684,6 +696,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -725,6 +738,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	cst.cs.siafundPool = types.NewCurrency64(101)
 
 	// Create a block node to use with application.
@@ -792,6 +806,7 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)

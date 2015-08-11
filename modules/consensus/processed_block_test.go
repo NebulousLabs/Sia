@@ -14,6 +14,7 @@ func TestEarliestChildTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Check the earliest timestamp generated when the block node has no
 	// parent.
@@ -125,6 +126,7 @@ func TestTargetAdjustmentBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a genesis node at timestamp 10,000
 	genesisNode := &processedBlock{
@@ -255,6 +257,7 @@ func TestSetChildTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a genesis node and a child that took 2x as long as expected.
 	genesisNode := &processedBlock{
@@ -286,6 +289,7 @@ func TestNewChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	parent := &processedBlock{
 		Height: 12,
