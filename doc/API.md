@@ -44,11 +44,10 @@ Queries:
 * /wallet/seed              [GET]
 * /wallet/seed              [PUT]
 * /wallet/seed              [POST]
-* /wallet/siacoins          [GET]
 * /wallet/siacoins          [PUT]
-* /wallet/siafunds          [GET]
 * /wallet/siafunds          [PUT]
 * /wallet/transaction/$(id) [GET]
+* /wallet/transactions      [GET]
 * /wallet/unlock            [PUT]
 
 #### /wallet [GET]
@@ -63,6 +62,13 @@ Response:
 struct {
 	encrypted bool
 	unlocked  bool
+
+	confirmedSiacoinBalance     int
+	unconfirmedOutgoingSiacoins int
+	unconfirmedIncomingSiacoins int
+
+	siafundBalance      int
+	siacoinClaimBalance int
 }
 ```
 'encrypted' indicates whether the wallet has been encrypted or not. If the
@@ -74,6 +80,30 @@ encryped - but the encryption key is in memory).
 
 'unlocked' indicates whether the wallet is currently locked or unlocked. Some
 calls become unavailable when the wallet is locked.
+
+'confirmedSiacoinBalance' is the number of siacoins available to the wallet as
+of the most recent block in the blockchain.
+
+'unconfirmedOutgoingSiacoins' is the number of siacoins that are leaving the
+wallet according to the set of unconfirmed transactions. Often this number
+appears inflated, because outputs are frequently larger than the number of
+coins being sent, and there is a refund. These coins are counted as outgoing,
+and the refund is counted as incoming. The difference in balance can be
+claculated using 'unconfirmedIncomingSiacoins' - 'unconfirmedOutgoingSiacoins'
+
+'unconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
+according to the set of unconfirmed transactions. This number is often inflated
+by outgoing siacoins, because outputs are frequently larger than the amount
+being sent. The refund will be included in the unconfirmed incoming siacoins
+balance.
+
+'siafundBalance' is the number of siafunds available to the wallet as
+of the most recent block in the blockchain.
+
+'siacoinClaimBalance' is the number of siacoins that can be claimed from the
+siafunds as of the most recent block. Because the claim balance increases every
+time a file contract is created, it is possible that the balance will increase
+before any claim transaction is confirmed.
 
 #### /wallet/close [PUT]
 
@@ -101,9 +131,8 @@ struct {
 begin.
 
 'end' refers to the height of of the block where the transaction history should
-end. Unconfirmed transactions will never be included. If 'end' is greater than
-the current height, all transactions up to and including the most recent block
-will be provided.
+end. If 'end' is greater than the current height, all transactions up to and
+including the most recent block will be provided.
 
 Response:
 ```
@@ -273,36 +302,6 @@ struct {
 'newSeed' is the new seed that will be used as the seed for generating new
 addresses.
 
-#### /wallet/siacoins [GET]
-
-Function: get the siacoin balance (confirmed and unconfirmed) of the wallet.
-
-Parameters: none
-
-Response:
-```
-struct {
-	confirmedSiacoinBalance     int
-	unconfirmedOutgoingSiacoins int
-	unconfirmedIncomingSiacoins int
-}
-```
-'confirmedSiacoinBalance' is the number of siacoins available to the wallet as
-of the most recent block in the blockchain.
-
-'unconfirmedOutgoingSiacoins' is the number of siacoins that are leaving the
-wallet according to the set of unconfirmed transactions. Often this number
-appears inflated, because outputs are frequently larger than the number of
-coins being sent, and there is a refund. These coins are counted as outgoing,
-and the refund is counted as incoming. The difference in balance can be
-claculated using 'unconfirmedIncomingSiacoins' - 'unconfirmedOutgoingSiacoins'
-
-'unconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
-according to the set of unconfirmed transactions. This number is often inflated
-by outgoing siacoins, because outputs are frequently larger than the amount
-being sent. The refund will be included in the unconfirmed incoming siacoins
-balance.
-
 #### /wallet/siacoins [PUT]
 
 Function: Send siacoins to an address. The outputs are arbitrarily selected
@@ -320,28 +319,6 @@ struct {
 'destination' is the address that is receiving the coins.
 
 Response: standard
-
-#### /wallet/siafunds [GET]
-
-Function: get the siafund balance of the wallet. Only the confirmed balance is
-displayed for siafunds.
-
-Parameters: none
-
-Response:
-```
-struct {
-	siafundBalance      int
-	siacoinClaimBalance int
-}
-```
-'siafundBalance' is the number of siafunds available to the wallet as
-of the most recent block in the blockchain.
-
-'siacoinClaimBalance' is the number of siacoins that can be claimed from the
-siafunds as of the most recent block. Because the claim balance increases every
-time a file contract is created, it is possible that the balance will increase
-before any claim transaction is confirmed.
 
 #### /wallet/siafunds [PUT]
 
@@ -380,6 +357,37 @@ struct {
 ```
 'transaction' is a 'types.Transaction'. The full transaction can be seen in
 types.transaction.go. All hashes in the transaction are encoded as strings.
+
+#### /wallet/transactions [GET]
+
+Function: Return all raw transactions relevant to the wallet in a block range.
+Raw transactions are missing metadata such as confirmation height.
+
+Parameters:
+```
+struct {
+	start int
+	end   int
+}
+```
+'start' refers to the height of the block where transaction history should
+begin.
+
+'end' refers to the height of of the block where the transaction history should
+end. If 'end' is greater than the current height, all transactions up to and
+including the most recent block will be provided.
+
+Response:
+```
+struct {
+	confirmedTransactions   []types.Transaction
+	unconfirmedTransactions []types.Transaction
+}
+```
+'confirmedTransactions' lists all of the confirmed transactions appearing
+between height 'start' and height 'end' (inclusive).
+
+'unconfirmedTransactions' lists all of the unconfirmed transactions.
 
 #### /wallet/unlock [PUT]
 
