@@ -406,6 +406,29 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 	return nil
 }
 
+// MarshalJSON is implemented on the unlock hash to always produce a hex string
+// upon marshalling.
+func (uh UnlockHash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(uh.String())
+}
+
+// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
+// that has been encoded to a hex string.
+func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
+	// Check the length of b.
+	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 && len(b) != crypto.HashSize*2+2 {
+		return ErrUnlockHashWrongLen
+	}
+	return uh.LoadString(string(b[1 : len(b)-1]))
+}
+
+// String returns the hex representation of the unlock hash as a string - this
+// includes a checksum.
+func (uh UnlockHash) String() string {
+	uhChecksum := crypto.HashObject(uh)
+	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
+}
+
 // LoadString loads a hex representation (including checksum) of an unlock hash
 // into an unlock hash object. An error is returned if the string is invalid or
 // fails the checksum.
@@ -438,27 +461,4 @@ func (uh *UnlockHash) LoadString(strUH string) error {
 	copy(uh[:], byteUnlockHash[:])
 
 	return nil
-}
-
-// MarshalJSON is implemented on the unlock hash to always produce a hex string
-// upon marshalling.
-func (uh UnlockHash) MarshalJSON() ([]byte, error) {
-	return json.Marshal(uh.String())
-}
-
-// UnmarshalJSON is implemented on the unlock hash to recover an unlock hash
-// that has been encoded to a hex string.
-func (uh *UnlockHash) UnmarshalJSON(b []byte) error {
-	// Check the length of b.
-	if len(b) != crypto.HashSize*2+UnlockHashChecksumSize*2+2 && len(b) != crypto.HashSize*2+2 {
-		return ErrUnlockHashWrongLen
-	}
-	return uh.LoadString(string(b[1 : len(b)-1]))
-}
-
-// String returns the hex representation of the unlock hash as a string - this
-// includes a checksum.
-func (uh UnlockHash) String() string {
-	uhChecksum := crypto.HashObject(uh)
-	return fmt.Sprintf("%x%x", uh[:], uhChecksum[:UnlockHashChecksumSize])
 }

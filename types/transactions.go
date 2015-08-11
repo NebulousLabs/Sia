@@ -6,6 +6,10 @@ package types
 // it is cryptographically unlikely that any two objects would share an id.
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+
 	"github.com/NebulousLabs/Sia/crypto"
 )
 
@@ -25,13 +29,11 @@ var (
 	SpecifierStorageProofOutput   = Specifier{'s', 't', 'o', 'r', 'a', 'g', 'e', ' ', 'p', 'r', 'o', 'o', 'f'}
 	SpecifierSiafundInput         = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'i', 'n', 'p', 'u', 't'}
 	SpecifierSiafundOutput        = Specifier{'s', 'i', 'a', 'f', 'u', 'n', 'd', ' ', 'o', 'u', 't', 'p', 'u', 't'}
+
+	ErrTransactionIDWrongLen = errors.New("input has wrong length to be an encoded transaction id")
 )
 
 type (
-	// OutputID is any type of output id, such as SiacoinOutputID or
-	// StorageProofOutputID.
-	OutputID crypto.Hash
-
 	// A Specifier is a fixed-length byte-array that serves two purposes. In
 	// the wire protocol, they are used to identify a particular encoding
 	// algorithm, signature algorithm, etc. This allows nodes to communicate on
@@ -52,6 +54,7 @@ type (
 	SiacoinOutputID crypto.Hash
 	SiafundOutputID crypto.Hash
 	FileContractID  crypto.Hash
+	OutputID        crypto.Hash
 
 	// A Transaction is an atomic component of a block. Transactions can contain
 	// inputs and outputs, file contracts, storage proofs, and even arbitrary
@@ -228,4 +231,43 @@ func (t Transaction) SiacoinOutputSum() (sum Currency) {
 // the siafund output is spent. The ID is the hash the SiafundOutputID.
 func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashObject(id))
+}
+
+// MarshalJSON is implemented on the transaction id to always produce a hex string
+// upon marshalling.
+func (tid TransactionID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(tid.String())
+}
+
+// UnmarshalJSON is implemented on the transaction id to recover an unlock hash
+// that has been encoded to a hex string.
+func (tid *TransactionID) UnmarshalJSON(b []byte) error {
+	// Check the length of b.
+	if len(b) != crypto.HashSize*2+2 {
+		return ErrTransactionIDWrongLen
+	}
+	return tid.LoadString(string(b[1 : len(b)-1]))
+}
+
+// String returns the hex representation of the transaction id as a string.
+func (tid TransactionID) String() string {
+	return fmt.Sprintf("%x", tid[:])
+}
+
+// LoadString loads a hex representation of a transaction id.
+func (tid *TransactionID) LoadString(strTID string) error {
+	// Check the length of strUH.
+	if len(strTID) != crypto.HashSize*2 {
+		return ErrTransactionIDWrongLen
+	}
+
+	// Decode the unlock hash.
+	var byteTID []byte
+	_, err := fmt.Sscanf(strTID, "%x", &byteTID)
+	if err != nil {
+		return err
+	}
+	copy(tid[:], byteTID[:])
+
+	return nil
 }
