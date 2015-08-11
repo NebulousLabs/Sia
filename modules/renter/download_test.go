@@ -17,7 +17,7 @@ func (h *testHost) pieces(chunkIndex uint64) []pieceData {
 }
 
 func (h *testHost) fetch(p pieceData) ([]byte, error) {
-	return h.data[p.offset : p.offset+p.length], nil
+	return h.data[p.Offset : p.Offset+p.Length], nil
 }
 
 // TestErasureDownload tests parallel downloading of erasure-coded data.
@@ -60,6 +60,7 @@ func TestErasureDownload(t *testing.T) {
 		for j, p := range pieces {
 			host := hosts[j%len(hosts)].(*testHost) // distribute evenly
 			host.pieceMap[i] = append(host.pieceMap[i], pieceData{
+				uint64(i),
 				uint64(j),
 				uint64(len(host.data)),
 				uint64(len(p)),

@@ -8,17 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// pieceData contains the metadata necessary to request a piece from a
-// fetcher.
-// TODO: may not need the piece field. Think about restructuring.
-type pieceData struct {
-	piece  uint64
-	offset uint64
-	length uint64
+// deriveKey derives the key used to encrypt and decrypt a specific file piece.
+func deriveKey(masterKey crypto.TwofishKey, chunkIndex, pieceIndex uint64) crypto.TwofishKey {
+	return crypto.TwofishKey(crypto.HashAll(masterKey, chunkIndex, pieceIndex))
 }
 
 // A fetcher fetches pieces from a host. This interface exists to facilitate
@@ -34,8 +31,9 @@ type fetcher interface {
 // A hostFetcher fetches pieces from a host. It implements the fetcher
 // interface.
 type hostFetcher struct {
-	conn     net.Conn
-	pieceMap map[uint64][]pieceData
+	conn      net.Conn
+	pieceMap  map[uint64][]pieceData
+	masterKey crypto.TwofishKey
 }
 
 // pieces returns the pieces stored on this host that are part of a given
@@ -46,20 +44,23 @@ func (hf *hostFetcher) pieces(chunk uint64) []pieceData {
 
 // fetch downloads the piece specified by p.
 func (hf *hostFetcher) fetch(p pieceData) ([]byte, error) {
-	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.offset, p.length})
+	err := encoding.WriteObject(hf.conn, modules.DownloadRequest{p.Offset, p.Length})
 	if err != nil {
 		return nil, err
 	}
 	// TODO: would it be more efficient to do this manually?
 	// i.e. read directly into a bytes.Buffer
 	var b []byte
-	err = encoding.ReadObject(hf.conn, &b, p.length)
+	err = encoding.ReadObject(hf.conn, &b, p.Length)
 	if err != nil {
 		return nil, err
 	}
-	// decrypt, verify
-	//...
-	return b, nil
+
+	// generate decryption key
+	key := deriveKey(hf.masterKey, p.Chunk, p.Piece)
+
+	// decrypt and return
+	return key.DecryptBytes(b)
 }
 
 func (hf *hostFetcher) Close() error {
@@ -68,7 +69,7 @@ func (hf *hostFetcher) Close() error {
 	return hf.conn.Close()
 }
 
-func newHostFetcher(fc fileContract) (*hostFetcher, error) {
+func newHostFetcher(fc fileContract, masterKey crypto.TwofishKey) (*hostFetcher, error) {
 	conn, err := net.DialTimeout("tcp", string(fc.IP), 5*time.Second)
 	if err != nil {
 		return nil, err
@@ -83,11 +84,12 @@ func newHostFetcher(fc fileContract) (*hostFetcher, error) {
 	// make piece map
 	pieceMap := make(map[uint64][]pieceData)
 	for _, p := range fc.Pieces {
-		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], pieceData{p.Piece, p.Offset, p.Length})
+		pieceMap[p.Chunk] = append(pieceMap[p.Chunk], p)
 	}
 	return &hostFetcher{
-		conn:     conn,
-		pieceMap: pieceMap,
+		conn:      conn,
+		pieceMap:  pieceMap,
+		masterKey: masterKey,
 	}, nil
 }
 
@@ -157,7 +159,7 @@ func (d *download) worker(host fetcher, reqChan chan uint64) {
 			if err != nil {
 				data = nil
 			}
-			d.respChans[p.piece] <- data
+			d.respChans[p.Piece] <- data
 		}
 	}
 }
@@ -180,7 +182,8 @@ func (d *download) run(w io.Writer) error {
 	}()
 
 	chunk := make([][]byte, d.ecc.NumPieces())
-	for i := uint64(0); d.received < d.fileSize; i++ {
+	var received uint64
+	for i := uint64(0); received < d.fileSize; i++ {
 		// tell all workers to download chunk i
 		for _, ch := range d.reqChans {
 			ch <- i
@@ -194,14 +197,15 @@ func (d *download) run(w io.Writer) error {
 		// Write pieces to w. We always write chunkSize bytes unless this is
 		// the last chunk; in that case, we write the remainder.
 		n := d.chunkSize
-		if n > d.fileSize-d.received {
-			n = d.fileSize - d.received
+		if n > d.fileSize-received {
+			n = d.fileSize - received
 		}
 		err := d.ecc.Recover(chunk, uint64(n), w)
 		if err != nil {
 			return err
 		}
-		atomic.AddUint64(&d.received, d.chunkSize)
+		received += n
+		atomic.AddUint64(&d.received, n)
 	}
 
 	return nil
@@ -260,7 +264,7 @@ func (r *Renter) Download(nickname, destination string) error {
 	var hosts []fetcher
 	for i := range file.Contracts {
 		// TODO: connect in parallel
-		hf, err := newHostFetcher(file.Contracts[i])
+		hf, err := newHostFetcher(file.Contracts[i], file.MasterKey)
 		if err != nil {
 			continue
 		}

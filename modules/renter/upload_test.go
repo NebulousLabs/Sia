@@ -30,6 +30,7 @@ func (h *testHost) connect() (fileContract, error) {
 
 func (h *testHost) upload(chunkIndex, pieceIndex uint64, piece []byte) error {
 	h.pieceMap[chunkIndex] = append(h.pieceMap[chunkIndex], pieceData{
+		chunkIndex,
 		pieceIndex,
 		uint64(len(h.data)),
 		uint64(len(piece)),
@@ -115,7 +116,7 @@ func TestErasureUpload(t *testing.T) {
 		for _, h := range hosts {
 			host := h.(fetcher)
 			for _, p := range host.pieces(i) {
-				chunk[p.piece], err = host.fetch(p)
+				chunk[p.Piece], err = host.fetch(p)
 				if err != nil {
 					t.Fatal(err)
 				}
