@@ -50,6 +50,19 @@ type WalletSeedPOST struct {
 	NewSeed string `json:"newSeed"`
 }
 
+// WalletTransactionGETid contains the transaction returned by a call to
+// /wallet/transaction/$(id)
+type WalletTransactionGETid struct {
+	Transaction types.Transaction `json:"transaction"`
+}
+
+// WalletTransactionsGET contains the specified set of confirmed and
+// unconfirmed transactions.
+type WalletTransactionsGET struct {
+	ConfirmedTransactions   []types.Transaction `json:"confirmedTransactions"`
+	UnconfirmedTransactions []types.Transaction `json:"unconfirmedTransactions"`
+}
+
 // scanAmount scans a types.Currency from a string.
 func scanAmount(amount string) (types.Currency, bool) {
 	// use SetString manually to ensure that amount does not contain
@@ -114,18 +127,21 @@ func (srv *Server) walletCloseHandler(w http.ResponseWriter, req *http.Request) 
 
 // walletHistoryHandlerGET handles a GET request to /wallet/history.
 func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Request) {
-	start, err := strconv.Atoi(req.FormValue("start"))
+	start, err := strconv.Atoi(req.FormValue("startHeight"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	end, err := strconv.Atoi(req.FormValue("end"))
+	end, err := strconv.Atoi(req.FormValue("endHeight"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	confirmedHistory, err := srv.wallet.History(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
 		writeError(w, "/walet/history [GET] Error:"+err.Error(), http.StatusBadRequest)
+		return
 	}
 	writeJSON(w, WalletHistoryGET{
 		UnconfirmedTransactions: srv.wallet.UnconfirmedHistory(),
@@ -133,12 +149,13 @@ func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Requ
 	})
 }
 
-// walletHistoryHandlerGETAddr handles a GET request to
+// walletHistoryHandlerGETaddr handles a GET request to
 // /wallet/history/$(addr).
-func (srv *Server) walletHistoryHandlerGETAddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
+func (srv *Server) walletHistoryHandlerGETaddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
 	addrHistory, err := srv.wallet.AddressHistory(addr)
 	if err != nil {
 		writeError(w, "error after call to /wallet/history/$(addr): "+err.Error(), http.StatusBadRequest)
+		return
 	}
 	writeJSON(w, addrHistory)
 }
@@ -154,16 +171,18 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 	// check that the method is correct.
 	if req.Method != "GET" && req.Method != "" {
 		writeError(w, "unrecognized method in call to /wallet/history", http.StatusBadRequest)
+		return
 	}
 
-	// Parse the address from the url and call the GETAddr Handler.
-	jsonAddr := "\"" + req.URL.Path[len("/wallet/history"):] + "\""
+	// Parse the address from the url and call the GETaddr Handler.
+	jsonAddr := "\"" + req.URL.Path[len("/wallet/history/"):] + "\""
 	var addr types.UnlockHash
 	err := addr.UnmarshalJSON([]byte(jsonAddr))
 	if err != nil {
 		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
+		return
 	}
-	srv.walletHistoryHandlerGETAddr(w, req, addr)
+	srv.walletHistoryHandlerGETaddr(w, req, addr)
 }
 
 // walletSeedHandlerGET handles a GET request to /wallet/seed.
@@ -254,6 +273,7 @@ func (srv *Server) walletSiacoinsHandlerPUT(w http.ResponseWriter, req *http.Req
 	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
 		writeError(w, "could not read 'amount' from PUT call to /wallet/siacoins", http.StatusBadRequest)
+		return
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
@@ -283,6 +303,7 @@ func (srv *Server) walletSiafundsHandlerPUT(w http.ResponseWriter, req *http.Req
 	amount, ok := scanAmount(req.FormValue("amount"))
 	if !ok {
 		writeError(w, "could not read 'amount' from PUT call to /wallet/siafunds", http.StatusBadRequest)
+		return
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
 	if err != nil {
@@ -304,6 +325,73 @@ func (srv *Server) walletSiafundsHandler(w http.ResponseWriter, req *http.Reques
 		srv.walletSiafundsHandlerPUT(w, req)
 	} else {
 		writeError(w, "unrecognized method when calling /wallet/siafunds", http.StatusBadRequest)
+	}
+}
+
+// walletTransactionHandlerGETid handles a GET call to
+// /wallet/transaction/$(id).
+func (srv *Server) walletTransactionHandlerGETid(w http.ResponseWriter, req *http.Request, id types.TransactionID) {
+	txn, ok := srv.wallet.Transaction(id)
+	if !ok {
+		writeError(w, "error when calling /wallet/transaction/$(id): transaction not found", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, WalletTransactionGETid{
+		Transaction: txn,
+	})
+}
+
+// walletTransactionHandler handles API calls to /wallet/transaction.
+func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Request) {
+	// GET is the only supported method.
+	if req.Method != "" && req.Method != "GET" {
+		writeError(w, "unrecognized method when calling /wallet/transaction", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the id from the url.
+	var id types.TransactionID
+	jsonID := "\"" + req.URL.Path[len("/wallet/transaction/"):] + "\""
+	err := id.UnmarshalJSON([]byte(jsonID))
+	if err != nil {
+		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	srv.walletTransactionHandlerGETid(w, req, id)
+}
+
+// walletTransactionsHandlerGET handles a GET call to /wallet/transactions.
+func (srv *Server) walletTransactionsHandlerGET(w http.ResponseWriter, req *http.Request) {
+	// Get the start and end blocks.
+	start, err := strconv.Atoi(req.FormValue("startHeight"))
+	if err != nil {
+		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	end, err := strconv.Atoi(req.FormValue("endHeight"))
+	if err != nil {
+		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	confirmedTxns, err := srv.wallet.Transactions(types.BlockHeight(start), types.BlockHeight(end))
+	if err != nil {
+		writeError(w, "error after call to /wallet/transactions: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	unconfirmedTxns := srv.wallet.UnconfirmedTransactions()
+
+	writeJSON(w, WalletTransactionsGET{
+		ConfirmedTransactions:   confirmedTxns,
+		UnconfirmedTransactions: unconfirmedTxns,
+	})
+}
+
+// walletTransactionsHandler handles API calls to /wallet/transactions.
+func (srv *Server) walletTransactionsHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "" || req.Method == "GET" {
+		srv.walletTransactionsHandlerGET(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/transactions", http.StatusBadRequest)
 	}
 }
 

@@ -123,16 +123,16 @@ Function: Return a list of transactions related to the wallet.
 Parameters:
 ```
 struct {
-	start int
-	end   int
+	startHeight int
+	endHeight   int
 }
 ```
-'start' refers to the height of the block where transaction history should
-begin.
+'startHeight' refers to the height of the block where transaction history
+should begin.
 
-'end' refers to the height of of the block where the transaction history should
-end. If 'end' is greater than the current height, all transactions up to and
-including the most recent block will be provided.
+'endHeight' refers to the height of of the block where the transaction history
+should end. If 'endHeight' is greater than the current height, all transactions
+up to and including the most recent block will be provided.
 
 Response:
 ```
@@ -366,16 +366,16 @@ Raw transactions are missing metadata such as confirmation height.
 Parameters:
 ```
 struct {
-	start int
-	end   int
+	startHeight int
+	endHeight   int
 }
 ```
-'start' refers to the height of the block where transaction history should
-begin.
+'startHeight' refers to the height of the block where transaction history
+should begin.
 
-'end' refers to the height of of the block where the transaction history should
-end. If 'end' is greater than the current height, all transactions up to and
-including the most recent block will be provided.
+'endHeight' refers to the height of of the block where the transaction history
+should end. If 'endHeight' is greater than the current height, all transactions
+up to and including the most recent block will be provided.
 
 Response:
 ```

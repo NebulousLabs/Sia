@@ -39,12 +39,12 @@ func (w *Wallet) revertWalletTransaction(uh types.UnlockHash, wtid modules.Walle
 
 // applyWalletTransaction adds a wallet transaction to the wallet transaction
 // history.
-func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) {
+func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.UnlockHash, t types.Transaction, confirmationTime types.Timestamp, oid types.OutputID, value types.Currency) bool {
 	_, exists := w.keys[uh]
 	if !exists {
 		// The wallet only applies and reverts transactions that are relevant
 		// to a key it knows.
-		return
+		return false
 	}
 
 	// Sanity check - the output should not exist in the wallet transaction
@@ -67,6 +67,7 @@ func (w *Wallet) applyWalletTransaction(fundType types.Specifier, uh types.Unloc
 	w.walletTransactions = append(w.walletTransactions, wt)
 	w.walletTransactionMap[wtid] = &w.walletTransactions[len(w.walletTransactions)-1]
 	w.historicOutputs[oid] = value
+	return true
 }
 
 // ProcessConsensusChange parses a consensus change to update the set of
@@ -157,7 +158,7 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			for i := len(txn.SiacoinInputs) - 1; i >= 0; i-- {
 				w.revertWalletTransaction(txn.SiacoinInputs[i].UnlockConditions.UnlockHash(), modules.CalculateWalletTransactionID(txid, types.OutputID(txn.SiacoinInputs[i].ParentID)))
 			}
-
+			delete(w.transactions, txid)
 		}
 		for i := len(block.MinerPayouts) - 1; i >= 0; i-- {
 			w.revertWalletTransaction(block.MinerPayouts[i].UnlockHash, modules.CalculateWalletTransactionID(types.Transaction{}.ID(), types.OutputID(block.MinerPayoutID(uint64(i)))))
@@ -173,18 +174,30 @@ func (w *Wallet) ProcessConsensusChange(cc modules.ConsensusChange) {
 			w.applyWalletTransaction(types.SpecifierMinerPayout, mp.UnlockHash, types.Transaction{}, block.Timestamp, types.OutputID(block.MinerPayoutID(uint64(i))), mp.Value)
 		}
 		for _, txn := range block.Transactions {
+			relevant := false // indicates whether the transaction is relevant to the wallet.
 			// Add a wallet transaction for all transaction elements.
 			for _, sci := range txn.SiacoinInputs {
-				w.applyWalletTransaction(types.SpecifierSiacoinInput, sci.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sci.ParentID), w.historicOutputs[types.OutputID(sci.ParentID)])
+				if w.applyWalletTransaction(types.SpecifierSiacoinInput, sci.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sci.ParentID), w.historicOutputs[types.OutputID(sci.ParentID)]) {
+					relevant = true
+				}
 			}
 			for i, sco := range txn.SiacoinOutputs {
-				w.applyWalletTransaction(types.SpecifierSiacoinOutput, sco.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiacoinOutputID(i)), sco.Value)
+				if w.applyWalletTransaction(types.SpecifierSiacoinOutput, sco.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiacoinOutputID(i)), sco.Value) {
+					relevant = true
+				}
 			}
 			for _, sfi := range txn.SiafundInputs {
-				w.applyWalletTransaction(types.SpecifierSiafundInput, sfi.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sfi.ParentID), w.historicOutputs[types.OutputID(sfi.ParentID)])
+				if w.applyWalletTransaction(types.SpecifierSiafundInput, sfi.UnlockConditions.UnlockHash(), txn, block.Timestamp, types.OutputID(sfi.ParentID), w.historicOutputs[types.OutputID(sfi.ParentID)]) {
+					relevant = true
+				}
 			}
 			for i, sfo := range txn.SiafundOutputs {
-				w.applyWalletTransaction(types.SpecifierSiafundOutput, sfo.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiafundOutputID(i)), sfo.Value)
+				if w.applyWalletTransaction(types.SpecifierSiafundOutput, sfo.UnlockHash, txn, block.Timestamp, types.OutputID(txn.SiafundOutputID(i)), sfo.Value) {
+					relevant = true
+				}
+			}
+			if relevant {
+				w.transactions[txn.ID()] = txn
 			}
 		}
 	}
@@ -204,8 +217,10 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 		defer w.mu.Unlock(lockID)
 	}
 
+	w.unconfirmedTransactions = nil
 	w.unconfirmedWalletTransactions = nil
 	for _, txn := range txns {
+		relevant := false // indicates whether the transaction is relevant to the wallet
 		for _, sci := range txn.SiacoinInputs {
 			_, exists := w.keys[sci.UnlockConditions.UnlockHash()]
 			if exists {
@@ -220,6 +235,7 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 					Value:          w.historicOutputs[types.OutputID(sci.ParentID)],
 				}
 				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
+				relevant = true
 			}
 		}
 		for i, sco := range txn.SiacoinOutputs {
@@ -238,7 +254,11 @@ func (w *Wallet) ReceiveUpdatedUnconfirmedTransactions(txns []types.Transaction,
 				w.unconfirmedWalletTransactions = append(w.unconfirmedWalletTransactions, wt)
 				oid := types.OutputID(txn.SiacoinOutputID(i))
 				w.historicOutputs[oid] = sco.Value
+				relevant = true
 			}
+		}
+		if relevant {
+			w.unconfirmedTransactions = append(w.unconfirmedTransactions, txn)
 		}
 	}
 }

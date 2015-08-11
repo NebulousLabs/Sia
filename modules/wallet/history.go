@@ -11,13 +11,13 @@ var (
 	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
 
-// History returns all of the confirmed transactions between 'startBlock' and
-// 'endBlock' (inclusive).
-func (w *Wallet) History(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
+// History returns all of the confirmed transactions between 'startHeight' and
+// 'endHeight' (inclusive).
+func (w *Wallet) History(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]modules.WalletTransaction, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
-	if startBlock > w.consensusSetHeight || startBlock > endBlock {
+	if startHeight > w.consensusSetHeight || startHeight > endHeight {
 		return nil, errOutOfBounds
 	}
 	if len(w.walletTransactions) == 0 {
@@ -26,12 +26,12 @@ func (w *Wallet) History(startBlock types.BlockHeight, endBlock types.BlockHeigh
 
 	var start, end int
 	for start = 0; start < len(w.walletTransactions); start++ {
-		if w.walletTransactions[start].ConfirmationHeight >= startBlock {
+		if w.walletTransactions[start].ConfirmationHeight >= startHeight {
 			break
 		}
 	}
 	for end = start; end < len(w.walletTransactions); end++ {
-		if w.walletTransactions[end].ConfirmationHeight > endBlock {
+		if w.walletTransactions[end].ConfirmationHeight > endHeight {
 			break
 		}
 	}
@@ -79,4 +79,47 @@ func (w *Wallet) AddressUnconfirmedHistory(uh types.UnlockHash) (wts []modules.W
 		}
 	}
 	return wts
+}
+
+// Transaction returns the transaction with the given id. 'False' is returned
+// if the transaction does not exist.
+func (w *Wallet) Transaction(txid types.TransactionID) (txn types.Transaction, ok bool) {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	txn, ok = w.transactions[txid]
+	return txn, ok
+}
+
+// Transactions returns all transactions relevant to the wallet that were
+// confirmed in the range [startHeight, endHeight].
+func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (txns []types.Transaction, err error) {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+
+	if startHeight > w.consensusSetHeight || startHeight > endHeight {
+		return nil, errOutOfBounds
+	}
+	if len(w.walletTransactions) == 0 {
+		return nil, nil
+	}
+
+	var prevTxid types.TransactionID
+	for _, wt := range w.walletTransactions {
+		if wt.ConfirmationHeight > endHeight {
+			break
+		}
+		if wt.ConfirmationHeight >= startHeight && wt.TransactionID != prevTxid {
+			prevTxid = wt.TransactionID
+			txns = append(txns, w.transactions[wt.TransactionID])
+		}
+	}
+	return txns, nil
+}
+
+// UnconfirmedTransactions returns the set of unconfirmed transactions that are
+// relevant to the wallet.
+func (w *Wallet) UnconfirmedTransactions() []types.Transaction {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	return w.unconfirmedTransactions
 }

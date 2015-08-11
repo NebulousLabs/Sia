@@ -217,13 +217,14 @@ type (
 		// related to a given address.
 		AddressUnconfirmedHistory(types.UnlockHash) []WalletTransaction
 
-		// Transaction returns the transaction with the given id. An error is
-		// returned if no transaction is known with the given id.
-		Transaction(types.TransactionID) (types.Transaction, error)
+		// Transaction returns the transaction with the given id. The bool
+		// indicates whether the transaction is in the wallet database. The
+		// wallet only stores transactions that are related to the wallet.
+		Transaction(types.TransactionID) (types.Transaction, bool)
 
 		// Transactions returns all transactions that were confirmed from
-		// height [startHeight, endHeight].
-		Transactions(startHeight types.BlockHeight, endHeight types.BlockHeight) []types.Transaction
+		// height [startHeight, endHeight] that are relevant to the wallet.
+		Transactions(startHeight, endHeight types.BlockHeight) ([]types.Transaction, error)
 
 		// UnconfirmedTransactions returns all unconfirmed transactions.
 		UnconfirmedTransactions() []types.Transaction
