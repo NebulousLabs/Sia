@@ -35,14 +35,17 @@ var (
 	ErrUnlockHashWrongLen        = errors.New("marshalled unlock hash is the wrong length")
 	ErrWholeTransactionViolation = errors.New("covered fields violation")
 
-	ZeroUnlockHash = UnlockHash{0}
-
 	// UnlockHashChecksumSize is the size of the checksum used to verify
 	// human-readable addresses. It is not a crypytographically secure
 	// checksum, it's merely intended to prevent typos. 6 is chosen because it
 	// brings the total size of the address to 38 bytes, leaving 2 bytes for
 	// potential version additions in the future.
 	UnlockHashChecksumSize = 6
+
+	// FullCoveredFields is a covered fileds object where the
+	// 'WholeTransaction' field has been set to true. The primary purpose of
+	// this variable is syntactic sugar.
+	FullCoveredFields = CoveredFields{WholeTransaction: true}
 )
 
 type (

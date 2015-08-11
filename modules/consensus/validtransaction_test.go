@@ -324,7 +324,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 	}
 
 	// Grab an address + unlock conditions for the transaction.
-	unlockHash, unlockConditions, err := cst.wallet.CoinAddress(false)
+	unlockConditions, err := cst.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +344,7 @@ func TestValidFileContractRevisions(t *testing.T) {
 		FileMerkleRoot: root,
 		WindowStart:    102,
 		WindowEnd:      1200,
-		UnlockHash:     unlockHash,
+		UnlockHash:     unlockConditions.UnlockHash(),
 		RevisionNumber: 1,
 	}
 	cst.cs.db.addFileContracts(fcid, fc)
@@ -573,7 +573,7 @@ func TestTryTransactionSet(t *testing.T) {
 
 	// Try a valid transaction.
 	var txns []types.Transaction
-	_, err = cst.wallet.SendCoins(types.NewCurrency64(1), types.UnlockHash{})
+	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -118,7 +118,7 @@ func (srv *Server) debugMutextestHandler(w http.ResponseWriter, req *http.Reques
 		mds.TransactionPool = true
 	}()
 	go func() {
-		srv.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
+		srv.wallet.NextAddress()
 		mds.Wallet = true
 	}()
 	time.Sleep(time.Second * 3)

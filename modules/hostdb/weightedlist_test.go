@@ -226,6 +226,9 @@ func TestRepeatInsert(t *testing.T) {
 
 // TestRandomHosts probles the RandomHosts function.
 func TestRandomHosts(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdbt := newHDBTester("TestRandomHosts", t)
 
 	// Insert 3 hosts to be selected.

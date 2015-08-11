@@ -24,6 +24,9 @@ func (et *explorerTester) testConsensusUpdates(t *testing.T) {
 }
 
 func TestConsensusUpdates(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	et, err := createExplorerTester("TestExplorerConsensusUpdate", t)
 	if err != nil {
 		t.Fatal(err)

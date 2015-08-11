@@ -99,7 +99,7 @@ func TestHeavierThan(t *testing.T) {
 }
 
 // TestChildDepth probes the childDeath method of the blockNode type.
-func TestChildDept(t *testing.T) {
+func TestChildDepth(t *testing.T) {
 	// Try adding to equal weight nodes, result should be half.
 	pb := new(processedBlock)
 	pb.Depth[0] = 64

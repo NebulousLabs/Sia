@@ -1044,7 +1044,8 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	// Funding entity creates and signs a transaction that spends the full
 	// channel output.
 	channelOutputID := channelTxn.SiacoinOutputID(0)
-	refundAddr, _, err := cst.wallet.CoinAddress(false)
+	refundUC, err := cst.wallet.NextAddress()
+	refundAddr := refundUC.UnlockHash()
 	if err != nil {
 		return err
 	}
@@ -1222,7 +1223,8 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		// Funding entity creates and signs a transaction that spends the full
 		// channel output.
 		channelOutputID := channelTxn.SiacoinOutputID(0)
-		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		refundUC, err := cst.wallet.NextAddress()
+		refundAddr := refundUC.UnlockHash()
 		if err != nil {
 			return err
 		}
@@ -1250,7 +1252,8 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 
 		// Recieving entity never communitcates, funding entity must reclaim
 		// the 'channelSize' coins that were intended to go to the channel.
-		reclaimAddr, _, err := cst.wallet.CoinAddress(false)
+		reclaimUC, err := cst.wallet.NextAddress()
+		reclaimAddr := reclaimUC.UnlockHash()
 		if err != nil {
 			return err
 		}
@@ -1341,7 +1344,8 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 		// Funding entity creates and signs a transaction that spends the full
 		// channel output.
 		channelOutputID := channelTxn.SiacoinOutputID(0)
-		refundAddr, _, err := cst.wallet.CoinAddress(false)
+		refundUC, err := cst.wallet.NextAddress()
+		refundAddr := refundUC.UnlockHash()
 		if err != nil {
 			return err
 		}
@@ -1468,6 +1472,7 @@ func (cst *consensusSetTester) complexBlockSet() error {
 			return err
 		}
 	}
+
 	err = cst.testFileContractsBlocks()
 	if err != nil {
 		return err
@@ -1486,7 +1491,6 @@ func TestComplexForking(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-
 	cst1, err := createConsensusSetTester("TestComplexForking - 1")
 	if err != nil {
 		t.Fatal(err)

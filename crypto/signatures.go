@@ -62,3 +62,9 @@ func VerifyHash(data Hash, pk PublicKey, sig Signature) error {
 	}
 	return nil
 }
+
+// PublicKey returns the public key that corresponds to a secret key.
+func (sk SecretKey) PublicKey() (pk PublicKey) {
+	copy(pk[:], sk[32:])
+	return
+}

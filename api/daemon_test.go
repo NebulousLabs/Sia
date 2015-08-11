@@ -27,6 +27,9 @@ func (uh *updateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // TestUpdate checks that updates work properly.
 func TestSignedUpdate(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st := newServerTester("TestSignedUpdate", t)
 
 	// to test the update process, we need to spoof the update server

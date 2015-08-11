@@ -141,10 +141,7 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	}
 
 	// Fill out the consensus information for the genesis block.
-	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.ZeroUnlockHash,
-	}
+	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{Value: types.CalculateCoinbase(0)}
 
 	// Create the consensus directory.
 	err := os.MkdirAll(saveDir, 0700)

@@ -128,11 +128,11 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 		}
 
 		for i := 0; i < numSigs; i++ {
-			addr, _, err := cst.wallet.CoinAddress(false)
+			unlockConditions, err := cst.wallet.NextAddress()
 			if err != nil {
 				b.Fatal(err)
 			}
-			txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: outputValues[i], UnlockHash: addr})
+			txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: outputValues[i], UnlockHash: unlockConditions.UnlockHash()})
 		}
 
 		txnSet, err := txnBuilder.Sign(true)

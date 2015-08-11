@@ -1,5 +1,6 @@
 package wallet
 
+/*
 import (
 	"path/filepath"
 
@@ -173,3 +174,4 @@ func (w *Wallet) MergeWallet(filepath string) error {
 	}
 	return w.save()
 }
+*/

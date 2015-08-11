@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/gateway"
 	"github.com/NebulousLabs/Sia/modules/miner"
@@ -17,10 +18,11 @@ import (
 // including helper modules and methods for controlling synchronization between
 // the tester and the modules.
 type consensusSetTester struct {
-	gateway modules.Gateway
-	miner   modules.Miner
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	gateway   modules.Gateway
+	miner     modules.Miner
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	cs *ConsensusSet
 
@@ -48,6 +50,14 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	key, err := crypto.GenerateTwofishKey()
+	if err != nil {
+		return nil, err
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
@@ -55,10 +65,11 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 
 	// Assemble all objects into a consensusSetTester.
 	cst := &consensusSetTester{
-		gateway: g,
-		miner:   m,
-		tpool:   tp,
-		wallet:  w,
+		gateway:   g,
+		miner:     m,
+		tpool:     tp,
+		wallet:    w,
+		walletKey: key,
 
 		cs: cs,
 

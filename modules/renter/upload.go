@@ -46,7 +46,8 @@ func (r *Renter) checkWalletBalance(up modules.FileUploadParams) error {
 	estimatedCost := averagePrice.Mul(types.NewCurrency64(uint64(up.Duration))).Mul(curSize)
 	bufferedCost := estimatedCost.Mul(types.NewCurrency64(2))
 
-	if bufferedCost.Cmp(r.wallet.Balance(false)) > 0 {
+	siacoinBalance, _, _ := r.wallet.ConfirmedBalance()
+	if bufferedCost.Cmp(siacoinBalance) > 0 {
 		return errors.New("insufficient balance for upload")
 	}
 	return nil

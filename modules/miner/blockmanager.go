@@ -144,10 +144,10 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	// Grab a new address for the miner.
 	lockID := m.mu.Lock()
 	m.blocksFound = append(m.blocksFound, b.ID())
-	var addr types.UnlockHash
-	addr, _, err = m.wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
-	if err == nil {                            // Special case: only update the address if there was no error.
-		m.address = addr
+	var uc types.UnlockConditions
+	uc, err = m.wallet.NextAddress()
+	if err == nil { // Special case: only update the address if there was no error.
+		m.address = uc.UnlockHash()
 	}
 	m.mu.Unlock(lockID)
 	return err
