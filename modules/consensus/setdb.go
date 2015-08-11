@@ -71,7 +71,7 @@ func openDB(filename string) (*setDB, error) {
 }
 
 // startConsistencyGuard increments the first guard. If this is not
-// equal to the second, a transaction is taking place in the database.
+// equal to the second, a transaction is taking place in the database
 func (db *setDB) startConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Metadata"))
