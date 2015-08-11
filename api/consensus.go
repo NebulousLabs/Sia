@@ -7,9 +7,9 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// The ConsensusSetGET struct contains general information about the
-// consensus set, with tags to support idiomatic json encodings.
-type ConsensusSetGET struct {
+// The ConsensusGET struct contains general information about the consensus
+// set, with tags to support idiomatic json encodings.
+type ConsensusGET struct {
 	Height       types.BlockHeight `json:"height"`
 	CurrentBlock types.BlockID     `json:"currentblock"`
 	Target       types.Target      `json:"target"`
@@ -24,7 +24,7 @@ func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request)
 		}
 	}
 
-	writeJSON(w, ConsensusSetGET{
+	writeJSON(w, ConsensusGET{
 		Height:       types.BlockHeight(srv.blockchainHeight),
 		CurrentBlock: srv.currentBlock.ID(),
 		Target:       currentTarget,

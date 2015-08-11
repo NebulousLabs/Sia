@@ -178,7 +178,7 @@ func main() {
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletMergeCmd, walletSendCmd, walletSiafundsCmd, walletStatusCmd)
-	walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
+	// walletSiafundsCmd.AddCommand(walletSiafundsTrackCmd)
 	walletSiafundsCmd.AddCommand(walletSiafundsSendCmd)
 
 	root.AddCommand(renterCmd)

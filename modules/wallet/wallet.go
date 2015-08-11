@@ -80,6 +80,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		historicOutputs: make(map[types.OutputID]types.Currency),
 		spentOutputs:    make(map[types.OutputID]types.BlockHeight),
 
+		transactions:         make(map[types.TransactionID]types.Transaction),
 		walletTransactionMap: make(map[modules.WalletTransactionID]*modules.WalletTransaction),
 
 		persistDir: persistDir,

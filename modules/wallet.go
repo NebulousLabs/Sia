@@ -202,7 +202,7 @@ type (
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
 		// History returns all of the history that was confirmed at heights
-		// [startHeight, endHeight].
+		// [startHeight, endHeight]. Unconfirmed history not included.
 		History(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]WalletTransaction, error)
 
 		// AddressHistory returns all of the transactions that are related to a

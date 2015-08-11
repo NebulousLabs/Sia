@@ -18,8 +18,8 @@ var (
 )
 
 func consensusstatuscmd() {
-	var css api.ConsensusSetStatus
-	err := getAPI("/consensus/status", &css)
+	var cg api.ConsensusGET
+	err := getAPI("/consensus/status", &cg)
 	if err != nil {
 		fmt.Println("Could not get daemon status:", err)
 		return
@@ -27,5 +27,5 @@ func consensusstatuscmd() {
 	fmt.Printf(`Block:  %v
 Height: %v
 Target: %v
-`, css.CurrentBlock, css.Height, css.Target)
+`, cg.CurrentBlock, cg.Height, cg.Target)
 }
