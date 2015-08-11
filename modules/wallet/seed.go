@@ -95,6 +95,7 @@ func (w *Wallet) integrateSeed(seed modules.Seed) {
 		spendableKey := generateSpendableKey(seed, i)
 		w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
 	}
+	w.seeds = append(w.seeds, seed)
 }
 
 // loadSeedFile loads an encrypted seed from disk, decrypting it and
@@ -277,35 +278,9 @@ func (w *Wallet) RecoverSeed(masterKey crypto.TwofishKey, seed modules.Seed) err
 	return w.recoverSeed(masterKey, seed)
 }
 
-// AllSeeds returns a list of all seeds known to the wallet.
-func (w *Wallet) AllSeeds(masterKey crypto.TwofishKey) ([]modules.Seed, error) {
-	// Scan for existing wallet seed files.
-	var seeds []modules.Seed
-	filesInfo, err := ioutil.ReadDir(w.persistDir)
-	if err != nil {
-		return nil, err
-	}
-	for _, fileInfo := range filesInfo {
-		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) {
-			// Open the seed file.
-			var seedFile SeedFile
-			err := persist.LoadFile(seedMetadata, &seedFile, fileInfo.Name())
-			if err != nil {
-				return nil, err
-			}
-			seed, err := decryptSeedFile(masterKey, seedFile)
-			if err != nil {
-				continue
-			}
-
-			// Check that the seed is actively being used by the wallet.
-			spendableKey := generateSpendableKey(seed, 0)
-			_, exists := w.keys[spendableKey.unlockConditions.UnlockHash()]
-			if !exists {
-				continue
-			}
-			seeds = append(seeds, seed)
-		}
-	}
-	return seeds, nil
+// AllSeeds returns a list of all seeds known to and used by the wallet.
+func (w *Wallet) AllSeeds() []modules.Seed {
+	lockID := w.mu.Lock()
+	defer w.mu.Unlock(lockID)
+	return w.seeds
 }

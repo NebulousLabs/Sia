@@ -387,7 +387,7 @@ func (t *Transaction) validSignatures(currentHeight BlockHeight) error {
 			}
 
 		default:
-			// If we don't recognize the identifier, assume that the signature
+			// If the identifier is not recognized, assume that the signature
 			// is valid. This allows more signature types to be added via soft
 			// forking.
 		}

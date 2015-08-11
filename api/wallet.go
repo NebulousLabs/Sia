@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/NebulousLabs/entropy-mnemonics"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -13,19 +15,42 @@ import (
 type WalletGET struct {
 	Encrypted bool `json:"encrypted"`
 	Unlocked  bool `json:"unlocked"`
+
+	ConfirmedSiacoinBalance     types.Currency `json:"confirmedSiacoinBalance"`
+	UnconfirmedOutgoingSiacoins types.Currency `json:"unconfirmedOutgoingSiacoins"`
+	UnconfirmedIncomingSiacoins types.Currency `json:"unconfirmedIncomingSiacoins"`
+
+	SiafundBalance      types.Currency `json:"siafundBalance"`
+	SiacoinClaimBalance types.Currency `json:"siacoinClaimBalance"`
 }
 
-// WalletHistoryGet contains wallet history.
+// WalletHistoryGet contains wallet transaction history.
 type WalletHistoryGET struct {
 	UnconfirmedTransactions []modules.WalletTransaction `json:"unconfirmedTransactions"`
 	ConfirmedTransactions   []modules.WalletTransaction `json:"confirmedTransactions"`
 }
 
+// WalletSeedGet contains the seeds used by the wallet.
+type WalletSeedGET struct {
+	PrimarySeed        string   `json:"primarySeed"`
+	AddressesRemaining int      `json:"AddressesRemaining"`
+	AllSeeds           []string `json:"allSeeds"`
+}
+
 // walletHandlerGET handles a GET request to /wallet.
 func (srv *Server) walletHandlerGET(w http.ResponseWriter, req *http.Request) {
+	siacoinBal, siafundBal, siaclaimBal := srv.wallet.ConfirmedBalance()
+	siacoinsOut, siacoinsIn := srv.wallet.UnconfirmedBalance()
 	writeJSON(w, WalletGET{
 		Encrypted: srv.wallet.Encrypted(),
 		Unlocked:  srv.wallet.Unlocked(),
+
+		ConfirmedSiacoinBalance:     siacoinBal,
+		UnconfirmedOutgoingSiacoins: siacoinsOut,
+		UnconfirmedIncomingSiacoins: siacoinsIn,
+
+		SiafundBalance:      siafundBal,
+		SiacoinClaimBalance: siaclaimBal,
 	})
 }
 
@@ -109,4 +134,42 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
 	}
 	srv.walletHistoryHandlerGETAddr(w, req, addr)
+}
+
+// walletSeedHandlerGET handles a GET request to /wallet/seed.
+func (srv *Server) walletSeedHandlerGET(w http.ResponseWriter, req *http.Request) {
+	dictionary := mnemonics.DictionaryID(req.FormValue("dictionary"))
+	if dictionary == "" {
+		dictionary = mnemonics.English
+	}
+
+	// Get the primary seed information.
+	primarySeed, progress, err := srv.wallet.PrimarySeed()
+	if err != nil {
+		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	primarySeedStr, err := modules.SeedToString(primarySeed, dictionary)
+	if err != nil {
+		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get the list of seeds known to the wallet.
+	allSeeds := srv.wallet.AllSeeds()
+	var allSeedsStrs []string
+	for _, seed := range allSeeds {
+		str, err := modules.SeedToString(seed, dictionary)
+		if err != nil {
+			writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		allSeedsStrs = append(allSeedsStrs, str)
+	}
+
+	writeJSON(w, WalletSeedGET{
+		PrimarySeed:        primarySeedStr,
+		AddressesRemaining: int(modules.PublicKeysPerSeed - progress),
+		AllSeeds:           allSeedsStrs,
+	})
 }

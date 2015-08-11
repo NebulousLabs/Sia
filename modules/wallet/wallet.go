@@ -40,6 +40,7 @@ type Wallet struct {
 	consensusSetHeight types.BlockHeight
 	siafundPool        types.Currency
 
+	seeds           []modules.Seed
 	keys            map[types.UnlockHash]spendableKey
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
 	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
