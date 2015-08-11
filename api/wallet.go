@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math/big"
 	"net/http"
 	"strconv"
 
@@ -47,6 +48,23 @@ type WalletSeedPUT struct {
 // /wallet/seed.
 type WalletSeedPOST struct {
 	NewSeed string `json:"newSeed"`
+}
+
+// scanAmount scans a types.Currency from a string.
+func scanAmount(amount string) (types.Currency, bool) {
+	// use SetString manually to ensure that amount does not contain
+	// multiple values, which would confuse fmt.Scan
+	i, ok := new(big.Int).SetString(amount, 10)
+	if !ok {
+		return types.Currency{}, ok
+	}
+	return types.NewCurrency(i), true
+}
+
+// scanAddres scans a types.UnlockHash from a string.
+func scanAddress(addrStr string) (addr types.UnlockHash, err error) {
+	err = addr.LoadString(addrStr)
+	return
 }
 
 // walletHandlerGET handles a GET request to /wallet.
@@ -227,6 +245,64 @@ func (srv *Server) walletSeedHandler(w http.ResponseWriter, req *http.Request) {
 	} else if req.Method == "POST" {
 		srv.walletSeedHandlerPOST(w, req)
 	} else {
-		writeError(w, "unrecognized method when calling /wallet", http.StatusBadRequest)
+		writeError(w, "unrecognized method when calling /wallet/seed", http.StatusBadRequest)
+	}
+}
+
+// walletSiacoinsHandlerPUT handles a PUT request to /wallet/siacoins.
+func (srv *Server) walletSiacoinsHandlerPUT(w http.ResponseWriter, req *http.Request) {
+	amount, ok := scanAmount(req.FormValue("amount"))
+	if !ok {
+		writeError(w, "could not read 'amount' from PUT call to /wallet/siacoins", http.StatusBadRequest)
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		writeError(w, "error after call to /wallet/siacoins: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = srv.wallet.SendSiacoins(amount, dest)
+	if err != nil {
+		writeError(w, "error after call to /wallet/siacoins: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeSuccess(w)
+}
+
+// walletSiacoinsHandler handles API calls to /wallet/siacoins.
+func (srv *Server) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "PUT" {
+		srv.walletSiacoinsHandlerPUT(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
+	}
+}
+
+// walletSiafundsHandlerPUT handles a PUT request to /wallet/siafunds.
+func (srv *Server) walletSiafundsHandlerPUT(w http.ResponseWriter, req *http.Request) {
+	amount, ok := scanAmount(req.FormValue("amount"))
+	if !ok {
+		writeError(w, "could not read 'amount' from PUT call to /wallet/siafunds", http.StatusBadRequest)
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		writeError(w, "error after call to /wallet/siafunds: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = srv.wallet.SendSiafunds(amount, dest)
+	if err != nil {
+		writeError(w, "error after call to /wallet/siafunds: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeSuccess(w)
+}
+
+// walletSiafundsHandler handles API calls to /wallet/siafunds.
+func (srv *Server) walletSiafundsHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "PUT" {
+		srv.walletSiafundsHandlerPUT(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/siafunds", http.StatusBadRequest)
 	}
 }
