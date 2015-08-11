@@ -72,8 +72,8 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		}
 
 		// Put a file contract into the file contract expirations map.
-		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
-		if !exists {
+		exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
+		if !exists && cs.updateDatabase {
 			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
 			if cs.updateDatabase {
 				cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
@@ -83,7 +83,7 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		// Sanity check - file contract expiration pointer should not already
 		// exist.
 		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists := cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if exists {
 				panic(errExistingFileContractExpiration)
 			}
@@ -97,12 +97,12 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 			cs.db.rmFileContracts(fcd.ID)
 		}
 
-		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+		if build.DEBUG && cs.updateDatabase {
+			exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}
-			_, exists = cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists = cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}

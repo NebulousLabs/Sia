@@ -162,27 +162,29 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 // expired without an appropriate storage proof, and calls 'applyMissedProof'
 // for the file contract.
 func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) {
+	// Return if the map doesn't begin to exist with
+	if !cs.db.inFCExpirations(pb.Height) {
+		return
+	}
 	// Because you can't modify a map safely while iterating through it, a
 	// slice of contracts to be handled is created, then acted upon after
 	// iterating through the map.
 	var expiredFileContracts []types.FileContractID
-	for id, _ := range cs.fileContractExpirations[pb.Height] {
+	cs.db.forEachFCExpirationsHeight(pb.Height, func(id types.FileContractID) {
 		expiredFileContracts = append(expiredFileContracts, id)
-	}
+	})
 	for _, id := range expiredFileContracts {
 		cs.applyMissedStorageProof(pb, id)
 	}
 
 	// Sanity check - map with expiring file contracts should now be empty.
 	if build.DEBUG {
-		if len(cs.fileContractExpirations[pb.Height]) != 0 {
+		if cs.db.lenFCExpirationsHeight(pb.Height) != 0 {
 			panic("an expiring file contract was missed")
 		}
 	}
 	delete(cs.fileContractExpirations, pb.Height)
-	if cs.db.inFCExpirations(pb.Height) {
-		cs.db.rmFCExpirations(pb.Height)
-	}
+	cs.db.rmFCExpirations(pb.Height)
 	return
 }
 
