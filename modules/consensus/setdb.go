@@ -50,6 +50,7 @@ func openDB(filename string) (*setDB, error) {
 		"BlockMap",
 		"Metadata",
 		"DelayedSiacoinOutputs",
+		"FileContractExpirations",
 	}
 
 	// Create buckets

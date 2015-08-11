@@ -75,6 +75,9 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
 		if !exists {
 			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
+			if cs.updateDatabase {
+				cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
+			}
 		}
 
 		// Sanity check - file contract expiration pointer should not already
@@ -86,6 +89,9 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 			}
 		}
 		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
+		if cs.updateDatabase {
+			cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
+		}
 	} else {
 		if cs.updateDatabase {
 			cs.db.rmFileContracts(fcd.ID)
@@ -102,6 +108,9 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 			}
 		}
 		delete(cs.fileContractExpirations[fcd.FileContract.WindowEnd], fcd.ID)
+		if cs.updateDatabase {
+			cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
+		}
 	}
 }
 

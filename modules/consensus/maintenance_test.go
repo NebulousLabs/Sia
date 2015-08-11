@@ -146,7 +146,9 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	// Assign the contract a 0-id.
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
+	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
+	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
 	cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {
@@ -235,7 +237,9 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	// Assign the contract a 0-id.
 	cst.cs.db.addFileContracts(types.FileContractID{}, expiringFC)
 	cst.cs.fileContractExpirations[pb.Height] = make(map[types.FileContractID]struct{})
+	cst.cs.db.addFCExpirations(pb.Height)
 	cst.cs.fileContractExpirations[pb.Height][types.FileContractID{}] = struct{}{}
+	cst.cs.db.addFCExpirationsHeight(pb.Height, types.FileContractID{})
 	cst.cs.applyFileContractMaintenance(pb)
 	exists := cst.cs.db.inFileContracts(types.FileContractID{})
 	if exists {

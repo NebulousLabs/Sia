@@ -180,7 +180,9 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) {
 		}
 	}
 	delete(cs.fileContractExpirations, pb.Height)
-
+	if cs.db.inFCExpirations(pb.Height) {
+		cs.db.rmFCExpirations(pb.Height)
+	}
 	return
 }
 
