@@ -278,14 +278,12 @@ struct {
 
 Function: Fetch a new seed for the wallet. The old seed will be added to the
 list of backup seeds. In general, this call should be avoided unless address
-exhaustion is reached. Because making a new seed is considered a significant
-action, there is a verification field that must be set to true. This is to
-prevent mistakes e.g. calling POST instead of GET or PUT.
+exhaustion is reached. The encryption password is required to make this change.
 
 Parameters:
 ```
 struct {
-	verification bool
+	masterKey    string
 	dictionary   string
 }
 ```
