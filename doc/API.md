@@ -283,8 +283,8 @@ exhaustion is reached. The encryption password is required to make this change.
 Parameters:
 ```
 struct {
-	masterKey    string
-	dictionary   string
+	encryptionKey string
+	dictionary    string
 }
 ```
 'verification' must be set to true, or an error is returned. This is to prevent
@@ -400,7 +400,7 @@ used.
 Parameters:
 ```
 struct {
-	key string
+	encryptionKey string
 }
 ```
 
@@ -622,8 +622,8 @@ Response: standard
 
 #### /host/status
 
-Function: Queries the host for its configuration values, as well as some
-additional data.
+Function: Queries the host for its configuration values, as well as the amount
+of storage remaining and the number of contracts formed.
 
 Parameters: none
 
@@ -640,18 +640,8 @@ struct {
 	Collateral       int
 	StorageRemaining int
 	NumContracts     int
-	PotentialProfit int
-	Competition      int
 }
 ```
-`StorageRemaining` is how much storage (in bytes) the host has available for
-renting out.
-
-`NumContracts` is the number of contacts the Host is currently handling
-
-`PotentialProfit` is how much the host's current contracts are worth 
-
-`Competition` is the estimated going rate for storage in S/GB/Month
 
 HostDB
 ------

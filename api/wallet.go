@@ -218,9 +218,9 @@ func (srv *Server) walletSeedHandlerPUT(w http.ResponseWriter, req *http.Request
 // walletSeedHandlerPOST handles a POST request to /wallet/seed.
 func (srv *Server) walletSeedHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	// Fetch the new seed.
-	masterKey := crypto.TwofishKey(crypto.HashObject(req.FormValue("masterKey")))
+	encryptionKey := crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionKey")))
 	did := mnemonics.DictionaryID(req.FormValue("dictionary"))
-	seed, err := srv.wallet.NewPrimarySeed(masterKey)
+	seed, err := srv.wallet.NewPrimarySeed(encryptionKey)
 	if err != nil {
 		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
 		return
@@ -304,5 +304,25 @@ func (srv *Server) walletSiafundsHandler(w http.ResponseWriter, req *http.Reques
 		srv.walletSiafundsHandlerPUT(w, req)
 	} else {
 		writeError(w, "unrecognized method when calling /wallet/siafunds", http.StatusBadRequest)
+	}
+}
+
+// walletUnlockHandlerPUT handles a PUT call to /wallet/unlock.
+func (srv *Server) walletUnlockHandlerPUT(w http.ResponseWriter, req *http.Request) {
+	encryptionKey := crypto.TwofishKey(crypto.HashObject(req.FormValue("encryptionKey")))
+	err := srv.wallet.Unlock(encryptionKey)
+	if err != nil {
+		writeError(w, "error when calling /wallet/unlock: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeSuccess(w)
+}
+
+// walletUnlockHandler handles API calls to /wallet/unlock.
+func (srv *Server) walletUnlockHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "PUT" {
+		srv.walletUnlockHandlerPUT(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/unlock", http.StatusBadRequest)
 	}
 }
