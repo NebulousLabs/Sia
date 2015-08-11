@@ -57,27 +57,25 @@ func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, 
 
 // commitFileContractDiff applies or reverts a FileContractDiff.
 func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
 		exists := cs.db.inFileContracts(fcd.ID)
-		if exists == (fcd.Direction == dir) && cs.updateDatabase {
+		if exists == (fcd.Direction == dir) {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		if cs.updateDatabase {
-			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
-		}
+		cs.db.addFileContracts(fcd.ID, fcd.FileContract)
 
 		// Put a file contract into the file contract expirations map.
 		exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
-		if !exists && cs.updateDatabase {
-			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
-			if cs.updateDatabase {
-				cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
-			}
+		if !exists {
+			cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
 		}
 
 		// Sanity check - file contract expiration pointer should not already
@@ -88,16 +86,11 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 				panic(errExistingFileContractExpiration)
 			}
 		}
-		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
-		if cs.updateDatabase {
-			cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-		}
+		cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	} else {
-		if cs.updateDatabase {
-			cs.db.rmFileContracts(fcd.ID)
-		}
+		cs.db.rmFileContracts(fcd.ID)
 
-		if build.DEBUG && cs.updateDatabase {
+		if build.DEBUG {
 			exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 			if !exists {
 				panic(errBadExpirationPointer)
@@ -107,10 +100,7 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 				panic(errBadExpirationPointer)
 			}
 		}
-		delete(cs.fileContractExpirations[fcd.FileContract.WindowEnd], fcd.ID)
-		if cs.updateDatabase {
-			cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
-		}
+		cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	}
 }
 

@@ -183,7 +183,6 @@ func (cs *ConsensusSet) applyFileContractMaintenance(pb *processedBlock) {
 			panic("an expiring file contract was missed")
 		}
 	}
-	delete(cs.fileContractExpirations, pb.Height)
 	cs.db.rmFCExpirations(pb.Height)
 	return
 }

@@ -49,14 +49,6 @@ type ConsensusSet struct {
 	// should never decrease.
 	siafundPool types.Currency
 
-	// fileContractExpirations is not actually a part of the consensus set, but
-	// it is needed to get decent order notation on the file contract lookups.
-	// It is a map of heights to maps of file contract ids. The other table is
-	// needed because of file contract revisions - you need to have random
-	// access lookups to file contracts for when revisions are submitted to the
-	// blockchain.
-	fileContractExpirations map[types.BlockHeight]map[types.FileContractID]struct{}
-
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
 	changeLog   []changeEntry
@@ -74,6 +66,15 @@ type ConsensusSet struct {
 	// allowed to be spent until a certain height. When that
 	// height is reached, they are moved to the siacoinOutputs
 	// map.
+	//
+	// The database also holds the file contract expirations.
+	// FileContractExpirations is not actually a part of the
+	// consensus set, but it is needed to get decent order
+	// notation on the file contract lookups.  It is a map of
+	// heights to maps of file contract ids. The other table is
+	// needed because of file contract revisions - you need to
+	// have random access lookups to file contracts for when
+	// revisions are submitted to the blockchain.
 	db *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
@@ -99,8 +100,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
 		dosBlocks: make(map[types.BlockID]struct{}),
-
-		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
 
 		gateway: gateway,
 
