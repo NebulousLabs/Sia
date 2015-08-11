@@ -23,8 +23,8 @@ var (
 )
 
 type (
-	// Seed is a cryptographic entropy that is used to derive spendable wallet
-	// addresses.
+	// AddressSeed is cryptographic entropy that is used to derive spendable
+	// wallet addresses.
 	Seed [crypto.EntropySize]byte
 
 	// WalletTransactionID is a unique identifier for a wallet transaction.
@@ -201,21 +201,32 @@ type (
 		// not considered in the unconfirmed balance.
 		UnconfirmedBalance() (outgoingSiacoins types.Currency, incomingSiacoins types.Currency)
 
-		// TransactionHistory returns all of the transactions that were
-		// confirmed at heights [startBlock, endBlock].
-		TransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]WalletTransaction, error)
+		// History returns all of the history that was confirmed at heights
+		// [startHeight, endHeight].
+		History(startHeight types.BlockHeight, endHeight types.BlockHeight) ([]WalletTransaction, error)
 
-		// AddressTransactionHistory returns all of the transactions that are
-		// related to a given address.
-		AddressTransactionHistory(types.UnlockHash) ([]WalletTransaction, error)
+		// AddressHistory returns all of the transactions that are related to a
+		// given address.
+		AddressHistory(types.UnlockHash) ([]WalletTransaction, error)
 
-		// UnconfirmedTransactions returns the list of known unconfirmed wallet
+		// UnconfirmedHistory returns the list of known unconfirmed wallet
 		// transactions.
-		UnconfirmedTransactions() []WalletTransaction
+		UnconfirmedHistory() []WalletTransaction
 
-		// AddressUnconfirmedTransactions returns all of the wallet
-		// transactions related to a given address.
-		AddressUnconfirmedTransactions(types.UnlockHash) []WalletTransaction
+		// AddressUnconfirmedHistory returns all of the wallet transactions
+		// related to a given address.
+		AddressUnconfirmedHistory(types.UnlockHash) []WalletTransaction
+
+		// Transaction returns the transaction with the given id. An error is
+		// returned if no transaction is known with the given id.
+		Transaction(types.TransactionID) (types.Transaction, error)
+
+		// Transactions returns all transactions that were confirmed from
+		// height [startHeight, endHeight].
+		Transactions(startHeight types.BlockHeight, endHeight types.BlockHeight) []types.Transaction
+
+		// UnconfirmedTransactions returns all unconfirmed transactions.
+		UnconfirmedTransactions() []types.Transaction
 
 		// NextAddress returns a new coin addresses generated from the
 		// primary seed.

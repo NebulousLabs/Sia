@@ -137,8 +137,8 @@ including the most recent block will be provided.
 Response:
 ```
 struct {
-	confirmedTransactions   []WalletTransaction
-	unconfirmedTransactions []WalletTransaction
+	confirmedHistory   []WalletTransaction
+	unconfirmedHistory []WalletTransaction
 }
 ```
 'confirmedTransactions' lists all of the confirmed wallet transactions

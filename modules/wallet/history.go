@@ -11,9 +11,9 @@ var (
 	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
 )
 
-// TransactionHistory returns all of the confirmed transactions between
-// 'startBlock' and 'endBlock' (inclusive).
-func (w *Wallet) TransactionHistory(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
+// History returns all of the confirmed transactions between 'startBlock' and
+// 'endBlock' (inclusive).
+func (w *Wallet) History(startBlock types.BlockHeight, endBlock types.BlockHeight) ([]modules.WalletTransaction, error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
@@ -38,9 +38,9 @@ func (w *Wallet) TransactionHistory(startBlock types.BlockHeight, endBlock types
 	return w.walletTransactions[start:end], nil
 }
 
-// AddressTransactionHistory returns all of the wallet transactions associated
-// with a single unlock hash.
-func (w *Wallet) AddressTransactionHistory(uh types.UnlockHash) (wts []modules.WalletTransaction, err error) {
+// AddressHistory returns all of the wallet transactions associated with a
+// single unlock hash.
+func (w *Wallet) AddressHistory(uh types.UnlockHash) (wts []modules.WalletTransaction, err error) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 
@@ -60,16 +60,16 @@ func (w *Wallet) AddressTransactionHistory(uh types.UnlockHash) (wts []modules.W
 	return wts, nil
 }
 
-// UnconfirmedTransactions returns the set of unconfirmed wallet transactions.
-func (w *Wallet) UnconfirmedTransactions() []modules.WalletTransaction {
+// UnconfirmedHistory returns the set of unconfirmed wallet transactions.
+func (w *Wallet) UnconfirmedHistory() []modules.WalletTransaction {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 	return w.unconfirmedWalletTransactions
 }
 
-// AddressUnconfirmedTransactions returns all of the unconfirmed wallet
-// transactions related to a specific address.
-func (w *Wallet) AddressUnconfirmedTransactions(uh types.UnlockHash) (wts []modules.WalletTransaction) {
+// AddressUnconfirmedHistory returns all of the unconfirmed wallet transactions
+// related to a specific address.
+func (w *Wallet) AddressUnconfirmedHistory(uh types.UnlockHash) (wts []modules.WalletTransaction) {
 	lockID := w.mu.Lock()
 	defer w.mu.Unlock(lockID)
 

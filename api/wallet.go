@@ -123,12 +123,12 @@ func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Requ
 		writeError(w, err.Error(), http.StatusBadRequest)
 	}
 
-	confirmedHistory, err := srv.wallet.TransactionHistory(types.BlockHeight(start), types.BlockHeight(end))
+	confirmedHistory, err := srv.wallet.History(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
 		writeError(w, "/walet/history [GET] Error:"+err.Error(), http.StatusBadRequest)
 	}
 	writeJSON(w, WalletHistoryGET{
-		UnconfirmedTransactions: srv.wallet.UnconfirmedTransactions(),
+		UnconfirmedTransactions: srv.wallet.UnconfirmedHistory(),
 		ConfirmedTransactions:   confirmedHistory,
 	})
 }
@@ -136,7 +136,7 @@ func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Requ
 // walletHistoryHandlerGETAddr handles a GET request to
 // /wallet/history/$(addr).
 func (srv *Server) walletHistoryHandlerGETAddr(w http.ResponseWriter, req *http.Request, addr types.UnlockHash) {
-	addrHistory, err := srv.wallet.AddressTransactionHistory(addr)
+	addrHistory, err := srv.wallet.AddressHistory(addr)
 	if err != nil {
 		writeError(w, "error after call to /wallet/history/$(addr): "+err.Error(), http.StatusBadRequest)
 	}
