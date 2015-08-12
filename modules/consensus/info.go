@@ -22,7 +22,8 @@ func (cs *ConsensusSet) currentProcessedBlock() *processedBlock {
 
 // height returns the current height of the state.
 func (s *ConsensusSet) height() types.BlockHeight {
-	return s.blocksLoaded
+	// Off by one as the genesis block doesn't count.
+	return s.db.pathHeight() - 1
 }
 
 // CurrentBlock returns the highest block on the tallest fork.

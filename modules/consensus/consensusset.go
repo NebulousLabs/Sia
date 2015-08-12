@@ -24,18 +24,6 @@ var (
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// updateDatabase is a flag that determines if a block will be
-	// added to the database when commiting diffs. It should be
-	// false when loading the current path from disk and true
-	// otherwise
-	updateDatabase bool // DEPRECATED
-
-	// blocksLoaded is the number of blocks that have been loaded
-	// from memory. This variable only exists while some
-	// structures are still in memory, and should always equal
-	// db.pathHeight after loading from disk
-	blocksLoaded types.BlockHeight // DEPRECATED
-
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *processedBlock
 
@@ -149,8 +137,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 	// Load the saved processed blocks into memory and send out updates
 	cs.loadDiffs()
-
-	cs.updateDatabase = true
 
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)

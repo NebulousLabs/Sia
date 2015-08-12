@@ -29,7 +29,6 @@ func (cs *ConsensusSet) initSetDB() error {
 	// Update the siafundoutput diffs map for the genesis block on
 	// disk. This needs to happen between the database being
 	// opened/initilized and the consensus set hash being calculated
-	cs.updateDatabase = true
 	for _, sfod := range cs.blockRoot.SiafundOutputDiffs {
 		cs.commitSiafundOutputDiff(sfod, modules.DiffApply)
 	}
@@ -40,8 +39,6 @@ func (cs *ConsensusSet) initSetDB() error {
 		UnlockHash: types.UnlockHash{},
 	})
 
-	// Explicit initilization preferred to implicit for blocksLoaded
-	cs.blocksLoaded = 0
 	if build.DEBUG {
 		cs.blockRoot.ConsensusSetHash = cs.consensusSetHash()
 		cs.db.updateBlockMap(cs.blockRoot)
@@ -88,8 +85,6 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	pb := cs.db.getBlockMap(bid)
 
 	cs.blockRoot.ConsensusSetHash = pb.ConsensusSetHash
-	// Explicit initilization preferred to implicit
-	cs.blocksLoaded = 0
 
 	return nil
 }
@@ -111,14 +106,6 @@ func (cs *ConsensusSet) loadDiffs() {
 
 		// Blocks loaded from disk are trusted, don't bother with verification.
 		lockID := cs.mu.Lock()
-		// This guard is for when the program is stopped. It is temporary.
-		// DEPRECATED
-		if !cs.db.open {
-			break
-		}
-		cs.updateDatabase = false
-		cs.commitDiffSet(pb, modules.DiffApply)
-		cs.updateDatabase = true
 		cs.updateSubscribers(nil, []*processedBlock{pb})
 		cs.mu.Unlock(lockID)
 	}
