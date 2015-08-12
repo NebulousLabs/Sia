@@ -40,14 +40,17 @@ type Wallet struct {
 	consensusSetHeight types.BlockHeight
 	siafundPool        types.Currency
 
+	seeds           []modules.Seed
 	keys            map[types.UnlockHash]spendableKey
 	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
 	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
 	historicOutputs map[types.OutputID]types.Currency
 	spentOutputs    map[types.OutputID]types.BlockHeight
 
+	transactions                  map[types.TransactionID]types.Transaction
 	walletTransactions            []modules.WalletTransaction
 	walletTransactionMap          map[modules.WalletTransactionID]*modules.WalletTransaction
+	unconfirmedTransactions       []types.Transaction
 	unconfirmedWalletTransactions []modules.WalletTransaction
 
 	persistDir string
@@ -77,6 +80,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		historicOutputs: make(map[types.OutputID]types.Currency),
 		spentOutputs:    make(map[types.OutputID]types.BlockHeight),
 
+		transactions:         make(map[types.TransactionID]types.Transaction),
 		walletTransactionMap: make(map[modules.WalletTransactionID]*modules.WalletTransaction),
 
 		persistDir: persistDir,
@@ -94,8 +98,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 
 // Close will save the wallet before shutting down.
 func (w *Wallet) Close() error {
-	id := w.mu.RLock()
-	defer w.mu.RUnlock(id)
+	lockID := w.mu.RLock()
+	defer w.mu.RUnlock(lockID)
 	w.log.Println("INFO: Closing wallet")
 
 	// Save the wallet data.
@@ -115,6 +119,13 @@ func (w *Wallet) Close() error {
 	}
 	w.unlocked = false
 	return nil
+}
+
+// Unlockd indicates whether the wallet is locked or unlocked.
+func (w *Wallet) Unlocked() bool {
+	lockID := w.mu.RLock()
+	defer w.mu.RUnlock(lockID)
+	return w.unlocked
 }
 
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction

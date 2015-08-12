@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -13,12 +14,8 @@ import (
 	"github.com/kardianos/osext"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/types"
 )
-
-type UpdateInfo struct {
-	Available bool
-	Version   string
-}
 
 const (
 	developerKey = `-----BEGIN PUBLIC KEY-----
@@ -56,6 +53,39 @@ bwIDAQAB
 // the version is newer, we download and apply the files listed in the update
 // manifest.
 var updateURL = "http://23.239.14.98/releases/" + runtime.GOOS + "_" + runtime.GOARCH
+
+// SiaConstants is a struct listing all of the constants in use.
+type SiaConstants struct {
+	BlockSizeLimit        uint64
+	BlockFrequency        types.BlockHeight
+	TargetWindow          types.BlockHeight
+	MedianTimestampWindow uint64
+	FutureThreshold       types.Timestamp
+	SiafundCount          types.Currency
+	SiafundPortion        *big.Rat
+
+	InitialCoinbase uint64
+	MinimumCoinbase uint64
+
+	MaturityDelay types.BlockHeight
+
+	GenesisTimestamp         types.Timestamp
+	GenesisSiafundUnlockHash types.UnlockHash
+	GenesisClaimUnlockHash   types.UnlockHash
+
+	RootTarget types.Target
+	RootDepth  types.Target
+
+	MaxAdjustmentUp   *big.Rat
+	MaxAdjustmentDown *big.Rat
+
+	SiacoinPrecision types.Currency
+}
+
+type UpdateInfo struct {
+	Available bool
+	Version   string
+}
 
 // getHTTP is a helper function that returns the full response of an HTTP call
 // to the update server.
@@ -171,4 +201,31 @@ func (srv *Server) daemonUpdatesApplyHandler(w http.ResponseWriter, req *http.Re
 	}
 
 	writeSuccess(w)
+}
+
+// debugConstantsHandler prints a json file containing all of the constants.
+func (srv *Server) daemonConstantsHandler(w http.ResponseWriter, req *http.Request) {
+	sc := SiaConstants{
+		GenesisTimestamp:      types.GenesisTimestamp,
+		BlockSizeLimit:        types.BlockSizeLimit,
+		BlockFrequency:        types.BlockFrequency,
+		TargetWindow:          types.TargetWindow,
+		MedianTimestampWindow: types.MedianTimestampWindow,
+		FutureThreshold:       types.FutureThreshold,
+		SiafundCount:          types.SiafundCount,
+		MaturityDelay:         types.MaturityDelay,
+		SiafundPortion:        types.SiafundPortion,
+
+		InitialCoinbase:  types.InitialCoinbase,
+		MinimumCoinbase:  types.MinimumCoinbase,
+		SiacoinPrecision: types.SiacoinPrecision,
+
+		RootTarget: types.RootTarget,
+		RootDepth:  types.RootDepth,
+
+		MaxAdjustmentUp:   types.MaxAdjustmentUp,
+		MaxAdjustmentDown: types.MaxAdjustmentDown,
+	}
+
+	writeJSON(w, sc)
 }

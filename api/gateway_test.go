@@ -22,13 +22,6 @@ func (st *serverTester) addPeer(name string) *serverTester {
 	if err != nil {
 		st.t.Fatal("bootstrap failed:", err)
 	}
-
-	// Synchronize the consensus sets of newPeer and st.
-	err = newPeer.server.cs.Synchronize(st.netAddress())
-	if err != nil {
-		st.t.Fatal("synchronize failed:", err)
-	}
-
 	return newPeer
 }
 

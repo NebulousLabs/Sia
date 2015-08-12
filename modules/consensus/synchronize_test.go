@@ -45,16 +45,6 @@ func TestSynchronize(t *testing.T) {
 		t.Fatal("Consensus Sets did not synchronize")
 	}
 
-	// Synchronize again; nothing should change
-	oldHeight := cst1.cs.Height()
-	err = cst1.cs.Synchronize(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cst1.cs.Height() != oldHeight {
-		t.Fatalf("height changed after synchronizing to equal peer: %v -> %v", oldHeight, cst1.cs.Height())
-	}
-
 	// Mine on cst2 until it is more than 'MaxCatchUpBlocks' ahead of cst2.
 	// NOTE: we have to disconnect prior to this, otherwise cst2 will relay
 	// blocks to cst1.
@@ -87,10 +77,6 @@ func TestSynchronize(t *testing.T) {
 	cst2.cs.db.pushPath(cst2.cs.db.getPath(0))
 	cst2.cs.mu.Unlock(lockID)
 	// ErrBlockKnown will be converted to nil
-	err = cst1.cs.Synchronize(cst2.gateway.Address())
-	if err != nil {
-		t.Fatal(err)
-	}
 	if cst1.cs.db.pathHeight() == cst2.cs.db.pathHeight() {
 		t.Fatal("cst1 did not reject bad block")
 	}

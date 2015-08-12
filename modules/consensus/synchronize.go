@@ -165,18 +165,3 @@ func (s *ConsensusSet) sendBlocks(conn modules.PeerConn) error {
 
 	return nil
 }
-
-// Synchronize synchronizes the local consensus set (i.e. the blockchain) with
-// the network consensus set. The process is as follows: synchronize asks a
-// peer for new blocks. The requester sends 32 block IDs, starting with the 12
-// most recent and then progressing exponentially backwards to the genesis
-// block. The receiver uses these blocks to find the most recent block seen by
-// both peers. From this starting height, it transmits blocks sequentially.
-// The requester then integrates these blocks into its consensus set. Multiple
-// such transmissions may be required to fully synchronize.
-//
-// TODO: Synchronize is a blocking call that involved network traffic. This
-// seems to break convention, but I'm not certain. It does seem weird though.
-func (s *ConsensusSet) Synchronize(peer modules.NetAddress) error {
-	return s.gateway.RPC(peer, "SendBlocks", s.receiveBlocks)
-}

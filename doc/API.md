@@ -2,7 +2,14 @@ Siad API
 ========
 
 The siad API is currently under construction. The deprecated way of doing
-things is documented at the end of the (incomplete) new documentation.
+things is documented at the end of the (incomplete) new documentation. The new
+documentation is a spec for the 0.4.0 api. After a round of fixes and
+improvments for 0.4.1, the API will be frozen into 'compatibility mode', such
+that backwards compatibility is preserved with all apps in future upgrades. The
+api may change again when 1.0.0 is released.
+
+The types.Currency object is an infinite precision unsigned integer that gets
+represented in json as a base-10 string.
 
 Consensus
 ---------
@@ -10,7 +17,6 @@ Consensus
 Queries:
 
 * /consensus [GET]
-* /consensus/synchronize [GET]
 
 #### /consensus [GET]
 
@@ -22,23 +28,390 @@ Parameters: none
 Response:
 ```
 struct {
-	height       int
-	currentBlock string
-	target       string
+	Height       types.BlockHeight (uint64)
+	CurrentBlock types.BlockID     (string)
+	Target       types.Target      (byte array)
 }
 ```
+'Height' is the number of blocks in the blockchain.
 
-#### /consensus/synchronize [GET]
+'CurrentBlock' is the hash of the current block.
 
-Function: Sends a command to the consensus package to try synchronizing to the
-network.
+'Target' is the hash that needs to be met by a block for the block to be valid.
+The target is inversely proportional to the difficulty.
+
+Wallet
+------
+
+Queries:
+
+* /wallet                   [GET]
+* /wallet/close             [PUT]
+* /wallet/history           [GET]
+* /wallet/history/$(addr)   [GET]
+* /wallet/seed              [GET]
+* /wallet/seed              [PUT]
+* /wallet/seed              [POST]
+* /wallet/siacoins          [PUT]
+* /wallet/siafunds          [PUT]
+* /wallet/transaction/$(id) [GET]
+* /wallet/transactions      [GET]
+* /wallet/unlock            [PUT]
+
+#### /wallet [GET]
+
+Function: Returns basic information about the wallet, such as whether the
+wallet is locked or unlocked.
 
 Parameters: none
 
 Response:
 ```
-UNDECIDED
+struct {
+	Encrypted bool
+	Unlocked  bool
+
+	ConfirmedSiacoinBalance     types.Currency (string)
+	UnconfirmedOutgoingSiacoins types.Currency (string)
+	UnconfirmedIncomingSiacoins types.Currency (string)
+
+	SiafundBalance      types.Currency (string)
+	SiacoinClaimBalance types.Currency (string)
+}
 ```
+'Encrypted' indicates whether the wallet has been encrypted or not. If the
+wallet has not been encrypted, then no data has been generated at all, and the
+first time the wallet is unlocked, the password given will be used as the
+password for encrypting all of the data. Encrypted will only be set to false if
+the wallet has never been unlocked before (the unlocked wallet is still
+encryped - but the encryption key is in memory).
+
+'Unlocked' indicates whether the wallet is currently locked or unlocked. Some
+calls become unavailable when the wallet is locked.
+
+'ConfirmedSiacoinBalance' is the number of siacoins available to the wallet as
+of the most recent block in the blockchain.
+
+'UnconfirmedOutgoingSiacoins' is the number of siacoins that are leaving the
+wallet according to the set of unconfirmed transactions. Often this number
+appears inflated, because outputs are frequently larger than the number of
+coins being sent, and there is a refund. These coins are counted as outgoing,
+and the refund is counted as incoming. The difference in balance can be
+calculated using 'UnconfirmedIncomingSiacoins' - 'UnconfirmedOutgoingSiacoins'
+
+'UnconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
+according to the set of unconfirmed transactions. This number is often inflated
+by outgoing siacoins, because outputs are frequently larger than the amount
+being sent. The refund will be included in the unconfirmed incoming siacoins
+balance.
+
+'SiafundBalance' is the number of siafunds available to the wallet as
+of the most recent block in the blockchain.
+
+'SiacoinClaimBalance' is the number of siacoins that can be claimed from the
+siafunds as of the most recent block. Because the claim balance increases every
+time a file contract is created, it is possible that the balance will increase
+before any claim transaction is confirmed.
+
+#### /wallet/close [PUT]
+
+Function: Locks and closes the wallet, preparing for shutdown. After being
+closed, the keys are encrypted. Queries for the seed, to send siafunds, and
+related queries become unavailable. Queries concerning transaction history and
+balance are still available.
+
+Parameters: none
+
+Response: Standard.
+
+#### /wallet/history [GET]
+
+Function: Return a list of transactions related to the wallet.
+
+Parameters:
+```
+struct {
+	startHeight types.BlockHeight (uint64)
+	endHeight   types.BlockHeight (uint64)
+}
+```
+'startHeight' refers to the height of the block where transaction history
+should begin.
+
+'endHeight' refers to the height of of the block where the transaction history
+should end. If 'endHeight' is greater than the current height, all transactions
+up to and including the most recent block will be provided.
+
+Response:
+```
+struct {
+	ConfirmedHistory   []WalletTransaction
+	UnconfirmedHistory []WalletTransaction
+}
+```
+'ConfirmedHistory' lists all of the confirmed wallet transactions appearing
+between height 'Start' and height 'End' (inclusive).
+
+'UnconfirmedHistory' lists all of the unconfirmed wallet transactions.
+
+Wallet transactions are transactions that have been processed by the wallet and
+given more information, such as a confirmation height and a timestamp. Each
+wallet transaction contains information about only a single input or output.
+One network transaction with many inputs an outputs can result in many wallet
+transactions. All of the wallet transactions created by a network transaction
+are guaranteed to be consecutive in history. Wallet transactions will always be
+returned in chronological order.
+
+A wallet transaction takes the following form:
+```
+struct WalletTransaction {
+	TransactionID         types.TransactionID (string)
+	ConfirmationHeight    types.BlockHeight   (int)
+	ConfirmationTimestamp types.Timestamp     (uint64)
+
+	FundType       types.Specifier  (string)
+	OutputID       types.OutputID   (string)
+	RelatedAddress types.UnlockHash (string)
+	Value          types.Currency   (string)
+}
+```
+'TransactionID' is the id of the transaction from which the wallet transaction
+was derived. The full transaction can be obtaied by calling
+'/wallet/transaction/$(id)'
+
+'ConfirmationHeight' is the height at which the transaction was confirmed. The
+height will be set to 'uint64MAX' if the transaction has not been confirmed.
+
+'ConfirmationTimestamp' is the time at which a transaction was confirmed. The
+timestamp is a 64bit unix timestamp, and will be set to uint64MAX if the
+transaction is unconfirmed.
+
+'FundType' indicates what type of fund is represented by the wallet
+transaction. The options are 'Siacoin Input', 'Siacoin Output', 'Siafund
+Input', and 'Siafund Output', corresponding to whether the fund is related to
+siacoins or siafunds, and to whether the fund is an input to the transaction or
+an output of the transaction. When looking at transactions, it should be noted
+that a 'Siacoin Input' actually represents outgoing siacoins, as they are an
+input to the transaction; they are being spent. A 'Siacoin Output' represents
+incoming coins, because the output is being created by the transaction and made
+available to the wallet.
+
+'OutputID' is the id of the output. OutputIDs will always be unique.
+
+'RelatedAddress' is the address that is affected. For inputs (outgoing money),
+the related address is usually not important because the wallet arbitrarily
+selects which addresses will fund a transaction. For outputs (incoming money),
+the related address field can be used to determine who has sent money to the
+wallet.
+
+'Value' indicates how much money has been moved in the input or output.
+
+#### /wallet/history/$(addr) [GET]
+
+Function: Return all of the transaction related to a specific address.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Transactions []WalletTransaction
+}
+```
+'Transactions' is a list of 'WalletTransactions' that affect the input address.
+See the documentation for '/wallet/history' for more information.
+
+#### /wallet/seed [GET]
+
+Function: Return the seed that is being used to generate addresses. This seed
+can be used to derive secret keys, and must be kept safe. This call is
+unavailable when the wallet is locked or closed.
+
+Parameters:
+```
+struct {
+	dictionary string
+}
+```
+'dictionary' is the name of the dictionary that should be used when encoding
+the seed.
+
+Response:
+```
+struct {
+	PrimarySeed        mnemonics.Phrase (string)
+	AddressesRemaining int
+	AllSeeds           []mnemonics.Phrase (array of strings)
+}
+```
+'PrimarySeed' is the seed that is actively being used to generate new addresses
+for the wallet.
+
+'AddressesRemaining' is the number of addresses that remain in the primary seed
+until exhaustion has been reached and no more addresses will be generated.
+
+'AllSeeds' is a list of all seeds that the wallet references when scanning the
+blockchain for outputs. The wallet is able to spend any output generated by any
+of the seeds, however only the primary seed is being used to generate new
+addresses.
+
+A seed is an encoded version of a 128 bit random seed. The output is 15 words
+chosen from a small dictionary as indicated by the input. The most common
+choice for the dictionary is going to be 'english'. The underlying seed is the
+same no matter what dictionary is used for the encoding. The encoding also
+contains a small checksum of the seed, to help catch simple mistakes when
+copying. The library
+[entropy-mnemonics](https://github.com/NebulousLabs/entropy-mnemonics) is used
+when encoding.
+
+#### /wallet/seed [PUT]
+
+Function: Get a new address from the wallet generated by the primary seed. An
+error will be returned if the seed has been exhausted (there is a limit on the
+number of addresses that can be generated from one seed), or if the wallet is
+locked/closed.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Address types.UnlockHash (string)
+}
+```
+'Address' is a Sia address that can receive siacoins or siafunds.
+
+#### /wallet/seed [POST]
+
+Function: Fetch a new seed for the wallet. The old seed will be added to the
+list of backup seeds. In general, this call should be avoided unless address
+exhaustion is reached. The encryption password is required to make this change.
+
+Parameters:
+```
+struct {
+	encryptionKey string
+	dictionary    string
+}
+```
+'encryptionKey' is the key that is used to encrypt the new seed when it is
+saved to disk.
+
+'dictionary' is the name of the dictionary that should be used when encoding
+the newly created seed. 'english' is the most common choice.
+
+Response:
+```
+struct {
+	NewSeed Phrase (string)
+}
+```
+'NewSeed' is the new seed that will be used as the seed for generating new
+addresses.
+
+#### /wallet/siacoins [POST]
+
+Function: Send siacoins to an address. The outputs are arbitrarily selected
+from addresses in the wallet.
+
+Parameters:
+```
+struct {
+	amount      int
+	destination string
+}
+```
+'amount' is the number of siacoins being sent.
+
+'destination' is the address that is receiving the coins.
+
+Response: standard
+
+#### /wallet/siafunds [POST]
+
+Function: Send siafunds to an address. The outputs are arbitrarily selected
+from addresses in the wallet. Any siacoins available in the siafunds being sent
+(as well as the siacoins available in any siafunds that end up in a refund
+address) will become available to the wallet as siacoins after 144
+confirmations. To access all of the siacoins in the siacoin claim balance, send
+all of the siafunds to an address in your control (this will give you all the
+siacoins, while still letting you control the siafunds).
+
+Parameters:
+```
+struct {
+	amount      int
+	destination string
+}
+```
+'amount' is the number of siafunds being sent.
+
+'destination' is the address that is receiving the funds.
+
+Response: standard
+
+#### /wallet/transaction/$(id) [GET]
+
+Function: Get the transaction associated with a specific transaction id.
+
+Parameters: none
+
+Response:
+```
+struct {
+	Transaction types.Transaction
+}
+```
+'Transaction' is a 'types.Transaction'. The full transaction can be seen in
+types.transaction.go. All hashes in the transaction are encoded as strings.
+
+#### /wallet/transactions [GET]
+
+Function: Return all raw transactions relevant to the wallet in a block range.
+Raw transactions are missing metadata such as confirmation height.
+
+Parameters:
+```
+struct {
+	startHeight int
+	endHeight   int
+}
+```
+'startHeight' refers to the height of the block where transaction history
+should begin.
+
+'endHeight' refers to the height of of the block where the transaction history
+should end. If 'endHeight' is greater than the current height, all transactions
+up to and including the most recent block will be provided.
+
+Response:
+```
+struct {
+	ConfirmedTransactions   []types.Transaction
+	UnconfirmedTransactions []types.Transaction
+}
+```
+'ConfirmedTransactions' lists all of the confirmed transactions appearing
+between height 'startHeight' and height 'endHeight' (inclusive).
+
+'UnconfirmedTransactions' lists all of the unconfirmed transactions.
+
+#### /wallet/unlock [PUT]
+
+Function: Unlock the wallet. The wallet is capable of knowing whether the
+correct password was provided. The first time that the wallet is unlocked ever,
+the password used will become the permanent password. Any string can be used as
+the key, though it is generally recommended that the encoded primary seed be
+used.
+
+Parameters:
+```
+struct {
+	encryptionKey string
+}
+```
+
+Response: standard
 
 Siad API (Deprecated)
 =====================
@@ -256,8 +629,8 @@ Response: standard
 
 #### /host/status
 
-Function: Queries the host for its configuration values, as well as some
-additional data.
+Function: Queries the host for its configuration values, as well as the amount
+of storage remaining and the number of contracts formed.
 
 Parameters: none
 
@@ -274,18 +647,8 @@ struct {
 	Collateral       int
 	StorageRemaining int
 	NumContracts     int
-	PotentialProfit int
-	Competition      int
 }
 ```
-`StorageRemaining` is how much storage (in bytes) the host has available for
-renting out.
-
-`NumContracts` is the number of contacts the Host is currently handling
-
-`PotentialProfit` is how much the host's current contracts are worth 
-
-`Competition` is the estimated going rate for storage in S/GB/Month
 
 HostDB
 ------

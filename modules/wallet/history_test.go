@@ -21,7 +21,11 @@ func TestIntegrationTransactionHistory(t *testing.T) {
 	// has money, which means types.MaturityDelay+1 blocks are created, and
 	// each block is going to have a transaction (the miner payout) going to
 	// the wallet.
-	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+1) {
+	history, err := wt.wallet.History(0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
 	_, err = wt.wallet.SendSiacoins(types.NewCurrency64(5000), types.UnlockHash{})
@@ -29,14 +33,18 @@ func TestIntegrationTransactionHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	// No more confirmed transactions have been added.
-	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+1) {
+	history, err = wt.wallet.History(0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != int(types.MaturityDelay+1) {
 		t.Error("unexpected transaction history length")
 	}
 	// Four transactions were added: to fund the parent txn (an input), create
 	// an exact output (an output) for the child, and refund the parent (an
 	// output), and then an input to the child transaction (an input). The
 	// output of the child transaction is not tracked by the wallet.
-	if len(wt.wallet.UnconfirmedTransactions()) != 4 {
+	if len(wt.wallet.UnconfirmedHistory()) != 4 {
 		t.Error("was expecting 4 unconfirmed transactions")
 	}
 
@@ -47,12 +55,16 @@ func TestIntegrationTransactionHistory(t *testing.T) {
 	}
 	// A confirmed transaction was added for the miner payout, and the 4
 	// transactions that were previously unconfirmed.
-	if len(wt.wallet.ConfirmedTransactionHistory()) != int(types.MaturityDelay+2+4) {
+	history, err = wt.wallet.History(0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != int(types.MaturityDelay+2+4) {
 		t.Error("unexpected transaction history length")
 	}
 
 	// Try getting a partial history for just the previous block.
-	txns, err := wt.wallet.PartialTransactionHistory(types.MaturityDelay+3, types.MaturityDelay+3)
+	txns, err := wt.wallet.History(types.MaturityDelay+3, types.MaturityDelay+3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,10 +98,11 @@ func TestIntegrationAddressHistory(t *testing.T) {
 	}
 
 	// Check the confirmed balance of the address.
-	if len(wt.wallet.AddressTransactionHistory(addr)) != 0 {
-		t.Error("address history should be empty")
+	addrHist, err := wt.wallet.AddressHistory(addr)
+	if err != errNoHistoryForAddr {
+		t.Fatal(err)
 	}
-	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) == 0 {
+	if len(wt.wallet.AddressUnconfirmedHistory(addr)) == 0 {
 		t.Error("addresses unconfirmed transactions should not be empty")
 	}
 	b, _ := wt.miner.FindBlock()
@@ -97,10 +110,14 @@ func TestIntegrationAddressHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(wt.wallet.AddressTransactionHistory(addr)) == 0 {
+	addrHist, err = wt.wallet.AddressHistory(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(addrHist) == 0 {
 		t.Error("address history should have some transactions")
 	}
-	if len(wt.wallet.AddressUnconfirmedTransactions(addr)) != 0 {
+	if len(wt.wallet.AddressUnconfirmedHistory(addr)) != 0 {
 		t.Error("addresses unconfirmed transactions should be empty")
 	}
 }

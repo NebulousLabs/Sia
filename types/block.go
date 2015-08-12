@@ -5,6 +5,9 @@ package types
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/crypto"
 )
@@ -129,4 +132,29 @@ func (b Block) MinerPayoutID(i uint64) SiacoinOutputID {
 		b.ID(),
 		i,
 	))
+}
+
+// MarshalJSON marshales a block id as a hex string.
+func (bid BlockID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(bid.String())
+}
+
+// String prints the block id in hex.
+func (bid BlockID) String() string {
+	return fmt.Sprintf("%x", bid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the block id.
+func (bid *BlockID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var bidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &bidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(bid[:], bidBytes)
+	return nil
 }
