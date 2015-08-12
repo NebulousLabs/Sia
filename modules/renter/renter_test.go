@@ -104,8 +104,7 @@ func newRenterTester(name string, t *testing.T) *renterTester {
 
 	// Mine blocks until there is money in the wallet.
 	for i := types.BlockHeight(0); i <= types.MaturityDelay; i++ {
-		b, _ := rt.miner.FindBlock()
-		err := rt.cs.AcceptBlock(b)
+		_, err := rt.miner.AddBlock()
 		if err != nil {
 			t.Fatal(err)
 		}

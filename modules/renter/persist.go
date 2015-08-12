@@ -70,7 +70,7 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 			return ErrUnknownNickname
 		}
 		// TODO: implement activity check
-		// if !file.isActive() {
+		// if !r.isActive(file) {
 		// 	return errors.New("Cannot share an inactive file")
 		// }
 		files = append(files, *file)

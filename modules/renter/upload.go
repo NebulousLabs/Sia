@@ -86,7 +86,8 @@ func (f *file) upload(r io.Reader, hosts []uploader) error {
 			}
 			f.Contracts[contract.IP] = *contract
 		}
-		f.uploaded += uint64(n)
+		f.bytesUploaded += uint64(n) // TODO: move inside workers
+		f.chunksUploaded++
 	}
 	return nil
 }

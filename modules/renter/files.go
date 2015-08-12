@@ -26,12 +26,13 @@ type file struct {
 	ecc       modules.ECC
 	pieceSize uint64
 
-	uploaded uint64
+	bytesUploaded  uint64
+	chunksUploaded uint64
 }
 
 // chunkSize returns the size of one chunk.
 func (f *file) chunkSize() uint64 {
-	return f.pieceSize * uint64(f.ecc.NumPieces())
+	return f.pieceSize * uint64(f.ecc.MinPieces())
 }
 
 // numChunks returns the number of chunks that f was split into.
@@ -64,15 +65,15 @@ type pieceData struct {
 
 // Available indicates whether the file is ready to be downloaded.
 func (f *file) Available() bool {
-	// TODO: what's the best way to do this?
-	return true
+	return f.chunksUploaded >= f.numChunks()
 }
 
 // UploadProgress indicates what percentage of the file (plus redundancy) has
 // been uploaded. Note that a file may be Available long before UploadProgress
 // reaches 100%.
 func (f *file) UploadProgress() float32 {
-	return 0
+	totalBytes := f.pieceSize * uint64(f.ecc.NumPieces()) * f.numChunks()
+	return 100 * float32(f.bytesUploaded) / float32(totalBytes)
 }
 
 // Nickname returns the nickname of the file.
@@ -85,18 +86,13 @@ func (f *file) Filesize() uint64 {
 	return f.Size
 }
 
-// Repairing returns whether or not the file is actively being repaired.
-func (f *file) Repairing() bool {
-	return false
-}
-
 // Expiration returns the lowest height at which any of the file's contracts
 // will expire.
 func (f *file) Expiration() types.BlockHeight {
 	if len(f.Contracts) == 0 {
 		return 0
 	}
-	lowest := types.BlockHeight(0)
+	lowest := ^types.BlockHeight(0)
 	for _, fc := range f.Contracts {
 		if fc.WindowStart < lowest {
 			lowest = fc.WindowStart
