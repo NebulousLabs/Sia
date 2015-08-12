@@ -160,6 +160,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Adjusted
+		cs.db.updateSiafundPool(cs.siafundPool)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
 		if build.DEBUG {
@@ -168,6 +169,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Previous
+		cs.db.updateSiafundPool(cs.siafundPool)
 	}
 }
 

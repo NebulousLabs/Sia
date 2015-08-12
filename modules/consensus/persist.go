@@ -9,12 +9,16 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
-// initDatabase is run when the database
+// initDatabase is run when the database. This has become the true
+// init function for consensus set
 func (cs *ConsensusSet) initSetDB() error {
 	if cs.db.checkConsistencyGuard() {
 		return ErrInconsistentSet
 	}
 	cs.db.startConsistencyGuard()
+
+	// Initilize the saved siafund pool on disk
+	cs.db.setSiafundPool(cs.siafundPool)
 
 	// add genesis block
 	err := cs.db.addBlockMap(cs.blockRoot)
@@ -81,10 +85,14 @@ func (cs *ConsensusSet) load(saveDir string) error {
 	}
 
 	// The state cannot be easily reverted to a point where the
-	// consensusSetHash can be re-made. Load from disk instead
+	// consensusSetHash for the genesis block can be re-made. Load
+	// from disk instead
 	pb := cs.db.getBlockMap(bid)
 
 	cs.blockRoot.ConsensusSetHash = pb.ConsensusSetHash
+
+	// Restore the saved siafund pool
+	cs.siafundPool = cs.db.getSiafundPool()
 
 	return nil
 }
@@ -93,13 +101,8 @@ func (cs *ConsensusSet) load(saveDir string) error {
 // from disk and move the diffs into memory
 func (cs *ConsensusSet) loadDiffs() {
 	height := cs.db.pathHeight()
-	// consistency guard
-	if cs.db.checkConsistencyGuard() {
-		panic(ErrInconsistentSet)
-	}
-	cs.db.startConsistencyGuard()
-	defer cs.db.stopConsistencyGuard()
-	// load blocks from the db, starting after the genesis block
+
+	// load blocks frpom the db, starting after the genesis block
 	for i := types.BlockHeight(1); i < height; i++ {
 		bid := cs.db.getPath(i)
 		pb := cs.db.getBlockMap(bid)
@@ -113,10 +116,16 @@ func (cs *ConsensusSet) loadDiffs() {
 	// Do a consistency check after loading the database. This
 	// will be redundant when debug is turned on
 	if height > 1 {
+		// consistency guard
+		if cs.db.checkConsistencyGuard() {
+			panic(ErrInconsistentSet)
+		}
+		cs.db.startConsistencyGuard()
+
 		err := cs.checkConsistency()
 		if err != nil {
 			panic(err)
 		}
+		cs.db.stopConsistencyGuard()
 	}
-
 }
