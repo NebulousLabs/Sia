@@ -19,7 +19,7 @@ var (
 
 func consensusstatuscmd() {
 	var cg api.ConsensusGET
-	err := getAPI("/consensus/status", &cg)
+	err := getAPI("/consensus", &cg)
 	if err != nil {
 		fmt.Println("Could not get daemon status:", err)
 		return
