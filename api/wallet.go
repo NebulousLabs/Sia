@@ -292,7 +292,7 @@ func (srv *Server) walletSiacoinsHandlerPUT(w http.ResponseWriter, req *http.Req
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
 func (srv *Server) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "PUT" {
+	if req.Method == "POST" {
 		srv.walletSiacoinsHandlerPUT(w, req)
 	} else {
 		writeError(w, "unrecognized method when calling /wallet/siacoins", http.StatusBadRequest)
@@ -322,7 +322,7 @@ func (srv *Server) walletSiafundsHandlerPUT(w http.ResponseWriter, req *http.Req
 
 // walletSiafundsHandler handles API calls to /wallet/siafunds.
 func (srv *Server) walletSiafundsHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "PUT" {
+	if req.Method == "POST" {
 		srv.walletSiafundsHandlerPUT(w, req)
 	} else {
 		writeError(w, "unrecognized method when calling /wallet/siafunds", http.StatusBadRequest)

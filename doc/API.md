@@ -309,7 +309,7 @@ struct {
 'NewSeed' is the new seed that will be used as the seed for generating new
 addresses.
 
-#### /wallet/siacoins [PUT]
+#### /wallet/siacoins [POST]
 
 Function: Send siacoins to an address. The outputs are arbitrarily selected
 from addresses in the wallet.
@@ -327,7 +327,7 @@ struct {
 
 Response: standard
 
-#### /wallet/siafunds [PUT]
+#### /wallet/siafunds [POST]
 
 Function: Send siafunds to an address. The outputs are arbitrarily selected
 from addresses in the wallet. Any siacoins available in the siafunds being sent
