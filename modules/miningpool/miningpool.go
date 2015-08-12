@@ -40,7 +40,9 @@ type MiningPool struct {
 	profit      types.Currency
 
 	// Some variables to keep track of each miner's payment channel
-	// For now, the payment channels are a map of miner addresses to channels. The problem with this is that if miners want to change to a new address (e.g. avoid address reuse), they have to create a new payment channel
+	// For now, the payment channels are a map of miner addresses to channels.
+	// The problem with this is that if miners want to change to a new address
+	// (e.g. avoid address reuse), they have to create a new payment channel
 	channels map[types.UnlockHash]paymentChannel
 
 	// Subscription management variables.
@@ -78,6 +80,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		cs:     cs,
 		tpool:  tpool,
 		wallet: w,
+
+		channels: make(map[types.UnlockHash]paymentChannel),
 
 		MiningPoolSettings: modules.MiningPoolSettings{
 			Address:         coinAddress,

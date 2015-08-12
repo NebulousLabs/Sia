@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -12,6 +13,79 @@ import (
 
 // Negotiates a new payment channel with the pool
 func (m *Miner) negotiatePaymentChannel() error {
+	fmt.Println("Negotiating payment channel (miner)")
+
+	// Connect to the pool
+	conn, err := net.DialTimeout("tcp", m.poolIP, 10e9)
+	if err != nil {
+		fmt.Println(1)
+		return err
+	}
+	defer conn.Close()
+
+	err = encoding.WriteObject(conn, [8]byte{'C', 'h', 'a', 'n', 'n', 'e', 'l'})
+	if err != nil {
+		fmt.Println(2)
+		return err
+	}
+
+	// Generate and send a public key to the pool
+	sk, pk, err := crypto.GenerateSignatureKeys()
+	err = encoding.WriteObject(conn, pk)
+	if err != nil {
+		fmt.Println(3)
+		return err
+	}
+
+	// Receive the channel-funding transaction from the pool
+	var channelTxn types.Transaction
+	err = encoding.ReadObject(conn, &channelTxn, 10e3) // TODO: change to txn size
+	if err != nil {
+		fmt.Println(4)
+		return err
+	}
+
+	// Receive the pool's refund transaction
+	var refundTxn types.Transaction
+	err = encoding.ReadObject(conn, &refundTxn, 10e3) // TODO: change to txn size
+	if err != nil {
+		fmt.Println(5)
+		return err
+	}
+
+	// TODO: Check that the pool's transactions are correct (not trying to cheat us)
+
+	// Sign the refund transaction, but with a timelock. This way the pool will
+	// know it can get its money back if the miner disappears or fails to mine
+	// any blocks.
+	refundTxn.TransactionSignatures = append(refundTxn.TransactionSignatures, types.TransactionSignature{
+		ParentID:       crypto.Hash(refundTxn.SiacoinInputs[0].ParentID),
+		PublicKeyIndex: 1,
+		Timelock:       m.height + 30, // TODO: Make this a less arbitrary number
+		CoveredFields:  types.CoveredFields{WholeTransaction: true},
+	})
+	sigHash := refundTxn.SigHash(1)
+	cryptoSig, err := crypto.SignHash(sigHash, sk)
+	if err != nil {
+		return err
+	}
+	refundTxn.TransactionSignatures[1].Signature = cryptoSig[:]
+
+	// Send the refundTxn back to the pool
+	err = encoding.WriteObject(conn, refundTxn)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Verify the channelTxn has been signed and broadcasted
+
+	// Send the pool an address so it can pay us
+	err = encoding.WriteObject(conn, m.address)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Miner completed the payment channel")
 	return nil
 }
 
@@ -115,15 +189,12 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
 		return types.BlockHeader{}, types.Target{}
 	}
 	subsidy := block.MinerPayouts[0].Value
-	fmt.Println(subsidy, target)
+	fmt.Println("Block subsidy, target: ", subsidy, target)
 	minerPayout := subsidy.Div(types.NewCurrency64(100)).Mul(types.NewCurrency64(uint64(m.minerPercentCut)))
 	poolPayout := subsidy.Sub(minerPayout)
 	blockPayouts := []types.SiacoinOutput{
 		types.SiacoinOutput{Value: minerPayout, UnlockHash: m.address},
 		types.SiacoinOutput{Value: poolPayout, UnlockHash: m.poolPayoutAddress}}
-
-	fmt.Println(minerPayout)
-	fmt.Println(poolPayout)
 
 	newBlock := types.Block{
 		ParentID:     block.ParentID,

@@ -61,7 +61,7 @@ func init() {
 		BlockFrequency = 6                       // 6 seconds: slow enough for developers to see ~each block, fast enough that blocks don't waste time.
 		MaturityDelay = 10                       // 60 seconds before a delayed output matures.
 		GenesisTimestamp = Timestamp(1424139000) // Change as necessary.
-		RootTarget = Target{0, 0, 4}             // Standard developer CPUs will be able to mine blocks.
+		RootTarget = Target{4, 0, 4}             // Standard developer CPUs will be able to mine blocks.
 
 		TargetWindow = 40                        // Difficulty is adjusted based on prior 40 blocks.
 		MaxAdjustmentUp = big.NewRat(120, 100)   // Difficulty adjusts quickly.

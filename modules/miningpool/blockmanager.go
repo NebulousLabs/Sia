@@ -13,7 +13,7 @@ func (mp *MiningPool) rpcSubmit(conn net.Conn) error {
 	fmt.Println("Block attempt submitted") // testing statement
 	// Read the Block in from conn
 	var b types.Block
-	err := encoding.ReadObject(conn, &b, 10e3) // TODO: figure out how big the read number should be
+	err := encoding.ReadObject(conn, &b, 1e6) // TODO: figure out how big the read number should be
 	if err != nil {
 		return err
 	}
@@ -21,6 +21,8 @@ func (mp *MiningPool) rpcSubmit(conn net.Conn) error {
 	// TODO: Verify it beats target * targetMultiplier
 
 	// TODO: Verify the block's payouts
+
+	// TODO: Verify the block hasn't been submitted before
 
 	// Send a payment to the miner
 	// TODO: Actually calculate how much a share should be
