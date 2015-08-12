@@ -69,6 +69,32 @@ func TestStorageProofSegment(t *testing.T) {
 	}
 	defer cst.closeCst()
 
+	// Submit a file contract that is unrecognized.
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnrecognizedFileContractID {
+		t.Error(err)
+	}
+
+	// Try to get the segment of an unfinished file contract.
+	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
+		WindowStart: 100000,
+	})
+	_, err = cst.cs.storageProofSegment(types.FileContractID{})
+	if err != ErrUnfinishedFileContract {
+		t.Error(err)
+	}
+}
+
+// TestStorageProofSegmentRandomness checks that the storageProofSegment method
+// is producing outputs that pass an imperfect randomness check (gzip).
+func TestStorageProofSegmentRandomness(t *testing.T) {
+	t.Skip("randomness check takes a long time")
+	cst, err := createConsensusSetTester("TestStorageProofSegment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cst.closeCst()
+
 	// Add a file contract to the consensus set that can be used to probe the
 	// storage segment.
 	var outputs []byte
@@ -97,21 +123,6 @@ func TestStorageProofSegment(t *testing.T) {
 	zip.Close()
 	if b.Len() < len(outputs) {
 		t.Error("supposedly high entropy random segments have been compressed!")
-	}
-
-	// Submit a file contract that is unrecognized.
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnrecognizedFileContractID {
-		t.Error(err)
-	}
-
-	// Try to get the segment of an unfinished file contract.
-	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
-		WindowStart: 100000,
-	})
-	_, err = cst.cs.storageProofSegment(types.FileContractID{})
-	if err != ErrUnfinishedFileContract {
-		t.Error(err)
 	}
 }
 
