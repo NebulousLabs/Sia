@@ -87,6 +87,11 @@ func createConsensusSetTester(name string) (*consensusSetTester, error) {
 	return cst, nil
 }
 
+// closeCst safely closes the consensus set tester. 'close' is a builtin
+func (cst *consensusSetTester) closeCst() error {
+	return cst.gateway.Close()
+}
+
 // TestNilInputs tries to create new consensus set modules using nil inputs.
 func TestNilInputs(t *testing.T) {
 	testdir := build.TempDir(modules.ConsensusDir, "TestNilInputs")

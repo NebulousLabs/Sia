@@ -21,6 +21,7 @@ func TestDoSBlockHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Mine a DoS block and submit it to the state, expect a normal error.
 	// Create a transaction that is funded but the funds are never spent. This
@@ -109,6 +110,7 @@ func TestBlockKnownHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	err = cst.testBlockKnownHandling()
 	if err != nil {
 		t.Error(err)
@@ -124,6 +126,7 @@ func TestOrphanHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// The empty block is an orphan.
 	orphan := types.Block{}
@@ -146,6 +149,7 @@ func TestMissedTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Mine a block that doesn't meet the target.
 	block, _, target := cst.miner.BlockForWork()
@@ -171,6 +175,7 @@ func TestLargeBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction that puts the block over the size limit.
 	bigData := make([]byte, types.BlockSizeLimit)
@@ -198,6 +203,7 @@ func TestEarlyBlockTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block with a too early timestamp - block should be rejected
 	// outright.
@@ -221,6 +227,7 @@ func TestExtremeFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Submit a block with a timestamp in the extreme future.
 	block, _, target := cst.miner.BlockForWork()
@@ -253,6 +260,7 @@ func TestMinerPayoutHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block with the wrong miner payout structure - testing can be
 	// light here because there is heavier testing in the 'types' package,
@@ -301,6 +309,7 @@ func TestFutureTimestampHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	err = cst.testFutureTimestampHandling()
 	if err != nil {
 		t.Error(err)
@@ -317,6 +326,7 @@ func TestInconsistentCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Corrupt the consensus set.
 	var sfod types.SiafundOutputID
@@ -396,6 +406,7 @@ func TestSimpleBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	err = cst.testSimpleBlock()
 	if err != nil {
 		t.Error(err)
@@ -439,16 +450,19 @@ func (cst *consensusSetTester) testSpendSiacoinsBlock() error {
 
 	// Find the destAddr among the outputs.
 	var found bool
-	for id, output := range cst.cs.siacoinOutputs {
+	cst.cs.db.forEachSiacoinOutputs(func(id types.SiacoinOutputID, output types.SiacoinOutput) {
 		if id == outputID {
 			if found {
-				return errors.New("output found twice")
+				err = errors.New("output found twice")
 			}
 			if output.Value.Cmp(txnValue) != 0 {
-				return errors.New("output has wrong value")
+				err = errors.New("output has wrong value")
 			}
 			found = true
 		}
+	})
+	if err != nil {
+		return err
 	}
 	if !found {
 		return errors.New("could not find created siacoin output")
@@ -466,6 +480,7 @@ func TestSpendSiacoinsBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	err = cst.testSpendSiacoinsBlock()
 	if err != nil {
 		t.Error(err)
@@ -677,10 +692,10 @@ func (cst *consensusSetTester) testFileContractsBlocks() error {
 	}
 
 	// Check that all of the outputs have ended up at the right destination.
-	if cst.cs.siacoinOutputs[validFCID.StorageProofOutputID(types.ProofValid, 0)].UnlockHash != validProofDest {
+	if cst.cs.db.getSiacoinOutputs(validFCID.StorageProofOutputID(types.ProofValid, 0)).UnlockHash != validProofDest {
 		return errors.New("file contract output did not end up at the right place.")
 	}
-	if cst.cs.siacoinOutputs[missedFCID.StorageProofOutputID(types.ProofMissed, 0)].UnlockHash != revisionDest {
+	if cst.cs.db.getSiacoinOutputs(missedFCID.StorageProofOutputID(types.ProofMissed, 0)).UnlockHash != revisionDest {
 		return errors.New("missed file proof output did not end up at the revised destination")
 	}
 
@@ -697,6 +712,7 @@ func TestFileContractsBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// COMPATv0.4.0
 	//
@@ -898,6 +914,7 @@ func TestSpendSiafundsBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// COMPATv0.4.0
 	//
@@ -1164,11 +1181,11 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 	}
 	closeRefundID := closeTxn.SiacoinOutputID(0)
 	closePaymentID := closeTxn.SiacoinOutputID(1)
-	_, exists := cst.cs.siacoinOutputs[closeRefundID]
+	exists := cst.cs.db.inSiacoinOutputs(closeRefundID)
 	if !exists {
 		return errors.New("close txn refund output doesn't exist")
 	}
-	_, exists = cst.cs.siacoinOutputs[closePaymentID]
+	exists = cst.cs.db.inSiacoinOutputs(closePaymentID)
 	if !exists {
 		return errors.New("close txn payment output doesn't exist")
 	}
@@ -1288,7 +1305,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 			return err
 		}
 		reclaimOutputID := reclaimTxn.SiacoinOutputID(0)
-		_, exists := cst.cs.siacoinOutputs[reclaimOutputID]
+		exists := cst.cs.db.inSiacoinOutputs(reclaimOutputID)
 		if !exists {
 			return errors.New("failed to reclaim an output that belongs to the funding entity")
 		}
@@ -1424,7 +1441,7 @@ func (cst *consensusSetTester) testPaymentChannelBlocks() error {
 			return err
 		}
 		refundOutputID := refundTxn.SiacoinOutputID(0)
-		_, exists := cst.cs.siacoinOutputs[refundOutputID]
+		exists := cst.cs.db.inSiacoinOutputs(refundOutputID)
 		if !exists {
 			return errors.New("timelocked refund transaction did not get spent correctly")
 		}
@@ -1443,6 +1460,7 @@ func TestPaymentChannelBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	err = cst.testPaymentChannelBlocks()
 	if err != nil {
 		t.Fatal(err)
@@ -1495,14 +1513,17 @@ func TestComplexForking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst1.closeCst()
 	cst2, err := createConsensusSetTester("TestComplexForking - 2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst2.closeCst()
 	cst3, err := createConsensusSetTester("TestComplexForking - 3")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst3.closeCst()
 
 	// Give each type of major block to cst1.
 	err = cst1.complexBlockSet()
@@ -1606,6 +1627,7 @@ func TestBuriedBadFork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	pb := cst.cs.currentProcessedBlock()
 
 	// Create a bad block that builds on a parent, so that it is part of not
@@ -1658,6 +1680,7 @@ func TestBuriedBadTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	pb := cst.cs.currentProcessedBlock()
 
 	// Create a good transaction using the wallet.
@@ -1713,6 +1736,7 @@ func TestTaxHardfork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a file contract with a payout that is put into the blockchain
 	// before the hardfork block but expires after the hardfork block.

@@ -17,6 +17,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node with a single miner payout.
 	pb := new(processedBlock)
@@ -34,7 +35,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 	if dsco.Value.Cmp(types.NewCurrency64(12)) != 0 {
 		t.Error("miner payout created with wrong currency value")
 	}
-	_, exists = cst.cs.siacoinOutputs[mpid0]
+	exists = cst.cs.db.inSiacoinOutputs(mpid0)
 	if exists {
 		t.Error("miner payout was added to the siacoin output set")
 	}
@@ -87,7 +88,7 @@ func TestApplyMinerPayouts(t *testing.T) {
 			t.Error(r)
 		}
 		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], mpid0)
-		cst.cs.siacoinOutputs[mpid0] = types.SiacoinOutput{}
+		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})
 		cst.cs.applyMinerPayouts(pb)
 	}()
 	cst.cs.applyMinerPayouts(pb)
@@ -103,6 +104,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	pb := cst.cs.currentProcessedBlock()
 
 	// Trigger the sanity check concerning already-matured outputs.
@@ -112,7 +114,7 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 			t.Error(r)
 		}
 	}()
-	cst.cs.siacoinOutputs[types.SiacoinOutputID{}] = types.SiacoinOutput{}
+	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
 	cst.cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
 	cst.cs.delayedSiacoinOutputs[pb.Height][types.SiacoinOutputID{}] = types.SiacoinOutput{}
 	cst.cs.applyMaturedSiacoinOutputs(pb)
@@ -128,6 +130,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)
@@ -153,7 +156,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 	if !exists {
 		t.Error("missed proof output was never created")
 	}
-	_, exists = cst.cs.siacoinOutputs[spoid]
+	exists = cst.cs.db.inSiacoinOutputs(spoid)
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}
@@ -196,7 +199,7 @@ func TestApplyMissedStorageProof(t *testing.T) {
 
 		// Trigger errPayoutsAlreadyPaid from siacoin outputs.
 		delete(cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay], spoid)
-		cst.cs.siacoinOutputs[spoid] = types.SiacoinOutput{}
+		cst.cs.db.addSiacoinOutputs(spoid, types.SiacoinOutput{})
 		cst.cs.applyMissedStorageProof(pb, types.FileContractID{})
 	}()
 	// Trigger errPayoutsAlreadyPaid from delayed outputs.
@@ -216,6 +219,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)
@@ -241,7 +245,7 @@ func TestApplyFileContractMaintenance(t *testing.T) {
 	if !exists {
 		t.Error("missed proof output was never created")
 	}
-	_, exists = cst.cs.siacoinOutputs[spoid]
+	exists = cst.cs.db.inSiacoinOutputs(spoid)
 	if exists {
 		t.Error("storage proof output made it into the siacoin output set")
 	}

@@ -26,7 +26,7 @@ func (cs *ConsensusSet) applySiacoinInputs(pb *processedBlock, t types.Transacti
 	for _, sci := range t.SiacoinInputs {
 		// Sanity check - the input should exist within the blockchain.
 		if build.DEBUG {
-			_, exists := cs.siacoinOutputs[sci.ParentID]
+			exists := cs.db.inSiacoinOutputs(sci.ParentID)
 			if !exists {
 				panic(ErrMisuseApplySiacoinInput)
 			}
@@ -35,7 +35,7 @@ func (cs *ConsensusSet) applySiacoinInputs(pb *processedBlock, t types.Transacti
 		scod := modules.SiacoinOutputDiff{
 			Direction:     modules.DiffRevert,
 			ID:            sci.ParentID,
-			SiacoinOutput: cs.siacoinOutputs[sci.ParentID],
+			SiacoinOutput: cs.db.getSiacoinOutputs(sci.ParentID),
 		}
 		pb.SiacoinOutputDiffs = append(pb.SiacoinOutputDiffs, scod)
 		cs.commitSiacoinOutputDiff(scod, modules.DiffApply)
@@ -50,7 +50,7 @@ func (cs *ConsensusSet) applySiacoinOutputs(pb *processedBlock, t types.Transact
 		// Sanity check - the output should not exist within the state.
 		scoid := t.SiacoinOutputID(i)
 		if build.DEBUG {
-			_, exists := cs.siacoinOutputs[scoid]
+			exists := cs.db.inSiacoinOutputs(scoid)
 			if exists {
 				panic(ErrMisuseApplySiacoinOutput)
 			}

@@ -36,19 +36,22 @@ var (
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.siacoinOutputs[scod.ID]
+		exists := cs.db.inSiacoinOutputs(scod.ID)
 		if exists == (scod.Direction == dir) {
 			panic(errBadCommitSiacoinOutputDiff)
 		}
 	}
 
 	if scod.Direction == dir {
-		cs.siacoinOutputs[scod.ID] = scod.SiacoinOutput
+		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
 	} else {
-		delete(cs.siacoinOutputs, scod.ID)
+		cs.db.rmSiacoinOutputs(scod.ID)
 	}
 }
 

@@ -28,7 +28,7 @@ func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) {
 				panic(errPayoutsAlreadyPaid)
 			}
 			// Check the full outputs set.
-			_, exists = cs.siacoinOutputs[mpid]
+			exists = cs.db.inSiacoinOutputs(mpid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -61,7 +61,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 	for dscoid, dsco := range cs.delayedSiacoinOutputs[pb.Height] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG {
-			_, exists := cs.siacoinOutputs[dscoid]
+			exists := cs.db.inSiacoinOutputs(dscoid)
 			if exists {
 				panic(errOutputAlreadyMature)
 			}
@@ -119,7 +119,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
-			_, exists = cs.siacoinOutputs[spoid]
+			exists = cs.db.inSiacoinOutputs(spoid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
