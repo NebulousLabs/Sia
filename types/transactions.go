@@ -233,41 +233,154 @@ func (id SiafundOutputID) SiaClaimOutputID() SiacoinOutputID {
 	return SiacoinOutputID(crypto.HashObject(id))
 }
 
-// MarshalJSON is implemented on the transaction id to always produce a hex string
-// upon marshalling.
+// Below this point is a bunch of repeated definitions so that all type aliases
+// of 'crypto.Hash' are printed as hex strings. A notable exception is
+// types.Target, which is still printed as a byte array.
+
+// MarshalJSON marshales a specifier as a hex string.
+func (s Specifier) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+// String prints the specifier in hex.
+func (s Specifier) String() string {
+	var i int
+	for i = 0; i < len(s); i++ {
+		if s[i] == 0 {
+			break
+		}
+	}
+	return string(s[:i])
+}
+
+// UnmarshalJSON decodes the json hex string of the id.
+func (s *Specifier) UnmarshalJSON(b []byte) error {
+	// Copy b into s, minus the json quotation marks.
+	copy(s[:], b[1:len(b)-1])
+	return nil
+}
+
+// MarshalJSON marshales an id as a hex string.
 func (tid TransactionID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tid.String())
 }
 
-// UnmarshalJSON is implemented on the transaction id to recover an unlock hash
-// that has been encoded to a hex string.
-func (tid *TransactionID) UnmarshalJSON(b []byte) error {
-	// Check the length of b.
-	if len(b) != crypto.HashSize*2+2 {
-		return ErrTransactionIDWrongLen
-	}
-	return tid.LoadString(string(b[1 : len(b)-1]))
-}
-
-// String returns the hex representation of the transaction id as a string.
+// String prints the id in hex.
 func (tid TransactionID) String() string {
 	return fmt.Sprintf("%x", tid[:])
 }
 
-// LoadString loads a hex representation of a transaction id.
-func (tid *TransactionID) LoadString(strTID string) error {
-	// Check the length of strUH.
-	if len(strTID) != crypto.HashSize*2 {
-		return ErrTransactionIDWrongLen
+// UnmarshalJSON decodes the json hex string of the id.
+func (tid *TransactionID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
 	}
 
-	// Decode the unlock hash.
-	var byteTID []byte
-	_, err := fmt.Sscanf(strTID, "%x", &byteTID)
+	var tidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &tidBytes)
 	if err != nil {
-		return err
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
 	}
-	copy(tid[:], byteTID[:])
+	copy(tid[:], tidBytes)
+	return nil
+}
 
+// MarshalJSON marshales an id as a hex string.
+func (oid OutputID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(oid.String())
+}
+
+// String prints the id in hex.
+func (oid OutputID) String() string {
+	return fmt.Sprintf("%x", oid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the id.
+func (oid *OutputID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var oidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &oidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(oid[:], oidBytes)
+	return nil
+}
+
+// MarshalJSON marshales an id as a hex string.
+func (scoid SiacoinOutputID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(scoid.String())
+}
+
+// String prints the id in hex.
+func (scoid SiacoinOutputID) String() string {
+	return fmt.Sprintf("%x", scoid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the id.
+func (scoid *SiacoinOutputID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var scoidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &scoidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(scoid[:], scoidBytes)
+	return nil
+}
+
+// MarshalJSON marshales an id as a hex string.
+func (fcid FileContractID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(fcid.String())
+}
+
+// String prints the id in hex.
+func (fcid FileContractID) String() string {
+	return fmt.Sprintf("%x", fcid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the id.
+func (fcid *FileContractID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var fcidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &fcidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(fcid[:], fcidBytes)
+	return nil
+}
+
+// MarshalJSON marshales an id as a hex string.
+func (sfoid SiafundOutputID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(sfoid.String())
+}
+
+// String prints the id in hex.
+func (sfoid SiafundOutputID) String() string {
+	return fmt.Sprintf("%x", sfoid[:])
+}
+
+// UnmarshalJSON decodes the json hex string of the id.
+func (sfoid *SiafundOutputID) UnmarshalJSON(b []byte) error {
+	if len(b) != crypto.HashSize*2+2 {
+		return crypto.ErrHashWrongLen
+	}
+
+	var sfoidBytes []byte
+	_, err := fmt.Sscanf(string(b[1:len(b)-1]), "%x", &sfoidBytes)
+	if err != nil {
+		return errors.New("could not unmarshal types.BlockID: " + err.Error())
+	}
+	copy(sfoid[:], sfoidBytes)
 	return nil
 }
