@@ -23,6 +23,7 @@ var (
 	errNonEmptyBucket = errors.New("cannot remove a map with objects still in it")
 
 	prefix_dsco = []byte("dsco_")
+	prefix_fcex = []byte("fcex_")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -48,7 +49,9 @@ func openDB(filename string) (*setDB, error) {
 		"Path",
 		"BlockMap",
 		"Metadata",
+		"SiafundPool",
 		"DelayedSiacoinOutputs",
+		"FileContractExpirations",
 	}
 
 	// Create buckets
@@ -71,7 +74,7 @@ func openDB(filename string) (*setDB, error) {
 }
 
 // startConsistencyGuard increments the first guard. If this is not
-// equal to the second, a transaction is taking place in the database.
+// equal to the second, a transaction is taking place in the database
 func (db *setDB) startConsistencyGuard() {
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("Metadata"))
@@ -132,7 +135,7 @@ func (db *setDB) checkConsistencyGuard() bool {
 // addItem should only be called from this file, and adds a new item
 // to the database
 //
-// addItem and getItem are part of consensus due to stricter error
+// addItem and getItem are part of consensus as oopp due to stricter error
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	// Check that this transaction is guarded by consensusGuard.
@@ -551,11 +554,11 @@ func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
 		}
 		return tx.DeleteBucket(bucketID)
 	})
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 	err = db.rmItem("DelayedSiacoinOutputs", h)
-	if err != nil {
+	if build.DEBUG && err != nil {
 		panic(err)
 	}
 }
@@ -633,4 +636,115 @@ func (db *setDB) forEachDelayedSiacoinOutputs(fn func(k types.SiacoinOutputID, v
 	if err != nil {
 		panic(err)
 	}
+}
+
+// addFCExpirations creates a new file contract expirations map for the given height
+func (db *setDB) addFCExpirations(h types.BlockHeight) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	err := db.addItem("FileContractExpirations", h, bucketID)
+	if err != nil {
+		return err
+	}
+	return db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucket(bucketID)
+		return err
+	})
+}
+
+// addFCExpirationsHeight adds a file contract ID to the set at a particular height
+func (db *setDB) addFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	return db.addItem(string(bucketID), id, struct{}{})
+}
+
+// inFCExpirations returns a bool showing the presence of a file contract map at a given height
+func (db *setDB) inFCExpirations(h types.BlockHeight) bool {
+	return db.inBucket("FileContractExpirations", h)
+}
+
+// inFCExpirationsHeight returns a bool showing the presence a file
+// contract in the map for a given height
+func (db *setDB) inFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) bool {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	return db.inBucket(string(bucketID), id)
+}
+
+// rmFCExpirations removes a file contract set for a given height
+func (db *setDB) rmFCExpirations(h types.BlockHeight) {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketID)
+		if b == nil {
+			return errNilBucket
+		}
+		if b.Stats().KeyN != 0 {
+			return errNonEmptyBucket
+		}
+		return tx.DeleteBucket(bucketID)
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = db.rmItem("FileContractExpirations", h)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// rmFCExpirationsHeight removes an individual file contract from a given height
+func (db *setDB) rmFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	return db.rmItem(string(bucketID), id)
+}
+
+// lenFCExpirationsHeight returns the number of file contracts which expire at a given height
+func (db *setDB) lenFCExpirationsHeight(h types.BlockHeight) uint64 {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	return db.lenBucket(string(bucketID))
+}
+
+// forEachFCExpirationsHeight applies a function to every file
+// contract ID that expires at a given height
+func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(k types.FileContractID)) {
+	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
+	db.forEachItem(string(bucketID), func(kb, vb []byte) error {
+		var key types.FileContractID
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		fn(key)
+		return nil
+	})
+}
+
+// setSiafundPool sets the siafund pool
+func (db *setDB) setSiafundPool(sfp types.Currency) error {
+	return db.addItem("SiafundPool", []byte("SiafundPool"), sfp)
+}
+
+// updateSiafundPool updates the saved siafund pool on disk
+func (db *setDB) updateSiafundPool(sfp types.Currency) {
+	err := db.rmItem("SiafundPool", []byte("SiafundPool"))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = db.addItem("SiafundPool", []byte("SiafundPool"), sfp)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// getSiafundPool retrieves the value of the saved siafund pool
+func (db *setDB) getSiafundPool() types.Currency {
+	sfpBytes, err := db.getItem("SiafundPool", []byte("SiafundPool"))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sfp types.Currency
+	err = encoding.Unmarshal(sfpBytes, &sfp)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfp
 }

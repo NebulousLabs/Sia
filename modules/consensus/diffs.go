@@ -36,9 +36,6 @@ var (
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
-	if !cs.updateDatabase {
-		return
-	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -61,57 +58,48 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	// contract that does not exist.
 	if build.DEBUG {
 		exists := cs.db.inFileContracts(fcd.ID)
-		if exists == (fcd.Direction == dir) && cs.updateDatabase {
+		if exists == (fcd.Direction == dir) {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		if cs.updateDatabase {
-			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
-		}
+		cs.db.addFileContracts(fcd.ID, fcd.FileContract)
 
 		// Put a file contract into the file contract expirations map.
-		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+		exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 		if !exists {
-			cs.fileContractExpirations[fcd.FileContract.WindowEnd] = make(map[types.FileContractID]struct{})
+			cs.db.addFCExpirations(fcd.FileContract.WindowEnd)
 		}
 
 		// Sanity check - file contract expiration pointer should not already
 		// exist.
 		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists := cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if exists {
 				panic(errExistingFileContractExpiration)
 			}
 		}
-		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
+		cs.db.addFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	} else {
-		if cs.updateDatabase {
-			cs.db.rmFileContracts(fcd.ID)
-		}
+		cs.db.rmFileContracts(fcd.ID)
 
 		if build.DEBUG {
-			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
+			exists := cs.db.inFCExpirations(fcd.FileContract.WindowEnd)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}
-			_, exists = cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID]
+			exists = cs.db.inFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 			if !exists {
 				panic(errBadExpirationPointer)
 			}
 		}
-		delete(cs.fileContractExpirations[fcd.FileContract.WindowEnd], fcd.ID)
+		cs.db.rmFCExpirationsHeight(fcd.FileContract.WindowEnd, fcd.ID)
 	}
 }
 
 // commitSiafundOutputDiff applies or reverts a SiafundOutputDiff.
 func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, dir modules.DiffDirection) {
-	// This function only modifies the database now, so the whole
-	// nothing happens when this flag is false
-	if !cs.updateDatabase {
-		return
-	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -132,9 +120,6 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
 func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
-	if !cs.updateDatabase {
-		return
-	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
@@ -175,6 +160,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Adjusted
+		cs.db.updateSiafundPool(cs.siafundPool)
 	} else {
 		// Sanity check - sfpd.Adjusted should equal the current siafund pool.
 		if build.DEBUG {
@@ -183,6 +169,7 @@ func (cs *ConsensusSet) commitSiafundPoolDiff(sfpd modules.SiafundPoolDiff, dir 
 			}
 		}
 		cs.siafundPool = sfpd.Previous
+		cs.db.updateSiafundPool(cs.siafundPool)
 	}
 }
 
@@ -214,9 +201,6 @@ func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.Diff
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
 func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
-	if !cs.updateDatabase {
-		return
-	}
 	if dir == modules.DiffApply {
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
@@ -283,15 +267,12 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
 func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
-	if !cs.updateDatabase {
-		return
-	}
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if pb.Height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if cs.updateDatabase && cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
+				if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
 					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
@@ -312,21 +293,15 @@ func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir 
 func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDirection) {
 	// Update the current path.
 	if dir == modules.DiffApply {
-		if cs.updateDatabase {
-			err := cs.db.pushPath(pb.Block.ID())
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
+		err := cs.db.pushPath(pb.Block.ID())
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
-		cs.blocksLoaded += 1
 	} else {
-		if cs.updateDatabase {
-			err := cs.db.popPath()
-			if build.DEBUG && err != nil {
-				panic(err)
-			}
+		err := cs.db.popPath()
+		if build.DEBUG && err != nil {
+			panic(err)
 		}
-		cs.blocksLoaded -= 1
 	}
 }
 
@@ -364,7 +339,6 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	if err != nil {
 		return err
 	}
-	cs.blocksLoaded += 1
 	cs.db.addDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 
 	// diffsGenerated is set to true as soon as we start changing the set of

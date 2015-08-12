@@ -24,18 +24,6 @@ var (
 // consensus.  It accepts blocks and constructs a blockchain, forking when
 // necessary.
 type ConsensusSet struct {
-	// updateDatabase is a flag that determines if a block will be
-	// added to the database when commiting diffs. It should be
-	// false when loading the current path from disk and true
-	// otherwise
-	updateDatabase bool // DEPRECATED
-
-	// blocksLoaded is the number of blocks that have been loaded
-	// from memory. This variable only exists while some
-	// structures are still in memory, and should always equal
-	// db.pathHeight after loading from disk
-	blocksLoaded types.BlockHeight // DEPRECATED
-
 	// The blockRoot is the block node that contains the genesis block.
 	blockRoot *processedBlock
 
@@ -48,14 +36,6 @@ type ConsensusSet struct {
 	// taxed from file contracts. Unless a reorg occurs, the siafundPool
 	// should never decrease.
 	siafundPool types.Currency
-
-	// fileContractExpirations is not actually a part of the consensus set, but
-	// it is needed to get decent order notation on the file contract lookups.
-	// It is a map of heights to maps of file contract ids. The other table is
-	// needed because of file contract revisions - you need to have random
-	// access lookups to file contracts for when revisions are submitted to the
-	// blockchain.
-	fileContractExpirations map[types.BlockHeight]map[types.FileContractID]struct{}
 
 	// Modules subscribed to the consensus set will receive an ordered list of
 	// changes that occur to the consensus set, computed using the changeLog.
@@ -74,6 +54,15 @@ type ConsensusSet struct {
 	// allowed to be spent until a certain height. When that
 	// height is reached, they are moved to the siacoinOutputs
 	// map.
+	//
+	// The database also holds the file contract expirations.
+	// FileContractExpirations is not actually a part of the
+	// consensus set, but it is needed to get decent order
+	// notation on the file contract lookups.  It is a map of
+	// heights to maps of file contract ids. The other table is
+	// needed because of file contract revisions - you need to
+	// have random access lookups to file contracts for when
+	// revisions are submitted to the blockchain.
 	db *setDB
 
 	// gateway, for receiving/relaying blocks to/from peers
@@ -99,8 +88,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	// Create the ConsensusSet object.
 	cs := &ConsensusSet{
 		dosBlocks: make(map[types.BlockID]struct{}),
-
-		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
 
 		gateway: gateway,
 
@@ -150,8 +137,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 
 	// Load the saved processed blocks into memory and send out updates
 	cs.loadDiffs()
-
-	cs.updateDatabase = true
 
 	// Register RPCs
 	gateway.RegisterRPC("SendBlocks", cs.sendBlocks)
