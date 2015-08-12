@@ -10,33 +10,33 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 )
 
-// disallow arbitrary offset+length: require indexes
-// you can only download a full index at a time
-// nice benefits for merkle trees
-// but then you need a separate merkle root...
+type uploadPiece struct {
+	data       []byte
+	chunkIndex uint64
+	pieceIndex uint64
+}
 
 type uploader interface {
-	// connect initiates the connection to the uploader, creating a
-	// fileContract (or returning a pre-existing one).
+	// connect initiates the connection to the uploader.
 	connect() (fileContract, error)
 
-	// upload
-	upload(uint64, uint64, []byte) error
+	// upload uploads a piece to the uploader.
+	upload(uploadPiece) (fileContract, error)
 }
 
 func (h *testHost) connect() (fileContract, error) {
 	return fileContract{}, nil
 }
 
-func (h *testHost) upload(chunkIndex, pieceIndex uint64, piece []byte) error {
-	h.pieceMap[chunkIndex] = append(h.pieceMap[chunkIndex], pieceData{
-		chunkIndex,
-		pieceIndex,
+func (h *testHost) upload(p uploadPiece) (fileContract, error) {
+	h.pieceMap[p.chunkIndex] = append(h.pieceMap[p.chunkIndex], pieceData{
+		p.chunkIndex,
+		p.pieceIndex,
 		uint64(len(h.data)),
-		uint64(len(piece)),
+		uint64(len(p.data)),
 	})
-	h.data = append(h.data, piece...)
-	return nil
+	h.data = append(h.data, p.data...)
+	return fileContract{}, nil
 }
 
 func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *dfile {
@@ -49,10 +49,33 @@ func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *dfile {
 	}
 }
 
-func (f *dfile) upload(r io.Reader, hosts []uploader) error {
-	for _, h := range hosts {
-		h.connect()
+func (f *dfile) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
+	// TODO: move connect outside worker
+	_, err := host.connect()
+	if err != nil {
+		respChan <- nil
+		return
 	}
+	for req := range reqChan {
+		contract, err := host.upload(req)
+		if err != nil {
+			respChan <- nil
+			return // this host is now dead to us; upload will use a new one
+		}
+		respChan <- &contract
+	}
+}
+
+func (f *dfile) upload(r io.Reader, hosts []uploader) error {
+	// create request/response channels and spawn workers
+	reqChans := make([]chan uploadPiece, len(hosts))
+	respChans := make([]chan *fileContract, len(hosts))
+	for i, h := range hosts {
+		reqChans[i] = make(chan uploadPiece)
+		respChans[i] = make(chan *fileContract)
+		go f.worker(h, reqChans[i], respChans[i])
+	}
+
 	chunk := make([]byte, f.chunkSize())
 	for i := uint64(0); ; i++ {
 		// read next chunk
@@ -67,12 +90,19 @@ func (f *dfile) upload(r io.Reader, hosts []uploader) error {
 		if err != nil {
 			return err
 		}
-		// upload pieces to hosts
-		for j, h := range hosts {
-			err := h.upload(i, uint64(j), pieces[j])
-			if err != nil {
-				return err
+		// send upload requests to workers
+		for j, ch := range reqChans {
+			ch <- uploadPiece{pieces[j], i, uint64(j)}
+		}
+		// read upload responses from workers
+		for _, ch := range respChans {
+			contract := <-ch
+			if contract == nil {
+				// choose new host somehow
+				//go f.worker(newhost, reqChans[j], respChans[j])
+				continue
 			}
+			f.Contracts = append(f.Contracts, *contract)
 		}
 		f.uploaded += uint64(n)
 	}
