@@ -20,14 +20,22 @@ type MinerStatus struct {
 // minerBlockforworkHandler handles the API call that retrieves a block for
 // work.
 func (srv *Server) minerBlockforworkHandler(w http.ResponseWriter, req *http.Request) {
-	bfw, _, target := srv.miner.BlockForWork()
+	bfw, _, target, err := srv.miner.BlockForWork()
+	if err != nil {
+		writeError(w, "call to /miner/blockforwork failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Write(encoding.MarshalAll(target, bfw.Header(), bfw))
 }
 
 // minerHeaderforworkHandler handles the API call that retrieves a block header
 // for work.
 func (srv *Server) minerHeaderforworkHandler(w http.ResponseWriter, req *http.Request) {
-	bhfw, target := srv.miner.HeaderForWork()
+	bhfw, target, err := srv.miner.HeaderForWork()
+	if err != nil {
+		writeError(w, "call to /miner/headerforwork failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Write(encoding.MarshalAll(target, bhfw))
 }
 

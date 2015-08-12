@@ -45,15 +45,22 @@ func benchmarkAcceptEmptyBlocks(b *testing.B) error {
 
 	b.ResetTimer()
 	for j := 0; j < b.N; j++ {
+		// Submit a block to the consensus set tester - which has many
+		// subscribers. (untimed)
 		b.StopTimer()
-		block, _ := cst.miner.FindBlock()
-
+		block, err := cst.miner.FindBlock()
+		if err != nil {
+			return err
+		}
 		err = cst.cs.AcceptBlock(block)
 		if err != nil {
 			errstr := fmt.Sprintf("Error accepting %d from mined: %s", j, err.Error())
 			return errors.New(errstr)
 		}
 		b.StartTimer()
+
+		// Submit a block to the consensus set which has no subscribers.
+		// (timed)
 		err = cs.AcceptBlock(block)
 		if err != nil {
 			errstr := fmt.Sprintf("Error accepting %d for timing: %s", j, err.Error())
@@ -87,8 +94,7 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 
 	// Mine until the wallet has 100 utxos
 	for cst.cs.height() < (types.BlockHeight(numSigs) + types.MaturityDelay) {
-		block, _ := cst.miner.FindBlock()
-		err = cst.cs.AcceptBlock(block)
+		_, err := cst.miner.AddBlock()
 		if err != nil {
 			b.Fatal(err)
 		}

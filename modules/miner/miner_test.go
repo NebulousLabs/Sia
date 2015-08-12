@@ -102,7 +102,7 @@ func TestMiner(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 50; i++ {
 		b, _ := mt.miner.FindBlock()
 		err = mt.cs.AcceptBlock(b)
 		if err != nil {

@@ -45,7 +45,10 @@ func TestBlockManager(t *testing.T) {
 	headers := make([]types.BlockHeader, 2*headerForWorkMemory)
 
 	for i := 0; i < headerForWorkMemory; i++ {
-		headers[i], _ = mt.miner.HeaderForWork()
+		headers[i], _, err = mt.miner.HeaderForWork()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Make sure Miner still has headerForWorkMemory headers stored
@@ -75,7 +78,10 @@ func TestBlockManager(t *testing.T) {
 
 	// Start getting headers beyond headerForWorkMemory
 	for i := headerForWorkMemory; i < 2*headerForWorkMemory; i++ {
-		headers[i], _ = mt.miner.HeaderForWork()
+		headers[i], _, err = mt.miner.HeaderForWork()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Make sure the oldest headers are being erased
 		_, exists := mt.miner.blockMem[headers[i-headerForWorkMemory]]

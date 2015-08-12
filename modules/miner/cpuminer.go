@@ -3,10 +3,12 @@ package miner
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"time"
 	"unsafe"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -60,6 +62,19 @@ func (m *Miner) threadedMine() {
 	}
 }
 
+// AddBlock adds a block to the consensus set.
+func (m *Miner) AddBlock() (types.Block, error) {
+	block, err := m.FindBlock()
+	if err != nil {
+		return types.Block{}, err
+	}
+	err = m.cs.AcceptBlock(block)
+	if err != nil {
+		return types.Block{}, err
+	}
+	return block, nil
+}
+
 // CPUHashrate returns the cpu hashrate.
 func (m *Miner) CPUHashrate() int {
 	lockID := m.mu.Lock()
@@ -75,11 +90,27 @@ func (m *Miner) CPUMining() bool {
 }
 
 // FindBlock finds at most one block that extends the current blockchain.
-func (m *Miner) FindBlock() (types.Block, bool) {
+func (m *Miner) FindBlock() (types.Block, error) {
 	lockID := m.mu.Lock()
+	if !m.wallet.Unlocked() {
+		return types.Block{}, modules.ErrWalletLocked
+	}
+	err := m.checkAddress()
+	if err != nil {
+		return types.Block{}, err
+	}
+	m.mu.Unlock(lockID)
+
+	// Get a block for work.
+	lockID = m.mu.Lock()
 	bfw, target := m.blockForWork()
 	m.mu.Unlock(lockID)
-	return m.SolveBlock(bfw, target)
+
+	block, ok := m.SolveBlock(bfw, target)
+	if !ok {
+		return types.Block{}, errors.New("could not solve block using limited hashing power")
+	}
+	return block, nil
 }
 
 // SolveBlock takes a block, target, and number of iterations as input and
