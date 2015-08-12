@@ -74,10 +74,6 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		return nil, err
 	}
 
-	unlockConditions, err := wallet.NextAddress()
-	if err != nil {
-		return nil, err
-	}
 	h := &Host{
 		cs:     cs,
 		hostdb: hdb,
@@ -92,7 +88,6 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 			WindowSize:   288,                         // 48 hours
 			Price:        types.NewCurrency64(100e12), // 0.1 siacoin / mb / week
 			Collateral:   types.NewCurrency64(0),
-			UnlockHash:   unlockConditions.UnlockHash(),
 		},
 
 		saveDir: saveDir,
