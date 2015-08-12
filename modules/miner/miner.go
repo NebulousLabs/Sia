@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -81,6 +82,7 @@ type Miner struct {
 	targetMultiple    uint32
 	poolPayoutAddress types.UnlockHash
 	poolTransaction   types.Transaction
+	poolSK            crypto.SecretKey
 	poolHeaderMem     map[types.BlockHeader]types.BlockHeader
 
 	// CPUMiner variables. startTime, attempts, and hashRate are used to
@@ -128,7 +130,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 			panic("could not get child earliest timestamp")
 		}
 	}
-	unlockConditions, err := w.NextAddress()
+	addrUC, err := w.NextAddress() // false indicates that the address should not be visible to the user.
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +144,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		parent:            currentBlock,
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
-		address:           unlockConditions.UnlockHash(),
+		address:           addrUC.UnlockHash(),
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),

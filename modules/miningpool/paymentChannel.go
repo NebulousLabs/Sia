@@ -1,6 +1,7 @@
 package miningpool
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
@@ -25,6 +26,13 @@ type paymentChannel struct {
 	// submits new work
 	sk crypto.SecretKey
 	pk crypto.PublicKey
+
+	// The unlock conditions of the channel transactions. Contains the miner's
+	// public key
+	uc types.UnlockConditions
+
+	// The channelOutputID (the ID of the txn funding the payment channel
+	channelOutputID types.SiacoinOutputID
 
 	// The transaction that refunds money to the pool (in case the miner
 	// doesn't take their payout
@@ -52,7 +60,7 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 
 	// Create a 2-of-2 unlock conditions. 1 key for the pool, 1 key for the
 	// miner
-	uc := types.UnlockConditions{
+	pc.uc = types.UnlockConditions{
 		PublicKeys: []types.SiaPublicKey{
 			{
 				Algorithm: types.SignatureEd25519,
@@ -65,11 +73,11 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 		},
 		SignaturesRequired: 2,
 	}
-	pc.channelAddress = uc.UnlockHash()
+	pc.channelAddress = pc.uc.UnlockHash()
 
 	// Pool also creates, but does no sign a transaction that funds the channel
 	// address.
-	pc.size = types.NewCurrency64(10e3)
+	pc.size = types.SiacoinPrecision.Mul(types.NewCurrency64(300e3))
 	fundingSK, fundingPK, err := crypto.GenerateSignatureKeys()
 	if err != nil {
 		return err
@@ -116,7 +124,7 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 	}
 
 	// Pool creates and signs a transaction that refunds the channel to itself
-	channelOutputID := channelTxn.SiacoinOutputID(0)
+	pc.channelOutputID = channelTxn.SiacoinOutputID(0)
 	refundUC, err := mp.wallet.NextAddress()
 	refundAddr := refundUC.UnlockHash()
 	if err != nil {
@@ -124,15 +132,15 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 	}
 	pc.refundTxn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
-			ParentID:         channelOutputID,
-			UnlockConditions: uc, // 2-of-2 sig
+			ParentID:         pc.channelOutputID,
+			UnlockConditions: pc.uc,
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      pc.size,
 			UnlockHash: refundAddr,
 		}},
 		TransactionSignatures: []types.TransactionSignature{{
-			ParentID:       crypto.Hash(channelOutputID),
+			ParentID:       crypto.Hash(pc.channelOutputID),
 			PublicKeyIndex: 0,
 			CoveredFields:  types.CoveredFields{WholeTransaction: true},
 		}},
@@ -187,5 +195,50 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 // `addr` and returning it. This new transaction is meant to then be sent to
 // the miner off-chain
 func (mp *MiningPool) sendPayment(amount types.Currency, addr types.UnlockHash) (types.Transaction, error) {
-	return types.Transaction{}, nil
+	pc, exists := mp.channels[addr]
+	if !exists {
+		return types.Transaction{}, errors.New("No payment channel exists with given output addr")
+	}
+
+	// TODO: Increment amount by how much the pool has already sent
+
+	// TODO: Make sure amount is less than channel size
+	pc.refundTxn = types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         pc.channelOutputID,
+			UnlockConditions: pc.uc,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{
+			{
+				Value:      pc.size.Sub(amount),
+				UnlockHash: mp.MiningPoolSettings.Address, // TODO: unique address per pc
+			},
+			{
+				Value:      amount,
+				UnlockHash: addr,
+			},
+		},
+		TransactionSignatures: []types.TransactionSignature{
+			{
+				ParentID:       crypto.Hash(pc.channelOutputID),
+				PublicKeyIndex: 0,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			},
+			{
+				ParentID:       crypto.Hash(pc.channelOutputID),
+				PublicKeyIndex: 1,
+				CoveredFields:  types.CoveredFields{WholeTransaction: true},
+			},
+		},
+	}
+
+	// Pool signs the output transaction
+	sigHash := pc.refundTxn.SigHash(0)
+	cryptoSig, err := crypto.SignHash(sigHash, pc.sk)
+	if err != nil {
+		return types.Transaction{}, err
+	}
+	pc.refundTxn.TransactionSignatures[0].Signature = cryptoSig[:]
+
+	return pc.refundTxn, nil
 }

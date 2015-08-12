@@ -3,6 +3,7 @@ package miner
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -85,6 +86,7 @@ func (m *Miner) negotiatePaymentChannel() error {
 		return err
 	}
 
+	m.poolSK = sk
 	fmt.Println("Miner completed the payment channel")
 	return nil
 }
@@ -92,7 +94,21 @@ func (m *Miner) negotiatePaymentChannel() error {
 // Closes the specified payment channel by broadcasting the final transaction
 // to the network. The miner recieves its payouts, but prevents more money from
 // being sent through this channel
-func (m *Miner) closeChannel(poolTxn types.Transaction) error {
+func (m *Miner) closeChannel() error {
+	// TODO: First, make sure there is a channel to close?
+	// Sign and broadcast the channel's output transaction
+	sigHash := m.poolTransaction.SigHash(1)
+	cryptoSig, err := crypto.SignHash(sigHash, m.poolSK)
+	if err != nil {
+		return err
+	}
+	m.poolTransaction.TransactionSignatures[1].Signature = cryptoSig[:]
+	err = m.tpool.AcceptTransactionSet([]types.Transaction{m.poolTransaction})
+	if err != nil {
+		return err
+	}
+
+	// TODO: Tell pool that we closed the channel
 	return nil
 }
 
@@ -181,7 +197,8 @@ func (m *Miner) PoolHeaderForWork() (types.BlockHeader, types.Target) {
 	header, target := m.HeaderForWork()
 
 	// TODO: Set the target to be easier
-	//target = types.Target{uint32(target) * m.targetMultiple}
+	fmt.Println(m.targetMultiple)
+	target = target.MulDifficulty(big.NewRat(int64(m.targetMultiple), 1))
 
 	// Change the payouts of the block manager's block
 	block, err := m.reconstructBlock(header)
@@ -241,6 +258,13 @@ func (m *Miner) SubmitPoolHeader(bh types.BlockHeader) error {
 		return err
 	}
 
+	// If the block beats the full target, submit it to the network also
+	if b.CheckTarget(m.target) {
+		err = m.SubmitBlock(b)
+		fmt.Println("Pool block beat the real target (too)", err)
+		err = nil
+	}
+
 	// Get the updated transaction (with the additional pay)
 	var newTxn types.Transaction
 	err = encoding.ReadObject(conn, &newTxn, 256)
@@ -250,9 +274,10 @@ func (m *Miner) SubmitPoolHeader(bh types.BlockHeader) error {
 	// TODO: Check the txn for correctness
 	m.poolTransaction = newTxn
 
-	// For now, broadcast the payment channel to the network
+	// For now, broadcast the payment channel to the network immediately
+	// Let the pool know we're closing the channel so it can free some memory
 	// TODO: Wait like 6 days until broadcasting/closing the payment channel
-	err = m.closeChannel(m.poolTransaction)
+	err = m.closeChannel()
 	if err != nil {
 		return err
 	}
