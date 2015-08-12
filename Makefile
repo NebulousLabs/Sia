@@ -7,6 +7,7 @@ all: install
 dependencies:
 	go install -race std
 	go get -u github.com/NebulousLabs/ed25519
+	go get -u github.com/NebulousLabs/entropy-mnemonics
 	go get -u github.com/NebulousLabs/go-upnp
 	go get -u github.com/NebulousLabs/merkletree
 	go get -u github.com/boltdb/bolt

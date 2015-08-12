@@ -2,12 +2,11 @@ Siad API
 ========
 
 The siad API is currently under construction. The deprecated way of doing
-things is documented at the end of the (incomplete) new documentation.
-
-All responses from the API contain a 'success' field (a bool) and an 'error'
-field (a string). If the query returns an error, the 'success' field will be
-set to false and there will be an error message. If no error occurs, 'success'
-will be set to true and the error field will be empty.
+things is documented at the end of the (incomplete) new documentation. The new
+documentation is a spec for the 0.4.0 api. After a round of fixes and
+improvments for 0.4.1, the API will be frozen into 'compatibility mode', such
+that backwards compatibility is preserved with all apps in future upgrades. The
+api may change again when 1.0.0 is released.
 
 Consensus
 ---------
@@ -89,7 +88,7 @@ wallet according to the set of unconfirmed transactions. Often this number
 appears inflated, because outputs are frequently larger than the number of
 coins being sent, and there is a refund. These coins are counted as outgoing,
 and the refund is counted as incoming. The difference in balance can be
-claculated using 'unconfirmedIncomingSiacoins' - 'unconfirmedOutgoingSiacoins'
+calculated using 'unconfirmedIncomingSiacoins' - 'unconfirmedOutgoingSiacoins'
 
 'unconfirmedIncomingSiacoins' is the number of siacoins are entering the wallet
 according to the set of unconfirmed transactions. This number is often inflated
@@ -148,8 +147,8 @@ appearing between height 'start' and height 'end' (inclusive).
 
 Wallet transactions are transactions that have been processed by the wallet and
 given more information, such as a confirmation height and a timestamp. Each
-wallet transaction contins information about only a single input or output. One
-network transaction with many inputs an outputs can result in many wallet
+wallet transaction contains information about only a single input or output.
+One network transaction with many inputs an outputs can result in many wallet
 transactions. All of the wallet transactions created by a network transaction
 are guaranteed to be consecutive in history. Wallet transactions will always be
 returned in chronological order.
@@ -226,7 +225,7 @@ struct {
 	dictionary string
 }
 ```
-'dictionary' is the name of the dicitionary that should be used when encoding
+'dictionary' is the name of the dictionary that should be used when encoding
 the seed.
 
 Response:
@@ -272,7 +271,7 @@ struct {
 	address string
 }
 ```
-'address' is the address that cna
+'address' is a Sia address that can receive siacoins or siafunds.
 
 #### /wallet/seed [POST]
 

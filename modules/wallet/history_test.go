@@ -99,11 +99,8 @@ func TestIntegrationAddressHistory(t *testing.T) {
 
 	// Check the confirmed balance of the address.
 	addrHist, err := wt.wallet.AddressHistory(addr)
-	if err != nil {
+	if err != errNoHistoryForAddr {
 		t.Fatal(err)
-	}
-	if len(addrHist) != 0 {
-		t.Error("address history should be empty")
 	}
 	if len(wt.wallet.AddressUnconfirmedHistory(addr)) == 0 {
 		t.Error("addresses unconfirmed transactions should not be empty")

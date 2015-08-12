@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/NebulousLabs/entropy-mnemonics"
 
@@ -140,7 +141,7 @@ func (srv *Server) walletHistoryHandlerGET(w http.ResponseWriter, req *http.Requ
 
 	confirmedHistory, err := srv.wallet.History(types.BlockHeight(start), types.BlockHeight(end))
 	if err != nil {
-		writeError(w, "/walet/history [GET] Error:"+err.Error(), http.StatusBadRequest)
+		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, WalletHistoryGET{
@@ -175,7 +176,7 @@ func (srv *Server) walletHistoryHandler(w http.ResponseWriter, req *http.Request
 	}
 
 	// Parse the address from the url and call the GETaddr Handler.
-	jsonAddr := "\"" + req.URL.Path[len("/wallet/history/"):] + "\""
+	jsonAddr := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/history/") + "\""
 	var addr types.UnlockHash
 	err := addr.UnmarshalJSON([]byte(jsonAddr))
 	if err != nil {
@@ -257,13 +258,14 @@ func (srv *Server) walletSeedHandlerPOST(w http.ResponseWriter, req *http.Reques
 
 // walletSeedHandler handles API calls to /wallet/seed.
 func (srv *Server) walletSeedHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "" || req.Method == "GET" {
+	switch req.Method {
+	case "GET", "":
 		srv.walletSeedHandlerGET(w, req)
-	} else if req.Method == "PUT" {
+	case "PUT":
 		srv.walletSeedHandlerPUT(w, req)
-	} else if req.Method == "POST" {
+	case "POST":
 		srv.walletSeedHandlerPOST(w, req)
-	} else {
+	default:
 		writeError(w, "unrecognized method when calling /wallet/seed", http.StatusBadRequest)
 	}
 }
@@ -351,7 +353,7 @@ func (srv *Server) walletTransactionHandler(w http.ResponseWriter, req *http.Req
 
 	// Parse the id from the url.
 	var id types.TransactionID
-	jsonID := "\"" + req.URL.Path[len("/wallet/transaction/"):] + "\""
+	jsonID := "\"" + strings.TrimPrefix(req.URL.Path, "/wallet/transaction/") + "\""
 	err := id.UnmarshalJSON([]byte(jsonID))
 	if err != nil {
 		writeError(w, "error after call to /wallet/history: "+err.Error(), http.StatusBadRequest)

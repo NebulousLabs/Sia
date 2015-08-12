@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	errOutOfBounds = errors.New("requesting transactions at unknown confirmation heights")
+	errOutOfBounds      = errors.New("requesting transactions at unknown confirmation heights")
+	errNoHistoryForAddr = errors.New("no history found for provided address")
 )
 
 // History returns all of the confirmed transactions between 'startHeight' and
@@ -55,7 +56,7 @@ func (w *Wallet) AddressHistory(uh types.UnlockHash) (wts []modules.WalletTransa
 		}
 	}
 	if len(wts) == 0 {
-		return nil, errors.New("no history found for provided addresse")
+		return nil, errNoHistoryForAddr
 	}
 	return wts, nil
 }
@@ -103,6 +104,10 @@ func (w *Wallet) Transactions(startHeight, endHeight types.BlockHeight) (txns []
 		return nil, nil
 	}
 
+	// prevTxid is kept because multiple WalletTransactions can be created from
+	// the same source types.Transaction, and will appear in the slice
+	// consecutively. This is an effective way to prevent duplicates from
+	// appearing in the output.
 	var prevTxid types.TransactionID
 	for _, wt := range w.walletTransactions {
 		if wt.ConfirmationHeight > endHeight {

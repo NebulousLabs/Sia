@@ -117,7 +117,7 @@ func (srv *Server) initAPI(addr string) {
 		handleHTTPRequest(mux, "/explorer/gethash", srv.explorerGetHashHandler)
 	}
 
-	// create graceful HTTP server - Unfinished
+	// Create graceful HTTP server
 	srv.apiServer = &graceful.Server{
 		Timeout: apiTimeout,
 		Server:  &http.Server{Addr: addr, Handler: mux},

@@ -11,7 +11,7 @@ import (
 // set, with tags to support idiomatic json encodings.
 type ConsensusGET struct {
 	Height       types.BlockHeight `json:"height"`
-	CurrentBlock types.BlockID     `json:"currentblock"`
+	CurrentBlock types.BlockID     `json:"currentBlock"`
 	Target       types.Target      `json:"target"`
 }
 
