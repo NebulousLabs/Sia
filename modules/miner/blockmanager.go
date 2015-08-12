@@ -79,6 +79,9 @@ func (m *Miner) prepareNewBlock() {
 		delete(m.blockMem, m.headerMem[m.memProgress])
 		delete(m.arbDataMem, m.headerMem[m.memProgress])
 		m.memProgress++
+		if m.memProgress == headerForWorkMemory {
+			m.memProgress = 0
+		}
 	}
 }
 
@@ -159,10 +162,11 @@ func (m *Miner) SubmitBlock(b types.Block) error {
 	// Grab a new address for the miner.
 	lockID := m.mu.Lock()
 	m.blocksFound = append(m.blocksFound, b.ID())
-	var uc types.UnlockConditions
-	uc, err = m.wallet.NextAddress()
+	var addr types.UnlockHash
+	addrUC, err := m.wallet.NextAddress() // false indicates that the address should not be visible to the user.
+	addr = addrUC.UnlockHash()
 	if err == nil { // Special case: only update the address if there was no error.
-		m.address = uc.UnlockHash()
+		m.address = addr
 	}
 	m.mu.Unlock(lockID)
 	return err
