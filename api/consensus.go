@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/NebulousLabs/Sia/build"
@@ -17,9 +18,14 @@ type ConsensusGET struct {
 
 // consensusHandlerGET handles a GET request to /consensus.
 func (srv *Server) consensusHandlerGET(w http.ResponseWriter, req *http.Request) {
-	currentTarget, exists := srv.cs.ChildTarget(srv.currentBlock.ID())
+	id := srv.mu.RLock()
+	defer srv.mu.RUnlock(id)
+
+	curblockID := srv.currentBlock.ID()
+	currentTarget, exists := srv.cs.ChildTarget(curblockID)
 	if build.DEBUG {
 		if !exists {
+			fmt.Printf("Could not find block %s\n", curblockID)
 			panic("server has nonexistent current block")
 		}
 	}

@@ -162,6 +162,32 @@ func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	})
 }
 
+// updateItem removes and inserts an item in a single database
+// transaction. The item must exist, otherwise this will panic.
+func (db *setDB) updateItem(bucket string, key, value interface{}) {
+	if build.DEBUG && !db.checkConsistencyGuard() && build.Release != "testing" {
+		panic(errNotGuarded)
+	}
+	v := encoding.Marshal(value)
+	k := encoding.Marshal(key)
+	err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		if build.DEBUG {
+			if b == nil {
+				panic(errNilBucket)
+			}
+			i := b.Get(k)
+			if i == nil {
+				panic(errNilItem)
+			}
+		}
+		return b.Put(k, v)
+	})
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
 // getItem is a generic function to insert an item into the set database
 func (db *setDB) getItem(bucket string, key interface{}) (item []byte, err error) {
 	k := encoding.Marshal(key)
@@ -320,16 +346,7 @@ func (db *setDB) rmBlockMap(id types.BlockID) error {
 
 // updateBlockMap is a wrapper function for modification of
 func (db *setDB) updateBlockMap(pb *processedBlock) {
-	// These errors will only be caused by an error by bolt
-	// e.g. database being closed.
-	err := db.rmBlockMap(pb.Block.ID())
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = db.addBlockMap(pb)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	db.updateItem("BlockMap", pb.Block.ID(), *pb)
 }
 
 // addSiafundOutputs is a wrapper around addItem for adding a siafundOutput.
@@ -725,14 +742,7 @@ func (db *setDB) setSiafundPool(sfp types.Currency) error {
 
 // updateSiafundPool updates the saved siafund pool on disk
 func (db *setDB) updateSiafundPool(sfp types.Currency) {
-	err := db.rmItem("SiafundPool", []byte("SiafundPool"))
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
-	err = db.addItem("SiafundPool", []byte("SiafundPool"), sfp)
-	if build.DEBUG && err != nil {
-		panic(err)
-	}
+	db.updateItem("SiafundPool", []byte("SiafundPool"), sfp)
 }
 
 // getSiafundPool retrieves the value of the saved siafund pool
