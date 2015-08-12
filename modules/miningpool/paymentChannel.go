@@ -117,7 +117,8 @@ func (mp *MiningPool) rpcNegotiatePaymentChannel(conn net.Conn) error {
 
 	// Pool creates and signs a transaction that refunds the channel to itself
 	channelOutputID := channelTxn.SiacoinOutputID(0)
-	refundAddr, _, err := mp.wallet.CoinAddress(false)
+	refundUC, err := mp.wallet.NextAddress()
+	refundAddr := refundUC.UnlockHash()
 	if err != nil {
 		return err
 	}

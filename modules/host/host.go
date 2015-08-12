@@ -74,7 +74,7 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 		return nil, err
 	}
 
-	coinAddr, _, err := wallet.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	unlockConditions, err := wallet.NextAddress()
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func New(cs *consensus.ConsensusSet, hdb modules.HostDB, tpool modules.Transacti
 			WindowSize:   288,                         // 48 hours
 			Price:        types.NewCurrency64(100e12), // 0.1 siacoin / mb / week
 			Collateral:   types.NewCurrency64(0),
-			UnlockHash:   coinAddr,
+			UnlockHash:   unlockConditions.UnlockHash(),
 		},
 
 		saveDir: saveDir,

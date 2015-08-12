@@ -1,5 +1,6 @@
 package wallet
 
+/*
 import (
 	"errors"
 
@@ -189,3 +190,4 @@ func (w *Wallet) WatchSiagSiafundAddress(keyfile string) error {
 	w.save()
 	return nil
 }
+*/

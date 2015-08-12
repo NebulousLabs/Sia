@@ -71,7 +71,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		return nil, errors.New("mining pool cannot use a nil wallet")
 	}
 
-	coinAddress, _, err := w.CoinAddress(false)
+	uc, err := w.NextAddress()
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		channels: make(map[types.UnlockHash]paymentChannel),
 
 		MiningPoolSettings: modules.MiningPoolSettings{
-			Address:         coinAddress,
+			Address:         uc.UnlockHash(),
 			TargetMultiple:  256,
 			PoolPercentCut:  5,
 			MinerPercentCut: 3,

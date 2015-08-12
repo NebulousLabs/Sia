@@ -4,44 +4,51 @@ import (
 	"errors"
 	"log"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
-	// AgeDelay indicates how long the wallet will wait before allowing the
-	// user to double-spend a transaction under standard circumstances. The
-	// rationale is that most transactions are meant to be submitted to the
-	// blockchain immediately, and ones that take more than AgeDelay blocks
-	// have probably failed in some way.
-	AgeDelay = 80
-
-	// TransactionFee is yet another deprecated-on-arrival constant that says
-	// how large the transaction fees should be. This should really be a
-	// function supplied by the transaction pool.
-	TransactionFee = 10
+	// RespendTimeout records the number of blocks that the wallet will wait
+	// before spending an output that has been spent in the past. If the
+	// transaction spending the output has not made it to the transaction pool
+	// after the limit, the assumption is that it never will.
+	RespendTimeout = 40
 )
 
+var (
+	errLockedWallet    = errors.New("wallet must be unlocked before it can be used")
+	errNilConsensusSet = errors.New("wallet cannot initialize with a nil consensus set")
+	errNilTpool        = errors.New("wallet cannot initialize with a nil transaction pool")
+)
+
+type spendableKey struct {
+	unlockConditions types.UnlockConditions
+	secretKeys       []crypto.SecretKey
+}
+
 type Wallet struct {
-	unlocked bool
-	settings WalletSettings
+	unlocked    bool
+	subscribed  bool
+	settings    WalletSettings
+	primarySeed modules.Seed
 
-	state            modules.ConsensusSet
-	tpool            modules.TransactionPool
-	unconfirmedDiffs []modules.SiacoinOutputDiff
-	siafundPool      types.Currency
+	state              modules.ConsensusSet
+	tpool              modules.TransactionPool
+	consensusSetHeight types.BlockHeight
+	siafundPool        types.Currency
 
-	consensusHeight  types.BlockHeight
-	age              int
-	keys             map[types.UnlockHash]*key
-	timelockedKeys   map[types.BlockHeight][]types.UnlockHash
-	visibleAddresses map[types.UnlockHash]struct{}
-	siafundAddresses map[types.UnlockHash]struct{}
-	siafundOutputs   map[types.SiafundOutputID]types.SiafundOutput
+	keys            map[types.UnlockHash]spendableKey
+	siacoinOutputs  map[types.SiacoinOutputID]types.SiacoinOutput
+	siafundOutputs  map[types.SiafundOutputID]types.SiafundOutput
+	historicOutputs map[types.OutputID]types.Currency
+	spentOutputs    map[types.OutputID]types.BlockHeight
 
-	generatedKeys map[types.UnlockHash]generatedSignatureKey
-	trackedKeys   map[types.UnlockHash]struct{}
+	walletTransactions            []modules.WalletTransaction
+	walletTransactionMap          map[modules.WalletTransactionID]*modules.WalletTransaction
+	unconfirmedWalletTransactions []modules.WalletTransaction
 
 	persistDir string
 	log        *log.Logger
@@ -53,10 +60,10 @@ type Wallet struct {
 func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir string) (*Wallet, error) {
 	// Check for nil dependencies.
 	if cs == nil {
-		return nil, errors.New("wallet cannot use a nil state")
+		return nil, errNilConsensusSet
 	}
 	if tpool == nil {
-		return nil, errors.New("wallet cannot use a nil transaction pool")
+		return nil, errNilTpool
 	}
 
 	// Initialize the data structure.
@@ -64,15 +71,13 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		state: cs,
 		tpool: tpool,
 
-		age:              AgeDelay * 2,
-		keys:             make(map[types.UnlockHash]*key),
-		timelockedKeys:   make(map[types.BlockHeight][]types.UnlockHash),
-		visibleAddresses: make(map[types.UnlockHash]struct{}),
-		siafundAddresses: make(map[types.UnlockHash]struct{}),
-		siafundOutputs:   make(map[types.SiafundOutputID]types.SiafundOutput),
+		keys:            make(map[types.UnlockHash]spendableKey),
+		siacoinOutputs:  make(map[types.SiacoinOutputID]types.SiacoinOutput),
+		siafundOutputs:  make(map[types.SiafundOutputID]types.SiafundOutput),
+		historicOutputs: make(map[types.OutputID]types.Currency),
+		spentOutputs:    make(map[types.OutputID]types.BlockHeight),
 
-		generatedKeys: make(map[types.UnlockHash]generatedSignatureKey),
-		trackedKeys:   make(map[types.UnlockHash]struct{}),
+		walletTransactionMap: make(map[modules.WalletTransactionID]*modules.WalletTransaction),
 
 		persistDir: persistDir,
 		mu:         sync.New(modules.SafeMutexDelay, 1),
@@ -84,8 +89,6 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 		return nil, err
 	}
 
-	w.tpool.TransactionPoolSubscribe(w)
-
 	return w, nil
 }
 
@@ -93,13 +96,31 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, persistDir stri
 func (w *Wallet) Close() error {
 	id := w.mu.RLock()
 	defer w.mu.RUnlock(id)
-	return w.save()
+	w.log.Println("INFO: Closing wallet")
+
+	// Save the wallet data.
+	err := w.saveSettings()
+	if err != nil {
+		return err
+	}
+
+	// Wipe all of the secret keys, they will be replaced upon calling 'Unlock'
+	// again.
+	for _, key := range w.keys {
+		// Must use 'for i :=  range' otherwise a copy of the secret data is
+		// made.
+		for i := range key.secretKeys {
+			crypto.SecureWipe(key.secretKeys[i][:])
+		}
+	}
+	w.unlocked = false
+	return nil
 }
 
-// SendCoins creates a transaction sending 'amount' to 'dest'. The transaction
+// SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
-func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
-	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision)
+func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
 	output := types.SiacoinOutput{
 		Value:      amount,
 		UnlockHash: dest,
@@ -112,6 +133,37 @@ func (w *Wallet) SendCoins(amount types.Currency, dest types.UnlockHash) ([]type
 	}
 	txnBuilder.AddMinerFee(tpoolFee)
 	txnBuilder.AddSiacoinOutput(output)
+	txnSet, err := txnBuilder.Sign(true)
+	if err != nil {
+		return nil, err
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		return nil, err
+	}
+	return txnSet, nil
+}
+
+// SendSiafunds creates a transaction sending 'amount' to 'dest'. The transaction
+// is submitted to the transaction pool and is also returned.
+func (w *Wallet) SendSiafunds(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error) {
+	tpoolFee := types.NewCurrency64(10).Mul(types.SiacoinPrecision) // TODO: better fee algo.
+	output := types.SiafundOutput{
+		Value:      amount,
+		UnlockHash: dest,
+	}
+
+	txnBuilder := w.StartTransaction()
+	err := txnBuilder.FundSiacoins(tpoolFee)
+	if err != nil {
+		return nil, err
+	}
+	err = txnBuilder.FundSiafunds(amount)
+	if err != nil {
+		return nil, err
+	}
+	txnBuilder.AddMinerFee(tpoolFee)
+	txnBuilder.AddSiafundOutput(output)
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		return nil, err

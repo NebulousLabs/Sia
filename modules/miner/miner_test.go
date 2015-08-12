@@ -1,10 +1,12 @@
 package miner
 
 import (
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -15,10 +17,11 @@ import (
 
 // A minerTester is the helper object for miner testing.
 type minerTester struct {
-	gateway modules.Gateway
-	cs      modules.ConsensusSet
-	tpool   modules.TransactionPool
-	wallet  modules.Wallet
+	gateway   modules.Gateway
+	cs        modules.ConsensusSet
+	tpool     modules.TransactionPool
+	wallet    modules.Wallet
+	walletKey crypto.TwofishKey
 
 	miner *Miner
 }
@@ -44,6 +47,15 @@ func createMinerTester(name string) (*minerTester, error) {
 	if err != nil {
 		return nil, err
 	}
+	var key crypto.TwofishKey
+	_, err = rand.Read(key[:])
+	if err != nil {
+		return nil, err
+	}
+	err = w.Unlock(key)
+	if err != nil {
+		return nil, err
+	}
 	m, err := New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		return nil, err
@@ -51,10 +63,11 @@ func createMinerTester(name string) (*minerTester, error) {
 
 	// Assemble the minerTester.
 	mt := &minerTester{
-		gateway: g,
-		cs:      cs,
-		tpool:   tp,
-		wallet:  w,
+		gateway:   g,
+		cs:        cs,
+		tpool:     tp,
+		wallet:    w,
+		walletKey: key,
 
 		miner: m,
 	}
@@ -80,11 +93,9 @@ func TestMiner(t *testing.T) {
 	}
 
 	// Check that the wallet has money.
-	if mt.wallet.Balance(true).IsZero() {
+	siacoins, _, _ := mt.wallet.ConfirmedBalance()
+	if siacoins.IsZero() {
 		t.Error("expecting mining full balance to not be zero")
-	}
-	if mt.wallet.Balance(false).IsZero() {
-		t.Error("expecting mining nonfull balance to not be zero")
 	}
 
 	// Mine a bunch of blocks.

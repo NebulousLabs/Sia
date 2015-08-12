@@ -18,10 +18,12 @@ func TestSynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst1.closeCst()
 	cst2, err := createConsensusSetTester("TestSynchronize2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst2.closeCst()
 
 	// mine on cst2 until it is above cst1
 	for cst1.cs.Height() >= cst2.cs.Height() {
@@ -101,10 +103,12 @@ func TestResynchronize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst1.closeCst()
 	cst2, err := createConsensusSetTester("TestResynchronize2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst2.closeCst()
 
 	// TODO: without this extra block, sync fails. Why?
 	b, _ := cst2.miner.FindBlock()
@@ -178,6 +182,7 @@ func TestBlockHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// mine until we have enough blocks to test blockHistory
 	for cst.cs.Height() < MaxCatchUpBlocks {

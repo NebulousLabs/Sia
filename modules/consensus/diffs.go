@@ -36,19 +36,22 @@ var (
 
 // commitSiacoinOutputDiff applies or reverts a SiacoinOutputDiff.
 func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.siacoinOutputs[scod.ID]
+		exists := cs.db.inSiacoinOutputs(scod.ID)
 		if exists == (scod.Direction == dir) {
 			panic(errBadCommitSiacoinOutputDiff)
 		}
 	}
 
 	if scod.Direction == dir {
-		cs.siacoinOutputs[scod.ID] = scod.SiacoinOutput
+		cs.db.addSiacoinOutputs(scod.ID, scod.SiacoinOutput)
 	} else {
-		delete(cs.siacoinOutputs, scod.ID)
+		cs.db.rmSiacoinOutputs(scod.ID)
 	}
 }
 
@@ -57,14 +60,16 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 	// Sanity check - should not be adding a contract twice, or deleting a
 	// contract that does not exist.
 	if build.DEBUG {
-		_, exists := cs.fileContracts[fcd.ID]
-		if exists == (fcd.Direction == dir) {
+		exists := cs.db.inFileContracts(fcd.ID)
+		if exists == (fcd.Direction == dir) && cs.updateDatabase {
 			panic(errBadCommitFileContractDiff)
 		}
 	}
 
 	if fcd.Direction == dir {
-		cs.fileContracts[fcd.ID] = fcd.FileContract
+		if cs.updateDatabase {
+			cs.db.addFileContracts(fcd.ID, fcd.FileContract)
+		}
 
 		// Put a file contract into the file contract expirations map.
 		_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]
@@ -82,7 +87,9 @@ func (cs *ConsensusSet) commitFileContractDiff(fcd modules.FileContractDiff, dir
 		}
 		cs.fileContractExpirations[fcd.FileContract.WindowEnd][fcd.ID] = struct{}{}
 	} else {
-		delete(cs.fileContracts, fcd.ID)
+		if cs.updateDatabase {
+			cs.db.rmFileContracts(fcd.ID)
+		}
 
 		if build.DEBUG {
 			_, exists := cs.fileContractExpirations[fcd.FileContract.WindowEnd]

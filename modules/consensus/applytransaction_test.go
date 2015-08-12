@@ -20,6 +20,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	b, _ := cst.miner.FindBlock()
 	err = cst.cs.AcceptBlock(b)
 	if err != nil {
@@ -31,9 +32,9 @@ func TestApplySiacoinInputs(t *testing.T) {
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	cst.cs.db.forEachSiacoinOutputs(func(id types.SiacoinOutputID, sco types.SiacoinOutput) {
 		ids = append(ids, id)
-	}
+	})
 
 	// Apply a transaction with a single siacoin input.
 	txn := types.Transaction{
@@ -42,11 +43,11 @@ func TestApplySiacoinInputs(t *testing.T) {
 		},
 	}
 	cst.cs.applySiacoinInputs(pb, txn)
-	_, exists := cst.cs.siacoinOutputs[ids[0]]
+	exists := cst.cs.db.inSiacoinOutputs(ids[0])
 	if exists {
 		t.Error("Failed to conusme a siacoin output")
 	}
-	if len(cst.cs.siacoinOutputs) != 2 {
+	if cst.cs.db.lenSiacoinOutputs() != 2 {
 		t.Error("siacoin outputs not correctly updated")
 	}
 	if len(pb.SiacoinOutputDiffs) != 1 {
@@ -67,7 +68,7 @@ func TestApplySiacoinInputs(t *testing.T) {
 		},
 	}
 	cst.cs.applySiacoinInputs(pb, txn)
-	if len(cst.cs.siacoinOutputs) != 0 {
+	if cst.cs.db.lenSiacoinOutputs() != 0 {
 		t.Error("failed to consume all siacoin outputs in the consensus set")
 	}
 	if len(pb.SiacoinOutputDiffs) != 3 {
@@ -85,15 +86,16 @@ func TestMisuseApplySiacoinInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
 
 	// Fetch the output id's of each siacoin output in the consensus set.
 	var ids []types.SiacoinOutputID
-	for id, _ := range cst.cs.siacoinOutputs {
+	cst.cs.db.forEachSiacoinOutputs(func(id types.SiacoinOutputID, sco types.SiacoinOutput) {
 		ids = append(ids, id)
-	}
+	})
 
 	// Apply a transaction with a single siacoin input.
 	txn := types.Transaction{
@@ -124,6 +126,7 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -134,11 +137,11 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	}
 	cst.cs.applySiacoinOutputs(pb, txn)
 	scoid := txn.SiacoinOutputID(0)
-	_, exists := cst.cs.siacoinOutputs[scoid]
+	exists := cst.cs.db.inSiacoinOutputs(scoid)
 	if !exists {
 		t.Error("Failed to create siacoin output")
 	}
-	if len(cst.cs.siacoinOutputs) != 3 { // 3 because createConsensusSetTester has 2 initially.
+	if cst.cs.db.lenSiacoinOutputs() != 3 { // 3 because createConsensusSetTester has 2 initially.
 		t.Error("siacoin outputs not correctly updated")
 	}
 	if len(pb.SiacoinOutputDiffs) != 1 {
@@ -161,15 +164,15 @@ func TestApplySiacoinOutputs(t *testing.T) {
 	cst.cs.applySiacoinOutputs(pb, txn)
 	scoid0 := txn.SiacoinOutputID(0)
 	scoid1 := txn.SiacoinOutputID(1)
-	_, exists = cst.cs.siacoinOutputs[scoid0]
+	exists = cst.cs.db.inSiacoinOutputs(scoid0)
 	if !exists {
 		t.Error("Failed to create siacoin output")
 	}
-	_, exists = cst.cs.siacoinOutputs[scoid1]
+	exists = cst.cs.db.inSiacoinOutputs(scoid1)
 	if !exists {
 		t.Error("Failed to create siacoin output")
 	}
-	if len(cst.cs.siacoinOutputs) != 5 { // 5 because createConsensusSetTester has 2 initially.
+	if cst.cs.db.lenSiacoinOutputs() != 5 { // 5 because createConsensusSetTester has 2 initially.
 		t.Error("siacoin outputs not correctly updated")
 	}
 	if len(pb.SiacoinOutputDiffs) != 3 {
@@ -187,6 +190,7 @@ func TestMisuseApplySiacoinOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -218,6 +222,7 @@ func TestApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -228,11 +233,11 @@ func TestApplyFileContracts(t *testing.T) {
 	}
 	cst.cs.applyFileContracts(pb, txn)
 	fcid := txn.FileContractID(0)
-	_, exists := cst.cs.fileContracts[fcid]
+	exists := cst.cs.db.inFileContracts(fcid)
 	if !exists {
 		t.Error("Failed to create file contract")
 	}
-	if len(cst.cs.fileContracts) != 1 {
+	if cst.cs.db.lenFileContracts() != 1 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 1 {
@@ -255,15 +260,15 @@ func TestApplyFileContracts(t *testing.T) {
 	cst.cs.applyFileContracts(pb, txn)
 	fcid0 := txn.FileContractID(0)
 	fcid1 := txn.FileContractID(1)
-	_, exists = cst.cs.fileContracts[fcid0]
+	exists = cst.cs.db.inFileContracts(fcid0)
 	if !exists {
 		t.Error("Failed to create file contract")
 	}
-	_, exists = cst.cs.fileContracts[fcid1]
+	exists = cst.cs.db.inFileContracts(fcid1)
 	if !exists {
 		t.Error("Failed to create file contract")
 	}
-	if len(cst.cs.fileContracts) != 3 {
+	if cst.cs.db.lenFileContracts() != 3 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 3 {
@@ -284,6 +289,7 @@ func TestMisuseApplyFileContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -315,6 +321,7 @@ func TestApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -341,14 +348,15 @@ func TestApplyFileContractRevisions(t *testing.T) {
 		},
 	}
 	cst.cs.applyFileContractRevisions(pb, txn)
-	fc, exists := cst.cs.fileContracts[fcid0]
+	exists := cst.cs.db.inFileContracts(fcid0)
 	if !exists {
 		t.Error("Revision killed a file contract")
 	}
+	fc := cst.cs.db.getFileContracts(fcid0)
 	if fc.FileSize != 1 {
 		t.Error("file contract filesize not properly updated")
 	}
-	if len(cst.cs.fileContracts) != 2 {
+	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 4 { // 2 creating the initial contracts, 1 to remove the old, 1 to add the revision.
@@ -381,21 +389,23 @@ func TestApplyFileContractRevisions(t *testing.T) {
 		},
 	}
 	cst.cs.applyFileContractRevisions(pb, txn)
-	fc0, exists := cst.cs.fileContracts[fcid0]
+	exists = cst.cs.db.inFileContracts(fcid0)
 	if !exists {
 		t.Error("Revision ate file contract")
 	}
-	fc1, exists := cst.cs.fileContracts[fcid1]
+	fc0 := cst.cs.db.getFileContracts(fcid0)
+	exists = cst.cs.db.inFileContracts(fcid1)
 	if !exists {
 		t.Error("Revision ate file contract")
 	}
+	fc1 := cst.cs.db.getFileContracts(fcid1)
 	if fc0.FileSize != 2 {
 		t.Error("Revision not correctly applied")
 	}
 	if fc1.FileSize != 3 {
 		t.Error("Revision not correctly applied")
 	}
-	if len(cst.cs.fileContracts) != 2 {
+	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 8 {
@@ -413,6 +423,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -420,7 +431,7 @@ func TestMisuseApplyFileContractRevisions(t *testing.T) {
 	// Trigger a panic from revising a nonexistent file contract.
 	defer func() {
 		r := recover()
-		if r != ErrMisuseApplyFileContractRevisions {
+		if r != errNilItem {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
@@ -440,6 +451,7 @@ func TestApplyStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -475,11 +487,11 @@ func TestApplyStorageProofs(t *testing.T) {
 		StorageProofs: []types.StorageProof{{ParentID: fcid0}},
 	}
 	cst.cs.applyStorageProofs(pb, txn)
-	_, exists := cst.cs.fileContracts[fcid0]
+	exists := cst.cs.db.inFileContracts(fcid0)
 	if exists {
 		t.Error("Storage proof did not disable a file contract.")
 	}
-	if len(cst.cs.fileContracts) != 2 {
+	if cst.cs.db.lenFileContracts() != 2 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 4 { // 3 creating the initial contracts, 1 for the storage proof.
@@ -508,22 +520,22 @@ func TestApplyStorageProofs(t *testing.T) {
 		},
 	}
 	cst.cs.applyStorageProofs(pb, txn)
-	_, exists = cst.cs.fileContracts[fcid1]
+	exists = cst.cs.db.inFileContracts(fcid1)
 	if exists {
 		t.Error("Storage proof failed to consume file contract.")
 	}
-	_, exists = cst.cs.fileContracts[fcid2]
+	exists = cst.cs.db.inFileContracts(fcid2)
 	if exists {
 		t.Error("storage proof did not consume file contract")
 	}
-	if len(cst.cs.fileContracts) != 0 {
+	if cst.cs.db.lenFileContracts() != 0 {
 		t.Error("file contracts not correctly updated")
 	}
 	if len(pb.FileContractDiffs) != 6 {
 		t.Error("block node was not updated correctly")
 	}
 	spoid1 := fcid1.StorageProofOutputID(types.ProofValid, 0)
-	_, exists = cst.cs.siacoinOutputs[spoid1]
+	exists = cst.cs.db.inSiacoinOutputs(spoid1)
 	if exists {
 		t.Error("output created when file contract had no corresponding output")
 	}
@@ -558,6 +570,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -566,7 +579,7 @@ func TestNonexistentStorageProof(t *testing.T) {
 	// contract.
 	defer func() {
 		r := recover()
-		if r != ErrNonexistentStorageProof {
+		if r != errNilItem {
 			t.Error("no panic occured when misusing applySiacoinInput")
 		}
 	}()
@@ -586,6 +599,7 @@ func TestDuplicateStorageProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node.
 	pb := new(processedBlock)
@@ -632,6 +646,7 @@ func TestApplySiafundInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -681,6 +696,7 @@ func TestMisuseApplySiafundInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)
@@ -722,6 +738,7 @@ func TestApplySiafundOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	cst.cs.siafundPool = types.NewCurrency64(101)
 
 	// Create a block node to use with application.
@@ -789,6 +806,7 @@ func TestMisuseApplySiafundOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a block node to use with application.
 	pb := new(processedBlock)

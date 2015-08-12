@@ -28,7 +28,7 @@ func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) {
 				panic(errPayoutsAlreadyPaid)
 			}
 			// Check the full outputs set.
-			_, exists = cs.siacoinOutputs[mpid]
+			exists = cs.db.inSiacoinOutputs(mpid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -61,7 +61,7 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 	for dscoid, dsco := range cs.delayedSiacoinOutputs[pb.Height] {
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG {
-			_, exists := cs.siacoinOutputs[dscoid]
+			exists := cs.db.inSiacoinOutputs(dscoid)
 			if exists {
 				panic(errOutputAlreadyMature)
 			}
@@ -102,13 +102,8 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 // contract expiring.
 func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.FileContractID) {
 	// Sanity checks.
-	fc, exists := cs.fileContracts[fcid]
+	fc := cs.db.getFileContracts(fcid)
 	if build.DEBUG {
-		// Check that the file contract in question exists.
-		if !exists {
-			panic(errMissingFileContract)
-		}
-
 		// Check that the file contract in question expires at pb.Height.
 		if fc.WindowEnd != pb.Height {
 			panic(errStorageProofTiming)
@@ -124,7 +119,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
-			_, exists = cs.siacoinOutputs[spoid]
+			exists = cs.db.inSiacoinOutputs(spoid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}

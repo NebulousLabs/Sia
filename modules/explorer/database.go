@@ -3,7 +3,6 @@ package explorer
 import (
 	"errors"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
@@ -59,16 +58,16 @@ type txInfo struct {
 // fcInfo provides enough information to easily find the file
 // contracts in the blockchain
 type fcInfo struct {
-	Contract  crypto.Hash
-	Revisions []crypto.Hash
-	Proof     crypto.Hash
+	Contract  types.TransactionID
+	Revisions []types.TransactionID
+	Proof     types.TransactionID
 }
 
 // outputTransactions stores enough information to go from an output id to
 // the places where it is used
 type outputTransactions struct {
-	OutputTx crypto.Hash
-	InputTx  crypto.Hash
+	OutputTx types.TransactionID
+	InputTx  types.TransactionID
 }
 
 // Create an enum (a bunch of integers with iota) for the hash type lookup

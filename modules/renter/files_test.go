@@ -8,6 +8,9 @@ import (
 
 // TestFileAvailable probes the Available method of the file type.
 func TestFileAvailable(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	rt := newRenterTester("TestFileAvailable", t)
 	f := file{
 		PiecesRequired: 1,
@@ -91,6 +94,9 @@ func TestFileRepairing(t *testing.T) {
 
 // TestFileTimeRemaining probes the TimeRemaining method of the file type.
 func TestFileTimeRemaining(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	rt := newRenterTester("TestFileTimeRemaining", t)
 	f := file{
 		renter: rt.renter,
@@ -165,6 +171,9 @@ func TestRenterDeleteFile(t *testing.T) {
 
 // TestRenterFileList probes the FileList method of the renter type.
 func TestRenterFileList(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	rt := newRenterTester("TestRenterFileList", t)
 
 	// Get the file list of an empty renter.
@@ -202,6 +211,9 @@ func TestRenterFileList(t *testing.T) {
 
 // TestRenterRenameFile probes the rename method of the renter.
 func TestRenterRenameFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	rt := newRenterTester("TestRenterRenameFile", t)
 
 	// Rename a file that doesn't exist.

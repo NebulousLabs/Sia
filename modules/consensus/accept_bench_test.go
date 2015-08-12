@@ -26,6 +26,7 @@ func benchmarkAcceptEmptyBlocks(b *testing.B) error {
 	if err != nil {
 		return errors.New("Error creating consensus: " + err.Error())
 	}
+	defer cs.Close()
 
 	// The test dir will be reset each time the benchmark
 	// is done.
@@ -33,6 +34,7 @@ func benchmarkAcceptEmptyBlocks(b *testing.B) error {
 	if err != nil {
 		return errors.New("Error creating tester: " + err.Error())
 	}
+	defer cst.closeCst()
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
 		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
@@ -81,6 +83,7 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Mine until the wallet has 100 utxos
 	for cst.cs.height() < (types.BlockHeight(numSigs) + types.MaturityDelay) {
@@ -102,6 +105,7 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 	if err != nil {
 		b.Fatal("Error creating consensus: " + err.Error())
 	}
+	defer cs.Close()
 	h := cst.cs.db.pathHeight()
 	for i := types.BlockHeight(1); i < h; i++ {
 		err = cs.AcceptBlock(cst.cs.db.getBlockMap(cst.cs.db.getPath(i)).Block)
@@ -128,11 +132,11 @@ func BenchmarkAcceptBigTxBlocks(b *testing.B) {
 		}
 
 		for i := 0; i < numSigs; i++ {
-			addr, _, err := cst.wallet.CoinAddress(false)
+			unlockConditions, err := cst.wallet.NextAddress()
 			if err != nil {
 				b.Fatal(err)
 			}
-			txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: outputValues[i], UnlockHash: addr})
+			txnBuilder.AddSiacoinOutput(types.SiacoinOutput{Value: outputValues[i], UnlockHash: unlockConditions.UnlockHash()})
 		}
 
 		txnSet, err := txnBuilder.Sign(true)

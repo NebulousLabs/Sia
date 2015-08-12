@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/types"
 )
 
@@ -53,21 +52,21 @@ type (
 
 	// Wrapper for fcInfo struct, defined in database.go
 	FcResponse struct {
-		Contract     crypto.Hash
-		Revisions    []crypto.Hash
-		Proof        crypto.Hash
+		Contract     types.TransactionID
+		Revisions    []types.TransactionID
+		Proof        types.TransactionID
 		ResponseType string
 	}
 
 	// Wrapper for the address type response
 	AddrResponse struct {
-		Txns         []crypto.Hash
+		Txns         []types.TransactionID
 		ResponseType string
 	}
 
 	OutputResponse struct {
-		OutputTx     crypto.Hash
-		InputTx      crypto.Hash
+		OutputTx     types.TransactionID
+		InputTx      types.TransactionID
 		ResponseType string
 	}
 

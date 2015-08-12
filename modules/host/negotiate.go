@@ -75,7 +75,7 @@ func (h *Host) considerTerms(terms modules.ContractTerms) error {
 	case len(terms.MissedProofOutputs) != 1:
 		return errors.New("refund len does not match host settings")
 
-	case terms.MissedProofOutputs[0].UnlockHash != types.ZeroUnlockHash:
+	case terms.MissedProofOutputs[0].UnlockHash != types.UnlockHash{}:
 		return errors.New("coins are not paying out to correct address")
 	}
 
@@ -127,7 +127,7 @@ func verifyTransaction(txn types.Transaction, terms modules.ContractTerms, merkl
 	case fc.MissedProofOutputs[0].UnlockHash != terms.MissedProofOutputs[0].UnlockHash:
 		return errors.New("bad file contract missed proof outputs")
 
-	case fc.UnlockHash != types.ZeroUnlockHash:
+	case fc.UnlockHash != types.UnlockHash{}:
 		return errors.New("bad file contract termination hash")
 	}
 	return nil

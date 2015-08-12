@@ -19,6 +19,7 @@ func TestValidSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction pointing to a nonexistent siacoin output.
 	txn := types.Transaction{
@@ -31,10 +32,9 @@ func TestValidSiacoins(t *testing.T) {
 
 	// Create a transaction with invalid unlock conditions.
 	var scoid types.SiacoinOutputID
-	for mapScoid, _ := range cst.cs.siacoinOutputs {
+	cst.cs.db.forEachSiacoinOutputs(func(mapScoid types.SiacoinOutputID, sco types.SiacoinOutput) {
 		scoid = mapScoid
-		break
-	}
+	})
 	txn = types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID: scoid,
@@ -67,18 +67,19 @@ func TestStorageProofSegment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Add a file contract to the consensus set that can be used to probe the
 	// storage segment.
 	var outputs []byte
-	for i := 0; i < 4*256*256; i++ {
+	for i := 0; i < 32*256; i++ {
 		var fcid types.FileContractID
 		rand.Read(fcid[:])
 		fc := types.FileContract{
 			WindowStart: 2,
 			FileSize:    256 * 64,
 		}
-		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		index, err := cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Error(err)
@@ -105,9 +106,9 @@ func TestStorageProofSegment(t *testing.T) {
 	}
 
 	// Try to get the segment of an unfinished file contract.
-	cst.cs.fileContracts[types.FileContractID{}] = types.FileContract{
+	cst.cs.db.addFileContracts(types.FileContractID{}, types.FileContract{
 		WindowStart: 100000,
-	}
+	})
 	_, err = cst.cs.storageProofSegment(types.FileContractID{})
 	if err != ErrUnfinishedFileContract {
 		t.Error(err)
@@ -124,6 +125,7 @@ func TestValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// COMPATv0.4.0
 	//
@@ -155,7 +157,7 @@ func TestValidStorageProofs(t *testing.T) {
 		WindowStart:    2,
 		WindowEnd:      1200,
 	}
-	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.addFileContracts(fcid, fc)
 	buffer.Seek(0, 0)
 
 	// Create a transaction with a storage proof.
@@ -222,7 +224,7 @@ func TestValidStorageProofs(t *testing.T) {
 	// Find a proofIndex that has the value '1'.
 	for {
 		fcid[0]++
-		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
@@ -261,6 +263,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Try a proof set where there is padding on the last segment in the file.
 	file := make([]byte, 100)
@@ -286,7 +289,7 @@ func TestPreForkValidStorageProofs(t *testing.T) {
 	var proofIndex uint64
 	for {
 		fcid[0]++
-		cst.cs.fileContracts[fcid] = fc
+		cst.cs.db.addFileContracts(fcid, fc)
 		proofIndex, err = cst.cs.storageProofSegment(fcid)
 		if err != nil {
 			t.Fatal(err)
@@ -322,9 +325,10 @@ func TestValidFileContractRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Grab an address + unlock conditions for the transaction.
-	unlockHash, unlockConditions, err := cst.wallet.CoinAddress(false)
+	unlockConditions, err := cst.wallet.NextAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,10 +348,10 @@ func TestValidFileContractRevisions(t *testing.T) {
 		FileMerkleRoot: root,
 		WindowStart:    102,
 		WindowEnd:      1200,
-		UnlockHash:     unlockHash,
+		UnlockHash:     unlockConditions.UnlockHash(),
 		RevisionNumber: 1,
 	}
-	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.addFileContracts(fcid, fc)
 
 	// Try a working file contract revision.
 	txn := types.Transaction{
@@ -402,9 +406,10 @@ func TestValidFileContractRevisions(t *testing.T) {
 
 	// Submit a file contract revision for a file contract whose window has
 	// already opened.
-	fc = cst.cs.fileContracts[fcid]
+	fc = cst.cs.db.getFileContracts(fcid)
 	fc.WindowStart = 0
-	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.rmFileContracts(fcid)
+	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].NewRevisionNumber = 3
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrLateRevision {
@@ -413,7 +418,8 @@ func TestValidFileContractRevisions(t *testing.T) {
 
 	// Submit a file contract revision with incorrect unlock conditions.
 	fc.WindowStart = 100
-	cst.cs.fileContracts[fcid] = fc
+	cst.cs.db.rmFileContracts(fcid)
+	cst.cs.db.addFileContracts(fcid, fc)
 	txn.FileContractRevisions[0].UnlockConditions.Timelock++
 	err = cst.cs.validFileContractRevisions(txn)
 	if err != ErrWrongUnlockConditions {
@@ -456,6 +462,7 @@ func TestValidSiafunds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction pointing to a nonexistent siafund output.
 	txn := types.Transaction{
@@ -505,6 +512,7 @@ func TestValidTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 
 	// Create a transaction that is not standalone valid.
 	txn := types.Transaction{
@@ -567,11 +575,12 @@ func TestTryTransactionSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cst.closeCst()
 	initialHash := cst.cs.consensusSetHash()
 
 	// Try a valid transaction.
 	var txns []types.Transaction
-	_, err = cst.wallet.SendCoins(types.NewCurrency64(1), types.UnlockHash{})
+	_, err = cst.wallet.SendSiacoins(types.NewCurrency64(1), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}

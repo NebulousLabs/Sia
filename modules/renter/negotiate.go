@@ -116,7 +116,7 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 		},
 
 		MissedProofOutputs: []types.SiacoinOutput{
-			{Value: validOutputValue, UnlockHash: types.ZeroUnlockHash},
+			{Value: validOutputValue, UnlockHash: types.UnlockHash{}},
 		},
 	}
 

@@ -6,6 +6,7 @@ package crypto
 import (
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"io"
 
@@ -18,14 +19,14 @@ var (
 
 type (
 	Ciphertext []byte
-	TwofishKey [32]byte
+	TwofishKey [EntropySize]byte
 )
 
 // GenerateEncryptionKey produces a key that can be used for encrypting and
 // decrypting files.
 func GenerateTwofishKey() (key TwofishKey, err error) {
 	_, err = rand.Read(key[:])
-	return
+	return key, err
 }
 
 // NewCipher creates a new Twofish cipher from the key.
@@ -85,4 +86,18 @@ func (key TwofishKey) NewReader(r io.Reader) io.Reader {
 	stream := cipher.NewOFB(key.NewCipher(), iv)
 
 	return &cipher.StreamReader{S: stream, R: r}
+}
+
+func (c Ciphertext) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]byte(c))
+}
+
+func (c *Ciphertext) UnmarshalJSON(b []byte) error {
+	var umarB []byte
+	err := json.Unmarshal(b, &umarB)
+	if err != nil {
+		return err
+	}
+	*c = Ciphertext(umarB)
+	return nil
 }

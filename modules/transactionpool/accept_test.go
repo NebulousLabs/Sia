@@ -23,7 +23,7 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 	}
 
 	// Create a valid transaction set using the wallet.
-	txns, err := tpt.wallet.SendCoins(types.NewCurrency64(100), types.UnlockHash{})
+	txns, err := tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +58,9 @@ func TestIntegrationAcceptTransactionSet(t *testing.T) {
 // to the transaction pool that are each legal individually, but double spend
 // an output.
 func TestIntegrationConflictingTransactionSets(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a transaction pool tester.
 	tpt, err := createTpoolTester("TestIntegrationConflictingTransactionSets")
 	if err != nil {
@@ -112,6 +115,9 @@ func TestIntegrationConflictingTransactionSets(t *testing.T) {
 // TestIntegrationCheckMinerFees probes the checkMinerFees method of the
 // transaction pool.
 func TestIntegrationCheckMinerFees(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	// Create a transaction pool tester.
 	tpt, err := createTpoolTester("TestIntegrationCheckMinerFees")
 	if err != nil {
@@ -140,7 +146,7 @@ func TestIntegrationCheckMinerFees(t *testing.T) {
 	}
 
 	// Add a transaction that has sufficient fees.
-	_, err = tpt.wallet.SendCoins(types.NewCurrency64(100), types.UnlockHash{})
+	_, err = tpt.wallet.SendSiacoins(types.NewCurrency64(100), types.UnlockHash{})
 	if err != nil {
 		t.Error(err)
 	}

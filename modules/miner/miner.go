@@ -128,7 +128,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 			panic("could not get child earliest timestamp")
 		}
 	}
-	addr, _, err := w.CoinAddress(false) // false indicates that the address should not be visible to the user.
+	unlockConditions, err := w.NextAddress()
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		parent:            currentBlock,
 		target:            currentTarget,
 		earliestTimestamp: earliestTimestamp,
-		address:           addr,
+		address:           unlockConditions.UnlockHash(),
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
 		arbDataMem: make(map[types.BlockHeader][]byte),

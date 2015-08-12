@@ -62,7 +62,7 @@ func (ht *hostTester) testConsiderTerms() {
 		},
 		MissedProofOutputs: []types.SiacoinOutput{
 			types.SiacoinOutput{
-				UnlockHash: types.ZeroUnlockHash,
+				UnlockHash: types.UnlockHash{},
 			},
 		},
 	}

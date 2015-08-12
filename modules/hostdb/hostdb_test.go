@@ -4,10 +4,12 @@ package hostdb
 // functions for managing hostdb tests.
 
 import (
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
 	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/consensus"
 	"github.com/NebulousLabs/Sia/modules/gateway"
@@ -26,6 +28,8 @@ type hdbTester struct {
 	tpool   modules.TransactionPool
 	wallet  modules.Wallet
 
+	walletMasterKey crypto.TwofishKey
+
 	hostdb *HostDB
 
 	t *testing.T
@@ -36,43 +40,40 @@ type hdbTester struct {
 func newHDBTester(name string, t *testing.T) *hdbTester {
 	testdir := build.TempDir("hostdb", name)
 
-	// Create the gateway.
+	// Create the modules.
 	g, err := gateway.New(":0", filepath.Join(testdir, modules.GatewayDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the consensus set.
 	cs, err := consensus.New(g, filepath.Join(testdir, modules.ConsensusDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the hostdb.
 	hdb, err := New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the tpool.
 	tp, err := transactionpool.New(cs, g)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the wallet.
 	w, err := wallet.New(cs, tp, filepath.Join(testdir, modules.WalletDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the host.
+	var masterKey crypto.TwofishKey
+	_, err = rand.Read(masterKey[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Unlock(masterKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	h, err := host.New(cs, hdb, tp, w, ":0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the miner.
 	m, err := miner.New(cs, tp, w, filepath.Join(testdir, modules.MinerDir))
 	if err != nil {
 		t.Fatal(err)
@@ -86,6 +87,8 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		miner:   m,
 		tpool:   tp,
 		wallet:  w,
+
+		walletMasterKey: masterKey,
 
 		hostdb: hdb,
 
@@ -101,15 +104,15 @@ func newHDBTester(name string, t *testing.T) *hdbTester {
 		}
 	}
 
-	// TODO: Reconsider the way that the RPC's happen.
-	//g.RegisterRPC("HostSettings", h.Settings)
-
 	return hdbt
 }
 
 // TestNilInputs tries supplying the hostdb with nil inputs and checks for
 // correct rejection.
 func TestNilInputs(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	hdbt := newHDBTester("TestNilInputs", t)
 	_, err := New(nil, nil)
 	if err == nil {

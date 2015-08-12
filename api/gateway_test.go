@@ -2,11 +2,9 @@ package api
 
 import (
 	"testing"
-	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules/gateway"
-	"github.com/NebulousLabs/Sia/types"
 )
 
 // addPeer creates a new serverTester and bootstraps it to st. It returns the
@@ -35,6 +33,9 @@ func (st *serverTester) addPeer(name string) *serverTester {
 }
 
 func TestGatewayStatus(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	st := newServerTester("TestGatewayStatus", t)
 	var info GatewayInfo
 	st.getAPI("/gateway/status", &info)
@@ -76,49 +77,5 @@ func TestGatewayPeerRemove(t *testing.T) {
 	st.getAPI("/gateway/status", &info)
 	if len(info.Peers) != 0 {
 		t.Fatal("/gateway/peer/add did not add peer", peer.Address())
-	}
-}
-
-// TestTransactionRelay checks that an unconfirmed transaction is relayed to
-// all peers.
-func TestTransactionRelay(t *testing.T) {
-	t.Skip("TODO: Broken")
-
-	// Create a server tester and give it a peer.
-	st := newServerTester("TestTransactionRelay1", t)
-	st2 := st.addPeer("TestTransactionRelay2")
-
-	// Make sure both servers have empty transaction pools.
-	tset := st.server.tpool.TransactionList()
-	tset2 := st2.server.tpool.TransactionList()
-	if len(tset) != 0 || len(tset2) != 0 {
-		t.Fatal("transaction set is not empty after creating new server tester")
-	}
-
-	// Get the original balances of each server for later comparison.
-	origBal := st.server.wallet.Balance(false)
-	origBal2 := st2.server.wallet.Balance(false)
-
-	// Create a transaction in the first server and check that it propagates to
-	// the second. The check is done via spinning because network propagation
-	// will take an unknown amount of time.
-	st.callAPI("/wallet/send?amount=15&destination=" + st2.coinAddress())
-	for len(tset) == 0 || len(tset2) == 0 {
-		tset = st.server.tpool.TransactionList()
-		tset2 = st2.server.tpool.TransactionList()
-		time.Sleep(time.Millisecond)
-	}
-
-	// Check that the balances of each have updated appropriately, in
-	// accordance with 0-conf.
-	if origBal.Sub(types.NewCurrency64(15)).Cmp(st.server.wallet.Balance(false)) != 0 {
-		t.Error(origBal.Big())
-		t.Error(st.server.wallet.Balance(false).Big())
-		t.Error("balances are incorrect for 0-conf transaction")
-	}
-	for origBal2.Add(types.NewCurrency64(15)).Cmp(st2.server.wallet.Balance(false)) != 0 {
-		// t.Error(origBal2.Big())
-		// t.Error(st2.wallet.Balance(false).Big())
-		// t.Error("balances are incorrect for 0-conf transaction")
 	}
 }

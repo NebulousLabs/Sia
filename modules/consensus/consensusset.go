@@ -60,8 +60,6 @@ type ConsensusSet struct {
 	// block, but are not allowed to be spent until a certain height. When
 	// that height is reached, they are moved to the siacoinOutputs map.
 	siafundPool           types.Currency
-	siacoinOutputs        map[types.SiacoinOutputID]types.SiacoinOutput
-	fileContracts         map[types.FileContractID]types.FileContract
 	delayedSiacoinOutputs map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput
 
 	// fileContractExpirations is not actually a part of the consensus set, but
@@ -105,8 +103,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 	cs := &ConsensusSet{
 		dosBlocks: make(map[types.BlockID]struct{}),
 
-		siacoinOutputs:        make(map[types.SiacoinOutputID]types.SiacoinOutput),
-		fileContracts:         make(map[types.FileContractID]types.FileContract),
 		delayedSiacoinOutputs: make(map[types.BlockHeight]map[types.SiacoinOutputID]types.SiacoinOutput),
 
 		fileContractExpirations: make(map[types.BlockHeight]map[types.FileContractID]struct{}),
@@ -140,12 +136,6 @@ func New(gateway modules.Gateway, saveDir string) (*ConsensusSet, error) {
 			SiafundOutput: siafundOutput,
 		}
 		cs.blockRoot.SiafundOutputDiffs = append(cs.blockRoot.SiafundOutputDiffs, sfod)
-	}
-
-	// Fill out the consensus information for the genesis block.
-	cs.siacoinOutputs[genesisBlock.MinerPayoutID(0)] = types.SiacoinOutput{
-		Value:      types.CalculateCoinbase(0),
-		UnlockHash: types.ZeroUnlockHash,
 	}
 
 	// Create the consensus directory.

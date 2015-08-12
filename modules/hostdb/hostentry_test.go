@@ -43,33 +43,3 @@ func TestHostWeight(t *testing.T) {
 		t.Error("Free host not weighing fairly")
 	}
 }
-
-// TestInsertHost probes the insertHost and InsertHost functions.
-func TestInsertHost(t *testing.T) {
-	t.Skip("test broke when subscription model changed")
-
-	hdbt := newHDBTester("TestInsertHost", t)
-
-	// There should be no hosts in a fresh hostdb.
-	if len(hdbt.hostdb.allHosts) != 0 {
-		t.Fatal("an empty hostdb is required")
-	}
-
-	// Insert a host with no information, the host should be placed in the set
-	// of all hosts.
-	hdbt.hostdb.InsertHost(modules.HostSettings{})
-	if len(hdbt.hostdb.allHosts) != 1 {
-		t.Error("host was not inserted")
-	}
-	if len(hdbt.hostdb.activeHosts) != 0 {
-		t.Error("not expecting an active host")
-	}
-
-	hdbt.hostdb.InsertHost(modules.HostSettings{IPAddress: hdbt.host.Address()})
-	if len(hdbt.hostdb.allHosts) != 2 {
-		t.Error("host was not inserted")
-	}
-	if len(hdbt.hostdb.activeHosts) != 1 {
-		t.Error("expecting an active host")
-	}
-}

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NebulousLabs/Sia/api"
-	"github.com/NebulousLabs/Sia/modules"
+	// "github.com/NebulousLabs/Sia/modules"
 )
 
 // coinUnits converts a siacoin amount to base units.
@@ -58,7 +58,7 @@ The smallest unit of siacoins is the hasting. One siacoin is 10^24 hastings. Oth
   MS (mega, 10^6 SC)
   GS (giga, 10^9 SC)
   TS (tera, 10^12 SC)`,
-		Run: wrap(walletstatuscmd),
+		Run: wrap(walletsiafundscmd),
 	}
 
 	walletAddressCmd = &cobra.Command{
@@ -201,18 +201,21 @@ Do not delete the original keyfile.
 }
 
 func walletstatuscmd() {
-	status := new(modules.WalletInfo)
-	err := getAPI("/wallet/status", status)
-	if err != nil {
-		fmt.Println("Could not get wallet status:", err)
-		return
-	}
-	// divide by 1e24 to get SC
-	r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
-	sc, _ := r.Float64()
-	fmt.Printf(`Wallet status:
-Balance:   %.2f SC
-Exact:     %v H
-Addresses: %d
-`, sc, status.Balance, status.NumAddresses)
+	/*
+			status := new(modules.WalletInfo)
+			err := getAPI("/wallet/status", status)
+			if err != nil {
+				fmt.Println("Could not get wallet status:", err)
+				return
+			}
+			// divide by 1e24 to get SC
+			r := new(big.Rat).SetFrac(status.Balance.Big(), new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil))
+			sc, _ := r.Float64()
+			fmt.Printf(`Wallet status:
+		Balance:   %.2f SC
+		Exact:     %v H
+		Addresses: %d
+		`, sc, status.Balance, status.NumAddresses)
+	*/
+	fmt.Println("wallet status not implemented in siac")
 }
