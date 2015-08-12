@@ -1,5 +1,7 @@
 package renter
 
+/*
+
 import (
 	"errors"
 	"io"
@@ -232,3 +234,5 @@ func (r *Renter) negotiateContract(host modules.HostSettings, up modules.FileUpl
 
 	return nil
 }
+
+*/

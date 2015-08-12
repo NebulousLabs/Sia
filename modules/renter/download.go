@@ -164,7 +164,7 @@ func (d *download) worker(host fetcher, reqChan chan uint64) {
 	}
 }
 
-// run performs the actual download. It spawns one helper per host, and
+// run performs the actual download. It spawns one worker per host, and
 // instructs them to sequentially download chunks. It then writes the
 // recovered chunks to w.
 func (d *download) run(w io.Writer) error {
@@ -242,12 +242,11 @@ func newDownload(ecc modules.ECC, chunkSize, fileSize uint64, hosts []fetcher, n
 func (r *Renter) Download(nickname, destination string) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.Lock()
-	// file, exists := r.files[nickname]
+	file, exists := r.files[nickname]
 	r.mu.Unlock(lockID)
-	// if !exists {
-	// 	return errors.New("no file of that nickname")
-	// }
-	file := new(dfile)
+	if !exists {
+		return errors.New("no file of that nickname")
+	}
 
 	// Create file on disk.
 	f, err := os.Create(destination)

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -28,21 +27,9 @@ type uploader interface {
 	addPiece(uploadPiece) (fileContract, error)
 }
 
-// newFile creates a new file object.
-func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *dfile {
-	key, _ := crypto.GenerateTwofishKey()
-	return &dfile{
-		Size:      fileSize,
-		Contracts: make(map[modules.NetAddress]fileContract),
-		MasterKey: key,
-		ecc:       ecc,
-		pieceSize: pieceSize,
-	}
-}
-
 // worker uploads pieces to a host as directed by reqChan. It sends the
 // updated fileContract down respChan.
-func (f *dfile) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
+func (f *file) worker(host uploader, reqChan chan uploadPiece, respChan chan *fileContract) {
 	// TODO: move connect outside worker
 	_, err := host.connect()
 	if err != nil {
@@ -61,7 +48,7 @@ func (f *dfile) worker(host uploader, reqChan chan uploadPiece, respChan chan *f
 
 // upload reads chunks from r and uploads them to hosts. It spawns a worker
 // for each host, and instructs them to upload pieces of each chunk.
-func (f *dfile) upload(r io.Reader, hosts []uploader) error {
+func (f *file) upload(r io.Reader, hosts []uploader) error {
 	// create request/response channels and spawn workers
 	reqChans := make([]chan uploadPiece, len(hosts))
 	respChans := make([]chan *fileContract, len(hosts))

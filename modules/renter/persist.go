@@ -50,7 +50,6 @@ func (r *Renter) load() error {
 		return err
 	}
 	for i := range files {
-		files[i].renter = r
 		r.files[files[i].Name] = &files[i]
 	}
 	return nil
@@ -70,15 +69,10 @@ func (r *Renter) shareFiles(nicknames []string, w io.Writer) error {
 		if !exists {
 			return ErrUnknownNickname
 		}
-		active := 0
-		for _, piece := range file.Pieces {
-			if piece.Active {
-				active++
-			}
-		}
-		if active < 3 {
-			return errors.New("Cannot share an inactive file")
-		}
+		// TODO: implement activity check
+		// if !file.isActive() {
+		// 	return errors.New("Cannot share an inactive file")
+		// }
 		files = append(files, *file)
 	}
 
@@ -156,7 +150,6 @@ func (r *Renter) loadSharedFile(reader io.Reader) ([]string, error) {
 			dupCount++
 			files[i].Name = origName + "_" + strconv.Itoa(dupCount)
 		}
-		files[i].renter = r
 		r.files[files[i].Name] = &files[i]
 		fileList = append(fileList, files[i].Name)
 	}
