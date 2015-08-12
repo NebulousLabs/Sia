@@ -22,7 +22,7 @@ var (
 type dfile struct {
 	Name      string
 	Size      uint64
-	Contracts []fileContract
+	Contracts map[modules.NetAddress]fileContract
 	MasterKey crypto.TwofishKey
 	ecc       modules.ECC
 	pieceSize uint64
@@ -99,7 +99,7 @@ func (f *dfile) Expiration() types.BlockHeight {
 	if len(f.Contracts) == 0 {
 		return 0
 	}
-	lowest := f.Contracts[0].WindowStart
+	lowest := types.BlockHeight(0)
 	for _, fc := range f.Contracts {
 		if fc.WindowStart < lowest {
 			lowest = fc.WindowStart

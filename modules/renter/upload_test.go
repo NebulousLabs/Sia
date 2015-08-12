@@ -43,6 +43,7 @@ func newFile(ecc modules.ECC, pieceSize, fileSize uint64) *dfile {
 	key, _ := crypto.GenerateTwofishKey()
 	return &dfile{
 		Size:      fileSize,
+		Contracts: make(map[modules.NetAddress]fileContract),
 		MasterKey: key,
 		ecc:       ecc,
 		pieceSize: pieceSize,
@@ -102,7 +103,7 @@ func (f *dfile) upload(r io.Reader, hosts []uploader) error {
 				//go f.worker(newhost, reqChans[j], respChans[j])
 				continue
 			}
-			f.Contracts = append(f.Contracts, *contract)
+			f.Contracts[contract.IP] = *contract
 		}
 		f.uploaded += uint64(n)
 	}

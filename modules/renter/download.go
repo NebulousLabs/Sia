@@ -262,9 +262,9 @@ func (r *Renter) Download(nickname, destination string) error {
 	// wind up connecting and then disconnecting without transferring any
 	// data, which is wasteful of host resources.
 	var hosts []fetcher
-	for i := range file.Contracts {
+	for _, fc := range file.Contracts {
 		// TODO: connect in parallel
-		hf, err := newHostFetcher(file.Contracts[i], file.MasterKey)
+		hf, err := newHostFetcher(fc, file.MasterKey)
 		if err != nil {
 			continue
 		}
