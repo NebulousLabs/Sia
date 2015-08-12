@@ -47,12 +47,10 @@ func (f *dfile) numChunks() uint64 {
 // A fileContract is a contract covering an arbitrary number of file pieces.
 // Chunk/Piece metadata is used to split the raw contract data appropriately.
 type fileContract struct {
-	types.FileContract // TODO: store this internally in the renterContracts []fileContract
+	types.FileContract // TODO: store this internally in the renter
 
-	ID types.FileContractID
-	IP modules.NetAddress
-
-	// IDEA: prepend each piece with its checksum before storage
+	ID     types.FileContractID
+	IP     modules.NetAddress
 	Pieces []pieceData
 }
 

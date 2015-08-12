@@ -81,6 +81,7 @@ func (r *Renter) Info() (ri modules.RentInfo) {
 
 	// Calculate the average cost of a file.
 	var totalPrice types.Currency
+	redundancy := 6 // reasonable estimate until we come up with an alternative
 	sampleSize := redundancy * 3 / 2
 	hosts := r.hostDB.RandomHosts(sampleSize)
 	for _, host := range hosts {

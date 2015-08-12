@@ -37,10 +37,11 @@ type ECC interface {
 // FileUploadParams contains the information used by the Renter to upload a
 // file.
 type FileUploadParams struct {
-	Filename string
-	Duration types.BlockHeight
-	Nickname string
-	Pieces   int
+	Filename  string
+	Duration  types.BlockHeight
+	Nickname  string
+	ECC       ECC
+	PieceSize uint64
 }
 
 // FileInfo is an interface providing information about a file.

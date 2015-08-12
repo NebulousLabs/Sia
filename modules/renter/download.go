@@ -166,8 +166,7 @@ func (d *download) worker(host fetcher, reqChan chan uint64) {
 
 // run performs the actual download. It spawns one helper per host, and
 // instructs them to sequentially download chunks. It then writes the
-// recovered chunks to w. Note that download progress is only updated after a
-// full chunk has been written.
+// recovered chunks to w.
 func (d *download) run(w io.Writer) error {
 	// spawn download workers
 	for i, h := range d.hosts {
