@@ -238,7 +238,7 @@ func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 
 	// Commit a delayed siacoin output with maturity height = cs.height()+1
 	maturityHeight := cst.cs.height() + 1
-	initialDscosLen := len(cst.cs.delayedSiacoinOutputs[maturityHeight])
+	initialDscosLen := cst.cs.db.lenDelayedSiacoinOutputsHeight(maturityHeight)
 	id := types.SiacoinOutputID{'1'}
 	dsco := types.SiacoinOutput{Value: types.NewCurrency64(1)}
 	dscod := modules.DelayedSiacoinOutputDiff{
@@ -248,19 +248,19 @@ func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 		MaturityHeight: maturityHeight,
 	}
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
-	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen+1 {
+	if cst.cs.db.lenDelayedSiacoinOutputsHeight(maturityHeight) != initialDscosLen+1 {
 		t.Error("delayed output diff set did not increase in size")
 	}
-	if cst.cs.delayedSiacoinOutputs[maturityHeight][id].Value.Cmp(dsco.Value) != 0 {
+	if cst.cs.db.getDelayedSiacoinOutputs(maturityHeight, id).Value.Cmp(dsco.Value) != 0 {
 		t.Error("wrong delayed siacoin output value after committing a diff")
 	}
 
 	// Rewind the diff.
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffRevert)
-	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen {
+	if cst.cs.db.lenDelayedSiacoinOutputsHeight(maturityHeight) != initialDscosLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists := cst.cs.delayedSiacoinOutputs[maturityHeight][id]
+	exists := cst.cs.db.inDelayedSiacoinOutputsHeight(maturityHeight, id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
@@ -269,20 +269,20 @@ func TestCommitDelayedSiacoinOutputDiff(t *testing.T) {
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
 	dscod.Direction = modules.DiffRevert
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffApply)
-	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen {
+	if cst.cs.db.lenDelayedSiacoinOutputsHeight(maturityHeight) != initialDscosLen {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	_, exists = cst.cs.delayedSiacoinOutputs[maturityHeight][id]
+	exists = cst.cs.db.inDelayedSiacoinOutputsHeight(maturityHeight, id)
 	if exists {
 		t.Error("siacoin output was not reverted")
 	}
 
 	// Revert the inverse diff.
 	cst.cs.commitDelayedSiacoinOutputDiff(dscod, modules.DiffRevert)
-	if len(cst.cs.delayedSiacoinOutputs[maturityHeight]) != initialDscosLen+1 {
+	if cst.cs.db.lenDelayedSiacoinOutputsHeight(maturityHeight) != initialDscosLen+1 {
 		t.Error("siacoin output diff set did not increase in size")
 	}
-	if cst.cs.delayedSiacoinOutputs[maturityHeight][id].Value.Cmp(dsco.Value) != 0 {
+	if cst.cs.db.getDelayedSiacoinOutputs(maturityHeight, id).Value.Cmp(dsco.Value) != 0 {
 		t.Error("wrong siacoin output value after committing a diff")
 	}
 
@@ -486,23 +486,23 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	pb := cst.cs.currentProcessedBlock()
 
 	// Check that a map gets created upon revert.
-	_, exists := cst.cs.delayedSiacoinOutputs[pb.Height]
+	exists := cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if exists {
 		t.Fatal("unexpected delayed output map at pb.Height")
 	}
 	cst.cs.commitDiffSet(pb, modules.DiffRevert) // revert the current block node
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if !exists {
 		t.Error("delayed output map was not created when reverting diffs")
 	}
 
 	// Check that a map gets created on apply.
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if exists {
 		t.Fatal("delayed output map exists when it shouldn't")
 	}
 	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if !exists {
 		t.Error("delayed output map was not created")
 	}
@@ -513,7 +513,7 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 	cst.cs.commitDiffSet(parent, modules.DiffRevert)
 	grandparent := cst.cs.db.getBlockMap(parent.Parent)
 	cst.cs.commitDiffSet(grandparent, modules.DiffRevert)
-	_, exists = cst.cs.delayedSiacoinOutputs[grandparent.Height]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(grandparent.Height)
 	if exists {
 		t.Error("delayed output map was created when bringing the height too low")
 	}
@@ -643,7 +643,7 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	cst.cs.commitDiffSet(pb, modules.DiffRevert)
 
 	// Check that maps are deleted at pb.Height when applying changes.
-	_, exists := cst.cs.delayedSiacoinOutputs[pb.Height]
+	exists := cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if !exists {
 		t.Fatal("expected a delayed output map at pb.Height")
 	}
@@ -651,21 +651,21 @@ func TestDeleteObsoleteDelayedOutputMaps(t *testing.T) {
 	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
 	cst.cs.commitNodeDiffs(pb, modules.DiffApply)
 	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height)
 	if exists {
 		t.Error("delayed output map was not deleted on apply")
 	}
 
 	// Check that maps are deleted at pb.Height+types.MaturityDelay when
 	// reverting changes.
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if !exists {
 		t.Fatal("expected a delayed output map at pb.Height+maturity delay")
 	}
 	cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffRevert)
 	cst.cs.commitNodeDiffs(pb, modules.DiffRevert)
 	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
-	_, exists = cst.cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+	exists = cst.cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	if exists {
 		t.Error("delayed siacoin output map was not deleted upon revert")
 	}

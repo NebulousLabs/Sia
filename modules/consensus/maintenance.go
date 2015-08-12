@@ -23,7 +23,7 @@ func (cs *ConsensusSet) applyMinerPayouts(pb *processedBlock) {
 		mpid := pb.Block.MinerPayoutID(uint64(i))
 		if build.DEBUG {
 			// Check the delayed outputs set.
-			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][mpid]
+			exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}
@@ -57,8 +57,18 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 		return
 	}
 
+	// Gather the matured outputs from the delayed outputs map
+	var dscoids []types.SiacoinOutputID
+	var dscos []types.SiacoinOutput
+	cs.db.forEachDelayedSiacoinOutputsHeight(pb.Height, func(id types.SiacoinOutputID, sco types.SiacoinOutput) {
+		dscoids = append(dscoids, id)
+		dscos = append(dscos, sco)
+	})
 	// Add all of the matured outputs to the full siaocin output set.
-	for dscoid, dsco := range cs.delayedSiacoinOutputs[pb.Height] {
+	for i := 0; i < len(dscos); i++ {
+		dscoid := dscoids[i]
+		dsco := dscos[i]
+
 		// Sanity check - the output should not already be in siacoinOuptuts.
 		if build.DEBUG {
 			exists := cs.db.inSiacoinOutputs(dscoid)
@@ -91,11 +101,11 @@ func (cs *ConsensusSet) applyMaturedSiacoinOutputs(pb *processedBlock) {
 	// Delete the map that held the now-matured outputs.
 	// Sanity check - map should be empty.
 	if build.DEBUG {
-		if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
+		if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
 			panic("deleting non-empty map")
 		}
 	}
-	delete(cs.delayedSiacoinOutputs, pb.Height)
+	cs.db.rmDelayedSiacoinOutputs(pb.Height)
 }
 
 // applyMissedStorageProof adds the outputs and diffs that result from a file
@@ -115,7 +125,7 @@ func (cs *ConsensusSet) applyMissedStorageProof(pb *processedBlock, fcid types.F
 		// Sanity check - output should not already exist.
 		spoid := fcid.StorageProofOutputID(types.ProofMissed, uint64(i))
 		if build.DEBUG {
-			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid]
+			exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
 			if exists {
 				panic(errPayoutsAlreadyPaid)
 			}

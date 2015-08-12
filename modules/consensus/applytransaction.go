@@ -155,7 +155,7 @@ func (cs *ConsensusSet) applyStorageProofs(pb *processedBlock, t types.Transacti
 			// Sanity check - output should not already exist.
 			spoid := sp.ParentID.StorageProofOutputID(types.ProofValid, uint64(i))
 			if build.DEBUG {
-				_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay][spoid]
+				exists := cs.db.inDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, spoid)
 				if exists {
 					panic(ErrDuplicateValidProofOutput)
 				}

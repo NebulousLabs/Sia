@@ -132,23 +132,26 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 
 // commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
 func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	// Sanity check - should not be adding an output twice, or deleting an
 	// output that does not exist.
 	if build.DEBUG {
-		_, exists := cs.delayedSiacoinOutputs[dscod.MaturityHeight]
+		exists := cs.db.inDelayedSiacoinOutputs(dscod.MaturityHeight)
 		if !exists {
 			panic(errBadMaturityHeight)
 		}
-		_, exists = cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID]
+		exists = cs.db.inDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
 		if exists == (dscod.Direction == dir) {
 			panic(errBadCommitDelayedSiacoinOutputDiff)
 		}
 	}
 
 	if dscod.Direction == dir {
-		cs.delayedSiacoinOutputs[dscod.MaturityHeight][dscod.ID] = dscod.SiacoinOutput
+		cs.db.addDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
 	} else {
-		delete(cs.delayedSiacoinOutputs[dscod.MaturityHeight], dscod.ID)
+		cs.db.rmDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
 	}
 }
 
@@ -211,28 +214,31 @@ func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.Diff
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
 func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	if dir == modules.DiffApply {
 		if build.DEBUG {
 			// Sanity check - the output map being created should not already
 			// exist.
-			_, exists := cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]
+			exists := cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 			if exists {
 				panic(errCreatingExistingUpcomingMap)
 			}
 		}
-		cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+		cs.db.addDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	} else {
 		// Skip creating maps for heights that can't have delayed outputs.
 		if pb.Height > types.MaturityDelay {
 			// Sanity check - the output map being created should not already
 			// exist.
 			if build.DEBUG {
-				_, exists := cs.delayedSiacoinOutputs[pb.Height]
+				exists := cs.db.inDelayedSiacoinOutputs(pb.Height)
 				if exists {
 					panic(errCreatingExistingUpcomingMap)
 				}
 			}
-			cs.delayedSiacoinOutputs[pb.Height] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+			cs.db.addDelayedSiacoinOutputs(pb.Height)
 		}
 	}
 }
@@ -277,25 +283,28 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 // deleteObsoleteDelayedOutputMaps deletes the delayed siacoin output maps that
 // are no longer in use.
 func (cs *ConsensusSet) deleteObsoleteDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
+	if !cs.updateDatabase {
+		return
+	}
 	if dir == modules.DiffApply {
 		// There are no outputs that mature in the first MaturityDelay blocks.
 		if pb.Height > types.MaturityDelay {
 			// Sanity check - the map being deleted should be empty.
 			if build.DEBUG {
-				if len(cs.delayedSiacoinOutputs[pb.Height]) != 0 {
+				if cs.updateDatabase && cs.db.lenDelayedSiacoinOutputsHeight(pb.Height) != 0 {
 					panic(errDeletingNonEmptyDelayedMap)
 				}
 			}
-			delete(cs.delayedSiacoinOutputs, pb.Height)
+			cs.db.rmDelayedSiacoinOutputs(pb.Height)
 		}
 	} else {
 		// Sanity check - the map being deleted should be empty
 		if build.DEBUG {
-			if len(cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay]) != 0 {
+			if cs.db.lenDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay) != 0 {
 				panic(errDeletingNonEmptyDelayedMap)
 			}
 		}
-		delete(cs.delayedSiacoinOutputs, pb.Height+types.MaturityDelay)
+		cs.db.rmDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 	}
 }
 
@@ -305,16 +314,17 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 	if dir == modules.DiffApply {
 		if cs.updateDatabase {
 			err := cs.db.pushPath(pb.Block.ID())
-
 			if build.DEBUG && err != nil {
 				panic(err)
 			}
 		}
 		cs.blocksLoaded += 1
 	} else {
-		err := cs.db.popPath()
-		if build.DEBUG && err != nil {
-			panic(err)
+		if cs.updateDatabase {
+			err := cs.db.popPath()
+			if build.DEBUG && err != nil {
+				panic(err)
+			}
 		}
 		cs.blocksLoaded -= 1
 	}
@@ -355,7 +365,7 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 		return err
 	}
 	cs.blocksLoaded += 1
-	cs.delayedSiacoinOutputs[pb.Height+types.MaturityDelay] = make(map[types.SiacoinOutputID]types.SiacoinOutput)
+	cs.db.addDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
