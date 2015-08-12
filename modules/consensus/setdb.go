@@ -49,6 +49,7 @@ func openDB(filename string) (*setDB, error) {
 		"Path",
 		"BlockMap",
 		"Metadata",
+		"SiafundPool",
 		"DelayedSiacoinOutputs",
 		"FileContractExpirations",
 	}
@@ -134,7 +135,7 @@ func (db *setDB) checkConsistencyGuard() bool {
 // addItem should only be called from this file, and adds a new item
 // to the database
 //
-// addItem and getItem are part of consensus due to stricter error
+// addItem and getItem are part of consensus as oopp due to stricter error
 // conditions than a generic bolt implementation
 func (db *setDB) addItem(bucket string, key, value interface{}) error {
 	// Check that this transaction is guarded by consensusGuard.
@@ -715,4 +716,35 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(k types
 		fn(key)
 		return nil
 	})
+}
+
+// setSiafundPool sets the siafund pool
+func (db *setDB) setSiafundPool(sfp types.Currency) error {
+	return db.addItem("SiafundPool", []byte("SiafundPool"), sfp)
+}
+
+// updateSiafundPool updates the saved siafund pool on disk
+func (db *setDB) updateSiafundPool(sfp types.Currency) {
+	err := db.rmItem("SiafundPool", []byte("SiafundPool"))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = db.addItem("SiafundPool", []byte("SiafundPool"), sfp)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+}
+
+// getSiafundPool retrieves the value of the saved siafund pool
+func (db *setDB) getSiafundPool() types.Currency {
+	sfpBytes, err := db.getItem("SiafundPool", []byte("SiafundPool"))
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var sfp types.Currency
+	err = encoding.Unmarshal(sfpBytes, &sfp)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return sfp
 }
