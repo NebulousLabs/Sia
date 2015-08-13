@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
-	"github.com/boltdb/bolt"
 )
 
 var (
-	errBadSetInsert   = errors.New("attempting to add an already existing item to the consensus set")
+	errRepeatInsert   = errors.New("attempting to add an already existing item to the consensus set")
 	errNilBucket      = errors.New("using a bucket that does not exist")
 	errNilItem        = errors.New("requested item does not exist")
 	errDBInconsistent = errors.New("database guard indicates inconsistency within database")
@@ -37,7 +38,7 @@ var (
 	FileContractExpirations = []byte("FileContractExpirations")
 	SiafundOutputs          = []byte("SiafundOutputs")
 	SiafundPool             = []byte("SiafundPool")
-	DelayedSiacoinOutputs   = []byte("DelayedSiacoinOutputs")
+	DSCOBuckets             = []byte("DSCOBuckets")
 )
 
 // setDB is a wrapper around the persist bolt db which backs the
@@ -65,7 +66,7 @@ func openDB(filename string) (*setDB, error) {
 		FileContractExpirations,
 		SiafundOutputs,
 		SiafundPool,
-		DelayedSiacoinOutputs,
+		DSCOBuckets,
 	}
 
 	// Initialize the database.
@@ -129,26 +130,36 @@ func (db *setDB) stopConsistencyGuard() error {
 	})
 }
 
-// addItem adds an item to a bucket in the setDB. If the bucket does not exist,
-// or if the item is already in the bucket, an error is returned.
-func (db *setDB) addItem(bucket []byte, key, value interface{}) error {
-	v := encoding.Marshal(value)
+// insertItem inserts an item to a bucket. In debug mode, a panic is thrown if
+// the bucket does not exist or if the item is already in the bucket.
+func insertItem(tx *bolt.Tx, bucket []byte, key, value interface{}) error {
 	k := encoding.Marshal(key)
-	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		// Sanity check: make sure the buckets exists and that
-		// you are not inserting something that already exists
-		if build.DEBUG {
-			if b == nil {
-				panic(errNilBucket)
-			}
-			i := b.Get(k)
-			if i != nil {
-				panic(errBadSetInsert)
-			}
+	v := encoding.Marshal(value)
+	b := tx.Bucket(bucket)
+	if build.DEBUG {
+		if b == nil {
+			panic(errNilBucket)
 		}
-		return b.Put(k, v)
-	})
+		if b.Get(k) != nil {
+			panic(errRepeatInsert)
+		}
+	}
+	return b.Put(k, v)
+}
+
+// getItem returns an item from a bucket. In debug mode, a panic is thrown if
+// the bucket does not exist or if the item does not exist.
+func getItem(tx *bolt.Tx, bucket []byte, key interface{}) ([]byte, error) {
+	k := encoding.Marshal(key)
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
+	item := b.Get(k)
+	if build.DEBUG && item == nil {
+		panic(errNilItem)
+	}
+	return item, nil
 }
 
 // updateItem removes and inserts an item in a single database
@@ -175,6 +186,8 @@ func (db *setDB) updateItem(bucket []byte, key, value interface{}) {
 }
 
 // getItem is a generic function to insert an item into the set database
+//
+// DEPRECATED
 func (db *setDB) getItem(bucket []byte, key interface{}) (item []byte, err error) {
 	k := encoding.Marshal(key)
 	err = db.View(func(tx *bolt.Tx) error {
@@ -250,8 +263,18 @@ func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 	}
 }
 
+// pushPath adds a block to the BlockPath at current height + 1.
+func pushPath(tx *bolt.Tx, bid types.BlockID) error {
+	b := tx.Bucket(BlockPath)
+	key := encoding.EncUint64(uint64(b.Stats().KeyN)) // TODO: use the current path?
+	value := encoding.Marshal(bid)
+	return b.Put(key, value)
+}
+
 // pushPath inserts a block into the database at the "end" of the chain, i.e.
 // the current height + 1.
+//
+// DEPRECATED
 func (db *setDB) pushPath(bid types.BlockID) error {
 	value := encoding.Marshal(bid)
 	return db.Update(func(tx *bolt.Tx) error {
@@ -272,6 +295,8 @@ func (db *setDB) popPath() error {
 }
 
 // getPath retreives the block id of a block at a given hegiht from the path
+//
+// DEPRECATED
 func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	idBytes, err := db.getItem(BlockPath, h)
 	if err != nil {
@@ -284,6 +309,19 @@ func (db *setDB) getPath(h types.BlockHeight) (id types.BlockID) {
 	return
 }
 
+// getPath returns the block id at 'height' in the block path.
+func getPath(tx *bolt.Tx, height types.BlockHeight) (id types.BlockID) {
+	idBytes, err := getItem(tx, BlockPath, height)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	err = encoding.Unmarshal(idBytes, &id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // pathHeight returns the size of the current path
 func (db *setDB) pathHeight() types.BlockHeight {
 	return types.BlockHeight(db.lenBucket(BlockPath))
@@ -292,11 +330,29 @@ func (db *setDB) pathHeight() types.BlockHeight {
 // addBlockMap adds a processedBlock to the block map
 // This will eventually take a processed block as an argument
 func (db *setDB) addBlockMap(pb *processedBlock) error {
-	return db.addItem(BlockMap, pb.Block.ID(), *pb)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, BlockMap, pb.Block.ID(), *pb)
+	})
+}
+
+// getBlockMap returns a processed block with the input id.
+func getBlockMap(tx *bolt.Tx, id types.BlockID) *processedBlock {
+	pbBytes, err := getItem(tx, BlockMap, id)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	var pb processedBlock
+	err = encoding.Unmarshal(pbBytes, &pb)
+	if build.DEBUG && err != nil {
+		panic(err)
+	}
+	return &pb
 }
 
 // getBlockMap queries the set database to return a processedBlock
 // with the given ID
+//
+// DEPRECATED
 func (db *setDB) getBlockMap(id types.BlockID) *processedBlock {
 	bnBytes, err := db.getItem(BlockMap, id)
 	if build.DEBUG && err != nil {
@@ -328,7 +384,9 @@ func (db *setDB) updateBlockMap(pb *processedBlock) {
 
 // addSiafundOutputs is a wrapper around addItem for adding a siafundOutput.
 func (db *setDB) addSiafundOutputs(id types.SiafundOutputID, output types.SiafundOutput) error {
-	return db.addItem(SiafundOutputs, id, output)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, SiafundOutputs, id, output)
+	})
 }
 
 // getSiafundOutputs is a wrapper around getItem which decodes the
@@ -377,7 +435,9 @@ func (db *setDB) forEachSiafundOutputs(fn func(k types.SiafundOutputID, v types.
 // addFileContracts is a wrapper around addItem for adding a file
 // contract to the consensusset
 func (db *setDB) addFileContracts(id types.FileContractID, fc types.FileContract) error {
-	return db.addItem(FileContracts, id, fc)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, FileContracts, id, fc)
+	})
 }
 
 // getFileContracts is a wrapper around getItem for retrieving a file contract
@@ -426,7 +486,9 @@ func (db *setDB) forEachFileContracts(fn func(k types.FileContractID, v types.Fi
 
 // addSiacoinOutputs adds a given siacoin output to the SiacoinOutputs bucket
 func (db *setDB) addSiacoinOutputs(id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	return db.addItem(SiacoinOutputs, id, sco)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, SiacoinOutputs, id, sco)
+	})
 }
 
 // getSiacoinOutputs retrieves a saicoin output by ID
@@ -472,10 +534,24 @@ func (db *setDB) forEachSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.
 	})
 }
 
+// createDSCOBucket creates a bucket for the delayed siacoin outputs at the
+// input height.
+func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	err := insertItem(tx, DSCOBuckets, bh, bucketID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.CreateBucket(bucketID)
+	return err
+}
+
 // addDelayedSiacoinOutputs creats a new bucket for a certain height for delayed siacoin outputs
 func (db *setDB) addDelayedSiacoinOutputs(h types.BlockHeight) error {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	err := db.addItem(DelayedSiacoinOutputs, h, bucketID)
+	err := db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, DSCOBuckets, h, bucketID)
+	})
 	if err != nil {
 		// This is particularly dangerous as the map and the buckets will be out of sync.
 		// Perhaps a panic is called for to prevent silent inconsistencies
@@ -490,7 +566,9 @@ func (db *setDB) addDelayedSiacoinOutputs(h types.BlockHeight) error {
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
 func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	return db.addItem(bucketID, id, sco)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, bucketID, id, sco)
+	})
 }
 
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
@@ -510,7 +588,7 @@ func (db *setDB) getDelayedSiacoinOutputs(h types.BlockHeight, id types.SiacoinO
 
 // inDelayedSiacoinOutputs returns a boolean representing the prescence of a height bucket with a given height
 func (db *setDB) inDelayedSiacoinOutputs(h types.BlockHeight) bool {
-	return db.inBucket(DelayedSiacoinOutputs, h)
+	return db.inBucket(DSCOBuckets, h)
 }
 
 // inDelayedSiacoinOutputsHeight returns a boolean showing if a siacoin output exists at a given height
@@ -536,7 +614,7 @@ func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
-	err = db.rmItem(DelayedSiacoinOutputs, h)
+	err = db.rmItem(DSCOBuckets, h)
 	if build.DEBUG && err != nil {
 		panic(err)
 	}
@@ -550,7 +628,7 @@ func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Sia
 
 // lenDelayedSiacoinOutputs returns the number of unique heights in the delayed siacoin outputs map
 func (db *setDB) lenDelayedSiacoinOutputs() uint64 {
-	return db.lenBucket(DelayedSiacoinOutputs)
+	return db.lenBucket(DSCOBuckets)
 }
 
 // lenDelayedSiacoinOutputsHeight returns the number of outputs stored at one height
@@ -582,7 +660,7 @@ func (db *setDB) forEachDelayedSiacoinOutputsHeight(h types.BlockHeight, fn func
 // element across every height in the delayed siacoin output map
 func (db *setDB) forEachDelayedSiacoinOutputs(fn func(k types.SiacoinOutputID, v types.SiacoinOutput)) {
 	err := db.View(func(tx *bolt.Tx) error {
-		bDsco := tx.Bucket([]byte(DelayedSiacoinOutputs))
+		bDsco := tx.Bucket(DSCOBuckets)
 		if bDsco == nil {
 			return errNilBucket
 		}
@@ -620,7 +698,9 @@ func (db *setDB) forEachDelayedSiacoinOutputs(fn func(k types.SiacoinOutputID, v
 // addFCExpirations creates a new file contract expirations map for the given height
 func (db *setDB) addFCExpirations(h types.BlockHeight) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	err := db.addItem(FileContractExpirations, h, bucketID)
+	err := db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, FileContractExpirations, h, bucketID)
+	})
 	if err != nil {
 		return err
 	}
@@ -633,7 +713,9 @@ func (db *setDB) addFCExpirations(h types.BlockHeight) error {
 // addFCExpirationsHeight adds a file contract ID to the set at a particular height
 func (db *setDB) addFCExpirationsHeight(h types.BlockHeight, id types.FileContractID) error {
 	bucketID := append(prefix_fcex, encoding.Marshal(h)...)
-	return db.addItem(bucketID, id, struct{}{})
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, bucketID, id, struct{}{})
+	})
 }
 
 // inFCExpirations returns a bool showing the presence of a file contract map at a given height
@@ -693,7 +775,9 @@ func (db *setDB) forEachFCExpirationsHeight(h types.BlockHeight, fn func(k types
 
 // setSiafundPool sets the siafund pool
 func (db *setDB) setSiafundPool(sfp types.Currency) error {
-	return db.addItem(SiafundPool, SiafundPool, sfp)
+	return db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, SiafundPool, SiafundPool, sfp)
+	})
 }
 
 // updateSiafundPool updates the saved siafund pool on disk

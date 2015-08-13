@@ -3,6 +3,8 @@ package consensus
 import (
 	"errors"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -335,11 +337,16 @@ func (cs *ConsensusSet) generateAndApplyDiff(pb *processedBlock) error {
 	}
 
 	// Update the state to point to the new block.
-	err := cs.db.pushPath(pb.Block.ID())
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		err := pushPath(tx, pb.Block.ID())
+		if err != nil {
+			return err
+		}
+		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+	})
 	if err != nil {
 		return err
 	}
-	cs.db.addDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
 
 	// diffsGenerated is set to true as soon as we start changing the set of
 	// diffs in the block node. If at any point the block is found to be
