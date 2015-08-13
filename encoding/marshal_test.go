@@ -50,11 +50,11 @@ type (
 
 func (t test5) MarshalSia() []byte { return []byte(t.s) }
 
-func (t *test5) UnmarshalSia(b []byte) { t.s = string(b) }
+func (t *test5) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
 
 func (t *test6) MarshalSia() []byte { return []byte(t.s) }
 
-func (t *test6) UnmarshalSia(b []byte) { t.s = string(b) }
+func (t *test6) UnmarshalSia(b []byte) error { t.s = string(b); return nil }
 
 var testStructs = []interface{}{
 	test0{false, 65537, 256, "foo"},

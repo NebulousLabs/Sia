@@ -185,8 +185,9 @@ func (c Currency) MarshalSia() []byte {
 }
 
 // UnmarshalSia implements the encoding.SiaUnmarshaler interface.
-func (c *Currency) UnmarshalSia(b []byte) {
+func (c *Currency) UnmarshalSia(b []byte) error {
 	c.i.SetBytes(b)
+	return nil
 }
 
 // String implements the fmt.Stringer interface.
