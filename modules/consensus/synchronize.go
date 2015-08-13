@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MaxCatchUpBlocks          = 50
+	MaxCatchUpBlocks          = 10
 	MaxSynchronizeAttempts    = 8
 	ResynchronizePeerTimeout  = time.Second * 30
 	ResynchronizeBatchTimeout = time.Minute * 3
