@@ -831,7 +831,6 @@ Parameters: none
 Response:
 ```
 []struct{
-	Complete    bool
 	Filesize    uint64
 	Received    uint64
 	Destination string
@@ -839,11 +838,6 @@ Response:
 }
 ```
 Each file in the queue is represented by the above struct.
-
-`Complete` indicates whether the file is ready to be used. Note that `Received
-== Filesize` does not imply `Complete`, because the file may require
-additional processing (e.g. decryption) after all of the raw bytes have been
-downloaded.
 
 `Filesize` is the size of the file being download.
 

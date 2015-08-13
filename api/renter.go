@@ -16,7 +16,6 @@ const (
 // DownloadInfo is a helper struct for the downloadqueue API call.
 type DownloadInfo struct {
 	StartTime   time.Time
-	Complete    bool
 	Filesize    uint64
 	Received    uint64
 	Destination string
@@ -57,7 +56,6 @@ func (srv *Server) renterDownloadqueueHandler(w http.ResponseWriter, req *http.R
 	for _, dl := range downloads {
 		downloadSet = append(downloadSet, DownloadInfo{
 			StartTime:   dl.StartTime(),
-			Complete:    dl.Complete(),
 			Filesize:    dl.Filesize(),
 			Received:    dl.Received(),
 			Destination: dl.Destination(),
