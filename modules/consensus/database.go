@@ -522,6 +522,15 @@ func (db *setDB) getSiacoinOutputs(id types.SiacoinOutputID) types.SiacoinOutput
 	return sco
 }
 
+func isSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) bool {
+	bucket := tx.Bucket(SiacoinOutputs)
+	if bucket == nil {
+		panic(errNilBucket)
+	}
+	item := bucket.Get(encoding.Marshal(id))
+	return item != nil
+}
+
 // inSiacoinOutputs returns a bool showing if a soacoin output ID is
 // in the siacoin outputs bucket
 func (db *setDB) inSiacoinOutputs(id types.SiacoinOutputID) bool {
@@ -567,12 +576,13 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
 	return err
 }
 
-// addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
-func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	return db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, bucketID, id, sco)
-	})
+func addDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
+	// Sanity check - output should not already be in the siacoin outputs set.
+	if build.DEBUG && isSiacoinOutput(tx, id) {
+		panic(errOutputAlreadyMature)
+	}
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	return insertItem(tx, bucketID, id, sco)
 }
 
 // getDelayedSiacoinOutputs returns a particular siacoin output given a height and an ID
@@ -601,6 +611,22 @@ func (db *setDB) inDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.Sia
 	return db.inBucket(bucketID, id)
 }
 
+func removeDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	b := tx.Bucket(bucketID)
+	if b == nil {
+		return errNilBucket
+	}
+	if b.Stats().KeyN != 0 {
+		return errNonEmptyBucket
+	}
+	err := tx.DeleteBucket(bucketID)
+	if err != nil {
+		return err
+	}
+	return removeItem(tx, DSCOBuckets, bh)
+}
+
 // rmDelayedSiacoinOutputs removes a height and its corresponding
 // bucket from the set of delayed siacoin outputs. The map must be empty
 func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
@@ -624,10 +650,9 @@ func (db *setDB) rmDelayedSiacoinOutputs(h types.BlockHeight) {
 	}
 }
 
-// rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height
-func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	return db.rmItem(bucketID, id)
+func removeDSCO(tx *bolt.Tx, bh types.BlockHeight, id types.SiacoinOutputID) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	return removeItem(tx, bucketID, id)
 }
 
 // lenDelayedSiacoinOutputs returns the number of unique heights in the delayed siacoin outputs map

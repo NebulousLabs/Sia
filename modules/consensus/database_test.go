@@ -4,6 +4,8 @@ package consensus
 // compatibility with the test suite.
 
 import (
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -26,6 +28,31 @@ func (cs *ConsensusSet) commitSiacoinOutputDiff(scod modules.SiacoinOutputDiff, 
 	} else {
 		cs.db.rmSiacoinOutputs(scod.ID)
 	}
+}
+
+// commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
+func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
+	if dscod.Direction == dir {
+		cs.db.addDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
+	}
+	cs.db.rmDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
+}
+
+// addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
+func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	err := db.Update(func(tx *bolt.Tx) error {
+		return insertItem(tx, bucketID, id, sco)
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+// rmDelayedSiacoinOutputsHeight removes a siacoin output with a given ID at the given height
+func (db *setDB) rmDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
+	return db.rmItem(bucketID, id)
 }
 
 // lenSiacoinOutputs returns the size of the siacoin outputs bucket
