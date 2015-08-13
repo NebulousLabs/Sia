@@ -28,7 +28,6 @@ type FileInfo struct {
 	UploadProgress float32
 	Nickname       string
 	Filesize       uint64
-	Repairing      bool
 	TimeRemaining  types.BlockHeight
 }
 
@@ -76,7 +75,6 @@ func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Reque
 			UploadProgress: file.UploadProgress(),
 			Nickname:       file.Nickname(),
 			Filesize:       file.Filesize(),
-			Repairing:      file.Repairing(),
 			TimeRemaining:  file.TimeRemaining(),
 		})
 	}

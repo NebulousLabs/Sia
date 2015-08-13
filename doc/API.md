@@ -886,7 +886,6 @@ Response:
 []struct {
 	Available     bool
 	Nickname      string
-	Repairing     bool
 	TimeRemaining int
 }
 ```
@@ -895,9 +894,6 @@ Each uploaded file is represented by the above struct.
 `Available` indicates whether or not the file can be downloaded immediately.
 
 `Nickname` is the nickname given to the file when it was uploaded.
-
-`Repairing` indicates whether the file is currently being repaired. It is
-typically best not to shut down siad until files are no longer being repaired.
 
 `TimeRemaining` indicates how many blocks the file will be available for.
 
