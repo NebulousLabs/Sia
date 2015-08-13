@@ -94,12 +94,12 @@ func (db *BoltDatabase) GetFromBucket(bucketName string, key []byte) ([]byte, er
 }
 
 // Exists checks for the existance of an item in the specified bucket
-func (db *BoltDatabase) Exists(bucketName string, key []byte) (bool, error) {
+func (db *BoltDatabase) Exists(bucketName []byte, key []byte) (bool, error) {
 	var exists bool
 	err := db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
+		bucket := tx.Bucket(bucketName)
 		if bucket == nil {
-			return errors.New("requested bucket does not exist: " + bucketName)
+			return errors.New("requested bucket does not exist: " + string(bucketName))
 		}
 
 		v := bucket.Get(key)
@@ -110,10 +110,10 @@ func (db *BoltDatabase) Exists(bucketName string, key []byte) (bool, error) {
 }
 
 // BucketSize returns the number of keys in a bucket.
-func (db *BoltDatabase) BucketSize(bucketName string) (uint64, error) {
+func (db *BoltDatabase) BucketSize(bucketName []byte) (uint64, error) {
 	var size uint64
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
+		b := tx.Bucket(bucketName)
 		size = uint64(b.Stats().KeyN)
 		return nil
 	})
@@ -122,14 +122,6 @@ func (db *BoltDatabase) BucketSize(bucketName string) (uint64, error) {
 
 // CloseDatabase saves the bolt database to a file, and updates metadata
 func (db *BoltDatabase) CloseDatabase() error {
-	// TODO: Is this call to 'Update' necessary? As far as I can tell, there's
-	// no way to modify the metadata while the database is running. The
-	// metadata was already set an initialization.
-	err := db.Update(db.updateMetadata)
-	if err != nil {
-		return err
-	}
-
 	db.Close()
 	return nil
 }
