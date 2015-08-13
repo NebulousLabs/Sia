@@ -81,14 +81,14 @@ func TestApplyMinerPayouts(t *testing.T) {
 	// Trigger a panic where the miner payouts have already been applied.
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
-			t.Error(r)
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 	}()
 	defer func() {
 		r := recover()
-		if r != errPayoutsAlreadyPaid {
-			t.Error(r)
+		if r == nil {
+			t.Error("expecting error after corrupting database")
 		}
 		cst.cs.db.rmDelayedSiacoinOutputsHeight(pb.Height+types.MaturityDelay, mpid0)
 		cst.cs.db.addSiacoinOutputs(mpid0, types.SiacoinOutput{})

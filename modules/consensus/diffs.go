@@ -111,26 +111,12 @@ func (cs *ConsensusSet) commitSiafundOutputDiff(sfod modules.SiafundOutputDiff, 
 	}
 }
 
-// commitDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
-func (cs *ConsensusSet) commitDelayedSiacoinOutputDiff(dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) {
-	// Sanity check - should not be adding an output twice, or deleting an
-	// output that does not exist.
-	if build.DEBUG {
-		exists := cs.db.inDelayedSiacoinOutputs(dscod.MaturityHeight)
-		if !exists {
-			panic(errBadMaturityHeight)
-		}
-		exists = cs.db.inDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
-		if exists == (dscod.Direction == dir) {
-			panic(errBadCommitDelayedSiacoinOutputDiff)
-		}
-	}
-
+// commitTxDelayedSiacoinOutputDiff applies or reverts a delayedSiacoinOutputDiff.
+func (cs *ConsensusSet) commitTxDelayedSiacoinOutputDiff(tx *bolt.Tx, dscod modules.DelayedSiacoinOutputDiff, dir modules.DiffDirection) error {
 	if dscod.Direction == dir {
-		cs.db.addDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
-	} else {
-		cs.db.rmDelayedSiacoinOutputsHeight(dscod.MaturityHeight, dscod.ID)
+		return addDSCO(tx, dscod.MaturityHeight, dscod.ID, dscod.SiacoinOutput)
 	}
+	return removeDSCO(tx, dscod.MaturityHeight, dscod.ID)
 }
 
 // commitSiafundPoolDiff applies or reverts a SiafundPoolDiff.
@@ -220,7 +206,12 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundOutputDiff(sfod, dir)
 		}
 		for _, dscod := range pb.DelayedSiacoinOutputDiffs {
-			cs.commitDelayedSiacoinOutputDiff(dscod, dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxDelayedSiacoinOutputDiff(tx, dscod, dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for _, sfpd := range pb.SiafundPoolDiffs {
 			cs.commitSiafundPoolDiff(sfpd, dir)
@@ -241,7 +232,12 @@ func (cs *ConsensusSet) commitNodeDiffs(pb *processedBlock, dir modules.DiffDire
 			cs.commitSiafundOutputDiff(pb.SiafundOutputDiffs[i], dir)
 		}
 		for i := len(pb.DelayedSiacoinOutputDiffs) - 1; i >= 0; i-- {
-			cs.commitDelayedSiacoinOutputDiff(pb.DelayedSiacoinOutputDiffs[i], dir)
+			err := cs.db.Update(func(tx *bolt.Tx) error {
+				return cs.commitTxDelayedSiacoinOutputDiff(tx, pb.DelayedSiacoinOutputDiffs[i], dir)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		for i := len(pb.SiafundPoolDiffs) - 1; i >= 0; i-- {
 			cs.commitSiafundPoolDiff(pb.SiafundPoolDiffs[i], dir)
