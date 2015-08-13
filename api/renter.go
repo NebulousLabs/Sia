@@ -75,7 +75,7 @@ func (srv *Server) renterFilesListHandler(w http.ResponseWriter, req *http.Reque
 			UploadProgress: file.UploadProgress(),
 			Nickname:       file.Nickname(),
 			Filesize:       file.Filesize(),
-			TimeRemaining:  file.TimeRemaining(),
+			TimeRemaining:  file.Expiration() - types.BlockHeight(srv.blockchainHeight),
 		})
 	}
 
