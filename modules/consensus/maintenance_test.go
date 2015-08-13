@@ -3,6 +3,8 @@ package consensus
 import (
 	"testing"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -116,7 +118,12 @@ func TestApplyMaturedSiacoinOutputs(t *testing.T) {
 		}
 	}()
 	cst.cs.db.addSiacoinOutputs(types.SiacoinOutputID{}, types.SiacoinOutput{})
-	cst.cs.db.addDelayedSiacoinOutputs(pb.Height)
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return createDSCOBucket(tx, pb.Height)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cst.cs.db.addDelayedSiacoinOutputsHeight(pb.Height, types.SiacoinOutputID{}, types.SiacoinOutput{})
 	cst.cs.applyMaturedSiacoinOutputs(pb)
 }

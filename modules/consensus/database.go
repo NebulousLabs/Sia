@@ -546,23 +546,6 @@ func createDSCOBucket(tx *bolt.Tx, bh types.BlockHeight) error {
 	return err
 }
 
-// addDelayedSiacoinOutputs creats a new bucket for a certain height for delayed siacoin outputs
-func (db *setDB) addDelayedSiacoinOutputs(h types.BlockHeight) error {
-	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
-	err := db.Update(func(tx *bolt.Tx) error {
-		return insertItem(tx, DSCOBuckets, h, bucketID)
-	})
-	if err != nil {
-		// This is particularly dangerous as the map and the buckets will be out of sync.
-		// Perhaps a panic is called for to prevent silent inconsistencies
-		return err
-	}
-	return db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket(bucketID)
-		return err
-	})
-}
-
 // addDelayedSiacoinOutputsHeight inserts a siacoin output to the bucket at a particular height
 func (db *setDB) addDelayedSiacoinOutputsHeight(h types.BlockHeight, id types.SiacoinOutputID, sco types.SiacoinOutput) error {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)

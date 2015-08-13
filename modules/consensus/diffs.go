@@ -202,31 +202,13 @@ func (cs *ConsensusSet) commitDiffSetSanity(pb *processedBlock, dir modules.Diff
 
 // createUpcomingDelayeOutputdMaps creates the delayed siacoin output maps that
 // will be used when applying delayed siacoin outputs in the diff set.
-func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) createUpcomingDelayedOutputMaps(tx *bolt.Tx, pb *processedBlock, dir modules.DiffDirection) error {
 	if dir == modules.DiffApply {
-		if build.DEBUG {
-			// Sanity check - the output map being created should not already
-			// exist.
-			exists := cs.db.inDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-			if exists {
-				panic(errCreatingExistingUpcomingMap)
-			}
-		}
-		cs.db.addDelayedSiacoinOutputs(pb.Height + types.MaturityDelay)
-	} else {
-		// Skip creating maps for heights that can't have delayed outputs.
-		if pb.Height > types.MaturityDelay {
-			// Sanity check - the output map being created should not already
-			// exist.
-			if build.DEBUG {
-				exists := cs.db.inDelayedSiacoinOutputs(pb.Height)
-				if exists {
-					panic(errCreatingExistingUpcomingMap)
-				}
-			}
-			cs.db.addDelayedSiacoinOutputs(pb.Height)
-		}
+		return createDSCOBucket(tx, pb.Height+types.MaturityDelay)
+	} else if pb.Height > types.MaturityDelay {
+		return createDSCOBucket(tx, pb.Height)
 	}
+	return nil
 }
 
 // commitNodeDiffs commits all of the diffs in a block node.
@@ -308,12 +290,19 @@ func (cs *ConsensusSet) updateCurrentPath(pb *processedBlock, dir modules.DiffDi
 }
 
 // commitDiffSet applies or reverts the diffs in a blockNode.
-func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) {
+func (cs *ConsensusSet) commitDiffSet(pb *processedBlock, dir modules.DiffDirection) error {
 	cs.commitDiffSetSanity(pb, dir)
-	cs.createUpcomingDelayedOutputMaps(pb, dir)
+	err := cs.db.Update(func(tx *bolt.Tx) error {
+		return cs.createUpcomingDelayedOutputMaps(tx, pb, dir)
+	})
+	if err != nil {
+		return err
+	}
 	cs.commitNodeDiffs(pb, dir)
 	cs.deleteObsoleteDelayedOutputMaps(pb, dir)
 	cs.updateCurrentPath(pb, dir)
+
+	return nil
 }
 
 // generateAndApplyDiff will verify the block and then integrate it into the
