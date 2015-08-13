@@ -525,26 +525,33 @@ func TestCreateUpcomingDelayedOutputMaps(t *testing.T) {
 		t.Error("delayed output map was created when bringing the height too low")
 	}
 
-	/*
-		defer func() {
-			r := recover()
-			if r != errCreatingExistingUpcomingMap {
-				t.Error("expected errCreatingExistingUpcomingMap, got", r)
-			}
-		}()
-		defer func() {
-			r := recover()
-			if r != errCreatingExistingUpcomingMap {
-				t.Error("expected errCreatingExistingUpcomingMap, got", r)
-			}
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expecting an error to be thrown after corrupting the database")
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expecting an error to be thrown after corrupting the database")
+		}
 
-			// Trigger a panic by creating a map that's already there during a revert.
-			cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffRevert)
-		}()
-
-		// Trigger a panic by creating a map that's already there during an apply.
-		cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
-	*/
+		// Trigger a panic by creating a map that's already there during a revert.
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffRevert)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// Trigger a panic by creating a map that's already there during an apply.
+	err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+		return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestCommitNodeDiffs probes the commitNodeDiffs method of the consensus set.
@@ -708,28 +715,31 @@ func TestDeleteObsoleteDelayedOutputMapsSanity(t *testing.T) {
 	pb := cst.cs.currentProcessedBlock()
 	cst.cs.commitDiffSet(pb, modules.DiffRevert)
 
-	/*
-		defer func() {
-			r := recover()
-			if r != errDeletingNonEmptyDelayedMap {
-				t.Error("expected errDeletingNonEmptyDelayedMap, got", r)
-			}
-		}()
-		defer func() {
-			r := recover()
-			if r != errDeletingNonEmptyDelayedMap {
-				t.Error("expected errDeletingNonEmptyDelayedMap, got", r)
-			}
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expecting an error after corrupting the database")
+		}
+	}()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expecting an error after corrupting the database")
+		}
 
-			// Trigger a panic by deleting a map with outputs in it during revert.
-			cst.cs.createUpcomingDelayedOutputMaps(pb, modules.DiffApply)
-			cst.cs.commitNodeDiffs(pb, modules.DiffApply)
-			cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
-		}()
+		// Trigger a panic by deleting a map with outputs in it during revert.
+		err = cst.cs.db.Update(func(tx *bolt.Tx) error {
+			return cst.cs.createUpcomingDelayedOutputMaps(tx, pb, modules.DiffApply)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cst.cs.commitNodeDiffs(pb, modules.DiffApply)
+		cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffRevert)
+	}()
 
-		// Trigger a panic by deleting a map with outputs in it during apply.
-		cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
-	*/
+	// Trigger a panic by deleting a map with outputs in it during apply.
+	cst.cs.deleteObsoleteDelayedOutputMaps(pb, modules.DiffApply)
 }
 
 // TestGenerateAndApplyDiffSanity triggers the sanity checks in the
