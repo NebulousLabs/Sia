@@ -106,6 +106,27 @@ func (srv *Server) walletHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// walletAddressHandlerPOST handles a POST request to /wallet/seed.
+func (srv *Server) walletAddressHandlerPOST(w http.ResponseWriter, req *http.Request) {
+	unlockConditions, err := srv.wallet.NextAddress()
+	if err != nil {
+		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, WalletSeedPUT{
+		Address: unlockConditions.UnlockHash(),
+	})
+}
+
+// walletAddressHandler handles API calls to /wallet/address.
+func (srv *Server) walletAddressHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "POST" {
+		srv.walletAddressHandlerPOST(w, req)
+	} else {
+		writeError(w, "unrecognized method when calling /wallet/address", http.StatusBadRequest)
+	}
+}
+
 // walletCloseHandlerPUT handles a PUT request to /wallet/close.
 func (srv *Server) walletCloseHandlerPUT(w http.ResponseWriter, req *http.Request) {
 	err := srv.wallet.Close()
@@ -222,18 +243,6 @@ func (srv *Server) walletSeedHandlerGET(w http.ResponseWriter, req *http.Request
 	})
 }
 
-// walletSeedHandlerPUT handles a PUT request to /wallet/seed.
-func (srv *Server) walletSeedHandlerPUT(w http.ResponseWriter, req *http.Request) {
-	unlockConditions, err := srv.wallet.NextAddress()
-	if err != nil {
-		writeError(w, "error after call to /wallet/seed: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, WalletSeedPUT{
-		Address: unlockConditions.UnlockHash(),
-	})
-}
-
 // walletSeedHandlerPOST handles a POST request to /wallet/seed.
 func (srv *Server) walletSeedHandlerPOST(w http.ResponseWriter, req *http.Request) {
 	// Fetch the new seed.
@@ -260,8 +269,6 @@ func (srv *Server) walletSeedHandler(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET", "":
 		srv.walletSeedHandlerGET(w, req)
-	case "PUT":
-		srv.walletSeedHandlerPUT(w, req)
 	case "POST":
 		srv.walletSeedHandlerPOST(w, req)
 	default:
