@@ -237,7 +237,6 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -247,23 +246,21 @@ func (cs *ConsensusSet) validTransaction(t types.Transaction) error {
 // is not checked. After the transactions have been validated, a consensus
 // change is returned detailing the diffs that the transaciton set would have.
 func (cs *ConsensusSet) TryTransactionSet(txns []types.Transaction) (modules.ConsensusChange, error) {
-	// Simple consistency guard
-	if cs.db.checkConsistencyGuard() {
-		return modules.ConsensusChange{}, ErrInconsistentSet
+	err := cs.db.startConsistencyGuard()
+	if err != nil {
+		return modules.ConsensusChange{}, err
 	}
+	defer cs.db.stopConsistencyGuard()
+
 	// applyTransaction will apply the diffs from a transaction and store them
 	// in a block node. diffHolder is the blockNode that tracks the temporary
 	// changes. At the end of the function, all changes that were made to the
 	// consensus set get reverted.
 	diffHolder := new(processedBlock)
 	diffHolder.Height = cs.height()
-	cs.db.startConsistencyGuard()
-	defer func() {
-		cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
-		cs.db.stopConsistencyGuard()
-	}()
+	defer cs.commitNodeDiffs(diffHolder, modules.DiffRevert)
 	for _, txn := range txns {
-		err := cs.validTransaction(txn)
+		err = cs.validTransaction(txn)
 		if err != nil {
 			return modules.ConsensusChange{}, err
 		}
