@@ -184,11 +184,11 @@ func (cs *ConsensusSet) applyMaintenance(pb *processedBlock) error {
 	if err != nil {
 		return err
 	}
-	err = cs.applyMaturedSiacoinOutputs(pb)
+	err = cs.applyFileContractMaintenance(pb)
 	if err != nil {
 		return err
 	}
-	err = cs.applyFileContractMaintenance(pb)
+	err = cs.applyMaturedSiacoinOutputs(pb)
 	if err != nil {
 		return err
 	}

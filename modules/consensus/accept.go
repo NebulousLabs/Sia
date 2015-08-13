@@ -90,6 +90,9 @@ func (cs *ConsensusSet) addBlockToTree(b types.Block) (revertedNodes, appliedNod
 	// When validating/accepting a block, the types height needs to be set to
 	// the height of the block that's being analyzed. After analysis is
 	// finished, the height needs to be set to the height of the current block.
+	//
+	// This is so that the Tax() logic correctly handles the hardfork that
+	// changes the tax from a float64 to a big.Rat during computation.
 	types.CurrentHeightLock.Lock()
 	types.CurrentHeight = parentNode.Height
 	types.CurrentHeightLock.Unlock()
@@ -147,7 +150,6 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 	if err != nil {
 		return err
 	}
-
 	if len(appliedNodes) > 0 {
 		cs.updateSubscribers(revertedNodes, appliedNodes)
 	}
@@ -158,15 +160,12 @@ func (cs *ConsensusSet) acceptBlock(b types.Block) error {
 		if len(appliedNodes) == 0 && len(revertedNodes) != 0 {
 			panic("appliedNodes and revertedNodes are mismatched!")
 		}
-
-		// After applying a block, the consensus set should be in a consistent
-		// state.
+		// Check that the general setup makes sense.
 		err = cs.checkConsistency()
 		if err != nil {
 			panic(err)
 		}
 	}
-
 	return nil
 }
 
