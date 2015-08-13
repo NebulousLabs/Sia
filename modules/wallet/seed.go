@@ -157,13 +157,12 @@ func (w *Wallet) createSeed(masterKey crypto.TwofishKey) (modules.Seed, error) {
 		return modules.Seed{}, err
 	}
 
-	// Create the unencrypted seed and integrate it into the wallet.
+	// Create the unencrypted seed.
 	var seed modules.Seed
 	_, err = rand.Read(seed[:])
 	if err != nil {
 		return modules.Seed{}, err
 	}
-	w.integrateSeed(seed)
 
 	// Encrypt the seed and save the seed file.
 	randomSuffix := persist.RandomSuffix()
@@ -196,7 +195,7 @@ func (w *Wallet) initAuxiliarySeeds(masterKey crypto.TwofishKey) error {
 		return err
 	}
 	for _, fileInfo := range filesInfo {
-		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) {
+		if strings.HasSuffix(fileInfo.Name(), seedFileSuffix) && fileInfo.Name() != w.settings.PrimarySeedFilename {
 			err = w.loadSeedFile(masterKey, fileInfo)
 			if err != nil {
 				w.log.Println("WARNING: loading seed", fileInfo.Name(), "returned an error:", err)
@@ -213,30 +212,16 @@ func (w *Wallet) nextPrimarySeedAddress() (types.UnlockConditions, error) {
 		return types.UnlockConditions{}, errLockedWallet
 	}
 
-	// Check that the seed has room for more addresses.
-	if w.settings.PrimarySeedProgress == modules.PublicKeysPerSeed {
-		return types.UnlockConditions{}, errAddressExhaustion
-	}
-
-	// Using the seed, determine the public key of the next address.
-	entropy := crypto.HashAll(w.primarySeed, w.settings.PrimarySeedProgress)
-	_, pk := crypto.DeterministicSignatureKeys(entropy)
-
-	// Increase the address usage.
+	// Integrate the next key into the wallet, and return the unlock
+	// conditions.
+	spendableKey := generateSpendableKey(w.primarySeed, w.settings.PrimarySeedProgress)
+	w.keys[spendableKey.unlockConditions.UnlockHash()] = spendableKey
 	w.settings.PrimarySeedProgress++
 	err := w.saveSettings()
 	if err != nil {
 		return types.UnlockConditions{}, err
 	}
-
-	uc := types.UnlockConditions{
-		PublicKeys: []types.SiaPublicKey{{
-			Algorithm: types.SignatureEd25519,
-			Key:       pk[:],
-		}},
-		SignaturesRequired: 1,
-	}
-	return uc, nil
+	return spendableKey.unlockConditions, nil
 }
 
 // NewPrimarySeed has the wallet create a new primary seed for the wallet,
