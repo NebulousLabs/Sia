@@ -261,11 +261,19 @@ func (db *setDB) lenBucket(bucket []byte) uint64 {
 	return s
 }
 
+func forEach(tx *bolt.Tx, bucket []byte, fn func(k, v []byte) error) error {
+	b := tx.Bucket(bucket)
+	if build.DEBUG && b == nil {
+		panic(errNilBucket)
+	}
+	return b.ForEach(fn)
+}
+
 // forEachItem runs a given function on every element in a given
 // bucket name, and will panic on any error
 func (db *setDB) forEachItem(bucket []byte, fn func(k, v []byte) error) {
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
+		b := tx.Bucket(bucket)
 		if build.DEBUG && b == nil {
 			panic(errNilBucket)
 		}
@@ -664,6 +672,23 @@ func (db *setDB) lenDelayedSiacoinOutputs() uint64 {
 func (db *setDB) lenDelayedSiacoinOutputsHeight(h types.BlockHeight) uint64 {
 	bucketID := append(prefix_dsco, encoding.Marshal(h)...)
 	return db.lenBucket(bucketID)
+}
+
+func forEachDSCO(tx *bolt.Tx, bh types.BlockHeight, fn func(id types.SiacoinOutputID, sco types.SiacoinOutput) error) error {
+	bucketID := append(prefix_dsco, encoding.Marshal(bh)...)
+	return forEach(tx, bucketID, func(kb, vb []byte) error {
+		var key types.SiacoinOutputID
+		var value types.SiacoinOutput
+		err := encoding.Unmarshal(kb, &key)
+		if err != nil {
+			return err
+		}
+		err = encoding.Unmarshal(vb, &value)
+		if err != nil {
+			return err
+		}
+		return fn(key, value)
+	})
 }
 
 // forEachDelayedSiacoinOutputsHeight applies a function to every siacoin output at a given height
